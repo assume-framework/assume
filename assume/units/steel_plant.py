@@ -8,13 +8,10 @@ from datetime import datetime
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
-    SolverStatus,
-    TerminationCondition,
     check_available_solvers,
 )
 
 from assume.common.base import SupportsMinMax
-from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import Forecaster
 from assume.units.dsm_load_shift import DSMFlex
 
@@ -45,7 +42,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
     """
 
     required_technologies = ["dri_plant", "eaf"]
-    optional_technologies = ["electrolyser", "hydrogen_storage", "dri_storage"]
+    optional_technologies = ["electrolyser", "hydrogen_buffer_storage", "dri_storage"]
 
     def __init__(
         self,
@@ -106,7 +103,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.cost_tolerance = cost_tolerance
 
         # Check for the presence of components
-        self.has_h2storage = "hydrogen_storage" in self.components.keys()
+        self.has_h2storage = "hydrogen_buffer_storage" in self.components.keys()
         self.has_dristorage = "dri_storage" in self.components.keys()
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
@@ -239,9 +236,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 if self.has_h2storage:
                     return (
                         self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        + self.model.dsm_blocks["hydrogen_storage"].discharge[t]
+                        + self.model.dsm_blocks["hydrogen_buffer_storage"].discharge[t]
                         == self.model.dsm_blocks["dri_plant"].hydrogen_in[t]
-                        + self.model.dsm_blocks["hydrogen_storage"].charge[t]
+                        + self.model.dsm_blocks["hydrogen_buffer_storage"].charge[t]
                     )
                 else:
                     return (
@@ -387,137 +384,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
         if self.opt_power_requirement is None and self.objective == "min_variable_cost":
             self.determine_optimal_operation_without_flex()
-
-    def determine_optimal_operation_without_flex(self):
-        """
-        Determines the optimal operation of the steel plant without considering flexibility.
-        """
-        # create an instance of the model
-        instance = self.model.create_instance()
-        # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
-        instance = self.switch_to_opt(instance)
-        # solve the instance
-        results = self.solver.solve(instance, options=self.solver_options)
-
-        # Check solver status and termination condition
-        if (results.solver.status == SolverStatus.ok) and (
-            results.solver.termination_condition == TerminationCondition.optimal
-        ):
-            logger.debug("The model was solved optimally.")
-
-            # Display the Objective Function Value
-            objective_value = instance.obj_rule_opt()
-            logger.debug("The value of the objective function is %s.", objective_value)
-
-        elif results.solver.termination_condition == TerminationCondition.infeasible:
-            logger.debug("The model is infeasible.")
-
-        else:
-            logger.debug("Solver Status: ", results.solver.status)
-            logger.debug(
-                "Termination Condition: ", results.solver.termination_condition
-            )
-
-        opt_power_requirement = [
-            pyo.value(instance.total_power_input[t]) for t in instance.time_steps
-        ]
-        self.opt_power_requirement = FastSeries(
-            index=self.index, value=opt_power_requirement
-        )
-
-        self.total_cost = sum(
-            instance.variable_cost[t].value for t in instance.time_steps
-        )
-
-        # Variable cost series
-        variable_cost = [
-            pyo.value(instance.variable_cost[t]) for t in instance.time_steps
-        ]
-        self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
-
-    def determine_optimal_operation_with_flex(self):
-        """
-        Determines the optimal operation of the steel plant without considering flexibility.
-        """
-        # create an instance of the model
-        instance = self.model.create_instance()
-        # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
-        instance = self.switch_to_flex(instance)
-        # solve the instance
-        results = self.solver.solve(instance, options=self.solver_options)
-
-        # Check solver status and termination condition
-        if (results.solver.status == SolverStatus.ok) and (
-            results.solver.termination_condition == TerminationCondition.optimal
-        ):
-            logger.debug("The model was solved optimally.")
-
-            # Display the Objective Function Value
-            objective_value = instance.obj_rule_flex()
-            logger.debug("The value of the objective function is %s.", objective_value)
-
-        elif results.solver.termination_condition == TerminationCondition.infeasible:
-            logger.debug("The model is infeasible.")
-
-        else:
-            logger.debug("Solver Status: ", results.solver.status)
-            logger.debug(
-                "Termination Condition: ", results.solver.termination_condition
-            )
-
-        flex_power_requirement = [
-            pyo.value(instance.total_power_input[t]) for t in instance.time_steps
-        ]
-        self.flex_power_requirement = FastSeries(
-            index=self.index, value=flex_power_requirement
-        )
-
-        # Variable cost series
-        flex_variable_cost = [
-            instance.variable_cost[t].value for t in instance.time_steps
-        ]
-        self.flex_variable_cost_series = FastSeries(
-            index=self.index, value=flex_variable_cost
-        )
-
-    def switch_to_opt(self, instance):
-        """
-        Switches the instance to solve a cost based optimisation problem by deactivating the flexibility constraints and objective.
-
-        Args:
-            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
-
-        Returns:
-            pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
-        """
-        # deactivate the flexibility constraints and objective
-        instance.obj_rule_flex.deactivate()
-
-        instance.total_cost_upper_limit.deactivate()
-        instance.total_power_input_constraint_with_flex.deactivate()
-
-        return instance
-
-    def switch_to_flex(self, instance):
-        """
-        Switches the instance to flexibility mode by deactivating few constraints and objective function.
-
-        Args:
-            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
-
-        Returns:
-            pyomo.ConcreteModel: The modified instance with optimal constraints and objective deactivated.
-        """
-        # deactivate the optimal constraints and objective
-        instance.obj_rule_opt.deactivate()
-        instance.total_power_input_constraint.deactivate()
-
-        # fix values of model.total_power_input
-        for t in instance.time_steps:
-            instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
-        instance.total_cost = self.total_cost
-
-        return instance
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """

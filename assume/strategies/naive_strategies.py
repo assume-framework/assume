@@ -142,7 +142,12 @@ class NaiveProfileStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDASteelplantStrategy(BaseStrategy):
+class NaiveDADSMStrategy(BaseStrategy):
+    """
+    A naive strategy of a Demand Side Management (DSM) unit. The bid volume is the optimal power requirement of
+    the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
+    """
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -176,7 +181,12 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         return bids
 
 
-class NaiveRedispatchSteelplantStrategy(BaseStrategy):
+class NaiveRedispatchDSMStrategy(BaseStrategy):
+    """
+    A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of the unit on the redispatch market.
+    The bid volume is the flexible power requirement of the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
+    """
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -205,135 +215,6 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                     "volume": -volume,
                 }
             )
-
-        return bids
-
-
-class NaivePosReserveStrategy(BaseStrategy):
-    """
-    A naive strategy that bids the ramp up volume on the positive reserve market (price = 0).
-
-    Args:
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def calculate_bids(
-        self,
-        unit: SupportsMinMax,
-        market_config: MarketConfig,
-        product_tuples: list[Product],
-        **kwargs,
-    ) -> Orderbook:
-        """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market.
-
-        Args:
-            unit (SupportsMinMax): The unit to be dispatched.
-            market_config (MarketConfig): The market configuration.
-            product_tuples (list[Product]): The list of all products the unit can offer.
-
-        Returns:
-            Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
-        """
-        start = product_tuples[0][0]
-        end_all = product_tuples[-1][1]
-        previous_power = unit.get_output_before(start)
-        _, max_power_values = unit.calculate_min_max_power(
-            start, end_all, market_config.product_type
-        )
-
-        bids = []
-        for product, max_power in zip(product_tuples, max_power_values):
-            start = product[0]
-            op_time = unit.get_operation_time(start)
-            current_power = unit.outputs["energy"].at[start]
-            volume = unit.calculate_ramp(
-                op_time, previous_power, max_power, current_power
-            )
-            price = 0
-            bids.append(
-                {
-                    "start_time": product[0],
-                    "end_time": product[1],
-                    "only_hours": product[2],
-                    "price": price,
-                    "volume": volume,
-                    "node": unit.node,
-                }
-            )
-            previous_power = volume + current_power
-
-        bids = self.remove_empty_bids(bids)
-
-        return bids
-
-
-class NaiveNegReserveStrategy(BaseStrategy):
-    """
-    A naive strategy that bids the ramp down volume on the negative reserve market (price = 0).
-
-    Args:
-        *args: Variable length argument list.
-        **kwargs: Arbitrary keyword arguments.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def calculate_bids(
-        self,
-        unit: SupportsMinMax,
-        market_config: MarketConfig,
-        product_tuples: list[Product],
-        **kwargs,
-    ) -> Orderbook:
-        """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market.
-
-        Args:
-            unit (SupportsMinMax): The unit to be dispatched.
-            market_config (MarketConfig): The market configuration.
-            product_tuples (list[Product]): The list of all products the unit can offer.
-
-        Returns:
-            Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
-        """
-        start = product_tuples[0][0]
-        end_all = product_tuples[-1][1]
-        previous_power = unit.get_output_before(start)
-        min_power_values, _ = unit.calculate_min_max_power(
-            start, end_all, market_config.product_type
-        )
-
-        bids = []
-        for product, min_power in zip(product_tuples, min_power_values):
-            start = product[0]
-            op_time = unit.get_operation_time(start)
-            previous_power = unit.get_output_before(start)
-            current_power = unit.outputs["energy"].at[start]
-            volume = unit.calculate_ramp(
-                op_time, previous_power, min_power, current_power
-            )
-            price = 0
-            bids.append(
-                {
-                    "start_time": start,
-                    "end_time": product[1],
-                    "only_hours": product[2],
-                    "price": price,
-                    "volume": volume,
-                    "node": unit.node,
-                }
-            )
-            previous_power = volume + current_power
-
-        bids = self.remove_empty_bids(bids)
 
         return bids
 
