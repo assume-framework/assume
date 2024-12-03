@@ -142,7 +142,12 @@ class NaiveProfileStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDASteelplantStrategy(BaseStrategy):
+class NaiveDADSMStrategy(BaseStrategy):
+    """
+    A naive strategy of a Demand Side Management (DSM) unit. The bid volume is the optimal power requirement of
+    the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
+    """
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -176,7 +181,12 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         return bids
 
 
-class NaiveRedispatchSteelplantStrategy(BaseStrategy):
+class NaiveRedispatchDSMStrategy(BaseStrategy):
+    """
+    A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of the unit on the redispatch market.
+    The bid volume is the flexible power requirement of the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
+    """
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
