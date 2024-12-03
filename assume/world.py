@@ -254,7 +254,10 @@ class World:
             # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
-            self.learning_role = Learning(self.learning_config)
+            self.learning_role = Learning(
+                self.learning_config, start=self.start, end=self.end
+            )
+
             # separate process does not support buffer and learning
             self.learning_agent_addr = addr(self.addr, "learning_agent")
             rl_agent = agent_composed_of(

@@ -878,7 +878,7 @@ def run_learning(
     # initialize policies already here to set the obs_dim and act_dim in the learning role
     actors_and_critics = None
     world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
-    world.output_role.del_similar_runs()
+    world.output_role.delete_similar_runs()
 
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
@@ -913,7 +913,6 @@ def run_learning(
         "avg_all_eval": [],
         "episodes_done": 0,
         "eval_episodes_done": 0,
-        "noise_scale": world.learning_config.get("noise_scale", 1.0),
     }
 
     # -----------------------------------------
