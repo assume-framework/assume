@@ -1049,6 +1049,9 @@ class StorageRLStrategy(AbstractLearningStrategy):
         upper_scaling_factor_price = self.max_market_price
         lower_scaling_factor_price = self.min_market_price
 
+        upper_scaling_factor_energy_cost = self.max_bid_price
+        lower_scaling_factor_energy_cost = 0
+
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
         if (
@@ -1106,8 +1109,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
         soc_scaled = min_max_scale(unit.outputs["soc"].at[start], 0, unit.max_soc)
         energy_cost_scaled = min_max_scale(
             unit.outputs["energy_cost"].at[start],
-            self.min_bid_price,
-            self.max_bid_price,
+            lower_scaling_factor_energy_cost,
+            upper_scaling_factor_energy_cost,
         )
 
         # concat all obsverations into one array
