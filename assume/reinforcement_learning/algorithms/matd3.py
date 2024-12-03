@@ -414,7 +414,8 @@ class TD3(RLAlgorithm):
                 [
                     self.learning_role.critics[u_id].optimizer,
                     self.learning_role.rl_strats[u_id].actor.optimizer,
-                ], learning_rate=learning_rate
+                ],
+                learning_rate=learning_rate,
             )
             unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
 

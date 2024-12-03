@@ -74,7 +74,9 @@ class RLAlgorithm:
         self.float_type = self.learning_role.float_type
 
     def update_learning_rate(
-        self, optimizers: list[th.optim.Optimizer] | th.optim.Optimizer, learning_rate: float
+        self,
+        optimizers: list[th.optim.Optimizer] | th.optim.Optimizer,
+        learning_rate: float,
     ) -> None:
         """
         Update the optimizers learning rate using the current learning rate schedule and the current progress remaining (from 1 to 0).
