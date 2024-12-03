@@ -7,6 +7,7 @@ base_case_2019:
   end_date: 2019-02-01 00:00
   time_step: 1h
   industrial_dsm_units: null
+  save_frequency_hours: 720
 
   markets_config:
     EOM:
@@ -31,6 +32,7 @@ dam_case_2019:
   end_date: 2019-02-01 00:00
   time_step: 1h
   industrial_dsm_units: null
+  save_frequency_hours: 720
 
   markets_config:
     EOM:
@@ -55,6 +57,7 @@ eom_crm_case_2019:
   end_date: 2019-02-01 00:00
   time_step: 1h
   industrial_dsm_units: null
+  save_frequency_hours: 720
 
   bidding_strategy_params:
     crm_foresight: 4h
@@ -116,6 +119,7 @@ base_case_2019_with_DSM:
   end_date: 2019-02-01 00:00
   time_step: 1h
   industrial_dsm_units: industrial_dsm_units.csv
+  save_frequency_hours: 720
 
   markets_config:
     EOM:

@@ -20,7 +20,7 @@ The method signature for the market_mechanism is given as::
 
 The :code:`market_mechanism` is called by the MarketRole, which is the agent that is responsible for the market.
 It is called with the :code:`market_agent` and the :code:`market_products`, which are the products that are traded in the current opening of the market.
-This gives maximum flexbility as it allows to access properties from the MarketRole directly.
+This gives maximum flexibility as it allows to access properties from the MarketRole directly.
 The :code:`market_mechanism` returns a list of accepted orders, a list of rejected orders and a list of meta information (for each tradable market product or trading zone, if needed).
 The meta information is used to store information about the clearing, e.g. the min and max price, the cleared demand volume and supply volume, as well as the information about the cleared product.
 
@@ -31,8 +31,6 @@ The available market mechanisms are the following:
 
 1. :py:meth:`assume.markets.clearing_algorithms.simple.PayAsClearRole`
 2. :py:meth:`assume.markets.clearing_algorithms.simple.PayAsBidRole`
-3. :py:meth:`assume.markets.clearing_algorithms.all_or_nothing.PayAsClearAonRole`
-4. :py:meth:`assume.markets.clearing_algorithms.all_or_nothing.PayAsBidAonRole`
 5. :py:meth:`assume.markets.clearing_algorithms.complex_clearing.ComplexClearingRole`
 6. :py:meth:`assume.markets.clearing_algorithms.complex_clearing_dmas.ComplexDmasClearingRole`
 7. :py:meth:`assume.markets.clearing_algorithms.redispatch.RedispatchMarketRole`
@@ -48,16 +46,8 @@ Where those two curves in a price over power plot meet, the market is cleared fo
 All supply orders with a price below and all demand orders above are accepted.
 Where the price is equal, only partial volume is accepted.
 
-The :code:`PayAsBidRole` cleares the market in the same manner as the pay-as-clear mechanism, but the accepted_price is
+The :code:`PayAsBidRole` clears the market in the same manner as the pay-as-clear mechanism, but the accepted_price is
 the price of the supply order for both the demand order and the supply orders that meet this demand.
-
-The :code:`PayAsClearAonRole` performs an electricity market clearing using a pay-as-clear mechanism
-where each bids volume needs an exactly matching order with the same volume.
-Partial clearing is not allowed here.
-This has the side effect, that the cleared price can be much higher if bids with different volume are accepted.
-
-The :code:`PayAsBidAonRole` performs an electricity market clearing using a pay-as-bid mechanism
-where each bids volume needs an exactly matching order with the same volume as in :code:`PayAsClearAonRole`.
 
 Complex clearing
 ^^^^^^^^^^^^^^^^
@@ -82,10 +72,10 @@ The minimum acceptance ratio constraint: :math:`\quad u_{b} \geq U_{b} \: x_{b} 
 
 with the minimum acceptance ratio :math:`U_{b}` defined for each bid b.
 
-The linked bid contraint, ensuring that the acceptance of child bids c is below the acceptance of their parent bids p
+The linked bid constraint, ensuring that the acceptance of child bids c is below the acceptance of their parent bids p
 is given by: :math:`\mathbf{a}_{c, p} \: u_c \leq u_{p} \quad \forall \: c, p \in \mathcal{B}`,
 
-with the incidence matrix :math:`\mathbf{a}_{c, p}` defining the linkes between bids as 1, if c is linked as child to p, 0 else.
+with the incidence matrix :math:`\mathbf{a}_{c, p}` defining the links between bids as 1, if c is linked as child to p, 0 else.
 
 Because with this algorithm, paradoxically accepted bids (PABs) can occur, the objective is solved in an iterative manner:
 

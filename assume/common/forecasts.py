@@ -7,6 +7,8 @@ import logging
 import numpy as np
 import pandas as pd
 
+from assume.common.fast_pandas import FastIndex, FastSeries
+
 
 class Forecaster:
     """
@@ -28,10 +30,10 @@ class Forecaster:
 
     """
 
-    def __init__(self, index: pd.Series):
+    def __init__(self, index: FastIndex):
         self.index = index
 
-    def __getitem__(self, column: str) -> pd.Series:
+    def __getitem__(self, column: str) -> FastSeries:
         """
         Returns the forecast for a given column.
 
@@ -39,13 +41,13 @@ class Forecaster:
             column (str): The column of the forecast.
 
         Returns:
-            pd.Series: The forecast.
+            FastSeries: The forecast.
 
         This method returns the forecast for a given column as a pandas Series based on the provided index.
         """
-        return pd.Series(0.0, self.index)
+        return FastSeries(value=0.0, index=self.index)
 
-    def get_availability(self, unit: str) -> pd.Series:
+    def get_availability(self, unit: str) -> FastSeries:
         """
         Returns the availability of a given unit as a pandas Series based on the provided index.
 
@@ -53,7 +55,7 @@ class Forecaster:
             unit (str): The unit.
 
         Returns:
-            pd.Series: The availability of the unit.
+            FastSeries: The availability of the unit.
 
         Example:
         >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
@@ -63,7 +65,7 @@ class Forecaster:
 
         return self[f"availability_{unit}"]
 
-    def get_price(self, fuel_type: str) -> pd.Series:
+    def get_price(self, fuel_type: str) -> FastSeries:
         """
         Returns the price for a given fuel type as a pandas Series or zeros if the type does
         not exist.
@@ -72,7 +74,7 @@ class Forecaster:
             fuel_type (str): The fuel type.
 
         Returns:
-            pd.Series: The price of the fuel.
+            FastSeries: The price of the fuel.
 
         Example:
             >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
@@ -108,9 +110,10 @@ class CsvForecaster(Forecaster):
     def __init__(
         self,
         index: pd.Series,
-        powerplants_units: dict[str, pd.Series] = {},
-        demand_units: dict[str, pd.Series] = {},
-        market_configs: dict[str, pd.Series] = {},
+        powerplants_units: pd.DataFrame,
+        demand_units: pd.DataFrame,
+        market_configs: dict = {},
+        save_path: str = "",
         *args,
         **kwargs,
     ):
@@ -120,8 +123,9 @@ class CsvForecaster(Forecaster):
         self.demand_units = demand_units
         self.market_configs = market_configs
         self.forecasts = pd.DataFrame(index=index)
+        self.save_path = save_path
 
-    def __getitem__(self, column: str) -> pd.Series:
+    def __getitem__(self, column: str) -> FastSeries:
         """
         Returns the forecast for a given column.
 
@@ -131,14 +135,19 @@ class CsvForecaster(Forecaster):
             column (str): The column of the forecast.
 
         Returns:
-            pd.Series: The forecast for the given column.
+            FastSeries: The forecast for the given column.
 
         """
 
-        if column not in self.forecasts.columns:
+        if column not in self.forecasts.keys():
             if "availability" in column:
-                return pd.Series(1, self.index)
-            return pd.Series(0.0, self.index)
+                self.forecasts[column] = FastSeries(
+                    value=1.0, index=self.index, name=column
+                )
+            else:
+                self.forecasts[column] = FastSeries(
+                    value=0.0, index=self.index, name=column
+                )
 
         return self.forecasts[column]
 
@@ -183,7 +192,7 @@ class CsvForecaster(Forecaster):
         Calculates the forecasts if they are not already calculated.
 
         This method calculates price forecast and residual load forecast for available markets, if
-        thise don't already exist.
+        these don't already exist.
         """
 
         cols = []
@@ -293,7 +302,7 @@ class CsvForecaster(Forecaster):
         # calculate infeed of renewables and residual demand_df
         # check if max_power is a series or a float
 
-        # select only those power plant units, which have a bidding strategy for the specifi market_id
+        # select only those power plant units, which have a bidding strategy for the specific market_id
         powerplants_units = self.powerplants_units[
             self.powerplants_units[f"bidding_{market_id}"].notnull()
         ]
@@ -371,7 +380,7 @@ class CsvForecaster(Forecaster):
 
         return marginal_cost
 
-    def save_forecasts(self, path):
+    def save_forecasts(self, path=None):
         """
         Saves the forecasts to a csv file located at the specified path.
 
@@ -382,12 +391,39 @@ class CsvForecaster(Forecaster):
             ValueError: If no forecasts are provided, an error message is logged.
         """
 
-        try:
-            self.forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
-        except ValueError:
-            self.logger.error(
-                f"No forecasts for {self.market_id} provided, so none saved."
-            )
+        path = path or self.save_path
+
+        merged_forecasts = pd.DataFrame(self.forecasts)
+        merged_forecasts.index = pd.date_range(
+            start=self.index[0], end=self.index[-1], freq=self.index.freq
+        )
+        merged_forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
+
+    def convert_forecasts_to_fast_series(self):
+        """
+        Converts all forecasts in self.forecasts (DataFrame) into FastSeries and saves them
+        in a dictionary. It also converts the self.index to a FastIndex.
+        """
+        # Convert index to FastIndex
+        inferred_freq = pd.infer_freq(self.index)
+        if inferred_freq is None:
+            raise ValueError("Frequency could not be inferred from the index.")
+
+        self.index = FastIndex(
+            start=self.index[0], end=self.index[-1], freq=inferred_freq
+        )
+
+        # Initialize an empty dictionary to store FastSeries
+        fast_forecasts = {}
+
+        # Convert each column in the forecasts DataFrame to a FastSeries
+        for column_name in self.forecasts.columns:
+            # Convert each column in self.forecasts to FastSeries
+            forecast_series = self.forecasts[column_name]
+            fast_forecasts[column_name] = FastSeries.from_pandas_series(forecast_series)
+
+        # Replace the DataFrame with the dictionary of FastSeries
+        self.forecasts = fast_forecasts
 
 
 class RandomForecaster(CsvForecaster):
@@ -398,12 +434,12 @@ class RandomForecaster(CsvForecaster):
 
     Attributes:
         index (pandas.Series): The index of the forecasts.
-        powerplants_units (dict[str, pandas.Series]): The power plants.
+        powerplants_units (pandas.DataFrame): The power plants.
         sigma (float): The standard deviation of the noise.
 
     Args:
         index (pandas.Series): The index of the forecasts.
-        powerplants_units (dict[str, pandas.Series]): The power plants.
+        powerplants_units (pandas.DataFrame): The power plants.
         sigma (float): The standard deviation of the noise.
 
     Example:
@@ -416,15 +452,21 @@ class RandomForecaster(CsvForecaster):
     def __init__(
         self,
         index: pd.Series,
-        powerplants_units: dict[str, pd.Series] = {},
+        powerplants_units: pd.DataFrame,
+        demand_units: pd.DataFrame,
+        market_configs: dict = {},
         sigma: float = 0.02,
         *args,
         **kwargs,
     ):
-        self.sigma = sigma
-        super().__init__(index, powerplants_units, *args, **kwargs)
+        super().__init__(
+            index, powerplants_units, demand_units, market_configs, *args, **kwargs
+        )
 
-    def __getitem__(self, column: str) -> pd.Series:
+        self.index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
+        self.sigma = sigma
+
+    def __getitem__(self, column: str) -> FastSeries:
         """
         Retrieves forecasted values modified by random noise.
 
@@ -436,14 +478,15 @@ class RandomForecaster(CsvForecaster):
             column (str): The column of the forecast.
 
         Returns:
-            pd.Series: The forecast modified by random noise.
+            FastSeries: The forecast modified by random noise.
 
         """
 
         if column not in self.forecasts.columns:
-            return pd.Series(0.0, self.index)
+            return FastSeries(value=0.0, index=self.index)
         noise = np.random.normal(0, self.sigma, len(self.index))
-        return self.forecasts[column] * noise
+        forecast_data = self.forecasts[column].values * noise
+        return FastSeries(index=self.index, value=forecast_data)
 
 
 class NaiveForecast(Forecaster):
@@ -494,13 +537,22 @@ class NaiveForecast(Forecaster):
         **kwargs,
     ):
         super().__init__(index)
-        self.fuel_price = fuel_price
-        self.availability = availability
-        self.co2_price = co2_price
-        self.demand = demand
-        self.price_forecast = price_forecast
+        self.index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
 
-    def __getitem__(self, column: str) -> pd.Series:
+        # Convert attributes to FastSeries if they are not already Series
+        self.fuel_price = FastSeries(
+            index=self.index, value=fuel_price, name="fuel_price"
+        )
+        self.availability = FastSeries(
+            index=self.index, value=availability, name="availability"
+        )
+        self.co2_price = FastSeries(index=self.index, value=co2_price, name="co2_price")
+        self.demand = FastSeries(index=self.index, value=demand, name="demand")
+        self.price_forecast = FastSeries(
+            index=self.index, value=price_forecast, name="price_forecast"
+        )
+
+    def __getitem__(self, column: str) -> FastSeries:
         """
         Retrieves forecasted values.
 
@@ -513,22 +565,19 @@ class NaiveForecast(Forecaster):
             column (str): The column for which forecasted values are requested.
 
         Returns:
-            pd.Series: The forecasted values for the specified column.
+            FastSeries: The forecasted values for the specified column.
 
         """
 
         if "availability" in column:
-            value = self.availability
+            return self.availability
         elif column == "fuel_price_co2":
-            value = self.co2_price
+            return self.co2_price
         elif "fuel_price" in column:
-            value = self.fuel_price
+            return self.fuel_price
         elif "demand" in column:
-            value = self.demand
+            return self.demand
         elif column == "price_EOM":
-            value = self.price_forecast
+            return self.price_forecast
         else:
-            value = 0
-        if isinstance(value, pd.Series):
-            value.index = self.index
-        return pd.Series(value, self.index)
+            return FastSeries(value=0.0, index=self.index)

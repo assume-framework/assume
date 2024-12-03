@@ -135,6 +135,7 @@ def add_agent_to_world(
     base_path: str,
     markups: dict = {},
     supports: dict = {},
+    index: pd.DatetimeIndex = None,
 ):
     """
     Adds an agent from a amiris agent definition to the ASSUME world.
@@ -154,7 +155,7 @@ def add_agent_to_world(
     match agent["Type"]:
         case "SupportPolicy":
             support_data = agent["Attributes"]["SetSupportData"]
-            supports |= {x.pop("Set"): x for x in support_data}
+            supports |= {x.pop("PolicySet"): x for x in support_data}
             world.add_unit_operator(agent["Id"])
 
             for name, support in supports.items():
@@ -175,7 +176,7 @@ def add_agent_to_world(
                         "technology": "demand",
                         "price": value,
                     },
-                    NaiveForecast(world.index, demand=100000),
+                    NaiveForecast(index, demand=100000),
                 )
         case "EnergyExchange" | "DayAheadMarketSingleZone":
             clearing_section = agent["Attributes"].get("Clearing", agent["Attributes"])
@@ -223,7 +224,7 @@ def add_agent_to_world(
             co2_price = agent["Attributes"]["Co2Prices"]
             if isinstance(co2_price, str):
                 price_series = read_csv(base_path, co2_price)
-                co2_price = price_series.reindex(world.index).ffill().fillna(0)
+                co2_price = price_series.reindex(index).ffill().fillna(0)
             prices["co2"] = co2_price
         case "FuelsMarket":
             # fill prices for forecaster
@@ -235,7 +236,7 @@ def add_agent_to_world(
                     price_series.index = price_series.index.round("h")
                     if not price_series.index.is_unique:
                         price_series = price_series.groupby(level=0).last()
-                    price = price_series.reindex(world.index).ffill()
+                    price = price_series.reindex(index).ffill()
                 prices[fuel_type] = price * fuel["ConversionFactor"]
         case "DemandTrader":
             world.add_unit_operator(agent["Id"])
@@ -253,7 +254,7 @@ def add_agent_to_world(
                         "technology": "demand",
                         "price": load["ValueOfLostLoad"],
                     },
-                    NaiveForecast(world.index, demand=demand_series),
+                    NaiveForecast(index, demand=demand_series),
                 )
 
         case "StorageTrader":
@@ -270,7 +271,7 @@ def add_agent_to_world(
             forecast_price = prices.get("co2", 20)
             # TODO forecast should be calculated using calculate_EOM_price_forecast
             forecast = NaiveForecast(
-                world.index,
+                index,
                 availability=1,
                 co2_price=prices.get("co2", 2),
                 # price_forecast is used for price_EOM
@@ -336,11 +337,11 @@ def add_agent_to_world(
             availability = prototype["PlannedAvailability"]
             if isinstance(availability, str):
                 availability = read_csv(base_path, availability)
-                availability = availability.reindex(world.index).ffill()
+                availability = availability.reindex(index).ffill()
             availability *= prototype.get("UnplannedAvailabilityFactor", 1)
 
             forecast = NaiveForecast(
-                world.index,
+                index,
                 availability=availability,
                 fuel_price=fuel_price,
                 co2_price=prices.get("co2", 2),
@@ -387,7 +388,7 @@ def add_agent_to_world(
             max_power = attr["InstalledPowerInMW"]
             if isinstance(availability, str):
                 dispatch_profile = read_csv(base_path, availability)
-                availability = dispatch_profile.reindex(world.index).ffill().fillna(0)
+                availability = dispatch_profile.reindex(index).ffill().fillna(0)
 
                 if availability.max() > 1:
                     scale_value = availability.max()
@@ -398,7 +399,7 @@ def add_agent_to_world(
             fuel_price = prices.get(translate_fuel_type[attr["EnergyCarrier"]], 0)
             fuel_price += attr.get("OpexVarInEURperMWH", 0)
             forecast = NaiveForecast(
-                world.index,
+                index,
                 availability=availability,
                 fuel_price=fuel_price,
                 co2_price=prices.get("co2", 0),
@@ -458,7 +459,7 @@ def load_amiris(
     """
     Loads an Amiris scenario.
     Markups and markdowns are handled by linearly interpolating the agents volume.
-    This mimicks the behavior of the way it is done in AMIRIS.
+    This mimics the behavior of the way it is done in AMIRIS.
 
     Args:
         world (World): the ASSUME world
@@ -479,16 +480,13 @@ def load_amiris(
     start += timedelta(minutes=2)
     end += timedelta(minutes=2)
     sim_id = f"{scenario}_{study_case}"
-    save_interval = amiris_scenario["GeneralProperties"]["Output"]["Interval"]
     prices = {}
     index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
     world.bidding_strategies["support"] = SupportStrategy
     world.setup(
         start=start,
         end=end,
-        save_frequency_hours=save_interval,
         simulation_id=sim_id,
-        index=index,
     )
     # helper dict to map trader markups/markdowns to powerplants
     markups = {}
@@ -523,6 +521,7 @@ def load_amiris(
             base_path,
             markups,
             supports,
+            index,
         )
     # calculate market price before simulation
     world

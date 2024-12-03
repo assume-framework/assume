@@ -39,12 +39,14 @@ class NaiveSingleBidStrategy(BaseStrategy):
             start
         )  # power output of the unit before the start time of the first product
         op_time = unit.get_operation_time(start)
-        min_power, max_power = unit.calculate_min_max_power(
+        min_power_values, max_power_values = unit.calculate_min_max_power(
             start, end_all
         )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
         bids = []
-        for product in product_tuples:
+        for product, min_power, max_power in zip(
+            product_tuples, min_power_values, max_power_values
+        ):
             # for each product, calculate the marginal cost of the unit at the start time of the product
             # and the volume of the product. Dispatch the order to the market.
             start = product[0]
@@ -55,11 +57,11 @@ class NaiveSingleBidStrategy(BaseStrategy):
                 start, previous_power
             )  # calculation of the marginal costs
             volume = unit.calculate_ramp(
-                op_time, previous_power, max_power[start], current_power
+                op_time, previous_power, max_power, current_power
             )
             bids.append(
                 {
-                    "start_time": product[0],
+                    "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
                     "price": marginal_cost,
@@ -70,9 +72,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
 
             if "node" in market_config.additional_fields:
                 bids[-1]["max_power"] = unit.max_power if volume > 0 else unit.min_power
-                bids[-1]["min_power"] = (
-                    min_power[start] if volume > 0 else unit.max_power
-                )
+                bids[-1]["min_power"] = min_power if volume > 0 else unit.max_power
 
             previous_power = volume + current_power
             if previous_power > 0:
@@ -115,12 +115,14 @@ class NaiveProfileStrategy(BaseStrategy):
         end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
         op_time = unit.get_operation_time(start)
-        min_power, max_power = unit.calculate_min_max_power(start, end_all)
+        _, max_power = unit.calculate_min_max_power(start, end_all)
 
         current_power = unit.outputs["energy"].at[start]
         marginal_cost = unit.calculate_marginal_cost(start, previous_power)
+
+        # calculate the ramp up volume using the initial maximum power
         volume = unit.calculate_ramp(
-            op_time, previous_power, max_power[start], current_power
+            op_time, previous_power, max_power[0], current_power
         )
 
         profile = {product[0]: volume for product in product_tuples}
@@ -140,7 +142,12 @@ class NaiveProfileStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDASteelplantStrategy(BaseStrategy):
+class NaiveDADSMStrategy(BaseStrategy):
+    """
+    A naive strategy of a Demand Side Management (DSM) unit. The bid volume is the optimal power requirement of
+    the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
+    """
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -159,11 +166,11 @@ class NaiveDASteelplantStrategy(BaseStrategy):
             """
             start = product[0]
 
-            volume = unit.opt_power_requirement.loc[start]
+            volume = unit.opt_power_requirement.at[start]
             marginal_price = unit.calculate_marginal_cost(start, volume)
             bids.append(
                 {
-                    "start_time": product[0],
+                    "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
                     "price": marginal_price,
@@ -174,6 +181,7 @@ class NaiveDASteelplantStrategy(BaseStrategy):
         return bids
 
 
+<<<<<<< HEAD
 class NaivePosReserveStrategy(BaseStrategy):
     """
     A naive strategy that bids the ramp up volume on the positive reserve market (price = 0).
@@ -186,6 +194,14 @@ class NaivePosReserveStrategy(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+=======
+class NaiveRedispatchDSMStrategy(BaseStrategy):
+    """
+    A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of the unit on the redispatch market.
+    The bid volume is the flexible power requirement of the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
+    """
+
+>>>>>>> 44fb0fce3e67d02550d66c7c67b89c2a2b5c5920
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -193,6 +209,7 @@ class NaivePosReserveStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+<<<<<<< HEAD
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market.
@@ -299,6 +316,29 @@ class NaiveNegReserveStrategy(BaseStrategy):
             previous_power = volume + current_power
 
         bids = self.remove_empty_bids(bids)
+=======
+        # calculate the optimal operation of the unit according to the objective function
+        unit.calculate_optimal_operation_if_needed()
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            volume = unit.flex_power_requirement.at[start]
+            marginal_price = unit.calculate_marginal_cost(start, volume)
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": marginal_price,
+                    "volume": -volume,
+                }
+            )
+>>>>>>> 44fb0fce3e67d02550d66c7c67b89c2a2b5c5920
 
         return bids
 
@@ -307,7 +347,7 @@ class NaiveRedispatchStrategy(BaseStrategy):
     """
     A naive strategy that simply submits all information about the unit and
     currently dispatched power for the following hours to the redispatch market.
-    Information incldes the marginal cost, the ramp up and down values, and the dispatch.
+    Information includes the marginal cost, the ramp up and down values, and the dispatch.
 
     """
 

@@ -175,7 +175,7 @@ class RedispatchMarketRole(MarketRole):
         # run linear powerflow
         redispatch_network.lpf()
 
-        # check lines for congestion where power flow is larget than s_nom
+        # check lines for congestion where power flow is larger than s_nom
         line_loading = (
             redispatch_network.lines_t.p0.abs() / redispatch_network.lines.s_nom
         )
@@ -188,6 +188,9 @@ class RedispatchMarketRole(MarketRole):
                 status, termination_condition = redispatch_network.optimize(
                     solver_name=self.solver,
                     solver_options=self.solver_options,
+                    # do not show tqdm progress bars for large grids
+                    # https://github.com/PyPSA/linopy/pull/375
+                    progress=False,
                 )
 
             if status != "ok":

@@ -457,7 +457,7 @@ class MarketRole(MarketMechanism, Role):
             ),
             receiver_addr=agent_addr,
         )
-        logger.debug(f"Sent registration reply to agent '{agent_addr}': {msg}")
+        logger.debug("Sent registration reply to agent '%s': %s", agent_addr, msg)
 
     def handle_orderbook(self, content: OrderBookMessage, meta: MetaDict):
         """
@@ -536,7 +536,7 @@ class MarketRole(MarketMechanism, Role):
 
             data = pd.DataFrame(self.results)
             data.index = data["time"]
-            data = data[metric_type][start:end]
+            data = data[metric_type].loc[start:end]
         except Exception:
             logger.exception("Error handling data request")
 
@@ -590,7 +590,7 @@ class MarketRole(MarketMechanism, Role):
                 },
                 receiver_addr=agent_addr,
             )
-            logger.debug(f"Sent unmatched orders to agent '{agent_addr}'.")
+            logger.debug("Sent unmatched orders to agent '%s'.", agent_addr)
 
         except KeyError as ke:
             logger.error(f"Missing key in meta data: {ke}")
@@ -683,7 +683,7 @@ class MarketRole(MarketMechanism, Role):
 
         await self.store_market_results(market_meta)
 
-        if flows and len(flows) > 0:
+        if flows is not None and len(flows) > 0:
             await self.store_flows(flows)
 
         return accepted_orderbook, market_meta
@@ -702,7 +702,7 @@ class MarketRole(MarketMechanism, Role):
         if db_addr:
             message = {
                 "context": "write_results",
-                "type": "store_order_book",
+                "type": "market_orders",
                 "market_id": self.marketconfig.market_id,
                 "data": orderbook,
             }
@@ -724,7 +724,7 @@ class MarketRole(MarketMechanism, Role):
         if db_addr:
             message = {
                 "context": "write_results",
-                "type": "store_market_results",
+                "type": "market_meta",
                 "market_id": self.marketconfig.market_id,
                 "data": market_meta,
             }
@@ -746,7 +746,7 @@ class MarketRole(MarketMechanism, Role):
         if db_addr:
             message = {
                 "context": "write_results",
-                "type": "store_flows",
+                "type": "grid_flows",
                 "market_id": self.marketconfig.market_id,
                 "data": flows,
             }

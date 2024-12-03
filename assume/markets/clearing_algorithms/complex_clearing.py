@@ -243,7 +243,10 @@ def market_clearing_opt(
 
         for bid_id in instance.Bids:
             # Fix the binary variable to its value
-            instance.x[bid_id].fix(instance.x[bid_id].value)
+            value = instance.x[bid_id].value
+            if value is not None:
+                value = 1 if value >= 0.99 else 0
+            instance.x[bid_id].fix(value)
             # Change the domain to Reals (or appropriate continuous domain)
             instance.x[bid_id].domain = pyo.Reals
 

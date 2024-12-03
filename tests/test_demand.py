@@ -26,21 +26,20 @@ def test_demand():
         datetime(2023, 7, 1, hour=2),
         None,
     )
-    ff = NaiveForecast(index, demand=150)
+    forecaster = NaiveForecast(index, demand=150)
     dem = Demand(
-        "demand_test01",
-        "UO1",
-        "energy",
-        strategies,
-        index,
-        150,
-        0,
-        forecaster=ff,
+        id="demand",
+        unit_operator="UO1",
+        technology="energy",
+        bidding_strategies=strategies,
+        max_power=150,
+        min_power=0,
+        forecaster=forecaster,
         price=2000,
     )
     start = product_tuple[0]
     end = product_tuple[1]
-    min_power, max_power = dem.calculate_min_max_power(start, end)
+    _, max_power = dem.calculate_min_max_power(start, end)
 
     assert max_power.max() == -150
     assert dem.calculate_marginal_cost(start, max_power.max()) == 2000
@@ -82,21 +81,20 @@ def test_demand_series():
     price = pd.Series(1000, index=index)
     price.iloc[1] = 0
 
-    ff = NaiveForecast(index, demand=demand)
+    forecaster = NaiveForecast(index, demand=demand)
     dem = Demand(
-        "demand_test02",
-        "UO1",
-        "energy",
-        strategies,
-        index,
-        150,
-        0,
-        forecaster=ff,
+        id="demand",
+        unit_operator="UO1",
+        technology="energy",
+        bidding_strategies=strategies,
+        max_power=150,
+        min_power=0,
+        forecaster=forecaster,
         price=price,
     )
     start = product_tuple[0]
     end = product_tuple[1]
-    min_power, max_power = dem.calculate_min_max_power(start, end)
+    _, max_power = dem.calculate_min_max_power(start, end)
 
     # power should be the highest demand which is used throughout the period
     # in our case 80 MW

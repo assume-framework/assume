@@ -82,13 +82,13 @@ ASSUME uses `argcomplete` for argument completion on the CLI.
 
 On Windows, one needs to run:
 
-`register-python-argcomplete --shell powershell assume | Out-String | Invoke-Expression`
+    register-python-argcomplete --shell powershell assume | Out-String | Invoke-Expression
 
 in the used conda environment, to install tab completions.
 
 On Bash or zsh (Linux and Mac) run the following in the correct conda environment with assume and argcomplete installed:
 
-`eval "$(register-python-argcomplete assume)"`
+    eval "$(register-python-argcomplete assume)"
 
 
 Install using Docker
@@ -122,7 +122,7 @@ Follow these steps:
 
 This will launch a container for TimescaleDB and Grafana with
 preconfigured dashboards for analysis. You can access the Grafana
-dashboards at `http://localhost:3000`. Here are some exampels of the general grafana dashboard.
+dashboards at `http://localhost:3000`. Here are some examples of the general grafana dashboard.
 
 .. image:: ./img/Grafana_General.png
    :width: 100%
