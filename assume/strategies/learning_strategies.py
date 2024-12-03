@@ -12,7 +12,10 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
-from assume.reinforcement_learning.learning_utils import NormalActionNoise, min_max_scale
+from assume.reinforcement_learning.learning_utils import (
+    NormalActionNoise,
+    min_max_scale,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -405,13 +408,12 @@ class RLStrategy(AbstractLearningStrategy):
         self.min_market_price = min(unit.forecaster[f"price_{market_id}"])
         self.max_residual = max(unit.forecaster[f"residualy_load_{market_id}"])
         self.min_residual = min(unit.forecaster[f"residual_load_{market_id}"])
-        
+
         # scaling factors for the observations
         upper_scaling_factor_res_load = self.max_residual
         lower_scaling_factor_res_load = self.min_residual
         upper_scaling_factor_price = self.max_market_price
         lower_scaling_factor_price = self.min_market_price
-
 
         # total dispatch and marginal cost
         upper_scaling_factor_total_dispatch = unit.max_power
@@ -429,12 +431,10 @@ class RLStrategy(AbstractLearningStrategy):
             end_excl + forecast_len
             > unit.forecaster[f"residual_load_{market_id}"].index[-1]
         ):
-            scaled_res_load_forecast = (
-                min_max_scale(
-                unit.forecaster[f"residual_load_{market_id}"].loc[start:]
-                , lower_scaling_factor_res_load
-                , upper_scaling_factor_res_load
-                )
+            scaled_res_load_forecast = min_max_scale(
+                unit.forecaster[f"residual_load_{market_id}"].loc[start:],
+                lower_scaling_factor_res_load,
+                upper_scaling_factor_res_load,
             )
             scaled_res_load_forecast = np.concatenate(
                 [
@@ -446,24 +446,19 @@ class RLStrategy(AbstractLearningStrategy):
             )
 
         else:
-            scaled_res_load_forecast = (
-                min_max_scale(
+            scaled_res_load_forecast = min_max_scale(
                 unit.forecaster[f"residual_load_{market_id}"].loc[
                     start : end_excl + forecast_len
-                ]
-                , lower_scaling_factor_res_load
-                , upper_scaling_factor_res_load
-                )
-                
+                ],
+                lower_scaling_factor_res_load,
+                upper_scaling_factor_res_load,
             )
 
         if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
-            scaled_price_forecast = (
-                min_max_scale(
-                unit.forecaster[f"price_{market_id}"].loc[start:]
-                , lower_scaling_factor_price
-                , upper_scaling_factor_price
-                )
+            scaled_price_forecast = min_max_scale(
+                unit.forecaster[f"price_{market_id}"].loc[start:],
+                lower_scaling_factor_price,
+                upper_scaling_factor_price,
             )
             scaled_price_forecast = np.concatenate(
                 [
@@ -475,14 +470,12 @@ class RLStrategy(AbstractLearningStrategy):
             )
 
         else:
-            scaled_price_forecast = (
-                min_max_scale(
+            scaled_price_forecast = min_max_scale(
                 unit.forecaster[f"price_{market_id}"].loc[
                     start : end_excl + forecast_len
-                ]
-                , lower_scaling_factor_price
-                , upper_scaling_factor_price
-                )
+                ],
+                lower_scaling_factor_price,
+                upper_scaling_factor_price,
             )
 
         # get last accepted bid volume and the current marginal costs of the unit
@@ -491,15 +484,15 @@ class RLStrategy(AbstractLearningStrategy):
 
         # scale unit outputs
         scaled_total_dispatch = min_max_scale(
-            current_volume
-            , lower_scaling_factor_total_dispatch
-            , upper_scaling_factor_total_dispatch
-            )
+            current_volume,
+            lower_scaling_factor_total_dispatch,
+            upper_scaling_factor_total_dispatch,
+        )
         scaled_marginal_cost = min_max_scale(
-            current_costs
-            , lower_scaling_factor_marginal_cost
-            , upper_scaling_factor_marginal_cost
-            )
+            current_costs,
+            lower_scaling_factor_marginal_cost,
+            upper_scaling_factor_marginal_cost,
+        )
 
         # concat all obsverations into one array
         observation = np.concatenate(
@@ -1050,7 +1043,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         self.min_market_price = min(unit.forecaster[f"price_{market_id}"])
         self.max_residual = max(unit.forecaster[f"residualy_load_{market_id}"])
         self.min_residual = min(unit.forecaster[f"residual_load_{market_id}"])
-        
+
         upper_scaling_factor_res_load = self.max_residual
         lower_scaling_factor_res_load = self.min_residual
         upper_scaling_factor_price = self.max_market_price
@@ -1062,12 +1055,10 @@ class StorageRLStrategy(AbstractLearningStrategy):
             end_excl + forecast_len
             > unit.forecaster[f"residual_load_{market_id}"].index[-1]
         ):
-            scaled_res_load_forecast = (
-                min_max_scale(
-                unit.forecaster[f"residual_load_{market_id}"].loc[start:]
-                , lower_scaling_factor_res_load
-                , upper_scaling_factor_res_load
-                )
+            scaled_res_load_forecast = min_max_scale(
+                unit.forecaster[f"residual_load_{market_id}"].loc[start:],
+                lower_scaling_factor_res_load,
+                upper_scaling_factor_res_load,
             )
             scaled_res_load_forecast = np.concatenate(
                 [
@@ -1079,23 +1070,19 @@ class StorageRLStrategy(AbstractLearningStrategy):
             )
 
         else:
-            scaled_res_load_forecast = (
-                min_max_scale(
+            scaled_res_load_forecast = min_max_scale(
                 unit.forecaster[f"residual_load_{market_id}"].loc[
                     start : end_excl + forecast_len
-                ]
-                , lower_scaling_factor_res_load
-                , upper_scaling_factor_res_load
-                )
+                ],
+                lower_scaling_factor_res_load,
+                upper_scaling_factor_res_load,
             )
 
         if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
-            scaled_price_forecast = (
-                min_max_scale(
-                unit.forecaster[f"price_{market_id}"].loc[start:]
-                , lower_scaling_factor_price
-                , upper_scaling_factor_price
-                )
+            scaled_price_forecast = min_max_scale(
+                unit.forecaster[f"price_{market_id}"].loc[start:],
+                lower_scaling_factor_price,
+                upper_scaling_factor_price,
             )
             scaled_price_forecast = np.concatenate(
                 [
@@ -1107,27 +1094,21 @@ class StorageRLStrategy(AbstractLearningStrategy):
             )
 
         else:
-            scaled_price_forecast = (
-                min_max_scale(
+            scaled_price_forecast = min_max_scale(
                 unit.forecaster[f"price_{market_id}"].loc[
                     start : end_excl + forecast_len
-                ]
-                , lower_scaling_factor_price
-                , upper_scaling_factor_price
-                )
+                ],
+                lower_scaling_factor_price,
+                upper_scaling_factor_price,
             )
 
         # get the current soc value
-        soc_scaled = min_max_scale(
-            unit.outputs["soc"].at[start]
-            , 0 
-            , unit.max_soc
-            )
+        soc_scaled = min_max_scale(unit.outputs["soc"].at[start], 0, unit.max_soc)
         energy_cost_scaled = min_max_scale(
-            unit.outputs["energy_cost"].at[start]
-            ,self.min_bid_price 
-            , self.max_bid_price
-            )
+            unit.outputs["energy_cost"].at[start],
+            self.min_bid_price,
+            self.max_bid_price,
+        )
 
         # concat all obsverations into one array
         observation = np.concatenate(

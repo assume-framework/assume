@@ -108,7 +108,7 @@ class ReplayBuffer:
 
         Args:
             array (numpy.ndarray): The numpy array to convert.
-            copy (bool, optional): Whether to copy the data or not 
+            copy (bool, optional): Whether to copy the data or not
                 (may be useful to avoid changing things by reference). Defaults to True.
 
         Returns:
