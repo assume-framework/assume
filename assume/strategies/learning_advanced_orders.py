@@ -275,6 +275,10 @@ class RLAdvancedOrderStrategy(RLStrategy):
         self.max_residual = max(unit.forecaster[f"residualy_load_{market_id}"])
         self.min_residual = min(unit.forecaster[f"residual_load_{market_id}"])
 
+        # residual load forecast
+        upper_scaling_factor_res_load = self.max_residual
+        lower_scaling_factor_res_load = self.min_residual
+        
         # price forecast
         upper_scaling_factor_price = self.max_market_price
         lower_scaling_factor_price = self.min_market_price
