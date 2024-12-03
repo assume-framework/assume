@@ -74,7 +74,7 @@ class RLAlgorithm:
         self.float_type = self.learning_role.float_type
 
     def update_learning_rate(
-        self, optimizers: list[th.optim.Optimizer] | th.optim.Optimizer
+        self, optimizers: list[th.optim.Optimizer] | th.optim.Optimizer, learning_rate: float
     ) -> None:
         """
         Update the optimizers learning rate using the current learning rate schedule and the current progress remaining (from 1 to 0).
@@ -88,9 +88,6 @@ class RLAlgorithm:
             - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L68
 
         """
-        learning_rate = self.learning_role.calc_lr_from_progress(
-            self.learning_role.get_progress_remaining()
-        )
 
         if not isinstance(optimizers, list):
             optimizers = [optimizers]

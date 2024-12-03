@@ -404,13 +404,17 @@ class TD3(RLAlgorithm):
             self.learning_role.get_progress_remaining()
         )
 
+        learning_rate = self.learning_role.calc_lr_from_progress(
+            self.learning_role.get_progress_remaining()
+        )
+
         # loop again over all units to avoid update call for every gradient step, as it will be ambiguous
         for u_id, unit_strategy in self.learning_role.rl_strats.items():
             self.update_learning_rate(
                 [
                     self.learning_role.critics[u_id].optimizer,
                     self.learning_role.rl_strats[u_id].actor.optimizer,
-                ]
+                ], learning_rate=learning_rate
             )
             unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
 
