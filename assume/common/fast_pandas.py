@@ -131,9 +131,7 @@ class FastIndex:
             if not sliced_dates:
                 return []
 
-            return FastIndex(
-                start=sliced_dates[0], end=sliced_dates[-1], freq=self._freq
-            )
+            return sliced_dates
 
         else:
             raise TypeError("Index must be an integer or a slice")
@@ -184,7 +182,7 @@ class FastIndex:
         """Return an informal string representation of the FastIndex."""
         return self.__repr__()
 
-    @lru_cache(maxsize=100)
+    @lru_cache(maxsize=1000)
     def get_date_list(
         self, start: datetime | None = None, end: datetime | None = None
     ) -> list[datetime]:
@@ -312,8 +310,6 @@ class FastSeries:
 
         self._index = index
         self._name = name
-        self.loc = self  # Allow adjusting loc as well
-        self.at = self
 
         count = len(self.index)  # Use index length directly
         self._data = (
@@ -385,6 +381,16 @@ class FastSeries:
         return self.data.dtype
 
     @property
+    def loc(self):
+        """
+        Label-based indexing property.
+
+        Returns:
+            FastSeriesLocIndexer: Indexer for label-based access.
+        """
+        return FastSeriesLocIndexer(self)
+
+    @property
     def iloc(self):
         """
         Integer-based indexing property.
@@ -393,6 +399,16 @@ class FastSeries:
             FastSeriesILocIndexer: Indexer for integer-based access.
         """
         return FastSeriesILocIndexer(self)
+
+    @property
+    def at(self):
+        """
+        Label-based single-item access property.
+
+        Returns:
+            FastSeriesAtIndexer: Indexer for label-based single-element access.
+        """
+        return FastSeriesAtIndexer(self)
 
     @property
     def iat(self):
@@ -976,6 +992,39 @@ class FastSeries:
         return result
 
 
+class FastSeriesLocIndexer:
+    def __init__(self, series: FastSeries):
+        self._series = series
+
+    def __getitem__(
+        self, item: datetime | slice | list | pd.Index | pd.Series | np.ndarray | str
+    ):
+        """
+        Retrieve item(s) using label-based indexing.
+
+        Parameters:
+            item (datetime | slice | list | pd.Index | pd.Series | np.ndarray | str): The label(s) to retrieve.
+
+        Returns:
+            float | np.ndarray: The retrieved value(s).
+        """
+        return self._series.__getitem__(item)
+
+    def __setitem__(
+        self,
+        item: datetime | slice | list | pd.Index | pd.Series | np.ndarray | str,
+        value: float | np.ndarray,
+    ):
+        """
+        Assign value(s) using label-based indexing.
+
+        Parameters:
+            item (datetime | slice | list | pd.Index | pd.Series | np.ndarray | str): The label(s) to set.
+            value (float | np.ndarray): The value(s) to assign.
+        """
+        self._series.__setitem__(item, value)
+
+
 class FastSeriesILocIndexer:
     def __init__(self, series: FastSeries):
         self._series = series
@@ -1068,6 +1117,33 @@ class FastSeriesILocIndexer:
             raise TypeError(
                 f"Unsupported index type for iloc: {type(item)}. Must be int or slice."
             )
+
+
+class FastSeriesAtIndexer:
+    def __init__(self, series: FastSeries):
+        self._series = series
+
+    def __getitem__(self, item):
+        """
+        Retrieve a single item using label-based indexing.
+
+        Parameters:
+            item (datetime | str): The label.
+
+        Returns:
+            float: The retrieved value.
+        """
+        return self._series[item]
+
+    def __setitem__(self, item, value: float):
+        """
+        Assign a value using label-based indexing.
+
+        Parameters:
+            item (datetime | str): The label.
+            value (float): The value to assign.
+        """
+        self._series[item] = value
 
 
 class FastSeriesIatIndexer:

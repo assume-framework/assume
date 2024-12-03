@@ -476,14 +476,14 @@ def test_create_date_range():
     # check that slicing is faster
     t = time.time()
     for i in range(n):
-        q_slice = fs[start:new_end]
+        q_slice = fs.loc[start:new_end]
     res_slice = time.time() - t
 
     series = pd.Series(0, index=q_pd)
 
     t = time.time()
     for i in range(n):
-        q_pd_slice = series[start:new_end]
+        q_pd_slice = series.loc[start:new_end]
     res_slice_pd = time.time() - t
     # more than at least factor 5
     assert res_slice < res_slice_pd / 5
@@ -491,14 +491,14 @@ def test_create_date_range():
     # check that setting items is faster:
     t = time.time()
     for i in range(n):
-        fs[start] = 1
+        fs.at[start] = 1
     res_slice = time.time() - t
 
     series = pd.Series(0, index=q_pd)
 
     t = time.time()
     for i in range(n):
-        series[start] = 1
+        series.at[start] = 1
     res_slice_pd = time.time() - t
     # more than at least factor 5
     assert res_slice < res_slice_pd / 5
@@ -506,14 +506,14 @@ def test_create_date_range():
     # check that setting slices is faster
     t = time.time()
     for i in range(n):
-        fs[start:new_end] = 17
+        fs.loc[start:new_end] = 17
     res_slice = time.time() - t
 
     series = pd.Series(0, index=q_pd)
 
     t = time.time()
     for i in range(n):
-        series[start:new_end] = 17
+        series.loc[start:new_end] = 17
     res_slice_pd = time.time() - t
     # more than at least factor 5
     assert res_slice < res_slice_pd / 5
@@ -524,9 +524,9 @@ def test_create_date_range():
     series.loc[new_end] = 33
 
     fs[new_end] = 33
-    new = series[start:new_end][::-1]
+    new = series.loc[start:new_end][::-1]
     assert new.iloc[0] == 33
-    new = fs[start:new_end][::-1]
+    new = fs.loc[start:new_end][::-1]
     assert new[0] == 33
     fs.data
     fs.index._get_idx_from_date(start)
