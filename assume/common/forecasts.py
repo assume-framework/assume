@@ -118,8 +118,8 @@ class CsvForecaster(Forecaster):
         buses: pd.DataFrame | None = None,
         lines: pd.DataFrame | None = None,
         save_path: str = "",
-        *args: object,
-        **kwargs: object,
+        *args,
+        **kwargs,
     ):
         super().__init__(index, *args, **kwargs)
         self.logger = logging.getLogger(__name__)
@@ -206,7 +206,7 @@ class CsvForecaster(Forecaster):
 
         # the following forecasts are only calculated if buses and lines are available
         # and self.demand_units have a node column
-        if self.buses and self.lines:
+        if self.buses is not None and self.lines is not None:
             # check if the demand_units have a node column and
             # if the nodes are available in the buses
             if (

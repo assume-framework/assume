@@ -4,7 +4,7 @@
 
 dst_flexibility_case:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-01 23:00
+  end_date: 2019-01-05 00:00
   time_step: 1h
   save_frequency_hours: 24
   markets_config:

@@ -533,8 +533,6 @@ def load_config_and_create_forecaster(
         "storage_units": storage_units,
         "demand_units": demand_units,
         "dsm_units": dsm_units,
-        "buses": buses,
-        "lines": lines,
         "forecaster": forecaster,
     }
 
