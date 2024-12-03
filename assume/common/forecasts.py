@@ -89,45 +89,46 @@ class CsvForecaster(Forecaster):
     """
     This class represents a forecaster that provides timeseries for forecasts derived from existing files.
 
-    It initializes with the provided index. It includes methods to retrieve forecasts for specific columns,
-    availability of units, and prices of fuel types, returning the corresponding timeseries as pandas Series.
+    It initializes with the provided index and configuration data, including power plants, demand units,
+    and market configurations. The forecaster also supports optional inputs like DSM (demand-side management) units,
+    buses, and lines for more advanced forecasting scenarios.
 
-    Attributes:
-        index (pandas.Series): The index of the forecasts.
-        powerplants_units (dict[str, pandas.Series]): The power plants.
+    Methods are included to retrieve forecasts for specific columns, availability of units,
+    and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
     Args:
-        index (pandas.Series): The index of the forecasts.
-        powerplants_units (dict[str, pandas.Series]): The power plants.
-
-    Example:
-        >>> forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
-        >>> forecast = forecaster['temperature']
-        >>> print(forecast)
+        index (pd.Series): The index of the forecasts.
+        powerplants_units (pd.DataFrame): A DataFrame containing information about power plants.
+        demand_units (pd.DataFrame): A DataFrame with demand unit data.
+        market_configs (dict[str, dict]): Configuration details for the markets.
+        buses (pd.DataFrame | None, optional): A DataFrame of buses information. Defaults to None.
+        lines (pd.DataFrame | None, optional): A DataFrame of line information. Defaults to None.
+        save_path (str, optional): Path where the forecasts should be saved. Defaults to an empty string.
+        *args (object): Additional positional arguments.
+        **kwargs (object): Additional keyword arguments.
 
     """
 
     def __init__(
         self,
         index: pd.Series,
-        powerplants_units: dict[str, pd.Series] = {},
-        demand_units: dict[str, pd.Series] = {},
-        market_configs: dict[str, pd.Series] = {},
-        dsm_units: dict[str, pd.Series] = {},
-        buses: dict[str, pd.Series] = {},
-        lines: dict[str, pd.Series] = {},
+        powerplants_units: pd.DataFrame,
+        demand_units: pd.DataFrame,
+        market_configs: dict[str, dict],
+        buses: pd.DataFrame | None = None,
+        lines: pd.DataFrame | None = None,
         save_path: str = "",
-        *args,
-        **kwargs,
+        *args: object,
+        **kwargs: object,
     ):
         super().__init__(index, *args, **kwargs)
         self.logger = logging.getLogger(__name__)
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
         self.market_configs = market_configs
-        self.dsm_units = dsm_units
         self.buses = buses
         self.lines = lines
+
         self.forecasts = pd.DataFrame(index=index)
         self.save_path = save_path
 

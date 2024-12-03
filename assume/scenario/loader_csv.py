@@ -507,7 +507,6 @@ def load_config_and_create_forecaster(
         powerplants_units=powerplant_units,
         demand_units=demand_units,
         market_configs=config["markets_config"],
-        dsm_units=dsm_units,
         buses=buses,
         lines=lines,
     )
