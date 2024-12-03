@@ -93,7 +93,7 @@ available_examples = {
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
     
     # redispatch validation examples
-    "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
+    "redisp_storage_3_nodes_valid": {"scenario": "example_07a", "study_case": "base"},
 }
 
 
