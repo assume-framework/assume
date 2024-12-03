@@ -31,7 +31,12 @@ class Learning(Role):
 
     """
 
-    def __init__(self, learning_config: LearningConfig, start: datetime, end: datetime):
+    def __init__(
+        self,
+        learning_config: LearningConfig,
+        start: datetime = None,
+        end: datetime = None,
+    ):
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
         self.episodes_done = 0
@@ -78,8 +83,10 @@ class Learning(Role):
         th.backends.cuda.matmul.allow_tf32 = True
         th.backends.cudnn.allow_tf32 = True
 
-        self.start = datetime2timestamp(start)
-        self.end = datetime2timestamp(end)
+        if start is not None:
+            self.start = datetime2timestamp(start)
+        if end is not None:
+            self.end = datetime2timestamp(end)
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
         self.learning_rate_schedule = learning_config.get(
