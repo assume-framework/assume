@@ -265,12 +265,20 @@ class RLAdvancedOrderStrategy(RLStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
-        upper_scaling_factor_res_load = self.max_residual
-        lower_scaling_factor_res_load = self.min_residual
+
+        # defines bounds of observation space
+        # stays here as it is unit specific, and different forecasts might apply for different units
+        # different handling would require an extra unit loop at learning role intiliazation and unit specific max/min values
+        # further forecasts might change during the simulation if advanced forecasting is used
+        self.max_market_price = max(unit.forecaster[f"price_{market_id}"])
+        self.min_market_price = min(unit.forecaster[f"price_{market_id}"])
+        self.max_residual = max(unit.forecaster[f"residualy_load_{market_id}"])
+        self.min_residual = min(unit.forecaster[f"residual_load_{market_id}"])
+        
 
         # price forecast
-        upper_scaling_factor_price = self.max_bid_price
-        lower_scaling_factor_price = self.min_bid_price
+        upper_scaling_factor_price = self.max_market_price
+        lower_scaling_factor_price = self.min_market_price
 
         # total capacity and marginal cost
         upper_scaling_factor_total_dispatch = unit.max_power
