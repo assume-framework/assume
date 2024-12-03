@@ -128,6 +128,9 @@ class RLStrategy(AbstractLearningStrategy):
 
         self.unit_id = kwargs["unit_id"]
 
+        # defines bounds of actions space
+        self.max_bid_price = kwargs.get("max_bid_price", 100)
+
         # tells us whether we are training the agents or just executing per-learning strategies
         self.learning_mode = kwargs.get("learning_mode", False)
         self.perform_evaluation = kwargs.get("perform_evaluation", False)
@@ -693,6 +696,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
         super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
+        # defines bounds of actions space
+        self.max_bid_price = kwargs.get("max_bid_price", 100)
 
         # tells us whether we are training the agents or just executing per-learnind strategies
         self.learning_mode = kwargs.get("learning_mode", False)
