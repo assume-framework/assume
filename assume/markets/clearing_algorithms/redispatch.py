@@ -225,7 +225,7 @@ class RedispatchMarketRole(MarketRole):
                 calculate_network_meta(network=redispatch_network, product=product, i=i)
             )
 
-        # write network flows here if applicable
+        # TODO write network flows here
         flows = []
 
         return accepted_orders, rejected_orders, meta, flows

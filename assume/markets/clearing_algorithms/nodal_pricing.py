@@ -264,4 +264,4 @@ class NodalMarketRole(MarketRole):
                 # rename columns
                 flows.columns = ["datetime", "line", "flow"]
 
-        return flows
+        return flows.to_dict(orient="records")
