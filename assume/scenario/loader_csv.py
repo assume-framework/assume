@@ -439,7 +439,7 @@ def load_config_and_create_forecaster(
 
     index = pd.date_range(
         start=start,
-        end=end + timedelta(days=1),
+        end=end,
         freq=config["time_step"],
     )
 
