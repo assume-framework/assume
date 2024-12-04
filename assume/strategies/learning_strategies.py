@@ -302,7 +302,7 @@ class RLStrategy(AbstractLearningStrategy):
             unit.outputs["exploration_noise"].at[start] = extra_info  # It's noise
         else:
             unit.outputs["rl_log_probs"].append(extra_info)  # It's log_probs
-            # unit.outputs["dones"][start] = False
+            
 
         bids = self.remove_empty_bids(bids)
 

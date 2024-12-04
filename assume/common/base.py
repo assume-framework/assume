@@ -68,36 +68,19 @@ class BaseUnit:
             for strategy in self.bidding_strategies.values()
         ):
             self.outputs["actions"] = TensorFastSeries(value=0.0, index=self.index)
-            self.outputs["exploration_noise"] = TensorFastSeries(
-                value=0.0,
-                index=self.index,
-            )
             self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
             self.outputs["regret"] = FastSeries(value=0.0, index=self.index)
 
         self.avg_op_time = 0
         self.total_op_time = 0
 
-        # some data is stored as series to allow to store it in the outputs
-        # check if any bidding strategy is using the RL strategy
-        if any(
-            isinstance(strategy, LearningStrategy)
-            for strategy in self.bidding_strategies.values()
-        ):
-            self.outputs["actions"] = TensorFastSeries(value=0.0, index=self.index)
-            self.outputs["exploration_noise"] = TensorFastSeries(
-                value=0.0,
-                index=self.index,
-            )
-            self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
-            self.outputs["regret"] = FastSeries(value=0.0, index=self.index)
 
         # RL data stored as lists to simplify storing to the buffer
         self.outputs["rl_observations"] = []
         self.outputs["rl_actions"] = []
         self.outputs["rl_rewards"] = []
-         # For PPO
         self.outputs["rl_log_probs"] = []
+
 
     def calculate_bids(
         self,

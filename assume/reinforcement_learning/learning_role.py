@@ -62,33 +62,6 @@ class Learning(Role):
             "trained_policies_load_path", self.trained_policies_save_path
         )
 
-        # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
-        self.early_stopping_steps = learning_config.get(
-            "early_stopping_steps",
-            int(
-                self.training_episodes
-                / learning_config.get("validation_episodes_interval", 5)
-                + 1
-            ),
-        )
-        self.early_stopping_threshold = learning_config.get(
-            "early_stopping_threshold", 0.05
-        )
-
-        # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
-        self.early_stopping_steps = learning_config.get(
-            "early_stopping_steps",
-            int(
-                self.training_episodes
-                / learning_config.get("validation_episodes_interval", 5)
-                + 1
-            ),
-        )
-        self.early_stopping_threshold = learning_config.get(
-            "early_stopping_threshold", 0.05
-        )
-
-
 
         self.learning_rate = learning_config["learning_rate"]
         self.actor_architecture = learning_config.get(self.rl_algorithm_name, {}).get(
@@ -131,6 +104,32 @@ class Learning(Role):
                 "episodes_collecting_initial_experience", 5
             ),
             1,
+        )
+
+                # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
+        self.early_stopping_steps = learning_config.get(
+            "early_stopping_steps",
+            int(
+                self.training_episodes
+                / learning_config.get("validation_episodes_interval", 5)
+                + 1
+            ),
+        )
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
+        )
+
+        # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
+        self.early_stopping_steps = learning_config.get(
+            "early_stopping_steps",
+            int(
+                self.training_episodes
+                / learning_config.get("validation_episodes_interval", 5)
+                + 1
+            ),
+        )
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
         )
 
         self.gradient_steps = (
@@ -208,8 +207,6 @@ class Learning(Role):
             # turn off initial exploration and go into full learning mode
             if self.episodes_done > self.episodes_collecting_initial_experience:
                 self.turn_off_initial_exploration()
-
-        self.set_noise_scale(inter_episodic_data["noise_scale"])
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
@@ -323,7 +320,7 @@ class Learning(Role):
 
         return stored_scale
 
-    def create_learning_algorithm(self, algorithm: RLAlgorithm):
+    def create_learning_algorithm(self, algorithm: str):
         """
         Create and initialize the reinforcement learning algorithm, based on defined algorithm type.
 
@@ -331,7 +328,7 @@ class Learning(Role):
         is associated with the learning role and configured with relevant hyperparameters.
 
         Args:
-            algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
+            algorithm (str): The name of the reinforcement learning algorithm.
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(

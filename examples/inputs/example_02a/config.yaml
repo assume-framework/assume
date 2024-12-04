@@ -95,7 +95,7 @@ base_ppo:
   start_date: 2019-03-01 00:00
   time_step: 1h
   end_date: 2019-03-31 00:00
-  learning_mode: false
+  learning_mode: true
   learning_config:
     algorithm: ppo
     continue_learning: false
@@ -103,7 +103,7 @@ base_ppo:
     gradient_steps: 10
     learning_rate: 0.0003
     max_bid_price: 100
-    trained_policies_save_path: "learned_strategies/base_ppo/avg_reward_eval_policies"
+    trained_policies_save_path: null
     training_episodes: 100
     validation_episodes_interval: 10
     matd3:
@@ -137,6 +137,11 @@ base_ppo:
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
 
 
 tiny_ppo:
