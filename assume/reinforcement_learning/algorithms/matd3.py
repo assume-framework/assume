@@ -267,7 +267,10 @@ class TD3(RLAlgorithm):
             unit_strategy.actor_target.train(mode=False)
 
             unit_strategy.actor.optimizer = Adam(
-                unit_strategy.actor.parameters(), lr=self.learning_rate
+                unit_strategy.actor.parameters(),
+                lr=self.learning_role.calc_lr_from_progress(
+                    1
+                ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
             )
 
             obs_dim_list.append(unit_strategy.obs_dim)
@@ -316,7 +319,10 @@ class TD3(RLAlgorithm):
             )
 
             self.learning_role.critics[u_id].optimizer = Adam(
-                self.learning_role.critics[u_id].parameters(), lr=self.learning_rate
+                self.learning_role.critics[u_id].parameters(),
+                lr=self.learning_role.calc_lr_from_progress(
+                    1
+                ),  # 1 = 100% of simulation remaining, uses learning_rate from config as starting point
             )
 
             self.learning_role.target_critics[u_id].load_state_dict(
@@ -394,6 +400,27 @@ class TD3(RLAlgorithm):
 
         logger.debug("Updating Policy")
         n_rl_agents = len(self.learning_role.rl_strats.keys())
+
+        # update noise decay and learning rate
+        updated_noise_decay = self.learning_role.calc_noise_from_progress(
+            self.learning_role.get_progress_remaining()
+        )
+
+        learning_rate = self.learning_role.calc_lr_from_progress(
+            self.learning_role.get_progress_remaining()
+        )
+
+        # loop again over all units to avoid update call for every gradient step, as it will be ambiguous
+        for u_id, unit_strategy in self.learning_role.rl_strats.items():
+            self.update_learning_rate(
+                [
+                    self.learning_role.critics[u_id].optimizer,
+                    self.learning_role.rl_strats[u_id].actor.optimizer,
+                ],
+                learning_rate=learning_rate,
+            )
+            unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
+
         for _ in range(self.gradient_steps):
             self.n_updates += 1
             i = 0

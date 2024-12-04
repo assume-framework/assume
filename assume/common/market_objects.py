@@ -141,7 +141,7 @@ class MarketConfig:
     supports_get_unmatched: bool = False
     eligible_obligations_lambda: eligible_lambda = lambda x: True
     param_dict: dict = field(default_factory=dict)
-    addr: AgentAddress| None = None
+    addr: AgentAddress | None = None
 
 
 class OpeningMessage(TypedDict):

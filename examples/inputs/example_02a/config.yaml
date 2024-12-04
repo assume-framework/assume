@@ -42,7 +42,12 @@ tiny:
 
 
 base:
+  start_date: 2019-03-01 00:00
   end_date: 2019-03-31 00:00
+  time_step: 1h
+  learning_mode: true
+  save_frequency_hours: null
+
   learning_config:
     algorithm: matd3
     continue_learning: false
@@ -64,21 +69,23 @@ base:
       noise_sigma: 0.1
   markets_config:
     EOM:
-      market_mechanism: pay_as_clear
-      maximum_bid_price: 3000
-      maximum_bid_volume: 100000
-      minimum_bid_price: -500
-      opening_duration: 1h
-      opening_frequency: 1h
       operator: EOM_operator
-      price_unit: EUR/MWh
       product_type: energy
+      start_date: 2019-03-01 00:00
       products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
       volume_unit: MWh
-  save_frequency_hours: null
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+base_lstm:
   start_date: 2019-03-01 00:00
   time_step: 1h
 
@@ -120,19 +127,15 @@ base_ppo:
       vf_coef: 0.75
   markets_config:
     EOM:
-      market_mechanism: pay_as_clear
-      maximum_bid_price: 3000
-      maximum_bid_volume: 100000
-      minimum_bid_price: -500
-      opening_duration: 1h
-      opening_frequency: 1h
       operator: EOM_operator
-      price_unit: EUR/MWh
       product_type: energy
+      start_date: 2019-03-01 00:00
       products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
       volume_unit: MWh
 
 
@@ -173,18 +176,14 @@ tiny_ppo:
       vf_coef: 0.75
   markets_config:
     EOM:
-      market_mechanism: pay_as_clear
-      maximum_bid_price: 3000
-      maximum_bid_volume: 100000
-      minimum_bid_price: -500
-      opening_duration: 1h
-      opening_frequency: 1h
       operator: EOM_operator
-      price_unit: EUR/MWh
       product_type: energy
+      start_date: 2019-01-01 00:00
       products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
       volume_unit: MWh
 

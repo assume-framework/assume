@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from collections.abc import Callable
 from datetime import timedelta
 import pandas as pd
 from datetime import datetime
@@ -20,6 +21,10 @@ class ObsActRew(TypedDict):
 
 # TD3 and PPO
 observation_dict = dict[list[datetime], ObsActRew]
+
+# A schedule takes the remaining progress as input
+# and outputs a scalar (e.g. learning rate, action noise scale ...)
+Schedule = Callable[[float], float]
 
 
 
@@ -71,9 +76,15 @@ class NormalActionNoise:
         self.dt = dt
 
     def noise(self):
-        noise = self.scale * np.random.normal(self.mu, self.sigma, self.act_dimension)
-        self.scale = self.dt * self.scale  # if self.scale >= 0.1 else self.scale
+        noise = (
+            self.dt
+            * self.scale
+            * np.random.normal(self.mu, self.sigma, self.act_dimension)
+        )
         return noise
+
+    def update_noise_decay(self, updated_decay: float):
+        self.dt = updated_decay
 
 
 # TD3
@@ -99,6 +110,57 @@ def polyak_update(params, target_params, tau: float):
         for param, target_param in zip(params, target_params):
             target_param.data.mul_(1 - tau)
             th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
+
+
+def linear_schedule_func(
+    start: float, end: float = 0, end_fraction: float = 1
+) -> Schedule:
+    """
+    Create a function that interpolates linearly between start and end
+    between ``progress_remaining`` = 1 and ``progress_remaining`` = 1 - ``end_fraction``.
+
+    Args:
+        start: value to start with if ``progress_remaining`` = 1
+        end: value to end with if ``progress_remaining`` = 0
+        end_fraction: fraction of ``progress_remaining``
+            where end is reached e.g 0.1 then end is reached after 10%
+            of the complete training process.
+
+    Returns:
+        Linear schedule function.
+
+    Note:
+        Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L100
+
+    """
+
+    def func(progress_remaining: float) -> float:
+        if (1 - progress_remaining) > end_fraction:
+            return end
+        else:
+            return start + (1 - progress_remaining) * (end - start) / end_fraction
+
+    return func
+
+
+def constant_schedule(val: float) -> Schedule:
+    """
+    Create a function that returns a constant. It is useful for learning rate schedule (to avoid code duplication)
+
+    Args:
+        val: constant value
+    Returns:
+        Constant schedule function.
+
+    Note:
+        From SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L124
+
+    """
+
+    def func(_):
+        return val
+
+    return func
 
 
 def collect_obs_for_central_critic(
@@ -141,49 +203,5 @@ def collect_obs_for_central_critic(
 
     return all_states
 
-# # For non-dynamic PPO buffer size calculation (remove if buffer stays dynamic)
-# def convert_to_timedelta(time_str):
-#     # Wenn bereits ein Timedelta-Objekt, direkt zurückgeben
-#     if isinstance(time_str, pd.Timedelta):
-#         return time_str
-
-#     # Extrahiere den Zeitwert und die Einheit aus dem String
-#     time_value, time_unit = int(time_str[:-1]), time_str[-1]
-    
-#     if time_unit == 'h':
-#         return timedelta(hours=time_value)
-#     elif time_unit == 'd':
-#         return timedelta(days=time_value)
-#     elif time_unit == 'm':
-#         return timedelta(minutes=time_value)
-#     else:
-#         raise ValueError(f"Unsupported time unit: {time_unit}")
-
-# # For non-dynamic PPO buffer size calculation (remove if buffer stays dynamic)
-# def calculate_total_timesteps_per_episode(start_date, end_date, time_step):
-#     # Wenn start_date und end_date bereits Timestamps sind, direkt nutzen
-#     if isinstance(start_date, str):
-#         start_dt = datetime.strptime(start_date, "%Y-%m-%d %H:%M")
-#     else:
-#         start_dt = start_date
-
-#     if isinstance(end_date, str):
-#         end_dt = datetime.strptime(end_date, "%Y-%m-%d %H:%M")
-#     else:
-#         end_dt = end_date
-    
-#     # Berechne den gesamten Zeitraum
-#     total_time = end_dt - start_dt
-    
-#     # Konvertiere time_step in ein timedelta-Objekt, wenn es kein Timedelta ist
-#     time_step_td = convert_to_timedelta(time_step)
-    
-#     # Berechne die Gesamtanzahl der Zeitschritte für die gesamte Dauer
-#     total_timesteps = total_time // time_step_td
-    
-#     # print("Total timesteps:")
-#     # print(total_timesteps)
-
-#     return total_timesteps
 
 

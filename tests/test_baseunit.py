@@ -34,11 +34,11 @@ class BasicStrategy(BaseStrategy):
         return bids
 
 
-@pytest.fixture(params=["h", "15min"])
+@pytest.fixture(params=["1h", "15min"])
 def base_unit(request) -> BaseUnit:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2022-01-01", periods=4, freq=request.param)
-    NaiveForecast(
+    forecaster = NaiveForecast(
         index, availability=1, fuel_price=[10, 11, 12, 13], co2_price=[10, 20, 30, 30]
     )
     return BaseUnit(
@@ -46,7 +46,8 @@ def base_unit(request) -> BaseUnit:
         unit_operator="test_operator",
         technology="base",
         bidding_strategies={"EOM": BasicStrategy()},
-        index=index,
+        forecaster=forecaster,
+        index=forecaster.index,
     )
 
 

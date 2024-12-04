@@ -519,13 +519,14 @@ def load_config_and_create_forecaster(
     forecaster.set_forecast(temperature_df)
     forecaster.calc_forecast_if_needed()
 
+    forecaster.convert_forecasts_to_fast_series()
+
     return {
         "config": config,
         "sim_id": sim_id,
         "path": path,
         "start": start,
         "end": end,
-        "index": index,
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
@@ -570,13 +571,13 @@ def setup_world(
     config = scenario_data["config"]
     start = scenario_data["start"]
     end = scenario_data["end"]
-    index = scenario_data["index"]
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
     dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
+    # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
     # Disable save frequency if CSV export is enabled
     if world.export_csv_path and save_frequency_hours is not None:
@@ -632,7 +633,6 @@ def setup_world(
         simulation_id=sim_id,
         learning_config=learning_config,
         bidding_params=bidding_strategy_params,
-        index=index,
         forecaster=forecaster,
     )
 
@@ -869,10 +869,9 @@ def run_learning(
     world.export_csv_path = ""
 
     actors_and_critics = None
-    world.learning_role.initialize_policy(
-        actors_and_critics=actors_and_critics
-    )  # Leads to the initialization of the Learning role, makes world.learning_role.rl_algorithm_name accessible
-    world.output_role.del_similar_runs()
+    world.learning_role.initialize_policy(actors_and_critics=actors_and_critics) # Leads to the initialization of the Learning role, makes world.learning_role.rl_algorithm_name accessible
+    
+    world.output_role.delete_similar_runs()
 
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
@@ -916,20 +915,8 @@ def run_learning(
         "eval_episodes_done": 0,
     }
 
-    if world.learning_role.rl_algorithm_name == "matd3":
-        # In MATD3, noise_scale is relevant because it adds noise to the actions taken by the agents
-        # during exploration. This is essential in deterministic policy gradient methods like TD3 and MATD3,
-        # where the agents need to explore the environment sufficiently to avoid getting stuck in local optima.
-        # Noise is added to the actions to encourage exploration. In contrast, PPO uses stochastic policies
-        # that naturally explore the environment by sampling actions from a probability distribution, making
-        # external noise addition unnecessary.
-        # TODO: delete noise scale here as new sheduler makes it obsolete in future, leave like this now
-        inter_episodic_data["noise_scale"] = world.learning_config.get(
-            "noise_scale", 1.0
-        )
+    # -----------------------------------------
 
-    # if world.learning_role.rl_algorithm_name == "matd3":
-    # Sets the validation interval: After how many episodes does validation take place
     validation_interval = min(
         world.learning_role.training_episodes,
         validation_interval_from_config,

@@ -4,15 +4,18 @@
 
 import logging
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
+from assume.common.utils import datetime2timestamp
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.algorithms.ppo import PPO
 from assume.reinforcement_learning.buffer import ReplayBuffer, RolloutBuffer
+from assume.reinforcement_learning.learning_utils import linear_schedule_func
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +35,8 @@ class Learning(Role):
     def __init__(
         self,
         learning_config: LearningConfig,
+        start: datetime = None,
+        end: datetime = None,
     ):
         # General parameters
         self.rl_algorithm_name = learning_config.get("algorithm", "matd3")
@@ -57,9 +62,33 @@ class Learning(Role):
             "trained_policies_load_path", self.trained_policies_save_path
         )
 
-        self.device = th.device(
-            learning_config["device"] if th.cuda.is_available() else "cpu"
+        # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
+        self.early_stopping_steps = learning_config.get(
+            "early_stopping_steps",
+            int(
+                self.training_episodes
+                / learning_config.get("validation_episodes_interval", 5)
+                + 1
+            ),
         )
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
+        )
+
+        # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
+        self.early_stopping_steps = learning_config.get(
+            "early_stopping_steps",
+            int(
+                self.training_episodes
+                / learning_config.get("validation_episodes_interval", 5)
+                + 1
+            ),
+        )
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
+        )
+
+
 
         self.learning_rate = learning_config["learning_rate"]
         self.actor_architecture = learning_config.get(self.rl_algorithm_name, {}).get(
@@ -74,7 +103,26 @@ class Learning(Role):
         self.batch_size = learning_config.get(self.rl_algorithm_name, {}).get(
             "batch_size", 128
         )
+        if start is not None:
+            self.start = datetime2timestamp(start)
+        if end is not None:
+            self.end = datetime2timestamp(end)
+
         self.gamma = learning_config.get(self.rl_algorithm_name, {}).get("gamma", 0.99)
+        self.learning_rate_schedule = learning_config.get(
+            "learning_rate_schedule", None
+        )
+        if self.learning_rate_schedule == "linear":
+            self.calc_lr_from_progress = linear_schedule_func(self.learning_rate)
+        else:
+            self.calc_lr_from_progress = lambda x: self.learning_rate
+
+        noise_dt = learning_config.get("noise_dt", 1)
+        self.action_noise_schedule = learning_config.get("action_noise_schedule", None)
+        if self.action_noise_schedule == "linear":
+            self.calc_noise_from_progress = linear_schedule_func(noise_dt)
+        else:
+            self.calc_noise_from_progress = lambda x: noise_dt
         
         # if we do not have initial experience collected we will get an error as no samples are available on the
         # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
@@ -109,13 +157,24 @@ class Learning(Role):
             self.max_grad_norm = learning_config["ppo"].get("max_grad_norm", 0.5)
             self.gae_lambda = learning_config["ppo"].get("gae_lambda", 0.95)
 
-        # Set up CUDA and float types
-        th.backends.cuda.matmul.allow_tf32 = True
-        th.backends.cudnn.allow_tf32 = True
+        
+        
+        cuda_device = (
+            learning_config["device"]
+            if "cuda" in learning_config.get("device", "cpu")
+            else "cpu"
+        )
+        
+        self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
 
         # future: add option to choose between float16 and float32
         # float_type = learning_config.get("float_type", "float32")
         self.float_type = th.float
+
+        th.backends.cuda.matmul.allow_tf32 = True
+        th.backends.cudnn.allow_tf32 = True
+
+
 
         # Initialize the algorithm depending on the type
         self.create_learning_algorithm(self.rl_algorithm_name)
@@ -150,7 +209,7 @@ class Learning(Role):
             if self.episodes_done > self.episodes_collecting_initial_experience:
                 self.turn_off_initial_exploration()
 
-            self.set_noise_scale(inter_episodic_data["noise_scale"])
+        self.set_noise_scale(inter_episodic_data["noise_scale"])
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
@@ -171,7 +230,6 @@ class Learning(Role):
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
-            "noise_scale": self.get_noise_scale(),
         }
 
     # TD3 and PPO
@@ -244,9 +302,9 @@ class Learning(Role):
         for _, unit in self.rl_strats.items():
             unit.collect_initial_experience_mode = False
 
-    def set_noise_scale(self, stored_scale) -> None:
+    def get_progress_remaining(self) -> float:
         """
-        Set the noise scale for all learning strategies (units) in rl_strats.
+        Get the remaining learning progress from the simulation run.
 
         """
         for _, unit in self.rl_strats.items():
@@ -265,9 +323,15 @@ class Learning(Role):
 
         return stored_scale
 
-    def create_learning_algorithm(self, algorithm: str):
+    def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """
-        Algorithm initialization depending on the type
+        Create and initialize the reinforcement learning algorithm, based on defined algorithm type.
+
+        This method creates and initializes the reinforcement learning algorithm based on the specified algorithm name. The algorithm
+        is associated with the learning role and configured with relevant hyperparameters.
+
+        Args:
+            algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
@@ -400,6 +464,12 @@ class Learning(Role):
                         logger.info(
                             f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
                         )
+                        if (
+                            self.learning_rate_schedule or self.action_noise_schedule
+                        ) is not None:
+                            logger.info(
+                                f"Learning rate schedule ({self.learning_rate_schedule}) or action noise schedule ({self.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
+                            )
 
                         self.rl_algorithm.save_params(
                             directory=f"{self.trained_policies_save_path}/last_policies"

@@ -104,11 +104,16 @@ if __name__ == "__main__":
     - local_db: without database and grafana
     - timescale: with database and grafana (note: you need docker installed)
     """
-    data_format = "timescale"  # "local_db" or "timescale"
-    example = "small_learning_1"
+
+    # select to store the simulation results in a local database or in timescale
+    # when using timescale, you need to have docker installed and can access the grafana dashboard
+    data_format = "local_db"  # "local_db" or "timescale"
+
+    # select the example to run from the available examples above
+    example = "small"
 
     if data_format == "local_db":
-        db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
+        db_uri = "sqlite:///./examples/local_db/assume_db.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
