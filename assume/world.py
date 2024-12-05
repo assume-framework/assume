@@ -49,6 +49,11 @@ logging.getLogger("mango").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
 
 
+def handle_exception(loop, context):
+    # context["message"] will always be there; but context["exception"] may not
+    msg = context.get("exception", context["message"])
+    logger.exception(f"Caught exception: {msg}")
+    
 class World:
     """
     World instance with the provided address, database URI, export CSV path, log level, and distributed role settings.
@@ -150,6 +155,7 @@ class World:
         nest_asyncio.apply()
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
+        self.loop.set_exception_handler(handle_exception)
 
     def setup(
         self,
