@@ -154,18 +154,24 @@ class NodalMarketRole(MarketRole):
         df_p_max_pu.update(p_max_pu)
         new_columns = p_max_pu.loc[:,~p_max_pu.columns.isin(df_p_max_pu.columns)]
         nodal_network.generators_t.p_max_pu = pd.concat([df_p_max_pu, new_columns], axis=1)
+        nodal_network.generators_t.p_max_pu.index.name = "snapshot"
+        nodal_network.generators_t.p_max_pu.columns.name = "Generator"
 
         # Update p_min_pu for generators
         df_p_min_pu = nodal_network.generators_t.p_min_pu
         df_p_min_pu.update(p_min_pu)
         new_columns = p_min_pu.loc[:,~p_min_pu.columns.isin(df_p_min_pu.columns)]
         nodal_network.generators_t.p_min_pu = pd.concat([df_p_min_pu, new_columns], axis=1)
+        nodal_network.generators_t.p_min_pu.index.name = "snapshot"
+        nodal_network.generators_t.p_min_pu.columns.name = "Generator"
 
         # Update marginal costs for generators
         df_costs = nodal_network.generators_t.marginal_cost
         df_costs.update(costs)
         new_columns = costs.loc[:,~costs.columns.isin(df_costs.columns)]
         nodal_network.generators_t.marginal_cost = pd.concat([df_costs, new_columns], axis=1)
+        nodal_network.generators_t.marginal_cost.index.name = "snapshot"
+        nodal_network.generators_t.marginal_cost.columns.name = "Generator"
 
 
         with suppress_output():
@@ -181,11 +187,9 @@ class NodalMarketRole(MarketRole):
             logger.error(f"Solver exited with {termination_condition}")
             raise Exception("Solver in redispatch market did not converge")
 
-        log_flows = True
-
         # process dispatch data
         flows = self.process_dispatch_data(
-            network=nodal_network, orderbook_df=orderbook_df, log_flows=log_flows
+            network=nodal_network, orderbook_df=orderbook_df, log_flows=True
         )
 
         # return orderbook_df back to orderbook format as list of dicts
