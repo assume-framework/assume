@@ -227,7 +227,7 @@ class WriteOutput(Role):
         content_type = content.get("type")
         market_id = content.get("market_id")
 
-        if not content_data:
+        if content_data is None or len(content_data) == 0:
             return
 
         if content_type in [
@@ -404,7 +404,9 @@ class WriteOutput(Role):
         if isinstance(data, pd.DataFrame):
             df = data
 
-        # if data is dict
+        # if data is list
+        elif isinstance(data, list):
+            df = pd.DataFrame.from_dict(data)
         elif isinstance(data, dict):
             # Convert the dictionary to a DataFrame
             df = pd.DataFrame.from_dict(
@@ -557,6 +559,7 @@ class WriteOutput(Role):
                 continue
             df["simulation"] = self.simulation_id
             df.reset_index()
+            df.columns = df.columns.str.lower()
 
             try:
                 with self.db.begin() as db:

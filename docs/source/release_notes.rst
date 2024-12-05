@@ -43,6 +43,10 @@ Upcoming Release
   - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
   - **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
   - **Powerplant**: Remove duplicate `Powerplant.set_dispatch_plan()` which broke multi-market bidding
+  - **CSV scenario loader**: Fixed issue when one extra day was being added to the index, which lead to an error in the simulation when additional data was not available in the input data.
+  - **Market opening schedule**: Fixed issue where the market opening was scheduled even though the simulation was ending before the required products. Now the market opening is only scheduled
+    if the total duration of the market products plus first delivery time fits before the simulation end.
+  - **Mango warnings**: Set MANGO logging level to ERROR to avoid unnecessary warnings in the logs.
 
 v0.4.3 - (11th November 2024)
 ===========================================
