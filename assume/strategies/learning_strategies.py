@@ -12,7 +12,10 @@ import torch as th
 from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
-from assume.reinforcement_learning.learning_utils import NormalActionNoise
+from assume.reinforcement_learning.learning_utils import (
+    NormalActionNoise,
+    min_max_scale,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +133,6 @@ class RLStrategy(AbstractLearningStrategy):
 
         # defines bounds of actions space
         self.max_bid_price = kwargs.get("max_bid_price", 100)
-        self.max_demand = kwargs.get("max_demand", 10e3)
 
         # tells us whether we are training the agents or just executing per-learning strategies
         self.learning_mode = kwargs.get("learning_mode", False)
@@ -247,7 +249,7 @@ class RLStrategy(AbstractLearningStrategy):
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
-        # actions are in the range [0,1], we need to transform them into actual bids
+        # actions are in the range [-1,1], we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
         bid_prices = actions * self.max_bid_price
 
@@ -397,15 +399,31 @@ class RLStrategy(AbstractLearningStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
-        # scaling factors for the observations
-        scaling_factor_res_load = self.max_demand
-        scaling_factor_price = self.max_bid_price
 
-        # total capacity and marginal cost
-        scaling_factor_total_capacity = unit.max_power
+        # defines bounds of observation space
+        # stays here as it is unit specific, and different forecasts might apply for different units
+        # different handling would require an extra unit loop at learning role intiliazation and unit specific max/min values
+        # further forecasts might change during the simulation if advanced forecasting is used
+        self.max_market_price = max(unit.forecaster[f"price_{market_id}"])
+        self.min_market_price = min(unit.forecaster[f"price_{market_id}"])
+        self.max_residual = max(unit.forecaster[f"residualy_load_{market_id}"])
+        self.min_residual = min(unit.forecaster[f"residual_load_{market_id}"])
+
+        # scaling factors for the observations
+        upper_scaling_factor_res_load = self.max_residual
+        lower_scaling_factor_res_load = self.min_residual
+        upper_scaling_factor_price = self.max_market_price
+        lower_scaling_factor_price = self.min_market_price
+
+        # total dispatch and marginal cost
+        upper_scaling_factor_total_dispatch = unit.max_power
+        # if unit is not running, total dispatch is 0
+        lower_scaling_factor_total_dispatch = 0
 
         # marginal cost
-        scaling_factor_marginal_cost = self.max_bid_price
+        # Could theoretically be negative (eg. subsidies), but assumed to be always positive in the simulation
+        upper_scaling_factor_marginal_cost = self.max_bid_price
+        lower_scaling_factor_marginal_cost = 0
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
@@ -413,9 +431,10 @@ class RLStrategy(AbstractLearningStrategy):
             end_excl + forecast_len
             > unit.forecaster[f"residual_load_{market_id}"].index[-1]
         ):
-            scaled_res_load_forecast = (
-                unit.forecaster[f"residual_load_{market_id}"].loc[start:]
-                / scaling_factor_res_load
+            scaled_res_load_forecast = min_max_scale(
+                unit.forecaster[f"residual_load_{market_id}"].loc[start:],
+                lower_scaling_factor_res_load,
+                upper_scaling_factor_res_load,
             )
             scaled_res_load_forecast = np.concatenate(
                 [
@@ -427,16 +446,19 @@ class RLStrategy(AbstractLearningStrategy):
             )
 
         else:
-            scaled_res_load_forecast = (
+            scaled_res_load_forecast = min_max_scale(
                 unit.forecaster[f"residual_load_{market_id}"].loc[
                     start : end_excl + forecast_len
-                ]
-                / scaling_factor_res_load
+                ],
+                lower_scaling_factor_res_load,
+                upper_scaling_factor_res_load,
             )
 
         if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
-            scaled_price_forecast = (
-                unit.forecaster[f"price_{market_id}"].loc[start:] / scaling_factor_price
+            scaled_price_forecast = min_max_scale(
+                unit.forecaster[f"price_{market_id}"].loc[start:],
+                lower_scaling_factor_price,
+                upper_scaling_factor_price,
             )
             scaled_price_forecast = np.concatenate(
                 [
@@ -448,11 +470,12 @@ class RLStrategy(AbstractLearningStrategy):
             )
 
         else:
-            scaled_price_forecast = (
+            scaled_price_forecast = min_max_scale(
                 unit.forecaster[f"price_{market_id}"].loc[
                     start : end_excl + forecast_len
-                ]
-                / scaling_factor_price
+                ],
+                lower_scaling_factor_price,
+                upper_scaling_factor_price,
             )
 
         # get last accepted bid volume and the current marginal costs of the unit
@@ -460,15 +483,23 @@ class RLStrategy(AbstractLearningStrategy):
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
         # scale unit outputs
-        scaled_total_capacity = current_volume / scaling_factor_total_capacity
-        scaled_marginal_cost = current_costs / scaling_factor_marginal_cost
+        scaled_total_dispatch = min_max_scale(
+            current_volume,
+            lower_scaling_factor_total_dispatch,
+            upper_scaling_factor_total_dispatch,
+        )
+        scaled_marginal_cost = min_max_scale(
+            current_costs,
+            lower_scaling_factor_marginal_cost,
+            upper_scaling_factor_marginal_cost,
+        )
 
         # concat all obsverations into one array
         observation = np.concatenate(
             [
                 scaled_res_load_forecast,
                 scaled_price_forecast,
-                np.array([scaled_total_capacity, scaled_marginal_cost]),
+                np.array([scaled_total_dispatch, scaled_marginal_cost]),
             ]
         )
 
@@ -658,10 +689,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
         super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
-
         # defines bounds of actions space
         self.max_bid_price = kwargs.get("max_bid_price", 100)
-        self.max_demand = kwargs.get("max_demand", 10e3)
 
         # tells us whether we are training the agents or just executing per-learnind strategies
         self.learning_mode = kwargs.get("learning_mode", False)
@@ -1006,9 +1035,22 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
-        # scaling factors for the observations
-        scaling_factor_res_load = self.max_demand
-        scaling_factor_price = self.max_bid_price
+        # defines bounds of observation space
+        # stays here as it is unit specific, and different forecasts might apply for different units
+        # different handling would require an extra unit loop at learning role intiliazation and unit specific max/min values
+        # further forecasts might change during the simulation if advanced forecasting is used
+        self.max_market_price = max(unit.forecaster[f"price_{market_id}"])
+        self.min_market_price = min(unit.forecaster[f"price_{market_id}"])
+        self.max_residual = max(unit.forecaster[f"residualy_load_{market_id}"])
+        self.min_residual = min(unit.forecaster[f"residual_load_{market_id}"])
+
+        upper_scaling_factor_res_load = self.max_residual
+        lower_scaling_factor_res_load = self.min_residual
+        upper_scaling_factor_price = self.max_market_price
+        lower_scaling_factor_price = self.min_market_price
+
+        upper_scaling_factor_energy_cost = self.max_bid_price
+        lower_scaling_factor_energy_cost = 0
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
@@ -1016,9 +1058,10 @@ class StorageRLStrategy(AbstractLearningStrategy):
             end_excl + forecast_len
             > unit.forecaster[f"residual_load_{market_id}"].index[-1]
         ):
-            scaled_res_load_forecast = (
-                unit.forecaster[f"residual_load_{market_id}"].loc[start:]
-                / scaling_factor_res_load
+            scaled_res_load_forecast = min_max_scale(
+                unit.forecaster[f"residual_load_{market_id}"].loc[start:],
+                lower_scaling_factor_res_load,
+                upper_scaling_factor_res_load,
             )
             scaled_res_load_forecast = np.concatenate(
                 [
@@ -1030,16 +1073,19 @@ class StorageRLStrategy(AbstractLearningStrategy):
             )
 
         else:
-            scaled_res_load_forecast = (
+            scaled_res_load_forecast = min_max_scale(
                 unit.forecaster[f"residual_load_{market_id}"].loc[
                     start : end_excl + forecast_len
-                ]
-                / scaling_factor_res_load
+                ],
+                lower_scaling_factor_res_load,
+                upper_scaling_factor_res_load,
             )
 
         if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
-            scaled_price_forecast = (
-                unit.forecaster[f"price_{market_id}"].loc[start:] / scaling_factor_price
+            scaled_price_forecast = min_max_scale(
+                unit.forecaster[f"price_{market_id}"].loc[start:],
+                lower_scaling_factor_price,
+                upper_scaling_factor_price,
             )
             scaled_price_forecast = np.concatenate(
                 [
@@ -1051,16 +1097,21 @@ class StorageRLStrategy(AbstractLearningStrategy):
             )
 
         else:
-            scaled_price_forecast = (
+            scaled_price_forecast = min_max_scale(
                 unit.forecaster[f"price_{market_id}"].loc[
                     start : end_excl + forecast_len
-                ]
-                / scaling_factor_price
+                ],
+                lower_scaling_factor_price,
+                upper_scaling_factor_price,
             )
 
         # get the current soc value
-        soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
-        energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
+        soc_scaled = min_max_scale(unit.outputs["soc"].at[start], 0, unit.max_soc)
+        energy_cost_scaled = min_max_scale(
+            unit.outputs["energy_cost"].at[start],
+            lower_scaling_factor_energy_cost,
+            upper_scaling_factor_energy_cost,
+        )
 
         # concat all obsverations into one array
         observation = np.concatenate(
