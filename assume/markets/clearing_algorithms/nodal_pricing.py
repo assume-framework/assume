@@ -109,6 +109,8 @@ class NodalMarketRole(MarketRole):
             Tuple[Orderbook, Orderbook, List[dict]]: The accepted orderbook, rejected orderbook and market metadata.
         """
 
+        if len(orderbook) <= 0:
+            return super().clear(orderbook, market_products)
         orderbook_df = pd.DataFrame(orderbook)
         orderbook_df["accepted_volume"] = 0.0
         orderbook_df["accepted_price"] = 0.0
