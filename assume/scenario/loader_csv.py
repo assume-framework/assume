@@ -5,7 +5,7 @@
 import copy
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import dateutil.rrule as rr
@@ -439,7 +439,7 @@ def load_config_and_create_forecaster(
 
     index = pd.date_range(
         start=start,
-        end=end + timedelta(days=1),
+        end=end,
         freq=config["time_step"],
     )
 
