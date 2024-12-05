@@ -47,7 +47,7 @@ def is_demand_from_provider_needed(demand_order, supply_order) -> bool:
     return "building" in demand_order["unit_id"] and "building" not in supply_order["unit_id"]
 
 
-def is_supply_from_provider_needed(demand_order, supply_order) -> bool:
+def is_supply_to_provider_needed(demand_order, supply_order) -> bool:
     return "building" not in demand_order["unit_id"] and "building" in supply_order["unit_id"]
 
 
@@ -327,13 +327,15 @@ class PayAsBidBuildingRole(PayAsBidRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
-    def sort_orders(self, supply_orders: list[Orderbook], demand_orders: list[Orderbook]):
+    def sort_orders_supply(self, supply_orders: list[Orderbook]):
         # Sort supply orders by price with preference for 'building' units and randomness for tie-breaking
         supply_orders.sort(key=lambda i: (
             0 if "building" in i["unit_id"] else 1,  # Prioritize bids with 'building'
             i["price"],  # Sort by price ascending
             random.random()
         ))
+
+    def sort_orders_demand(self, demand_orders: list[Orderbook]):
 
         # Sort demand orders by price in descending order with preference for 'building' units and randomness for tie-breaking
         demand_orders.sort(key=lambda i: (
@@ -374,7 +376,8 @@ class PayAsBidBuildingRole(PayAsBidRole):
             demand_orders = [x for x in product_orders if x["volume"] < 0]
             # volume 0 is ignored/invalid
 
-            self.sort_orders(supply_orders, demand_orders)
+            self.sort_orders_supply(supply_orders)
+            self.sort_orders_demand(demand_orders)
 
             dem_vol, gen_vol = 0, 0
             # the following algorithm is inspired by one bar for generation and one for demand
@@ -389,6 +392,7 @@ class PayAsBidBuildingRole(PayAsBidRole):
                 dem_vol += -demand_order["volume"]
                 to_commit: Orderbook = []
 
+                self.sort_orders_supply(supply_orders)
                 while supply_orders and gen_vol < dem_vol:
                     supply_order = supply_orders.pop(0)
 
@@ -401,7 +405,7 @@ class PayAsBidBuildingRole(PayAsBidRole):
                         gen_vol += supply_order["volume"]
 
                     # Case 2: Surplus of a building was not fully consumed within the community -> sell to energy provider
-                    elif is_supply_from_provider_needed(demand_order, supply_order):
+                    elif is_supply_to_provider_needed(demand_order, supply_order):
                         # Overwrite the supply_order price with demand_order price since now the provider serves as backup
                         supply_order["accepted_price"] = demand_order["price"]
                         demand_order["accepted_price"] = demand_order["price"]
@@ -418,7 +422,11 @@ class PayAsBidBuildingRole(PayAsBidRole):
                         gen_vol += supply_order["volume"]
                     # if supply is not partially accepted before, reject it
                     elif not supply_order.get("accepted_volume"):
-                        rejected_orders.append(supply_order)
+                        if "building" in supply_order["unit_id"] and "building" in demand_order["unit_id"]:
+                            # Put it at the end, such that it can be cleared at the end from the provider
+                            supply_orders.insert(len(supply_orders), supply_order)
+                        else:
+                            rejected_orders.append(supply_order)
                 # now we know which orders we need
                 # we only need to see how to arrange it.
 
@@ -446,8 +454,8 @@ class PayAsBidBuildingRole(PayAsBidRole):
                 if demand_order["accepted_volume"]:
                     accepted_demand_orders.append(demand_order)
                 accepted_supply_orders.extend(to_commit)
-                if math.isclose(gen_vol, dem_vol, abs_tol=1e-8):
-                    gen_vol, dem_vol = 0, 0
+                # if math.isclose(gen_vol, dem_vol, abs_tol=1e-8):
+                #     gen_vol, dem_vol = 0, 0
 
             # if demand is fulfilled, we do have some additional supply orders
             # these will be rejected
