@@ -227,7 +227,7 @@ class WriteOutput(Role):
         content_type = content.get("type")
         market_id = content.get("market_id")
 
-        if content_data is None:
+        if content_data is None or len(content_data) == 0:
             return
 
         if content_type in [
