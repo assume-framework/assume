@@ -176,8 +176,8 @@ class NodalMarketRole(MarketRole):
         )
 
         # return orderbook_df back to orderbook format as list of dicts
-        accepted_orders = orderbook_df.to_dict("records")
-        rejected_orders = []
+        accepted_orders = orderbook_df[orderbook_df["accepted_volume"] != 0].to_dict("records")
+        rejected_orders = orderbook_df[orderbook_df["accepted_volume"] == 0].to_dict("records")
         meta = []
 
         # calculate meta data such as total upwared and downward redispatch, total backup dispatch
@@ -264,4 +264,4 @@ class NodalMarketRole(MarketRole):
                 # rename columns
                 flows.columns = ["datetime", "line", "flow"]
 
-        return flows.to_dict(orient="records")
+                return flows.to_dict(orient="records")
