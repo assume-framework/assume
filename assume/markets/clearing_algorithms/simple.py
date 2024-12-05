@@ -9,6 +9,8 @@ from datetime import timedelta
 from itertools import groupby
 from operator import itemgetter
 
+import numpy as np
+
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.markets.base_market import MarketRole
 
@@ -399,7 +401,7 @@ class PayAsBidBuildingRole(PayAsBidRole):
                     # Case 1: Demand of a building could not be fulfilled within the community -> buy from energy provider
                     if is_demand_from_provider_needed(demand_order, supply_order):
                         supply_order["accepted_price"] = supply_order["price"]
-                        demand_order["accepted_price"] = supply_order["price"]
+                        demand_order["accepted_price"] = np.mean([supply_order["price"], demand_order.get("accepted_price") or supply_order["price"]])
                         supply_order["accepted_volume"] = supply_order["volume"]
                         to_commit.append(supply_order)
                         gen_vol += supply_order["volume"]
@@ -416,7 +418,7 @@ class PayAsBidBuildingRole(PayAsBidRole):
                     # Default behavior: pay-as-bid mechanism for trading within the community
                     elif supply_order["price"] <= demand_order["price"]:
                         supply_order["accepted_price"] = supply_order["price"]
-                        demand_order["accepted_price"] = supply_order["price"]
+                        demand_order["accepted_price"] = np.mean([supply_order["price"], demand_order.get("accepted_price") or supply_order["price"]])
                         supply_order["accepted_volume"] = supply_order["volume"]
                         to_commit.append(supply_order)
                         gen_vol += supply_order["volume"]
