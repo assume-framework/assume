@@ -59,7 +59,7 @@ class MarketMechanism:
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
-    ) -> tuple[Orderbook, Orderbook, list[dict]]:
+    ) -> tuple[Orderbook, Orderbook, list[dict], dict[tuple, float]]:
         """
         Clears the market.
 

@@ -97,7 +97,7 @@ class NodalMarketRole(MarketRole):
 
     def clear(
         self, orderbook: Orderbook, market_products
-    ) -> tuple[Orderbook, Orderbook, list[dict]]:
+    ) -> tuple[Orderbook, Orderbook, list[dict], dict[tuple, float]]:
         """
         Clears the market by running a linear optimal power flow (LOPF) with PyPSA.
 
