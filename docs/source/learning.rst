@@ -31,7 +31,7 @@ interacting in the same environment. The Markov game for :math:`N` agents consis
 a set of observations :math:`O_1, \ldots, O_N`, and a state transition function :math:`P: S \times A_1 \times \ldots \times A_N \rightarrow \mathcal{P}(S)` dependent on the state and actions of all agents.
 After taking action :math:`a_i \in A_i` in state :math:`s_i \in S` according to a policy :math:`\pi_i: O_i \rightarrow A_i`, every agent :math:`i` is transitioned into the new state :math:`s'_i \in S`.
 Each agent receives a reward :math:`r_i` according to the individual reward function :math:`R_i` and a private observation correlated with the state :math:`o_i: S \rightarrow O_i`.
-Like MDP, each agent :math:`i` learns an optimal policy :math:`\pi_i^*(s)` that maximizes its expected reward.
+Like Markov Decision Process (MDP), each agent :math:`i` learns an optimal policy :math:`\pi_i^*(s)` that maximizes its expected reward.
 
 To enable multi-agent learning some adjustments are needed within the learning algorithm to get from the TD3 to an MATD3 algorithm.
 Other authors used similar tweaks to improve the MADDPG algorithm and derive the MA-TD3 algorithm.

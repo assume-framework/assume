@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from collections.abc import Callable
+from datetime import timedelta
+import pandas as pd
 from datetime import datetime
 from typing import TypedDict
 
@@ -10,12 +12,14 @@ import numpy as np
 import torch as th
 
 
+# TD3 and PPO
 class ObsActRew(TypedDict):
     observation: list[th.Tensor]
     action: list[th.Tensor]
     reward: list[th.Tensor]
 
 
+# TD3 and PPO
 observation_dict = dict[list[datetime], ObsActRew]
 
 # A schedule takes the remaining progress as input
@@ -23,6 +27,8 @@ observation_dict = dict[list[datetime], ObsActRew]
 Schedule = Callable[[float], float]
 
 
+
+# TD3
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:
@@ -56,6 +62,7 @@ class OUNoise:
         return noise
 
 
+# TD3
 class NormalActionNoise:
     """
     A gaussian action noise
@@ -80,6 +87,7 @@ class NormalActionNoise:
         self.dt = updated_decay
 
 
+# TD3
 def polyak_update(params, target_params, tau: float):
     """
     Perform a Polyak average update on ``target_params`` using ``params``:
@@ -153,3 +161,47 @@ def constant_schedule(val: float) -> Schedule:
         return val
 
     return func
+
+
+def collect_obs_for_central_critic(
+    states: th.Tensor, i: int, obs_dim: int, unique_obs_dim: int, batch_size: int   
+) -> th.Tensor:
+    """
+    This function samels the observations from allagents for the central critic. 
+    In detail it takes all actions and concates all unique_obs of the agents and one time the similar observations. 
+
+    Args:
+        actions (th.Tensor): The actions
+        n_agents (int): Number of agents
+        n_actions (int): Number of actions
+
+    Returns:
+        th.Tensor: The sampled actions
+    """
+    # Sample actions for the central critic
+
+    # this takes the unique observations from all other agents assuming that
+    # the unique observations are at the end of the observation vector
+    temp = th.cat(
+        (
+            states[:, :i, obs_dim - unique_obs_dim :].reshape(
+                batch_size, -1
+            ),
+            states[
+                :, i + 1 :, obs_dim - unique_obs_dim :
+            ].reshape(batch_size, -1),
+        ),
+        axis=1,
+    )
+
+    # the final all_states vector now contains the current agent's observation
+    # and the unique observations from all other agents
+    all_states = th.cat(
+        (states[:, i, :].reshape(batch_size, -1), temp), axis=1
+    ).view(batch_size, -1)
+
+
+    return all_states
+
+
+

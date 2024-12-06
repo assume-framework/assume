@@ -46,6 +46,10 @@ Upcoming Release
     if the total duration of the market products plus first delivery time fits before the simulation end.
   - **Mango warnings**: Set MANGO logging level to ERROR to avoid unnecessary warnings in the logs.
 
+**Features:**
+  - **PPO Integration:** The Proximal Policy Optimization (PPO) algorithm has been integrated into the framework, providing users with an additional reinforcement learning algorithm option for training agents. PPO is a popular policy gradient method that has been shown to be effective in a wide range of applications, making it a valuable addition to the framework's learning capabilities. A tutorial on how to use this feature is coming soon.
+
+
 v0.4.3 - (11th November 2024)
 ===========================================
 
@@ -112,6 +116,9 @@ v0.4.1 (8th October 2024)
 - add compatibility with pyyaml-include (#421)
 - make complex clearing compatible to RL (#430)
 - pin PyPSA to remove DeprecationWarnings for now (#431)
+**New Features:**
+
+
 
 v0.4.0 (8th August 2024)
 =========================================

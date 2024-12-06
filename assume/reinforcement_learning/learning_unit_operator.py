@@ -146,14 +146,21 @@ class RLUnitsOperator(UnitsOperator):
                         }
                     )
 
+                # Only for MATD3, not for PPO
+                # Check if exploration_noise is not empty (MATD3)
                 action_tuple = unit.outputs["actions"].at[start]
-                noise_tuple = unit.outputs["exploration_noise"].at[start]
+                if "exploration_noise" in unit.outputs and hasattr(unit.outputs["exploration_noise"].at[start], "numel"):
+                    noise_tuple = unit.outputs["exploration_noise"].at[start]
+                
                 action_dim = action_tuple.numel()
 
                 for i in range(action_dim):
-                    output_dict[f"exploration_noise_{i}"] = (
-                        noise_tuple[i] if action_dim > 1 else noise_tuple
-                    )
+                    # Only for MATD3, not for PPO
+                    if "exploration_noise" in unit.outputs and hasattr(unit.outputs["exploration_noise"].loc[start], "numel"):
+                        output_dict[f"exploration_noise_{i}"] = (
+                            noise_tuple[i] if action_dim > 1 else noise_tuple
+                        )
+                    # For MATD3 and PPO
                     output_dict[f"actions_{i}"] = (
                         action_tuple[i] if action_dim > 1 else action_tuple
                     )
@@ -172,6 +179,7 @@ class RLUnitsOperator(UnitsOperator):
                 },
             )
 
+    # Executed in the interval set by train_frequency
     async def write_to_learning_role(
         self,
     ) -> None:
@@ -179,6 +187,9 @@ class RLUnitsOperator(UnitsOperator):
         Writes learning results to the learning agent.
 
         """
+
+        # print("write_to_learning_role in learning_unit_operator.py")
+
         if len(self.rl_units) == 0:
             return
 
@@ -187,11 +198,12 @@ class RLUnitsOperator(UnitsOperator):
         device = self.learning_strategies["device"]
         learning_unit_count = len(self.rl_units)
 
+        # How many reward values are available in the first learning unit -> equals the number of steps
         values_len = len(self.rl_units[0].outputs["rl_rewards"])
         # return if no data is available
         if values_len == 0:
             return
-
+        
         all_observations = th.zeros(
             (values_len, learning_unit_count, obs_dim), device=device
         )
@@ -200,16 +212,37 @@ class RLUnitsOperator(UnitsOperator):
         )
         all_rewards = []
 
+        # For PPO
+        # dimensions: steps, learning units, one log-prob for multiple observations/actions dimensions
+        all_log_probs = th.zeros(
+            (values_len, learning_unit_count, 1), device=device
+        )
+
+        # i is the index of the learning unit, unit is the learning unit object
         for i, unit in enumerate(self.rl_units):
+
             # Convert pandas Series to torch Tensor
             obs_tensor = th.stack(unit.outputs["rl_observations"][:values_len], dim=0)
+
             actions_tensor = th.stack(
                 unit.outputs["rl_actions"][:values_len], dim=0
             ).reshape(-1, act_dim)
 
+            # In the second dimension, the tensors include the number of the learning units
+            # Three dimensions: Steps, learning units, observation/action dimensions
             all_observations[:, i, :] = obs_tensor
             all_actions[:, i, :] = actions_tensor
             all_rewards.append(unit.outputs["rl_rewards"])
+
+            # For PPO
+            # Check whether the list of tensors is not empty and whether the tensors contain elements
+            if unit.outputs["rl_log_probs"]: # and all(t.numel() > 0 for t in unit.outputs["rl_log_probs"][:values_len]):
+                
+                log_prob_tensor = th.stack(
+                    unit.outputs["rl_log_probs"][:values_len], dim=0
+                ).unsqueeze(-1)
+                
+                all_log_probs[:, i, :] = log_prob_tensor
 
             # reset the outputs
             unit.reset_saved_rl_data()
@@ -227,8 +260,18 @@ class RLUnitsOperator(UnitsOperator):
             .numpy()
             .reshape(-1, learning_unit_count, act_dim)
         )
+
+
         all_rewards = np.array(all_rewards).reshape(-1, learning_unit_count)
-        rl_agent_data = (all_observations, all_actions, all_rewards)
+
+        # For PPO
+        if unit.outputs["rl_log_probs"]: # and all(t.numel() > 0 for t in unit.outputs["rl_log_probs"][:values_len]):
+            all_log_probs = all_log_probs.detach().cpu().numpy().reshape(-1, learning_unit_count, 1)
+
+            rl_agent_data = (all_observations, all_actions, all_rewards, all_log_probs)
+        # For MATD3
+        else:    
+            rl_agent_data = (all_observations, all_actions, all_rewards)
 
         learning_role_addr = self.context.data.get("learning_agent_addr")
 

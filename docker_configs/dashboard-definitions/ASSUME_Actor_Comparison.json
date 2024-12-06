@@ -1,0 +1,2279 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "target": {
+          "limit": 100,
+          "matchAny": false,
+          "tags": [],
+          "type": "dashboard"
+        },
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "This dashboard offers various perspectives (performance, run time and robustness) to compare different Actor architectures.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 3,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 10,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Welcome to ASSUMES Actor Comparison Dashboard\n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "format": "time_series",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": false,
+          "rawSql": "SELECT\n  datetime AS \"time\",\n  power\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime)\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "power"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "table": "market_dispatch",
+          "timeColumn": "datetime",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 2
+      },
+      "id": 16,
+      "panels": [],
+      "title": "Market Result Comparison",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": false,
+            "axisLabel": "Price in [€/MWh]",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 0.5,
+            "pointSize": 2,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "mappings": [],
+          "max": 90,
+          "min": 33,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "#a3222240",
+                "value": 55.7
+              },
+              {
+                "color": "#a322226e",
+                "value": 85.7
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max. Price"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#8f8f8f52",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Avg. Price"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#404040",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Min. Price"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#5f6a7a82",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Max. Price"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "Min. Price"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Q1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#00968252",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Q3"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "Q1"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Q3"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#0096824f",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 0,
+        "y": 3
+      },
+      "id": 25,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  product_start AS \"time\",\r\n  avg(price) AS \"Avg. Price\",\r\n  min(price) AS \"Min. Price\", \r\n  percentile_disc (0.25) WITHIN GROUP ( ORDER BY price ) AS \"Q1\", \r\n  percentile_disc (0.75) WITHIN GROUP ( ORDER BY price ) AS \"Q3\", \r\n  max(price) AS \"Max. Price\"\r\nFROM market_meta\r\nWHERE (SUBSTRING(simulation, 1, regexp_instr(simulation, 'run')-2) IN ($case_study)) AND $__timeFilter(product_start) \r\nGROUP BY product_start\r\nORDER BY product_start",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Market Clearing Price - Case 2 with LSTM",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Accepted price and (flexible load) bid prices per unit in the chosen market",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic-by-name"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "area"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "transparent",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 85.7
+              }
+            ]
+          },
+          "unit": "currencyEUR"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "price .*"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "€/MW"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Accepted price: pp_1 - EOM"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#a22223",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Bid price - flex:"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#009682",
+                  "mode": "shades"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 12,
+        "x": 12,
+        "y": 3
+      },
+      "id": 26,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Name",
+          "sortDesc": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "9.2.15",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "group": [
+            {
+              "params": [
+                "$__interval",
+                "none"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "unit_id"
+              ],
+              "type": "column"
+            }
+          ],
+          "hide": false,
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  max(price) AS \"Bid price - flex:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id <> 'demand_EOM' AND \r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "original_price"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg"
+                ],
+                "type": "aggregate"
+              },
+              {
+                "params": [
+                  "price"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "market_orders",
+          "timeColumn": "start_time",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "market_id",
+                "=",
+                "'$market'"
+              ],
+              "type": "expression"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "simulation",
+                "=",
+                "'$simulation'"
+              ],
+              "type": "expression"
+            }
+          ]
+        }
+      ],
+      "title": "Bid Prices: $simulation",
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "byVariable": false,
+            "include": {
+              "names": [
+                "Time",
+                "Bid price - flex: pp_1 - EOM",
+                "Bid price - flex: pp_10 - EOM",
+                "Bid price - flex: pp_11 - EOM",
+                "Bid price - flex: pp_2 - EOM",
+                "Bid price - flex: pp_3 - EOM",
+                "Bid price - flex: pp_4 - EOM",
+                "Bid price - flex: pp_5 - EOM",
+                "Bid price - flex: pp_6 - EOM",
+                "Bid price - flex: pp_7 - EOM",
+                "Bid price - flex: pp_8 - EOM",
+                "Bid price - flex: pp_9 - EOM",
+                "Accepted price: pp_1 - EOM"
+              ]
+            }
+          }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Averaged over all simulation runs.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "text",
+            "mode": "fixed"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "color-text"
+            },
+            "filterable": false,
+            "inspect": false
+          },
+          "decimals": 2,
+          "mappings": [
+            {
+              "options": {
+                "example_02a_harder": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "example_02a_harder_LF": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "example_02a_harder_lstm": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "example_02a_harder_lstm_LF": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "example_02b_harder": {
+                  "color": "dark-orange",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "example_02b_harder_lstm": {
+                  "color": "super-light-orange",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case Study"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 163
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Overall Average"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 172
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Std. Dev"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 82
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Std. Dev."
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 138
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 0,
+        "y": 16
+      },
+      "id": 24,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": [],
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "10.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  simulation as \"Case Study\", \r\n  avg(\"Avg. Price\") as \"Overall Average\", \r\n  stddev(\"Avg. Price\") as \"Std. Dev.\"\r\nFROM (\r\n  SELECT\r\n    SUBSTRING(simulation, 1, regexp_instr(simulation, 'run')-2) as \"simulation\", \r\n    substr(simulation, regexp_instr(simulation, 'run')) as \"run\",\r\n    avg(price) AS \"Avg. Price\"\r\n  FROM market_meta\r\n  WHERE (\"market_id\" LIKE 'EOM')\r\n  GROUP BY simulation\r\n  ORDER BY 1, LENGTH(simulation), 2\r\n) as subselect\r\nGROUP BY simulation",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Overall Avg. Market Clearing Price",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic-by-name"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "hidden",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [
+            {
+              "options": {
+                "example_02a_harder": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "example_02a_harder_LF": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "example_02a_harder_lstm": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "example_02a_harder_lstm_LF": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "example_02b_harder": {
+                  "color": "dark-orange",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "example_02b_harder_lstm": {
+                  "color": "super-light-orange",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 15,
+        "x": 9,
+        "y": 16
+      },
+      "id": 23,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "colorByField": "simulation",
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  SUBSTRING(simulation, 1, regexp_instr(simulation, 'run')-2) as \"simulation\", \r\n  substr(simulation, regexp_instr(simulation, 'run')) as \"run\",\r\n  avg(price) AS \"Avg. Price\"\r\nFROM market_meta\r\nWHERE (\"market_id\" LIKE 'EOM')\r\nGROUP BY simulation\r\nORDER BY 1, LENGTH(simulation), 2;",
+          "refId": "Market Clearing Price",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Avg. Market Clearing Price per Run",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 18,
+      "panels": [],
+      "title": "Computation Time Comparison",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Comparison of Total Run Times for each Simulation Run",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic-by-name"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 2,
+          "mappings": [
+            {
+              "options": {
+                "1": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "2": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "3": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "4": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "5": {
+                  "color": "semi-dark-purple",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "6": {
+                  "color": "light-purple",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "min": 0,
+          "thresholds": {
+            "mode": "percentage",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "bars"
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "max"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "min"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "index"
+            },
+            "properties": [
+              {
+                "id": "custom.axisGridShow",
+                "value": false
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "auto"
+              },
+              {
+                "id": "max",
+                "value": 6.5
+              },
+              {
+                "id": "unit",
+                "value": "time: "
+              },
+              {
+                "id": "min",
+                "value": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 11,
+        "x": 0,
+        "y": 25
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xField": "index"
+      },
+      "pluginVersion": "10.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": true,
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n  SUBSTRING(ident, 1, 18) as scenario,\r\n  SUBSTRING(ident, 20) as run,\r\n  value \r\nFROM \r\n  kpis \r\nWHERE \r\n  variable = 'total_run_time'\r\nORDER BY \r\n  scenario, LENGTH(ident), run",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  scenario, \r\n  ROW_NUMBER() OVER (ORDER BY scenario) as index, \r\n  min(value),\r\n  avg(value),  \r\n  max(value)\r\nFROM (\r\n  SELECT \r\n    SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) as scenario,\r\n    SUBSTRING(ident, regexp_instr(ident, 'run')) as run,\r\n    value \r\n  FROM \r\n    kpis \r\n  WHERE \r\n    variable = 'total_run_time'\r\n  ORDER BY \r\n    scenario, LENGTH(ident), run\r\n  ) as subselect\r\nGROUP BY \r\n  scenario",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Run Time",
+      "transformations": [
+        {
+          "disabled": true,
+          "id": "calculateField",
+          "options": {
+            "alias": "index_2",
+            "index": {
+              "asPercentile": false
+            },
+            "mode": "index",
+            "reduce": {
+              "reducer": "sum"
+            },
+            "replaceFields": false
+          }
+        },
+        {
+          "disabled": true,
+          "id": "calculateField",
+          "options": {
+            "alias": "index",
+            "binary": {
+              "left": "index_2",
+              "right": "1"
+            },
+            "mode": "binary",
+            "reduce": {
+              "reducer": "sum"
+            }
+          }
+        }
+      ],
+      "type": "trend"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "How long takes one simulation episode?",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "green",
+            "mode": "palette-classic-by-name"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1
+          },
+          "fieldMinMax": false,
+          "mappings": [
+            {
+              "options": {
+                "example_02a_harder": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "example_02a_harder_LF": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "example_02a_harder_lstm": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "example_02a_harder_lstm_LF": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "example_02b_harder": {
+                  "color": "semi-dark-purple",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "example_02b_harder_lstm": {
+                  "color": "light-purple",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 1"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 1 (LF)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 1 with LSTM"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 1 with LSTM (LF)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 2"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Case 2 with LSTM"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 15,
+        "w": 9,
+        "x": 11,
+        "y": 25
+      },
+      "id": 20,
+      "options": {
+        "bucketCount": 200,
+        "combine": false,
+        "legend": {
+          "calcs": [
+            "mean",
+            "stdDev",
+            "count"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "pluginVersion": "10.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02a_harder' AND  \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case1",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1 (LF)\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02a_harder_LF' AND  \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case1_LF",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1 with LSTM\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND\r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02a_harder_lstm' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case1_LSTM",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 1 with LSTM (LF)\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND\r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02a_harder_lstm_LF' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case 1_LSTM_LF",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 2\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02b_harder' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case2",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  variable, \r\n  ident,\r\n  value as \"Case 2 with LSTM\"\r\nFROM \r\n  kpis\r\nWHERE \r\n  variable = 'run_time' AND \r\n  SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) = 'example_02b_harder_lstm' AND \r\n  (CASE \r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN 1=1\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'learning' in ($sim_type_filter) THEN ident !~ 'eval'\r\n    WHEN 'exploration' in ($sim_type_filter) AND 'evaluation' in ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'evaluation' in ($sim_type_filter) AND 'learning' in ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' OR ident ~ 'eval'\r\n    WHEN 'exploration' IN ($sim_type_filter) THEN ident ~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n    WHEN 'evaluation' IN ($sim_type_filter) THEN ident ~ 'eval'\r\n    WHEN 'learning' IN ($sim_type_filter)  THEN ident !~ '[0-9]{1,2}[_]{1}[1-5]{1}$' AND ident !~ 'eval'\r\n  END)",
+          "refId": "Case2_LSTM",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Run Time per Simulation Episode",
+      "type": "histogram"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "How many episodes were needed for training, until early stopping was triggered?",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 1,
+          "fieldMinMax": false,
+          "mappings": [
+            {
+              "options": {
+                "1": {
+                  "color": "dark-blue",
+                  "index": 0,
+                  "text": "Case 1"
+                },
+                "2": {
+                  "color": "semi-dark-blue",
+                  "index": 1,
+                  "text": "Case 1 (LF)"
+                },
+                "3": {
+                  "color": "blue",
+                  "index": 2,
+                  "text": "Case 1 with LSTM"
+                },
+                "4": {
+                  "color": "light-blue",
+                  "index": 3,
+                  "text": "Case 1 with LSTM (LF)"
+                },
+                "5": {
+                  "color": "semi-dark-purple",
+                  "index": 4,
+                  "text": "Case 2"
+                },
+                "6": {
+                  "color": "light-purple",
+                  "index": 5,
+                  "text": "Case 2 with LSTM"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min. episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min. eval episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg. episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "avg. eval episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-yellow",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.drawStyle",
+                "value": "points"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max. episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillBelowTo",
+                "value": "min. episodes"
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max. eval episodes"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillBelowTo",
+                "value": "min. eval episodes"
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "always"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "index"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "time: "
+              },
+              {
+                "id": "custom.axisGridShow",
+                "value": false
+              },
+              {
+                "id": "max",
+                "value": 6.5
+              },
+              {
+                "id": "min",
+                "value": 0.5
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 11,
+        "x": 0,
+        "y": 36
+      },
+      "id": 21,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xField": "index"
+      },
+      "pluginVersion": "10.4.2",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "CREATE EXTENSION IF NOT EXISTS tablefunc; \r\n\r\nSELECT \r\n  scenario,\r\n  ROW_NUMBER() OVER (ORDER BY scenario) as index,\r\n  min(episodes_done) as \"min. episodes\", \r\n  avg(episodes_done) as \"avg. episodes\", \r\n  max(episodes_done) as \"max. episodes\"\r\nFROM (\r\n  SELECT \r\n    SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) as scenario, \r\n    SUBSTRING(ident, regexp_instr(ident, 'run')) as run, \r\n    episodes_done::NUMERIC\r\n  FROM crosstab( \r\n    'SELECT ident, variable, value \r\n    FROM kpis \r\n    WHERE variable = ''episodes_done'' OR variable = ''eval_episodes_done'' \r\n    ORDER BY ident, LENGTH(ident), variable',\r\n    'VALUES(''episodes_done''), (''eval_episodes_done'')' \r\n    ) as ct (ident text, episodes_done text, eval_episodes_done text)\r\n  ORDER BY scenario, LENGTH(ident), run) as subselect\r\nGROUP BY scenario",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": true,
+          "rawQuery": true,
+          "rawSql": "CREATE EXTENSION IF NOT EXISTS tablefunc; \r\n\r\nSELECT\r\n  scenario\r\nFROM (\r\n  SELECT \r\n    SUBSTRING(ident, 1, regexp_instr(ident, 'run')-2) as scenario, \r\n    SUBSTRING(ident, regexp_instr(ident, 'run')) as run, \r\n    episodes_done, \r\n    eval_episodes_done \r\n  FROM crosstab( \r\n    'SELECT ident, variable, value \r\n    FROM kpis \r\n    WHERE variable = ''episodes_done'' OR variable = ''eval_episodes_done'' \r\n    ORDER BY ident, LENGTH(ident), variable', \r\n    'VALUES(''episodes_done''), (''eval_episodes_done'')' \r\n    ) as ct (ident text, episodes_done text, eval_episodes_done text)\r\n  ORDER BY scenario, LENGTH(ident), run) as subselect\r\nGROUP BY \r\n  scenario ",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Number of Episodes",
+      "type": "trend"
+    },
+    {
+      "collapsed": true,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 47
+      },
+      "id": 27,
+      "panels": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "description": "How much profit make all learning units combined per evaluation episode? (Trained models in eval_episode 1 are mostly based on exploration runs and performing badly.)",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "fillOpacity": 80,
+                "gradientMode": "none",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "lineWidth": 1,
+                "scaleDistribution": {
+                  "type": "linear"
+                },
+                "thresholdsStyle": {
+                  "mode": "off"
+                }
+              },
+              "mappings": [],
+              "min": -3000000,
+              "thresholds": {
+                "mode": "percentage",
+                "steps": [
+                  {
+                    "color": "text"
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 3,
+            "w": 3,
+            "x": 0,
+            "y": 50
+          },
+          "id": 22,
+          "options": {
+            "barRadius": 0,
+            "barWidth": 0.97,
+            "fullHighlight": false,
+            "groupWidth": 0.7,
+            "legend": {
+              "calcs": [],
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "orientation": "vertical",
+            "showValue": "auto",
+            "stacking": "none",
+            "tooltip": {
+              "mode": "single",
+              "sort": "none"
+            },
+            "xField": "episode",
+            "xTickLabelRotation": 0,
+            "xTickLabelSpacing": 0
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-postgresql-datasource",
+                "uid": "P7B13B9DF907EC40C"
+              },
+              "editorMode": "code",
+              "format": "table",
+              "rawQuery": true,
+              "rawSql": "SELECT\r\n  SUBSTRING(simulation, 1, regexp_instr(simulation, 'eval')-2) as \"simulation run\",\r\n  episode, \r\n  sum(profit) as \"Sum (Learning Agents Profit)\"\r\nFROM rl_params\r\nWHERE simulation ~ '${simulation}_' AND perform_evaluation is true \r\nGROUP BY simulation, episode\r\nORDER BY 1, episode",
+              "refId": "A",
+              "sql": {
+                "columns": [
+                  {
+                    "parameters": [],
+                    "type": "function"
+                  }
+                ],
+                "groupBy": [
+                  {
+                    "property": {
+                      "type": "string"
+                    },
+                    "type": "groupBy"
+                  }
+                ],
+                "limit": 50
+              }
+            }
+          ],
+          "title": "Total Evaluation Profit",
+          "type": "barchart"
+        }
+      ],
+      "title": "RIP - Plot Friedhof",
+      "type": "row"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "example_02b_harder_run_4",
+          "value": "example_02b_harder_run_4"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True and perform_evaluation is False",
+        "description": "Can choose which simulation we want to show ",
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "simulation",
+        "options": [],
+        "query": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere learning_mode is True and perform_evaluation is False",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "pp_6",
+          "value": "pp_6"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'",
+        "description": "All units that have an reinforcment learning strategy and hence have the Rl specific parameteres logged",
+        "hide": 0,
+        "includeAll": false,
+        "label": "rl_unit",
+        "multi": false,
+        "name": "rl_unit",
+        "options": [],
+        "query": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'",
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "1551402000000",
+          "value": "1551402000000"
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "",
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "timeRange",
+        "options": [],
+        "query": "SELECT MIN(datetime), MAX(datetime) FROM rl_params",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "example_02b_harder"
+          ],
+          "value": [
+            "example_02b_harder"
+          ]
+        },
+        "description": "The four different scenario and actor combinations.",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Case Study",
+        "multi": true,
+        "name": "case_study",
+        "options": [
+          {
+            "selected": false,
+            "text": "example_02a_harder",
+            "value": "example_02a_harder"
+          },
+          {
+            "selected": false,
+            "text": "example_02a_harder_LF",
+            "value": "example_02a_harder_LF"
+          },
+          {
+            "selected": false,
+            "text": "example_02a_harder_lstm",
+            "value": "example_02a_harder_lstm"
+          },
+          {
+            "selected": false,
+            "text": "example_02a_harder_lstm_LF",
+            "value": "example_02a_harder_lstm_LF"
+          },
+          {
+            "selected": true,
+            "text": "example_02b_harder",
+            "value": "example_02b_harder"
+          },
+          {
+            "selected": false,
+            "text": "example_02b_harder_lstm",
+            "value": "example_02b_harder_lstm"
+          }
+        ],
+        "query": "example_02a_harder, example_02a_harder_LF, example_02a_harder_lstm, example_02a_harder_lstm_LF, example_02b_harder, example_02b_harder_lstm",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": [
+            "exploration"
+          ],
+          "value": [
+            "exploration"
+          ]
+        },
+        "description": "Charts can be filtered by type of simulation (exploration, learning or evaluation episodes).",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Simulation Type",
+        "multi": true,
+        "name": "sim_type_filter",
+        "options": [
+          {
+            "selected": true,
+            "text": "exploration",
+            "value": "exploration"
+          },
+          {
+            "selected": false,
+            "text": "learning",
+            "value": "learning"
+          },
+          {
+            "selected": false,
+            "text": "evaluation",
+            "value": "evaluation"
+          }
+        ],
+        "query": "exploration, learning, evaluation",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "2019-03-03T23:00:00.000Z",
+    "to": "2019-03-09T03:00:00.000Z"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "1m",
+      "5m",
+      "15m",
+      "30m",
+      "1h",
+      "2h"
+    ]
+  },
+  "timezone": "",
+  "title": "ASSUME: Actor Comparison",
+  "uid": "bdnvfato1dlogd",
+  "version": 16,
+  "weekStart": ""
+}
