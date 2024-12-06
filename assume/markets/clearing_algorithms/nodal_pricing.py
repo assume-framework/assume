@@ -149,11 +149,30 @@ class NodalMarketRole(MarketRole):
         nodal_network = self.network.copy()
 
         # Update p_max_pu for generators
-        nodal_network.generators_t.p_max_pu.update(p_max_pu)
-        nodal_network.generators_t.p_min_pu.update(p_min_pu)
+        # Also add new columns which did not yet exist in nodal_network.generators_t
+        df_p_max_pu = nodal_network.generators_t.p_max_pu
+        df_p_max_pu.update(p_max_pu)
+        new_columns = p_max_pu.loc[:,~p_max_pu.columns.isin(df_p_max_pu.columns)]
+        nodal_network.generators_t.p_max_pu = pd.concat([df_p_max_pu, new_columns], axis=1)
+        nodal_network.generators_t.p_max_pu.index.name = "snapshot"
+        nodal_network.generators_t.p_max_pu.columns.name = "Generator"
+
+        # Update p_min_pu for generators
+        df_p_min_pu = nodal_network.generators_t.p_min_pu
+        df_p_min_pu.update(p_min_pu)
+        new_columns = p_min_pu.loc[:,~p_min_pu.columns.isin(df_p_min_pu.columns)]
+        nodal_network.generators_t.p_min_pu = pd.concat([df_p_min_pu, new_columns], axis=1)
+        nodal_network.generators_t.p_min_pu.index.name = "snapshot"
+        nodal_network.generators_t.p_min_pu.columns.name = "Generator"
 
         # Update marginal costs for generators
-        nodal_network.generators_t.marginal_cost.update(costs)
+        df_costs = nodal_network.generators_t.marginal_cost
+        df_costs.update(costs)
+        new_columns = costs.loc[:,~costs.columns.isin(df_costs.columns)]
+        nodal_network.generators_t.marginal_cost = pd.concat([df_costs, new_columns], axis=1)
+        nodal_network.generators_t.marginal_cost.index.name = "snapshot"
+        nodal_network.generators_t.marginal_cost.columns.name = "Generator"
+
 
         with suppress_output():
             status, termination_condition = nodal_network.optimize(
@@ -168,16 +187,14 @@ class NodalMarketRole(MarketRole):
             logger.error(f"Solver exited with {termination_condition}")
             raise Exception("Solver in redispatch market did not converge")
 
-        log_flows = True
-
         # process dispatch data
         flows = self.process_dispatch_data(
-            network=nodal_network, orderbook_df=orderbook_df, log_flows=log_flows
+            network=nodal_network, orderbook_df=orderbook_df, log_flows=True
         )
 
         # return orderbook_df back to orderbook format as list of dicts
-        accepted_orders = orderbook_df.to_dict("records")
-        rejected_orders = []
+        accepted_orders = orderbook_df[orderbook_df["accepted_volume"] != 0].to_dict("records")
+        rejected_orders = orderbook_df[orderbook_df["accepted_volume"] == 0].to_dict("records")
         meta = []
 
         # calculate meta data such as total upwared and downward redispatch, total backup dispatch
@@ -264,4 +281,4 @@ class NodalMarketRole(MarketRole):
                 # rename columns
                 flows.columns = ["datetime", "line", "flow"]
 
-        return flows
+                return flows.to_dict(orient="records")

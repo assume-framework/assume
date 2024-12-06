@@ -118,8 +118,10 @@ def load_pypsa(
         load_t = network.loads_t["p_set"][load.name]
         unit_type = "demand"
 
+        kwargs = {load.name: load_t}
+
         world.add_unit(
-            f"demand_{load.name}",
+            load.name,
             unit_type,
             "demand_operator",
             {
@@ -130,7 +132,7 @@ def load_pypsa(
                 "node": load.node,
                 "price": 1e3,
             },
-            NaiveForecast(index, demand=load_t),
+            NaiveForecast(index, demand=load_t, **kwargs),
         )
 
     world.add_unit_operator("storage_operator")
@@ -171,7 +173,7 @@ if __name__ == "__main__":
     scenario = "world_pypsa"
     study_case = "scigrid_de"
     # "pay_as_clear", "redispatch" or "nodal"
-    market_mechanism = "nodal"
+    market_mechanism = "pay_as_clear"
 
     match study_case:
         case "ac_dc_meshed":
@@ -184,7 +186,7 @@ if __name__ == "__main__":
             logger.info(f"invalid studycase: {study_case}")
             network = pd.DataFrame()
 
-    study_case += market_mechanism
+    study_case = f"{study_case}_{market_mechanism}" 
 
     start = network.snapshots[0]
     end = network.snapshots[-1]

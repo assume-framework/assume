@@ -24,16 +24,15 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 4,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 4,
         "w": 24,
@@ -50,79 +49,8 @@
         "content": "# Nodal Analysing Board\n\nThis board can be used to visualize the Grid statistics and usage.\nAs well as the prices at different locations of the grid.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.0.0",
+      "pluginVersion": "11.3.1",
       "title": "Nodal Dashboard",
-      "type": "text"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 4
-      },
-      "id": 30,
-      "panels": [],
-      "title": "Market Data",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 24,
-        "x": 0,
-        "y": 5
-      },
-      "id": 17,
-      "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
-        "mode": "markdown"
-      },
-      "pluginVersion": "11.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": false,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  supply_volume\nFROM market_meta\nWHERE\n  $__timeFilter(product_start)\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "supply_volume"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_meta",
-          "timeColumn": "product_start",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
       "type": "text"
     },
     {
@@ -144,19 +72,36 @@
                 "value": null
               },
               {
+                "color": "#EAB839",
+                "value": 0.5
+              },
+              {
                 "color": "red",
-                "value": 80
+                "value": 0.8
               }
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "usage"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
-        "h": 8,
+        "h": 9,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 4
       },
       "id": 101,
       "options": {
@@ -180,6 +125,7 @@
               "clusterMinDistance": 0,
               "clusterValue": "size",
               "color": {
+                "field": "usage",
                 "fixed": "dark-green"
               },
               "enableGradient": false,
@@ -199,7 +145,7 @@
             "displayProperties": [
               "bus0",
               "bus1",
-              "s_nom"
+              "usage"
             ],
             "location": {
               "geohash": "geometry",
@@ -208,7 +154,7 @@
             },
             "name": "Grid Data",
             "query": "A",
-            "titleField": "bus0",
+            "titleField": "name",
             "type": "markers"
           }
         ],
@@ -219,18 +165,19 @@
           "zoom": 5
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "1.4.4",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  bus0, bus1, s_nom, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, simulation\nFROM lines_geo\nwhere simulation = '$simulation' \nORDER BY 1",
+          "rawSql": "SELECT\n  datetime, coalesce(abs(flow),0)/s_nom as \"usage\", l.line as name, bus0, bus1, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, l.simulation\nFROM lines_geo l\nleft join grid_flows g on l.line = g.line and l.simulation = g.simulation\nWHERE\n  $__timeFilter(datetime) AND\nl.simulation = '$simulation'\nORDER BY 1\n",
           "refId": "A",
           "select": [
             [
@@ -242,6 +189,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "lines_geo",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -250,6 +214,243 @@
       ],
       "title": "Grid Information",
       "type": "orchestracities-map-panel"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Overview of nodal results",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "kwatt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 103,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "group": [
+            {
+              "params": [
+                "$__interval",
+                "none"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "unit_id"
+              ],
+              "type": "column"
+            }
+          ],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "select $__timeGroupAlias(datetime, $__interval), line, avg(flow) as flow from grid_flows where simulation = '$simulation'\nAND $__timeFilter(datetime)\nGROUP BY 1, line\nORDER BY 1;\n",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "price"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg"
+                ],
+                "type": "aggregate"
+              },
+              {
+                "params": [
+                  "price"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "market_orders",
+          "timeColumn": "start_time",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "market_id",
+                "=",
+                "'$market'"
+              ],
+              "type": "expression"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "simulation",
+                "=",
+                "'$simulation'"
+              ],
+              "type": "expression"
+            }
+          ]
+        }
+      ],
+      "title": "Grid Flows Nodal",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 30,
+      "panels": [],
+      "title": "Market Data",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 17,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "11.3.1",
+      "title": "",
+      "type": "text"
     },
     {
       "datasource": {
@@ -336,7 +537,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 17
       },
       "id": 11,
       "maxPerRow": 4,
@@ -436,6 +637,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -466,7 +668,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -482,7 +685,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 24
+        "y": 25
       },
       "id": 19,
       "options": {
@@ -499,6 +702,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -614,6 +818,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -644,7 +849,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -660,7 +866,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 24
+        "y": 25
       },
       "id": 20,
       "options": {
@@ -677,6 +883,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -775,15 +982,15 @@
       "type": "timeseries"
     }
   ],
-  "schemaVersion": 39,
+  "preload": false,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "example_01d_base",
-          "value": "example_01d_base"
+          "text": "example_01d_nodal_case",
+          "value": "example_01d_nodal_case"
         },
         "datasource": {
           "type": "postgres",
@@ -791,21 +998,17 @@
         },
         "definition": "SELECT simulation\nFROM market_meta",
         "description": "Can choose which simulation we want to show ",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "simulation",
         "options": [],
         "query": "SELECT simulation\nFROM market_meta",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
           "text": "DAM",
           "value": "DAM"
         },
@@ -815,25 +1018,21 @@
         },
         "definition": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "description": "Choose for which market the data is displayed",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "market",
         "options": [],
         "query": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       }
     ]
   },
   "time": {
-    "from": "2019-01-01T23:00:00.000Z",
-    "to": "2019-01-06T22:59:59.000Z"
+    "from": "2018-12-31T23:00:00.000Z",
+    "to": "2019-01-08T23:00:00.000Z"
   },
-  "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {
     "refresh_intervals": [
       "5s",
@@ -847,6 +1046,6 @@
   "timezone": "",
   "title": "ASSUME - Nodal view",
   "uid": "nodalview",
-  "version": 2,
+  "version": 21,
   "weekStart": ""
 }
