@@ -44,7 +44,7 @@ def building_components() -> dict:
     return {
         'generic_storage':
             {'efficiency_charge': 1.0, 'efficiency_discharge': 1.0, 'charging_profile': 'No',
-             'initial_soc': 4.0, 'max_capacity': 8.0, 'max_power_charge': 1.0, 'max_power_discharge': 1.0,
+             'initial_soc': 0.5, 'max_capacity': 8.0, 'max_power_charge': 1.0, 'max_power_discharge': 1.0,
              'min_capacity': 0.0, 'node': 'north', 'sells_energy_to_market': 'Yes',
              'unit_type': 'building'},
         'pv_plant':
@@ -148,7 +148,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, household_unit, index,
             ), f"Expected bid volume {expected_volume}, got {bid['volume']}"
 
             # Simulate bid acceptance by setting accepted_price and accepted_volume
-            bid["accepted_price"] = expected_bid_price  # 20.0
+            bid["accepted_price"] = expected_bid_price  # 68.0
             bid["accepted_volume"] = expected_volume  # 1(battery) - 0.5(inflex) + 0.25(PV) + 1e-8
 
             # Calculate rewards based on the accepted bids
@@ -162,11 +162,11 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, household_unit, index,
             duration_hours = 1  # Since the product tuple is 1 hour
             expected_profit = (
                 expected_bid_price * bid["volume"] * duration_hours
-            )  # 20 *(1(battery) - 0.5(inflex) + 0.25(PV) + 1e-8) * 1 = ~15
+            )  # 68 *(1(battery) - 0.5(inflex) + 0.25(PV) + 1e-8) * 1 = ~51
             scaling_factor = (
-                0.1 / household_unit.max_power_discharge
-            )  # 0.1 / 1 = 0.1
-            expected_reward = expected_profit * scaling_factor  # ~15 * 0.1 = 1.5
+                household_unit.max_power_discharge * learning_config["max_bid_price"]
+            )  # 1 * 100 = 100
+            expected_reward = expected_profit / scaling_factor  # ~51 / 100 = 0.51
 
             # Assert the calculated reward
             assert (
@@ -193,7 +193,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, household_unit, index, 
     # Instantiate the StorageRLStrategy
     strategy = household_unit.bidding_strategies["EOM"]
 
-    # Define the 'charge' action: [0.2, -1.0] -> price=30, direction='charge' with volume=-1
+    # Define the 'charge' action: [0.3, -1.0] -> price=30, direction='charge' with volume=-1
     buy_action = [-0.3, -1.0]
 
     # Mock the get_actions method to return the buy action
@@ -235,7 +235,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, household_unit, index, 
             ), f"Expected bid volume {expected_volume}, got {bid['volume']}"
 
             # Simulate bid acceptance by setting accepted_price and accepted_volume
-            bid["accepted_price"] = expected_bid_price  # 20.0
+            bid["accepted_price"] = expected_bid_price  # 48
             bid["accepted_volume"] = expected_volume  # -1(battery) - 0.5(inflex) + 0.25(PV) + 1e-8
 
             # Calculate rewards based on the accepted bids
@@ -249,11 +249,11 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, household_unit, index, 
             duration_hours = 1  # Since the product tuple is 1 hour
             expected_profit = (
                 expected_bid_price * bid["volume"] * duration_hours
-            )  # 30 *(-1(battery) - 0.5(inflex) + 0.25(PV) + 1e-8) * 1 = ~-37.5
+            )  # 48 *(-1(battery) - 0.5(inflex) + 0.25(PV) + 1e-8) * 1 = ~-60
             scaling_factor = (
-                0.1 / household_unit.max_power_discharge
-            )  # 0.1 / 1 = 0.1
-            expected_reward = expected_profit * scaling_factor  # (~37.5) * 0.1 = ~-3.75
+                household_unit.max_power_discharge * learning_config["max_bid_price"]
+            )  # 1 * 100 = 100
+            expected_reward = expected_profit / scaling_factor  # (~60) / 100 = ~-0.6
 
             # Assert the calculated reward
             assert (
@@ -322,7 +322,7 @@ def test_storage_rl_strategy_hold_charge_bid(mock_market_config, household_unit,
             ), f"Expected bid volume {expected_volume}, got {bid['volume']}"
 
             # Simulate bid acceptance by setting accepted_price and accepted_volume
-            bid["accepted_price"] = expected_bid_price  # 30.0
+            bid["accepted_price"] = expected_bid_price  # 72.0
             bid["accepted_volume"] = expected_volume  #-0.5(inflex) + 0.25(PV) + 1e-8
 
             # Calculate rewards based on the accepted bids
@@ -336,11 +336,11 @@ def test_storage_rl_strategy_hold_charge_bid(mock_market_config, household_unit,
             duration_hours = 1  # Since the product tuple is 1 hour
             expected_profit = (
                 expected_bid_price * bid["volume"] * duration_hours
-            )  # 30 *(-0.5(inflex) + 0.25(PV) + 1e-8) * 1 = ~-7.5
+            )  # 72 *(-0.5(inflex) + 0.25(PV) + 1e-8) * 1 = ~-18
             scaling_factor = (
-                0.1 / household_unit.max_power_discharge
-            )  # 0.1 / 1 = 0.1
-            expected_reward = expected_profit * scaling_factor  # (~37.5) * 0.1 = ~-0.75
+                household_unit.max_power_discharge * learning_config["max_bid_price"]
+            )  # 1 * 100 = 100
+            expected_reward = expected_profit / scaling_factor  # (~-18) / 100 = ~-0.18
 
             # Assert the calculated reward
             assert (
