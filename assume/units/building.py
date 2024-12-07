@@ -83,8 +83,8 @@ class Building(DSMFlex, SupportsMinMax):
                 )
 
         #JUST FOR MY SIMULATIONS/EXPERIMENTS!!
-        self.electricity_price = self.create_price_given_solar_forecast()
-        #self.electricity_price = self.create_price_given_grid_load_forecast()
+        #self.electricity_price = self.create_price_given_solar_forecast()
+        self.electricity_price = self.create_price_given_grid_load_forecast()
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
@@ -132,6 +132,7 @@ class Building(DSMFlex, SupportsMinMax):
                 )
 
         # Parse the availability of the PV plant
+        self.pv_max_power = 0
         if self.has_pv:
             self.pv_uses_power_profile = False
             if not strtobool(self.components["pv_plant"].get("uses_power_profile", "no")):
@@ -164,6 +165,7 @@ class Building(DSMFlex, SupportsMinMax):
             self.outputs["energy_cost"] = pd.Series(0.0, index=self.index, dtype=float)
             self.pv_production = pd.Series(0.0, index=self.index, dtype=float)
             self.battery_charge = pd.Series(0.0, index=self.index, dtype=float)
+            self.pv_availability = pd.Series(0.0 if not self.has_pv else self.components["pv_plant"]["power_profile"].values, index=self.index, dtype=float)
         # End section for storage units #
         else:
             self.initialize_components()
@@ -190,14 +192,14 @@ class Building(DSMFlex, SupportsMinMax):
     def create_price_given_grid_load_forecast(self):
         buy_forecast = self.forecaster["price_EOM"].values
         sell_forecast = self.forecaster["price_EOM_sell"].values
-        community_load = self.forecaster["total_community_load"].values.copy()
+        community_load = self.forecaster["total_community_load"].values
         min_val, max_val = min(community_load), max(community_load)
 
         # Normalization to be between -1 and 1
         community_load_scaled = ((community_load - min_val) / (max_val - min_val) * 2) - 1
-        spread = (buy_forecast - sell_forecast)
-        price_delta = spread * community_load_scaled / 2
-        return np.round(buy_forecast - max(price_delta) + price_delta, 5)
+        price_delta = (buy_forecast - sell_forecast) / 2
+        mid_price = buy_forecast - price_delta
+        return pd.Series(np.round(mid_price + community_load_scaled * price_delta, 5))
 
     def create_availability_df(self, availability_periods):
         """
@@ -411,38 +413,36 @@ class Building(DSMFlex, SupportsMinMax):
         for t in self.outputs["energy"][start : end_excl].index:
             inflex_demand = self.inflex_demand[t]
             pv_power = self.pv_production[t]
-            battery_power = self.battery_charge[t]
             delta_soc = 0
             soc = self.outputs["soc"][t]
-            #TODO: Why is that needed??
-            if battery_power > self.max_power_discharge:
-                battery_power = self.max_power_discharge
-            elif battery_power < self.max_power_charge:
-                battery_power = self.max_power_charge
+            if self.battery_charge[t] > self.max_power_discharge:
+                self.battery_charge[t] = self.max_power_discharge
+            elif self.battery_charge[t] < self.max_power_charge:
+                self.battery_charge[t] = self.max_power_charge
 
             # discharging
-            if battery_power > 0:
+            if self.battery_charge[t] > 0:
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
-                if battery_power > max_soc_discharge:
-                    battery_power = max_soc_discharge
+                if self.battery_charge[t] > max_soc_discharge:
+                    self.battery_charge[t] = max_soc_discharge
 
                 delta_soc = (
-                    -battery_power / self.efficiency_discharge
+                    -self.battery_charge[t] / self.efficiency_discharge
                 )
 
             # charging
-            elif battery_power < 0:
+            elif self.battery_charge[t] < 0:
                 max_soc_charge = self.calculate_soc_max_charge(soc)
 
-                if battery_power < max_soc_charge:
-                    battery_power = max_soc_charge
+                if self.battery_charge[t] < max_soc_charge:
+                    self.battery_charge[t] = max_soc_charge
 
                 delta_soc = (
-                    -battery_power * self.efficiency_charge
+                    -self.battery_charge[t] * self.efficiency_charge
                 )
             # Update the energy with the new values from battery_power
-            self.outputs["energy"][t] = battery_power + pv_power - inflex_demand
+            self.outputs["energy"][t] = self.battery_charge[t] + pv_power - inflex_demand
 
             self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
 
@@ -482,34 +482,33 @@ class Building(DSMFlex, SupportsMinMax):
                 soc = self.outputs["soc"][start]
                 inflex_demand = self.inflex_demand[start]
                 pv_power = self.pv_production[start]
-                battery_power = self.battery_charge[start]
 
                 # discharging
-                if battery_power > 0:
+                if self.battery_charge[start] > 0:
                     max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
-                    if battery_power > max_soc_discharge:
-                        battery_power = max_soc_discharge
+                    if self.battery_charge[start] > max_soc_discharge:
+                        self.battery_charge[start] = max_soc_discharge
 
                     delta_soc = (
-                            -battery_power
+                            -self.battery_charge[start]
                             / self.efficiency_discharge
                     )
 
                 # charging
-                elif battery_power < 0:
+                elif self.battery_charge[start] < 0:
                     max_soc_charge = self.calculate_soc_max_charge(soc)
 
-                    if battery_power < max_soc_charge:
-                        battery_power = max_soc_charge
+                    if self.battery_charge[start] < max_soc_charge:
+                        self.battery_charge[start] = max_soc_charge
 
                     delta_soc = (
-                            -battery_power * self.efficiency_charge
+                            -self.battery_charge[start] * self.efficiency_charge
                     )
 
                 self.outputs["soc"][start + self.index.freq:] = soc + delta_soc
                 # Update the energy with the new values from battery_power
-                self.outputs["energy"][start] = battery_power + pv_power - inflex_demand
+                self.outputs["energy"][start] = self.battery_charge[start] + pv_power - inflex_demand
             self.bidding_strategies[marketconfig.market_id].calculate_reward(
             unit=self,
             marketconfig=marketconfig,
