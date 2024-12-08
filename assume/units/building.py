@@ -196,7 +196,7 @@ class Building(DSMFlex, SupportsMinMax):
         min_val, max_val = min(community_load), max(community_load)
 
         # Normalization to be between -1 and 1
-        community_load_scaled = ((community_load - min_val) / (max_val - min_val) * 2) - 1
+        community_load_scaled = np.where(community_load < 0, community_load / abs(min_val), community_load / max_val)
         price_delta = (buy_forecast - sell_forecast) / 2
         mid_price = buy_forecast - price_delta
         return pd.Series(np.round(mid_price + community_load_scaled * price_delta, 5))
