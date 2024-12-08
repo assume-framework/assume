@@ -201,6 +201,7 @@ class NaiveDABuildingStrategy(BaseStrategy):
                     "only_hours": product[2],
                     "price": marginal_price,
                     "volume": -volume,
+                    "node": unit.node,
                 }
             )
 
