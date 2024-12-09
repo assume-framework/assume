@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
@@ -17,11 +16,12 @@ from .utils import extend_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
-    market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
+    market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
+        until=datetime(2005, 6, 2),
         cache=True,
     ),
     opening_duration=timedelta(hours=1),
@@ -37,11 +37,13 @@ eps = 1e-4
 def test_complex_clearing():
     market_config = simple_dayahead_auction_config
     h = 24
-    market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), h, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
     ]
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == h
 
@@ -74,7 +76,9 @@ def test_complex_clearing():
 def test_market_coupling():
     market_config = simple_dayahead_auction_config
     h = 2
-    market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), h, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
         "node_id",
@@ -102,7 +106,7 @@ def test_market_coupling():
     grid_data = {"buses": nodes, "lines": lines}
     market_config.param_dict["grid_data"] = grid_data
 
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == h
 
@@ -156,7 +160,9 @@ def test_market_coupling():
 def test_market_coupling_with_island():
     market_config = simple_dayahead_auction_config
     h = 2
-    market_config.market_products = [MarketProduct(rd(hours=+1), h, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), h, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
         "node_id",
@@ -185,7 +191,7 @@ def test_market_coupling_with_island():
     grid_data = {"buses": nodes, "lines": lines}
     market_config.param_dict["grid_data"] = grid_data
 
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == h
 
@@ -286,12 +292,14 @@ def test_market_coupling_with_island():
 
 def test_complex_clearing_BB():
     market_config = simple_dayahead_auction_config
-    market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 2, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
         "min_acceptance_ratio",
     ]
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 2
 
@@ -427,13 +435,15 @@ def test_complex_clearing_BB():
 
 def test_complex_clearing_LB():
     market_config = simple_dayahead_auction_config
-    market_config.market_products = [MarketProduct(rd(hours=+1), 2, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 2, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
         "min_acceptance_ratio",
         "parent_bid_id",
     ]
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 2
 
