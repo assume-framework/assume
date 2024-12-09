@@ -26,14 +26,13 @@
   "graphTooltip": 0,
   "id": 2,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 4,
         "w": 24,
@@ -50,7 +49,7 @@
         "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.3.1",
       "title": "Overview Dashboard",
       "type": "text"
     },
@@ -68,9 +67,9 @@
       "type": "row"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
       },
       "gridPos": {
         "h": 3,
@@ -88,41 +87,8 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "11.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": false,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  supply_volume\nFROM market_meta\nWHERE\n  $__timeFilter(product_start)\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "supply_volume"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_meta",
-          "timeColumn": "product_start",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
+      "pluginVersion": "11.3.1",
+      "title": "",
       "type": "text"
     },
     {
@@ -432,6 +398,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -613,6 +580,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -835,7 +803,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -968,7 +936,7 @@
           }
         ]
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -1061,6 +1029,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -1132,11 +1101,11 @@
       "type": "row"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 3,
         "w": 24,
@@ -1153,41 +1122,8 @@
         "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": false,
-          "rawSql": "SELECT\n  \"Timestamp\" AS \"time\",\n  volume\nFROM demand_meta\nWHERE\n  $__timeFilter(\"Timestamp\")\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "volume"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "demand_meta",
-          "timeColumn": "\"Timestamp\"",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
+      "pluginVersion": "11.3.1",
+      "title": "",
       "type": "text"
     },
     {
@@ -1278,6 +1214,7 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -1286,7 +1223,7 @@
           },
           "format": "time_series",
           "group": [],
-          "hide": false,
+          "hide": true,
           "metricColumn": "none",
           "rawQuery": true,
           "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  avg(power) AS \"Market dispatch\",\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Gen_Units)\nGROUP BY 1, unit_id, power, market_id\nORDER BY 1",
@@ -1317,12 +1254,13 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "format": "time_series",
+          "editorMode": "code",
+          "format": "table",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  avg(power) AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation = '$simulation' AND\n  unit in ($Gen_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
+          "rawSql": "SELECT\n  time::timestamp,\n  power,\n  unit\nFROM unit_dispatch\nWHERE\n  --$__timeFilter(index) AND\n  simulation = '$simulation'\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -1334,6 +1272,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -1534,7 +1489,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -1780,6 +1735,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -1952,18 +1908,19 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1975,6 +1932,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2103,18 +2077,19 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2126,6 +2101,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2239,12 +2231,14 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
@@ -2261,6 +2255,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -2277,12 +2288,13 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(time,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -2294,6 +2306,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2494,7 +2523,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -2684,19 +2713,20 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  -energy_cashflow AS \"Cashflow\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -energy_cashflow AS \"Cashflow\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2708,6 +2738,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2837,6 +2884,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -2944,19 +2992,20 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  sum(energy_cashflow)/sum(power) as \"Price per MW\",\n  unit\nFROM unit_dispatch d\nWHERE\n  $__timeFilter(index) AND\n  d.simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY unit\nORDER BY 1",
+          "rawSql": "SELECT\n  sum(energy_cashflow)/sum(power) as \"Price per MW\",\n  unit\nFROM unit_dispatch d\nWHERE\n  $__timeFilter(time) AND\n  d.simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY unit\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2968,6 +3017,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3035,19 +3101,20 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  -power*1e3 as \"Volume\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -power*1e3 as \"Volume\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3059,6 +3126,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3176,17 +3260,19 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  -energy_cashflow AS \"Cashflow\",\r\n  -energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -energy_cashflow AS \"Cashflow\",\r\n  -energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3198,6 +3284,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3311,12 +3414,14 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
@@ -3333,6 +3438,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -3349,12 +3471,13 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation = '$simulation' AND\n  unit in ($Storage_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(time,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  simulation = '$simulation' AND\n  unit in ($Storage_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -3366,6 +3489,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3553,6 +3693,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -3564,7 +3705,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  SOC AS \"State of Charge\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, SOC\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  SOC AS \"State of Charge\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, SOC\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3732,7 +3873,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -3987,6 +4128,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
@@ -4177,18 +4319,19 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -4200,6 +4343,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -4328,18 +4488,19 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.3.1",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -4351,6 +4512,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -4367,16 +4545,16 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "example_02e_base",
-          "value": "example_02e_base"
+          "text": "example_01a_base",
+          "value": "example_01a_base"
         },
         "datasource": {
           "type": "postgres",
@@ -4384,21 +4562,17 @@
         },
         "definition": "SELECT simulation\nFROM market_meta",
         "description": "Can choose which simulation we want to show ",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "simulation",
         "options": [],
         "query": "SELECT simulation\nFROM market_meta",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
           "text": "EOM",
           "value": "EOM"
         },
@@ -4408,23 +4582,23 @@
         },
         "definition": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "description": "Choose for which market the data is displayed",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "market",
         "options": [],
         "query": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
-          "text": "pp_1",
-          "value": "pp_1"
+          "text": [
+            "Unit 1"
+          ],
+          "value": [
+            "Unit 1"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -4432,24 +4606,24 @@
         },
         "definition": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
-        "hide": 0,
         "includeAll": false,
-        "label": "",
         "multi": true,
         "name": "Gen_Units",
         "options": [],
         "query": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
-          "text": "demand_EOM",
-          "value": "demand_EOM"
+          "text": [
+            "demand_EOM"
+          ],
+          "value": [
+            "demand_EOM"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -4457,28 +4631,20 @@
         },
         "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
-        "hide": 0,
         "includeAll": false,
-        "label": "",
         "multi": true,
         "name": "Demand_Units",
         "options": [],
         "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
-          "text": [
-            "Storage 1"
-          ],
-          "value": [
-            "Storage 1"
-          ]
+          "text": [],
+          "value": []
         },
         "datasource": {
           "type": "postgres",
@@ -4486,24 +4652,21 @@
         },
         "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which storage units we want to display ",
-        "hide": 0,
         "includeAll": false,
-        "label": "",
         "multi": true,
         "name": "Storage_Units",
         "options": [],
         "query": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       }
     ]
   },
   "time": {
-    "from": "2019-03-01T00:00:00.000Z",
-    "to": "2019-04-30T23:59:59.000Z"
+    "from": "2019-01-01T02:50:49.533Z",
+    "to": "2019-01-03T00:53:27.762Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -4518,6 +4681,6 @@
   "timezone": "utc",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 4,
+  "version": 3,
   "weekStart": ""
 }

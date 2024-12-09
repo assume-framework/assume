@@ -22,7 +22,7 @@ datasources:
     password: assume
   jsonData:
     sslmode: "disable"
-    postgresVersion: 1200
+    postgresVersion: 1600
     timescaledb: true
   isDefault: true
   editable: true
