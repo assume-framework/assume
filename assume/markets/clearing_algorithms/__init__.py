@@ -20,11 +20,8 @@ clearing_mechanisms: dict[str, MarketRole] = {
 
 # try importing pypsa if it is installed
 try:
-    from .nodal_pricing import NodalMarketRole
     from .redispatch import RedispatchMarketRole
 
     clearing_mechanisms["redispatch"] = RedispatchMarketRole
-    clearing_mechanisms["nodal"] = NodalMarketRole
-
 except ImportError:
     pass
