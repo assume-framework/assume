@@ -415,14 +415,14 @@ class WriteOutput(Role):
                 data, orient="index", columns=["flow"]
             ).reset_index()
             # Split the 'index' column into 'timestamp' and 'line'
-            df[["timestamp", "line"]] = pd.DataFrame(
+            df[["datetime", "line"]] = pd.DataFrame(
                 df["index"].tolist(), index=df.index
             )
             # Rename the columns
             df = df.drop(columns=["index"])
 
             # set timestamp to index
-            df.set_index("timestamp", inplace=True)
+            df.set_index("datetime", inplace=True)
 
         df["simulation"] = self.simulation_id
 
@@ -480,7 +480,6 @@ class WriteOutput(Role):
             if df is None:
                 continue
 
-            df.reset_index()
             if df.empty:
                 continue
 

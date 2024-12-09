@@ -552,6 +552,13 @@ class NaiveForecast(Forecaster):
             index=self.index, value=price_forecast, name="price_forecast"
         )
 
+        self.data_dict = {}
+
+        for key, value in kwargs.items():
+            self.data_dict[key] = FastSeries(index=self.index, value=value, name=key)
+
+
+
     def __getitem__(self, column: str) -> FastSeries:
         """
         Retrieves forecasted values.
@@ -579,5 +586,7 @@ class NaiveForecast(Forecaster):
             return self.demand
         elif column == "price_EOM":
             return self.price_forecast
+        elif column in self.data_dict.keys():
+            return self.data_dict[column]
         else:
             return FastSeries(value=0.0, index=self.index)
