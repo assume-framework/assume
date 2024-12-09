@@ -393,35 +393,41 @@ class PayAsBidBuildingRole(PayAsBidRole):
 
                 dem_vol += -demand_order["volume"]
                 to_commit: Orderbook = []
-
+                demand_cost = 0
                 self.sort_orders_supply(supply_orders)
                 while supply_orders and gen_vol < dem_vol:
                     supply_order = supply_orders.pop(0)
 
                     # Case 1: Demand of a building could not be fulfilled within the community -> buy from energy provider
-                    if is_demand_from_provider_needed(demand_order, supply_order):
+                    # Or Default behavior: pay-as-bid mechanism for trading within the community
+                    if is_demand_from_provider_needed(demand_order, supply_order) or supply_order["price"] <= demand_order["price"]:
+                        #supply price for orders
                         supply_order["accepted_price"] = supply_order["price"]
-                        demand_order["accepted_price"] = np.mean([supply_order["price"], demand_order.get("accepted_price") or supply_order["price"]])
                         supply_order["accepted_volume"] = supply_order["volume"]
                         to_commit.append(supply_order)
                         gen_vol += supply_order["volume"]
+                        diff = gen_vol - dem_vol
+                        if diff <= 0:
+                            demand_cost += supply_order["accepted_price"] * supply_order["accepted_volume"]
+                            demand_order["accepted_price"] = demand_cost / abs(demand_order["volume"])
+                        else:
+                            demand_cost += supply_order["accepted_price"] * (supply_order["accepted_volume"] - diff)
+                            demand_order["accepted_price"] = demand_cost / abs(demand_order["volume"])
 
                     # Case 2: Surplus of a building was not fully consumed within the community -> sell to energy provider
                     elif is_supply_to_provider_needed(demand_order, supply_order):
                         # Overwrite the supply_order price with demand_order price since now the provider serves as backup
                         supply_order["accepted_price"] = demand_order["price"]
-                        demand_order["accepted_price"] = demand_order["price"]
                         supply_order["accepted_volume"] = supply_order["volume"]
                         to_commit.append(supply_order)
                         gen_vol += supply_order["volume"]
-
-                    # Default behavior: pay-as-bid mechanism for trading within the community
-                    elif supply_order["price"] <= demand_order["price"]:
-                        supply_order["accepted_price"] = supply_order["price"]
-                        demand_order["accepted_price"] = np.mean([supply_order["price"], demand_order.get("accepted_price") or supply_order["price"]])
-                        supply_order["accepted_volume"] = supply_order["volume"]
-                        to_commit.append(supply_order)
-                        gen_vol += supply_order["volume"]
+                        diff = gen_vol - dem_vol
+                        if diff <= 0:
+                            demand_cost += demand_order["price"] * supply_order["accepted_volume"]
+                            demand_order["accepted_price"] = demand_cost / abs(demand_order["volume"])
+                        else:
+                            demand_cost += demand_order["price"] * (supply_order["accepted_volume"] - diff)
+                            demand_order["accepted_price"] = demand_cost / abs(demand_order["volume"])
                     # if supply is not partially accepted before, reject it
                     elif not supply_order.get("accepted_volume"):
                         if "building" in supply_order["unit_id"] and "building" in demand_order["unit_id"]:
@@ -456,8 +462,6 @@ class PayAsBidBuildingRole(PayAsBidRole):
                 if demand_order["accepted_volume"]:
                     accepted_demand_orders.append(demand_order)
                 accepted_supply_orders.extend(to_commit)
-                # if math.isclose(gen_vol, dem_vol, abs_tol=1e-8):
-                #     gen_vol, dem_vol = 0, 0
 
             # if demand is fulfilled, we do have some additional supply orders
             # these will be rejected

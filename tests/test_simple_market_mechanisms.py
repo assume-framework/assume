@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import copy
+import math
 from datetime import datetime, timedelta
 
 from dateutil import rrule as rr
@@ -202,7 +203,7 @@ def test_market_pay_as_clears_single_demand_more_generation():
     assert accepted[0]["accepted_volume"] == -400
 
 
-def test_bidding_demand_within_community_supply_external():
+def test_pay_as_bid_building_market_supply_external():
     # Example of demand from a building (within community) and supply from an external energy provider
     next_opening = simple_building_auction_config.opening_hours.after(datetime.now())
     products = get_available_products(simple_building_auction_config.market_products, next_opening)
@@ -212,7 +213,7 @@ def test_bidding_demand_within_community_supply_external():
     orderbook = extend_orderbook(products, 500, 130, "external_supply", orderbook)
 
     mr = PayAsBidBuildingRole(simple_building_auction_config)
-    accepted, rejected, meta, flows = mr.clear(orderbook, products)
+    accepted, rejected, _, _ = mr.clear(orderbook, products)
 
     assert len(accepted) == 2
     assert len(rejected) == 0
@@ -223,7 +224,7 @@ def test_bidding_demand_within_community_supply_external():
     assert accepted[1]["volume"] == 500
 
 
-def test_bidding_supply_within_community_demand_external():
+def test_pay_as_bid_building_market_demand_external():
     # Example of supply from a building (within community) and demand from an external energy provider
     next_opening = simple_building_auction_config.opening_hours.after(datetime.now())
     products = get_available_products(simple_building_auction_config.market_products, next_opening)
@@ -233,7 +234,7 @@ def test_bidding_supply_within_community_demand_external():
     orderbook = extend_orderbook(products, 500, 90, "building_supply", orderbook)
 
     mr = PayAsBidBuildingRole(simple_building_auction_config)
-    accepted, rejected, meta, flows = mr.clear(orderbook, products)
+    accepted, rejected, _, _ = mr.clear(orderbook, products)
 
     assert len(accepted) == 2
     assert len(rejected) == 0
@@ -243,7 +244,7 @@ def test_bidding_supply_within_community_demand_external():
     assert accepted[0]["volume"] == -500
     assert accepted[1]["volume"] == 500
 
-def test_sorting_with_building_priority():
+def test_pay_as_bid_building_market_multiple_supply():
     # Create an orderbook with both building and non-building bids
     next_opening = simple_building_auction_config.opening_hours.after(datetime.now())
     products = get_available_products(simple_building_auction_config.market_products, next_opening)
@@ -251,11 +252,12 @@ def test_sorting_with_building_priority():
     # Creating a mix of building and non-building orders
     orderbook = extend_orderbook(products, 500, 130, "external_supply")
     orderbook = extend_orderbook(products, -400, 68, "external_demand", orderbook)
-    orderbook = extend_orderbook(products, -0.2, 100, "building_demand", orderbook)
-    orderbook = extend_orderbook(products, 0.3, 90,  "building_supply", orderbook)
+    orderbook = extend_orderbook(products, -0.5, 100, "building1_demand", orderbook)
+    orderbook = extend_orderbook(products, 0.3, 69,  "building2_supply", orderbook)
+    orderbook = extend_orderbook(products, 0.1, 75,  "building3_supply", orderbook)
 
     mr = PayAsBidBuildingRole(simple_dayahead_auction_config)
-    accepted, rejected, meta, flows = mr.clear(orderbook, products)
+    accepted, rejected, _, _ = mr.clear(orderbook, products)
 
     # accepted for the trade within the community and one additional with the 0.1 surplus with the energy provider
     assert len(accepted) == 4
@@ -263,26 +265,20 @@ def test_sorting_with_building_priority():
     assert len(rejected) == 1
 
     # Ensure that building orders are prioritized over non-building orders
-    assert accepted[0]["unit_id"] == "bid_building_demand"
-    assert accepted[1]["unit_id"] == "bid_external_demand"
-    assert accepted[2]["unit_id"] == "bid_building_supply"
-    assert accepted[3]["unit_id"] == "bid_building_supply"
+    assert accepted[0]["unit_id"] == "bid_building1_demand"
+    assert accepted[1]["unit_id"] == "bid_building2_supply"
+    assert accepted[2]["unit_id"] == "bid_building3_supply"
+    assert accepted[3]["unit_id"] == "bid_external_supply"
 
-    # Ensure the pricing is correct
-    assert accepted[0]["accepted_price"] == 90
-    assert accepted[1]["accepted_price"] == 68
-    assert accepted[2]["accepted_price"] == 90
-    assert accepted[3]["accepted_price"] == 68
+    # Ensure the pricing is correct especially for demand orders which need multiple suppliers
+    # 0.3*69 + 0.1*75 + 0.1*130 = 41.2 => 41.2/0.5 = 82.4
+    assert math.isclose(accepted[0]["accepted_price"], 82.4, abs_tol=1e-1)
+    assert accepted[1]["accepted_price"] == 69
+    assert accepted[2]["accepted_price"] == 75
+    assert accepted[3]["accepted_price"] == 130
 
     # Ensure the volumes are correct
-    assert round(accepted[0]["accepted_volume"], 1) == -0.2
-    assert round(accepted[1]["accepted_volume"], 1) == -0.1
-    assert round(accepted[2]["accepted_volume"], 1) == 0.2
-    assert round(accepted[3]["accepted_volume"], 1) == 0.1
-
-def test():
-    test = ["A", "B"]
-
-    for e in test:
-        print(e)
-        test.insert(0, "X")
+    assert math.isclose(accepted[0]["accepted_volume"], -0.5, abs_tol=1e-1)
+    assert math.isclose(accepted[1]["accepted_volume"], 0.3, abs_tol=1e-1)
+    assert math.isclose(accepted[2]["accepted_volume"], 0.1, abs_tol=1e-1)
+    assert math.isclose(accepted[3]["accepted_volume"], 0.1, abs_tol=1e-1)
