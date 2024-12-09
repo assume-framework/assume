@@ -44,7 +44,7 @@ file_handler = logging.FileHandler(filename="assume.log", mode="w+")
 stdout_handler = logging.StreamHandler(stream=sys.stdout)
 handlers = [file_handler, stdout_handler]
 logging.basicConfig(level=logging.INFO, handlers=handlers)
-logging.getLogger("mango").setLevel(logging.ERROR)
+logging.getLogger("mango").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
