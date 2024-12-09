@@ -193,10 +193,10 @@ class Building(DSMFlex, SupportsMinMax):
         buy_forecast = self.forecaster["price_EOM"].values
         sell_forecast = self.forecaster["price_EOM_sell"].values
         community_load = self.forecaster["total_community_load"].values
-        min_val, max_val = min(community_load), max(community_load)
+        scaling_factor = max(abs(min(community_load)), max(community_load))
 
-        # Normalization to be between -1 and 1
-        community_load_scaled = np.where(community_load < 0, community_load / abs(min_val), community_load / max_val)
+        # Normalization
+        community_load_scaled = community_load / scaling_factor
         price_delta = (buy_forecast - sell_forecast) / 2
         mid_price = buy_forecast - price_delta
         return pd.Series(np.round(mid_price + community_load_scaled * price_delta, 5))
