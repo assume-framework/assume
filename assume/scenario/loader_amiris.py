@@ -255,7 +255,7 @@ def add_agent_to_world(
                         "price": load["ValueOfLostLoad"],
                     },
                     # demand_series might contain more values than index
-                    NaiveForecast(index, demand=demand_series[:len(index)]),
+                    NaiveForecast(index, demand=demand_series[: len(index)]),
                 )
 
         case "StorageTrader":
