@@ -446,6 +446,7 @@ def load_config_and_create_forecaster(
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
+    exchanges_units = load_file(path=path, config=config, file_name="cross_border_flows_units")
 
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
@@ -525,6 +526,7 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
+        "exchanges_units": exchanges_units,
         "dsm_units": dsm_units,
         "forecaster": forecaster,
     }
@@ -567,6 +569,7 @@ def setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
+    exchanges_units = scenario_data["exchanges_units"]
     dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
@@ -676,6 +679,13 @@ def setup_world(
         world_bidding_strategies=world.bidding_strategies,
     )
 
+    exchanges_plants = read_units(
+        units_df=exchanges_units,
+        unit_type="exchanges",
+        forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
+    )
+
     if dsm_units is not None:
         for unit_type, units_df in dsm_units.items():
             dsm_units = read_units(
@@ -692,6 +702,8 @@ def setup_world(
     for op, op_units in str_plants.items():
         units[op].extend(op_units)
     for op, op_units in dem_plants.items():
+        units[op].extend(op_units)
+    for op, op_units in exchanges_plants.items():
         units[op].extend(op_units)
 
     # if distributed_role is true - there is a manager available
