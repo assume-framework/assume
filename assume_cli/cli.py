@@ -126,13 +126,14 @@ def cli(args=None):
     # add these two weird hacks for now
     warnings.filterwarnings("ignore", "coroutine.*?was never awaited.*")
     logging.getLogger("asyncio").setLevel("FATAL")
+    
+    # import package after argcomplete.autocomplete
+    # to improve autocompletion speed
+    from assume import World
+    from assume.common.exceptions import AssumeException
+    from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
     try:
-        # import package after argcomplete.autocomplete
-        # to improve autocompletion speed
-        from assume import World
-        from assume.scenario.loader_csv import load_scenario_folder, run_learning
-
         os.makedirs("./examples/local_db", exist_ok=True)
 
         if args.parallel:
@@ -169,6 +170,8 @@ def cli(args=None):
 
     except KeyboardInterrupt:
         pass
+    except AssumeException as e:
+        logging.error(f"Stopping: {e}")
     except Exception:
         logging.exception("Simulation aborted")
 
