@@ -169,6 +169,8 @@ class WriteOutput(Role):
         """
         Deletes all similar runs from the database based on the simulation ID. This ensures that we overwrite simulations results when restarting one. Please note that a simulation which you also want to keep need to be assigned anew ID.
         """
+        if self.db_uri is None:
+            return
         query = text("select distinct simulation from rl_params")
 
         try:
@@ -413,14 +415,14 @@ class WriteOutput(Role):
                 data, orient="index", columns=["flow"]
             ).reset_index()
             # Split the 'index' column into 'timestamp' and 'line'
-            df[["timestamp", "line"]] = pd.DataFrame(
+            df[["datetime", "line"]] = pd.DataFrame(
                 df["index"].tolist(), index=df.index
             )
             # Rename the columns
             df = df.drop(columns=["index"])
 
             # set timestamp to index
-            df.set_index("timestamp", inplace=True)
+            df.set_index("datetime", inplace=True)
 
         df["simulation"] = self.simulation_id
 
@@ -478,7 +480,6 @@ class WriteOutput(Role):
             if df is None:
                 continue
 
-            df.reset_index()
             if df.empty:
                 continue
 
@@ -684,9 +685,11 @@ class WriteOutput(Role):
         query = text(
             f"select unit, SUM(reward) FROM rl_params where simulation='{self.simulation_id}' GROUP BY unit"
         )
-        if self.db is not None:
-            with self.db.begin() as db:
-                rewards_by_unit = db.execute(query).fetchall()
+        if self.db is None:
+            return []
+        
+        with self.db.begin() as db:
+            rewards_by_unit = db.execute(query).fetchall()
 
         # convert into a numpy array
         rewards_by_unit = [r[1] for r in rewards_by_unit]
