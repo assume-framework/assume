@@ -36,7 +36,7 @@ EEGH_2024_single_storage:
     learning_rate: 0.001
     training_episodes: 300
     episodes_collecting_initial_experience: 5
-    train_freq: 300h
+    train_freq: 250h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.999
@@ -47,4 +47,4 @@ EEGH_2024_single_storage:
     validation_episodes_interval: 2
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
-    foresight: 24
+    foresight: 48
