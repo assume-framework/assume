@@ -68,17 +68,19 @@ class BaseUnit:
             for strategy in self.bidding_strategies.values()
         ):
             self.outputs["actions"] = TensorFastSeries(value=0.0, index=self.index)
-            self.outputs["exploration_noise"] = TensorFastSeries(
-                value=0.0,
-                index=self.index,
-            )
             self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
             self.outputs["regret"] = FastSeries(value=0.0, index=self.index)
 
-            # RL data stored as lists to simplify storing to the buffer
-            self.outputs["rl_observations"] = []
-            self.outputs["rl_actions"] = []
-            self.outputs["rl_rewards"] = []
+        self.avg_op_time = 0
+        self.total_op_time = 0
+
+
+        # RL data stored as lists to simplify storing to the buffer
+        self.outputs["rl_observations"] = []
+        self.outputs["rl_actions"] = []
+        self.outputs["rl_rewards"] = []
+        self.outputs["rl_log_probs"] = []
+
 
     def calculate_bids(
         self,
@@ -741,6 +743,14 @@ class LearningStrategy(BaseStrategy):
         # defines the number of provided timeseries, this is necessary for correctly splitting
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
+
+        self.rl_algorithm_name = kwargs.get("algorithm", "matd3")
+        if self.rl_algorithm_name == "matd3":
+            from assume.reinforcement_learning.algorithms.matd3 import get_actions
+            self.get_actions = get_actions
+        elif self.rl_algorithm_name == "ppo":
+            from assume.reinforcement_learning.algorithms.ppo import get_actions
+            self.get_actions = get_actions
 
 
 class LearningConfig(TypedDict):

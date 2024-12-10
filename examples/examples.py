@@ -65,7 +65,10 @@ available_examples = {
     # example_01g is used in the tutorial notebook #6: Advanced order types example
     #
     # DRL references case for learning advancement testing
-    "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
+    "small_learning_1": {
+        "scenario": "example_02a",
+        "study_case": "base",
+    }, 
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     # DRL cases with lstm instead of mlp as actor neural network architecture
