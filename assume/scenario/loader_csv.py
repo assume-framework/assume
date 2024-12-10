@@ -154,15 +154,6 @@ def load_dsm_units(
     if dsm_units is None:
         return None
 
-    residential_dsm_units = load_file(
-        path=path,
-        config=config,
-        file_name=file_name,
-    )
-
-    if residential_dsm_units is None:
-        return None
-
     # Define columns that are common across different technologies within the same plant
     common_columns = [
         "unit_operator",
@@ -210,32 +201,6 @@ def load_dsm_units(
     # Convert the structured dictionary into a DataFrame
     dsm_units_df = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
 
-    # Process each group of components by building name
-    for name, group in residential_dsm_units.groupby(residential_dsm_units.index):
-        dsm_unit = {}
-
-        # Aggregate or select appropriate data for common and bidding columns
-        # We take the first non-null entry
-        for col in common_columns + bidding_columns:
-            non_null_values = group[col].dropna()
-            if not non_null_values.empty:
-                dsm_unit[col] = non_null_values.iloc[0]
-
-        # Process each technology within the plant
-        components = {}
-        for tech, tech_data in group.groupby("technology"):
-            # Clean the technology-specific data: drop all-NaN columns and 'technology' column
-            cleaned_data = tech_data.dropna(axis=1, how="all").drop(
-                columns=["technology"]
-            )
-            components[tech] = cleaned_data.to_dict(orient="records")[0]
-
-        dsm_unit["components"] = components
-        dsm_units_dict[name] = dsm_unit
-
-    # Convert the structured dictionary into a DataFrame
-    residential_dsm_units = pd.DataFrame.from_dict(dsm_units_dict, orient="index")
-
     # Split the DataFrame based on unit_type
     unit_type_dict = {}
     if "unit_type" in dsm_units_df.columns:
@@ -243,11 +208,6 @@ def load_dsm_units(
             unit_type_dict[unit_type] = dsm_units_df[
                 dsm_units_df["unit_type"] == unit_type
             ]
-
-    for unit_type in residential_dsm_units["unit_type"].unique():
-        unit_type_dict[unit_type] = residential_dsm_units[
-            residential_dsm_units["unit_type"] == unit_type
-        ]
 
     return unit_type_dict
 
@@ -498,13 +458,7 @@ def load_config_and_create_forecaster(
         if units is not None:
             dsm_units.update(units)
 
-    residential_dsm_units = load_dsm_units(
-        path=path,
-        config=config,
-        file_name="residential_dsm_units",
-    )
-
-    if residential_dsm_units is None and (powerplant_units is None or demand_units is None):
+    if powerplant_units is None or demand_units is None:
         raise ValueError("No power plant or no demand units were provided!")
 
     forecasts_df = load_file(
@@ -571,7 +525,6 @@ def load_config_and_create_forecaster(
         "storage_units": storage_units,
         "demand_units": demand_units,
         "dsm_units": dsm_units,
-        "residential_dsm_units": residential_dsm_units,
         "forecaster": forecaster,
     }
 
