@@ -728,7 +728,7 @@ def load_scenario_folder(
     study_case: str,
     perform_evaluation: bool = False,
     terminate_learning: bool = False,
-    episode: int = 1,
+    episode: int = 0,
     eval_episode: int = 1,
 ):
     """

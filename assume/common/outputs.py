@@ -86,17 +86,6 @@ class WriteOutput(Role):
         self.learning_mode = learning_mode
         self.perform_evaluation = perform_evaluation
 
-        # get episode number if in learning or evaluation mode
-        self.episode = None
-        if self.learning_mode or self.perform_evaluation:
-            episode = self.simulation_id.split("_")[-1]
-            if episode.isdigit():
-                self.episode = int(episode)
-
-            # check if episode=0 and delete all similar runs
-            if self.episode == 0:
-                self.delete_similar_runs()
-
         # construct all timeframe under which hourly values are written to excel and db
         self.start = start
         self.end = end
@@ -216,6 +205,17 @@ class WriteOutput(Role):
                 src="no_wait",
                 # this should not wait for the task to finish to block the simulation
             )
+
+        # get episode number if in learning or evaluation mode
+        self.episode = None
+        if self.learning_mode or self.perform_evaluation:
+            episode = self.simulation_id.split("_")[-1]
+            if episode.isdigit():
+                self.episode = int(episode)
+
+            # check if episode=0 and delete all similar runs
+            if self.episode == 0:
+                self.delete_similar_runs()
 
     def handle_output_message(self, content: dict, meta: MetaDict):
         """
