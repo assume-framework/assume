@@ -69,6 +69,7 @@ class flexableEOMBlock(flexableEOM):
         bid_quantity_block = {}
         bid_price_block = []
         op_time = unit.get_operation_time(start)
+        avg_op_time = self.update_avg_op_time(op_time)
 
         for product, min_power, max_power in zip(
             product_tuples, min_power_values, max_power_values
@@ -236,6 +237,7 @@ class flexableEOMLinked(flexableEOM):
         bid_quantity_block = {}
         bid_price_block = []
         op_time = unit.get_operation_time(start)
+        avg_op_time = self.update_avg_op_time(op_time)
 
         block_id = unit.id + "_block"
 
