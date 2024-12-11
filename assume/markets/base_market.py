@@ -670,11 +670,11 @@ class MarketRole(MarketMechanism, Role):
                 receiver_addr=agent,
             )
         # store order book in db agent
-        if not accepted_orderbook:
-            logger.warning(
-                f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.market_id} are empty!"
-            )
         all_orders = accepted_orderbook + rejected_orderbook
+        if not all_orders:
+            logger.warning(
+                f"[{self.context.current_timestamp}] The combined order book for market {self.marketconfig.market_id} with products {market_products} is empty. No accepted or rejected orders were found."
+            )
         await self.store_order_book(all_orders)
 
         for meta in market_meta:
