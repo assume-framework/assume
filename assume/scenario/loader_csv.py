@@ -100,6 +100,10 @@ def load_file(
                 return None
 
             if df.index.freq < index.freq:
+                logger.warning(
+                    f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
+                    "Resampling using mean(). Make sure this is what you want and your data is in units of power."
+                )
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")
 
