@@ -17,9 +17,10 @@ from pyomo.opt import (
 )
 
 from assume.common.base import SupportsMinMax
+from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
-from assume.strategies import NaiveDABuildingStrategy
+from assume.strategies import NaiveDADSMStrategy
 from assume.units.dsm_load_shift import DSMFlex
 
 SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
@@ -47,19 +48,19 @@ class Building(DSMFlex, SupportsMinMax):
     optional_technologies = ["heatpump", "boiler", "thermal_storage", "electric_vehicle", "generic_storage", "pv_plant"]
 
     def __init__(
-        self,
-        id: str,
-        unit_operator: str,
-        bidding_strategies: dict,
-        technology: str = "building",
-        node: str = "node0",
-        index: pd.DatetimeIndex = None,
-        location: tuple[float, float] = (0.0, 0.0),
-        components: dict[str, dict] = None,
-        flexibility_measure: str = "max_load_shift",
-        demand: float = 0,
-        objective: str = None,
-        **kwargs,
+            self,
+            id: str,
+            unit_operator: str,
+            bidding_strategies: dict,
+            technology: str = "building",
+            node: str = "node0",
+            index: pd.DatetimeIndex = None,
+            location: tuple[float, float] = (0.0, 0.0),
+            components: dict[str, dict] = None,
+            flexibility_measure: str = "max_load_shift",
+            demand: float = 0,
+            objective: str = None,
+            **kwargs,
     ):
         super().__init__(
             id=id,
@@ -76,7 +77,7 @@ class Building(DSMFlex, SupportsMinMax):
         # check if the provided components are valid and do not contain any unknown components
         for component in self.components.keys():
             if (
-                component not in self.optional_technologies
+                    component not in self.optional_technologies
             ):
                 raise ValueError(
                     f"Component {component} is not a valid component for the building unit."
@@ -136,12 +137,12 @@ class Building(DSMFlex, SupportsMinMax):
         if self.has_pv:
             self.pv_uses_power_profile = False
             if not strtobool(self.components["pv_plant"].get("uses_power_profile", "no")):
-                pv_availability = self.forecaster["availability_Solar"]
+                pv_availability = pd.Series(self.forecaster["availability_Solar"])
                 pv_availability.index = self.model.time_steps
                 self.components["pv_plant"]["availability_profile"] = pv_availability
                 self.pv_max_power = self.components.get("pv_plant", {}).get("max_power", 0)
             else:
-                pv_power = self.forecaster[f"{self.id}_pv_power_profile"]
+                pv_power = pd.Series(self.forecaster[f"{self.id}_pv_power_profile"])
                 pv_power.index = self.model.time_steps
                 self.components["pv_plant"]["power_profile"] = pv_power
                 self.pv_uses_power_profile = True
@@ -152,8 +153,7 @@ class Building(DSMFlex, SupportsMinMax):
         #############################
         # Section for storage units #
         #############################
-        if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDABuildingStrategy):
-            self.electricity_price.index = self.index
+        if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDADSMStrategy):
             self.max_power_discharge = abs(self.components.get("generic_storage", {}).get("max_power_discharge", 0))
             self.max_power_charge = -abs(self.components.get("generic_storage", {}).get("max_power_charge", 0))
             self.max_capacity = self.components.get("generic_storage", {}).get("max_capacity", 0)
@@ -161,18 +161,19 @@ class Building(DSMFlex, SupportsMinMax):
             self.efficiency_charge = self.components.get("generic_storage", {}).get("efficiency_charge", 1)
             self.efficiency_discharge = self.components.get("generic_storage", {}).get("efficiency_discharge", 1)
             self.initial_soc = self.components.get("generic_storage", {}).get("initial_soc", 1e-6) * self.max_capacity
-            self.outputs["soc"] = pd.Series(self.initial_soc, index=self.index, dtype=float)
-            self.outputs["energy_cost"] = pd.Series(0.0, index=self.index, dtype=float)
-            self.pv_production = pd.Series(0.0, index=self.index, dtype=float)
-            self.battery_charge = pd.Series(0.0, index=self.index, dtype=float)
-            self.pv_availability = pd.Series(0.0 if not self.has_pv or self.pv_max_power == 0 else self.components["pv_plant"]["power_profile"].values, index=self.index, dtype=float)
+            self.outputs["soc"] = FastSeries(value=self.initial_soc, index=self.index)
+            self.outputs["energy_cost"] = FastSeries(value=0.0, index=self.index)
+            self.pv_production = FastSeries(value=0.0, index=self.index)
+            self.battery_charge = FastSeries(value=0.0, index=self.index)
+            self.pv_availability = FastSeries(
+                value=0.0 if not self.has_pv or self.pv_max_power == 0 else self.components["pv_plant"][
+                    "power_profile"].values, index=self.index)
         # End section for storage units #
         else:
             self.initialize_components()
             self.define_constraints()
             self.define_objective()
             self.initialize_process_sequence()
-
 
         solvers = check_available_solvers(*SOLVERS)
         if len(solvers) < 1:
@@ -183,23 +184,23 @@ class Building(DSMFlex, SupportsMinMax):
         self.variable_expenses_series = None
 
     def create_price_given_solar_forecast(self):
-        buy_forecast = self.forecaster["price_EOM"].values
-        sell_forecast = self.forecaster["price_EOM_sell"].values
+        buy_forecast = self.forecaster["price_EOM"]
+        sell_forecast = self.forecaster["price_EOM_sell"]
 
         price_delta = (buy_forecast - sell_forecast) * (self.forecaster["availability_Solar"])
-        return round(buy_forecast - price_delta, 2)
+        return FastSeries(value=round(buy_forecast - price_delta, 2), index=sell_forecast.index)
 
     def create_price_given_grid_load_forecast(self):
-        buy_forecast = self.forecaster["price_EOM"].values
-        sell_forecast = self.forecaster["price_EOM_sell"].values
-        community_load = self.forecaster["total_community_load"].values
+        buy_forecast = self.forecaster["price_EOM"]
+        sell_forecast = self.forecaster["price_EOM_sell"]
+        community_load = self.forecaster["total_community_load"]
         scaling_factor = max(abs(min(community_load)), max(community_load))
 
         # Normalization
         community_load_scaled = community_load / scaling_factor
         price_delta = (buy_forecast - sell_forecast) / 2
         mid_price = buy_forecast - price_delta
-        return pd.Series(np.round(mid_price + community_load_scaled * price_delta, 5))
+        return FastSeries(value=np.round(mid_price + community_load_scaled * price_delta, 5), index=sell_forecast.index)
 
     def create_availability_df(self, availability_periods):
         """
@@ -218,7 +219,6 @@ class Building(DSMFlex, SupportsMinMax):
 
         return availability_series
 
-
     def initialize_process_sequence(self):
         """
         Initializes the process sequence and constraints for the building.
@@ -232,9 +232,11 @@ class Building(DSMFlex, SupportsMinMax):
                 return (
                         (self.model.dsm_blocks["heatpump"].heat_out[t] if self.has_heatpump else 0)
                         + (self.model.dsm_blocks["boiler"].heat_out[t] if self.has_boiler else 0)
-                        + (self.model.dsm_blocks["thermal_storage"].discharge_thermal[t] if self.has_thermal_storage else 0)
+                        + (self.model.dsm_blocks["thermal_storage"].discharge_thermal[
+                               t] if self.has_thermal_storage else 0)
                         == self.model.heat_demand[t]
-                        + (self.model.dsm_blocks["thermal_storage"].charge_thermal[t] if self.has_thermal_storage else 0)
+                        + (self.model.dsm_blocks["thermal_storage"].charge_thermal[
+                               t] if self.has_thermal_storage else 0)
                 )
 
     def define_sets(self) -> None:
@@ -296,7 +298,6 @@ class Building(DSMFlex, SupportsMinMax):
                     + (self.model.dsm_blocks["electric_vehicle"].charge[t] if self.has_ev else 0)
                     + (self.model.dsm_blocks["generic_storage"].charge[t] if self.has_battery_storage else 0)
                     - (self.model.dsm_blocks["pv_plant"].power[t] if self.has_pv else 0)
-                    # TODO: My idea with sells_battery_energy_to_market is not working since there is no split up anymore!
                     - (self.model.dsm_blocks["generic_storage"].discharge[t] if self.has_battery_storage else 0)
                     - (self.model.dsm_blocks["electric_vehicle"].discharge[t] if self.has_ev else 0)
             )
@@ -307,7 +308,6 @@ class Building(DSMFlex, SupportsMinMax):
             Calculates the variable expense per time step.
             """
             return (
-                # TODO: Also Idea not really possible to have two different prices for buying and selling (variable_power negtive or positive)
                     self.model.variable_expenses[t]
                     == self.model.variable_power[t]
                     * self.model.electricity_price[t]
@@ -347,7 +347,7 @@ class Building(DSMFlex, SupportsMinMax):
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
-            results.solver.termination_condition == TerminationCondition.optimal
+                results.solver.termination_condition == TerminationCondition.optimal
         ):
             logger.debug("The model was solved optimally.")
 
@@ -362,35 +362,30 @@ class Building(DSMFlex, SupportsMinMax):
                 "Termination Condition: ", results.solver.termination_condition
             )
         # Total power series
-        power = instance.variable_power.get_values()
-        self.opt_power_requirement = pd.Series(data=power)
-        self.opt_power_requirement.index = self.index
+        power = list(instance.variable_power.get_values().values())
+        self.opt_power_requirement = FastSeries(value=power, index=self.index)
 
         # Variable expense series
-        expenses = instance.variable_expenses.get_values()
-        self.variable_expenses_series = pd.Series(data=expenses)
-        self.variable_expenses_series.index = self.index
+        expenses = list(instance.variable_expenses.get_values().values())
+        self.variable_expenses_series = FastSeries(value=expenses, index=self.index)
 
         self.write_additional_outputs(instance)
 
     def write_additional_outputs(self, instance):
-        if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDABuildingStrategy):
+        if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDADSMStrategy):
             return
         if self.has_battery_storage:
             model_block = instance.dsm_blocks["generic_storage"]
-            soc = pd.Series(
-                data=model_block.soc.get_values(), dtype=float
+            soc = FastSeries(
+                value=list(model_block.soc.get_values()), index=self.index
             ) / pyo.value(model_block.max_capacity)
-            soc.index = self.index
             self.outputs["soc"] = soc
         if self.has_ev:
             model_block = instance.dsm_blocks["electric_vehicle"]
-            ev_soc = pd.Series(
-                data=model_block.ev_battery_soc.get_values(), dtype=float
+            ev_soc = FastSeries(
+                value=list(model_block.ev_battery_soc.get_values()), index=self.index
             ) / pyo.value(model_block.max_capacity)
-            ev_soc.index = self.index
             self.outputs["ev_soc"] = ev_soc
-
 
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
         """
@@ -406,53 +401,51 @@ class Building(DSMFlex, SupportsMinMax):
         Returns:
             pd.Series: The volume of the unit within the given time range.
         """
-        if isinstance(self.bidding_strategies.get("EOM", ""), NaiveDABuildingStrategy):
+        if isinstance(self.bidding_strategies.get("EOM", ""), NaiveDADSMStrategy):
             return super().execute_current_dispatch(start, end)
 
-        end_excl = end - self.index.freq
-        for t in self.outputs["energy"][start : end_excl].index:
-            inflex_demand = self.inflex_demand[t]
-            pv_power = self.pv_production[t]
-            delta_soc = 0
-            soc = self.outputs["soc"][t]
-            if self.battery_charge[t] > self.max_power_discharge:
-                self.battery_charge[t] = self.max_power_discharge
-            elif self.battery_charge[t] < self.max_power_charge:
-                self.battery_charge[t] = self.max_power_charge
+        t = end - self.index.freq
+        inflex_demand = self.inflex_demand[t]
+        pv_power = self.pv_production[t]
+        delta_soc = 0
+        soc = self.outputs["soc"][t]
+        if self.battery_charge[t] > self.max_power_discharge:
+            self.battery_charge.at[t] = self.max_power_discharge
+        elif self.battery_charge[t] < self.max_power_charge:
+            self.battery_charge.at[t] = self.max_power_charge
 
-            # discharging
-            if self.battery_charge[t] > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
+        # discharging
+        if self.battery_charge[t] > 0:
+            max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
-                if self.battery_charge[t] > max_soc_discharge:
-                    self.battery_charge[t] = max_soc_discharge
+            if self.battery_charge[t] > max_soc_discharge:
+                self.battery_charge.at[t] = max_soc_discharge
 
-                delta_soc = (
+            delta_soc = (
                     -self.battery_charge[t] / self.efficiency_discharge
-                )
+            )
 
-            # charging
-            elif self.battery_charge[t] < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
+        # charging
+        elif self.battery_charge[t] < 0:
+            max_soc_charge = self.calculate_soc_max_charge(soc)
 
-                if self.battery_charge[t] < max_soc_charge:
-                    self.battery_charge[t] = max_soc_charge
+            if self.battery_charge[t] < max_soc_charge:
+                self.battery_charge.at[t] = max_soc_charge
 
-                delta_soc = (
+            delta_soc = (
                     -self.battery_charge[t] * self.efficiency_charge
-                )
-            # Update the energy with the new values from battery_power
-            self.outputs["energy"][t] = self.battery_charge[t] + pv_power - inflex_demand
+            )
+        # Update the energy with the new values from battery_power
+        self.outputs["energy"].at[t] = self.battery_charge[t] + pv_power - inflex_demand
 
-            self.outputs["soc"].at[t + self.index.freq] = round(soc + delta_soc, 4)
+        self.outputs["soc"].at[t + self.index.freq] = round(soc + delta_soc, 4)
 
-        return self.outputs["energy"].loc[start:end]
-
+        return self.outputs["energy"][t]
 
     def set_dispatch_plan(
-        self,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
+            self,
+            marketconfig: MarketConfig,
+            orderbook: Orderbook,
     ) -> None:
         """
         Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
@@ -476,7 +469,7 @@ class Building(DSMFlex, SupportsMinMax):
                 self.outputs["energy"].loc[start] += order["accepted_volume"]
         self.calculate_cashflow("energy", orderbook)
 
-        if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDABuildingStrategy):
+        if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDADSMStrategy):
             for start in products_index:
                 delta_soc = 0
                 soc = self.outputs["soc"][start]
@@ -488,7 +481,7 @@ class Building(DSMFlex, SupportsMinMax):
                     max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
                     if self.battery_charge[start] > max_soc_discharge:
-                        self.battery_charge[start] = max_soc_discharge
+                        self.battery_charge.at[start] = max_soc_discharge
 
                     delta_soc = (
                             -self.battery_charge[start]
@@ -500,20 +493,20 @@ class Building(DSMFlex, SupportsMinMax):
                     max_soc_charge = self.calculate_soc_max_charge(soc)
 
                     if self.battery_charge[start] < max_soc_charge:
-                        self.battery_charge[start] = max_soc_charge
+                        self.battery_charge.at[start] = max_soc_charge
 
                     delta_soc = (
                             -self.battery_charge[start] * self.efficiency_charge
                     )
 
-                self.outputs["soc"][start + self.index.freq:] = round(soc + delta_soc, 4)
+                self.outputs["soc"].at[start + self.index.freq:] = round(soc + delta_soc, 4)
                 # Update the energy with the new values from battery_power
-                self.outputs["energy"][start] = self.battery_charge[start] + pv_power - inflex_demand
+                self.outputs["energy"].at[start] = self.battery_charge[start] + pv_power - inflex_demand
             self.bidding_strategies[marketconfig.market_id].calculate_reward(
-            unit=self,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
-        )
+                unit=self,
+                marketconfig=marketconfig,
+                orderbook=orderbook,
+            )
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
@@ -529,13 +522,13 @@ class Building(DSMFlex, SupportsMinMax):
         # Initialize marginal cost
         marginal_cost = 0
 
-        if self.opt_power_requirement[start] != 0:
+        if self.opt_power_requirement is not None and self.opt_power_requirement[start] != 0:
             marginal_cost = round(abs(
                 self.variable_expenses_series[start] / self.opt_power_requirement[start]
-            ),5)
+            ), 5)
         return marginal_cost
 
-    def calculate_max_discharge(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
+    def calculate_max_discharge(self, start: pd.Timestamp) -> float:
         """
         Calculates the maximum discharging power for the given time period.
 
@@ -546,20 +539,16 @@ class Building(DSMFlex, SupportsMinMax):
         Returns:
 
         """
-        end_excl = end - self.index.freq
         if not self.has_battery_storage:
-            return pd.Series(0, index=self.index[(self.index >= start) & (self.index <= end_excl)], dtype=float)
+            return 0
 
-        max_power_discharge = pd.Series(self.max_power_discharge,
-                                        index=self.index[(self.index >= start) & (self.index <= end_excl)],
-                                        dtype=float
-                                        )
+        max_power_discharge = self.max_power_discharge
         # restrict according to min_soc
         max_soc_discharge = self.calculate_soc_max_discharge(self.outputs["soc"][start])
-        max_power_discharge = max_power_discharge.clip(upper=max_soc_discharge)
+        max_power_discharge = min(max_power_discharge, max_soc_discharge)
         return max_power_discharge
 
-    def calculate_max_charge(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
+    def calculate_max_charge(self, start: pd.Timestamp) -> float:
         """
         Calculates the maximum discharging power for the given time period.
 
@@ -570,43 +559,35 @@ class Building(DSMFlex, SupportsMinMax):
         Returns:
 
         """
-        end_excl = end - self.index.freq
         if not self.has_battery_storage:
-            return pd.Series(0, index=self.index[(self.index >= start) & (self.index <= end_excl)], dtype=float)
+            return 0
 
-        max_power_charge = pd.Series(self.max_power_charge,
-                                     index=self.index[(self.index >= start) & (self.index <= end_excl)],
-                                     dtype=float
-                                     )
+        max_power_charge = self.max_power_charge
         # restrict charging according to max_soc
         max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"][start])
-        max_power_charge = max_power_charge.clip(lower=max_soc_charge)
+        max_power_charge = max(max_power_charge, max_soc_charge)
         return max_power_charge
 
-
-    def calculate_pv_power(self, start: pd.Timestamp, end: pd.Timestamp) -> pd.Series:
-        end_excl = end - self.index.freq
-        index = self.index[(self.index >= start) & (self.index <= end_excl)]
-        current_power = pd.Series(0, index=index, dtype=float)
+    def calculate_pv_power(self, start: pd.Timestamp) -> float:
+        current_power = 0
 
         if self.has_pv and self.pv_uses_power_profile:
             power = self.components["pv_plant"].get("power_profile", 0)
             if isinstance(power, pd.Series):
-                power.index = self.index
-                current_power = power[start:end_excl]
+                power.index = self.index[self.index.start:self.index.end]
+                current_power = power[start]
         elif self.has_pv:
             av_solar = self.components["pv_plant"].get("availability_profile", 0)
             if isinstance(av_solar, pd.Series):
-                av_solar.index = self.index
-                current_power = av_solar[start:end_excl] * self.pv_max_power
+                av_solar.index = self.index[self.index.start:self.index.end]
+                current_power = av_solar[start] * self.pv_max_power
 
-        self.pv_production[start:end_excl] = current_power
+        self.pv_production.at[start] = current_power
         return current_power
 
-
     def calculate_soc_max_charge(
-        self,
-        soc,
+            self,
+            soc,
     ) -> float:
         """
         Calculates the maximum charge power depending on the current state of charge.
@@ -623,7 +604,6 @@ class Building(DSMFlex, SupportsMinMax):
         )
         return power
 
-
     def calculate_soc_max_discharge(self, soc) -> float:
         """
         Calculates the maximum discharge power depending on the current state of charge.
@@ -639,7 +619,6 @@ class Building(DSMFlex, SupportsMinMax):
             round((soc - self.min_capacity) * self.efficiency_discharge, 6),
         )
         return power
-
 
     def as_dict(self) -> dict:
         """
