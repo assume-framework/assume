@@ -687,7 +687,7 @@ class WriteOutput(Role):
         )
         if self.db is None:
             return []
-        
+
         with self.db.begin() as db:
             rewards_by_unit = db.execute(query).fetchall()
 

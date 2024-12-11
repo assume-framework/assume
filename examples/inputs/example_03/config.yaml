@@ -50,7 +50,13 @@ dam_case_2019:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear
+      market_mechanism: complex_clearing
+      param_dict:
+        solver: highs
+        pricing_mechanism: pay_as_clear
+      additional_fields:
+        - bid_type
+
 
 eom_crm_case_2019:
   start_date: 2019-01-01 00:00
