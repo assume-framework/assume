@@ -446,7 +446,9 @@ def load_config_and_create_forecaster(
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
-    exchanges_units = load_file(path=path, config=config, file_name="cross_border_flows_units")
+    exchanges_units = load_file(
+        path=path, config=config, file_name="cross_border_flows_units"
+    )
 
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}

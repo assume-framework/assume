@@ -60,17 +60,11 @@ class Exchanges(SupportsMinMax):
         self.max_power = max_power
         self.min_power = min_power
 
-        if max_power > 0 and min_power <= 0:
-            self.max_power = min_power
-            self.min_power = -max_power
-
-        self.ramp_down = max(abs(min_power), abs(max_power))
-        self.ramp_up = max(abs(min_power), abs(max_power))
-
         if direction == "import":
             self.volume = abs(self.forecaster[self.id])  # import is positive
         elif direction == "export":
             self.volume = -abs(self.forecaster[self.id])  # export is negative
+
         self.price = FastSeries(index=self.index, value=price)
 
     def execute_current_dispatch(
@@ -106,29 +100,15 @@ class Exchanges(SupportsMinMax):
             tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
         """
 
-        return self.volume, self.volume
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+        end_excl = end - self.index.freq
+        bid_volume = (
+            self.volume.loc[start:end_excl]
+            - self.outputs[product_type].loc[start:end_excl]
+        )
 
-    def calculate_ramp(
-        self,
-        op_time: int,
-        previous_power: float,
-        power: float,
-        current_power: float = 0,
-    ) -> float:
-        """
-        Corrects the possible power to offer according to ramping restrictions.
+        return bid_volume, bid_volume
 
-        Args:
-            op_time (int): The operation time.
-            previous_power (float): The previous power output of the unit.
-            power (float): The planned power offer of the unit.
-            current_power (float): The current power output of the unit.
-
-        Returns:
-            float: The corrected possible power to offer according to ramping restrictions.
-        """
-        return power
-    
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.
