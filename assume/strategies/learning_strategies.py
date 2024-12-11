@@ -142,6 +142,7 @@ class RLStrategy(AbstractLearningStrategy):
         self.algorithm = kwargs.get("algorithm", "matd3")
         actor_architecture = kwargs.get("actor_architecture", "mlp")
 
+
         if actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
                 actor_architecture
@@ -185,6 +186,27 @@ class RLStrategy(AbstractLearningStrategy):
         else:
             raise FileNotFoundError(
                 f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+            )
+        
+    def prepare_observations(self, unit, market_id):
+
+        # scaling factors for the observations
+        upper_scaling_factor_res_load = max(unit.forecaster[f"price_{market_id}"])
+        lower_scaling_factor_res_load = min(unit.forecaster[f"price_{market_id}"])
+        upper_scaling_factor_price = max(unit.forecaster[f"residualy_load_{market_id}"])
+        lower_scaling_factor_price = min(unit.forecaster[f"residual_load_{market_id}"])
+
+
+        self.scaled_res_load_obs = min_max_scale(
+                unit.forecaster[f"residual_load_{market_id}"],
+                lower_scaling_factor_res_load,
+                upper_scaling_factor_res_load,
+            )
+        
+        self.scaled_pices_obs = min_max_scale(
+                unit.forecaster[f"price_{market_id}"],
+                lower_scaling_factor_price,
+                upper_scaling_factor_price,
             )
 
     def calculate_bids(
@@ -400,98 +422,62 @@ class RLStrategy(AbstractLearningStrategy):
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
 
-        # defines bounds of observation space
-        # stays here as it is unit specific, and different forecasts might apply for different units
-        # different handling would require an extra unit loop at learning role intiliazation and unit specific max/min values
-        # further forecasts might change during the simulation if advanced forecasting is used
-        self.max_market_price = max(unit.forecaster[f"price_{market_id}"])
-        self.min_market_price = min(unit.forecaster[f"price_{market_id}"])
-        self.max_residual = max(unit.forecaster[f"residualy_load_{market_id}"])
-        self.min_residual = min(unit.forecaster[f"residual_load_{market_id}"])
-
-        # scaling factors for the observations
-        upper_scaling_factor_res_load = self.max_residual
-        lower_scaling_factor_res_load = self.min_residual
-        upper_scaling_factor_price = self.max_market_price
-        lower_scaling_factor_price = self.min_market_price
-
-        # total dispatch and marginal cost
-        upper_scaling_factor_total_dispatch = unit.max_power
-        # if unit is not running, total dispatch is 0
-        lower_scaling_factor_total_dispatch = 0
-
-        # marginal cost
-        # Could theoretically be negative (eg. subsidies), but assumed to be always positive in the simulation
-        upper_scaling_factor_marginal_cost = self.max_bid_price
-        lower_scaling_factor_marginal_cost = 0
-
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
         if (
             end_excl + forecast_len
-            > unit.forecaster[f"residual_load_{market_id}"].index[-1]
+            > self.scaled_res_load_obs.index[-1]
         ):
-            scaled_res_load_forecast = min_max_scale(
-                unit.forecaster[f"residual_load_{market_id}"].loc[start:],
-                lower_scaling_factor_res_load,
-                upper_scaling_factor_res_load,
-            )
+            scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
+                
             scaled_res_load_forecast = np.concatenate(
                 [
                     scaled_res_load_forecast,
-                    unit.forecaster[f"residual_load_{market_id}"].iloc[
+                    self.scaled_res_load_obs.iloc[
                         : self.foresight - len(scaled_res_load_forecast)
                     ],
                 ]
             )
 
         else:
-            scaled_res_load_forecast = min_max_scale(
-                unit.forecaster[f"residual_load_{market_id}"].loc[
+            scaled_res_load_forecast = self.scaled_res_load_obs.loc[
                     start : end_excl + forecast_len
-                ],
-                lower_scaling_factor_res_load,
-                upper_scaling_factor_res_load,
-            )
-
-        if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
-            scaled_price_forecast = min_max_scale(
-                unit.forecaster[f"price_{market_id}"].loc[start:],
-                lower_scaling_factor_price,
-                upper_scaling_factor_price,
-            )
+                ]
+            
+        if end_excl + forecast_len > self.scaled_pices_obs.index[-1]:
+            scaled_price_forecast = self.scaled_pices_obs.loc[start:]
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    unit.forecaster[f"price_{market_id}"].iloc[
+                    self.scaled_pices_obs.iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
             )
 
         else:
-            scaled_price_forecast = min_max_scale(
-                unit.forecaster[f"price_{market_id}"].loc[
+            scaled_price_forecast = self.scaled_pices_obs.loc[
                     start : end_excl + forecast_len
-                ],
-                lower_scaling_factor_price,
-                upper_scaling_factor_price,
-            )
+                ]
+            
 
         # get last accepted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
         # scale unit outputs
+        # if unit is not running, total dispatch is 0
         scaled_total_dispatch = min_max_scale(
             current_volume,
-            lower_scaling_factor_total_dispatch,
-            upper_scaling_factor_total_dispatch,
+            0,
+            unit.max_power,
         )
+        # marginal cost
+        # Could theoretically be negative (eg. subsidies), but assumed to be always positive in the simulation
         scaled_marginal_cost = min_max_scale(
             current_costs,
-            lower_scaling_factor_marginal_cost,
-            upper_scaling_factor_marginal_cost,
+            0,
+            self.max_bid_price,
         )
 
         # concat all obsverations into one array
