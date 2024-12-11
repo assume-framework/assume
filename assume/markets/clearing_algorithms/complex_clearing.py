@@ -258,43 +258,51 @@ def market_clearing_opt(
 
 class ComplexClearingRole(MarketRole):
     """
-    Defines an optimization-based market clearing algorithm with support for complex bid types, including block bids, linked bids,
-    minimum acceptance ratios, and profiled volumes. This class also supports network representations with either zonal or nodal
-    configurations, allowing the modeling of complex markets with multiple zones and power flow constraints.
+    This class defines an optimization-based market clearing algorithm with support for complex bid types,
+    including block bids, linked bids, minimum acceptance ratios, and profiled volumes. It supports network
+    representations with either zonal or nodal configurations, enabling the modeling of complex markets with
+    multiple zones and power flow constraints.
 
-    The market clearing algorithm accepts the following additional arguments via the `param_dict` in the market configuration:
-
-    - `solver` (str): Specifies the solver to be used for the optimization problem. Default is 'appsi_highs'.
-    - `log_flows` (bool): Indicates whether to log the power flows on the lines. Default is False.
-    - `pricing_mechanism` (str): Defines the pricing mechanism to be used. Default is 'pay_as_clear', with an alternative option of 'pay_as_bid'.
-    - `zones_identifier` (str): The key in the bus data that identifies the zone each bus belongs to. Used for zonal representation.
-
-    Example market configuration:
-    ```
-    market_mechanism: complex_clearing
-    param_dict:
-        solver: apps_highs
-        log_flows: true
-        pricing_mechanism: pay_as_clear
-        zones_identifier: zone_id
-    ```
-
-    Network Representations:
-
-    The class supports two types of network representations:
-
-    1. Zonal Representation: The network is divided into zones, and the incidence matrix represents the connections between these zones.
-       - If a `zones_identifier` is provided, buses are grouped into zones based on this identifier. The incidence matrix is then constructed to represent the power connections between these zones. The total transfer capacity between zones is determined by the sum of the capacities of the lines connecting the zones.
-
-    2. Nodal Representation: If no `zones_identifier` is provided, each bus is treated as a separate node, and the incidence matrix represents the connections between these nodes.
-
-    Attributes:
-    - `marketconfig` (MarketConfig): The market configuration.
-    - `incidence_matrix` (pd.DataFrame): The incidence matrix representing the power network connections.
-    - `nodes` (list): List of nodes or zones in the network, depending on the selected representation.
+    The market clearing algorithm accepts additional arguments via the `param_dict` in the market configuration.
 
     Args:
-    - `marketconfig` (MarketConfig): The market configuration object containing all parameters for the market clearing process.
+        marketconfig (MarketConfig): The market configuration object containing all parameters for the market
+            clearing process.
+
+    Attributes:
+        marketconfig (MarketConfig): The market configuration.
+        incidence_matrix (pd.DataFrame): The incidence matrix representing the power network connections.
+        nodes (list): List of nodes or zones in the network, depending on the selected representation.
+
+    Supported Parameters in `param_dict`:
+        solver (str): Specifies the solver to be used for the optimization problem. Default is 'appsi_highs'.
+        log_flows (bool): Indicates whether to log the power flows on the lines. Default is False.
+        pricing_mechanism (str): Defines the pricing mechanism to be used. Default is 'pay_as_clear', with an
+            alternative option of 'pay_as_bid'.
+        zones_identifier (str): The key in the bus data that identifies the zone each bus belongs to. Used
+            for zonal representation.
+
+    Example:
+        Example market configuration:
+        ```
+        market_mechanism: complex_clearing
+        param_dict:
+            solver: apps_highs
+            log_flows: true
+            pricing_mechanism: pay_as_clear
+            zones_identifier: zone_id
+        ```
+
+    Network Representations:
+        - Zonal Representation: The network is divided into zones, and the incidence matrix represents
+        the connections between these zones.
+            - If a `zones_identifier` is provided, buses are grouped into zones based on this identifier.
+            The incidence matrix is constructed to represent the power connections between these zones.
+            The total transfer capacity between zones is determined by the sum of the capacities of the
+            lines connecting the zones.
+
+        - Nodal Representation: If no `zones_identifier` is provided, each bus is treated as a separate
+        node, and the incidence matrix represents the connections between these nodes.
     """
 
     required_fields = ["bid_type"]
