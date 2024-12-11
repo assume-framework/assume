@@ -60,6 +60,8 @@ class Exchanges(SupportsMinMax):
         self.max_power = max_power
         self.min_power = min_power
 
+        self.direction = direction
+
         if direction == "import":
             self.volume = abs(self.forecaster[self.id])  # import is positive
         elif direction == "export":
@@ -134,7 +136,7 @@ class Exchanges(SupportsMinMax):
             {
                 "max_power": self.max_power,
                 "min_power": self.min_power,
-                "unit_type": "exchanges",
+                "unit_type": "demand" if self.direction == "export" else "power_plant",
             }
         )
 
