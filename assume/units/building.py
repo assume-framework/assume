@@ -165,7 +165,7 @@ class Building(DSMFlex, SupportsMinMax):
             self.outputs["energy_cost"] = pd.Series(0.0, index=self.index, dtype=float)
             self.pv_production = pd.Series(0.0, index=self.index, dtype=float)
             self.battery_charge = pd.Series(0.0, index=self.index, dtype=float)
-            self.pv_availability = pd.Series(0.0 if not self.has_pv else self.components["pv_plant"]["power_profile"].values, index=self.index, dtype=float)
+            self.pv_availability = pd.Series(0.0 if not self.has_pv or self.pv_max_power == 0 else self.components["pv_plant"]["power_profile"].values, index=self.index, dtype=float)
         # End section for storage units #
         else:
             self.initialize_components()
@@ -444,7 +444,7 @@ class Building(DSMFlex, SupportsMinMax):
             # Update the energy with the new values from battery_power
             self.outputs["energy"][t] = self.battery_charge[t] + pv_power - inflex_demand
 
-            self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
+            self.outputs["soc"].at[t + self.index.freq] = round(soc + delta_soc, 4)
 
         return self.outputs["energy"].loc[start:end]
 
@@ -506,7 +506,7 @@ class Building(DSMFlex, SupportsMinMax):
                             -self.battery_charge[start] * self.efficiency_charge
                     )
 
-                self.outputs["soc"][start + self.index.freq:] = soc + delta_soc
+                self.outputs["soc"][start + self.index.freq:] = round(soc + delta_soc, 4)
                 # Update the energy with the new values from battery_power
                 self.outputs["energy"][start] = self.battery_charge[start] + pv_power - inflex_demand
             self.bidding_strategies[marketconfig.market_id].calculate_reward(

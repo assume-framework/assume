@@ -1416,7 +1416,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         community_load = unit.forecaster["total_community_load"]
         # Normalization to be between -1 and 1
         scaling_factor_res_load = max(abs(min(community_load)), max(community_load))
-        scaling_factor_pv = max(unit.pv_availability) if unit.has_pv else 1
+        scaling_factor_pv = max(unit.pv_availability) if unit.has_pv and unit.pv_max_power != 0 else 1
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
