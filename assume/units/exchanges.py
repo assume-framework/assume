@@ -106,15 +106,29 @@ class Exchanges(SupportsMinMax):
             tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
         """
 
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - self.index.freq
-        bid_volume = (
-            self.volume.loc[start:end_excl]
-            - self.outputs[product_type].loc[start:end_excl]
-        )
+        return self.volume, self.volume
 
-        return bid_volume, bid_volume
+    def calculate_ramp(
+        self,
+        op_time: int,
+        previous_power: float,
+        power: float,
+        current_power: float = 0,
+    ) -> float:
+        """
+        Corrects the possible power to offer according to ramping restrictions.
 
+        Args:
+            op_time (int): The operation time.
+            previous_power (float): The previous power output of the unit.
+            power (float): The planned power offer of the unit.
+            current_power (float): The current power output of the unit.
+
+        Returns:
+            float: The corrected possible power to offer according to ramping restrictions.
+        """
+        return power
+    
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.
