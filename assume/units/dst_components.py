@@ -246,7 +246,7 @@ class Boiler:
             pyo.Block: A Pyomo block representing the boiler with variables and constraints.
         """
 
-        # dependig on the fuel type, check if the model has the price profile for the fuel
+        # depending on the fuel type, check if the model has the price profile for the fuel
         if self.fuel_type == "electricity":
             if not hasattr(model, "electricity_price"):
                 raise ValueError(
@@ -929,7 +929,7 @@ class DRIPlant:
             pyo.Block: A Pyomo block representing the DRI plant with variables and constraints.
         """
 
-        # dependig on the fuel type, check if the model has the price profile for the fuel
+        # depending on the fuel type, check if the model has the price profile for the fuel
         if self.fuel_type in ["natural_gas", "both"]:
             if not hasattr(model, "natural_gas_price"):
                 raise ValueError(
@@ -1397,7 +1397,7 @@ class ElectricVehicle(GenericStorage):
         return model_block
 
 
-class HydrogenStorage(GenericStorage):
+class HydrogenBufferStorage(GenericStorage):
     """
     A class to represent a hydrogen storage unit in an energy system model.
 
@@ -1469,6 +1469,114 @@ class HydrogenStorage(GenericStorage):
             return b.discharge[t] <= b.max_power_discharge * (1 - b.status[t])
 
         # add further constraints or variables specific to hydrogen storage here
+
+        return model_block
+
+
+class SeasonalHydrogenStorage(GenericStorage):
+    """
+    A class to represent a seasonal hydrogen storage unit with specific attributes for
+    seasonal operation. This class internally handles conversion of `time_steps`.
+    """
+
+    def __init__(
+        self,
+        max_capacity: float,
+        time_steps: list[int],
+        horizon: int = 0,
+        min_capacity: float = 0.0,
+        max_power_charge: float | None = None,
+        max_power_discharge: float | None = None,
+        efficiency_charge: float = 1.0,
+        efficiency_discharge: float = 1.0,
+        initial_soc: float = 1.0,
+        final_soc_target: float = 0.5,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        storage_loss_rate: float = 0.0,
+        off_season_start: int = 0,
+        off_season_end: int = 0,
+        on_season_start: int = 0,
+        on_season_end: int = 0,
+        **kwargs,
+    ):
+        horizon = int(horizon)
+
+        super().__init__(
+            max_capacity=max_capacity,
+            time_steps=time_steps,
+            min_capacity=min_capacity,
+            max_power_charge=max_power_charge,
+            max_power_discharge=max_power_discharge,
+            efficiency_charge=efficiency_charge,
+            efficiency_discharge=efficiency_discharge,
+            initial_soc=initial_soc,
+            final_soc_target=final_soc_target,
+            ramp_up=ramp_up,
+            ramp_down=ramp_down,
+            storage_loss_rate=storage_loss_rate,
+            **kwargs,
+        )
+
+        # Convert `time_steps` to a list of integers representing each time step
+        self.time_steps = time_steps
+        self.final_soc_target = final_soc_target
+
+        # Check if initial SOC is within the bounds [0, 1]
+        if initial_soc > 1:
+            initial_soc /= max_capacity
+            logger.warning(
+                f"Initial SOC is greater than 1.0. Setting it to {initial_soc}."
+            )
+
+        # Parse comma-separated season start and end values into lists of integers
+        off_season_start_list = [int(x) for x in off_season_start.split(",")]
+        off_season_end_list = [int(x) for x in off_season_end.split(",")]
+        on_season_start_list = [int(x) for x in on_season_start.split(",")]
+        on_season_end_list = [int(x) for x in on_season_end.split(",")]
+
+        # Generate `off_season` and `on_season` lists based on parsed start and end values
+        self.off_season = []
+        for start, end in zip(off_season_start_list, off_season_end_list):
+            self.off_season.extend(list(range(start, end + 1)))
+
+        self.on_season = []
+        for start, end in zip(on_season_start_list, on_season_end_list):
+            self.on_season.extend(list(range(start, end + 1)))
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """
+        Adds seasonal storage block to the Pyomo model, defining constraints based on seasonal operation.
+        """
+        model_block = super().add_to_model(model, model_block)
+
+        # Add final_soc_target as a parameter to model_block
+        model_block.final_soc_target = pyo.Param(initialize=self.final_soc_target)
+
+        # Seasonal Constraints
+        @model_block.Constraint(self.off_season)
+        def off_season_no_discharge(b, t):
+            """
+            Prevent discharging during the off-season.
+            """
+            return b.discharge[t] == 0
+
+        @model_block.Constraint(self.on_season)
+        def on_season_no_charge(b, t):
+            """
+            Prevent charging during the on-season.
+            """
+            return b.charge[t] == 0
+
+        # Final SOC Constraint
+        @model_block.Constraint()
+        def final_soc_constraint(b):
+            """
+            Ensure SOC at the end of the time steps meets the target.
+            """
+            return b.soc[self.time_steps[-1]] >= b.final_soc_target * b.max_capacity
 
         return model_block
 
@@ -1552,7 +1660,8 @@ class DRIStorage(GenericStorage):
 # Mapping of component type identifiers to their respective classes
 demand_side_technologies: dict = {
     "electrolyser": Electrolyser,
-    "hydrogen_storage": HydrogenStorage,
+    "hydrogen_buffer_storage": HydrogenBufferStorage,
+    "hydrogen_seasonal_storage": SeasonalHydrogenStorage,
     "dri_plant": DRIPlant,
     "dri_storage": DRIStorage,
     "eaf": ElectricArcFurnace,

@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 from itertools import product
 
 import numpy as np
-import pandas as pd
 
 from assume.common.market_objects import Order
 
@@ -225,9 +224,6 @@ def get_test_prices(num: int = 24):
 
     prices = dict(
         power=power_price, gas=gas, co2=co2, lignite=lignite, coal=coal, nuclear=nuclear
-    )
-    prices = pd.DataFrame(
-        data=prices, index=pd.date_range(start="2018-01-01", freq="h", periods=num)
     )
 
     return prices

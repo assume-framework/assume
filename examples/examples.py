@@ -121,7 +121,7 @@ if __name__ == "__main__":
     example = "EEGH_2024_single_storage"
 
     if data_format == "local_db":
-        db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
+        db_uri = "sqlite:///./examples/local_db/assume_db.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 

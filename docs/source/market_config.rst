@@ -51,7 +51,7 @@ Most important, the `market_products` are a list of MarketProduct objects.
 MarketProduct
 -------------
 
-Each :meth:`assume.common.market_objects.MarketProduct` contains the three informations:
+Each :meth:`assume.common.market_objects.MarketProduct` contains the three information:
 
 - duration (a relative timedelta or recurrency rule)
 - count (how many consecutive products are available for trading)

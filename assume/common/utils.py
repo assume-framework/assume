@@ -333,31 +333,6 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
     return [j for sub in list(aggregation.values()) for j in sub]
 
 
-def get_test_demand_orders(power: np.ndarray):
-    """
-    Get test demand orders.
-
-    Args:
-        power (numpy.ndarray): Power array.
-
-    Returns:
-        pandas.DataFrame: DataFrame of demand orders.
-
-    Examples:
-        >>> power = np.array([100, 200, 150])
-        >>> get_test_demand_orders(power)
-    """
-
-    order_book = {}
-    for t in range(len(power)):
-        order_book[t] = dict(
-            type="demand", hour=t, block_id=t, name="DEM", price=3, volume=-power[t]
-        )
-    demand_order = pd.DataFrame.from_dict(order_book, orient="index")
-    demand_order = demand_order.set_index(["block_id", "hour", "name"])
-    return demand_order
-
-
 def separate_orders(orderbook: Orderbook):
     """
     Separate orders with several hours into single hour orders.
@@ -408,13 +383,13 @@ def separate_orders(orderbook: Orderbook):
 
 def get_products_index(orderbook: Orderbook) -> pd.DatetimeIndex:
     """
-    Creates an index containing all start times of orders in orderbook and all inbetween.
+    Creates an index containing all start times of orders in orderbook and all between.
 
     Args:
         orderbook (Orderbook): The orderbook.
 
     Returns:
-        pd.DatetimeIndex: The index containing all start times of orders in orderbook and all inbetween.
+        pd.DatetimeIndex: The index containing all start times of orders in orderbook and all between.
     """
     if orderbook == []:
         return []
@@ -503,7 +478,7 @@ def adjust_unit_operator_for_learning(
             unit_operator_id = "Operator-RL"
             logger.debug(
                 "Your chosen unit operator %s for the learning unit %s was overwritten with 'Operator-RL', "
-                "since all learning units need to be handeled by one unit operator.",
+                "since all learning units need to be handled by one unit operator.",
                 unit_operator_id,
                 id,
             )
@@ -587,7 +562,7 @@ def rename_study_case(path: str, old_key: str, new_key: str):
 
     Args:
         path (str): The path to the config file.
-        old_key (str): The orginal name of the key without adjustments. E.g. study_case from available_examples: "base".
+        old_key (str): The original name of the key without adjustments. E.g. study_case from available_examples: "base".
         new_key (str): The name of the key with adjustments. E.g. added run number: "base_run_1".
     """
     # Read the YAML file
@@ -674,3 +649,36 @@ def suppress_output():
         os.close(saved_stdout_fd)
         os.close(saved_stderr_fd)
         os.close(devnull)
+
+
+# Function to parse the duration string
+def parse_duration(duration_str):
+    if duration_str.endswith("d"):
+        days = float(duration_str[:-1])
+        return timedelta(days=days)
+    elif duration_str.endswith("h"):
+        hours = float(duration_str[:-1])
+        return timedelta(hours=hours)
+    elif duration_str.endswith("m"):
+        minutes = float(duration_str[:-1])
+        return timedelta(minutes=minutes)
+    elif duration_str.endswith("s"):
+        seconds = float(duration_str[:-1])
+        return timedelta(seconds=seconds)
+    else:
+        raise ValueError(f"Unsupported duration format: {duration_str}")
+
+
+def calculate_content_size(content: list | dict) -> int:
+    """
+    Calculate the size of a content in bytes.
+    """
+    if isinstance(content, dict):  # For dictionaries
+        return sys.getsizeof(content) + sum(
+            sys.getsizeof(value) for value in content.values()
+        )
+    elif isinstance(content, list):  # For lists, including lists of dicts
+        return sys.getsizeof(content) + sum(
+            calculate_content_size(item) for item in content
+        )
+    return sys.getsizeof(content)

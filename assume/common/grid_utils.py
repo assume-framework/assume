@@ -38,9 +38,9 @@ def add_generators(
         if "marginal_cost" not in gen_c.columns:
             gen_c["marginal_cost"] = p_set
 
-        network.madd(
+        network.add(
             "Generator",
-            names=generators.index,
+            name=generators.index,
             bus=generators["node"],  # bus to which the generator is connected to
             p_nom=generators[
                 "max_power"
@@ -49,9 +49,15 @@ def add_generators(
         )
     else:
         # add generators
-        network.madd(
+        generators.drop(
+            ["p_min_pu", "p_max_pu", "marginal_cost"],
+            axis=1,
+            inplace=True,
+            errors="ignore",
+        )
+        network.add(
             "Generator",
-            names=generators.index,
+            name=generators.index,
             bus=generators["node"],  # bus to which the generator is connected to
             p_nom=generators[
                 "max_power"
@@ -84,18 +90,18 @@ def add_redispatch_generators(
     )
 
     # add generators and their sold capacities as load with reversed sign to have fixed feed in
-    network.madd(
+    network.add(
         "Load",
-        names=generators.index,
+        name=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
         p_set=p_set,
         sign=1,
     )
 
     # add upward redispatch generators
-    network.madd(
+    network.add(
         "Generator",
-        names=generators.index,
+        name=generators.index,
         suffix="_up",
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
@@ -105,9 +111,9 @@ def add_redispatch_generators(
     )
 
     # add downward redispatch generators
-    network.madd(
+    network.add(
         "Generator",
-        names=generators.index,
+        name=generators.index,
         suffix="_down",
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
@@ -118,18 +124,18 @@ def add_redispatch_generators(
     )
 
     # add upward and downward backup generators at each node
-    network.madd(
+    network.add(
         "Generator",
-        names=network.buses.index,
+        name=network.buses.index,
         suffix="_backup_up",
         bus=network.buses.index,  # bus to which the generator is connected to
         p_nom=10e4,
         marginal_cost=backup_marginal_cost,
     )
 
-    network.madd(
+    network.add(
         "Generator",
-        names=network.buses.index,
+        name=network.buses.index,
         suffix="_backup_down",
         bus=network.buses.index,  # bus to which the generator is connected to
         p_nom=10e4,
@@ -151,9 +157,9 @@ def add_backup_generators(
     """
 
     # add backup generators at each node
-    network.madd(
+    network.add(
         "Generator",
-        names=network.buses.index,
+        name=network.buses.index,
         suffix="_backup",
         bus=network.buses.index,  # bus to which the generator is connected to
         p_nom=10e4,
@@ -174,9 +180,9 @@ def add_loads(
     """
 
     # add loads
-    network.madd(
+    network.add(
         "Load",
-        names=loads.index,
+        name=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
         **loads,
     )
@@ -201,9 +207,9 @@ def add_redispatch_loads(
         del loads_c["sign"]
 
     # add loads with opposite sign (default for loads is -1). This is needed to properly model the redispatch
-    network.madd(
+    network.add(
         "Load",
-        names=loads.index,
+        name=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
         sign=1,
         **loads_c,
@@ -237,9 +243,9 @@ def add_nodal_loads(
         del loads_c["sign"]
 
     # add loads as negative generators
-    network.madd(
+    network.add(
         "Generator",
-        names=loads.index,
+        name=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
         p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
         p_min_pu=p_set,
@@ -256,7 +262,7 @@ def read_pypsa_grid(
 ):
     """
     Generates the pypsa grid from a grid dictionary.
-    Does not add the generators, as they are added in different ways, depending on wether redispatch is used.
+    Does not add the generators, as they are added in different ways, depending on whether redispatch is used.
 
     Args:
         network (pypsa.Network): the pypsa network to which the components will be added
@@ -264,10 +270,10 @@ def read_pypsa_grid(
     """
 
     def add_buses(network: pypsa.Network, buses: pd.DataFrame) -> None:
-        network.import_components_from_dataframe(buses, "Bus")
+        network.add("Bus", buses.index, **buses)
 
     def add_lines(network: pypsa.Network, lines: pd.DataFrame) -> None:
-        network.import_components_from_dataframe(lines, "Line")
+        network.add("Line", lines.index, **lines)
 
     # setup the network
     add_buses(network, grid_dict["buses"])

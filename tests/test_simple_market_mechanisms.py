@@ -7,7 +7,6 @@ import math
 from datetime import datetime, timedelta
 
 from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
@@ -17,11 +16,12 @@ from .utils import create_orderbook, extend_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
-    market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
+    market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
+        until=datetime(2005, 6, 2),
         cache=True,
     ),
     opening_duration=timedelta(hours=1),
@@ -48,7 +48,9 @@ simple_building_auction_config = MarketConfig(
 )
 
 def test_market():
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )
@@ -89,7 +91,7 @@ async def test_simple_market_mechanism():
         print(name)
         market_config = copy.copy(simple_dayahead_auction_config)
         market_config.market_mechanism = name
-        next_opening = market_config.opening_hours.after(datetime.now())
+        next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
         products = get_available_products(market_config.market_products, next_opening)
         assert len(products) == 1
         order = {
@@ -112,7 +114,9 @@ async def test_simple_market_mechanism():
 
 
 def test_market_pay_as_clear():
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )
@@ -143,7 +147,9 @@ def test_market_pay_as_clear():
 
 
 def test_market_pay_as_clears_single_demand():
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )
@@ -173,7 +179,9 @@ def test_market_pay_as_clears_single_demand():
 
 
 def test_market_pay_as_clears_single_demand_more_generation():
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )

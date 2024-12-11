@@ -2,11 +2,11 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import copy
 import math
 from datetime import datetime, timedelta
 
 from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order
 from assume.common.utils import get_available_products
@@ -16,18 +16,19 @@ from .utils import extend_orderbook
 
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
-    market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
+    market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
+        until=datetime(2005, 6, 2),
         cache=True,
     ),
     opening_duration=timedelta(hours=1),
     volume_unit="MW",
     volume_tick=0.1,
     price_unit="€/MW",
-    market_mechanism="pay_as_clear_complex",
+    market_mechanism="complex_clearing",
 )
 eps = 1e-4
 
@@ -39,16 +40,15 @@ def test_complex_clearing_whitepaper_a():
     2021
     See Figure 5 a)
     """
-
-    import copy
-
     market_config = copy.copy(simple_dayahead_auction_config)
 
-    market_config.market_products = [MarketProduct(rd(hours=+1), 1, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
     ]
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 1
 
@@ -94,15 +94,15 @@ def test_complex_clearing_whitepaper_d():
     See figure 5 d)
     """
 
-    import copy
-
     market_config = copy.copy(simple_dayahead_auction_config)
-    market_config.market_products = [MarketProduct(rd(hours=+1), 1, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
         "min_acceptance_ratio",
     ]
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 1
 
@@ -150,14 +150,14 @@ def test_clearing_non_convex_1():
     5.1.1
     """
 
-    import copy
-
     market_config = copy.copy(simple_dayahead_auction_config)
-    market_config.market_products = [MarketProduct(rd(hours=+1), 3, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 3, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
     ]
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 3
 
@@ -261,15 +261,16 @@ def test_clearing_non_convex_2():
     including mar, BB for gen7
     no load costs cannot be integrated here, so the results differ
     """
-    import copy
 
     market_config = copy.copy(simple_dayahead_auction_config)
-    market_config.market_products = [MarketProduct(rd(hours=+1), 3, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 3, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
         "min_acceptance_ratio",
     ]
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 3
 
@@ -379,15 +380,16 @@ def test_clearing_non_convex_3():
 
     half of the demand bids are elastic
     """
-    import copy
 
     market_config = copy.copy(simple_dayahead_auction_config)
-    market_config.market_products = [MarketProduct(rd(hours=+1), 3, rd(hours=1))]
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), 3, timedelta(hours=1))
+    ]
     market_config.additional_fields = [
         "bid_type",
         "min_acceptance_ratio",
     ]
-    next_opening = market_config.opening_hours.after(datetime.now())
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(market_config.market_products, next_opening)
     assert len(products) == 3
 
