@@ -14,21 +14,20 @@ base:
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
-    actor_architecture: mlp
-    learning_rate: 0.001
-    training_episodes: 100
-    episodes_collecting_initial_experience: 3
-    train_freq: 24h
-    gradient_steps: 1
-    batch_size: 256
-    gamma: 0.99
     device: cpu
-    noise_sigma: 0.1
-    noise_scale: 1
-    noise_dt: 1
-    validation_episodes_interval: 5
-    early_stopping_steps: 10
-    early_stopping_threshold: 0.05
+    learning_rate: 0.001
+    validation_episodes_interval: 10 # after how many episodes the validation starts and the policy is updated
+    training_episodes: 100
+    gradient_steps: -1
+    matd3:
+      actor_architecture: mlp
+      train_freq: 24h # how often write_to_learning_role gets called
+      episodes_collecting_initial_experience: 3
+      batch_size: 64
+      gamma: 0.99
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
 
   markets_config:
     EOM:

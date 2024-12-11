@@ -6,7 +6,7 @@ import asyncio
 import logging
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from mango import (
@@ -392,14 +392,45 @@ class World:
 
         # after creation of an agent - we set additional context params
         if self.learning_mode:
+            # Extract algorithm from the Learning_Config
+            algorithm = self.learning_config.get("algorithm", "matd3")
+
+            # Select correct train_freq based on the algorithm
+            if algorithm == "matd3":
+                train_freq = self.learning_config.get("matd3", {}).get("train_freq", "24h")
+            elif algorithm == "ppo":
+                train_freq = self.learning_config.get("ppo", {}).get("train_freq", "24h")
+            else:
+                train_freq = "24h"  # Standard value if algorithm is not defined
+            
             unit_operator_agent._role_context.data.update(
                 {
                     "learning_agent_addr": self.learning_agent_addr,
                     "train_start": self.start,
                     "train_end": self.end,
-                    "train_freq": self.learning_config.get("train_freq", "24h"),
+                    "train_freq": train_freq,
                 }
             )
+            
+            
+            # Convert train_freq to hours for comparison
+            freq_value = int(train_freq[:-1])  # Extract the numerical value
+            freq_unit = train_freq[-1]  # Extract the time unit (h for hours, d for days)
+
+            # Convert the train_freq into hours
+            if freq_unit == "h":
+                train_freq_hours = freq_value
+            elif freq_unit == "d":
+                train_freq_hours = freq_value * 24
+            else:
+                train_freq_hours = 24  # Default to 24 hours
+
+            # Calculate time difference in hours
+            duration_hours = int((self.end - self.start) / timedelta(hours=1))
+
+            # Check if train_freq is larger than the time difference
+            if train_freq_hours > duration_hours:
+                print(f"Warning: The train frequency ({train_freq_hours}h) is larger than the time difference between start and end ({duration_hours}h).")
 
         else:
             unit_operator_agent._role_context.data.update(
@@ -620,11 +651,13 @@ class World:
             start_ts (datetime.datetime): The start timestamp for the simulation run.
             end_ts (datetime.datetime): The end timestamp for the simulation run.
         """
-        logger.debug("activating container")
+        if not self.learning_mode:
+            logger.info("activating container")
         # agent is implicit added to self.container._agents
         async with activate(self.container) as c:
             await tasks_complete_or_sleeping(c)
-            logger.debug("all agents up - starting simulation")
+            if not self.learning_mode:
+                logger.info("all agents up - starting simulation")
             pbar = tqdm(total=end_ts - start_ts)
 
             # allow registration before first opening

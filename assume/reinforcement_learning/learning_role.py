@@ -12,9 +12,9 @@ from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
 from assume.common.utils import datetime2timestamp
-from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
-from assume.reinforcement_learning.buffer import ReplayBuffer
+from assume.reinforcement_learning.algorithms.ppo import PPO
+from assume.reinforcement_learning.buffer import ReplayBuffer, RolloutBuffer
 from assume.reinforcement_learning.learning_utils import linear_schedule_func
 
 logger = logging.getLogger(__name__)
@@ -31,29 +31,92 @@ class Learning(Role):
 
     """
 
+    # TD3 and PPO (Replay buffer, gradient steps, early stopping, self.eval_episodes_done potentiall irrelevant for PPO)
     def __init__(
         self,
         learning_config: LearningConfig,
         start: datetime = None,
         end: datetime = None,
     ):
-        # how many learning roles do exist and how are they named
-        self.buffer: ReplayBuffer = None
+        # General parameters
+        self.rl_algorithm_name = learning_config.get("algorithm", "matd3")
+        self.early_stopping_steps = learning_config.get(self.rl_algorithm_name, {}).get(
+            "early_stopping_steps", 10
+        )
+        self.early_stopping_threshold = learning_config.get(
+            self.rl_algorithm_name, {}
+        ).get("early_stopping_threshold", 0.05)
         self.episodes_done = 0
+        # dict[key, value]
         self.rl_strats: dict[int, LearningStrategy] = {}
-        self.rl_algorithm = learning_config.get("algorithm", "matd3")
-        self.actor_architecture = learning_config.get("actor_architecture", "mlp")
+
+        # For centralized critic in MATD3
         self.critics = {}
-        self.target_critics = {}
 
         # define whether we train model or evaluate it
-        self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
         self.continue_learning = learning_config["continue_learning"]
         self.perform_evaluation = learning_config["perform_evaluation"]
         self.trained_policies_save_path = learning_config["trained_policies_save_path"]
         self.trained_policies_load_path = learning_config.get(
             "trained_policies_load_path", self.trained_policies_save_path
+        )
+
+
+        self.learning_rate = learning_config["learning_rate"]
+        self.actor_architecture = learning_config.get(self.rl_algorithm_name, {}).get(
+            "actor_architecture", "mlp"
+        )
+        self.training_episodes = learning_config[
+            "training_episodes"
+        ]
+        self.train_freq = learning_config.get(self.rl_algorithm_name, {}).get(
+            "train_freq"
+        )
+        self.batch_size = learning_config.get(self.rl_algorithm_name, {}).get(
+            "batch_size", 128
+        )
+        if start is not None:
+            self.start = datetime2timestamp(start)
+        if end is not None:
+            self.end = datetime2timestamp(end)
+
+        self.gamma = learning_config.get(self.rl_algorithm_name, {}).get("gamma", 0.99)
+        self.learning_rate_schedule = learning_config.get(
+            "learning_rate_schedule", None
+        )
+        if self.learning_rate_schedule == "linear":
+            self.calc_lr_from_progress = linear_schedule_func(self.learning_rate)
+        else:
+            self.calc_lr_from_progress = lambda x: self.learning_rate
+
+        noise_dt = learning_config.get("noise_dt", 1)
+        self.action_noise_schedule = learning_config.get("action_noise_schedule", None)
+        if self.action_noise_schedule == "linear":
+            self.calc_noise_from_progress = linear_schedule_func(noise_dt)
+        else:
+            self.calc_noise_from_progress = lambda x: noise_dt
+        
+        # if we do not have initial experience collected we will get an error as no samples are available on the
+        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
+        self.episodes_collecting_initial_experience = max(
+            learning_config.get(self.rl_algorithm_name, {}).get(
+                "episodes_collecting_initial_experience", 5
+            ),
+            1,
+        )
+
+                # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
+        self.early_stopping_steps = learning_config.get(
+            "early_stopping_steps",
+            int(
+                self.training_episodes
+                / learning_config.get("validation_episodes_interval", 5)
+                + 1
+            ),
+        )
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
         )
 
         # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
@@ -69,11 +132,38 @@ class Learning(Role):
             "early_stopping_threshold", 0.05
         )
 
+        self.gradient_steps = (
+            int(self.train_freq[:-1])
+            if learning_config.get("gradient_steps", -1) == -1
+            else learning_config["gradient_steps"]
+        )
+
+        # Algorithm-specific parameters
+        if self.rl_algorithm_name == "matd3":
+            self.buffer: ReplayBuffer = None
+            self.target_critics = {}
+            self.noise_sigma = learning_config["matd3"]["noise_sigma"]
+            self.noise_scale = learning_config["matd3"]["noise_scale"]
+
+        elif self.rl_algorithm_name == "ppo":
+            self.buffer: RolloutBuffer = None
+
+            # Potentially more parameters for PPO
+            self.steps_per_epoch = learning_config["ppo"].get("steps_per_epoch", 10)
+            self.clip_ratio = learning_config["ppo"].get("clip_ratio", 0.2)
+            self.entropy_coeff = learning_config["ppo"].get("entropy_coeff", 0.02)
+            self.value_coeff = learning_config["ppo"].get("value_coeff", 0.5)
+            self.max_grad_norm = learning_config["ppo"].get("max_grad_norm", 0.5)
+            self.gae_lambda = learning_config["ppo"].get("gae_lambda", 0.95)
+
+        
+        
         cuda_device = (
             learning_config["device"]
             if "cuda" in learning_config.get("device", "cpu")
             else "cpu"
         )
+        
         self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
 
         # future: add option to choose between float16 and float32
@@ -83,54 +173,19 @@ class Learning(Role):
         th.backends.cuda.matmul.allow_tf32 = True
         th.backends.cudnn.allow_tf32 = True
 
-        if start is not None:
-            self.start = datetime2timestamp(start)
-        if end is not None:
-            self.end = datetime2timestamp(end)
 
-        self.learning_rate = learning_config.get("learning_rate", 1e-4)
-        self.learning_rate_schedule = learning_config.get(
-            "learning_rate_schedule", None
-        )
-        if self.learning_rate_schedule == "linear":
-            self.calc_lr_from_progress = linear_schedule_func(self.learning_rate)
-        else:
-            self.calc_lr_from_progress = lambda x: self.learning_rate
 
-        noise_dt = learning_config.get("noise_dt", 1)
-        self.action_noise_schedule = learning_config.get("action_noise_schedule", None)
-        if self.action_noise_schedule == "linear":
-            self.calc_noise_from_progress = linear_schedule_func(noise_dt)
-        else:
-            self.calc_noise_from_progress = lambda x: noise_dt
+        # Initialize the algorithm depending on the type
+        self.create_learning_algorithm(self.rl_algorithm_name)
 
-        # if we do not have initial experience collected we will get an error as no samples are available on the
-        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
-
-        self.episodes_collecting_initial_experience = max(
-            learning_config.get("episodes_collecting_initial_experience", 5), 1
-        )
-
-        self.train_freq = learning_config.get("train_freq", "1h")
-        self.gradient_steps = (
-            int(self.train_freq[:-1])
-            if learning_config.get("gradient_steps", -1) == -1
-            else learning_config["gradient_steps"]
-        )
-        self.batch_size = learning_config.get("batch_size", 128)
-        self.gamma = learning_config.get("gamma", 0.99)
-
+        # Initialize evaluation metrics
         self.eval_episodes_done = 0
-
-        # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
-        self.create_learning_algorithm(self.rl_algorithm)
-
-        # store evaluation values
         self.max_eval = defaultdict(lambda: -1e9)
         self.rl_eval = defaultdict(list)
-        # list of avg_changes
+        # List of avg changes
         self.avg_rewards = []
 
+    # TD3 and PPO
     def load_inter_episodic_data(self, inter_episodic_data):
         """
         Load the inter-episodic data from the dict stored across simulation runs.
@@ -139,6 +194,7 @@ class Learning(Role):
             inter_episodic_data (dict): The inter-episodic data to be loaded.
 
         """
+        # TODO: Make this function of algorithm so that we loose case sensitivity here
         self.episodes_done = inter_episodic_data["episodes_done"]
         self.eval_episodes_done = inter_episodic_data["eval_episodes_done"]
         self.max_eval = inter_episodic_data["max_eval"]
@@ -146,13 +202,15 @@ class Learning(Role):
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
 
-        # if enough initial experience was collected according to specifications in learning config
-        # turn off initial exploration and go into full learning mode
-        if self.episodes_done > self.episodes_collecting_initial_experience:
-            self.turn_off_initial_exploration()
+        if self.rl_algorithm_name == "matd3":
+            # if enough initial experience was collected according to specifications in learning config
+            # turn off initial exploration and go into full learning mode
+            if self.episodes_done > self.episodes_collecting_initial_experience:
+                self.turn_off_initial_exploration()
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
+    # TD3 and PPO
     def get_inter_episodic_data(self):
         """
         Dump the inter-episodic data to a dict for storing across simulation runs.
@@ -171,6 +229,7 @@ class Learning(Role):
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
 
+    # TD3 and PPO
     def setup(self) -> None:
         """
         Set up the learning role for reinforcement learning training.
@@ -197,16 +256,37 @@ class Learning(Role):
             meta (dict): The metadata associated with the message. (not needed yet)
         """
 
-        if content.get("type") == "save_buffer_and_update":
-            data = content["data"]
-            self.buffer.add(
-                obs=data[0],
-                actions=data[1],
-                reward=data[2],
-            )
+        if self.rl_algorithm_name == "matd3":
+            if content.get("type") == "save_buffer_and_update":
+                data = content["data"]
+                self.buffer.add(
+                    obs=data[0],
+                    actions=data[1],
+                    reward=data[2],
+                )
 
-        self.update_policy()
+            self.update_policy()
 
+        elif self.rl_algorithm_name == "ppo":
+            
+            logger.debug("save_buffer_and_update in learning_role.py")
+
+            if content.get("type") == "save_buffer_and_update":
+                data = content["data"]
+                self.buffer.add(
+                    obs=data[0],
+                    actions=data[1],
+                    reward=data[2],
+                    log_probs=data[3],
+                )
+
+            self.update_policy()
+
+            # since the PPO is an on-policy algorithm it onyl uses the expercience collected with the current policy
+            # after the policy-update which ultimately changes the policy, theb buffer needs to be cleared 
+            self.buffer.reset()
+
+    # TD3
     def turn_off_initial_exploration(self) -> None:
         """
         Disable initial exploration mode for all learning strategies.
@@ -224,36 +304,31 @@ class Learning(Role):
         Get the remaining learning progress from the simulation run.
 
         """
-        total_duration = self.end - self.start
-        elapsed_duration = self.context.current_timestamp - self.start
+        for _, unit in self.rl_strats.items():
+            unit.action_noise.scale = stored_scale
 
-        learning_episodes = (
-            self.training_episodes - self.episodes_collecting_initial_experience
-        )
-
-        if self.episodes_done < self.episodes_collecting_initial_experience:
-            progress_remaining = 1
-        else:
-            progress_remaining = (
-                1
-                - (
-                    (self.episodes_done - self.episodes_collecting_initial_experience)
-                    / learning_episodes
-                )
-                - ((1 / learning_episodes) * (elapsed_duration / total_duration))
-            )
-
-        return progress_remaining
-
-    def create_learning_algorithm(self, algorithm: RLAlgorithm):
+    def get_noise_scale(self) -> None:
         """
-        Create and initialize the reinforcement learning algorithm.
+        Get the noise scale from the first learning strategy (unit) in rl_strats.
+
+        Notes:
+            The noise scale is the same for all learning strategies (units) in rl_strats, so we only need to get it from one unit.
+            It is only depended on the number of updates done so far, which is determined by the number of episodes done and the update frequency.
+
+        """
+        stored_scale = list(self.rl_strats.values())[0].action_noise.scale
+
+        return stored_scale
+
+    def create_learning_algorithm(self, algorithm: str):
+        """
+        Create and initialize the reinforcement learning algorithm, based on defined algorithm type.
 
         This method creates and initializes the reinforcement learning algorithm based on the specified algorithm name. The algorithm
         is associated with the learning role and configured with relevant hyperparameters.
 
         Args:
-            algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
+            algorithm (str): The name of the reinforcement learning algorithm.
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(
@@ -265,9 +340,27 @@ class Learning(Role):
                 gamma=self.gamma,
                 actor_architecture=self.actor_architecture,
             )
+        elif algorithm == "ppo":
+            self.rl_algorithm = PPO(
+                learning_role=self,
+                learning_rate=self.learning_rate,
+                gamma=self.gamma,  # Discount factor
+                gradient_steps=self.gradient_steps,  # Number of epochs for policy updates
+                clip_ratio=self.clip_ratio,  # PPO-specific clipping parameter
+                vf_coef=self.value_coeff,  # Coefficient for value function loss
+                entropy_coef=self.entropy_coeff,  # Coefficient for entropy to encourage exploration
+                max_grad_norm=self.max_grad_norm,  # Maximum gradient norm for clipping
+                gae_lambda=self.gae_lambda,  # Lambda for Generalized Advantage Estimation (GAE)
+                actor_architecture=self.actor_architecture,  # Actor network architecture
+            )
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")
 
+        # Loop over rl_strats
+        # self.rl_algorithm an die Learning Strategy übergeben
+        # Damit die Learning Strategy auf act/get_actions zugreifen kann
+
+    # TD3
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
         Initialize the policy of the reinforcement learning agent considering the respective algorithm.
@@ -289,6 +382,7 @@ class Learning(Role):
                     f"Folder with pretrained policies {directory} does not exist"
                 )
 
+    # TD3 and PPO
     def update_policy(self) -> None:
         """
         Update the policy of the reinforcement learning agent.
@@ -300,8 +394,11 @@ class Learning(Role):
         Notes:
             This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
-        if self.episodes_done > self.episodes_collecting_initial_experience:
+        if self.rl_algorithm_name == "ppo":
             self.rl_algorithm.update_policy()
+        else:
+            if self.episodes_done > self.episodes_collecting_initial_experience:
+                self.rl_algorithm.update_policy()
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """

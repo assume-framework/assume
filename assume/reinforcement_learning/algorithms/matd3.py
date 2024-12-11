@@ -11,7 +11,7 @@ from torch.optim import Adam
 
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.learning_utils import polyak_update
+from assume.reinforcement_learning.learning_utils import polyak_update, collect_obs_for_central_critic
 from assume.reinforcement_learning.neural_network_architecture import CriticTD3
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class TD3(RLAlgorithm):
 
     Original paper: https://arxiv.org/pdf/1802.09477.pdf
     """
-
+    
     def __init__(
         self,
         learning_role,
@@ -46,16 +46,16 @@ class TD3(RLAlgorithm):
         super().__init__(
             learning_role,
             learning_rate,
-            episodes_collecting_initial_experience,
             batch_size,
-            tau,
             gamma,
-            gradient_steps,
-            policy_delay,
-            target_policy_noise,
-            target_noise_clip,
             actor_architecture,
         )
+        self.episodes_collecting_initial_experience = episodes_collecting_initial_experience
+        self.tau = tau
+        self.gradient_steps = gradient_steps
+        self.policy_delay = policy_delay
+        self.target_policy_noise = target_policy_noise
+        self.target_noise_clip = target_noise_clip
         self.n_updates = 0
 
     def save_params(self, directory):
@@ -201,6 +201,8 @@ class TD3(RLAlgorithm):
             except Exception:
                 logger.warning(f"No actor values loaded for agent {u_id}")
 
+
+
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
         Create actor and critic networks for reinforcement learning.
@@ -293,7 +295,7 @@ class TD3(RLAlgorithm):
         This method initializes critic networks for each agent in the reinforcement learning setup.
 
         Notes:
-            The observation dimension need to be the same, due to the centralized criic that all actors share.
+            The observation dimension need to be the same, due to the centralized critic that all actors share.
             If you have units with different observation dimensions. They need to have different critics and hence learning roles.
         """
         n_agents = len(self.learning_role.rl_strats)
@@ -458,46 +460,13 @@ class TD3(RLAlgorithm):
 
                 all_actions = actions.view(self.batch_size, -1)
 
-                # this takes the unique observations from all other agents assuming that
-                # the unique observations are at the end of the observation vector
-                temp = th.cat(
-                    (
-                        states[:, :i, self.obs_dim - self.unique_obs_dim :].reshape(
-                            self.batch_size, -1
-                        ),
-                        states[
-                            :, i + 1 :, self.obs_dim - self.unique_obs_dim :
-                        ].reshape(self.batch_size, -1),
-                    ),
-                    axis=1,
+                #collect observations for critic
+                all_states = collect_obs_for_central_critic(
+                    states, i, self.obs_dim, self.unique_obs_dim, self.batch_size
                 )
-
-                # the final all_states vector now contains the current agent's observation
-                # and the unique observations from all other agents
-                all_states = th.cat(
-                    (states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
-                ).view(self.batch_size, -1)
-                # all_states = states[:, i, :].reshape(self.batch_size, -1)
-
-                # this is the same as above but for the next states
-                temp = th.cat(
-                    (
-                        next_states[
-                            :, :i, self.obs_dim - self.unique_obs_dim :
-                        ].reshape(self.batch_size, -1),
-                        next_states[
-                            :, i + 1 :, self.obs_dim - self.unique_obs_dim :
-                        ].reshape(self.batch_size, -1),
-                    ),
-                    axis=1,
+                all_next_states = collect_obs_for_central_critic(
+                    next_states, i, self.obs_dim, self.unique_obs_dim, self.batch_size
                 )
-
-                # the final all_next_states vector now contains the current agent's observation
-                # and the unique observations from all other agents
-                all_next_states = th.cat(
-                    (next_states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
-                ).view(self.batch_size, -1)
-                # all_next_states = next_states[:, i, :].reshape(self.batch_size, -1)
 
                 with th.no_grad():
                     # Compute the next Q-values: min over all critics targets
@@ -548,3 +517,73 @@ class TD3(RLAlgorithm):
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
                 i += 1
+
+
+def get_actions(rl_strategy, next_observation):
+    """
+    Gets actions for a unit based on the observation using MATD3.
+
+    Args:
+        rl_strategy (RLStrategy): The strategy containing relevant information.
+        next_observation (torch.Tensor): The observation.
+
+    Returns:
+        torch.Tensor: The actions containing two bid prices.
+        tuple: The noise (if applicable).
+
+    Note:
+        If the agent is in learning mode, the actions are chosen by the actor neuronal net and noise is added to the action.
+        In the first x episodes, the agent is in initial exploration mode, where the action is chosen by noise only to explore 
+        the entire action space. X is defined by episodes_collecting_initial_experience.
+        If the agent is not in learning mode, the actions are chosen by the actor neuronal net without noise.
+    """
+
+    actor = rl_strategy.actor
+    device = rl_strategy.device
+    float_type = rl_strategy.float_type
+    act_dim = rl_strategy.act_dim
+    learning_mode = rl_strategy.learning_mode
+    perform_evaluation = rl_strategy.perform_evaluation
+    action_noise = rl_strategy.action_noise
+    collect_initial_experience_mode = rl_strategy.collect_initial_experience_mode
+
+    # distinction whether we are in learning mode or not to handle exploration realised with noise
+    if learning_mode and not perform_evaluation:
+        # if we are in learning mode the first x episodes we want to explore the entire action space
+        # to get a good initial experience, in the area around the costs of the agent
+        if collect_initial_experience_mode:
+            # define current action as solely noise
+            noise = (
+                th.normal(mean=0.0, std=0.2, size=(1, act_dim), dtype=float_type)
+                .to(device)
+                .squeeze()
+            )
+
+            # =============================================================================
+            # 2.1 Get Actions and handle exploration
+            # =============================================================================
+            base_bid = next_observation[-1]
+
+            # add noise to the last dimension of the observation
+            # needs to be adjusted if observation space is changed, because only makes sense
+            # if the last dimension of the observation space are the marginal cost
+            curr_action = noise + base_bid.clone().detach()
+
+        else:
+            # if we are not in the initial exploration phase we choose the action with the actor neural net
+            # and add noise to the action
+            curr_action = actor(next_observation).detach()  # calls the forward method of the actor network
+            noise = th.tensor(
+                action_noise.noise(), device=device, dtype=float_type
+            )
+            curr_action += noise
+    else:
+        # if we are not in learning mode we just use the actor neural net to get the action without adding noise
+        curr_action = actor(next_observation).detach()
+        noise = tuple(0 for _ in range(act_dim))
+
+    # Clamp actions to be within the valid action space bounds
+    curr_action = curr_action.clamp(-1, 1)
+
+    return curr_action, noise
+

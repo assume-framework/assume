@@ -48,6 +48,10 @@ v0.5.0 - (10th December 2024)
     if the total duration of the market products plus first delivery time fits before the simulation end.
   - **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
 
+**Features:**
+  - **PPO Integration:** The Proximal Policy Optimization (PPO) algorithm has been integrated into the framework, providing users with an additional reinforcement learning algorithm option for training agents. PPO is a popular policy gradient method that has been shown to be effective in a wide range of applications, making it a valuable addition to the framework's learning capabilities. A tutorial on how to use this feature is coming soon.
+
+
 v0.4.3 - (11th November 2024)
 ===========================================
 
@@ -114,6 +118,9 @@ v0.4.1 (8th October 2024)
 - add compatibility with pyyaml-include (#421)
 - make complex clearing compatible to RL (#430)
 - pin PyPSA to remove DeprecationWarnings for now (#431)
+**New Features:**
+
+
 
 v0.4.0 (8th August 2024)
 =========================================
