@@ -126,7 +126,7 @@ def cli(args=None):
     # add these two weird hacks for now
     warnings.filterwarnings("ignore", "coroutine.*?was never awaited.*")
     logging.getLogger("asyncio").setLevel("FATAL")
-    
+
     # import package after argcomplete.autocomplete
     # to improve autocompletion speed
     from assume import World

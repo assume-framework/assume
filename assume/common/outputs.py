@@ -86,6 +86,13 @@ class WriteOutput(Role):
         self.learning_mode = learning_mode
         self.perform_evaluation = perform_evaluation
 
+        # get episode number if in learning or evaluation mode
+        self.episode = None
+        if self.learning_mode or self.perform_evaluation:
+            episode = self.simulation_id.split("_")[-1]
+            if episode.isdigit():
+                self.episode = int(episode)
+
         # construct all timeframe under which hourly values are written to excel and db
         self.start = start
         self.end = end
@@ -191,6 +198,11 @@ class WriteOutput(Role):
             self.db = create_engine(self.db_uri)
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
+
+            # check if episode equals 1 and delete all similar runs
+            if self.episode == 1:
+                self.delete_similar_runs()
+
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
                 freq=rr.HOURLY,
@@ -205,17 +217,6 @@ class WriteOutput(Role):
                 src="no_wait",
                 # this should not wait for the task to finish to block the simulation
             )
-
-        # get episode number if in learning or evaluation mode
-        self.episode = None
-        if self.learning_mode or self.perform_evaluation:
-            episode = self.simulation_id.split("_")[-1]
-            if episode.isdigit():
-                self.episode = int(episode)
-
-            # check if episode=0 and delete all similar runs
-            if self.episode == 0:
-                self.delete_similar_runs()
 
     def handle_output_message(self, content: dict, meta: MetaDict):
         """
@@ -687,7 +688,7 @@ class WriteOutput(Role):
         )
         if self.db is None:
             return []
-        
+
         with self.db.begin() as db:
             rewards_by_unit = db.execute(query).fetchall()
 
