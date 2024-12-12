@@ -73,11 +73,12 @@ zonal_case:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex
-      additional_fields:
-        - bid_type
-        - node
+      market_mechanism: complex_clearing
       param_dict:
         network_path: .
         solver: highs
         zones_identifier: zone_id
+        pricing_mechanism: pay_as_clear
+      additional_fields:
+        - bid_type
+        - node

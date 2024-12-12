@@ -49,7 +49,12 @@ def add_generators(
         )
     else:
         # add generators
-        generators.drop(["p_min_pu", "p_max_pu", "marginal_cost"], axis=1, inplace=True, errors="ignore")
+        generators.drop(
+            ["p_min_pu", "p_max_pu", "marginal_cost"],
+            axis=1,
+            inplace=True,
+            errors="ignore",
+        )
         network.add(
             "Generator",
             name=generators.index,
