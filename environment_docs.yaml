@@ -24,4 +24,4 @@ dependencies:
   - nbsphinx
   - nbsphinx_link
   - sphinx-argparse
-  - git+https://github.com/mgaitan/sphinxcontrib-mermaid
+  - sphinxcontrib-mermaid

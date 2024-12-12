@@ -277,10 +277,8 @@ class ComplexClearingRole(MarketRole):
     Supported Parameters in `param_dict`:
         solver (str): Specifies the solver to be used for the optimization problem. Default is 'appsi_highs'.
         log_flows (bool): Indicates whether to log the power flows on the lines. Default is False.
-        pricing_mechanism (str): Defines the pricing mechanism to be used. Default is 'pay_as_clear', with an
-            alternative option of 'pay_as_bid'.
-        zones_identifier (str): The key in the bus data that identifies the zone each bus belongs to. Used
-            for zonal representation.
+        pricing_mechanism (str): Defines the pricing mechanism to be used. Default is 'pay_as_clear', with an alternative option of 'pay_as_bid'.
+        zones_identifier (str): The key in the bus data that identifies the zone each bus belongs to. Used for zonal representation.
 
     Example:
         Example market configuration:

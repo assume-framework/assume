@@ -16,6 +16,7 @@ v0.5.0 - (10th December 2024)
 ===========================================
 
 **New Features:**
+
 - **Learning rate and noise scheduling**: Added the possibility to schedule the learning rate and action noise in the learning process. This feature
   enables streamlining the learning progress. Currently, only "linear" decay available by setting the `learning_rate_schedule` and
   `action_noise_schedule` in the learning config to "linear". Defaults to no decay if not provided. It decays `learning_rate`/ `noise_dt`
@@ -29,6 +30,7 @@ v0.5.0 - (10th December 2024)
   discharging during off-season or on-season time as well as a target level to be reached at the end of the season.
 
 **Improvements:**
+
 - **Timeseries Performance Optimization:** Switched to a custom `FastIndex` and `FastSeries` class, which is based on the pandas Series
   but utilizes NumPy arrays for internal data storage and indexing. This change significantly improves the
   performance of read and write operations, achieving an average speedup of **2x to 3x** compared to standard
@@ -40,24 +42,29 @@ v0.5.0 - (10th December 2024)
   depending on the size of the simulation (number of units, markets, and time steps).
 
 **Bugfixes:**
-  - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
-  - **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
-  - **Powerplant**: Remove duplicate `Powerplant.set_dispatch_plan()` which broke multi-market bidding
-  - **CSV scenario loader**: Fixed issue when one extra day was being added to the index, which lead to an error in the simulation when additional data was not available in the input data.
-  - **Market opening schedule**: Fixed issue where the market opening was scheduled even though the simulation was ending before the required products. Now the market opening is only scheduled
-    if the total duration of the market products plus first delivery time fits before the simulation end.
-  - **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
+
+- **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
+- **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
+- **Powerplant**: Remove duplicate `Powerplant.set_dispatch_plan()` which broke multi-market bidding
+- **CSV scenario loader**: Fixed issue when one extra day was being added to the index, which lead to an error in the simulation when additional data was not available in the input data.
+- **Market opening schedule**: Fixed issue where the market opening was scheduled even though the simulation was ending before the required products. Now the market opening is only scheduled
+  if the total duration of the market products plus first delivery time fits before the simulation end.
+- **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
+
+**Full Changelog**: `v0.4.3...v0.5.0 <https://github.com/assume-framework/assume/compare/v0.4.2...v0.5.0>`_
 
 v0.4.3 - (11th November 2024)
 ===========================================
 
 **Improvements:**
-  - **Documentation**: added codespell hook to pre-commit which checks for spelling errors in documentation and code
+
+- **Documentation**: added codespell hook to pre-commit which checks for spelling errors in documentation and code
 
 **Bugfixes:**
-  - **Simulation**: Delete simulation results for same simulation prior to run (as before v0.4.2)
 
-**Full Changelog**: [v0.4.2...v0.4.3](https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3)
+- **Simulation**: Delete simulation results for same simulation prior to run (as before v0.4.2)
+
+**Full Changelog**: `v0.4.2...v0.4.3 <https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3>`_
 
 v0.4.2 - (5th November 2024)
 ===========================================
@@ -91,7 +98,7 @@ v0.4.2 - (5th November 2024)
 
 - @HafnerMichael made their first contribution with improvements to cashflow calculations and development of residential DST components.
 
-**Full Changelog**: [v0.4.1...v0.4.2](https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2)
+**Full Changelog**: `v0.4.1...v0.4.2 <https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2>`_
 
 
 v0.4.1 (8th October 2024)
@@ -114,6 +121,8 @@ v0.4.1 (8th October 2024)
 - add compatibility with pyyaml-include (#421)
 - make complex clearing compatible to RL (#430)
 - pin PyPSA to remove DeprecationWarnings for now (#431)
+
+**Full Changelog**: `v0.4.0...v0.4.1 <https://github.com/assume-framework/assume/compare/v0.4.0...v0.4.1>`_
 
 v0.4.0 (8th August 2024)
 =========================================
@@ -181,6 +190,8 @@ v0.4.0 (8th August 2024)
 
 - Added closing word and final dashboard link to interoperability tutorial
 
+
+**Full Changelog**: `v0.3.7...v0.4.0 <https://github.com/assume-framework/assume/compare/v0.3.7...v0.4.0>`_
 
 v0.3.7 (21st March 2024)
 =========================

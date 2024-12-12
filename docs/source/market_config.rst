@@ -67,24 +67,7 @@ For example, if the duration is 1 hour, the count is 4 and first_delivery is 2 h
 
 It then makes sense to reschedule the market clearing all 4 hours, but it would also be possible to schedule the same clearing interval an hour later too, which would look like this:
 
-.. mermaid::
-
-   gantt
-      title Market Schedule Simple count 4
-      dateFormat  YYY-MM-DD HH:mm
-      axisFormat %H:%M
-      section First
-      Bidding00 EOM          :a1, 2019-01-01 12:00, 1h
-      Delivery01 EOM         :2019-01-01 14:00, 1h
-      Delivery02 EOM         :2019-01-01 15:00, 1h
-      Delivery03 EOM         :2019-01-01 16:00, 1h
-      Delivery04 EOM         :2019-01-01 17:00, 1h
-      section Second
-      Bidding10 EOM          :a2, 2019-01-01 13:00, 1h
-      Delivery11 EOM         :2019-01-01 15:00, 1h
-      Delivery12 EOM         :2019-01-01 16:00, 1h
-      Delivery13 EOM         :2019-01-01 17:00, 1h
-      Delivery14 EOM         :2019-01-01 18:00, 1h
+.. mermaid:: market.mmd
 
 
 Please note, Trade Convention
