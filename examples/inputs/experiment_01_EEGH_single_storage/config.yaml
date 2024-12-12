@@ -29,11 +29,12 @@ EEGH_2024_single_storage:
   learning_config:
     continue_learning: False
     trained_policies_save_path: null
-    max_bid_price: 0.13092
-    min_bid_price: 0.06288
+    max_bid_price: 0.2028
+    min_bid_price: 0.035
     algorithm: matd3
     actor_architecture: mlp
     learning_rate: 0.001
+    learning_rate_schedule: linear
     training_episodes: 300
     episodes_collecting_initial_experience: 5
     train_freq: 250h
@@ -41,6 +42,7 @@ EEGH_2024_single_storage:
     batch_size: 256
     gamma: 0.999
     device: cpu
+    action_noise_schedule: linear
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1

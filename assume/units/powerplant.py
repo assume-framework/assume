@@ -301,7 +301,7 @@ class PowerPlant(SupportsMinMax):
         Returns:
             float: The marginal cost of the unit.
         """
-        return 0.13092
+        return 0.2028
         # # if marginal costs already exists, return it
         # if self.marginal_cost is not None:
         #     return (

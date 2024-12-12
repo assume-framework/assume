@@ -1,2 +1,2 @@
 name,technology,bidding_EOM,bidding_redispatch,max_power,min_power,node,unit_operator,price
-Demand_Energy_Provider,inflex_demand,naive_eom,naive_redispatch,10000,0,north,eom_de,0.06288
+Demand_Energy_Provider,inflex_demand,naive_eom,naive_redispatch,10000,0,north,eom_de,0.035
