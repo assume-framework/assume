@@ -33,11 +33,12 @@ simple_dayahead_auction_config = MarketConfig(
 
 simple_building_auction_config = MarketConfig(
     market_id="simple_building_auction",
-    market_products=[MarketProduct(rd(hours=+1), 1, rd(hours=1))],
+    market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
     additional_fields=["node"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
+        until=datetime(2005, 6, 2),
         cache=True,
     ),
     opening_duration=timedelta(hours=1),
@@ -213,7 +214,7 @@ def test_market_pay_as_clears_single_demand_more_generation():
 
 def test_pay_as_bid_building_market_supply_external():
     # Example of demand from a building (within community) and supply from an external energy provider
-    next_opening = simple_building_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_building_auction_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(simple_building_auction_config.market_products, next_opening)
 
     # Create the orderbook with demand from the community (a building) and supply from an external energy provider
@@ -234,7 +235,7 @@ def test_pay_as_bid_building_market_supply_external():
 
 def test_pay_as_bid_building_market_demand_external():
     # Example of supply from a building (within community) and demand from an external energy provider
-    next_opening = simple_building_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_building_auction_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(simple_building_auction_config.market_products, next_opening)
 
     # Create the orderbook with supply from the community (a building) and demand from an external energy provider
@@ -254,7 +255,7 @@ def test_pay_as_bid_building_market_demand_external():
 
 def test_pay_as_bid_building_market_multiple_supply():
     # Create an orderbook with both building and non-building bids
-    next_opening = simple_building_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_building_auction_config.opening_hours.after(datetime(2005, 6, 1))
     products = get_available_products(simple_building_auction_config.market_products, next_opening)
 
     # Creating a mix of building and non-building orders
@@ -264,7 +265,7 @@ def test_pay_as_bid_building_market_multiple_supply():
     orderbook = extend_orderbook(products, 0.3, 69,  "building2_supply", orderbook)
     orderbook = extend_orderbook(products, 0.1, 75,  "building3_supply", orderbook)
 
-    mr = PayAsBidBuildingRole(simple_dayahead_auction_config)
+    mr = PayAsBidBuildingRole(simple_building_auction_config)
     accepted, rejected, _, _ = mr.clear(orderbook, products)
 
     # accepted for the trade within the community and one additional with the 0.1 surplus with the energy provider
