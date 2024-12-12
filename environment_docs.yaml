@@ -6,7 +6,7 @@ name: assume-doc
 channels:
   - conda-forge
 dependencies:
-- python>=3.11
+- python>=3.12
 - pip
 - ipykernel
 - pandas
@@ -19,7 +19,7 @@ dependencies:
 
 - pip:
   - .[oeds]
-  - sphinx<7
+  - sphinx>=7
   - sphinx-book-theme
   - nbsphinx
   - nbsphinx_link

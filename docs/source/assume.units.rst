@@ -62,7 +62,7 @@ Hydrogen Buffer Storage
 
 A class representing a hydrogen storage unit.
 
-.. autoclass:: assume.units.dst_components.SeasonalHydrogenStorage
+.. autoclass:: assume.units.dst_components.HydrogenBufferStorage
    :members:
    :undoc-members:
 
