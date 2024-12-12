@@ -450,9 +450,7 @@ def load_config_and_create_forecaster(
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
-    exchanges_units = load_file(
-        path=path, config=config, file_name="cross_border_flows_units"
-    )
+    exchanges_units = load_file(path=path, config=config, file_name="exchanges_units")
 
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
@@ -474,8 +472,8 @@ def load_config_and_create_forecaster(
     demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
     if demand_df is None:
         raise ValueError("No demand time series was provided!")
-    cross_border_flows_df = load_file(
-        path=path, config=config, file_name="cross_border_flows", index=index
+    exchanges_df = load_file(
+        path=path, config=config, file_name="exchanges_df", index=index
     )
     availability = load_file(
         path=path, config=config, file_name="availability_df", index=index
@@ -513,7 +511,7 @@ def load_config_and_create_forecaster(
 
     forecaster.set_forecast(forecasts_df)
     forecaster.set_forecast(demand_df)
-    forecaster.set_forecast(cross_border_flows_df)
+    forecaster.set_forecast(exchanges_df)
     forecaster.set_forecast(availability, prefix="availability_")
     forecaster.set_forecast(electricity_prices_df)
     forecaster.set_forecast(price_forecast_df, "price_")

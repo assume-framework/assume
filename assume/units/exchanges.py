@@ -13,16 +13,15 @@ from assume.common.forecasts import Forecaster
 
 class Exchanges(SupportsMinMax):
     """
-    A demand unit.
+    An exchanges unit.
 
     Attributes:
         id (str): The unique identifier of the unit.
         unit_operator (str): The operator of the unit.
-        direction (str): The exchange-direction (import/export) of the unit.
+        direction (str): The exchange-direction ("import" or "export") of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
-        index (pandas.DatetimeIndex): The index of the unit.
-        max_power (float): The maximum power output capacity of the power plant in MW.
-        min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
+        max_power (float): The max. power value of the unit in MW.
+        min_power (float): The min. power value of the unit in MW.
         node (str, optional): The node of the unit. Defaults to "node0".
         price (float): The price of the unit.
         location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
@@ -56,7 +55,7 @@ class Exchanges(SupportsMinMax):
             location=location,
             **kwargs,
         )
-        """Create an exchange unit."""
+        """Create an exchanges unit."""
         self.max_power = max_power
         self.min_power = min_power
 
