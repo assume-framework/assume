@@ -49,10 +49,17 @@ class MarketMechanism:
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
         self.marketconfig = marketconfig
+        # calculate last possible market opening as the difference between the market end
+        # and the length of the longest product plus the delivery time of the products
+        self.last_market_opening = marketconfig.opening_hours._until - max(
+            market_product.duration * market_product.count
+            + market_product.first_delivery
+            for market_product in marketconfig.market_products
+        )
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
-    ) -> tuple[Orderbook, Orderbook, list[dict]]:
+    ) -> tuple[Orderbook, Orderbook, list[dict], dict[tuple, float]]:
         """
         Clears the market.
 
@@ -263,7 +270,7 @@ class MarketRole(MarketMechanism, Role):
 
         # schedule the next opening too
         next_opening = self.marketconfig.opening_hours.after(market_open)
-        if next_opening:
+        if next_opening <= self.last_market_opening:
             next_opening_ts = datetime2timestamp(next_opening)
             self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
             logger.debug(

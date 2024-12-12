@@ -8,10 +8,25 @@ Release Notes
 
 Upcoming Release
 =======================
-
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
+
+v0.5.0 - (10th December 2024)
+===========================================
+
+**New Features:**
+- **Learning rate and noise scheduling**: Added the possibility to schedule the learning rate and action noise in the learning process. This feature
+  enables streamlining the learning progress. Currently, only "linear" decay available by setting the `learning_rate_schedule` and
+  `action_noise_schedule` in the learning config to "linear". Defaults to no decay if not provided. It decays `learning_rate`/ `noise_dt`
+  linearly from starting value to 0 over given `training_episodes` which can be adjusted by the user. The schedule parameters (e.g. end value
+  and end fraction) are not adjustable in the config file, but can be set in the code.
+- **Hydrogen Plant:** A new demand side unit representing a hydrogen plant has been added. The hydrogen plant consists of an
+  electrolyzer and a seasonal hydrogen storage unit. The electrolyzer converts electricity into hydrogen, which can be
+  stored in the hydrogen storage unit and later used.
+- **Seasonal Hydrogen Storage:** A new storage unit representing a seasonal hydrogen storage has been added. The seasonal hydrogen
+  storage unit can store hydrogen over long periods and release it when needed. It has specific constraints to avoid charging or
+  discharging during off-season or on-season time as well as a target level to be reached at the end of the season.
 
 **Improvements:**
 - **Timeseries Performance Optimization:** Switched to a custom `FastIndex` and `FastSeries` class, which is based on the pandas Series
@@ -24,18 +39,14 @@ Upcoming Release
 - **Overall Performance Optimization:** The overall performance of the framework has been improved by a factor of 5x to 12x
   depending on the size of the simulation (number of units, markets, and time steps).
 
-**New Features:**
-- **Hydrogen Plant:** A new demand side unit representing a hydrogen plant has been added. The hydrogen plant consists of an
-  electrolyzer and a seasonal hydrogen storage unit. The electrolyzer converts electricity into hydrogen, which can be
-  stored in the hydrogen storage unit and later used.
-- **Seasonal Hydrogen Storage:** A new storage unit representing a seasonal hydrogen storage has been added. The seasonal hydrogen
-  storage unit can store hydrogen over long periods and release it when needed. It has specific constraints to avoid charging or
-  discharging during off-season or on-season time as well as a target level to be reached at the end of the season.
-
 **Bugfixes:**
   - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
   - **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
   - **Powerplant**: Remove duplicate `Powerplant.set_dispatch_plan()` which broke multi-market bidding
+  - **CSV scenario loader**: Fixed issue when one extra day was being added to the index, which lead to an error in the simulation when additional data was not available in the input data.
+  - **Market opening schedule**: Fixed issue where the market opening was scheduled even though the simulation was ending before the required products. Now the market opening is only scheduled
+    if the total duration of the market products plus first delivery time fits before the simulation end.
+  - **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
 
 v0.4.3 - (11th November 2024)
 ===========================================

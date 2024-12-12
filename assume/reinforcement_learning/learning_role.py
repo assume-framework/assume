@@ -4,15 +4,18 @@
 
 import logging
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
 import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
+from assume.common.utils import datetime2timestamp
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
+from assume.reinforcement_learning.learning_utils import linear_schedule_func
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +34,11 @@ class Learning(Role):
     def __init__(
         self,
         learning_config: LearningConfig,
+        start: datetime = None,
+        end: datetime = None,
     ):
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
-        self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
-        self.early_stopping_threshold = learning_config.get(
-            "early_stopping_threshold", 0.05
-        )
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config.get("algorithm", "matd3")
@@ -55,6 +56,19 @@ class Learning(Role):
             "trained_policies_load_path", self.trained_policies_save_path
         )
 
+        # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
+        self.early_stopping_steps = learning_config.get(
+            "early_stopping_steps",
+            int(
+                self.training_episodes
+                / learning_config.get("validation_episodes_interval", 5)
+                + 1
+            ),
+        )
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
+        )
+
         cuda_device = (
             learning_config["device"]
             if "cuda" in learning_config.get("device", "cpu")
@@ -69,7 +83,26 @@ class Learning(Role):
         th.backends.cuda.matmul.allow_tf32 = True
         th.backends.cudnn.allow_tf32 = True
 
+        if start is not None:
+            self.start = datetime2timestamp(start)
+        if end is not None:
+            self.end = datetime2timestamp(end)
+
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
+        self.learning_rate_schedule = learning_config.get(
+            "learning_rate_schedule", None
+        )
+        if self.learning_rate_schedule == "linear":
+            self.calc_lr_from_progress = linear_schedule_func(self.learning_rate)
+        else:
+            self.calc_lr_from_progress = lambda x: self.learning_rate
+
+        noise_dt = learning_config.get("noise_dt", 1)
+        self.action_noise_schedule = learning_config.get("action_noise_schedule", None)
+        if self.action_noise_schedule == "linear":
+            self.calc_noise_from_progress = linear_schedule_func(noise_dt)
+        else:
+            self.calc_noise_from_progress = lambda x: noise_dt
 
         # if we do not have initial experience collected we will get an error as no samples are available on the
         # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
@@ -118,8 +151,6 @@ class Learning(Role):
         if self.episodes_done > self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
-        self.set_noise_scale(inter_episodic_data["noise_scale"])
-
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
     def get_inter_episodic_data(self):
@@ -138,7 +169,6 @@ class Learning(Role):
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
-            "noise_scale": self.get_noise_scale(),
         }
 
     def setup(self) -> None:
@@ -189,26 +219,31 @@ class Learning(Role):
         for _, unit in self.rl_strats.items():
             unit.collect_initial_experience_mode = False
 
-    def set_noise_scale(self, stored_scale) -> None:
+    def get_progress_remaining(self) -> float:
         """
-        Set the noise scale for all learning strategies (units) in rl_strats.
-
-        """
-        for _, unit in self.rl_strats.items():
-            unit.action_noise.scale = stored_scale
-
-    def get_noise_scale(self) -> None:
-        """
-        Get the noise scale from the first learning strategy (unit) in rl_strats.
-
-        Notes:
-            The noise scale is the same for all learning strategies (units) in rl_strats, so we only need to get it from one unit.
-            It is only depended on the number of updates done so far, which is determined by the number of episodes done and the update frequency.
+        Get the remaining learning progress from the simulation run.
 
         """
-        stored_scale = list(self.rl_strats.values())[0].action_noise.scale
+        total_duration = self.end - self.start
+        elapsed_duration = self.context.current_timestamp - self.start
 
-        return stored_scale
+        learning_episodes = (
+            self.training_episodes - self.episodes_collecting_initial_experience
+        )
+
+        if self.episodes_done < self.episodes_collecting_initial_experience:
+            progress_remaining = 1
+        else:
+            progress_remaining = (
+                1
+                - (
+                    (self.episodes_done - self.episodes_collecting_initial_experience)
+                    / learning_episodes
+                )
+                - ((1 / learning_episodes) * (elapsed_duration / total_duration))
+            )
+
+        return progress_remaining
 
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """
@@ -329,6 +364,12 @@ class Learning(Role):
                         logger.info(
                             f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
                         )
+                        if (
+                            self.learning_rate_schedule or self.action_noise_schedule
+                        ) is not None:
+                            logger.info(
+                                f"Learning rate schedule ({self.learning_rate_schedule}) or action noise schedule ({self.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
+                            )
 
                         self.rl_algorithm.save_params(
                             directory=f"{self.trained_policies_save_path}/last_policies"

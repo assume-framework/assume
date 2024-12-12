@@ -93,10 +93,6 @@ class WriteOutput(Role):
             if episode.isdigit():
                 self.episode = int(episode)
 
-            # check if episode=0 and delete all similar runs
-            if self.episode == 0:
-                self.delete_similar_runs()
-
         # construct all timeframe under which hourly values are written to excel and db
         self.start = start
         self.end = end
@@ -169,6 +165,8 @@ class WriteOutput(Role):
         """
         Deletes all similar runs from the database based on the simulation ID. This ensures that we overwrite simulations results when restarting one. Please note that a simulation which you also want to keep need to be assigned anew ID.
         """
+        if self.db_uri is None:
+            return
         query = text("select distinct simulation from rl_params")
 
         try:
@@ -200,6 +198,11 @@ class WriteOutput(Role):
             self.db = create_engine(self.db_uri)
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
+
+            # check if episode equals 1 and delete all similar runs
+            if self.episode == 1:
+                self.delete_similar_runs()
+
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
                 freq=rr.HOURLY,
@@ -227,14 +230,14 @@ class WriteOutput(Role):
         content_type = content.get("type")
         market_id = content.get("market_id")
 
-        if not content_data:
+        if content_data is None or len(content_data) == 0:
             return
 
         if content_type in [
             "market_meta",
             "market_dispatch",
             "unit_dispatch",
-            "rl_learning_params",
+            "rl_params",
         ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
@@ -404,21 +407,23 @@ class WriteOutput(Role):
         if isinstance(data, pd.DataFrame):
             df = data
 
-        # if data is dict
+        # if data is list
+        elif isinstance(data, list):
+            df = pd.DataFrame.from_dict(data)
         elif isinstance(data, dict):
             # Convert the dictionary to a DataFrame
             df = pd.DataFrame.from_dict(
                 data, orient="index", columns=["flow"]
             ).reset_index()
             # Split the 'index' column into 'timestamp' and 'line'
-            df[["timestamp", "line"]] = pd.DataFrame(
+            df[["datetime", "line"]] = pd.DataFrame(
                 df["index"].tolist(), index=df.index
             )
             # Rename the columns
             df = df.drop(columns=["index"])
 
             # set timestamp to index
-            df.set_index("timestamp", inplace=True)
+            df.set_index("datetime", inplace=True)
 
         df["simulation"] = self.simulation_id
 
@@ -449,7 +454,7 @@ class WriteOutput(Role):
                         df = self.convert_market_dispatch(data_list)
                     case "unit_dispatch":
                         df = self.convert_unit_dispatch(data_list)
-                    case "rl_learning_params":
+                    case "rl_params":
                         df = self.convert_rl_params(data_list)
                     case "grid_flows":
                         dfs = []
@@ -476,7 +481,6 @@ class WriteOutput(Role):
             if df is None:
                 continue
 
-            df.reset_index()
             if df.empty:
                 continue
 
@@ -557,6 +561,7 @@ class WriteOutput(Role):
                 continue
             df["simulation"] = self.simulation_id
             df.reset_index()
+            df.columns = df.columns.str.lower()
 
             try:
                 with self.db.begin() as db:
@@ -681,9 +686,11 @@ class WriteOutput(Role):
         query = text(
             f"select unit, SUM(reward) FROM rl_params where simulation='{self.simulation_id}' GROUP BY unit"
         )
-        if self.db is not None:
-            with self.db.begin() as db:
-                rewards_by_unit = db.execute(query).fetchall()
+        if self.db is None:
+            return []
+
+        with self.db.begin() as db:
+            rewards_by_unit = db.execute(query).fetchall()
 
         # convert into a numpy array
         rewards_by_unit = [r[1] for r in rewards_by_unit]

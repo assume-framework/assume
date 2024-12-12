@@ -50,7 +50,7 @@ def load_oeds(
         freq="h",
     )
     sim_id = f"{scenario}_{study_case}"
-    logger.info(f"loading scenario {sim_id}")
+    logger.info(f"loading scenario {sim_id} with {nuts_config}")
     infra_interface = InfrastructureInterface("test", infra_uri)
 
     if not nuts_config:
@@ -111,13 +111,13 @@ def load_oeds(
 
         lat, lon = infra_interface.get_lat_lon_area(area)
 
-        sum_demand = demand.sum(axis=1)
+        sum_demand = demand.sum(axis=1).sum()
 
-        world.add_unit_operator(f"demand{area}")
+        world.add_unit_operator(f"demand_{area}")
         world.add_unit(
-            f"demand{area}1",
+            f"demand_{area}1",
             "demand",
-            f"demand{area}",
+            f"demand_{area}",
             # the unit_params have no hints
             {
                 "min_power": 0,
@@ -215,11 +215,12 @@ if __name__ == "__main__":
         "postgresql://readonly:readonly@timescale.nowum.fh-aachen.de:5432/opendata",
     )
 
-    nuts_config = os.getenv("NUTS_CONFIG").split(",")
-    nuts_config = nuts_config or ["DE1", "DEA", "DEB", "DEC", "DED", "DEE", "DEF"]
+    default_nuts_config = "DE1, DEA, DEB, DEC, DED, DEE, DEF"
+    nuts_config = os.getenv("NUTS_CONFIG", default_nuts_config).split(",")
+    nuts_config = [n.strip() for n in nuts_config]
     year = 2019
     start = datetime(year, 1, 1)
-    end = datetime(year + 1, 1, 1) - timedelta(hours=1)
+    end = datetime(year, 1 + 1, 1) - timedelta(hours=1)
     marketdesign = [
         MarketConfig(
             "EOM",
