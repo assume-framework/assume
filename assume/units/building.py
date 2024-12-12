@@ -378,14 +378,14 @@ class Building(DSMFlex, SupportsMinMax):
         if self.has_battery_storage:
             model_block = instance.dsm_blocks["generic_storage"]
             soc = FastSeries(
-                value=list(model_block.soc.get_values()), index=self.index
-            ) / pyo.value(model_block.max_capacity)
+                value=list(model_block.soc.get_values().values()), index=self.index
+            )
             self.outputs["soc"] = soc
         if self.has_ev:
             model_block = instance.dsm_blocks["electric_vehicle"]
             ev_soc = FastSeries(
-                value=list(model_block.ev_battery_soc.get_values()), index=self.index
-            ) / pyo.value(model_block.max_capacity)
+                value=list(model_block.ev_battery_soc.get_values().values()), index=self.index
+            )
             self.outputs["ev_soc"] = ev_soc
 
     def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
