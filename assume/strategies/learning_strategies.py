@@ -1138,7 +1138,6 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
 
         #define scaling factors only once, to speed up
         self.community_load = None
-        self.scaling_factor_res_load = None
         self.scaling_factor_pv = None
 
         if self.learning_mode or self.perform_evaluation:
@@ -1428,9 +1427,10 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         # scaling factors for the observations
         if self.community_load is None:
             self.community_load = unit.forecaster["total_community_load"]
-        # Normalization to be between -1 and 1
-        if self.scaling_factor_res_load is None:
-            self.scaling_factor_res_load = max(abs(min(self.community_load)), max(self.community_load))
+            neg_factor, pos_factor = abs(min(self.community_load)), max(self.community_load)
+            # Normalization to be between -1 and 1
+            self.community_load.data[self.community_load.data > 0] /= pos_factor
+            self.community_load.data[self.community_load.data < 0] /= neg_factor
         if self.scaling_factor_pv is None:
             self.scaling_factor_pv = max(unit.pv_availability) if unit.has_pv and unit.pv_max_power != 0 else 1
         # checks if we are at end of simulation horizon, since we need to change the forecast then
@@ -1442,14 +1442,12 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             scaled_res_load_forecast = (
                 self.community_load
                     .loc[start:]
-                    / self.scaling_factor_res_load
             )
             scaled_res_load_forecast = np.concatenate(
                 [
                     scaled_res_load_forecast,
                     self.community_load
-                    .iloc[:self.foresight - len(scaled_res_load_forecast)]
-                    / self.scaling_factor_res_load,
+                    .iloc[:self.foresight - len(scaled_res_load_forecast)],
                 ]
             )
 
@@ -1457,7 +1455,6 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             scaled_res_load_forecast = (
                     self.community_load
                     .loc[start:end_excl + forecast_len]
-                    / self.scaling_factor_res_load
             )
 
         if end_excl + forecast_len > unit.electricity_price.index[-1]:

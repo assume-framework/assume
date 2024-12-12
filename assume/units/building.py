@@ -194,13 +194,14 @@ class Building(DSMFlex, SupportsMinMax):
         buy_forecast = self.forecaster["price_EOM"]
         sell_forecast = self.forecaster["price_EOM_sell"]
         community_load = self.forecaster["total_community_load"]
-        scaling_factor = max(abs(min(community_load)), max(community_load))
 
-        # Normalization
-        community_load_scaled = community_load / scaling_factor
+        neg_factor, pos_factor = abs(min(community_load)), max(community_load)
+        community_load.data[community_load.data > 0] /= pos_factor
+        community_load.data[community_load.data < 0] /= neg_factor
+
         price_delta = (buy_forecast - sell_forecast) / 2
         mid_price = buy_forecast - price_delta
-        return FastSeries(value=np.round(mid_price + community_load_scaled * price_delta, 5), index=sell_forecast.index)
+        return FastSeries(value=np.round(mid_price + community_load * price_delta, 5), index=sell_forecast.index)
 
     def create_availability_df(self, availability_periods):
         """
