@@ -86,6 +86,7 @@ class Building(DSMFlex, SupportsMinMax):
         #JUST FOR MY SIMULATIONS/EXPERIMENTS!!
         #self.electricity_price = self.create_price_given_solar_forecast()
         self.electricity_price = self.create_price_given_grid_load_forecast()
+        # self.electricity_price = self.forecaster["price_EGHSt1"]
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster["heat_demand"]
         self.ev_load_profile = self.forecaster["ev_load_profile"]
@@ -141,12 +142,14 @@ class Building(DSMFlex, SupportsMinMax):
                 pv_availability.index = self.model.time_steps
                 self.components["pv_plant"]["availability_profile"] = pv_availability
                 self.pv_max_power = self.components.get("pv_plant", {}).get("max_power", 0)
+                self.pv_availability_profile = FastSeries(value=pv_availability.values, index=self.index)
             else:
                 pv_power = pd.Series(self.forecaster[f"{self.id}_pv_power_profile"])
                 pv_power.index = self.model.time_steps
                 self.components["pv_plant"]["power_profile"] = pv_power
                 self.pv_uses_power_profile = True
                 self.pv_max_power = max(pv_power)
+                self.pv_power_profile = FastSeries(value=pv_power.values, index=self.index)
 
         self.define_variables()
 
@@ -188,7 +191,7 @@ class Building(DSMFlex, SupportsMinMax):
         sell_forecast = self.forecaster["price_EOM_sell"]
 
         price_delta = (buy_forecast - sell_forecast) * (self.forecaster["availability_Solar"])
-        return FastSeries(value=round(buy_forecast - price_delta, 2), index=sell_forecast.index)
+        return FastSeries(value=np.round(buy_forecast - price_delta, 5), index=sell_forecast.index)
 
     def create_price_given_grid_load_forecast(self):
         buy_forecast = self.forecaster["price_EOM"]
@@ -573,15 +576,9 @@ class Building(DSMFlex, SupportsMinMax):
         current_power = 0
 
         if self.has_pv and self.pv_uses_power_profile:
-            power = self.components["pv_plant"].get("power_profile", 0)
-            if isinstance(power, pd.Series):
-                power.index = self.index[self.index.start:self.index.end]
-                current_power = power[start]
+                current_power = self.pv_power_profile[start]
         elif self.has_pv:
-            av_solar = self.components["pv_plant"].get("availability_profile", 0)
-            if isinstance(av_solar, pd.Series):
-                av_solar.index = self.index[self.index.start:self.index.end]
-                current_power = av_solar[start] * self.pv_max_power
+                current_power = self.pv_availability_profile[start] * self.pv_max_power
 
         self.pv_production.at[start] = current_power
         return current_power

@@ -1090,8 +1090,9 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
 
     def __init__(self, *args, **kwargs):
         foresight = kwargs.get("foresight", 24)
-        uniq_obs_dim = 3
-        obs_dim = foresight * 3 + uniq_obs_dim
+        uniq_obs_dim = 4
+        foresight_obs = 1
+        obs_dim = foresight * foresight_obs + uniq_obs_dim
         super().__init__(obs_dim=obs_dim, act_dim=2, unique_obs_dim=uniq_obs_dim, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
@@ -1136,7 +1137,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
-        #define scaling factors only once, to speed up
+        # define scaling factors only once, to speed up
         self.community_load = None
         self.scaling_factor_pv = None
 
@@ -1197,7 +1198,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         # =============================================================================
         # Get the Households' Consumption and Generation
         # =============================================================================
-        inflex_demand = -unit.inflex_demand[start:end][0]
+        inflex_demand = -unit.inflex_demand[start]
         pv_generation = unit.calculate_pv_power(start)
 
         next_observation = self.create_observation(
@@ -1227,8 +1228,8 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             bid_direction = "hold_charge"
 
         if bid_direction == "charge":
-            charging_volume = (actions[1] * abs(unit.calculate_max_charge(start))).item()
-            unit.battery_charge[start:end] = charging_volume
+            charging_volume = unit.calculate_max_charge(start)
+            unit.battery_charge.at[start] = charging_volume
             bid = {
                 "start_time": start,
                 "end_time": end,
@@ -1241,8 +1242,8 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                 "node": unit.node,
             }
         elif bid_direction == "discharge":
-            discharging_volume = (actions[1] * unit.calculate_max_discharge(start)).item()
-            unit.battery_charge[start:end] = discharging_volume
+            discharging_volume = unit.calculate_max_discharge(start)
+            unit.battery_charge.at[start] = discharging_volume
             bid = {
                 "start_time": start,
                 "end_time": end,
@@ -1253,7 +1254,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             }
 
         elif bid_direction == "hold_charge":
-            unit.battery_charge[start:end] = 0
+            unit.battery_charge.at[start] = 0
             bid = {
                 "start_time": start,
                 "end_time": end,
@@ -1457,60 +1458,19 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                     .loc[start:end_excl + forecast_len]
             )
 
-        if end_excl + forecast_len > unit.electricity_price.index[-1]:
-            scaled_price_forecast = (
-                (unit.electricity_price.loc[start:] - self.mid_price) / self.price_delta
-            )
-            scaled_price_forecast = np.concatenate(
-                [
-                    scaled_price_forecast,
-                    (unit.electricity_price.iloc[
-                    : self.foresight - len(scaled_price_forecast)]
-                    - self.mid_price) / self.price_delta,
-                ]
-            )
-
-        else:
-            scaled_price_forecast = (
-                (unit.electricity_price
-                    .loc[start: end_excl + forecast_len]
-                    - self.mid_price) / self.price_delta
-            )
-
-        if end_excl + forecast_len > unit.pv_availability.index[-1]:
-            scaled_pv_availability = (
-                    unit.pv_availability.loc[start:] / self.scaling_factor_pv
-            )
-            scaled_pv_availability = np.concatenate(
-                [
-                    scaled_pv_availability,
-                    unit.pv_availability.iloc[
-                    : self.foresight - len(scaled_pv_availability)
-                    ]
-                    / self.scaling_factor_pv,
-                ]
-            )
-
-        else:
-            scaled_pv_availability = (
-                    unit.pv_availability
-                    .loc[start: end_excl + forecast_len]
-                    / self.scaling_factor_pv
-            )
-
+        scaled_pv_availability = unit.pv_availability.at[start] / self.scaling_factor_pv
         # get the current soc value
         soc_scaled = (unit.outputs["soc"].at[
                           start] / unit.max_capacity) if unit.has_battery_storage and unit.max_capacity != 0 else 0
         energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
-        inflex_demand_scaled = unit.inflex_demand[start] / (max(unit.inflex_demand) if max(unit.inflex_demand) != 0 else 1)
+        inflex_demand_scaled = unit.inflex_demand.at[start] / (max(unit.inflex_demand) if max(unit.inflex_demand) != 0 else 1)
 
         # concat all observations into one array
         observation = np.concatenate(
             [
                 scaled_res_load_forecast,
-                scaled_price_forecast,
-                scaled_pv_availability,
                 np.array([
+                    scaled_pv_availability,
                     inflex_demand_scaled,
                     soc_scaled,
                     energy_cost_scaled,
