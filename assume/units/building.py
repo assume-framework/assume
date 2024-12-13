@@ -23,7 +23,7 @@ from assume.common.utils import get_products_index
 from assume.strategies import NaiveDADSMStrategy
 from assume.units.dsm_load_shift import DSMFlex
 
-SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
