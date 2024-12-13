@@ -69,12 +69,12 @@ class Learning(Role):
             "early_stopping_threshold", 0.05
         )
 
-        cuda_device = (
+        device = (
             learning_config["device"]
             if "cuda" in learning_config.get("device", "cpu")
             else "cpu"
         )
-        self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
+        self.device = th.device(device if th.cuda.is_available() else "cpu")
 
         # future: add option to choose between float16 and float32
         # float_type = learning_config.get("float_type", "float32")

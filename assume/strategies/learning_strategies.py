@@ -18,6 +18,26 @@ logger = logging.getLogger(__name__)
 
 
 class AbstractLearningStrategy(LearningStrategy):
+    def __init__(
+        self,
+        obs_dim: int,
+        act_dim: int,
+        unique_obs_dim: int,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
+
+        # sets the device of the actor network
+        device = kwargs["device"] if "cuda" in kwargs.get("device", "cpu") else "cpu"
+        self.device = th.device(device if th.cuda.is_available() else "cpu")
+
     def load_actor_params(self, load_path):
         """
         Load actor parameters.
@@ -148,12 +168,6 @@ class RLStrategy(AbstractLearningStrategy):
             raise ValueError(
                 f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
             )
-
-        # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
 
         # future: add option to choose between float16 and float32
         # float_type = kwargs.get("float_type", "float32")
@@ -679,12 +693,6 @@ class StorageRLStrategy(AbstractLearningStrategy):
             raise ValueError(
                 f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
             )
-
-        # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
 
         # future: add option to choose between float16 and float32
         # float_type = kwargs.get("float_type", "float32")
