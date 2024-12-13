@@ -557,8 +557,6 @@ class NaiveForecast(Forecaster):
         for key, value in kwargs.items():
             self.data_dict[key] = FastSeries(index=self.index, value=value, name=key)
 
-
-
     def __getitem__(self, column: str) -> FastSeries:
         """
         Retrieves forecasted values.

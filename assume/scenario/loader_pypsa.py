@@ -95,7 +95,7 @@ def load_pypsa(
                 "bidding_strategies": bidding_strategies[unit_type][generator.name],
                 "technology": "conventional",
                 "node": generator.node,
-                "efficiency": 1, # do not use generator.efficiency as it is respected in marginal_cost,
+                "efficiency": 1,  # do not use generator.efficiency as it is respected in marginal_cost,
                 "fuel_type": generator.carrier,
                 "ramp_up": ramp_up,
                 "ramp_down": ramp_down,
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     scenario = "world_pypsa"
     study_case = "ac_dc_meshed"
     # "pay_as_clear", "redispatch" or "nodal"
-    market_mechanism = "pay_as_clear_complex"
+    market_mechanism = "complex_clearing"
 
     match study_case:
         case "ac_dc_meshed":
@@ -186,7 +186,7 @@ if __name__ == "__main__":
             logger.info(f"invalid studycase: {study_case}")
             network = pd.DataFrame()
 
-    study_case = f"{study_case}_{market_mechanism}" 
+    study_case = f"{study_case}_{market_mechanism}"
 
     start = network.snapshots[0]
     end = network.snapshots[-1]
@@ -206,7 +206,12 @@ if __name__ == "__main__":
         marketdesign.append(
             MarketConfig(
                 "EOM",
-                rr.rrule(rr.HOURLY, interval=1, dtstart=start-timedelta(hours=0.5), until=end),
+                rr.rrule(
+                    rr.HOURLY,
+                    interval=1,
+                    dtstart=start - timedelta(hours=0.5),
+                    until=end,
+                ),
                 timedelta(hours=0.25),
                 "pay_as_clear",
                 [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1.5))],
@@ -225,7 +230,9 @@ if __name__ == "__main__":
 
     bidding_strategies = {
         "power_plant": defaultdict(lambda: default_strategies),
-        "demand": defaultdict(lambda: {mc.market_id: "naive_eom" for mc in marketdesign}),
+        "demand": defaultdict(
+            lambda: {mc.market_id: "naive_eom" for mc in marketdesign}
+        ),
         "storage": defaultdict(lambda: default_strategies),
     }
 
