@@ -19,9 +19,9 @@ available_examples = {
     # small examples for easier understanding of different features and configurations
     "small": {"scenario": "example_01a", "study_case": "base"},
     "small_with_exchanges": {
-        "scenario": "example_01a", 
-        "study_case": "base_with_exchanges"
-        },
+        "scenario": "example_01a",
+        "study_case": "base_with_exchanges",
+    },
     "small_dam": {"scenario": "example_01a", "study_case": "dam"},
     "small_with_opt_clearing": {
         "scenario": "example_01a",

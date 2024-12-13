@@ -13,7 +13,7 @@ from assume.common.forecasts import Forecaster
 
 class Exchanges(SupportsMinMax):
     """
-    An exchanges unit.
+    An exchanges unit represents a unit that can import or export energy.
 
     Attributes:
         id (str): The unique identifier of the unit.

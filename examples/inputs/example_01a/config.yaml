@@ -49,7 +49,7 @@ base_with_exchanges:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-      
+
 tiny:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-02 00:00
