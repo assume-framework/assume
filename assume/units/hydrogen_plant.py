@@ -6,10 +6,6 @@ import logging
 
 import pandas as pd
 import pyomo.environ as pyo
-from pyomo.opt import (
-    SolverFactory,
-    check_available_solvers,
-)
 
 from assume.common.base import SupportsMinMax
 from assume.units.dsm_load_shift import DSMFlex
@@ -114,25 +110,13 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         self.define_constraints()
         self.define_objective_opt()
 
-        if self.flexibility_measure == "max_load_shift":
-            self.flexibility_cost_tolerance(self.model)
+        # Apply the flexibility function based on flexibility measure
+        if self.flexibility_measure in DSMFlex.flexibility_map:
+            DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
+        else:
+            raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
+
         self.define_objective_flex()
-
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
-
-        self.solver = SolverFactory(solvers[0])
-        self.solver_options = {
-            "output_flag": False,
-            "log_to_console": False,
-            "LogToConsole": 0,
-        }
-
-        self.opt_power_requirement = None
-        self.flex_power_requirement = None
-
-        self.variable_cost_series = None
 
     def define_sets(self):
         self.model.time_steps = pyo.Set(
@@ -257,22 +241,24 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 return sum(self.model.variable_cost[t] for t in self.model.time_steps)
 
     def define_objective_flex(self):
-        if self.flexibility_measure == "max_load_shift":
+        if self.flexibility_measure == "cost_based_load_shift":
 
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule_flex(m):
-                return sum(m.load_shift[t] for t in self.model.time_steps)
+                """
+                Maximizes the load shift over all time steps.
+                """
 
-    def calculate_optimal_operation_if_needed(self):
-        if (
-            self.opt_power_requirement is not None
-            and self.flex_power_requirement is None
-            and self.flexibility_measure == "max_load_shift"
-        ):
-            self.determine_optimal_operation_with_flex()
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_pos[t] for t in m.time_steps
+                )
 
-        if self.opt_power_requirement is None and self.objective == "min_variable_cost":
-            self.determine_optimal_operation_without_flex()
+                return maximise_load_shift
+
+        else:
+            raise ValueError(
+                f"Unknown flexibility measure: {self.flexibility_measure} for hydrogen plant."
+            )
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
