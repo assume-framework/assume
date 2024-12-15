@@ -6,8 +6,8 @@ import ast
 import logging
 from distutils.util import strtobool
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -18,8 +18,6 @@ from pyomo.opt import (
 
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
-from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import get_products_index
 from assume.strategies import NaiveDADSMStrategy
 from assume.units.dsm_load_shift import DSMFlex
 
