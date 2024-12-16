@@ -9,8 +9,7 @@ import torch as th
 
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import get_products_index
-from assume.reinforcement_learning.learning_utils import min_max_scale
+from assume.common.utils import get_products_index, min_max_scale
 from assume.strategies.learning_strategies import RLStrategy
 
 
