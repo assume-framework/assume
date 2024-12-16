@@ -39,7 +39,7 @@ v0.5.0 - (10th December 2024)
 - **Overall Performance Optimization:** The overall performance of the framework has been improved by a factor of 5x to 12x
   depending on the size of the simulation (number of units, markets, and time steps).
 - **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
-  This allows for a more robust scaling of the observation space for furture analysis.
+  This allows for a more robust scaling of the observation space for future analysis.
 
 **Bugfixes:**
   - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume

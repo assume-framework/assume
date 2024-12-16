@@ -91,6 +91,7 @@ def test_learning_strategies(mock_market_config, power_plant_mcp):
     ]
 
     strategy = power_plant_mcp.bidding_strategies["EOM"]
+    strategy.prepare_observations(power_plant_mcp, mc.market_id)
     bids = strategy.calculate_bids(power_plant_mcp, mc, product_tuples=product_tuples)
 
     assert len(bids) == 2
@@ -123,6 +124,7 @@ def test_lstm_learning_strategies(mock_market_config, power_plant_lstm):
     ]
 
     strategy = power_plant_lstm.bidding_strategies["EOM"]
+    strategy.prepare_observations(power_plant_lstm, mc.market_id)
     bids = strategy.calculate_bids(power_plant_lstm, mc, product_tuples=product_tuples)
 
     assert len(bids) == 2

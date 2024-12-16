@@ -53,6 +53,25 @@ class AbstractLearningStrategy(LearningStrategy):
             self.actor_target.eval()
             self.actor.optimizer.load_state_dict(params["actor_optimizer"])
 
+    def prepare_observations(self, unit, market_id):
+        # scaling factors for the observations
+        upper_scaling_factor_res_load = max(unit.forecaster[f"price_{market_id}"])
+        lower_scaling_factor_res_load = min(unit.forecaster[f"price_{market_id}"])
+        upper_scaling_factor_price = max(unit.forecaster[f"residualy_load_{market_id}"])
+        lower_scaling_factor_price = min(unit.forecaster[f"residual_load_{market_id}"])
+
+        self.scaled_res_load_obs = min_max_scale(
+            unit.forecaster[f"residual_load_{market_id}"],
+            lower_scaling_factor_res_load,
+            upper_scaling_factor_res_load,
+        )
+
+        self.scaled_pices_obs = min_max_scale(
+            unit.forecaster[f"price_{market_id}"],
+            lower_scaling_factor_price,
+            upper_scaling_factor_price,
+        )
+
 
 class RLStrategy(AbstractLearningStrategy):
     """
@@ -142,7 +161,6 @@ class RLStrategy(AbstractLearningStrategy):
         self.algorithm = kwargs.get("algorithm", "matd3")
         actor_architecture = kwargs.get("actor_architecture", "mlp")
 
-
         if actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
                 actor_architecture
@@ -186,27 +204,6 @@ class RLStrategy(AbstractLearningStrategy):
         else:
             raise FileNotFoundError(
                 f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
-        
-    def prepare_observations(self, unit, market_id):
-
-        # scaling factors for the observations
-        upper_scaling_factor_res_load = max(unit.forecaster[f"price_{market_id}"])
-        lower_scaling_factor_res_load = min(unit.forecaster[f"price_{market_id}"])
-        upper_scaling_factor_price = max(unit.forecaster[f"residualy_load_{market_id}"])
-        lower_scaling_factor_price = min(unit.forecaster[f"residual_load_{market_id}"])
-
-
-        self.scaled_res_load_obs = min_max_scale(
-                unit.forecaster[f"residual_load_{market_id}"],
-                lower_scaling_factor_res_load,
-                upper_scaling_factor_res_load,
-            )
-        
-        self.scaled_pices_obs = min_max_scale(
-                unit.forecaster[f"price_{market_id}"],
-                lower_scaling_factor_price,
-                upper_scaling_factor_price,
             )
 
     def calculate_bids(
@@ -424,12 +421,9 @@ class RLStrategy(AbstractLearningStrategy):
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
-        if (
-            end_excl + forecast_len
-            > self.scaled_res_load_obs.index[-1]
-        ):
+        if end_excl + forecast_len > self.scaled_res_load_obs.index[-1]:
             scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
-                
+
             scaled_res_load_forecast = np.concatenate(
                 [
                     scaled_res_load_forecast,
@@ -441,9 +435,9 @@ class RLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_res_load_forecast = self.scaled_res_load_obs.loc[
-                    start : end_excl + forecast_len
-                ]
-            
+                start : end_excl + forecast_len
+            ]
+
         if end_excl + forecast_len > self.scaled_pices_obs.index[-1]:
             scaled_price_forecast = self.scaled_pices_obs.loc[start:]
             scaled_price_forecast = np.concatenate(
@@ -457,9 +451,8 @@ class RLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_price_forecast = self.scaled_pices_obs.loc[
-                    start : end_excl + forecast_len
-                ]
-            
+                start : end_excl + forecast_len
+            ]
 
         # get last accepted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
