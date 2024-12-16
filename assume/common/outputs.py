@@ -94,10 +94,6 @@ class WriteOutput(Role):
             if episode.isdigit():
                 self.episode = int(episode)
 
-            # check if episode=0 and delete all similar runs
-            if self.episode == 0:
-                self.delete_similar_runs()
-
         # construct all timeframe under which hourly values are written to excel and db
         self.start = start
         self.end = end
@@ -206,6 +202,11 @@ class WriteOutput(Role):
             self.db = create_engine(self.db_uri)
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
+
+            # check if episode equals 1 and delete all similar runs
+            if self.episode == 1:
+                self.delete_similar_runs()
+
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
                 freq=rr.HOURLY,
