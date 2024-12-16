@@ -1,17 +1,107 @@
 name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,unit_operator
 pp_1,nuclear,naive_eom,uranium,0.0,1000,1,0.36,10.0,Operator 1
-pp_2,nuclear,naive_eom,uranium,0,1000,1,0.36,10,Operator 1
+pp_2,nuclear,naive_eom,uranium,0.0,1000,1,0.36,10.0,Operator 1
 pp_3,lignite,naive_eom,lignite,0.406,1000,1,0.41,2.0,Operator 1
 pp_4,hard coal,naive_eom,hard coal,0.335,1000,1,0.48,1.0,Operator 1
 pp_5,hard coal,naive_eom,hard coal,0.335,1000,1,0.48,1.0,Operator 1
-pp_6,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_7,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_8,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_9,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_10,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_11,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_12,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_13,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_14,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_15,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.60,4.0,Operator 1
-pp_16,combined cycle gas turbine,naive_eom,natural gas,0.201,5000,1,0.60,34.0,Operator 1
+pp_6,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_7,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_8,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_9,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_10,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_11,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_12,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_13,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_14,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_15,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_16,combined cycle gas turbine,naive_eom,natural gas,0.201,5000,1,0.6,34.0,Operator 1
+pp_17,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_18,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_19,lignite,pp_learning,lignite,0.406,1000,1,0.41,2.0,Operator 1
+pp_20,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_21,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_22,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_23,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_24,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_25,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_26,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_27,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_28,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_29,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_30,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_31,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_32,combined cycle gas turbine,pp_learning,natural gas,0.201,5000,1,0.6,34.0,Operator 1
+pp_33,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_34,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_35,lignite,pp_learning,lignite,0.406,1000,1,0.41,2.0,Operator 1
+pp_36,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_37,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_38,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_39,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_40,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_41,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_42,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_43,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_44,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_45,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_46,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_47,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_48,combined cycle gas turbine,pp_learning,natural gas,0.201,5000,1,0.6,34.0,Operator 1
+pp_49,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_50,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_51,lignite,pp_learning,lignite,0.406,1000,1,0.41,2.0,Operator 1
+pp_52,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_53,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_54,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_55,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_56,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_57,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_58,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_59,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_60,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_61,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_62,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_63,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_64,combined cycle gas turbine,pp_learning,natural gas,0.201,5000,1,0.6,34.0,Operator 1
+pp_65,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_66,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_67,lignite,pp_learning,lignite,0.406,1000,1,0.41,2.0,Operator 1
+pp_68,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_69,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_70,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_71,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_72,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_73,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_74,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_75,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_76,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_77,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_78,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_79,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_80,combined cycle gas turbine,pp_learning,natural gas,0.201,5000,1,0.6,34.0,Operator 1
+pp_81,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_82,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_83,lignite,pp_learning,lignite,0.406,1000,1,0.41,2.0,Operator 1
+pp_84,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_85,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_86,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_87,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_88,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_89,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_90,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_91,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_92,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_93,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_94,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_95,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_96,combined cycle gas turbine,pp_learning,natural gas,0.201,5000,1,0.6,34.0,Operator 1
+pp_97,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_98,nuclear,pp_learning,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_99,lignite,pp_learning,lignite,0.406,1000,1,0.41,2.0,Operator 1
+pp_100,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_101,hard coal,pp_learning,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_102,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_103,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_104,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_105,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
+pp_106,combined cycle gas turbine,pp_learning,natural gas,0.201,500,1,0.6,4.0,Operator 1
