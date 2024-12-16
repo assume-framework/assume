@@ -16,8 +16,11 @@ from pyomo.opt import (
     check_available_solvers,
 )
 
+from assume import MarketConfig
+from assume.common import Orderbook
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
+from assume.common.utils import get_products_index
 from assume.strategies import NaiveDADSMStrategy
 from assume.units.dsm_load_shift import DSMFlex
 
@@ -388,61 +391,6 @@ class Building(DSMFlex, SupportsMinMax):
                 value=list(model_block.ev_battery_soc.get_values().values()), index=self.index
             )
             self.outputs["ev_soc"] = ev_soc
-
-    def execute_current_dispatch(self, start: pd.Timestamp, end: pd.Timestamp):
-        """
-        Executes the current dispatch of the unit based on the provided timestamps.
-
-        The dispatch is only executed, if it is in the constraints given by the unit.
-        Returns the volume of the unit within the given time range.
-
-        Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
-
-        Returns:
-            pd.Series: The volume of the unit within the given time range.
-        """
-        if isinstance(self.bidding_strategies.get("EOM", ""), NaiveDADSMStrategy):
-            return super().execute_current_dispatch(start, end)
-
-        t = end - self.index.freq
-        inflex_demand = self.inflex_demand[t]
-        pv_power = self.pv_production[t]
-        delta_soc = 0
-        soc = self.outputs["soc"][t]
-        if self.battery_charge[t] > self.max_power_discharge:
-            self.battery_charge.at[t] = self.max_power_discharge
-        elif self.battery_charge[t] < self.max_power_charge:
-            self.battery_charge.at[t] = self.max_power_charge
-
-        # discharging
-        if self.battery_charge[t] > 0:
-            max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
-            if self.battery_charge[t] > max_soc_discharge:
-                self.battery_charge.at[t] = max_soc_discharge
-
-            delta_soc = (
-                    -self.battery_charge[t] / self.efficiency_discharge
-            )
-
-        # charging
-        elif self.battery_charge[t] < 0:
-            max_soc_charge = self.calculate_soc_max_charge(soc)
-
-            if self.battery_charge[t] < max_soc_charge:
-                self.battery_charge.at[t] = max_soc_charge
-
-            delta_soc = (
-                    -self.battery_charge[t] * self.efficiency_charge
-            )
-        # Update the energy with the new values from battery_power
-        self.outputs["energy"].at[t] = self.battery_charge[t] + pv_power - inflex_demand
-
-        self.outputs["soc"].at[t + self.index.freq] = round(soc + delta_soc, 4)
-
-        return self.outputs["energy"][t]
 
     def set_dispatch_plan(
             self,
