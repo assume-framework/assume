@@ -16,8 +16,7 @@ from pyomo.opt import (
     check_available_solvers,
 )
 
-from assume import MarketConfig
-from assume.common import Orderbook
+from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
 from assume.common.utils import get_products_index
