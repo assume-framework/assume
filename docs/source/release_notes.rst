@@ -15,6 +15,8 @@ Upcoming Release
 **Improvements:**
 - **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
   This allows for a more robust scaling of the observation space for future analysis.
+- **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
+  This allows for a more robust scaling of the observation space for future analysis.
 
 
 v0.5.0 - (10th December 2024)
@@ -43,8 +45,6 @@ v0.5.0 - (10th December 2024)
 - **Outputs Role Performance Optimization:** Output role handles dict data directly and only converts to DataFrame on Database write.
 - **Overall Performance Optimization:** The overall performance of the framework has been improved by a factor of 5x to 12x
   depending on the size of the simulation (number of units, markets, and time steps).
-- **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
-  This allows for a more robust scaling of the observation space for future analysis.
 
 **Bugfixes:**
   - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
