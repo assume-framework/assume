@@ -18,6 +18,7 @@ from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from psycopg2.errors import UndefinedColumn
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
+from torch.utils.tensorboard import SummaryWriter
 
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
@@ -107,6 +108,9 @@ class WriteOutput(Role):
         # initializes dfs for storing and writing asynchronous
         self.write_buffers: dict = defaultdict(list)
         self.locks = defaultdict(lambda: Lock())
+
+        # initialize tensorboard writer for episodic evaluation
+        self.writer = SummaryWriter("logs/tensorboard")
 
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {
@@ -674,6 +678,55 @@ class WriteOutput(Role):
         if self.db is not None and not df.empty:
             with self.db.begin() as db:
                 df.to_sql("kpis", db, if_exists="append", index=None)
+        
+        # store episodic evalution data in tensorboard
+        query = f"""
+        SELECT 
+            datetime as dt, 
+            unit, 
+            profit, 
+            reward, 
+            regret, 
+            exploration_noise_0 as noise_0, 
+            exploration_noise_1 as noise_1 
+        FROM rl_params 
+        WHERE episode='{self.episode}' 
+        AND simulation='{self.simulation_id}'
+        And perform_evaluation=False
+        """
+        rl_params = pd.read_sql(query, self.db)
+        rl_params["dt"] = pd.to_datetime(rl_params["dt"])
+
+        # loop over all datetimes as tensorboard does not allow to store time series
+        datetimes = rl_params["dt"].unique()
+        for i, time in enumerate(datetimes):
+            time_df = rl_params[rl_params["dt"] == time]
+            rewards = {}
+            profits = {}
+            regrets = {}
+
+            # loop over all units and store the reward, profit and regret
+            for unit, unit_df in time_df.groupby("unit"):
+                rewards[f"reward {unit}"] = unit_df["reward"].values[0]
+                profits[f"profit {unit}"] = unit_df["profit"].values[0]
+                regrets[f"regret {unit}"] = unit_df["regret"].values[0]
+
+            # Add the averages over the units to the dictionaries
+            rewards["avg reward"] = sum(rewards.values()) / len(rewards)
+            profits["avg profit"] = sum(profits.values()) / len(profits)
+            regrets["avg regret"] = sum(regrets.values()) / len(regrets)
+            
+            # calculate the average noise
+            noise_0 = time_df["noise_0"].abs().mean()
+            noise_1 = time_df["noise_1"].abs().mean()
+
+            # store the data in tensorboard
+            x_index = (self.episode - 1) * len(datetimes) + i
+            self.writer.add_scalars(f"reward", rewards, x_index)
+            self.writer.add_scalars(f"profit", profits, x_index)
+            self.writer.add_scalars(f"regret", regrets, x_index)
+            self.writer.add_scalar(f"noise_0", noise_0, x_index)
+            self.writer.add_scalar(f"noise_1", noise_1, x_index)
 
     def get_sum_reward(self):
         """
@@ -696,3 +749,8 @@ class WriteOutput(Role):
         rewards_by_unit = np.array(rewards_by_unit)
 
         return rewards_by_unit
+
+    def __del__(self):
+        if hasattr(self, 'writer'):
+            self.writer.flush()
+            self.writer.close()

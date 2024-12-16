@@ -149,3 +149,6 @@ examples/notebooks/outputs
 *.pb
 *.jar
 fameSetup.yaml
+
+# TensorBoard log files
+logs/TensorBoard/
