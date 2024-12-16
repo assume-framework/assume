@@ -458,18 +458,10 @@ class RLStrategy(AbstractLearningStrategy):
 
         # scale unit outputs
         # if unit is not running, total dispatch is 0
-        scaled_total_dispatch = min_max_scale(
-            current_volume,
-            0,
-            unit.max_power,
-        )
+        scaled_total_dispatch = current_volume / unit.max_power
+
         # marginal cost
-        # Could theoretically be negative (eg. subsidies), but assumed to be always positive in the simulation
-        scaled_marginal_cost = min_max_scale(
-            current_costs,
-            0,
-            self.max_bid_price,
-        )
+        scaled_marginal_cost = current_costs / self.max_bid_price
 
         # concat all obsverations into one array
         observation = np.concatenate(
@@ -1012,83 +1004,45 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
-        # defines bounds of observation space
-        # stays here as it is unit specific, and different forecasts might apply for different units
-        # different handling would require an extra unit loop at learning role intiliazation and unit specific max/min values
-        # further forecasts might change during the simulation if advanced forecasting is used
-        self.max_market_price = max(unit.forecaster[f"price_{market_id}"])
-        self.min_market_price = min(unit.forecaster[f"price_{market_id}"])
-        self.max_residual = max(unit.forecaster[f"residualy_load_{market_id}"])
-        self.min_residual = min(unit.forecaster[f"residual_load_{market_id}"])
-
-        upper_scaling_factor_res_load = self.max_residual
-        lower_scaling_factor_res_load = self.min_residual
-        upper_scaling_factor_price = self.max_market_price
-        lower_scaling_factor_price = self.min_market_price
-
-        upper_scaling_factor_energy_cost = self.max_bid_price
-        lower_scaling_factor_energy_cost = 0
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
-        if (
-            end_excl + forecast_len
-            > unit.forecaster[f"residual_load_{market_id}"].index[-1]
-        ):
-            scaled_res_load_forecast = min_max_scale(
-                unit.forecaster[f"residual_load_{market_id}"].loc[start:],
-                lower_scaling_factor_res_load,
-                upper_scaling_factor_res_load,
-            )
+        if end_excl + forecast_len > self.scaled_res_load_obs.index[-1]:
+            scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
+
             scaled_res_load_forecast = np.concatenate(
                 [
                     scaled_res_load_forecast,
-                    unit.forecaster[f"residual_load_{market_id}"].iloc[
+                    self.scaled_res_load_obs.iloc[
                         : self.foresight - len(scaled_res_load_forecast)
                     ],
                 ]
             )
 
         else:
-            scaled_res_load_forecast = min_max_scale(
-                unit.forecaster[f"residual_load_{market_id}"].loc[
-                    start : end_excl + forecast_len
-                ],
-                lower_scaling_factor_res_load,
-                upper_scaling_factor_res_load,
-            )
+            scaled_res_load_forecast = self.scaled_res_load_obs.loc[
+                start : end_excl + forecast_len
+            ]
 
-        if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
-            scaled_price_forecast = min_max_scale(
-                unit.forecaster[f"price_{market_id}"].loc[start:],
-                lower_scaling_factor_price,
-                upper_scaling_factor_price,
-            )
+        if end_excl + forecast_len > self.scaled_pices_obs.index[-1]:
+            scaled_price_forecast = self.scaled_pices_obs.loc[start:]
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    unit.forecaster[f"price_{market_id}"].iloc[
+                    self.scaled_pices_obs.iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
             )
 
         else:
-            scaled_price_forecast = min_max_scale(
-                unit.forecaster[f"price_{market_id}"].loc[
-                    start : end_excl + forecast_len
-                ],
-                lower_scaling_factor_price,
-                upper_scaling_factor_price,
-            )
+            scaled_price_forecast = self.scaled_pices_obs.loc[
+                start : end_excl + forecast_len
+            ]
 
         # get the current soc value
-        soc_scaled = min_max_scale(unit.outputs["soc"].at[start], 0, unit.max_soc)
-        energy_cost_scaled = min_max_scale(
-            unit.outputs["energy_cost"].at[start],
-            lower_scaling_factor_energy_cost,
-            upper_scaling_factor_energy_cost,
-        )
+        soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
+        energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
 
         # concat all obsverations into one array
         observation = np.concatenate(

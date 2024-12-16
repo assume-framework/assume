@@ -9,7 +9,7 @@ import torch as th
 
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import get_products_index, min_max_scale
+from assume.common.utils import get_products_index
 from assume.strategies.learning_strategies import RLStrategy
 
 
@@ -306,19 +306,10 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         # scale unit outputs
         # if unit is not running, total dispatch is 0
-        scaled_total_dispatch = min_max_scale(
-            current_volume,
-            0,
-            unit.max_power,
-        )
+        scaled_total_dispatch = current_volume / unit.max_power
 
         # marginal cost
-        # Could theoretically be negative (eg. subsidies), but assumed to be always positive in the simulation
-        scaled_marginal_cost = min_max_scale(
-            current_costs,
-            0,
-            self.max_bid_price,
-        )
+        scaled_marginal_cost = current_costs / self.max_bid_price
 
         # calculate the time the unit has to continue to run or be down
         op_time = unit.get_operation_time(start)
