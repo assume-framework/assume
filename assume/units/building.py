@@ -410,20 +410,18 @@ class Building(DSMFlex, SupportsMinMax):
             end = order["end_time"]
             end_excl = end - self.index.freq
             if isinstance(order["accepted_volume"], dict):
-                self.outputs["energy"].loc[start:end_excl] += [
+                self.outputs["energy"].at[start:end_excl] += [
                     order["accepted_volume"][key]
                     for key in order["accepted_volume"].keys()
                 ]
             else:
-                self.outputs["energy"].loc[start] += order["accepted_volume"]
+                self.outputs["energy"].at[start] += order["accepted_volume"]
         self.calculate_cashflow("energy", orderbook)
 
         if not isinstance(self.bidding_strategies.get("EOM", ""), NaiveDADSMStrategy):
             for start in products_index:
                 delta_soc = 0
                 soc = self.outputs["soc"][start]
-                inflex_demand = self.inflex_demand[start]
-                pv_power = self.pv_production[start]
 
                 # discharging
                 if self.battery_charge[start] > 0:
@@ -449,8 +447,6 @@ class Building(DSMFlex, SupportsMinMax):
                     )
 
                 self.outputs["soc"].at[start + self.index.freq:] = round(soc + delta_soc, 4)
-                # Update the energy with the new values from battery_power
-                self.outputs["energy"].at[start] = self.battery_charge[start] + pv_power - inflex_demand
             self.bidding_strategies[marketconfig.market_id].calculate_reward(
                 unit=self,
                 marketconfig=marketconfig,
