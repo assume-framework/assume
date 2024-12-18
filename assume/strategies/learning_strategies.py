@@ -53,10 +53,10 @@ class AbstractLearningStrategy(LearningStrategy):
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
-        upper_scaling_factor_res_load = max(unit.forecaster[f"price_{market_id}"])
-        lower_scaling_factor_res_load = min(unit.forecaster[f"price_{market_id}"])
-        upper_scaling_factor_price = max(unit.forecaster[f"residualy_load_{market_id}"])
-        lower_scaling_factor_price = min(unit.forecaster[f"residual_load_{market_id}"])
+        upper_scaling_factor_price = max(unit.forecaster[f"price_{market_id}"])
+        lower_scaling_factor_price = min(unit.forecaster[f"price_{market_id}"])
+        upper_scaling_factor_res_load = max(unit.forecaster[f"residual_load_{market_id}"])
+        lower_scaling_factor_res_load = min(unit.forecaster[f"residual_load_{market_id}"])
 
         self.scaled_res_load_obs = min_max_scale(
             unit.forecaster[f"residual_load_{market_id}"],
