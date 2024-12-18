@@ -12,6 +12,13 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**Improvements:**
+- **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
+  This allows for a more robust scaling of the observation space for future analysis.
+- **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
+  This allows for a more robust scaling of the observation space for future analysis.
+
+
 v0.5.0 - (10th December 2024)
 ===========================================
 
