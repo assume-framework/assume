@@ -311,6 +311,9 @@ class FastSeries:
         self._index = index
         self._name = name
 
+        if isinstance(value, pd.Series) and is_datetime64_any_dtype(value.index):
+            value = value[self.start:self.end]
+
         count = len(self.index)  # Use index length directly
         self._data = (
             np.full(count, value, dtype=np.float64)
