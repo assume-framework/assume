@@ -105,13 +105,13 @@ def load_oeds(
                 shutil.rmtree(config_path, ignore_errors=True)
         else:
             logger.info("use existing local time series")
-            demand = pd.read_csv(config_path / "demand.csv", index_col=0).squeeze()
-            solar = pd.read_csv(config_path / "solar.csv", index_col=0).squeeze()
-            wind = pd.read_csv(config_path / "wind.csv", index_col=0).squeeze()
+            demand = pd.read_csv(config_path / "demand.csv", index_col=0, parse_dates=True).squeeze()
+            solar = pd.read_csv(config_path / "solar.csv", index_col=0, parse_dates=True).squeeze()
+            wind = pd.read_csv(config_path / "wind.csv", index_col=0, parse_dates=True).squeeze()
 
         lat, lon = infra_interface.get_lat_lon_area(area)
 
-        sum_demand = demand.sum(axis=1).sum()
+        sum_demand = demand.sum(axis=1)
 
         world.add_unit_operator(f"demand_{area}")
         world.add_unit(

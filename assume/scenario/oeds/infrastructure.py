@@ -727,7 +727,7 @@ class InfrastructureInterface:
         query = f"SELECT time, {selection} FROM ecmwf_eu  WHERE time BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'"
         if area is not None:
             query += f" AND nuts_id LIKE '{area.upper()}%%'"
-        query += "group by time"
+        query += "group by time order by time asc"
         with self.databases["weather"].connect() as connection:
             return pd.read_sql_query(query, connection, index_col="time")
 
@@ -783,7 +783,13 @@ def get_wind_series(wind_systems: pd.DataFrame, weather_df: pd.DataFrame):
         weather_df["temp_air"],
         weather_df["wind_speed"],
     ]
+
+    
+    # multiindex, second index is height of param
+    # TODO pressure could be added as well
     columns = [["roughness_length", "temperature", "wind_speed"], [0, 2, 10]]
+    # temperature at 2m height
+    # and wind measured at 10m in ECMWF data
     ww = pd.DataFrame(
         np.asarray(data).T,
         index=weather_df.index,
@@ -906,7 +912,7 @@ if __name__ == "__main__":
     import json
     import os
 
-    x = os.getenv("INFRASTRUCTURE_SOURCE", "timescale.nowum.fh-aachen.de:5432")
+    x = os.getenv("INFRASTRUCTURE_SOURCE", "timescale.nowum.fh-aachen.de:5432/opendata")
     y = os.getenv("INFRASTRUCTURE_LOGIN", "readonly:readonly")
     uri = f"postgresql://{y}@{x}"
     interface = InfrastructureInterface("test", uri)
@@ -971,7 +977,7 @@ if __name__ == "__main__":
         end=end + timedelta(hours=24),
         freq="h",
     )
-    database = os.getenv("INFRASTRUCTURE_SOURCE", "timescale.nowum.fh-aachen.de:5432")
+    database = os.getenv("INFRASTRUCTURE_SOURCE", "timescale.nowum.fh-aachen.de:5432/opendata")
     login = os.getenv("INFRASTRUCTURE_LOGIN", "readonly:readonly")
     infra_uri = f"postgresql://{login}@{database}"
     infra_interface = InfrastructureInterface("test", infra_uri)
