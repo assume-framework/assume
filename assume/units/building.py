@@ -16,9 +16,9 @@ from pyomo.opt import (
     check_available_solvers,
 )
 
-from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
+from assume.common.market_objects import MarketConfig, Orderbook
 from assume.common.utils import get_products_index
 from assume.strategies import NaiveDADSMStrategy
 from assume.units.dsm_load_shift import DSMFlex
@@ -445,8 +445,8 @@ class Building(DSMFlex, SupportsMinMax):
                     delta_soc = (
                             -self.battery_charge[start] * self.efficiency_charge
                     )
-
-                self.outputs["soc"].at[start + self.index.freq:] = round(soc + delta_soc, 4)
+                if self.has_battery_storage:
+                    self.outputs["soc"].at[start + self.index.freq:] = round(soc + delta_soc, 4)
             self.bidding_strategies[marketconfig.market_id].calculate_reward(
                 unit=self,
                 marketconfig=marketconfig,
