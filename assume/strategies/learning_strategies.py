@@ -1228,7 +1228,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
             bid_direction = "hold_charge"
 
         if bid_direction == "charge":
-            charging_volume = unit.calculate_max_charge(start)
+            charging_volume = (actions[1] * abs(unit.calculate_max_charge(start))).item()
             unit.battery_charge.at[start] = charging_volume
             bid = {
                 "start_time": start,
@@ -1242,7 +1242,7 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
                 "node": unit.node,
             }
         elif bid_direction == "discharge":
-            discharging_volume = unit.calculate_max_discharge(start)
+            discharging_volume = (actions[1] * unit.calculate_max_discharge(start)).item()
             unit.battery_charge.at[start] = discharging_volume
             bid = {
                 "start_time": start,
@@ -1428,10 +1428,9 @@ class HouseholdStorageRLStrategy(AbstractLearningStrategy):
         # scaling factors for the observations
         if self.community_load is None:
             self.community_load = unit.forecaster["total_community_load"]
-            neg_factor, pos_factor = abs(min(self.community_load)), max(self.community_load)
+            scale_factor = max(abs(min(self.community_load)), max(self.community_load))
             # Normalization to be between -1 and 1
-            self.community_load.data[self.community_load.data > 0] /= pos_factor
-            self.community_load.data[self.community_load.data < 0] /= neg_factor
+            self.community_load.data /= scale_factor
         if self.scaling_factor_pv is None:
             self.scaling_factor_pv = max(unit.pv_availability) if unit.has_pv and unit.pv_max_power != 0 else 1
         # checks if we are at end of simulation horizon, since we need to change the forecast then
