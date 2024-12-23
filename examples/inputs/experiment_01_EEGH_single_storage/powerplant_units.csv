@@ -1,2 +1,2 @@
 name,technology,bidding_EOM,,bidding_redispatch,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,node,unit_operator
-Backup_Energy_Provider,nuclear,naive_eom,,naive_redispatch,uranium,0,110,105,0.33,110,110,1,140,140,140,72,0,no,0,north,AWATTAR
+Backup_Energy_Provider,nuclear,naive_eom,,naive_redispatch,uranium,0,11000,10500,0.33,11000,11000,1,140,140,140,72,0,no,0,north,SalzburgAG

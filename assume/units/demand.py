@@ -2,11 +2,13 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import numbers
+from datetime import datetime
 
-import pandas as pd
+import numpy as np
 
 from assume.common.base import SupportsMinMax
+from assume.common.fast_pandas import FastSeries
+from assume.common.forecasts import Forecaster
 
 
 class Demand(SupportsMinMax):
@@ -35,11 +37,11 @@ class Demand(SupportsMinMax):
         unit_operator: str,
         technology: str,
         bidding_strategies: dict,
-        index: pd.DatetimeIndex,
         max_power: float,
         min_power: float,
+        forecaster: Forecaster,
         node: str = "node0",
-        price: float | pd.Series = 3000.0,
+        price: float = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
@@ -48,7 +50,7 @@ class Demand(SupportsMinMax):
             unit_operator=unit_operator,
             technology=technology,
             bidding_strategies=bidding_strategies,
-            index=index,
+            forecaster=forecaster,
             node=node,
             location=location,
             **kwargs,
@@ -56,39 +58,39 @@ class Demand(SupportsMinMax):
         """Create a demand unit."""
         self.max_power = max_power
         self.min_power = min_power
+
         if max_power > 0 and min_power <= 0:
             self.max_power = min_power
             self.min_power = -max_power
+
         self.ramp_down = max(abs(min_power), abs(max_power))
         self.ramp_up = max(abs(min_power), abs(max_power))
-        volume = self.forecaster[self.id]
-        self.volume = -abs(volume)  # demand is negative
-        if isinstance(price, numbers.Real):
-            price = pd.Series(price, index=self.index)
-        self.price = price
+
+        self.volume = -abs(self.forecaster[self.id])  # demand is negative
+        self.price = FastSeries(index=self.index, value=price)
 
     def execute_current_dispatch(
         self,
-        start: pd.Timestamp,
-        end: pd.Timestamp,
-    ):
+        start: datetime,
+        end: datetime,
+    ) -> np.array:
         """
         Execute the current dispatch of the unit.
         Returns the volume of the unit within the given time range.
 
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
+            start (datetime.datetime): The start time of the dispatch.
+            end (datetime.datetime): The end time of the dispatch.
 
         Returns:
-            pd.Series: The volume of the unit within the gicen time range.
+            np.array: The volume of the unit for the given time range.
         """
 
-        return self.volume[start:end]
+        return self.volume.loc[start:end]
 
     def calculate_min_max_power(
-        self, start: pd.Timestamp, end: pd.Timestamp, product_type="energy"
-    ) -> tuple[pd.Series, pd.Series]:
+        self, start: datetime, end: datetime, product_type="energy"
+    ) -> tuple[np.array, np.array]:
         """
         Calculates the minimum and maximum power output of the unit and returns the bid volume as both the minimum and maximum power output of the unit.
 
@@ -99,11 +101,17 @@ class Demand(SupportsMinMax):
         Returns:
             tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
         """
+
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
-        bid_volume = (self.volume - self.outputs[product_type]).loc[start:end_excl]
+        bid_volume = (
+            self.volume.loc[start:end_excl]
+            - self.outputs[product_type].loc[start:end_excl]
+        )
+
         return bid_volume, bid_volume
 
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculate the marginal cost of the unit returns the marginal cost of the unit based on the provided time and power.
 

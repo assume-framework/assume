@@ -7,15 +7,26 @@ from datetime import datetime
 import pandas as pd
 
 from assume.common.base import SupportsMinMax, SupportsMinMaxCharge
+from assume.common.forecasts import NaiveForecast
 
 
 def test_minmax():
-    mm = SupportsMinMax("Test", "TestOperator", "TestTechnology", {}, None, "empty")
+    index = pd.date_range("2022-01-01", periods=24, freq="h")
+    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+
+    mm = SupportsMinMax(
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        forecaster=forecaster,
+        node="empty",
+    )
+
     mm.ramp_down = 200
     mm.ramp_up = 400
     mm.max_power = 1000
     mm.min_power = 200
-    mm.index = pd.date_range("2022-01-01", periods=24, freq="h")
 
     # stay turned off
     assert mm.calculate_ramp(op_time=1, previous_power=0, power=0, current_power=0) == 0
@@ -70,7 +81,7 @@ def test_minmax():
         mm.calculate_ramp(op_time=1, previous_power=800, power=500, current_power=0)
         == 600
     )
-    # check min_operating_time contraint
+    # check min_operating_time constraint
     mm.min_operating_time = 2
     mm.outputs["energy"][mm.index[0]] = 0
     mm.outputs["energy"][mm.index[1]] = 200
@@ -88,7 +99,7 @@ def test_minmax():
         == 400
     )
 
-    # check min_down_time contraint
+    # check min_down_time constraint
     mm.min_down_time = 2
     mm.outputs["energy"][mm.index[2]] = 0
     op_time = mm.get_operation_time(mm.index[3])
@@ -105,8 +116,16 @@ def test_minmax():
 
 
 def test_minmaxcharge():
+    index = pd.date_range("2022-01-01", periods=24, freq="h")
+    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+
     mmc = SupportsMinMaxCharge(
-        "Test", "TestOperator", "TestTechnology", {}, None, "empty"
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        forecaster=forecaster,
+        node="empty",
     )
 
     mmc.ramp_down_charge = -100
@@ -141,13 +160,20 @@ def test_minmaxcharge():
 
 
 def test_minmaxcharge_unconstrained():
+    index = pd.date_range("2022-01-01", periods=24, freq="h")
+    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+
     mmc = SupportsMinMaxCharge(
-        "Test", "TestOperator", "TestTechnology", {}, None, "empty"
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        forecaster=forecaster,
+        node="empty",
     )
 
-    # 1. wenn ramp nicht definiert ist, sollte es auch keine constraints erzeugen
-    # 2. alle maximal/minimal und ramp werte werden positiv angegeben
-    #
+    # 1. wenn ramp is undefined, it should not create constraints
+    # 2. all maximum/minimum and ramp values should be given as positive values
 
     mmc.max_power_charge = -1000  # MW
     mmc.max_power_discharge = 1000  # MW
@@ -170,12 +196,20 @@ def test_minmaxcharge_unconstrained():
 
 
 def test_minmax_operationtime():
-    mm = SupportsMinMax("Test", "TestOperator", "TestTechnology", {}, None, "empty")
-    mm.index = pd.date_range(
-        start=datetime(2023, 7, 1),
-        end=datetime(2023, 7, 2),
-        freq="1h",
+    index = pd.date_range(
+        start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h"
     )
+    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+
+    mm = SupportsMinMax(
+        id="Test",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={},
+        forecaster=forecaster,
+        node="empty",
+    )
+
     mm.outputs["energy"] += 500
     mm.min_down_time = 4
     mm.min_operating_time = 4

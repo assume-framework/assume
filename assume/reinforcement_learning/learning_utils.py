@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from collections.abc import Callable
 from datetime import datetime
 from typing import TypedDict
 
@@ -16,6 +17,10 @@ class ObsActRew(TypedDict):
 
 
 observation_dict = dict[list[datetime], ObsActRew]
+
+# A schedule takes the remaining progress as input
+# and outputs a scalar (e.g. learning rate, action noise scale ...)
+Schedule = Callable[[float], float]
 
 
 # Ornstein-Uhlenbeck Noise
@@ -64,9 +69,15 @@ class NormalActionNoise:
         self.dt = dt
 
     def noise(self):
-        noise = self.scale * np.random.normal(self.mu, self.sigma, self.act_dimension)
-        self.scale = self.dt * self.scale  # if self.scale >= 0.1 else self.scale
+        noise = (
+            self.dt
+            * self.scale
+            * np.random.normal(self.mu, self.sigma, self.act_dimension)
+        )
         return noise
+
+    def update_noise_decay(self, updated_decay: float):
+        self.dt = updated_decay
 
 
 def polyak_update(params, target_params, tau: float):
@@ -91,3 +102,54 @@ def polyak_update(params, target_params, tau: float):
         for param, target_param in zip(params, target_params):
             target_param.data.mul_(1 - tau)
             th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
+
+
+def linear_schedule_func(
+    start: float, end: float = 0, end_fraction: float = 1
+) -> Schedule:
+    """
+    Create a function that interpolates linearly between start and end
+    between ``progress_remaining`` = 1 and ``progress_remaining`` = 1 - ``end_fraction``.
+
+    Args:
+        start: value to start with if ``progress_remaining`` = 1
+        end: value to end with if ``progress_remaining`` = 0
+        end_fraction: fraction of ``progress_remaining``
+            where end is reached e.g 0.1 then end is reached after 10%
+            of the complete training process.
+
+    Returns:
+        Linear schedule function.
+
+    Note:
+        Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L100
+
+    """
+
+    def func(progress_remaining: float) -> float:
+        if (1 - progress_remaining) > end_fraction:
+            return end
+        else:
+            return start + (1 - progress_remaining) * (end - start) / end_fraction
+
+    return func
+
+
+def constant_schedule(val: float) -> Schedule:
+    """
+    Create a function that returns a constant. It is useful for learning rate schedule (to avoid code duplication)
+
+    Args:
+        val: constant value
+    Returns:
+        Constant schedule function.
+
+    Note:
+        From SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L124
+
+    """
+
+    def func(_):
+        return val
+
+    return func

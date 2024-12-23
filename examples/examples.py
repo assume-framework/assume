@@ -118,10 +118,10 @@ if __name__ == "__main__":
     - timescale: with database and grafana (note: you need docker installed)
     """
     data_format = "timescale"  # "local_db" or "timescale"
-    example = "small_with_building_mh"
+    example = "EEGH_2024_single_storage"
 
     if data_format == "local_db":
-        db_uri = f"sqlite:///./examples/local_db/assume_db_{example}.db"
+        db_uri = "sqlite:///./examples/local_db/assume_db.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 

@@ -5,7 +5,6 @@
 from datetime import datetime, timedelta
 
 from dateutil import rrule as rr
-from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import get_available_products
@@ -18,11 +17,12 @@ end = datetime(2018, 1, 2)
 
 simple_dayahead_auction_config = MarketConfig(
     market_id="simple_dayahead_auction",
-    market_products=[MarketProduct(rd(hours=+1), 2, rd(hours=1))],
+    market_products=[MarketProduct(timedelta(hours=1), 2, timedelta(hours=1))],
     additional_fields=["exclusive_id", "link", "block_id"],
     opening_hours=rr.rrule(
         rr.HOURLY,
         dtstart=datetime(2005, 6, 1),
+        until=datetime(2005, 6, 2),
         cache=True,
     ),
     opening_duration=timedelta(hours=1),
@@ -34,7 +34,9 @@ simple_dayahead_auction_config = MarketConfig(
 
 def test_dmas_market_init():
     mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )
@@ -42,7 +44,9 @@ def test_dmas_market_init():
 
 
 def test_insufficient_generation():
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )
@@ -96,7 +100,9 @@ def test_insufficient_generation():
 
 
 def test_remaining_generation():
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )
@@ -175,7 +181,9 @@ def test_remaining_generation():
 
 def test_link_order():
     # test not taking a linked order.
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )
@@ -244,7 +252,9 @@ def test_link_order():
 
 def test_use_link_order():
     # test taking a linked order - use more expensive hour 0 to have cheaper overall dispatch.
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )
@@ -340,7 +350,9 @@ def test_use_link_order():
 
 def test_use_link_order2():
     # test taking a linked order - use more expensive hour 0 to have cheaper overall dispatch.
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )
@@ -454,7 +466,9 @@ def test_market():
     sources = [value(model.source[key]) for key in model.source]
     [model.use_hourly_ask[(block, hour, agent)].value for block, hour, agent in orders["single_ask"].keys()]
     """
-    next_opening = simple_dayahead_auction_config.opening_hours.after(datetime.now())
+    next_opening = simple_dayahead_auction_config.opening_hours.after(
+        datetime(2005, 6, 1)
+    )
     products = get_available_products(
         simple_dayahead_auction_config.market_products, next_opening
     )

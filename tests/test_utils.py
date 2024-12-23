@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import calendar
+import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
@@ -11,6 +12,7 @@ import pytest
 from dateutil import rrule as rr
 from dateutil.tz import tzlocal
 
+from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     aggregate_step_amount,
@@ -19,6 +21,7 @@ from assume.common.utils import (
     get_available_products,
     get_products_index,
     initializer,
+    parse_duration,
     plot_orderbook,
     separate_orders,
     timestamp2datetime,
@@ -172,7 +175,7 @@ def test_aggregate_step_amount_multi_hour():
             "market_id": "CRM_pos",
         },
     ]
-    # and we calculate the amount inbetween this bid
+    # and we calculate the amount between this bid
     step_func = aggregate_step_amount(
         orderbook, datetime(2019, 1, 3, 12), datetime(2019, 1, 3, 13)
     )
@@ -445,6 +448,191 @@ def test_timestamp2datetime():
 def test_datetime2timestamp():
     unix_start = datetime(1970, 1, 1)
     assert 0 == datetime2timestamp(unix_start)
+
+
+def test_create_date_range():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    n = 1000
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+
+    t = time.time()
+    for i in range(n):
+        index = FastIndex(start, end, freq="1h")
+        fs = FastSeries(index)
+    res = time.time() - t
+
+    t = time.time()
+    for i in range(n):
+        q_pd = pd.date_range(start, end, freq="1h")
+    res_pd = time.time() - t
+    # this is sometimes faster, sometimes not
+    # as a lot of objects are created
+    assert res < res_pd + 0.1
+
+    new_end = datetime(2020, 1, 1, 3)
+
+    # check that slicing is faster
+    t = time.time()
+    for i in range(n):
+        q_slice = fs.loc[start:new_end]
+    res_slice = time.time() - t
+
+    series = pd.Series(0, index=q_pd)
+
+    t = time.time()
+    for i in range(n):
+        q_pd_slice = series.loc[start:new_end]
+    res_slice_pd = time.time() - t
+    # more than at least factor 5
+    assert res_slice < res_slice_pd / 5
+
+    # check that setting items is faster:
+    t = time.time()
+    for i in range(n):
+        fs.at[start] = 1
+    res_slice = time.time() - t
+
+    series = pd.Series(0, index=q_pd)
+
+    t = time.time()
+    for i in range(n):
+        series.at[start] = 1
+    res_slice_pd = time.time() - t
+    # more than at least factor 5
+    assert res_slice < res_slice_pd / 5
+
+    # check that setting slices is faster
+    t = time.time()
+    for i in range(n):
+        fs.loc[start:new_end] = 17
+    res_slice = time.time() - t
+
+    series = pd.Series(0, index=q_pd)
+
+    t = time.time()
+    for i in range(n):
+        series.loc[start:new_end] = 17
+    res_slice_pd = time.time() - t
+    # more than at least factor 5
+    assert res_slice < res_slice_pd / 5
+
+    se = pd.Series(0.0, index=fs.index.get_date_list())
+    se.loc[start]
+
+    series.loc[new_end] = 33
+
+    fs[new_end] = 33
+    new = series.loc[start:new_end][::-1]
+    assert new.iloc[0] == 33
+    new = fs.loc[start:new_end][::-1]
+    assert new[0] == 33
+    fs.data
+    fs.index._get_idx_from_date(start)
+    fs.index._get_idx_from_date(new_end)
+    fs.data[0:4]
+
+
+def test_convert_pd():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+
+    df = fs.as_df()
+    assert isinstance(df, pd.DataFrame)
+
+
+def test_set_list():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 2, 1, 5)
+    n = 1000
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+
+    dr = pd.date_range(start, end=datetime(2020, 1, 3, 5))
+    dr = pd.Series(dr)
+
+    series = pd.Series(0, index=pd.date_range(start, end, freq="1h"))
+
+    t = time.time()
+    for i in range(n):
+        result_pd = fs[dr]
+    res_fds = time.time() - t
+    f_series = series > 1
+    series[f_series] = 4
+    fs.data[f_series] = 4
+
+    # accessing lists or series elements is also faster
+    # check getting list or series
+    t = time.time()
+    for i in range(n):
+        result = series[dr]
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
+
+    # check setting list or series with single value
+    t = time.time()
+    for i in range(n):
+        fs[dr] = 3
+    res_fds = time.time() - t
+
+    t = time.time()
+    for i in range(n):
+        series[dr] = 3
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
+
+    # check setting list or series with a series
+    d_new = pd.Series(dr.index)
+
+    t = time.time()
+    for i in range(n):
+        fs[dr] = d_new
+    res_fds = time.time() - t
+
+    t = time.time()
+    for i in range(n):
+        series[dr] = d_new
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
+
+    # check setting list or series with a list
+    d_new = list(d_new)
+
+    t = time.time()
+    for i in range(n):
+        fs[dr] = d_new
+    res_fds = time.time() - t
+
+    t = time.time()
+    for i in range(n):
+        series[dr] = d_new
+    res_pd = time.time() - t
+    print(res_fds)
+    print(res_pd)
+    assert res_fds < res_pd
+
+
+def test_parse_duration():
+    assert parse_duration("24h") == timedelta(days=1)
+    assert parse_duration("1d") == timedelta(days=1)
+    assert parse_duration("12h") == timedelta(hours=12)
+    assert parse_duration("0.25h") == timedelta(minutes=15)
+    assert parse_duration("15m") == timedelta(minutes=15)
+    assert parse_duration("1m") == timedelta(minutes=1)
+    assert parse_duration("10s") == timedelta(seconds=10)
+    with pytest.raises(ValueError):
+        parse_duration("1")
+    with pytest.raises(ValueError):
+        parse_duration("100ms")
 
 
 if __name__ == "__main__":

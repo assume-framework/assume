@@ -401,7 +401,7 @@ def ppa(
         tuple[dict, dict]: the buyer order and the seller order as a tuple
     """
     buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
-    volume = sum(future_generation_series[start:end])
+    volume = sum(future_generation_series.loc[start:end])
     buyer: Orderbook = [
         {
             "bid_id": contract["contractor_unit_id"],
@@ -441,7 +441,7 @@ def swingcontract(
     end: datetime,
 ):
     """
-    The swing contract is used to provide a band in which one price is payed, while the second (higher) price is paid, when the band is left.
+    The swing contract is used to provide a band in which one price is paid, while the second (higher) price is paid, when the band is left.
 
     Args:
         contract (dict): the contract which is executed
@@ -461,7 +461,7 @@ def swingcontract(
     outer_price = contract["price"] * 1.5  # ct/kwh
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
-    demand = -demand_series[start:end]
+    demand = -demand_series.loc[start:end]
     normal = demand[minDCQ < demand and demand < maxDCQ] * set_price
     expensive = ~demand[minDCQ < demand and demand < maxDCQ] * outer_price
     price = sum(normal) + sum(expensive)
@@ -522,13 +522,12 @@ def cfd(
 
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
-    # price_series = (contract["price"] - market_index[start:end]) * gen_series[seller][
-    #    start:end
-    # ]
-    price_series = (market_index[start:end] - contract["price"]) * gen_series[start:end]
+    price_series = (market_index.loc[start:end] - contract["price"]) * gen_series.loc[
+        start:end
+    ]
     price_series = price_series.dropna()
     price = sum(price_series)
-    volume = sum(gen_series[start:end])
+    volume = sum(gen_series.loc[start:end])
     # volume is hard to calculate with differing units?
     # unit conversion is quite hard regarding the different intervals
     buyer: Orderbook = [
@@ -586,11 +585,13 @@ def market_premium(
     buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
-    price_series = (market_index[start:end] - contract["price"]) * gen_series[start:end]
+    price_series = (market_index.loc[start:end] - contract["price"]) * gen_series.loc[
+        start:end
+    ]
     price_series = price_series.dropna()
     # sum only where market price is below contract price
     price = sum(price_series[price_series < 0])
-    volume = sum(gen_series[start:end])
+    volume = sum(gen_series.loc[start:end])
     # volume is hard to calculate with differing units?
     # unit conversion is quite hard regarding the different intervals
     buyer: Orderbook = [
@@ -634,7 +635,7 @@ def feed_in_tariff(
     buyer_agent, seller_agent = contract["contractor_id"], contract["agent_addr"]
     # TODO does not work with multiple markets with differing time scales..
     # this only works for whole trading hours (as x MW*1h == x MWh)
-    price_series = contract["price"] * client_series[start:end]
+    price_series = contract["price"] * client_series.loc[start:end]
     price = sum(price_series)
     # volume is hard to calculate with differing units?
     # unit conversion is quite hard regarding the different intervals

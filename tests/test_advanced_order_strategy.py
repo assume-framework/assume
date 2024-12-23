@@ -27,7 +27,6 @@ def power_plant() -> PowerPlant:
         id="test_pp",
         unit_operator="test_operator",
         technology="coal",
-        index=index,
         max_power=1000,
         min_power=200,
         efficiency=0.5,

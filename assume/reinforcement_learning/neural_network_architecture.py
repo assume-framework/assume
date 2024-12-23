@@ -162,7 +162,7 @@ class LSTMActor(Actor):
         self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
 
         # input size defined by forecast horizon and concatenated with capacity and marginal cost values
-        self.FC1 = nn.Linear(self.timeseries_len * 16 + 2, 128, dtype=float_type)
+        self.FC1 = nn.Linear(self.timeseries_len * 16 + unique_obs_dim, 128, dtype=float_type)
         self.FC2 = nn.Linear(128, act_dim, dtype=float_type)
 
     def forward(self, obs):

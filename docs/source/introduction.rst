@@ -18,7 +18,7 @@ to the specific use case of the user.
 
 Architecture
 ============
-In the following figure the architecture of the framework is depicted. It can be roughly devided into two parts.
+In the following figure the architecture of the framework is depicted. It can be roughly divided into two parts.
 On the left side of the world class the markets are located and on the right side the market participants,
 which are here named units. Both world are connected via the orders that market participants place on the markets.
 The learning capacbility is sketched out with the yellow classes on the right side, namely the units side.

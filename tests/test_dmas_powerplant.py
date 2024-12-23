@@ -33,7 +33,6 @@ def power_plant_1() -> PowerPlant:
         unit_operator="test_operator",
         technology="hard coal",
         bidding_strategies={"EOM": DmasPowerplantStrategy()},
-        index=index,
         max_power=1000,
         min_power=200,
         efficiency=0.5,
@@ -63,7 +62,6 @@ def power_plant_day(fuel_type="lignite") -> PowerPlant:
         unit_operator="test_operator",
         technology="hard coal",
         bidding_strategies={"EOM": DmasPowerplantStrategy()},
-        index=index,
         max_power=1000,
         min_power=200,
         efficiency=0.5,
@@ -148,7 +146,7 @@ def test_dmas_day(power_plant_day):
 def test_dmas_prevent_start(power_plant_day):
     """
     This test makes sure, that the powerplants still bids positive marginal cost, with block bids.
-    Even if the price is not well inbetween the day.
+    Even if the price is not well between the day.
     The market should still see this as the best option instead of turning off the powerplant
     """
     strategy = DmasPowerplantStrategy()

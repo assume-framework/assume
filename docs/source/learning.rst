@@ -9,7 +9,7 @@ Reinforcement Learning Overview
 One unique characteristic of ASSUME is the usage of Reinforcement Learning (RL) for the bidding of the agents.
 To enable this the architecture of the simulation is designed in a way to accommodate the learning process. In this part of
 the documentation, we give a short introduction to reinforcement learning in general and then pinpoint you to the
-relevant parts of the code. the descriptions are mostly based on the following paper
+relevant parts of the code. The descriptions are mostly based on the following paper
 Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. `10.1016/j.egyai.2023.100295 <https://doi.org/10.1016/j.egyai.2023.100295>`.
 
 If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
@@ -18,7 +18,7 @@ If you want a hands-on introduction check out the prepared tutorial in Colab: ht
 The Basics of Reinforcement Learning
 =====================================
 
-In general RL and deep reinforcement learning (DRL), in particular, open new prospects for agent-based electricity market modeling.
+In general, RL and deep reinforcement learning (DRL) in particular, open new prospects for agent-based electricity market modeling.
 Such algorithms offer the potential for agents to learn bidding strategies in the interplay between market participants.
 In contrast to traditional rule-based approaches, DRL allows for a faster adaptation of the bidding strategies to a changing market
 environment, which is impossible with fixed strategies that a market modeller explicitly formulates. Hence, DRL algorithms offer the
@@ -98,15 +98,15 @@ The main idea is to use a centralized critic during the training phase, which ha
 Changes in state transitions and rewards can be explained by the actions of other agents.
 Meanwhile, during both training and execution, the actor has access only to its local observations :math:`o_i` derived from the entire state :math:`S`.
 
-For each agent :math:`i`, we train two centralized critics :math:`Q_{i,\theta_1,2}(S, a_1, \ldots, a_N)` together with two target critic networks.
-Similar to TD3, the smaller value of the two critics and target action noise :math:`a_i,k \sim` is used to calculate the target :math:`y_i,k`.
+For each agent :math:`i`, we train not one but two centralized critics :math:`Q_{i,\theta_1,2}(S, a_1, \ldots, a_N)` together with two target critic networks.
+Similar to TD3, the smaller value of the two critics and target action noise :math:`a_i,k \sim` is used to calculate the target :math:`y_i,k`. This is done to to address the issue of overestimation bias.
 
 .. math::
 
     y_i,k = r_i,k + γ * min_j=1,2 Q_i,θ′_j(S′_k, a_1,k, ..., a_N,k, π′(o_i,k))
 
-where r_i,k is the reward obtained by agent i at time step k, γ is the discount factor, S′_k is the next state of the
-environment, and π′(o_i,k) is the target policy of agent i.
+where :math:`r_i,k` is the reward obtained by agent :math:`i` at time step :math:`k`, :math:`\gamma` is the discount factor, :math:`S'_k` is the next state of the
+environment, and :math:`\pi'(o_i,k)` is the target policy of agent :math:`i`.
 
 The critics are trained using the mean squared Bellman error (MSBE) loss:
 
@@ -120,8 +120,8 @@ The actor policy of each agent is updated using the deterministic policy gradien
 
     ∇_a Q_i,θ_j(S_k, a_1,k, ..., a_N,k, π(o_i,k))|a_i,k=π(o_i,k) * ∇_θ π(o_i,k)
 
-The actor is updated similarly using only one critic network Q_{θ1}. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the foregoing section.
-Please note that the actor and critics are updated by sampling expereience from the buffer where all intercations of the agents are stroed, namley the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :doc:`buffers`
+The actor is updated similarly using only one critic network :math:`Q_{θ1}`. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the foregoing section.
+Please note that the actor and critics are updated by sampling experience from the buffer where all interactions of the agents are stored, namely the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :doc:`buffers`
 
 
 The Learning Implementation in ASSUME
@@ -136,15 +136,15 @@ The Actor
 We will explain the way learning works in ASSUME starting from the interface to the simulation, namely the bidding strategy of the power plants.
 The bidding strategy, per definition in ASSUME, defines the way we formulate bids based on the technical restrictions of the unit.
 In a learning setting, this is done by the actor network. Which maps the observation to an action. The observation thereby is managed and collected by the units operator as
-summarized in the following picture. As you can see in the current working version the observation space contains of a residula load forecast for the next 24 h and aprice forecast for 24 h as well as the
-the current capacity of the powerplant and its marginal costs.
+summarized in the following picture. As you can see in the current working version, the observation space contains a residual load forecast for the next 24 hours and a price
+forecast for 24 hours, as well as the current capacity of the power plant and its marginal costs.
 
 .. image:: img/ActorTask.jpg
     :align: center
     :width: 500px
 
-The action space is a continuous space, which means that the actor can choose any price between 0 and the maximum bid price defined in the code. It gives two prices for two different party of its capacity.
-One, namley :math:`p_inlfex` for the minimum capacity of the power plant and one for the rest ( :math:`p_flex`). The action space is defined in the config file and can be adjusted to your needs.
+The action space is a continuous space, which means that the actor can choose any price between 0 and the maximum bid price defined in the code. It gives two prices for two different parts of its capacity.
+One, namley :math:`p_{inflex}` for the minimum capacity of the power plant and one for the rest ( :math:`p_{flex}`). The action space is defined in the config file and can be adjusted to your needs.
 After the bids are formulated in the bidding strategy they are sent to the market via the units operator.
 
 .. image:: img/ActorOutput.jpg
@@ -165,15 +165,15 @@ based on global information. The following graph shows the information flow.
     :width: 500px
 
 
-The learning role orchestrates this learning process. It initializes the training process, handels the algorithms and manages the experiences gained in a buffer.
+The learning role orchestrates this learning process. It initializes the training process, handles the algorithms and manages the experiences gained in a buffer.
 You can read more about the different algorithms and the learning role in :doc:`learning_algorithm`.
 
 The Learning Results in ASSUME
 =====================================
 
-Similarly, to the other results, the learning progress is tracked in the database, either with postgresql or timescale. The latter, enables the usage of the
+Similarly to the other results, the learning progress is tracked in the database, either with postgresql or timescale. The latter enables the usage of the
 predefined dashboards to track the leanring process in the "Assume:Training Process" dashboard. The following pictures show the learning process of a simple reinforcement learning setting.
-A more detailed description is given in the dashboard itsel.
+A more detailed description is given in the dashboard itself.
 
 .. image:: img/Grafana_Learning_1.jpeg
     :align: center
