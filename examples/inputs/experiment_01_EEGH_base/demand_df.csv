@@ -1,4 +1,4 @@
-datetime,Demand_Energy_Provider,EGHKH_building_load_profile,EGHR_building_load_profile,EGHR_building_pv_power_profile,EGHKM_building_load_profile,EGHKM_building_pv_power_profile,EGHF_building_load_profile,EGHFE_building_load_profile,EGHFM_building_pv_power_profile,EGHS_building_load_profile,EGHS_building_pv_power_profile,EGHL_building_load_profile,EGHD1_building_load_profile,EGHD2_building_load_profile,EGHD3_building_load_profile,total_community_load
+datetime,Demand_Energy_Provider,EGH1_building_load_profile,EGH2_building_load_profile,EGH2_building_pv_power_profile,EGH3_building_load_profile,EGH3_building_pv_power_profile,EGH4_building_load_profile,EGH5_building_load_profile,EGH11_building_pv_power_profile,EGH6_building_load_profile,EGH6_building_pv_power_profile,EGH7_building_load_profile,EGH8_building_load_profile,EGH9_building_load_profile,EGH10_building_load_profile,total_community_load
 01/01/2024 00:00,1000,0.293,0.055,0,0,0,0,0.315,0,0,0,0.421,0.087,0.127,0.01,1.308
 01/01/2024 00:15,1000,0.295,0.036,0,0,0,0,0.521,0,0,0,0.369,0.089,0.057,0.021,1.388
 01/01/2024 00:30,1000,0.011,0.031,0,0,0,0,0.095,0,0,0,0.356,0.089,0.071,0.034,0.687
