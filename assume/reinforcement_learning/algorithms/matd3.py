@@ -394,10 +394,19 @@ class TD3(RLAlgorithm):
             7. Apply Polyak averaging to update target networks.
 
             This function implements the TD3 algorithm's key step for policy improvement and exploration.
+        
+        Returns:
+            tuple: (learning_rate, average_critic_loss) where:
+                - learning_rate (float): The current learning rate
+                - critic_losses (list[dict]): Critic losses for each agent in each gradient step
         """
 
         logger.debug("Updating Policy")
         n_rl_agents = len(self.learning_role.rl_strats.keys())
+        critic_losses = [
+            {u_id: None for u_id in self.learning_role.rl_strats.keys()} 
+            for _ in range(self.gradient_steps)
+        ]
 
         # update noise decay and learning rate
         updated_noise_decay = self.learning_role.calc_noise_from_progress(
@@ -419,7 +428,7 @@ class TD3(RLAlgorithm):
             )
             unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
 
-        for _ in range(self.gradient_steps):
+        for step in range(self.gradient_steps):
             self.n_updates += 1
             i = 0
 
@@ -518,6 +527,9 @@ class TD3(RLAlgorithm):
                     for current_q in current_Q_values
                 )
 
+                # Store the critic loss for this unit ID
+                critic_losses[step][u_id] = critic_loss.item()
+
                 # Optimize the critics
                 critic.optimizer.zero_grad()
                 critic_loss.backward()
@@ -548,3 +560,5 @@ class TD3(RLAlgorithm):
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
                 i += 1
+        
+        return learning_rate, critic_losses

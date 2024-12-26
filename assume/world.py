@@ -66,6 +66,7 @@ class World:
         market_operators (dict[str, mango.RoleAgent]): The market operators for the world instance.
         markets (dict[str, MarketConfig]): The markets for the world instance.
         unit_operators (dict[str, UnitsOperator]): The unit operators for the world instance.
+        learning_operators (dict[str, RoleAgent]): The learning operators for the world instance.
         unit_types (dict[str, BaseUnit]): The unit types for the world instance.
         bidding_strategies (dict[str, type[BaseStrategy]]): The bidding strategies for the world instance.
         clearing_mechanisms (dict[str, MarketRole]): The clearing mechanisms for the world instance.
@@ -131,6 +132,7 @@ class World:
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
+        self.learning_operators: dict[str, RoleAgent] = {}
         self.unit_types = unit_types
         self.dst_components = demand_side_technologies
 
@@ -233,7 +235,8 @@ class World:
             # self.clock_agent.stopped.add_done_callback(stop)
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
-            self.setup_learning()
+            #TODO: which ID should be used here?
+            self.setup_learning(simulation_id)
 
             self.setup_output_agent(simulation_id, save_frequency_hours)
             self.clock_manager = DistributedClockManager(
@@ -241,7 +244,7 @@ class World:
             )
             self.container.register(self.clock_manager)
 
-    def setup_learning(self) -> None:
+    def setup_learning(self, id : str) -> None:
         """
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
@@ -266,6 +269,27 @@ class World:
                 suggested_aid=self.learning_agent_addr.aid,
             )
             rl_agent.suspendable_tasks = False
+            
+            if self.learning_operators.get(id):
+                raise ValueError(f"LearningOperator {id} already exists")
+            
+            learning_role_agent = RoleAgent()
+            learning_role_agent.add_role(self.learning_role)
+            self.container.register(learning_role_agent, suggested_aid=id)
+            learning_role_agent.suspendable_tasks = False
+
+            # after creation of an agent - we set additional context params
+            learning_role_agent._role_context.data.update(
+                {
+                "output_agent_addr": self.output_agent_addr,
+                "train_start": self.start,
+                "train_end": self.end,
+                "freq" : self.forecaster.index.freq
+                }
+            )
+        
+            self.learning_operators[id] = learning_role_agent
+
 
     def setup_output_agent(self, simulation_id: str, save_frequency_hours: int) -> None:
         """
@@ -678,6 +702,7 @@ class World:
         self.market_operators = {}
         self.markets = {}
         self.unit_operators = {}
+        self.learning_operators = {}
         self.forecast_providers = {}
 
     def add_unit(

@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 import torch as th
+import pandas as pd
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
@@ -110,8 +111,10 @@ class Learning(Role):
         self.episodes_collecting_initial_experience = max(
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
+        
+        self.datetime = None
+        self.train_freq = learning_config.get("train_freq", "24h")
 
-        self.train_freq = learning_config.get("train_freq", "1h")
         self.gradient_steps = (
             int(self.train_freq[:-1])
             if learning_config.get("gradient_steps", -1) == -1
@@ -179,8 +182,8 @@ class Learning(Role):
             This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
             for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
-        # subscribe to messages for handling the training process
 
+        # subscribe to messages for handling the training process
         if not self.perform_evaluation:
             self.context.subscribe_message(
                 self,
@@ -301,7 +304,8 @@ class Learning(Role):
             This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
         if self.episodes_done > self.episodes_collecting_initial_experience:
-            self.rl_algorithm.update_policy()
+            learning_rate, critic_losses = self.rl_algorithm.update_policy()
+            self.write_learning_params_to_output(learning_rate, critic_losses)
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """
@@ -377,3 +381,54 @@ class Learning(Role):
 
                         return True
             return False
+   
+    def write_learning_params_to_output(self, learning_rate : float, critic_losses_list : list[dict]) -> None:
+        """
+        Writes learning parameters and critic losses to output at specified time intervals.
+
+        This function processes training metrics for each critic over multiple time steps and
+        sends them to a database for storage. It tracks the learning rate and critic losses
+        across training iterations, associating each record with a timestamp.
+
+        Parameters
+        ----------
+        learning_rate : float
+            The current learning rate used in training.
+        critic_losses_list : list[dict]
+            A list of dictionaries containing critic losses for each time step.
+            Each dictionary maps critic names to their corresponding loss values.
+        """
+        db_addr = self.context.data.get("output_agent_addr")
+
+        # Initialize datetime the first time the function is called
+        if self.datetime == None:
+            self.datetime = pd.to_datetime(self.context.data.get("train_start"))
+        freq = self.context.data.get("freq")
+        
+        steps_per_training = int(pd.Timedelta(self.train_freq) / pd.Timedelta(freq))
+
+        output_list = []
+
+        
+        for step in range(steps_per_training):
+            for critic, value in critic_losses_list[step].items():
+                critic_losses = {
+                    "unit" : critic,
+                    "critic_loss" : value,
+                    "learning_rate" : learning_rate,
+                    "datetime" : self.datetime + step * pd.Timedelta(freq)
+                }
+
+            output_list.append(critic_losses)
+            
+        if db_addr:
+            self.context.schedule_instant_message(
+                receiver_addr=db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "learning_params",
+                    "data": output_list,
+                },
+            )
+
+        self.datetime = self.datetime + pd.Timedelta(self.train_freq)

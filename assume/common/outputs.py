@@ -242,6 +242,7 @@ class WriteOutput(Role):
             "market_dispatch",
             "unit_dispatch",
             "rl_params",
+            "learning_params"
         ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
@@ -276,9 +277,14 @@ class WriteOutput(Role):
         df["learning_mode"] = self.learning_mode
         df["perform_evaluation"] = self.perform_evaluation
         df["episode"] = self.episode
+        if "critic_loss" not in df.columns:
+            df["critic_loss"] = None
+        if "learning_rate" not in df.columns:
+            df["learning_rate"] = None
+
 
         return df
-
+    
     def convert_market_results(self, market_results: list[dict]):
         """
         Convert market results to a dataframe.
@@ -439,6 +445,19 @@ class WriteOutput(Role):
         """
         if not self.db and not self.export_csv_path:
             return
+
+        # Merge learning_params to rl_params before uploading to db
+        if "rl_params" in self.write_buffers and "learning_params" in self.write_buffers:
+            df1 = pd.DataFrame(self.write_buffers["rl_params"])
+            df2 = pd.DataFrame(self.write_buffers["learning_params"])
+            merged_df = pd.merge(df1, df2, how = 'outer').convert_dtypes()
+            merged_list = merged_df.to_dict('records')
+            self.write_buffers["rl_params"] = merged_list
+            del self.write_buffers["learning_params"]
+        # if only learning_params are present, rename them to rl_params
+        elif "learning_params" in self.write_buffers:
+            self.write_buffers["rl_params"] = self.write_buffers["learning_params"]
+            del self.write_buffers["learning_params"]
 
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:
@@ -681,53 +700,73 @@ class WriteOutput(Role):
                 df.to_sql("kpis", db, if_exists="append", index=None)
         
         # store episodic evalution data in tensorboard
-        query = f"""
-        SELECT 
-            datetime as dt, 
-            unit, 
-            profit, 
-            reward, 
-            regret, 
-            exploration_noise_0 as noise_0, 
-            exploration_noise_1 as noise_1 
-        FROM rl_params 
-        WHERE episode='{self.episode}' 
-        AND simulation='{self.simulation_id}'
-        And perform_evaluation=False
-        """
-        rl_params = pd.read_sql(query, self.db)
-        rl_params["dt"] = pd.to_datetime(rl_params["dt"])
-
-        # loop over all datetimes as tensorboard does not allow to store time series
-        datetimes = rl_params["dt"].unique()
-        for i, time in enumerate(datetimes):
-            time_df = rl_params[rl_params["dt"] == time]
-            rewards = {}
-            profits = {}
-            regrets = {}
-
-            # loop over all units and store the reward, profit and regret
-            for unit, unit_df in time_df.groupby("unit"):
-                rewards[f"reward {unit}"] = unit_df["reward"].values[0]
-                profits[f"profit {unit}"] = unit_df["profit"].values[0]
-                regrets[f"regret {unit}"] = unit_df["regret"].values[0]
-
-            # Add the averages over the units to the dictionaries
-            rewards["avg reward"] = sum(rewards.values()) / len(rewards)
-            profits["avg profit"] = sum(profits.values()) / len(profits)
-            regrets["avg regret"] = sum(regrets.values()) / len(regrets)
+        if self.episode:
             
-            # calculate the average noise
-            noise_0 = time_df["noise_0"].abs().mean()
-            noise_1 = time_df["noise_1"].abs().mean()
+            query = f"""
+            SELECT 
+                datetime as dt, 
+                unit, 
+                profit, 
+                reward, 
+                regret, 
+                critic_loss as loss,
+                learning_rate as lr,
+                exploration_noise_0 as noise_0, 
+                exploration_noise_1 as noise_1 
+            FROM rl_params 
+            WHERE episode = '{self.episode}' 
+            AND simulation = '{self.simulation_id}'
+            And perform_evaluation = False
+            """
+            try:
+                rl_params_df = pd.read_sql(query, self.db)
+                rl_params_df["dt"] = pd.to_datetime(rl_params_df["dt"])
+                # replace all NaN values with 0 to allow for plotting
+                rl_params_df = rl_params_df.fillna(0., downcast = 'infer')
+                print(rl_params_df)
+                # loop over all datetimes as tensorboard does not allow to store time series
+                datetimes = rl_params_df["dt"].unique()
+                for i, time in enumerate(datetimes):
+                    time_df = rl_params_df[rl_params_df["dt"] == time]
+                    rewards = {}
+                    profits = {}
+                    regrets = {}
+                    losses = {}
 
-            # store the data in tensorboard
-            x_index = (self.episode - 1) * len(datetimes) + i
-            self.writer.add_scalars(f"reward", rewards, x_index)
-            self.writer.add_scalars(f"profit", profits, x_index)
-            self.writer.add_scalars(f"regret", regrets, x_index)
-            self.writer.add_scalar(f"noise_0", noise_0, x_index)
-            self.writer.add_scalar(f"noise_1", noise_1, x_index)
+                    # loop over all units and store the reward, profit and regret
+                    for unit, unit_df in time_df.groupby("unit"):
+                        rewards[unit] = unit_df["reward"].values[0]
+                        profits[unit] = unit_df["profit"].values[0]
+                        regrets[unit] = unit_df["regret"].values[0]
+                        losses[unit] = float(unit_df["loss"].values[0])
+
+                    # Add the averages over the units to the dictionaries
+                    rewards["avg"] = sum(rewards.values()) / len(rewards)
+                    profits["avg"] = sum(profits.values()) / len(profits)
+                    regrets["avg"] = sum(regrets.values()) / len(regrets)
+                    losses["avg"] = sum(losses.values()) / len(losses)
+                    
+                    # calculate the average noise
+                    noise_0 = time_df["noise_0"].abs().mean()
+                    noise_1 = time_df["noise_1"].abs().mean()
+
+                    # get the learning rate
+                    lr = float(time_df["lr"].values[0])
+
+                    # store the data in tensorboard
+                    x_index = (self.episode - 1) * len(datetimes) + i
+                    self.writer.add_scalars(f"a) reward", rewards, x_index)
+                    self.writer.add_scalars(f"b) profit", profits, x_index)
+                    self.writer.add_scalars(f"c) regret", regrets, x_index)
+                    self.writer.add_scalars(f"d) loss", losses, x_index)
+                    self.writer.add_scalar(f"e) learning rate", lr, x_index)
+                    self.writer.add_scalar(f"f) noise_0", noise_0, x_index)
+                    self.writer.add_scalar(f"g) noise_1", noise_1, x_index)
+            except (ProgrammingError, OperationalError, DataError):
+                return
+            except Exception as e:
+                logger.error("could not read query: %s", e)
+                return
 
     def get_sum_reward(self):
         """
@@ -752,6 +791,9 @@ class WriteOutput(Role):
         return rewards_by_unit
 
     def __del__(self):
+        """
+        Deletes the WriteOutput instance.
+        """
         if hasattr(self, 'writer'):
             self.writer.flush()
             self.writer.close()
