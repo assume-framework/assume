@@ -204,18 +204,22 @@ class RedispatchMarketRole(MarketRole):
                 logger.error(f"Solver exited with {termination_condition}")
                 raise Exception("Solver in redispatch market did not converge")
 
-            # process dispatch data
-            self.process_dispatch_data(
-                network=redispatch_network, orderbook_df=orderbook_df
-            )
-
         # if no congestion is detected set accepted volume and price to 0
         else:
             logger.debug("No congestion detected")
 
+        # process dispatch data
+        self.process_dispatch_data(
+            network=redispatch_network, orderbook_df=orderbook_df
+        )
+
         # return orderbook_df back to orderbook format as list of dicts
-        accepted_orders = orderbook_df.to_dict("records")
-        rejected_orders = []
+        accepted_orders = orderbook_df[orderbook_df["accepted_volume"] != 0].to_dict(
+            "records"
+        )
+        rejected_orders = orderbook_df[orderbook_df["accepted_volume"] == 0].to_dict(
+            "records"
+        )
         meta = []
 
         # calculate meta data such as total upwared and downward redispatch, total backup dispatch
@@ -225,7 +229,7 @@ class RedispatchMarketRole(MarketRole):
                 calculate_network_meta(network=redispatch_network, product=product, i=i)
             )
 
-        # write network flows here if applicable
+        # TODO write network flows here
         flows = []
 
         return accepted_orders, rejected_orders, meta, flows

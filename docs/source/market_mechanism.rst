@@ -34,7 +34,6 @@ The available market mechanisms are the following:
 5. :py:meth:`assume.markets.clearing_algorithms.complex_clearing.ComplexClearingRole`
 6. :py:meth:`assume.markets.clearing_algorithms.complex_clearing_dmas.ComplexDmasClearingRole`
 7. :py:meth:`assume.markets.clearing_algorithms.redispatch.RedispatchMarketRole`
-8. :py:meth:`assume.markets.clearing_algorithms.nodal_pricing.NodalMarketRole`
 9. :py:meth:`assume.markets.clearing_algorithms.contracts.PayAsBidContractRole`
 
 The :code:`PayAsClearRole` performs an electricity market clearing using a pay-as-clear mechanism.

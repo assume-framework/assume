@@ -92,7 +92,10 @@ dam_with_complex_clearing:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex
+      market_mechanism: complex_clearing
+      param_dict:
+        solver: highs
+        pricing_mechanism: pay_as_clear
       additional_fields:
         - bid_type
         - min_acceptance_ratio

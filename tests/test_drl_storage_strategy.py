@@ -86,6 +86,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
     # get the strategy
     strategy = storage_unit.bidding_strategies["EOM"]
+    strategy.prepare_observations(storage_unit, mc.market_id)
 
     # Define the 'sell' action: [0.2, 0.5] -> price=20, direction='sell'
     sell_action = [0.2, 0.5]
@@ -181,6 +182,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
     # Instantiate the StorageRLStrategy
     strategy = storage_unit.bidding_strategies["EOM"]
+    strategy.prepare_observations(storage_unit, mc.market_id)
 
     # Define the 'buy' action: [0.3, -0.5] -> price=30, direction='buy'
     buy_action = [0.3, -0.5]
@@ -274,6 +276,7 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
 
     # Instantiate the StorageRLStrategy
     strategy = storage_unit.bidding_strategies["EOM"]
+    strategy.prepare_observations(storage_unit, mc.market_id)
 
     # Define the 'ignore' action: [0.0, 0.0] -> price=0, direction='ignore'
     ignore_action = [0.0, 0.0]

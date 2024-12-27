@@ -22,7 +22,7 @@ def load_pypsa(
     study_case: str,
     network: pypsa.Network,
     marketdesign: list[MarketConfig],
-    bidding_strategies: dict[str, str],
+    bidding_strategies: dict[str, dict[str, str]],
     save_frequency_hours: int = 4,
 ):
     """
@@ -92,10 +92,10 @@ def load_pypsa(
             {
                 "min_power": generator.p_nom_min,
                 "max_power": max_power,
-                "bidding_strategies": bidding_strategies[generator.name],
+                "bidding_strategies": bidding_strategies[unit_type][generator.name],
                 "technology": "conventional",
                 "node": generator.node,
-                "efficiency": generator.efficiency,
+                "efficiency": 1,  # do not use generator.efficiency as it is respected in marginal_cost,
                 "fuel_type": generator.carrier,
                 "ramp_up": ramp_up,
                 "ramp_down": ramp_down,
@@ -118,19 +118,21 @@ def load_pypsa(
         load_t = network.loads_t["p_set"][load.name]
         unit_type = "demand"
 
+        kwargs = {load.name: load_t}
+
         world.add_unit(
-            f"demand_{load.name}",
+            load.name,
             unit_type,
             "demand_operator",
             {
                 "min_power": 0,
                 "max_power": load_t.max(),
-                "bidding_strategies": bidding_strategies[load.name],
+                "bidding_strategies": bidding_strategies[unit_type][load.name],
                 "technology": "demand",
                 "node": load.node,
                 "price": 1e3,
             },
-            NaiveForecast(index, demand=load_t),
+            NaiveForecast(index, demand=load_t, **kwargs),
         )
 
     world.add_unit_operator("storage_operator")
@@ -156,7 +158,7 @@ def load_pypsa(
                 "efficiency_discharge": storage.efficiency_dispatch,
                 "initial_soc": storage.state_of_charge_initial,
                 "max_soc": storage.p_nom,
-                "bidding_strategies": bidding_strategies[storage.name],
+                "bidding_strategies": bidding_strategies[unit_type][storage.name],
                 "technology": "hydro",
                 "emission_factor": 0,
                 "node": storage.bus,
@@ -169,9 +171,9 @@ if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)
     scenario = "world_pypsa"
-    study_case = "scigrid_de"
+    study_case = "ac_dc_meshed"
     # "pay_as_clear", "redispatch" or "nodal"
-    market_mechanism = "nodal"
+    market_mechanism = "complex_clearing"
 
     match study_case:
         case "ac_dc_meshed":
@@ -184,7 +186,7 @@ if __name__ == "__main__":
             logger.info(f"invalid studycase: {study_case}")
             network = pd.DataFrame()
 
-    study_case += market_mechanism
+    study_case = f"{study_case}_{market_mechanism}"
 
     start = network.snapshots[0]
     end = network.snapshots[-1]
@@ -195,11 +197,29 @@ if __name__ == "__main__":
             timedelta(hours=1),
             market_mechanism,
             [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
-            additional_fields=["node", "max_power", "min_power"],
+            additional_fields=["node", "max_power", "min_power", "bid_type"],
             maximum_bid_volume=1e9,
             maximum_bid_price=1e9,
         )
     ]
+    if market_mechanism == "redispatch":
+        marketdesign.append(
+            MarketConfig(
+                "EOM",
+                rr.rrule(
+                    rr.HOURLY,
+                    interval=1,
+                    dtstart=start - timedelta(hours=0.5),
+                    until=end,
+                ),
+                timedelta(hours=0.25),
+                "pay_as_clear",
+                [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1.5))],
+                additional_fields=["node", "max_power", "min_power"],
+                maximum_bid_volume=1e9,
+                maximum_bid_price=1e9,
+            )
+        )
     default_strategies = {
         mc.market_id: (
             "naive_redispatch" if mc.market_mechanism == "redispatch" else "naive_eom"
@@ -208,7 +228,13 @@ if __name__ == "__main__":
     }
     from collections import defaultdict
 
-    bidding_strategies = defaultdict(lambda: default_strategies)
+    bidding_strategies = {
+        "power_plant": defaultdict(lambda: default_strategies),
+        "demand": defaultdict(
+            lambda: {mc.market_id: "naive_eom" for mc in marketdesign}
+        ),
+        "storage": defaultdict(lambda: default_strategies),
+    }
 
     load_pypsa(world, scenario, study_case, network, marketdesign, bidding_strategies)
     world.run()

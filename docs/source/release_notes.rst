@@ -8,10 +8,19 @@ Release Notes
 
 Upcoming Release
 =======================
-
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
+
+**Improvements:**
+- **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
+  This allows for a more robust scaling of the observation space for future analysis.
+- **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
+  This allows for a more robust scaling of the observation space for future analysis.
+
+
+v0.5.0 - (10th December 2024)
+===========================================
 
 **New Features:**
 - **Learning rate and noise scheduling**: Added the possibility to schedule the learning rate and action noise in the learning process. This feature
@@ -44,7 +53,7 @@ Upcoming Release
   - **CSV scenario loader**: Fixed issue when one extra day was being added to the index, which lead to an error in the simulation when additional data was not available in the input data.
   - **Market opening schedule**: Fixed issue where the market opening was scheduled even though the simulation was ending before the required products. Now the market opening is only scheduled
     if the total duration of the market products plus first delivery time fits before the simulation end.
-  - **Mango warnings**: Set MANGO logging level to ERROR to avoid unnecessary warnings in the logs.
+  - **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
 
 v0.4.3 - (11th November 2024)
 ===========================================
