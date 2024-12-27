@@ -218,8 +218,8 @@ class InfrastructureInterface:
             COALESCE(ev."Technologie", 839) as "turbineTyp",
             ev."GenMastrNummer" as "generatorID"
             """
-        plz_codes_str = ", ".join([str(x) for x in plz_codes])
-        plz_codes_str = f"({plz_codes_str})"
+        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = f"('{plz_codes_str}')"
         if fuel_type != "nuclear":
             query += f"""
                 ,
@@ -231,7 +231,7 @@ class InfrastructureInterface:
                 WHERE ev."Postleitzahl" in {plz_codes_str}
                 AND ev."Energietraeger" = {self.energietraeger_translated[fuel_type]}
                 AND ev."Nettonennleistung" > 5000 AND ev."EinheitBetriebsstatus" = 35
-                AND ev."ArtDerStilllegung" isnull;
+                AND ev."DatumEndgueltigeStilllegung" is null;
                 """
         else:
             query += f"""
@@ -301,8 +301,8 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         longitude, latitude = self.get_lat_lon_area(area)
-        plz_codes_str = ", ".join([str(x) for x in plz_codes])
-        plz_codes_str = f"({plz_codes_str})"
+        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
@@ -411,8 +411,8 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         longitude, latitude = self.get_lat_lon_area(area)
-        plz_codes_str = ", ".join([str(x) for x in plz_codes])
-        plz_codes_str = f"({plz_codes_str})"
+        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
@@ -479,8 +479,8 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         longitude, latitude = self.get_lat_lon_area(area)
-        plz_codes_str = ", ".join([str(x) for x in plz_codes])
-        plz_codes_str = f"({plz_codes_str})"
+        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = f"('{plz_codes_str}')"
 
         # TODO: Add more Parameters, if the model get more complex
         query = (
@@ -513,8 +513,8 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         longitude, latitude = self.get_lat_lon_area(area)
-        plz_codes_str = ", ".join([str(x) for x in plz_codes])
-        plz_codes_str = f"({plz_codes_str})"
+        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
@@ -546,8 +546,8 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         longitude, latitude = self.get_lat_lon_area(area)
-        plz_codes_str = ", ".join([str(x) for x in plz_codes])
-        plz_codes_str = f"({plz_codes_str})"
+        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
@@ -643,8 +643,8 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         longitude, latitude = self.get_lat_lon_area(area)
-        plz_codes_str = ", ".join([str(x) for x in plz_codes])
-        plz_codes_str = f"({plz_codes_str})"
+        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
             f'SELECT spe."LokationMastrNummer" as "unitID", '
@@ -660,7 +660,7 @@ class InfrastructureInterface:
             f'an."NutzbareSpeicherkapazitaet" as "VMax" '
             f'FROM "EinheitenStromSpeicher" spe '
             f'INNER JOIN "EinheitenSolar" so ON spe."LokationMastrNummer" = so."LokationMastrNummer" '
-            f'INNER JOIN "AnlagenStromSpeicher" an ON spe."SpeMastrNummer" = an."MastrNummer"'
+            f'INNER JOIN "AnlagenStromSpeicher" an ON spe."SpeMastrNummer" = an."MastrNummer" '
             f'WHERE so."Postleitzahl" in {plz_codes_str} '
             f'AND so."EinheitBetriebsstatus" = 35;'
         )

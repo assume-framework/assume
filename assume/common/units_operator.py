@@ -75,7 +75,6 @@ class UnitsOperator(Role):
 
     def setup(self):
         super().setup()
-        self.id = self.context.aid
         self.context.subscribe_message(
             self,
             self.handle_opening,
@@ -102,6 +101,7 @@ class UnitsOperator(Role):
 
     def on_ready(self):
         super().on_ready()
+        self.id = self.context.aid
 
         for market in self.available_markets:
             if self.participate(market):
