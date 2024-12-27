@@ -8,6 +8,7 @@ import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from dateutil import rrule as rr
 
@@ -53,8 +54,12 @@ def load_oeds(
     logger.info(f"loading scenario {sim_id} with {nuts_config}")
     infra_interface = InfrastructureInterface("test", infra_uri)
 
-    if not nuts_config:
+    if not nuts_config or nuts_config == "nuts3":
         nuts_config = list(infra_interface.plz_nuts["nuts3"].unique())
+    elif nuts_config == "nuts1":
+        nuts_config = list(infra_interface.plz_nuts["nuts1"].unique())
+    elif nuts_config == "nuts2":
+        nuts_config = list(infra_interface.plz_nuts["nuts2"].unique())
 
     world.setup(
         start=start,
@@ -69,16 +74,18 @@ def load_oeds(
     for market_config in marketdesign:
         world.add_market(mo_id, market_config)
 
-    co2_price = 1
-    fuel_prices = {
-        "hard coal": 8.6,
+    fuel_prices = { # €/MWh
+        "hard coal": infra_interface.get_coal_price(start, end), # 8.6
         "lignite": 1.8,
-        "oil": 22,
-        "gas": 26,
+        "oil": infra_interface.get_oil_price(start, end), # 22
+        "gas": infra_interface.get_gas_price(start, end), # 26
         "biomass": 20,
         "nuclear": 1,
-        "co2": 20,
+        "co2": infra_interface.get_co2_price(start, end), # 1€/tCO2
     }
+    for name in fuel_prices.keys():
+        if not isinstance(fuel_prices[name], float|int):
+            fuel_prices[name] = fuel_prices[name].reindex(index, method="nearest").values
 
     # for each area - add demand and generation
     for area in nuts_config:
@@ -186,10 +193,10 @@ def load_oeds(
                         "min_power": plant["minPower"] / 1e3,  # kW -> MW
                         "max_power": plant["maxPower"] / 1e3,  # kW -> MW
                         "bidding_strategies": bidding_strategies[fuel_type],
-                        "emission_factor": plant["chi"],  # [t/MWh therm]
+                        "emission_factor": plant["chi"] * 1e3,  # [t/MWh therm]
                         "efficiency": plant["eta"],
                         "technology": fuel_type,
-                        "cold_start_cost": plant["start_cost"],
+                        "cold_start_cost": plant["start_cost"] * 1e3,
                         "ramp_up": plant["ramp_up"],
                         "ramp_down": plant["ramp_down"],
                         "location": (lat, lon),
@@ -198,8 +205,8 @@ def load_oeds(
                     NaiveForecast(
                         index,
                         availability=1,
-                        fuel_price=fuel_prices[fuel_type],
-                        co2_price=co2_price,
+                        fuel_price=fuel_prices[fuel_type] + np.random.uniform(-5,5),
+                        co2_price=fuel_prices["co2"],
                     ),
                 )
 
@@ -208,25 +215,27 @@ if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)
     scenario = "world_mastr"
-    study_case = "study_case"
+    study_case = "nuts1_random"
     # FH Aachen internal server
     infra_uri = os.getenv(
         "INFRASTRUCTURE_URI",
         "postgresql://readonly:readonly@timescale.nowum.fh-aachen.de:5432/opendata",
     )
 
+    # default_nuts_config = "DE1"
     default_nuts_config = "DE1, DEA, DEB, DEC, DED, DEE, DEF"
     nuts_config = os.getenv("NUTS_CONFIG", default_nuts_config).split(",")
     nuts_config = [n.strip() for n in nuts_config]
+    nuts_config = "nuts1"
     year = 2019
     start = datetime(year, 1, 1)
-    end = datetime(year, 1 + 1, 1) - timedelta(hours=1)
+    end = datetime(year, 12, 31) - timedelta(hours=1)
     marketdesign = [
         MarketConfig(
             "EOM",
             rr.rrule(rr.HOURLY, interval=24, dtstart=start, until=end),
             timedelta(hours=1),
-            "pay_as_clear_complex_dmas",
+            "pay_as_clear",
             [MarketProduct(timedelta(hours=1), 24, timedelta(hours=1))],
             additional_fields=["block_id", "link", "exclusive_id"],
             maximum_bid_volume=1e9,
@@ -234,7 +243,7 @@ if __name__ == "__main__":
         )
     ]
 
-    default_strategy = {mc.market_id: "dmas_powerplant" for mc in marketdesign}
+    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
     default_naive_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
 
     bidding_strategies = {

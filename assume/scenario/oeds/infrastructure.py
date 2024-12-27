@@ -38,7 +38,7 @@ class InfrastructureInterface:
         self,
         name,
         db_server_uri,
-        structure_databases=("mastr", "oep", "windmodel", "nuts", "scigrid", "weather"),
+        structure_databases=("mastr", "oep", "windmodel", "nuts", "scigrid", "weather", "opec", "instrat_pl"),
     ):
         self.databases = {}
         for db in structure_databases:
@@ -54,7 +54,7 @@ class InfrastructureInterface:
     def setup(self):
         with self.databases["nuts"].connect() as conn:
             self.plz_nuts = pd.read_sql_query(
-                "select code, nuts3, longitude, latitude from plz",
+                "select code, nuts1, nuts2, nuts3, longitude, latitude from plz",
                 conn,
                 index_col="code",
             )
@@ -712,6 +712,47 @@ class InfrastructureInterface:
         holi = holidays.DE(years=year)
         e_slp = ElecSlp(year, holidays=holi)
         return e_slp.get_profile(ann_el_demand_per_sector)
+
+    def get_co2_price(
+        self,
+        start: datetime,
+        end: datetime,
+    ):
+        """returns price of CO2 equivalents per ton from EU ETS trading"""
+        query = f"SELECT date as time, eur_per_tco2 FROM eu_ets  WHERE date BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'"
+        with self.databases["instrat_pl"].connect() as connection:
+            return pd.read_sql_query(query, connection, index_col="time")["eur_per_tco2"]
+
+    def get_coal_price(
+        self,
+        start: datetime,
+        end: datetime,
+    ):
+        """returns price of CO2 equivalents per ton from EU ETS trading"""
+        query = f"SELECT date as time, price_eur_per_kwh*1000 as price_eur_per_mwh FROM coal_price WHERE date BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'"
+        with self.databases["instrat_pl"].connect() as connection:
+            return pd.read_sql_query(query, connection, index_col="time")["price_eur_per_mwh"]
+ 
+
+    def get_gas_price(
+        self,
+        start: datetime,
+        end: datetime,
+    ):
+        """returns price of CO2 equivalents per ton from EU ETS trading"""
+        query = f"SELECT date as time, price_eur_per_kwh*1000 as price_eur_per_mwh FROM gas_price WHERE date BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'"
+        with self.databases["instrat_pl"].connect() as connection:
+            return pd.read_sql_query(query, connection, index_col="time")["price_eur_per_mwh"]
+
+    def get_oil_price(
+        self,
+        start: datetime,
+        end: datetime,
+    ):
+        """returns price of CO2 equivalents per ton from EU ETS trading"""
+        query = f"SELECT date as time, \"euro_per_kWh\"*1000 as euro_per_mwh FROM opec WHERE date BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'"
+        with self.databases["opec"].connect() as connection:
+            return pd.read_sql_query(query, connection, index_col="time")["euro_per_mwh"]
 
     def get_weather_param(
         self,
