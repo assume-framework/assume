@@ -750,7 +750,7 @@ class InfrastructureInterface:
         end: datetime,
     ):
         """returns price of CO2 equivalents per ton from EU ETS trading"""
-        query = f"SELECT date as time, \"euro_per_kWh\"*1000 as euro_per_mwh FROM opec WHERE date BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'"
+        query = f"SELECT date as time, euro_per_kwh*1000 as euro_per_mwh FROM opec WHERE date BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'"
         with self.databases["opec"].connect() as connection:
             return pd.read_sql_query(query, connection, index_col="time")["euro_per_mwh"]
 
