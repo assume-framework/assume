@@ -330,7 +330,7 @@
         ]
       },
       "gridPos": {
-        "h": 12,
+        "h": 9,
         "w": 24,
         "x": 0,
         "y": 20
@@ -409,7 +409,6 @@
           }
         ],
         "tooltip": {
-          "maxWidth": 100,
           "mode": "single",
           "sort": "none"
         }
@@ -428,7 +427,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  \n  sum(volume::float) OVER (PARTITION BY market_id ORDER BY price asc) AS \"Volume\",\n  price::float AS \"Price\", unit_id,\n  1/(volume - accepted_volume +1)/2 as size\n  --'rgba(255,255,255,1)' as delta\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n  simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume > 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, price, market_id --, bid_id\nORDER BY price asc\n\n-- ",
+          "rawSql": "SELECT\n  \n  sum(volume::float) OVER (PARTITION BY market_id ORDER BY price asc, unit_id) AS \"Volume\",\n  price::float AS \"Price\", unit_id,\n  1/(volume - accepted_volume +1)/2 as size\n  --'rgba(255,255,255,1)' as delta\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n  simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume > 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, price, market_id --, bid_id\nORDER BY price asc\n\n-- ",
           "refId": "Volume",
           "select": [
             [
@@ -477,7 +476,7 @@
           "format": "table",
           "hide": false,
           "rawQuery": true,
-          "rawSql": "SELECT\n  -sum(volume::float) OVER (PARTITION BY market_id ORDER BY accepted_price asc) AS \"Volume\",\n  accepted_price::float AS \"Price\", unit_id,\n  10 as size\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n  simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume < 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, accepted_price, market_id --, bid_id\nORDER BY accepted_price asc\n\n-- ",
+          "rawSql": "SELECT\n  -sum(volume::float) OVER (PARTITION BY market_id ORDER BY accepted_price asc, unit_id) AS \"Volume\",\n  accepted_price::float AS \"Price\", unit_id,\n  10 as size\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n  simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume < 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, accepted_price, market_id --, bid_id\nORDER BY accepted_price asc\n\n-- ",
           "refId": "Demand",
           "sql": {
             "columns": [
@@ -550,8 +549,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -567,7 +565,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 29
       },
       "id": 19,
       "options": {
@@ -750,8 +748,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -767,7 +764,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 32
+        "y": 29
       },
       "id": 20,
       "options": {
@@ -902,12 +899,211 @@
       "type": "timeseries"
     },
     {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Dispatch by technology",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 18,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "megwatt"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      },
+      "id": 101,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "maxHeight": 600,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.3.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "group": [
+            {
+              "params": [
+                "$__interval",
+                "none"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "unit_id"
+              ],
+              "type": "column"
+            }
+          ],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "select time, sum(volume) as \"volume\", tech FROM \n(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  sum(accepted_volume) AS \"volume\", unit_id, pm.technology as tech\nFROM market_orders mo\njoin power_plant_meta pm on pm.index=mo.unit_id and pm.simulation=mo.simulation\nWHERE\n\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  mo.simulation = '$simulation'\n\nGROUP BY 1, unit_id, bid_id, pm.technology\nORDER BY 1\n\n) a\ngroup by 1, tech\nORDER BY 1, tech desc",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg"
+                ],
+                "type": "aggregate"
+              },
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "market_orders",
+          "timeColumn": "start_time",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "market_id",
+                "=",
+                "'$market'"
+              ],
+              "type": "expression"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "simulation",
+                "=",
+                "'$simulation'"
+              ],
+              "type": "expression"
+            }
+          ]
+        }
+      ],
+      "title": "Dispatch by technology",
+      "type": "timeseries"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 47
       },
       "id": 74,
       "panels": [],
@@ -950,8 +1146,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1000,7 +1195,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 42
+        "y": 48
       },
       "id": 72,
       "options": {
@@ -1084,8 +1279,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1150,7 +1344,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 42
+        "y": 48
       },
       "id": 76,
       "options": {
@@ -1255,7 +1449,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 42
+        "y": 48
       },
       "id": 7,
       "options": {
@@ -1346,7 +1540,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 54
+        "y": 60
       },
       "id": 41,
       "panels": [],
@@ -1363,7 +1557,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 55
+        "y": 61
       },
       "id": 22,
       "options": {
@@ -1430,8 +1624,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1447,7 +1640,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 58
+        "y": 64
       },
       "id": 24,
       "interval": "15m",
@@ -1565,8 +1758,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1581,7 +1773,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 58
+        "y": 64
       },
       "id": 26,
       "options": {
@@ -1609,6 +1801,7 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "none",
@@ -1625,6 +1818,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -1689,8 +1899,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1719,7 +1928,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 67
+        "y": 73
       },
       "id": 70,
       "options": {
@@ -1920,8 +2129,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1965,7 +2173,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 67
+        "y": 73
       },
       "id": 78,
       "options": {
@@ -2090,8 +2298,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2138,7 +2345,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 75
+        "y": 81
       },
       "id": 93,
       "options": {
@@ -2263,8 +2470,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2304,35 +2510,6 @@
                 }
               }
             ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "Cashflow Unit 44",
-                  "Cashflow Unit 43",
-                  "Cashflow Unit 42",
-                  "Cashflow Unit 41",
-                  "Cashflow Unit 40",
-                  "Cashflow Unit 4"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
           }
         ]
       },
@@ -2340,7 +2517,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 90
       },
       "id": 99,
       "options": {
@@ -2418,7 +2595,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 89
+        "y": 95
       },
       "id": 39,
       "panels": [],
@@ -2473,8 +2650,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2490,7 +2666,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 90
+        "y": 96
       },
       "id": 36,
       "options": {
@@ -2628,8 +2804,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2644,7 +2819,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 90
+        "y": 96
       },
       "id": 37,
       "options": {
@@ -2672,6 +2847,7 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "none",
@@ -2688,6 +2864,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -2752,8 +2945,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2782,7 +2974,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 99
+        "y": 105
       },
       "id": 89,
       "options": {
@@ -2915,8 +3107,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2972,7 +3163,7 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 99
+        "y": 105
       },
       "id": 95,
       "options": {
@@ -3098,8 +3289,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3143,7 +3333,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 99
+        "y": 105
       },
       "id": 90,
       "options": {
@@ -3234,8 +3424,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3251,7 +3440,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 104
+        "y": 110
       },
       "id": 96,
       "options": {
@@ -3343,8 +3532,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3360,7 +3548,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 104
+        "y": 110
       },
       "id": 94,
       "options": {
@@ -3485,8 +3673,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3518,7 +3705,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 114
       },
       "id": 86,
       "options": {
@@ -3601,7 +3788,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 117
+        "y": 123
       },
       "id": 44,
       "panels": [],
@@ -3656,8 +3843,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3673,7 +3859,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 118
+        "y": 124
       },
       "id": 65,
       "options": {
@@ -3811,8 +3997,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3827,7 +4012,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 118
+        "y": 124
       },
       "id": 47,
       "options": {
@@ -3935,8 +4120,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3952,7 +4136,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 127
+        "y": 133
       },
       "id": 80,
       "options": {
@@ -4077,8 +4261,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4107,7 +4290,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 136
+        "y": 142
       },
       "id": 91,
       "options": {
@@ -4292,8 +4475,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4337,7 +4519,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 136
+        "y": 142
       },
       "id": 92,
       "options": {
@@ -4480,8 +4662,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4528,7 +4709,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 145
+        "y": 151
       },
       "id": 97,
       "options": {
@@ -4653,8 +4834,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4701,7 +4881,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 154
+        "y": 160
       },
       "id": 98,
       "options": {
