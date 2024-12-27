@@ -184,6 +184,10 @@ def load_oeds(
             i = 0
             for plant in plants:
                 i += 1
+                if random:
+                    randomness = np.random.uniform(-5,5)
+                else:
+                    randomness = 0
                 world.add_unit(
                     f"conventional{area}_{fuel_type}_{i}",
                     "power_plant",
@@ -205,7 +209,7 @@ def load_oeds(
                     NaiveForecast(
                         index,
                         availability=1,
-                        fuel_price=fuel_prices[fuel_type] + np.random.uniform(-5,5),
+                        fuel_price=fuel_prices[fuel_type] + randomness,
                         co2_price=fuel_prices["co2"],
                     ),
                 )
@@ -215,7 +219,6 @@ if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)
     scenario = "world_mastr"
-    study_case = "nuts1_random"
     # FH Aachen internal server
     infra_uri = os.getenv(
         "INFRASTRUCTURE_URI",
@@ -226,8 +229,11 @@ if __name__ == "__main__":
     default_nuts_config = "DE1, DEA, DEB, DEC, DED, DEE, DEF"
     nuts_config = os.getenv("NUTS_CONFIG", default_nuts_config).split(",")
     nuts_config = [n.strip() for n in nuts_config]
-    nuts_config = "nuts1"
-    year = 2019
+    nuts_config = "nuts3"
+    year = 2024
+    random = False
+    type = "random" if random else "static"
+    study_case = "{nuts_config}_{type}_{year}"
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31) - timedelta(hours=1)
     marketdesign = [

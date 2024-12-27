@@ -786,6 +786,15 @@ class InfrastructureInterface:
             end,
             area,
         )
+        if weather_df.empty:
+            # happened for DE221
+            weather_df = self.get_weather_param(
+                WEATHER_PARAMS_ECMWF,
+                start,
+                end,
+                area[:-1], # get weather for greater area
+            )
+
         # convert from J/m^2 to Wh/m^2
         weather_df["ghi"] /= 3600
         weather_df["zenith"] = sun_position["zenith"]
@@ -957,6 +966,11 @@ if __name__ == "__main__":
     y = os.getenv("INFRASTRUCTURE_LOGIN", "readonly:readonly")
     uri = f"postgresql://{y}@{x}"
     interface = InfrastructureInterface("test", uri)
+
+    year = 2020
+    start = datetime(year, 1, 1)
+    end = datetime(year, 12, 31)
+    solar, wind = interface.get_renewables_series_in_area("DE221", start, end)
     interface.get_plz_codes("DEF")
     interface.get_lat_lon(52379)
     # x = interface.get_power_plant_in_area(area='DEA2D', fuel_type='gas')
@@ -1023,6 +1037,8 @@ if __name__ == "__main__":
     infra_uri = f"postgresql://{login}@{database}"
     infra_interface = InfrastructureInterface("test", infra_uri)
 
+    solar, wind = infra_interface.get_renewables_series_in_area("DE221", start, end)
+
     solar = infra_interface.get_solar_storage_systems_in_area("DE123")
     solar_sys = infra_interface.get_solar_systems_in_area("DE127")
     wind = infra_interface.get_wind_turbines_in_area("DE7")
@@ -1033,4 +1049,3 @@ if __name__ == "__main__":
         WEATHER_PARAMS_ECMWF, start, end, "DE"
     )
     demand = infra_interface.get_demand_series_in_area("DEA", year)
-    solar, wind = infra_interface.get_renewables_series_in_area("DE12", start, end)
