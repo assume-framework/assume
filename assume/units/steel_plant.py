@@ -98,9 +98,9 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.co2_price = self.forecaster.get_price("co2")
 
         # Calculate congestion forecast and set it as a forecast column in the forecaster
-        self.congestion_signal = self.forecaster["east_congestion_severity"]
+        self.congestion_signal = self.forecaster[f"{node}_congestion_severity"]
         self.renewable_utilisation_signal = self.forecaster[
-            "south_renewable_utilisation"
+            f"{node}_renewable_utilisation"
         ]
 
         self.objective = objective

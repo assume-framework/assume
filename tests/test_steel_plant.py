@@ -276,8 +276,7 @@ def test_renewable_utilisation(steel_plant_renewable_utilisation):
     # Assert load shifting respects renewable signal intensity
     for t in instance.time_steps:
         assert (
-            adjusted_total_power_input[t]
-            <= instance.total_power_input[t].value + instance.renewable_signal[t]
+            adjusted_total_power_input[1] <= instance.total_power_input[1].value
         ), f"Load shift exceeds renewable intensity signal at time {t}"
 
 

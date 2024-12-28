@@ -110,6 +110,8 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         self.define_constraints()
         self.define_objective_opt()
 
+        self.determine_optimal_operation_without_flex(switch_flex_off=False)
+
         # Apply the flexibility function based on flexibility measure
         if self.flexibility_measure in DSMFlex.flexibility_map:
             DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
@@ -241,6 +243,12 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 return sum(self.model.variable_cost[t] for t in self.model.time_steps)
 
     def define_objective_flex(self):
+        """
+        Defines the flexibility objective for the optimization model.
+
+        Args:
+            model (pyomo.ConcreteModel): The Pyomo model.
+        """
         if self.flexibility_measure == "cost_based_load_shift":
 
             @self.model.Objective(sense=pyo.maximize)
@@ -255,10 +263,48 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
 
                 return maximise_load_shift
 
+        elif self.flexibility_measure == "congestion_management_flexibility":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * m.congestion_indicator[t]
+                    for t in m.time_steps
+                )
+
+                return maximise_load_shift
+
+        elif self.flexibility_measure == "peak_load_shifting":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
+                )
+
+                return maximise_load_shift
+
+        elif self.flexibility_measure == "renewable_utilisation":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load increase over all time steps based on renewable surplus.
+                """
+                maximise_renewable_utilisation = pyo.quicksum(
+                    m.load_shift_pos[t] * m.renewable_signal[t] for t in m.time_steps
+                )
+
+                return maximise_renewable_utilisation
+
         else:
-            raise ValueError(
-                f"Unknown flexibility measure: {self.flexibility_measure} for hydrogen plant."
-            )
+            raise ValueError(f"Unknown objective: {self.flexibility_measure}")
 
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
