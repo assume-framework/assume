@@ -5,7 +5,7 @@
 import copy
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import dateutil.rrule as rr
@@ -439,7 +439,7 @@ def load_config_and_create_forecaster(
 
     index = pd.date_range(
         start=start,
-        end=end + timedelta(days=1),
+        end=end,
         freq=config["time_step"],
     )
 
@@ -514,13 +514,14 @@ def load_config_and_create_forecaster(
     forecaster.set_forecast(temperature_df)
     forecaster.calc_forecast_if_needed()
 
+    forecaster.convert_forecasts_to_fast_series()
+
     return {
         "config": config,
         "sim_id": sim_id,
         "path": path,
         "start": start,
         "end": end,
-        "index": index,
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
@@ -535,8 +536,8 @@ def setup_world(
     study_case: str,
     perform_evaluation: bool = False,
     terminate_learning: bool = False,
-    episode: int = 0,
-    eval_episode: int = 0,
+    episode: int = 1,
+    eval_episode: int = 1,
 ) -> None:
     """
     Load a scenario from a given path.
@@ -549,8 +550,8 @@ def setup_world(
         study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
-        episode (int, optional): The episode number for learning. Defaults to 0.
-        eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
+        episode (int, optional): The episode number for learning. Defaults to 1.
+        eval_episode (int, optional): The episode number for evaluation. Defaults to 1.
 
     Raises:
         ValueError: If the specified scenario or study case is not found in the provided inputs.
@@ -563,13 +564,13 @@ def setup_world(
     config = scenario_data["config"]
     start = scenario_data["start"]
     end = scenario_data["end"]
-    index = scenario_data["index"]
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
     dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
+    # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
     # Disable save frequency if CSV export is enabled
     if world.export_csv_path and save_frequency_hours is not None:
@@ -625,7 +626,6 @@ def setup_world(
         simulation_id=sim_id,
         learning_config=learning_config,
         bidding_params=bidding_strategy_params,
-        index=index,
         forecaster=forecaster,
     )
 
@@ -726,10 +726,6 @@ def load_scenario_folder(
     inputs_path: str,
     scenario: str,
     study_case: str,
-    perform_evaluation: bool = False,
-    terminate_learning: bool = False,
-    episode: int = 1,
-    eval_episode: int = 1,
 ):
     """
     Load a scenario from a given path.
@@ -741,29 +737,12 @@ def load_scenario_folder(
         inputs_path (str): The path to the folder containing input files necessary for the scenario.
         scenario (str): The name of the scenario to be loaded.
         study_case (str): The specific study case within the scenario to be loaded.
-        perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
-        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
-        episode (int, optional): The episode number for learning. Defaults to 0.
-        eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
     Raises:
         ValueError: If the specified scenario or study case is not found in the provided inputs.
 
-    Example:
-        >>> load_scenario_folder(
-            world=world,
-            inputs_path="/path/to/inputs",
-            scenario="scenario_name",
-            study_case="study_case_name",
-            perform_evaluation=False,
-            episode=1,
-            eval_episode=1,
-            trained_policies_save_path="",
-        )
-
     Notes:
         - The function sets up the world environment based on the provided inputs and configuration files.
-        - If `perform_evaluation` is set to True, the function performs evaluation using the specified evaluation episode number.
         - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
         - After calling this function, the world environment is prepared for further simulation and analysis.
 
@@ -776,10 +755,6 @@ def load_scenario_folder(
         world=world,
         scenario_data=scenario_data,
         study_case=study_case,
-        perform_evaluation=perform_evaluation,
-        terminate_learning=terminate_learning,
-        episode=episode,
-        eval_episode=eval_episode,
     )
 
 
@@ -878,7 +853,6 @@ def run_learning(
     # initialize policies already here to set the obs_dim and act_dim in the learning role
     actors_and_critics = None
     world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
-    world.output_role.del_similar_runs()
 
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
@@ -913,7 +887,6 @@ def run_learning(
         "avg_all_eval": [],
         "episodes_done": 0,
         "eval_episodes_done": 0,
-        "noise_scale": world.learning_config.get("noise_scale", 1.0),
     }
 
     # -----------------------------------------
@@ -929,14 +902,12 @@ def run_learning(
         range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
     ):
-        # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
-        if episode != 1:
-            setup_world(
-                world=world,
-                scenario_data=scenario_data,
-                study_case=study_case,
-                episode=episode,
-            )
+        setup_world(
+            world=world,
+            scenario_data=scenario_data,
+            study_case=study_case,
+            episode=episode,
+        )
 
         # -----------------------------------------
         # Give the newly initialized learning role the needed information across episodes
@@ -994,13 +965,12 @@ def run_learning(
 
         world.reset()
 
-        # if at end of simulation save last policies
-        if episode == (world.learning_role.training_episodes):
-            world.learning_role.rl_algorithm.save_params(
-                directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
-            )
+    # save the last policies at the end of the training
+    world.learning_role.rl_algorithm.save_params(
+        directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
+    )
 
-        # container shutdown implicitly with new initialisation
+    # container shutdown implicitly with new initialisation
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
     world.export_csv_path = temp_csv_path

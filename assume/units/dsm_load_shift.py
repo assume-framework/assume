@@ -2,12 +2,23 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from collections.abc import Callable
 
 import pyomo.environ as pyo
+from pyomo.opt import (
+    SolverFactory,
+    SolverStatus,
+    TerminationCondition,
+    check_available_solvers,
+)
 
-from assume.common.market_objects import MarketConfig, Orderbook
+from assume.common.fast_pandas import FastSeries
 from assume.units.dst_components import demand_side_technologies
+
+SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
+
+logger = logging.getLogger(__name__)
 
 
 class DSMFlex:
@@ -23,11 +34,26 @@ class DSMFlex:
             model,
         ),
     }
+    big_M = 10000000
 
     def __init__(self, components, **kwargs):
         super().__init__(**kwargs)
 
         self.components = components
+
+        self.initialize_solver()
+
+    def initialize_solver(self, solver=None):
+        # Define a solver
+        solvers = check_available_solvers(*SOLVERS)
+        solver = solver if solver in solvers else solvers[0]
+        if solver == "gurobi":
+            self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
+        elif solver == "appsi_highs":
+            self.solver_options = {"output_flag": False, "log_to_console": False}
+        else:
+            self.solver_options = {}
+        self.solver = SolverFactory(solver)
 
     def initialize_components(self):
         """
@@ -75,8 +101,8 @@ class DSMFlex:
         model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
         # Variables
-        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
-        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
         model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
         @model.Constraint()
@@ -86,13 +112,29 @@ class DSMFlex:
             ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
         @model.Constraint(model.time_steps)
+        def flex_constraint_upper(m, t):
+            return m.load_shift_pos[t] <= (1 - m.shift_indicator[t]) * self.big_M
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_lower(m, t):
+            return m.load_shift_neg[t] <= m.shift_indicator[t] * self.big_M
+
+        @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
-            if self.technology == "steel_plant":
+            # Apply constraints based on the technology type
+            if self.technology == "hydrogen_plant":
+                # Hydrogen plant constraint
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == self.model.dsm_blocks["electrolyser"].power_in[t]
+                )
+            elif self.technology == "steel_plant":
+                # Steel plant constraint with conditional electrolyser inclusion
                 if self.has_electrolyser:
                     return (
                         m.total_power_input[t]
-                        + m.load_shift_pos[t] * model.shift_indicator[t]
-                        - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
                         == self.model.dsm_blocks["electrolyser"].power_in[t]
                         + self.model.dsm_blocks["eaf"].power_in[t]
                         + self.model.dsm_blocks["dri_plant"].power_in[t]
@@ -100,8 +142,8 @@ class DSMFlex:
                 else:
                     return (
                         m.total_power_input[t]
-                        + m.load_shift_pos[t] * model.shift_indicator[t]
-                        - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
                         == self.model.dsm_blocks["eaf"].power_in[t]
                         + self.model.dsm_blocks["dri_plant"].power_in[t]
                     )
@@ -133,38 +175,361 @@ class DSMFlex:
                     == total_power_input
                 )
 
-    def set_dispatch_plan(
-        self,
-        marketconfig: MarketConfig,
-        orderbook: Orderbook,
-    ) -> None:
+    def grid_congestion_management(self, model):
         """
-        Adds the dispatch plan from the current market result to the total dispatch plan and calculates the cashflow.
+        Adjust load shifting based directly on grid congestion signals to enable
+        congestion-responsive flexibility.
 
         Args:
-            marketconfig (MarketConfig): The market configuration.
-            orderbook (Orderbook): The orderbook.
+            model (pyomo.ConcreteModel): The Pyomo model being optimized.
         """
 
-        product_type = marketconfig.product_type
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            end_excl = end - self.index.freq
-            if isinstance(order["accepted_volume"], dict):
-                self.outputs[product_type].loc[start:end_excl] += [
-                    order["accepted_volume"][key]
-                    for key in order["accepted_volume"].keys()
-                ]
-            else:
-                self.outputs[product_type].loc[start:end_excl] += order[
-                    "accepted_volume"
-                ]
+        # Generate the congestion indicator dictionary based on the threshold
+        congestion_indicator_dict = {
+            i: int(value > self.congestion_threshold)
+            for i, value in enumerate(self.congestion_signal)
+        }
 
-        self.calculate_cashflow(product_type, orderbook)
-
-        self.bidding_strategies[marketconfig.market_id].calculate_reward(
-            unit=self,
-            marketconfig=marketconfig,
-            orderbook=orderbook,
+        # Define the cost tolerance parameter
+        model.cost_tolerance = pyo.Param(initialize=(self.cost_tolerance))
+        model.total_cost = pyo.Param(initialize=0.0, mutable=True)
+        # Define congestion_indicator as a fixed parameter with matching indices
+        model.congestion_indicator = pyo.Param(
+            model.time_steps, initialize=congestion_indicator_dict
         )
+
+        # Variables
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
+
+        # Constraint to manage total cost upper limit with cost tolerance
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_upper(m, t):
+            return m.load_shift_pos[t] <= (1 - m.shift_indicator[t]) * self.big_M
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_lower(m, t):
+            return m.load_shift_neg[t] <= m.shift_indicator[t] * self.big_M
+
+        # Power input constraint with flexibility based on congestion
+        @model.Constraint(model.time_steps)
+        def total_power_input_constraint_with_flex(m, t):
+            if self.has_electrolyser:
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == self.model.dsm_blocks["electrolyser"].power_in[t]
+                    + self.model.dsm_blocks["eaf"].power_in[t]
+                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                )
+            else:
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == self.model.dsm_blocks["eaf"].power_in[t]
+                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                )
+
+    def peak_load_shifting_flexibility(self, model):
+        """
+        Implements constraints for peak load shifting flexibility by identifying peak periods
+        and allowing load shifts from peak to off-peak periods within a cost tolerance.
+
+        Args:
+            model (pyomo.ConcreteModel): The Pyomo model being optimized.
+        """
+
+        max_load = max(self.opt_power_requirement)
+
+        peak_load_cap_value = max_load * (
+            self.peak_load_cap / 100
+        )  # E.g., 10% threshold
+        # Add peak_threshold_value as a Param on the model so it can be accessed elsewhere
+        model.peak_load_cap_value = pyo.Param(initialize=peak_load_cap_value)
+
+        # Parameters
+        model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
+        model.total_cost = pyo.Param(initialize=0.0, mutable=True)
+
+        # Variables for load shifting
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
+
+        peak_periods = {
+            t
+            for t in model.time_steps
+            if self.opt_power_requirement.iloc[t] > peak_load_cap_value
+        }
+        model.peak_indicator = pyo.Param(
+            model.time_steps,
+            initialize={t: int(t in peak_periods) for t in model.time_steps},
+        )
+
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_upper(m, t):
+            return m.load_shift_pos[t] <= (1 - m.shift_indicator[t]) * self.big_M
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_lower(m, t):
+            return m.load_shift_neg[t] <= m.shift_indicator[t] * self.big_M
+
+        # Power input constraint with flexibility based on congestion
+        @model.Constraint(model.time_steps)
+        def total_power_input_constraint_with_peak_shift(m, t):
+            if self.has_electrolyser:
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == m.dsm_blocks["electrolyser"].power_in[t]
+                    + m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
+                )
+            else:
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
+                )
+
+        @model.Constraint(model.time_steps)
+        def peak_threshold_constraint(m, t):
+            """
+            Ensures that the power input during peak periods does not exceed the peak threshold value.
+            """
+            if self.has_electrolyser:
+                return (
+                    m.dsm_blocks["electrolyser"].power_in[t]
+                    + m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    <= peak_load_cap_value
+                )
+            else:
+                return (
+                    m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    <= peak_load_cap_value
+                )
+
+    def renewable_utilisation(self, model):
+        """
+        Implements flexibility based on the renewable utilisation signal. The normalized renewable intensity
+        signal indicates the periods with high renewable availability, allowing the steel plant to adjust
+        its load flexibly in response.
+
+        Args:
+            model (pyomo.ConcreteModel): The Pyomo model being optimized.
+        """
+        # Normalize renewable utilization signal between 0 and 1
+        renewable_signal_normalised = (
+            self.renewable_utilisation_signal - self.renewable_utilisation_signal.min()
+        ) / (
+            self.renewable_utilisation_signal.max()
+            - self.renewable_utilisation_signal.min()
+        )
+        # Add normalized renewable signal as a model parameter
+        model.renewable_signal = pyo.Param(
+            model.time_steps,
+            initialize={
+                t: renewable_signal_normalised.iloc[t] for t in model.time_steps
+            },
+        )
+
+        model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
+        model.total_cost = pyo.Param(initialize=0.0, mutable=True)
+
+        # Variables for load flexibility based on renewable intensity
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
+
+        # Constraint to manage total cost upper limit with cost tolerance
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_upper(m, t):
+            return m.load_shift_pos[t] <= (1 - m.shift_indicator[t]) * self.big_M
+
+        @model.Constraint(model.time_steps)
+        def flex_constraint_lower(m, t):
+            return m.load_shift_neg[t] <= m.shift_indicator[t] * self.big_M
+
+        # Power input constraint integrating flexibility
+        @model.Constraint(model.time_steps)
+        def total_power_input_constraint_flex(m, t):
+            if self.has_electrolyser:
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == m.dsm_blocks["electrolyser"].power_in[t]
+                    + m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
+                )
+            else:
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == m.dsm_blocks["eaf"].power_in[t]
+                    + m.dsm_blocks["dri_plant"].power_in[t]
+                )
+
+    def determine_optimal_operation_without_flex(self, switch_flex_off=True):
+        """
+        Determines the optimal operation of the steel plant without considering flexibility.
+        """
+        # create an instance of the model
+        instance = self.model.create_instance()
+        # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
+        if switch_flex_off:
+            instance = self.switch_to_opt(instance)
+        # solve the instance
+        results = self.solver.solve(instance, options=self.solver_options)
+
+        # Check solver status and termination condition
+        if (results.solver.status == SolverStatus.ok) and (
+            results.solver.termination_condition == TerminationCondition.optimal
+        ):
+            logger.debug("The model was solved optimally.")
+
+            # Display the Objective Function Value
+            objective_value = instance.obj_rule_opt()
+            logger.debug("The value of the objective function is %s.", objective_value)
+
+        elif results.solver.termination_condition == TerminationCondition.infeasible:
+            logger.debug("The model is infeasible.")
+
+        else:
+            logger.debug("Solver Status: ", results.solver.status)
+            logger.debug(
+                "Termination Condition: ", results.solver.termination_condition
+            )
+
+        opt_power_requirement = [
+            pyo.value(instance.total_power_input[t]) for t in instance.time_steps
+        ]
+        self.opt_power_requirement = FastSeries(
+            index=self.index, value=opt_power_requirement
+        )
+
+        self.total_cost = sum(
+            instance.variable_cost[t].value for t in instance.time_steps
+        )
+
+        # Variable cost series
+        variable_cost = [
+            pyo.value(instance.variable_cost[t]) for t in instance.time_steps
+        ]
+        self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
+
+    def determine_optimal_operation_with_flex(self):
+        """
+        Determines the optimal operation of the steel plant without considering flexibility.
+        """
+        # create an instance of the model
+        instance = self.model.create_instance()
+        # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
+        instance = self.switch_to_flex(instance)
+        # solve the instance
+        results = self.solver.solve(instance, options=self.solver_options)
+
+        # Check solver status and termination condition
+        if (results.solver.status == SolverStatus.ok) and (
+            results.solver.termination_condition == TerminationCondition.optimal
+        ):
+            logger.debug("The model was solved optimally.")
+
+            # Display the Objective Function Value
+            objective_value = instance.obj_rule_flex()
+            logger.debug("The value of the objective function is %s.", objective_value)
+
+        elif results.solver.termination_condition == TerminationCondition.infeasible:
+            logger.debug("The model is infeasible.")
+
+        else:
+            logger.debug("Solver Status: ", results.solver.status)
+            logger.debug(
+                "Termination Condition: ", results.solver.termination_condition
+            )
+
+        # Compute adjusted total power input with load shift applied
+        adjusted_total_power_input = []
+        for t in instance.time_steps:
+            # Calculate the load-shifted value of total_power_input
+            adjusted_power = (
+                instance.total_power_input[t].value
+                + instance.load_shift_pos[t].value
+                - instance.load_shift_neg[t].value
+            )
+            adjusted_total_power_input.append(adjusted_power)
+
+        # Assign this list to flex_power_requirement as a pandas Series
+        self.flex_power_requirement = FastSeries(
+            index=self.index, value=adjusted_total_power_input
+        )
+
+        # Variable cost series
+        flex_variable_cost = [
+            instance.variable_cost[t].value for t in instance.time_steps
+        ]
+        self.flex_variable_cost_series = FastSeries(
+            index=self.index, value=flex_variable_cost
+        )
+
+    def switch_to_opt(self, instance):
+        """
+        Switches the instance to solve a cost based optimisation problem by deactivating the flexibility constraints and objective.
+
+        Args:
+            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
+
+        Returns:
+            pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
+        """
+        # Deactivate the flexibility objective if it exists
+        # if hasattr(instance, "obj_rule_flex"):
+        instance.obj_rule_flex.deactivate()
+
+        # Deactivate flexibility constraints if they exist
+        if hasattr(instance, "total_cost_upper_limit"):
+            instance.total_cost_upper_limit.deactivate()
+
+        if hasattr(instance, "peak_load_shift_constraint"):
+            instance.peak_load_shift_constraint.deactivate()
+
+        # if hasattr(instance, "total_power_input_constraint_with_flex"):
+        instance.total_power_input_constraint_with_flex.deactivate()
+
+        return instance
+
+    def switch_to_flex(self, instance):
+        """
+        Switches the instance to flexibility mode by deactivating few constraints and objective function.
+
+        Args:
+            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
+
+        Returns:
+            pyomo.ConcreteModel: The modified instance with optimal constraints and objective deactivated.
+        """
+        # deactivate the optimal constraints and objective
+        instance.obj_rule_opt.deactivate()
+        instance.total_power_input_constraint.deactivate()
+
+        # fix values of model.total_power_input
+        for t in instance.time_steps:
+            instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
+        instance.total_cost = self.total_cost
+
+        return instance

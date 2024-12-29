@@ -9,7 +9,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
 from mango import (
     RoleAgent,
     activate,
@@ -157,7 +156,6 @@ class World:
         start: datetime,
         end: datetime,
         simulation_id: str,
-        index: pd.Series,
         save_frequency_hours: int = 24,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
@@ -195,20 +193,15 @@ class World:
         self.forecaster = forecaster
 
         self.bidding_params = bidding_params
-        self.index = index
 
         # create new container
-        container_kwargs = {}
+        container_kwargs = {"mp_method": "fork"} if sys.platform == "linux" else {}
         if self.addr == "world":
             container_func = create_ec_container
-            container_kwargs = {
-                "addr": self.addr,
-            }
+            container_kwargs.update({"addr": self.addr})
         elif isinstance(self.addr, tuple):
             container_func = create_tcp_container
-            container_kwargs = {
-                "addr": self.addr,
-            }
+            container_kwargs.update({"addr": self.addr})
         else:
             container_func = create_mqtt_container
             container_kwargs = {
@@ -261,7 +254,10 @@ class World:
             # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
-            self.learning_role = Learning(self.learning_config)
+            self.learning_role = Learning(
+                self.learning_config, start=self.start, end=self.end
+            )
+
             # separate process does not support buffer and learning
             self.learning_agent_addr = addr(self.addr, "learning_agent")
             rl_agent = agent_composed_of(
@@ -474,7 +470,6 @@ class World:
         return unit_class(
             id=id,
             unit_operator=unit_operator_id,
-            index=self.index,
             forecaster=forecaster,
             **unit_params,
         )
@@ -625,11 +620,11 @@ class World:
             start_ts (datetime.datetime): The start timestamp for the simulation run.
             end_ts (datetime.datetime): The end timestamp for the simulation run.
         """
-        logger.info("activating container")
+        logger.debug("activating container")
         # agent is implicit added to self.container._agents
         async with activate(self.container) as c:
             await tasks_complete_or_sleeping(c)
-            logger.info("all agents up - starting simulation")
+            logger.debug("all agents up - starting simulation")
             pbar = tqdm(total=end_ts - start_ts)
 
             # allow registration before first opening

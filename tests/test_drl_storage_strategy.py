@@ -28,13 +28,25 @@ def storage_unit() -> Storage:
     """
     Fixture to create a Storage unit instance with example parameters.
     """
+    # Define the learning configuration for the StorageRLStrategy
+    learning_config: LearningConfig = {
+        "observation_dimension": 50,
+        "action_dimension": 2,
+        "algorithm": "matd3",
+        "learning_mode": True,
+        "training_episodes": 3,
+        "unit_id": "test_storage",
+        "max_bid_price": 100,
+        "max_demand": 1000,
+    }
+
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     return Storage(
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
-        bidding_strategies={},
+        bidding_strategies={"EOM": StorageRLStrategy(**learning_config)},
         max_power_charge=500,  # Negative for charging
         max_power_discharge=500,
         max_soc=1000,
@@ -44,7 +56,6 @@ def storage_unit() -> Storage:
         efficiency_discharge=0.9,
         additional_cost_charge=5,
         additional_cost_discharge=5,
-        index=index,
         forecaster=ff,
     )
 
@@ -65,17 +76,6 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
     """
     Test the StorageRLStrategy for a 'sell' bid action.
     """
-    # Define the learning configuration for the StorageRLStrategy
-    learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "training_episodes": 3,
-        "unit_id": "test_storage",
-        "max_bid_price": 100,
-        "max_demand": 1000,
-    }
 
     # Define the product index and tuples
     product_index = pd.date_range("2023-07-01", periods=1, freq="h")
@@ -84,15 +84,18 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
 
-    # Instantiate the StorageRLStrategy
-    strategy = StorageRLStrategy(**learning_config)
+    # get the strategy
+    strategy = storage_unit.bidding_strategies["EOM"]
+    strategy.prepare_observations(storage_unit, mc.market_id)
 
     # Define the 'sell' action: [0.2, 0.5] -> price=20, direction='sell'
     sell_action = [0.2, 0.5]
 
     # Mock the get_actions method to return the sell action
     with patch.object(
-        StorageRLStrategy, "get_actions", return_value=(th.tensor(sell_action), None)
+        StorageRLStrategy,
+        "get_actions",
+        return_value=(th.tensor(sell_action), th.tensor(0.0)),
     ):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=10.0):
@@ -108,9 +111,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             bid = bids[0]
 
             # Assert the bid price is correctly scaled
-            expected_bid_price = (
-                sell_action[0] * learning_config["max_bid_price"]
-            )  # 20.0
+            expected_bid_price = sell_action[0] * strategy.max_bid_price  # 20.0
             assert (
                 bid["price"] == expected_bid_price
             ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
@@ -153,18 +154,18 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward.iloc[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward.iloc[0]}"
+                reward[0] == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward[0]}"
 
             # Assert the calculated profit
             assert (
-                profit.iloc[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit.iloc[0]}"
+                profit[0] == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit[0]}"
 
             # Assert the calculated costs
             assert (
-                costs.iloc[0] == expected_costs
-            ), f"Expected costs {expected_costs}, got {costs.iloc[0]}"
+                costs[0] == expected_costs
+            ), f"Expected costs {expected_costs}, got {costs[0]}"
 
 
 @pytest.mark.require_learning
@@ -172,18 +173,6 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
     """
     Test the StorageRLStrategy for a 'buy' bid action.
     """
-    # Define the learning configuration for the StorageRLStrategy
-    learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "training_episodes": 3,
-        "unit_id": "test_storage",
-        "max_bid_price": 100,
-        "max_demand": 1000,
-    }
-
     # Define the product index and tuples
     product_index = pd.date_range("2023-07-01", periods=1, freq="h")
     mc = mock_market_config
@@ -192,14 +181,17 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
     ]
 
     # Instantiate the StorageRLStrategy
-    strategy = StorageRLStrategy(**learning_config)
+    strategy = storage_unit.bidding_strategies["EOM"]
+    strategy.prepare_observations(storage_unit, mc.market_id)
 
     # Define the 'buy' action: [0.3, -0.5] -> price=30, direction='buy'
     buy_action = [0.3, -0.5]
 
     # Mock the get_actions method to return the buy action
     with patch.object(
-        StorageRLStrategy, "get_actions", return_value=(th.tensor(buy_action), None)
+        StorageRLStrategy,
+        "get_actions",
+        return_value=(th.tensor(buy_action), th.tensor(0.0)),
     ):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=15.0):
@@ -215,9 +207,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             bid = bids[0]
 
             # Assert the bid price is correctly scaled
-            expected_bid_price = (
-                buy_action[0] * learning_config["max_bid_price"]
-            )  # 30.0
+            expected_bid_price = buy_action[0] * strategy.max_bid_price  # 30.0
             assert math.isclose(
                 bid["price"], expected_bid_price, abs_tol=1e3
             ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
@@ -257,18 +247,18 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward.iloc[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward.iloc[0]}"
+                reward[0] == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward[0]}"
 
             # Assert the calculated profit
             assert (
-                profit.iloc[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit.iloc[0]}"
+                profit[0] == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit[0]}"
 
             # Assert the calculated costs
             assert (
-                costs.iloc[0] == expected_costs
-            ), f"Expected costs {expected_costs}, got {costs.iloc[0]}"
+                costs[0] == expected_costs
+            ), f"Expected costs {expected_costs}, got {costs[0]}"
 
 
 @pytest.mark.require_learning
@@ -276,17 +266,6 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
     """
     Test the StorageRLStrategy for an 'ignore' bid action.
     """
-    # Define the learning configuration for the StorageRLStrategy
-    learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "training_episodes": 3,
-        "unit_id": "test_storage",
-        "max_bid_price": 100,
-        "max_demand": 1000,
-    }
 
     # Define the product index and tuples
     product_index = pd.date_range("2023-07-01", periods=1, freq="h")
@@ -296,14 +275,17 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
     ]
 
     # Instantiate the StorageRLStrategy
-    strategy = StorageRLStrategy(**learning_config)
+    strategy = storage_unit.bidding_strategies["EOM"]
+    strategy.prepare_observations(storage_unit, mc.market_id)
 
     # Define the 'ignore' action: [0.0, 0.0] -> price=0, direction='ignore'
     ignore_action = [0.0, 0.0]
 
     # Mock the get_actions method to return the ignore action
     with patch.object(
-        StorageRLStrategy, "get_actions", return_value=(th.tensor(ignore_action), None)
+        StorageRLStrategy,
+        "get_actions",
+        return_value=(th.tensor(ignore_action), th.tensor(0.0)),
     ):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=0.0):
@@ -319,9 +301,7 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
             bid = bids[0]
 
             # Assert the bid price is correctly scaled
-            expected_bid_price = (
-                ignore_action[0] * learning_config["max_bid_price"]
-            )  # 0.0
+            expected_bid_price = ignore_action[0] * strategy.max_bid_price  # 0.0
             assert (
                 bid["price"] == expected_bid_price
             ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
@@ -355,15 +335,15 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward.iloc[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward.iloc[0]}"
+                reward[0] == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward[0]}"
 
             # Assert the calculated profit
             assert (
-                profit.iloc[0] == expected_profit
-            ), f"Expected profit {expected_profit}, got {profit.iloc[0]}"
+                profit[0] == expected_profit
+            ), f"Expected profit {expected_profit}, got {profit[0]}"
 
             # Assert the calculated costs
             assert (
-                costs.iloc[0] == expected_costs
-            ), f"Expected costs {expected_costs}, got {costs.iloc[0]}"
+                costs[0] == expected_costs
+            ), f"Expected costs {expected_costs}, got {costs[0]}"

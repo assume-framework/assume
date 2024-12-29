@@ -12,6 +12,7 @@ from mango import RoleAgent, activate, addr, create_tcp_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
@@ -47,7 +48,7 @@ async def units_operator() -> UnitsOperator:
     units_agent.add_role(units_role)
     agent_id = container.register(units_agent)
 
-    index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
@@ -57,7 +58,7 @@ async def units_operator() -> UnitsOperator:
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
-    unit = Demand("testdemand", index=index, **params_dict)
+    unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
 
     start_ts = datetime2timestamp(start)
@@ -87,7 +88,7 @@ async def rl_units_operator() -> RLUnitsOperator:
     units_agent.add_role(units_role)
     agent_id = container.register(units_agent)
 
-    index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
@@ -97,7 +98,7 @@ async def rl_units_operator() -> RLUnitsOperator:
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
-    unit = Demand("testdemand", index=index, **params_dict)
+    unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
 
     start_ts = datetime2timestamp(start)
@@ -168,7 +169,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     marketconfig = rl_units_operator.available_markets[0]
     start = datetime(2020, 1, 1)
     end = datetime(2020, 1, 2)
-    index = pd.date_range(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
 
     params_dict = {
         "bidding_strategies": {
@@ -183,7 +184,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
         "min_power": 0,
         "forecaster": NaiveForecast(index, powerplant=1000),
     }
-    unit = PowerPlant("testplant", index=index, **params_dict)
+    unit = PowerPlant("testplant", **params_dict)
     rl_units_operator.add_unit(unit)
 
     rl_units_operator.learning_mode = True
@@ -243,24 +244,28 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
     # THEN resulting unit dispatch dataframe contains one row
     # which is for the current time - as we must know our current dispatch
-    assert unit_dfs[0].index[0].timestamp() == clock.time
-    assert len(unit_dfs[0]) == 1
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
+    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
+    # only 1 start and stop contained
+    assert len(unit_dfs[0]["time"]) == 2
     assert len(market_dispatch) == 0
 
     # WHEN another hour passes
+    last = clock.time
     clock.set_time(clock.time + 3600)
-    last = clock.time - 3600
 
     # THEN resulting unit dispatch dataframe contains only one row with current dispatch
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
-    assert unit_dfs[0].index[0].timestamp() == clock.time
-    assert len(unit_dfs[0]) == 1
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
+    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 2
     assert len(market_dispatch) == 0
 
+    last = clock.time
     clock.set_time(clock.time + 3600)
-    last = clock.time - 3600
 
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
-    assert unit_dfs[0].index[0].timestamp() == clock.time
-    assert len(unit_dfs[0]) == 1
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
+    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 2
     assert len(market_dispatch) == 0

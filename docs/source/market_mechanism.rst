@@ -31,12 +31,9 @@ The available market mechanisms are the following:
 
 1. :py:meth:`assume.markets.clearing_algorithms.simple.PayAsClearRole`
 2. :py:meth:`assume.markets.clearing_algorithms.simple.PayAsBidRole`
-3. :py:meth:`assume.markets.clearing_algorithms.all_or_nothing.PayAsClearAonRole`
-4. :py:meth:`assume.markets.clearing_algorithms.all_or_nothing.PayAsBidAonRole`
 5. :py:meth:`assume.markets.clearing_algorithms.complex_clearing.ComplexClearingRole`
 6. :py:meth:`assume.markets.clearing_algorithms.complex_clearing_dmas.ComplexDmasClearingRole`
 7. :py:meth:`assume.markets.clearing_algorithms.redispatch.RedispatchMarketRole`
-8. :py:meth:`assume.markets.clearing_algorithms.nodal_pricing.NodalMarketRole`
 9. :py:meth:`assume.markets.clearing_algorithms.contracts.PayAsBidContractRole`
 
 The :code:`PayAsClearRole` performs an electricity market clearing using a pay-as-clear mechanism.
@@ -50,14 +47,6 @@ Where the price is equal, only partial volume is accepted.
 
 The :code:`PayAsBidRole` clears the market in the same manner as the pay-as-clear mechanism, but the accepted_price is
 the price of the supply order for both the demand order and the supply orders that meet this demand.
-
-The :code:`PayAsClearAonRole` performs an electricity market clearing using a pay-as-clear mechanism
-where each bids volume needs an exactly matching order with the same volume.
-Partial clearing is not allowed here.
-This has the side effect, that the cleared price can be much higher if bids with different volume are accepted.
-
-The :code:`PayAsBidAonRole` performs an electricity market clearing using a pay-as-bid mechanism
-where each bids volume needs an exactly matching order with the same volume as in :code:`PayAsClearAonRole`.
 
 Complex clearing
 ^^^^^^^^^^^^^^^^

@@ -95,7 +95,7 @@ class RedispatchMarketRole(MarketRole):
 
     def clear(
         self, orderbook: Orderbook, market_products
-    ) -> tuple[Orderbook, Orderbook, list[dict]]:
+    ) -> tuple[Orderbook, Orderbook, list[dict], dict[tuple, float]]:
         """
         Performs redispatch to resolve congestion in the electricity market.
         It first checks for congestion in the network and if it finds any, it performs redispatch to resolve it.
@@ -110,6 +110,8 @@ class RedispatchMarketRole(MarketRole):
             Tuple[Orderbook, Orderbook, List[dict]]: The accepted orderbook, rejected orderbook and market metadata.
         """
 
+        if len(orderbook) == 0:
+            return super().clear(orderbook, market_products)
         orderbook_df = pd.DataFrame(orderbook)
         orderbook_df["accepted_volume"] = 0.0
         orderbook_df["accepted_price"] = 0.0
@@ -193,24 +195,31 @@ class RedispatchMarketRole(MarketRole):
                 status, termination_condition = redispatch_network.optimize(
                     solver_name=self.solver,
                     solver_options=self.solver_options,
+                    # do not show tqdm progress bars for large grids
+                    # https://github.com/PyPSA/linopy/pull/375
+                    progress=False,
                 )
 
             if status != "ok":
                 logger.error(f"Solver exited with {termination_condition}")
                 raise Exception("Solver in redispatch market did not converge")
 
-            # process dispatch data
-            self.process_dispatch_data(
-                network=redispatch_network, orderbook_df=orderbook_df
-            )
-
         # if no congestion is detected set accepted volume and price to 0
         else:
             logger.debug("No congestion detected")
 
+        # process dispatch data
+        self.process_dispatch_data(
+            network=redispatch_network, orderbook_df=orderbook_df
+        )
+
         # return orderbook_df back to orderbook format as list of dicts
-        accepted_orders = orderbook_df.to_dict("records")
-        rejected_orders = []
+        accepted_orders = orderbook_df[orderbook_df["accepted_volume"] != 0].to_dict(
+            "records"
+        )
+        rejected_orders = orderbook_df[orderbook_df["accepted_volume"] == 0].to_dict(
+            "records"
+        )
         meta = []
 
         # calculate meta data such as total upwared and downward redispatch, total backup dispatch
@@ -220,7 +229,7 @@ class RedispatchMarketRole(MarketRole):
                 calculate_network_meta(network=redispatch_network, product=product, i=i)
             )
 
-        # write network flows here if applicable
+        # TODO write network flows here
         flows = []
 
         return accepted_orders, rejected_orders, meta, flows
