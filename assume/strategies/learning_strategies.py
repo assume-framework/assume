@@ -510,7 +510,7 @@ class RLStrategy(AbstractLearningStrategy):
         """
         # function is called after the market is cleared and we get the market feedback,
         # so we can calculate the profit
-
+        
         product_type = marketconfig.product_type
 
         profit = 0
@@ -581,9 +581,9 @@ class RLStrategy(AbstractLearningStrategy):
 
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
-        unit.outputs["total_costs"].loc[start:end_excl] = costs
+        unit.outputs["reward"].loc[start:end_excl] += reward
+        unit.outputs["regret"].loc[start:end_excl] += regret_scale * opportunity_cost
+        unit.outputs["total_costs"].loc[start:end_excl] = +costs
 
         unit.outputs["rl_rewards"].append(reward)
 
