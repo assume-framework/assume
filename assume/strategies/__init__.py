@@ -17,7 +17,6 @@ from assume.strategies.naive_strategies import (
     NaiveRedispatchDSMStrategy,
     NaiveRedispatchStrategy,
     NaiveSingleBidStrategy,
-    NaiveDSMStrategy,
 )
 from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy

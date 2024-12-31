@@ -163,6 +163,7 @@ def load_dsm_units(
         "unit_type",
         "node",
         "flexibility_measure",
+        "is_prosumer",
     ]
     # Filter the common columns to only include those that exist in the DataFrame
     common_columns = [col for col in common_columns if col in dsm_units.columns]

@@ -9,8 +9,9 @@ from pyomo.opt import SolverFactory
 
 from assume.common.forecasts import CsvForecaster
 from assume.common.market_objects import MarketConfig
-from assume.strategies.naive_strategies import NaiveDSMStrategy
-from assume.units.building import SOLVERS, Building, check_available_solvers
+from assume.strategies.naive_strategies import NaiveDADSMStrategy
+from assume.units.building import Building
+from assume.units.dsm_load_shift import SOLVERS, check_available_solvers
 
 # Fixtures for Component Configurations
 
@@ -116,7 +117,11 @@ def index():
 
 @pytest.fixture
 def forecast(price_profile):
-    forecaster = CsvForecaster(index=range(10))
+    forecaster = CsvForecaster(
+        index=range(10),
+        powerplants_units=[],  # Add appropriate values
+        demand_units=[],
+    )
     forecaster.forecasts = pd.DataFrame()
     forecaster.forecasts["price_EOM"] = price_profile
     forecaster.forecasts["fuel_price_natural gas"] = pd.Series(
@@ -208,7 +213,7 @@ def test_building_initialization_heatpump(
         id="building_heatpump",
         unit_operator="operator_hp",
         index=index,
-        bidding_strategies={"EOM": NaiveDSMStrategy()},
+        bidding_strategies={"EOM": NaiveDADSMStrategy()},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
@@ -697,15 +702,15 @@ def test_building_bidding_strategy_execution(
     default_flexibility_measure,
 ):
     """
-    Test that the NaiveDSMStrategy's calculate_bids method is executed correctly,
+    Test that the NaiveDADSMStrategy's calculate_bids method is executed correctly,
     and unit.determine_optimal_operation_without_flex() is called.
     """
-    # Create the Building instance with a NaiveDSMStrategy
+    # Create the Building instance with a NaiveDADSMStrategy
     building = Building(
         id="building_heatpump",
         unit_operator="operator_hp",
         index=index,
-        bidding_strategies={"EOM": NaiveDSMStrategy()},
+        bidding_strategies={"EOM": NaiveDADSMStrategy()},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,

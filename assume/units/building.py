@@ -6,12 +6,6 @@ import logging
 
 import pandas as pd
 import pyomo.environ as pyo
-from pyomo.opt import (
-    SolverFactory,
-    SolverStatus,
-    TerminationCondition,
-    check_available_solvers,
-)
 
 from assume.common.base import SupportsMinMax
 from assume.common.utils import str_to_bool
@@ -67,14 +61,15 @@ class Building(DSMFlex, SupportsMinMax):
         self,
         id: str,
         unit_operator: str,
-        index: pd.DatetimeIndex,
         bidding_strategies: dict,
         components: dict[str, dict] = None,
         technology: str = "building",
         objective: str = None,
         node: str = "node0",
         location: tuple[float, float] = (0.0, 0.0),
+        index: pd.DatetimeIndex = None,
         flexibility_measure: str = "",
+        is_prosumer: str = "No",
         cost_tolerance: float = 10,
         **kwargs,
     ):
@@ -92,6 +87,8 @@ class Building(DSMFlex, SupportsMinMax):
             node (str, optional): Network node where the building unit is connected. Defaults to "node0".
             location (tuple[float, float], optional): Geographic coordinates (latitude, longitude) of the building. Defaults to (0.0, 0.0).
             flexibility_measure (str, optional): Metric used to assess the building's flexibility. Defaults to "max_load_shift".
+            is_prosumer (str): Indicates whether the building participates as a prosumer in the market.
+                               Accepts "Yes" or "No" (case-insensitive).
             **kwargs: Additional keyword arguments for parent classes.
 
         Raises:
@@ -138,8 +135,9 @@ class Building(DSMFlex, SupportsMinMax):
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
+        self.is_prosumer = str_to_bool(is_prosumer)
 
-        # Flags indicating the presence of specific components
+        # Check for the presence of components
         self.has_heatpump = "heat_pump" in self.components.keys()
         self.has_boiler = "boiler" in self.components.keys()
         self.has_thermal_storage = "thermal_storage" in self.components.keys()
@@ -151,55 +149,30 @@ class Building(DSMFlex, SupportsMinMax):
         self.flex_power_requirement = None
         self.variable_cost_series = None
 
-        # Select the first available solver from the predefined list
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
-        self.solver = SolverFactory(solvers[0])
-        self.solver_options = {
-            "output_flag": False,
-            "log_to_console": False,
-            "LogToConsole": 0,
-        }
-
-        # self.has_heatpump = "heat_pump" in self.components
-        # self.has_boiler = "boiler" in self.components
-        # self.has_thermal_storage = "thermal_storage" in self.components
-        # self.has_ev = "electric_vehicle" in self.components
-        # self.has_battery_storage = "generic_storage" in self.components
-        # self.has_pv = "pv_plant" in self.components
-
         # Initialize the Pyomo optimization model
         self.model = pyo.ConcreteModel()
         self.define_sets()
 
-        # Configuration for electric vehicles selling energy to the market
-        if self.has_ev:
-            self.ev_sells_energy_to_market = str_to_bool(
-                self.components["electric_vehicle"].get(
-                    "sells_energy_to_market", "true"
-                )
-            )
-        # Configuration for battery storage selling energy to the market
-        if self.has_battery_storage:
-            self.battery_sells_energy_to_market = str_to_bool(
-                self.components["generic_storage"].get("sells_energy_to_market", "true")
-            )
-
         # Configure PV plant power profile based on availability
         if self.has_pv:
-            uses_power_profile = str_to_bool(
-                self.components["pv_plant"].get("uses_power_profile", "false")
-            )
             profile_key = (
                 f"{self.id}_pv_power_profile"
-                if not uses_power_profile
+                if not str_to_bool(
+                    self.components["pv_plant"].get("uses_power_profile", "false")
+                )
                 else "availability_solar"
             )
             pv_profile = self.forecaster[profile_key]
-            pv_profile.index = self.model.time_steps
+
+            # Convert and align pv_profile with Pyomo time steps
+            pv_profile = pv_profile.as_pd_series()
+            pv_profile.index = list(self.model.time_steps)
+
+            # Assign the aligned profile
             self.components["pv_plant"][
-                "power_profile" if not uses_power_profile else "availability_profile"
+                "power_profile"
+                if profile_key.endswith("power_profile")
+                else "availability_profile"
             ] = pv_profile
 
         self.define_parameters()
@@ -210,6 +183,7 @@ class Building(DSMFlex, SupportsMinMax):
 
         self.define_constraints()
         self.define_objective_opt()
+
         self.determine_optimal_operation_without_flex(switch_flex_off=False)
 
         # Apply the flexibility function based on flexibility measure
@@ -220,6 +194,21 @@ class Building(DSMFlex, SupportsMinMax):
 
         self.define_objective_flex()
 
+    def get_prosumer_components(self):
+        """
+        Identifies and returns a list of components capable of selling energy when the building is a prosumer.
+
+        Returns:
+            list[str]: Names of components that can participate in the market.
+        """
+        prosumer_components = []
+        if self.is_prosumer:
+            if self.has_ev:
+                prosumer_components.append("electric_vehicle")
+            if self.has_battery_storage:
+                prosumer_components.append("generic_storage")
+        return prosumer_components
+
     def define_sets(self) -> None:
         """
         Defines the sets used in the Pyomo optimization model.
@@ -227,9 +216,9 @@ class Building(DSMFlex, SupportsMinMax):
         Specifically, this method initializes the `time_steps` set, which represents each
         discrete time interval in the model based on the provided time index.
         """
-        self.model.time_steps = pyo.Set(
-            initialize=[idx for idx, _ in enumerate(self.index)]
-        )
+
+        # Create a pyo.Set from FastIndex
+        self.model.time_steps = pyo.Set(initialize=list(range(len(self.index))))
 
     def define_parameters(self):
         """
@@ -270,47 +259,109 @@ class Building(DSMFlex, SupportsMinMax):
 
     def initialize_process_sequence(self):
         """
-        Initializes the process sequence and associated constraints for the building's energy
-        components.
-
-        This method sets up constraints to ensure that the heat output from components like heat
-        pumps, boilers, and thermal storage meets the building's heat demand while accounting for
-        any charging or discharging from thermal storage.
+        Connects the energy components in the building system, establishing constraints for energy flow
+        between technologies like heat pumps, boilers, EVs, batteries, and PVs.
         """
+
+        # Heat flow constraint for heating components
         if self.has_heatpump or self.has_boiler or self.has_thermal_storage:
 
             @self.model.Constraint(self.model.time_steps)
-            def heat_flow_constraint(m, t):
+            def heating_demand_balance_constraint(m, t):
                 """
-                Ensures that the total heat output from all relevant components matches the heat demand.
-
-                This constraint accounts for the heat produced by the heat pump and boiler, the
-                discharge from thermal storage, and ensures that it meets the building's heat demand
-                plus any heat being charged into the thermal storage.
-
-                Args:
-                    m: Pyomo model reference.
-                    t: Current time step.
-
-                Returns:
-                    Equality condition balancing heat production and demand.
+                Ensures the total heat output matches demand plus storage dynamics.
                 """
-                return (
+                heat_pump_output = (
                     self.model.dsm_blocks["heat_pump"].heat_out[t]
                     if self.has_heatpump
                     else 0
-                ) + (
+                )
+                boiler_output = (
                     self.model.dsm_blocks["boiler"].heat_out[t]
                     if self.has_boiler
                     else 0
-                ) + (
+                )
+                thermal_storage_discharge = (
                     self.model.dsm_blocks["thermal_storage"].discharge[t]
                     if self.has_thermal_storage
                     else 0
-                ) == self.model.heat_demand[t] + (
+                )
+                thermal_storage_charge = (
                     self.model.dsm_blocks["thermal_storage"].charge[t]
                     if self.has_thermal_storage
                     else 0
+                )
+                return (
+                    heat_pump_output + boiler_output + thermal_storage_discharge
+                    == self.model.heat_demand[t] + thermal_storage_charge
+                )
+
+        # Electric flow and battery/EV constraints
+        if self.has_ev:
+
+            @self.model.Constraint(self.model.time_steps)
+            def ev_energy_flow_constraint(m, t):
+                """
+                Ensures that EV energy flows are connected appropriately.
+                """
+                ev_discharge = self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                # ev_charge = self.model.dsm_blocks["electric_vehicle"].charge[t]
+                inflex_demand = self.model.inflex_demand[t]
+
+                pv_output = (
+                    self.model.dsm_blocks["pv_plant"].power[t] if self.has_pv else 0
+                )
+                battery_discharge = (
+                    self.model.dsm_blocks["generic_storage"].discharge[t]
+                    if self.has_battery_storage
+                    else 0
+                )
+                battery_charge = (
+                    self.model.dsm_blocks["generic_storage"].charge[t]
+                    if self.has_battery_storage
+                    else 0
+                )
+                return (
+                    ev_discharge
+                    <= inflex_demand + battery_charge - battery_discharge - pv_output
+                )
+
+        if self.has_battery_storage:
+
+            @self.model.Constraint(self.model.time_steps)
+            def battery_energy_flow_constraint(m, t):
+                """
+                Ensures battery storage discharges are appropriately aligned with system demands.
+                """
+                battery_discharge = self.model.dsm_blocks["generic_storage"].discharge[
+                    t
+                ]
+                # battery_charge = self.model.dsm_blocks["generic_storage"].charge[t]
+                heat_pump_power = (
+                    self.model.dsm_blocks["heat_pump"].power_in[t]
+                    if self.has_heatpump
+                    else 0
+                )
+                boiler_power = (
+                    self.model.dsm_blocks["boiler"].power_in[t]
+                    if self.has_boiler
+                    else 0
+                )
+                ev_charge = (
+                    self.model.dsm_blocks["electric_vehicle"].charge[t]
+                    if self.has_ev
+                    else 0
+                )
+                pv_output = (
+                    self.model.dsm_blocks["pv_plant"].power[t] if self.has_pv else 0
+                )
+                return (
+                    battery_discharge
+                    <= self.model.inflex_demand[t]
+                    + heat_pump_power
+                    + boiler_power
+                    + ev_charge
+                    - pv_output
                 )
 
     def define_constraints(self):
@@ -366,81 +417,16 @@ class Building(DSMFlex, SupportsMinMax):
             # Assign the calculated total to the model's total_power_input for each time step
             return self.model.total_power_input[t] == total_power_input
 
-        if self.has_ev and not self.ev_sells_energy_to_market:
+        # Restrict discharge for non-prosumer components
+        for component in self.get_prosumer_components():
 
             @self.model.Constraint(self.model.time_steps)
-            def discharge_ev_to_market_constraint(m, t):
+            def restrict_discharge_to_market(m, t, component=component):
                 """
-                Restricts the discharging rate of the electric vehicle to self-use only.
-
-                If the electric vehicle is not allowed to sell energy to the market, this constraint
-                ensures that any energy discharged is solely used to meet the building's demands or
-                stored within other storage systems.
-
-                Args:
-                    m: Pyomo model reference.
-                    t: Current time step.
-
-                Returns:
-                    Inequality condition limiting EV discharge.
+                Restricts discharges to self-use only for non-prosumer components.
                 """
-                return self.model.dsm_blocks["electric_vehicle"].discharge[
-                    t
-                ] <= self.model.inflex_demand[t] + (
-                    self.model.dsm_blocks["heat_pump"].power_in[t]
-                    if self.has_heatpump
-                    else 0
-                ) + (
-                    self.model.dsm_blocks["boiler"].power_in[t]
-                    if self.has_boiler
-                    else 0
-                ) + (
-                    self.model.dsm_blocks["generic_storage"].charge[t]
-                    if self.has_battery_storage
-                    else 0
-                ) - (
-                    self.model.dsm_blocks["generic_storage"].discharge[t]
-                    if self.has_battery_storage
-                    else 0
-                ) - (self.model.dsm_blocks["pv_plant"].power[t] if self.has_pv else 0)
-
-        if self.has_battery_storage and not self.battery_sells_energy_to_market:
-
-            @self.model.Constraint(self.model.time_steps)
-            def discharge_battery_to_market_constraint(m, t):
-                """
-                Restricts the discharging rate of the battery storage to self-use only.
-
-                If the battery storage is not permitted to sell energy to the market, this constraint
-                ensures that any energy discharged is used to satisfy the building's demands or
-                stored within other storage systems.
-
-                Args:
-                    m: Pyomo model reference.
-                    t: Current time step.
-
-                Returns:
-                    Inequality condition limiting battery discharge.
-                """
-                return self.model.dsm_blocks["generic_storage"].discharge[
-                    t
-                ] <= self.model.inflex_demand[t] + (
-                    self.model.dsm_blocks["heat_pump"].power_in[t]
-                    if self.has_heatpump
-                    else 0
-                ) + (
-                    self.model.dsm_blocks["boiler"].power_in[t]
-                    if self.has_boiler
-                    else 0
-                ) + (
-                    self.model.dsm_blocks["electric_vehicle"].charge[t]
-                    if self.has_ev
-                    else 0
-                ) - (
-                    self.model.dsm_blocks["electric_vehicle"].discharge[t]
-                    if self.has_ev
-                    else 0
-                ) - (self.model.dsm_blocks["pv_plant"].power[t] if self.has_pv else 0)
+                discharge = self.model.dsm_blocks[component].discharge[t]
+                return discharge <= self.model.inflex_demand[t]
 
         @self.model.Constraint(self.model.time_steps)
         def variable_cost_constraint(m, t):
@@ -510,159 +496,10 @@ class Building(DSMFlex, SupportsMinMax):
                 """
 
                 maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t] * (1 - m.shift_indicator[t])
-                    for t in m.time_steps
+                    m.load_shift_pos[t] for t in m.time_steps
                 )
 
                 return maximise_load_shift
-
-    def determine_optimal_operation_without_flex(self, switch_flex_off=True):
-        """
-        Determines the optimal operation of the steel plant without considering flexibility.
-        """
-        # create an instance of the model
-        instance = self.model.create_instance()
-        # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
-        if switch_flex_off:
-            instance = self.switch_to_opt(instance)
-        # solve the instance
-        results = self.solver.solve(instance, options=self.solver_options)
-
-        # Check solver status and termination condition
-        if (results.solver.status == SolverStatus.ok) and (
-            results.solver.termination_condition == TerminationCondition.optimal
-        ):
-            logger.debug("The model was solved optimally.")
-
-            # Display the Objective Function Value
-            objective_value = instance.obj_rule_opt()
-            logger.debug(f"The value of the objective function is {objective_value}.")
-
-        elif results.solver.termination_condition == TerminationCondition.infeasible:
-            logger.debug("The model is infeasible.")
-
-        else:
-            logger.debug("Solver Status: ", results.solver.status)
-            logger.debug(
-                "Termination Condition: ", results.solver.termination_condition
-            )
-
-        self.opt_power_requirement = pd.Series(
-            data=instance.total_power_input.get_values()
-        ).set_axis(self.index)
-
-        self.total_cost = sum(
-            instance.variable_cost[t].value for t in instance.time_steps
-        )
-
-        # Variable cost series
-        self.variable_cost_series = pd.Series(
-            data=instance.variable_cost.get_values()
-        ).set_axis(self.index)
-
-        # Process additional outputs from specific components
-        self.write_additional_outputs(instance)
-
-    def determine_optimal_operation_with_flex(self):
-        """
-        Determines the optimal operation of the steel plant without considering flexibility.
-        """
-        # create an instance of the model
-        instance = self.model.create_instance()
-        # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
-        instance = self.switch_to_flex(instance)
-        # solve the instance
-        results = self.solver.solve(instance, options=self.solver_options)
-
-        # Check solver status and termination condition
-        if (results.solver.status == SolverStatus.ok) and (
-            results.solver.termination_condition == TerminationCondition.optimal
-        ):
-            logger.debug("The model was solved optimally.")
-
-            # Display the Objective Function Value
-            objective_value = instance.obj_rule_flex()
-            logger.debug(f"The value of the objective function is {objective_value}.")
-
-        elif results.solver.termination_condition == TerminationCondition.infeasible:
-            logger.debug("The model is infeasible.")
-
-        else:
-            logger.debug("Solver Status: ", results.solver.status)
-            logger.debug(
-                "Termination Condition: ", results.solver.termination_condition
-            )
-
-        # Compute adjusted total power input with load shift applied
-        adjusted_total_power_input = []
-        for t in instance.time_steps:
-            # Calculate the load-shifted value of total_power_input
-            adjusted_power = (
-                instance.total_power_input[t].value
-                + instance.load_shift_pos[t].value
-                - instance.load_shift_neg[t].value
-            )
-            adjusted_total_power_input.append(adjusted_power)
-
-        # Assign this list to flex_power_requirement as a pandas Series
-        self.flex_power_requirement = pd.Series(
-            data=adjusted_total_power_input, index=self.index
-        )
-
-        # Variable cost series
-        self.variable_cost_series = pd.Series(
-            data=instance.variable_cost.get_values()
-        ).set_axis(self.index)
-
-        # Process additional outputs from specific components
-        self.write_additional_outputs(instance)
-
-    def switch_to_opt(self, instance):
-        """
-        Switches the instance to solve a cost based optimisation problem by deactivating the flexibility constraints and objective.
-
-        Args:
-            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
-
-        Returns:
-            pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
-        """
-        # Deactivate the flexibility objective if it exists
-        # if hasattr(instance, "obj_rule_flex"):
-        instance.obj_rule_flex.deactivate()
-
-        # Deactivate flexibility constraints if they exist
-        if hasattr(instance, "total_cost_upper_limit"):
-            instance.total_cost_upper_limit.deactivate()
-
-        if hasattr(instance, "peak_load_shift_constraint"):
-            instance.peak_load_shift_constraint.deactivate()
-
-        # if hasattr(instance, "total_power_input_constraint_with_flex"):
-        instance.total_power_input_constraint_with_flex.deactivate()
-
-        return instance
-
-    def switch_to_flex(self, instance):
-        """
-        Switches the instance to flexibility mode by deactivating few constraints and objective function.
-
-        Args:
-            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
-
-        Returns:
-            pyomo.ConcreteModel: The modified instance with optimal constraints and objective deactivated.
-        """
-        # deactivate the optimal constraints and objective
-        instance.obj_rule_opt.deactivate()
-        instance.total_power_input_constraint.deactivate()
-
-        # fix values of model.total_power_input
-        for t in instance.time_steps:
-            instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
-        instance.total_cost = self.total_cost
-
-        return instance
 
     # def calculate_optimal_operation(self):
     #     """
