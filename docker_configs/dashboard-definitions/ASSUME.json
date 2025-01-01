@@ -202,8 +202,6 @@
         }
       },
       "pluginVersion": "11.3.1",
-      "repeat": "market",
-      "repeatDirection": "h",
       "targets": [
         {
           "datasource": {
@@ -331,7 +329,7 @@
       },
       "gridPos": {
         "h": 9,
-        "w": 24,
+        "w": 12,
         "x": 0,
         "y": 20
       },
@@ -414,8 +412,6 @@
         }
       },
       "pluginVersion": "11.3.1",
-      "repeat": "market",
-      "repeatDirection": "h",
       "targets": [
         {
           "datasource": {

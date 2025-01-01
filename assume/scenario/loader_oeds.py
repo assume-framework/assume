@@ -87,6 +87,28 @@ def load_oeds(
         if not isinstance(fuel_prices[name], float|int):
             fuel_prices[name] = fuel_prices[name].reindex(index, method="nearest").values
 
+
+    offshore_wind = infra_interface.get_offshore_wind_series(start, end)
+    if offshore_wind.max() > 0:
+        world.add_unit_operator("renewables_offshore")
+        world.add_unit(
+            "renewables_off_wind",
+            "power_plant",
+            "renewables_offshore",
+            # the unit_params have no hints
+            {
+                "min_power": 0,
+                "max_power": offshore_wind.max(),
+                "bidding_strategies": bidding_strategies["wind"],
+                "technology": "wind_offshore",
+                "location": (8.18, 54.4),
+                "node": "DEF",
+            },
+            NaiveForecast(
+                index, availability=offshore_wind / offshore_wind.max(), fuel_price=0.2, co2_price=0
+            ),
+        )
+
     # for each area - add demand and generation
     for area in nuts_config:
         logger.info(f"loading config {area} for {year}")
@@ -96,7 +118,8 @@ def load_oeds(
             demand = infra_interface.get_demand_series_in_area(area, year)
             demand = demand.resample("h").mean()
             # demand in MW
-            solar, wind = infra_interface.get_renewables_series_in_area(
+            # TODO add battery_power as storage
+            solar, wind, battery_power = infra_interface.get_renewables_series_in_area(
                 area,
                 start,
                 end,
@@ -156,30 +179,98 @@ def load_oeds(
                 index, availability=solar / solar.max(), fuel_price=0.1, co2_price=0
             ),
         )
+        if wind.max() > 0:
+            world.add_unit(
+                f"renewables{area}_wind",
+                "power_plant",
+                f"renewables{area}",
+                # the unit_params have no hints
+                {
+                    "min_power": 0,
+                    "max_power": wind.max(),
+                    "bidding_strategies": bidding_strategies["wind"],
+                    "technology": "wind_onshore",
+                    "location": (lat, lon),
+                    "node": area,
+                },
+                NaiveForecast(
+                    index, availability=wind / wind.max(), fuel_price=0.2, co2_price=0
+                ),
+            )
+
+        biomass = infra_interface.get_biomass_systems_in_area(area=area)
+
         world.add_unit(
-            f"renewables{area}_wind",
+            f"renewables{area}_bio",
             "power_plant",
             f"renewables{area}",
             # the unit_params have no hints
             {
                 "min_power": 0,
-                "max_power": wind.max(),
-                "bidding_strategies": bidding_strategies["wind"],
-                "technology": "wind",
+                "max_power": biomass["maxPower"].sum() / 1e3,  # kW -> MW
+                "bidding_strategies": bidding_strategies["biomass"],
+                "technology": "biomass",
                 "location": (lat, lon),
                 "node": area,
             },
             NaiveForecast(
-                index, availability=wind / wind.max(), fuel_price=0.2, co2_price=0
+                index, availability=1, fuel_price=fuel_prices["biomass"],
+                co2_price=0
+            ),
+        )
+        water = infra_interface.get_run_river_systems_in_area(area=area)
+
+        world.add_unit(
+            f"renewables{area}_hydro",
+            "power_plant",
+            f"renewables{area}",
+            # the unit_params have no hints
+            {
+                "min_power": 0,
+                "max_power": water["maxPower"].sum() / 1e3,  # kW -> MW
+                "bidding_strategies": bidding_strategies["hydro"],
+                "technology": "hydro",
+                "location": (lat, lon),
+                "node": area,
+            },
+            NaiveForecast(
+                index, availability=1, fuel_price=0.2,
+                co2_price=0
             ),
         )
 
-        # TODO add biomass, run_hydro and storages
+        if True:
+            storages = infra_interface.get_water_storage_systems(area)
+            world.add_unit_operator(f"storage{area}")
+            for storage in storages:
+                world.add_unit(
+                    f"storage{area}_hydro",
+                    "storage",
+                    f"storage{area}",
+                    # the unit_params have no hints
+                    {
+                        "max_power_charge": storage["max_power_charge"],
+                        "max_power_discharge": storage["max_power_discharge"],
+                        "max_soc": storage["max_soc"],
+                        "min_soc": storage["min_soc"],
+                        "efficiency_charge": storage["efficiency_charge"],
+                        "efficiency_discharge": storage["efficiency_discharge"],
+                        "bidding_strategies": bidding_strategies["storage"],
+                        "technology": "hydro_storage",
+                        "location": (lat, lon),
+                        "node": area,
+                    },
+                    NaiveForecast(
+                        index, availability=1, fuel_price=0.2,
+                        co2_price=0
+                    ),
+                )
+
 
         world.add_unit_operator(f"conventional{area}")
 
         for fuel_type in ["nuclear", "lignite", "hard coal", "oil", "gas"]:
-            plants = infra_interface.get_power_plant_in_area(area, fuel_type)
+            plants = infra_interface.get_power_plant_in_area(area, fuel_type, )
             plants = list(plants.T.to_dict().values())
             i = 0
             for plant in plants:
@@ -208,7 +299,7 @@ def load_oeds(
                     },
                     NaiveForecast(
                         index,
-                        availability=1,
+                        availability=1, # TODO mid-year availability for created and removed power plants
                         fuel_price=fuel_prices[fuel_type] + randomness,
                         co2_price=fuel_prices["co2"],
                     ),
@@ -231,9 +322,12 @@ if __name__ == "__main__":
     nuts_config = [n.strip() for n in nuts_config]
     nuts_config = "nuts3"
     year = 2024
-    random = False
+    random = True
     type = "random" if random else "static"
-    study_case = "{nuts_config}_{type}_{year}"
+    if isinstance(nuts_config, str):
+        study_case = f"{nuts_config}_{type}_{year}"
+    else:
+        study_case = f"custom_{type}_{year}"
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31) - timedelta(hours=1)
     marketdesign = [
@@ -258,10 +352,12 @@ if __name__ == "__main__":
         "oil": default_strategy,
         "gas": default_strategy,
         "biomass": default_strategy,
+        "hydro": default_strategy,
         "nuclear": default_strategy,
         "wind": default_naive_strategy,
         "solar": default_naive_strategy,
         "demand": default_naive_strategy,
+        "storage": {mc.market_id: "flexable_eom_storage" for mc in marketdesign}
     }
     load_oeds(
         world,

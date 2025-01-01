@@ -194,7 +194,7 @@ class InfrastructureInterface:
             df["kwkPowerElec"] = 0
         return df
 
-    def get_power_plant_in_area(self, area=52353, fuel_type="lignite"):
+    def get_power_plant_in_area(self, area=52353, fuel_type="lignite", created_before=None, stopped_after=None):
         if isinstance(area, str) and area.startswith("DE"):
             plz_codes = self.get_plz_codes(area)
             if not plz_codes:
@@ -230,14 +230,18 @@ class InfrastructureInterface:
                 LEFT JOIN "AnlagenKwk" kwk ON kwk."KwkMastrNummer" = ev."KwkMastrNummer"
                 WHERE ev."Postleitzahl" in {plz_codes_str}
                 AND ev."Energietraeger" = {self.energietraeger_translated[fuel_type]}
-                AND ev."Nettonennleistung" > 5000 AND ev."EinheitBetriebsstatus" = 35
-                AND ev."DatumEndgueltigeStilllegung" is null;
+                AND ev."Nettonennleistung" > 5000 AND ev."EinheitBetriebsstatus" >= 35
                 """
         else:
             query += f"""
                 FROM "EinheitenKernkraft" ev
                 WHERE ev."Postleitzahl" in {plz_codes_str}
                 """
+        if created_before:
+            query += f'AND "Inbetriebnahmedatum" < \'{created_before.isoformat()}\' '
+        if stopped_after:
+            query += f'AND ("DatumEndgueltigeStilllegung" IS NULL OR "DatumEndgueltigeStilllegung"  > \'{stopped_after.isoformat()}\')'
+
 
         with self.databases["mastr"].connect() as conn:
             df = pd.read_sql(query, conn)
@@ -288,7 +292,7 @@ class InfrastructureInterface:
 
         return df
 
-    def get_solar_systems_in_area(self, area=520, solar_type="roof_top"):
+    def get_solar_systems_in_area(self, area=520, solar_type="roof_top", created_before=None, stopped_after=None):
         if isinstance(area, str) and area.startswith("DE"):
             plz_codes = self.get_plz_codes(area)
             if not plz_codes:
@@ -319,8 +323,13 @@ class InfrastructureInterface:
             f'INNER JOIN "AnlagenEegSolar" ON "EinheitMastrNummer" = "VerknuepfteEinheitenMastrNummern" '
             f'WHERE "Postleitzahl" in {plz_codes_str} '
             f'AND "Lage" = {mastr_solar_codes[solar_type]} '
-            f'AND "EinheitBetriebsstatus" = 35;'
+            f'AND "EinheitBetriebsstatus" >= 35 '
         )
+
+        if created_before:
+            query += f'AND "Inbetriebnahmedatum" < \'{created_before.isoformat()}\' '
+        if stopped_after:
+            query += f'AND ("DatumEndgueltigeStilllegung" IS NULL OR "DatumEndgueltigeStilllegung"  > \'{stopped_after.isoformat()}\')'
 
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:
@@ -398,7 +407,7 @@ class InfrastructureInterface:
         df["eeg"] = df["eeg"].replace(np.nan, 0)
         return df
 
-    def get_wind_turbines_in_area(self, area=520, wind_type="on_shore"):
+    def get_wind_turbines_in_area(self, area=520, wind_type="on_shore", created_before=None, stopped_after=None):
         if isinstance(area, str) and area.startswith("DE"):
             plz_codes = self.get_plz_codes(area)
             if not plz_codes:
@@ -428,11 +437,16 @@ class InfrastructureInterface:
             f'"GenMastrNummer" as "generatorID", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate" '
             f'FROM "EinheitenWind" '
-            f'WHERE "EinheitBetriebsstatus" = 35 '
-            f'AND "Lage" = {self.mastr_wind_type[wind_type]}'
+            f'WHERE "EinheitBetriebsstatus" >= 35 '
+            f'AND "Lage" = {self.mastr_wind_type[wind_type]} '
         )
         if wind_type == "on_shore":
-            query += f' AND "Postleitzahl" in {plz_codes_str};'
+            query += f' AND "Postleitzahl" in {plz_codes_str} '
+        
+        if created_before:
+            query += f'AND "Inbetriebnahmedatum" < \'{created_before.isoformat()}\' '
+        if stopped_after:
+            query += f'AND ("DatumEndgueltigeStilllegung" IS NULL OR "DatumEndgueltigeStilllegung"  > \'{stopped_after.isoformat()}\')'
 
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:
@@ -466,7 +480,7 @@ class InfrastructureInterface:
                 counter += 1
         return df
 
-    def get_biomass_systems_in_area(self, area=520):
+    def get_biomass_systems_in_area(self, area=520, created_before=None, stopped_after=None):
         if isinstance(area, str) and area.startswith("DE"):
             plz_codes = self.get_plz_codes(area)
             if not plz_codes:
@@ -491,8 +505,14 @@ class InfrastructureInterface:
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
             f'FROM "EinheitenBiomasse"'
             f'WHERE "Postleitzahl" in {plz_codes_str} AND'
-            f'"EinheitBetriebsstatus" = 35 ;'
+            f'"EinheitBetriebsstatus" >= 35 '
         )
+
+        if created_before:
+            query += f'AND "Inbetriebnahmedatum" < \'{created_before.isoformat()}\' '
+        if stopped_after:
+            query += f'AND ("DatumEndgueltigeStilllegung" IS NULL OR "DatumEndgueltigeStilllegung"  > \'{stopped_after.isoformat()}\')'
+
 
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:
@@ -500,7 +520,7 @@ class InfrastructureInterface:
         # If the response Dataframe is not empty set technical parameter
         return df
 
-    def get_run_river_systems_in_area(self, area=520):
+    def get_run_river_systems_in_area(self, area=520, created_before=None, stopped_after=None):
         if isinstance(area, str) and area.startswith("DE"):
             plz_codes = self.get_plz_codes(area)
             if not plz_codes:
@@ -524,8 +544,13 @@ class InfrastructureInterface:
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
             f'FROM "EinheitenWasser" '
             f'WHERE "Postleitzahl"::int in {plz_codes_str} AND '
-            f'"EinheitBetriebsstatus" = 35 AND "ArtDerWasserkraftanlage" = 890'
+            f'"EinheitBetriebsstatus" >= 35 AND "ArtDerWasserkraftanlage" = 890 '
         )
+
+        if created_before:
+            query += f'AND "Inbetriebnahmedatum" < \'{created_before.isoformat()}\' '
+        if stopped_after:
+            query += f'AND ("DatumEndgueltigeStilllegung" IS NULL OR "DatumEndgueltigeStilllegung"  > \'{stopped_after.isoformat()}\')'
 
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:
@@ -533,7 +558,7 @@ class InfrastructureInterface:
 
         return df
 
-    def get_water_storage_systems(self, area=800):
+    def get_water_storage_systems(self, area=800, created_before=None, stopped_after=None):
         if isinstance(area, str) and area.startswith("DE"):
             plz_codes = self.get_plz_codes(area)
             if not plz_codes:
@@ -566,15 +591,19 @@ class InfrastructureInterface:
             f'"EinheitBetriebsstatus" = 35 AND "Technologie" = 1537 AND "EinheitSystemstatus"=472 AND "Land"=84 '
             f'AND "Nettonennleistung" > 500'
         )
+
+        if created_before:
+            query += f'AND "Inbetriebnahmedatum" < \'{created_before.isoformat()}\' '
+        if stopped_after:
+            query += f'AND ("DatumEndgueltigeStilllegung" IS NULL OR "DatumEndgueltigeStilllegung"  > \'{stopped_after.isoformat()}\')'
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:
             df = pd.read_sql(query, conn)
 
         # If the response Dataframe is not empty set technical parameter
         if df.empty:
-            return df
+            return []
 
-        logger.info(df["name"])
         # set charge and discharge power
         df["PPlus_max"] = df["PPlus_max"].fillna(
             df["PMinus_max"]
@@ -595,20 +624,20 @@ class InfrastructureInterface:
             storage = {
                 "unitID": id_,
                 "startDate": pd.to_datetime(data["startDate"].to_numpy()[0]),
-                "PMinus_max": data["PMinus_max"].sum(),
-                "PPlus_max": data["PPlus_max"].sum(),
-                "VMax": data["VMax"].to_numpy()[0],
-                "VMin": 0,
+                "max_power_discharge": data["PMinus_max"].sum(),
+                "max_power_charge": data["PPlus_max"].sum(),
+                "max_soc": data["VMax"].to_numpy()[0],
+                "min_soc": 0,
                 "V0": data["VMax"].to_numpy()[0] / 2,
                 "lat": data["lat"].to_numpy()[0],
                 "lon": data["lon"].to_numpy()[0],
-                "eta_plus": 0.88,
-                "eta_minus": 0.92,
+                "efficiency_charge": 0.88,
+                "efficiency_discharge": 0.92,
             }
             # https://energie.ch/pumpspeicherkraftwerk/
-            if storage["VMax"] > 0:
+            if storage["max_soc"] > 0:
                 storages.append(storage)
-        return df
+        return storages
 
     def get_demand_in_area(self, area):
         if area == "DE91C":
@@ -630,7 +659,7 @@ class InfrastructureInterface:
         # returned in GWh
         return df * 1e3  # convert to MWh
 
-    def get_solar_storage_systems_in_area(self, area):
+    def get_solar_storage_systems_in_area(self, area, created_before=None, stopped_after=None):
         if isinstance(area, str) and area.startswith("DE"):
             plz_codes = self.get_plz_codes(area)
             if not plz_codes:
@@ -662,8 +691,13 @@ class InfrastructureInterface:
             f'INNER JOIN "EinheitenSolar" so ON spe."LokationMastrNummer" = so."LokationMastrNummer" '
             f'INNER JOIN "AnlagenStromSpeicher" an ON spe."SpeMastrNummer" = an."MastrNummer" '
             f'WHERE so."Postleitzahl" in {plz_codes_str} '
-            f'AND so."EinheitBetriebsstatus" = 35;'
+            f'AND so."EinheitBetriebsstatus" >= 35 '
         )
+
+        if created_before:
+            query += f'AND so."Inbetriebnahmedatum" < \'{created_before.isoformat()}\' '
+        if stopped_after:
+            query += f'AND (so."DatumEndgueltigeStilllegung" IS NULL OR so."DatumEndgueltigeStilllegung" <= \'{stopped_after.isoformat()}\')'
 
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:
@@ -702,16 +736,20 @@ class InfrastructureInterface:
         demand = self.get_demand_in_area(area=area)
         demand = demand.T.to_dict()[0]
         ann_el_demand_per_sector = {
-            "g0": demand["business"],
+            "g0": demand["business"]/2,
             # "h0": demand["household"],
             "h0_dyn": demand["household"],
-            "l0": demand["agriculture"],
-            "g3": demand["industry"],
+            # use g7/const instead
+            # otherwise the peaks are too high
+            # "l0": demand["agriculture"],
+            # "g3": demand["industry"],
         }
         # d = holidays.DE(subdiv='NW', years=year)
         holi = holidays.DE(years=year)
         e_slp = ElecSlp(year, holidays=holi)
-        return e_slp.get_profile(ann_el_demand_per_sector)
+        profile = e_slp.get_profile(ann_el_demand_per_sector)
+        profile["g7"] = (demand["industry"]+demand["agriculture"]+demand["business"]/2) / 8760
+        return profile
 
     def get_co2_price(
         self,
@@ -772,6 +810,20 @@ class InfrastructureInterface:
         with self.databases["weather"].connect() as connection:
             return pd.read_sql_query(query, connection, index_col="time")
 
+    def get_offshore_wind_series(
+        self, start: datetime, end: datetime
+    ):
+        area = "DEF02"
+        longitude, latitude = self.get_lat_lon_area(area)
+        weather_df = self.get_weather_param(
+            WEATHER_PARAMS_ECMWF,
+            start,
+            end,
+            area,
+        )
+        wind_offshore = self.get_wind_turbines_in_area(area, wind_type="on_shore", created_before=end, stopped_after=start)
+        return get_wind_series(wind_offshore, weather_df) / 1e3
+
     def get_renewables_series_in_area(
         self, area: str | int, start: datetime, end: datetime
     ):
@@ -809,15 +861,16 @@ class InfrastructureInterface:
         weather_df["dhi"] = calculated["dhi"]
 
         # load systems from mastr
-        solar = self.get_solar_storage_systems_in_area(area)
-        solar_sys = self.get_solar_systems_in_area(area)
-        wind = self.get_wind_turbines_in_area(area)
-        solar_series, bat_power = get_solar_series(solar_sys, weather_df)
-        solar_series_sys, bat_power_sys = get_solar_series(solar, weather_df)
-        wind_power = get_wind_series(wind, weather_df)
-        solar_power = solar_series + solar_series_sys
+        solar_stor = self.get_solar_storage_systems_in_area(area, created_before=end, stopped_after=start)
+        solar = self.get_solar_systems_in_area(area, created_before=end, stopped_after=start)
+        wind_onshore = self.get_wind_turbines_in_area(area, wind_type="on_shore", created_before=end, stopped_after=start)
+        solar_series, bat_power = get_solar_series(solar, weather_df)
+        solar_series_stor, bat_power_stor = get_solar_series(solar_stor, weather_df)
+        wind_power_onshore = get_wind_series(wind_onshore, weather_df)
+        solar_power = solar_series + solar_series_stor
+        battery_power = bat_power + bat_power_stor
         # conversion kW -> MW
-        return solar_power / 1e3, wind_power / 1e3
+        return solar_power / 1e3, wind_power_onshore / 1e3, battery_power / 1e3
 
     def get_grid_nodes(self):
         # get scigrid
@@ -970,6 +1023,10 @@ if __name__ == "__main__":
     year = 2020
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31)
+    area = "DE221"
+    biomass = interface.get_biomass_systems_in_area(area=area)
+    water = interface.get_run_river_systems_in_area(area=area)
+    storage = interface.get_water_storage_systems(area)
     solar, wind = interface.get_renewables_series_in_area("DE221", start, end)
     interface.get_plz_codes("DEF")
     interface.get_lat_lon(52379)
@@ -1048,4 +1105,11 @@ if __name__ == "__main__":
     weather_df_de = infra_interface.get_weather_param(
         WEATHER_PARAMS_ECMWF, start, end, "DE"
     )
-    demand = infra_interface.get_demand_series_in_area("DEA", year)
+    demand_all = interface.get_demand_series_in_area("DE", year)
+    demand_all.sum()/ demand_all.sum().sum()
+    new_demand = demand_all.resample("1h").mean().sum(axis=1)
+    demand = interface.get_demand_in_area("DE")
+    new_demand
+    demand_all
+    new_demand[800:1000].plot()
+
