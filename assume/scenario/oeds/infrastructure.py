@@ -821,7 +821,7 @@ class InfrastructureInterface:
             end,
             area,
         )
-        wind_offshore = self.get_wind_turbines_in_area(area, wind_type="on_shore", created_before=end, stopped_after=start)
+        wind_offshore = self.get_wind_turbines_in_area(area, wind_type="off_shore", created_before=end, stopped_after=start)
         return get_wind_series(wind_offshore, weather_df) / 1e3
 
     def get_renewables_series_in_area(

@@ -200,6 +200,11 @@ def load_oeds(
 
         biomass = infra_interface.get_biomass_systems_in_area(area=area)
 
+        if random:
+            randomness = np.random.uniform(-5,5)
+        else:
+            randomness = 0
+
         world.add_unit(
             f"renewables{area}_bio",
             "power_plant",
@@ -214,7 +219,7 @@ def load_oeds(
                 "node": area,
             },
             NaiveForecast(
-                index, availability=1, fuel_price=fuel_prices["biomass"],
+                index, availability=1, fuel_price=fuel_prices["biomass"]+randomness,
                 co2_price=0
             ),
         )
