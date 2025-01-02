@@ -682,3 +682,18 @@ def calculate_content_size(content: list | dict) -> int:
             calculate_content_size(item) for item in content
         )
     return sys.getsizeof(content)
+
+
+def min_max_scale(x, min_val: float, max_val: float):
+    """
+    Min-Max scaling of a value x to the range [0, 1]
+
+    Args:
+        x: value(s) to scale
+        min_val: minimum value of the parameter
+        max_val: maximum value of the parameter
+    """
+    # Avoid division by zero
+    if min_val == max_val:
+        return x
+    return (x - min_val) / (max_val - min_val)

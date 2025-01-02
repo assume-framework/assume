@@ -215,12 +215,12 @@ if __name__ == "__main__":
         "postgresql://readonly:readonly@timescale.nowum.fh-aachen.de:5432/opendata",
     )
 
-    default_nuts_config = 'DE1, DEA, DEB, DEC, DED, DEE, DEF'
+    default_nuts_config = "DE1, DEA, DEB, DEC, DED, DEE, DEF"
     nuts_config = os.getenv("NUTS_CONFIG", default_nuts_config).split(",")
     nuts_config = [n.strip() for n in nuts_config]
     year = 2019
     start = datetime(year, 1, 1)
-    end = datetime(year, 1+1, 1) - timedelta(hours=1)
+    end = datetime(year, 1 + 1, 1) - timedelta(hours=1)
     marketdesign = [
         MarketConfig(
             "EOM",

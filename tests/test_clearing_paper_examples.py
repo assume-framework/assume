@@ -28,7 +28,7 @@ simple_dayahead_auction_config = MarketConfig(
     volume_unit="MW",
     volume_tick=0.1,
     price_unit="€/MW",
-    market_mechanism="pay_as_clear_complex",
+    market_mechanism="complex_clearing",
 )
 eps = 1e-4
 

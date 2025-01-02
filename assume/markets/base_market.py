@@ -610,6 +610,12 @@ class MarketRole(MarketMechanism, Role):
         Args:
             market_products (list[MarketProduct]): The products to be traded.
         """
+        if not self.all_orders:
+            logger.warning(
+                f"[{self.context.current_timestamp}] The order book for market {self.marketconfig.market_id} with products {market_products} is empty. No orders were found."
+            )
+            return
+
         try:
             (accepted_orderbook, rejected_orderbook, market_meta, flows) = self.clear(
                 self.all_orders, market_products
@@ -670,12 +676,7 @@ class MarketRole(MarketMechanism, Role):
                 receiver_addr=agent,
             )
         # store order book in db agent
-        if not accepted_orderbook:
-            logger.warning(
-                f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.market_id} are empty!"
-            )
-        all_orders = accepted_orderbook + rejected_orderbook
-        await self.store_order_book(all_orders)
+        await self.store_order_book(accepted_orderbook + rejected_orderbook)
 
         for meta in market_meta:
             logger.debug(
