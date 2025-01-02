@@ -200,7 +200,7 @@ if __name__ == "__main__":
             additional_fields=["node", "max_power", "min_power", "bid_type"],
             maximum_bid_volume=1e9,
             maximum_bid_price=1e9,
-            param_dict={"log_flows": True}
+            param_dict={"log_flows": True},
         )
     ]
     if market_mechanism == "redispatch":

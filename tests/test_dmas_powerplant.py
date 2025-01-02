@@ -142,12 +142,13 @@ def test_dmas_day(power_plant_day):
     unknown = [o["link"] for o in orderbook if o["link"] not in block_ids]
     assert unknown == [], "found unknown link orders"
 
+
 def test_dmas_ramp_day(power_plant_day):
     """
     Test that ramping constraints are respected in the bidding behavior
     """
-    power_plant_day.ramp_down = power_plant_day.max_power/2
-    power_plant_day.ramp_up = power_plant_day.max_power/2
+    power_plant_day.ramp_down = power_plant_day.max_power / 2
+    power_plant_day.ramp_up = power_plant_day.max_power / 2
     strategy = DmasPowerplantStrategy()
     hour_count = len(power_plant_day.index) // 2
     assert hour_count == 24
@@ -172,7 +173,6 @@ def test_dmas_ramp_day(power_plant_day):
     # all links should match existing block ids
     unknown = [o["link"] for o in orderbook if o["link"] not in block_ids]
     assert unknown == [], "found unknown link orders"
-
 
 
 def test_dmas_prevent_start(power_plant_day):

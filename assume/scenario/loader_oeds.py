@@ -74,19 +74,20 @@ def load_oeds(
     for market_config in marketdesign:
         world.add_market(mo_id, market_config)
 
-    fuel_prices = { # €/MWh
-        "hard coal": infra_interface.get_coal_price(start, end), # 8.6
+    fuel_prices = {  # €/MWh
+        "hard coal": infra_interface.get_coal_price(start, end),  # 8.6
         "lignite": 1.8,
-        "oil": infra_interface.get_oil_price(start, end), # 22
-        "gas": infra_interface.get_gas_price(start, end), # 26
+        "oil": infra_interface.get_oil_price(start, end),  # 22
+        "gas": infra_interface.get_gas_price(start, end),  # 26
         "biomass": 20,
         "nuclear": 1,
-        "co2": infra_interface.get_co2_price(start, end), # 1€/tCO2
+        "co2": infra_interface.get_co2_price(start, end),  # 1€/tCO2
     }
     for name in fuel_prices.keys():
-        if not isinstance(fuel_prices[name], float|int):
-            fuel_prices[name] = fuel_prices[name].reindex(index, method="nearest").values
-
+        if not isinstance(fuel_prices[name], float | int):
+            fuel_prices[name] = (
+                fuel_prices[name].reindex(index, method="nearest").values
+            )
 
     offshore_wind = infra_interface.get_offshore_wind_series(start, end)
     if offshore_wind.max() > 0:
@@ -105,7 +106,10 @@ def load_oeds(
                 "node": "DEF",
             },
             NaiveForecast(
-                index, availability=offshore_wind / offshore_wind.max(), fuel_price=0.2, co2_price=0
+                index,
+                availability=offshore_wind / offshore_wind.max(),
+                fuel_price=0.2,
+                co2_price=0,
             ),
         )
 
@@ -135,9 +139,15 @@ def load_oeds(
                 shutil.rmtree(config_path, ignore_errors=True)
         else:
             logger.info("use existing local time series")
-            demand = pd.read_csv(config_path / "demand.csv", index_col=0, parse_dates=True).squeeze()
-            solar = pd.read_csv(config_path / "solar.csv", index_col=0, parse_dates=True).squeeze()
-            wind = pd.read_csv(config_path / "wind.csv", index_col=0, parse_dates=True).squeeze()
+            demand = pd.read_csv(
+                config_path / "demand.csv", index_col=0, parse_dates=True
+            ).squeeze()
+            solar = pd.read_csv(
+                config_path / "solar.csv", index_col=0, parse_dates=True
+            ).squeeze()
+            wind = pd.read_csv(
+                config_path / "wind.csv", index_col=0, parse_dates=True
+            ).squeeze()
 
         lat, lon = infra_interface.get_lat_lon_area(area)
 
@@ -201,7 +211,7 @@ def load_oeds(
         biomass = infra_interface.get_biomass_systems_in_area(area=area)
 
         if random:
-            randomness = np.random.uniform(-5,5)
+            randomness = np.random.uniform(-5, 5)
         else:
             randomness = 0
 
@@ -219,8 +229,10 @@ def load_oeds(
                 "node": area,
             },
             NaiveForecast(
-                index, availability=1, fuel_price=fuel_prices["biomass"]+randomness,
-                co2_price=0
+                index,
+                availability=1,
+                fuel_price=fuel_prices["biomass"] + randomness,
+                co2_price=0,
             ),
         )
         water = infra_interface.get_run_river_systems_in_area(area=area)
@@ -238,10 +250,7 @@ def load_oeds(
                 "location": (lat, lon),
                 "node": area,
             },
-            NaiveForecast(
-                index, availability=1, fuel_price=0.2,
-                co2_price=0
-            ),
+            NaiveForecast(index, availability=1, fuel_price=0.2, co2_price=0),
         )
 
         if True:
@@ -265,23 +274,22 @@ def load_oeds(
                         "location": (lat, lon),
                         "node": area,
                     },
-                    NaiveForecast(
-                        index, availability=1, fuel_price=0.2,
-                        co2_price=0
-                    ),
+                    NaiveForecast(index, availability=1, fuel_price=0.2, co2_price=0),
                 )
-
 
         world.add_unit_operator(f"conventional{area}")
 
         for fuel_type in ["nuclear", "lignite", "hard coal", "oil", "gas"]:
-            plants = infra_interface.get_power_plant_in_area(area, fuel_type, )
+            plants = infra_interface.get_power_plant_in_area(
+                area,
+                fuel_type,
+            )
             plants = list(plants.T.to_dict().values())
             i = 0
             for plant in plants:
                 i += 1
                 if random:
-                    randomness = np.random.uniform(-5,5)
+                    randomness = np.random.uniform(-5, 5)
                 else:
                     randomness = 0
                 world.add_unit(
@@ -304,7 +312,7 @@ def load_oeds(
                     },
                     NaiveForecast(
                         index,
-                        availability=1, # TODO mid-year availability for created and removed power plants
+                        availability=1,  # TODO mid-year availability for created and removed power plants
                         fuel_price=fuel_prices[fuel_type] + randomness,
                         co2_price=fuel_prices["co2"],
                     ),
@@ -362,7 +370,7 @@ if __name__ == "__main__":
         "wind": default_naive_strategy,
         "solar": default_naive_strategy,
         "demand": default_naive_strategy,
-        "storage": {mc.market_id: "flexable_eom_storage" for mc in marketdesign}
+        "storage": {mc.market_id: "flexable_eom_storage" for mc in marketdesign},
     }
     load_oeds(
         world,

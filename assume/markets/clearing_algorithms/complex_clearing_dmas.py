@@ -204,7 +204,7 @@ class ComplexDmasClearingRole(MarketRole):
                     parent_hours = orders_local[(parent_id, agent)]
                     model.enable_child_block.add(
                         quicksum(model.use_linked_order[block, h, agent] for h in hours)
-                        <= 100 # this factor is arbitrary and means that if we took at least 0.01 from the linked block, we can use our full block
+                        <= 100  # this factor is arbitrary and means that if we took at least 0.01 from the linked block, we can use our full block
                         * quicksum(
                             model.use_linked_order[parent_id, h, agent]
                             for h in parent_hours
@@ -473,7 +473,6 @@ class ComplexDmasClearingRole(MarketRole):
         prices["volume"] = volumes
         prices["magic_source"] = [get_real_number(m) for m in magic_source]
 
-        
         meta = []
         for t in t_range:
             t = int(t)
