@@ -7,7 +7,7 @@ from dateutil import rrule as rr
 
 from assume import World
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.scenario.oeds.loader_oeds import load_oeds
+from assume.scenario.loader_oeds import load_oeds
 
 db_uri = "postgresql://assume:assume@localhost:5432/assume"
 world = World(database_uri=db_uri)
