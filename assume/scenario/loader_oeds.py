@@ -30,6 +30,7 @@ def load_oeds(
     marketdesign: list[MarketConfig],
     bidding_strategies: dict[str, str],
     nuts_config: list[str] = [],
+    random = True,
 ):
     """
     This initializes a scenario using the open-energy-data-server

@@ -928,7 +928,7 @@ ORDER BY 1
         with self.databases["entsoe"].connect() as connection:
             return pd.read_sql_query(query, connection, index_col="time")[
                 "actual_load"
-            ]
+            ].tz_localize(None)
 
     def get_grid_nodes(self):
         # get scigrid
