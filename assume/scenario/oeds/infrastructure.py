@@ -47,6 +47,7 @@ class InfrastructureInterface:
             "weather",
             "opec",
             "instrat_pl",
+            "entsoe"
         ),
     ):
         self.databases = {}
@@ -907,6 +908,27 @@ class InfrastructureInterface:
         battery_power = bat_power + bat_power_stor
         # conversion kW -> MW
         return solar_power / 1e3, wind_power_onshore / 1e3, battery_power / 1e3
+
+    def get_country_demand(
+        self,
+        start: datetime,
+        end: datetime,
+        country: str = "DE",
+    ):
+        """returns price of CO2 equivalents per ton from EU ETS trading"""
+        query = f"""
+SELECT
+  "index" as time,
+  actual_load
+FROM query_load
+WHERE
+  index BETWEEN '{start}' AND '{end}' AND country = '{country}'
+ORDER BY 1
+"""
+        with self.databases["entsoe"].connect() as connection:
+            return pd.read_sql_query(query, connection, index_col="time")[
+                "actual_load"
+            ]
 
     def get_grid_nodes(self):
         # get scigrid
