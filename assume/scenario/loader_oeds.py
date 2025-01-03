@@ -51,6 +51,7 @@ def load_oeds(
         freq="h",
     )
     sim_id = f"{scenario}_{study_case}"
+    year = start.year
     logger.info(f"loading scenario {sim_id} with {nuts_config}")
     infra_interface = InfrastructureInterface("test", infra_uri)
 
