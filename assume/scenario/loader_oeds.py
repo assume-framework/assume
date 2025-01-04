@@ -270,10 +270,10 @@ def load_oeds(
                     f"storage{area}",
                     # the unit_params have no hints
                     {
-                        "max_power_charge": storage["max_power_charge"],
-                        "max_power_discharge": storage["max_power_discharge"],
-                        "max_soc": storage["max_soc"],
-                        "min_soc": storage["min_soc"],
+                        "max_power_charge": storage["max_power_charge"] / 1e3,
+                        "max_power_discharge": storage["max_power_discharge"] / 1e3,
+                        "max_soc": storage["max_soc"] / 1e3,
+                        "min_soc": storage["min_soc"] / 1e3,
                         "efficiency_charge": storage["efficiency_charge"],
                         "efficiency_discharge": storage["efficiency_discharge"],
                         "bidding_strategies": bidding_strategies["storage"],

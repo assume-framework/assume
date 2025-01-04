@@ -628,15 +628,16 @@ class InfrastructureInterface:
         df["PPlus_max"] = df["PPlus_max"].fillna(
             df["PMinus_max"]
         )  # fill na with Rated Power
-        # df['PMinus_max'] = 0                                        # set min to zero
-        # df['PPlus_max'] = 0                                         # set min to zero
 
-        # fill nan values with default from wiki
+        # fill nan values with default from wikipedia
+        # find volume by lookup dictionary
         df["VMax"] = df["VMax"].fillna(0)
-        df["VMax"] = df["VMax"]
         for index, row in df[df["VMax"] == 0].iterrows():
             # storage_volumes is in [MWh]
-            df.at[index, "VMax"] = mastr_storage.get(row["name"], 0) * 1e3
+            for key in mastr_storage.keys():
+                if key in row["name"]:
+                    df.at[index, "VMax"] = mastr_storage[key] * 1e3
+                    break
 
         storages = []
         for id_ in df["storageID"].unique():
@@ -1164,10 +1165,3 @@ if __name__ == "__main__":
     weather_df_de = infra_interface.get_weather_param(
         WEATHER_PARAMS_ECMWF, start, end, "DE"
     )
-    demand_all = interface.get_demand_series_in_area("DE", year)
-    demand_all.sum() / demand_all.sum().sum()
-    new_demand = demand_all.resample("1h").mean().sum(axis=1)
-    demand = interface.get_demand_in_area("DE")
-    new_demand
-    demand_all
-    new_demand[800:1000].plot()
