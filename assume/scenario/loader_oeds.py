@@ -265,7 +265,7 @@ def load_oeds(
             world.add_unit_operator(f"storage{area}")
             for storage in storages:
                 world.add_unit(
-                    f"storage{area}_hydro",
+                    f"storage{area}_{storage['unitID']}",
                     "storage",
                     f"storage{area}",
                     # the unit_params have no hints
