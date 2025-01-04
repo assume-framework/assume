@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 5,
+  "id": 1,
   "links": [],
   "panels": [
     {
@@ -49,7 +49,7 @@
         "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "title": "Overview Dashboard",
       "type": "text"
     },
@@ -87,7 +87,7 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "title": "",
       "type": "text"
     },
@@ -201,7 +201,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -411,7 +411,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -501,205 +501,6 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
-      "description": "Bid prices of accepted bids per unit in the chosen market",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green"
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          },
-          "unit": "€/MW"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 29
-      },
-      "id": 19,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "maxHeight": 600,
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "pluginVersion": "11.3.1",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "editorMode": "code",
-          "format": "time_series",
-          "group": [
-            {
-              "params": [
-                "$__interval",
-                "none"
-              ],
-              "type": "time"
-            },
-            {
-              "params": [
-                "unit_id"
-              ],
-              "type": "column"
-            }
-          ],
-          "metricColumn": "none",
-          "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \"Price\", unit_id\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id --, bid_id\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "price"
-                ],
-                "type": "column"
-              },
-              {
-                "params": [
-                  "avg"
-                ],
-                "type": "aggregate"
-              },
-              {
-                "params": [
-                  "price"
-                ],
-                "type": "alias"
-              }
-            ],
-            [
-              {
-                "params": [
-                  "unit_id"
-                ],
-                "type": "column"
-              },
-              {
-                "params": [
-                  "unit_id"
-                ],
-                "type": "alias"
-              }
-            ]
-          ],
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          },
-          "table": "market_orders",
-          "timeColumn": "start_time",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            },
-            {
-              "datatype": "text",
-              "name": "",
-              "params": [
-                "market_id",
-                "=",
-                "'$market'"
-              ],
-              "type": "expression"
-            },
-            {
-              "datatype": "text",
-              "name": "",
-              "params": [
-                "simulation",
-                "=",
-                "'$simulation'"
-              ],
-              "type": "expression"
-            }
-          ]
-        }
-      ],
-      "title": "Average Accepted Bid Price",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "Accepted Volume  per unit in chosen market",
       "fieldConfig": {
         "defaults": {
@@ -744,7 +545,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -760,7 +562,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 20
       },
       "id": 20,
       "options": {
@@ -778,7 +580,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -899,6 +701,206 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "Bid prices of accepted bids per unit in the chosen market",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "€/MW"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 29
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "maxHeight": 600,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "group": [
+            {
+              "params": [
+                "$__interval",
+                "none"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "unit_id"
+              ],
+              "type": "column"
+            }
+          ],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \"Price\", unit_id\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id --, bid_id\nORDER BY 1",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "price"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg"
+                ],
+                "type": "aggregate"
+              },
+              {
+                "params": [
+                  "price"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "market_orders",
+          "timeColumn": "start_time",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "market_id",
+                "=",
+                "'$market'"
+              ],
+              "type": "expression"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "simulation",
+                "=",
+                "'$simulation'"
+              ],
+              "type": "expression"
+            }
+          ]
+        }
+      ],
+      "title": "Average Accepted Bid Price",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
       "description": "Dispatch by technology",
       "fieldConfig": {
         "defaults": {
@@ -943,7 +945,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -959,7 +962,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 38
+        "y": 29
       },
       "id": 101,
       "options": {
@@ -977,7 +980,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1099,7 +1102,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 47
+        "y": 38
       },
       "id": 74,
       "panels": [],
@@ -1142,7 +1145,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1191,7 +1195,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 48
+        "y": 39
       },
       "id": 72,
       "options": {
@@ -1217,7 +1221,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1275,7 +1279,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1340,7 +1345,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 48
+        "y": 39
       },
       "id": 76,
       "options": {
@@ -1361,7 +1366,7 @@
           }
         ]
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1445,7 +1450,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 48
+        "y": 39
       },
       "id": 7,
       "options": {
@@ -1472,7 +1477,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1536,7 +1541,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 51
       },
       "id": 41,
       "panels": [],
@@ -1553,7 +1558,7 @@
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 52
       },
       "id": 22,
       "options": {
@@ -1565,7 +1570,7 @@
         "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "title": "",
       "type": "text"
     },
@@ -1620,7 +1625,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1636,7 +1642,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 64
+        "y": 55
       },
       "id": 24,
       "interval": "15m",
@@ -1657,7 +1663,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1754,7 +1760,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1769,7 +1776,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 64
+        "y": 55
       },
       "id": 26,
       "options": {
@@ -1895,7 +1902,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1924,7 +1932,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 73
+        "y": 64
       },
       "id": 70,
       "options": {
@@ -1944,7 +1952,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2125,7 +2133,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2169,7 +2178,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 73
+        "y": 64
       },
       "id": 78,
       "options": {
@@ -2189,7 +2198,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2294,7 +2303,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2341,7 +2351,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 81
+        "y": 72
       },
       "id": 93,
       "options": {
@@ -2361,7 +2371,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2466,7 +2476,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2513,7 +2524,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 90
+        "y": 81
       },
       "id": 99,
       "options": {
@@ -2529,7 +2540,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2591,7 +2602,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 95
+        "y": 86
       },
       "id": 39,
       "panels": [],
@@ -2646,7 +2657,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2662,7 +2674,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 96
+        "y": 87
       },
       "id": 36,
       "options": {
@@ -2682,7 +2694,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2800,7 +2812,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2815,7 +2828,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 96
+        "y": 87
       },
       "id": 37,
       "options": {
@@ -2941,7 +2954,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2970,7 +2984,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 105
+        "y": 96
       },
       "id": 89,
       "options": {
@@ -2990,7 +3004,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3103,7 +3117,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3159,7 +3174,7 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 105
+        "y": 96
       },
       "id": 95,
       "options": {
@@ -3179,7 +3194,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3285,7 +3300,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3329,7 +3345,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 105
+        "y": 96
       },
       "id": 90,
       "options": {
@@ -3349,7 +3365,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3420,7 +3436,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3436,7 +3453,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 110
+        "y": 101
       },
       "id": 96,
       "options": {
@@ -3456,7 +3473,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3528,7 +3545,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3544,7 +3562,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 110
+        "y": 101
       },
       "id": 94,
       "options": {
@@ -3564,7 +3582,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3669,7 +3687,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3701,7 +3720,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 114
+        "y": 105
       },
       "id": 86,
       "options": {
@@ -3722,7 +3741,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3784,7 +3803,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 123
+        "y": 114
       },
       "id": 44,
       "panels": [],
@@ -3839,7 +3858,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3855,7 +3875,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 124
+        "y": 115
       },
       "id": 65,
       "options": {
@@ -3875,7 +3895,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3993,7 +4013,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4008,12 +4029,12 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 124
+        "y": 115
       },
       "id": 47,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power Disharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -4116,7 +4137,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4132,7 +4154,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 133
+        "y": 124
       },
       "id": 80,
       "options": {
@@ -4152,7 +4174,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -4257,7 +4279,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4286,7 +4309,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 142
+        "y": 133
       },
       "id": 91,
       "options": {
@@ -4306,7 +4329,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -4471,7 +4494,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4515,7 +4539,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 142
+        "y": 133
       },
       "id": 92,
       "options": {
@@ -4535,7 +4559,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -4658,7 +4682,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4705,7 +4730,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 151
+        "y": 142
       },
       "id": 97,
       "options": {
@@ -4725,7 +4750,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -4830,7 +4855,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4877,7 +4903,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 160
+        "y": 151
       },
       "id": 98,
       "options": {
@@ -4893,7 +4919,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -4958,8 +4984,8 @@
     "list": [
       {
         "current": {
-          "text": "example_01a_base",
-          "value": "example_01a_base"
+          "text": "example_01c_eom_only",
+          "value": "example_01c_eom_only"
         },
         "datasource": {
           "type": "postgres",
@@ -4999,10 +5025,10 @@
       {
         "current": {
           "text": [
-            "Unit 1"
+            "Biomass"
           ],
           "value": [
-            "Unit 1"
+            "Biomass"
           ]
         },
         "datasource": {
@@ -5024,10 +5050,10 @@
       {
         "current": {
           "text": [
-            "demand_EOM"
+            "demand_CRM_neg"
           ],
           "value": [
-            "demand_EOM"
+            "demand_CRM_neg"
           ]
         },
         "datasource": {
@@ -5048,8 +5074,12 @@
       },
       {
         "current": {
-          "text": [],
-          "value": []
+          "text": [
+            "Storage 1"
+          ],
+          "value": [
+            "Storage 1"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -5086,6 +5116,6 @@
   "timezone": "utc",
   "title": "ASSUME: Main overview",
   "uid": "ee6wyk2qb0ruoe",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }

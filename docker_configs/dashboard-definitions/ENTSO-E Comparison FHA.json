@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 9,
+  "id": 4,
   "links": [],
   "panels": [
     {
@@ -325,7 +325,7 @@
                 "mode": "exclude",
                 "names": [
                   "Historical Demand",
-                  "Demand volume"
+                  "ENTSO-E Generation"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -852,6 +852,31 @@
                 }
               }
             ]
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "ENTSO-E Wind",
+                  "ASSUME Actual dispatch wind_offshore"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
           }
         ]
       },
@@ -976,7 +1001,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select \n$__timeGroupAlias(a.\"time\",$__interval),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\", \n--sum(\"AMIRIS Awarded Energy\"- \"ASSUME Actual dispatch\") as \"Difference\", \n--a.\"agent\",\nc.\"technology\"\nfrom\n(SELECT\n  time as \"time\",\n  avg(power) AS \"ASSUME Actual dispatch\",\n  SUBSTRING(unit,27) as \"agent\",\n  simulation,\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  LOWER(simulation) = '$scenario'\nGROUP BY 1, unit, power, simulation\nORDER BY 1) a\njoin power_plant_meta c on a.unit = c.index and c.simulation=a.simulation\nwhere c.technology like '%wind%'\nGROUP BY 1, c.technology",
+          "rawSql": "-- select average through time aggregation\nselect \n$__timeGroupAlias(a.\"time\",$__interval),\navg(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom (\nselect \n-- select sum over all units\n$__timeGroupAlias(a.\"time\",'1h'),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom\n(\n  -- select average per unit - remove duplicate sent data\n  SELECT\n  $__timeGroupAlias(time,'1h'),\n  avg(power) AS \"ASSUME Actual dispatch\",\n  unit_dispatch.simulation,\n  technology,\n  unit\nFROM unit_dispatch\njoin power_plant_meta c on unit = c.index and c.simulation=unit_dispatch.simulation\nwhere c.technology like '%wind%'\nand\n  $__timeFilter(time) AND\n  LOWER(unit_dispatch.simulation) = '$scenario'\nGROUP BY 1, unit_dispatch.simulation, c.technology, unit\nORDER BY 1) a\nGROUP BY 1, technology\n) a\nGROUP BY 1, technology",
           "refId": "D",
           "select": [
             [
@@ -1279,7 +1304,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select \n$__timeGroupAlias(a.\"time\",$__interval),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\", \nc.\"technology\"\nfrom\n(SELECT\n  $__timeGroupAlias(time,$__interval),\n  avg(power) AS \"ASSUME Actual dispatch\",\n  simulation,\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  LOWER(simulation) = '$scenario'\nGROUP BY 1, unit, power, simulation\nORDER BY 1) a\njoin power_plant_meta c on a.unit = c.index and c.simulation=a.simulation\nwhere c.technology = 'solar'\nGROUP BY 1, c.technology",
+          "rawSql": "-- select average through time aggregation\nselect \n$__timeGroupAlias(a.\"time\",$__interval),\navg(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom (\nselect \n-- select sum over all units\n$__timeGroupAlias(a.\"time\",'1h'),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom\n(\n  -- select average per unit - remove duplicate sent data\n  SELECT\n  $__timeGroupAlias(time,'1h'),\n  avg(power) AS \"ASSUME Actual dispatch\",\n  unit_dispatch.simulation,\n  technology,\n  unit\nFROM unit_dispatch\njoin power_plant_meta c on unit = c.index and c.simulation=unit_dispatch.simulation\nwhere c.technology = 'solar'\nand\n  $__timeFilter(time) AND\n  LOWER(unit_dispatch.simulation) = '$scenario'\nGROUP BY 1, unit_dispatch.simulation, c.technology, unit\nORDER BY 1) a\nGROUP BY 1, technology\n) a\nGROUP BY 1, technology",
           "refId": "D",
           "select": [
             [
@@ -1582,7 +1607,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select \n$__timeGroupAlias(a.\"time\",$__interval),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\", \n--sum(\"AMIRIS Awarded Energy\"- \"ASSUME Actual dispatch\") as \"Difference\", \n--a.\"agent\",\nc.\"technology\"\nfrom\n(SELECT\n  time as \"time\",\n  avg(power) AS \"ASSUME Actual dispatch\",\n  SUBSTRING(unit,27) as \"agent\",\n  simulation,\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  LOWER(simulation) = '$scenario'\nGROUP BY 1, unit, power, simulation\nORDER BY 1) a\njoin power_plant_meta c on a.unit = c.index and c.simulation=a.simulation\nwhere c.technology like '%bio%'\nGROUP BY 1, c.technology",
+          "rawSql": "-- select average through time aggregation\nselect \n$__timeGroupAlias(a.\"time\",$__interval),\navg(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom (\nselect \n-- select sum over all units\n$__timeGroupAlias(a.\"time\",'1h'),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom\n(\n  -- select average per unit - remove duplicate sent data\n  SELECT\n  $__timeGroupAlias(time,'1h'),\n  avg(power) AS \"ASSUME Actual dispatch\",\n  unit_dispatch.simulation,\n  technology,\n  unit\nFROM unit_dispatch\njoin power_plant_meta c on unit = c.index and c.simulation=unit_dispatch.simulation\nwhere c.technology = 'biomass'\nand\n  $__timeFilter(time) AND\n  LOWER(unit_dispatch.simulation) = '$scenario'\nGROUP BY 1, unit_dispatch.simulation, c.technology, unit\nORDER BY 1) a\nGROUP BY 1, technology\n) a\nGROUP BY 1, technology",
           "refId": "D",
           "select": [
             [
@@ -1885,7 +1910,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select \n$__timeGroupAlias(a.\"time\",$__interval),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\", \n--sum(\"AMIRIS Awarded Energy\"- \"ASSUME Actual dispatch\") as \"Difference\", \n--a.\"agent\",\nc.\"technology\"\nfrom\n(SELECT\n  time as \"time\",\n  avg(power) AS \"ASSUME Actual dispatch\",\n  SUBSTRING(unit,27) as \"agent\",\n  simulation,\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  LOWER(simulation) = '$scenario'\nGROUP BY 1, unit, power, simulation\nORDER BY 1) a\njoin power_plant_meta c on a.unit = c.index and c.simulation=a.simulation\nwhere c.technology like '%hydro%'\nGROUP BY 1, c.technology",
+          "rawSql": "-- select average through time aggregation\nselect \n$__timeGroupAlias(a.\"time\",$__interval),\navg(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom (\nselect \n-- select sum over all units\n$__timeGroupAlias(a.\"time\",'1h'),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom\n(\n  -- select average per unit - remove duplicate sent data\n  SELECT\n  $__timeGroupAlias(time,'1h'),\n  avg(power) AS \"ASSUME Actual dispatch\",\n  unit_dispatch.simulation,\n  technology,\n  unit\nFROM unit_dispatch\njoin power_plant_meta c on unit = c.index and c.simulation=unit_dispatch.simulation\nwhere c.technology = 'hydro'\nand\n  $__timeFilter(time) AND\n  LOWER(unit_dispatch.simulation) = '$scenario'\nGROUP BY 1, unit_dispatch.simulation, c.technology, unit\nORDER BY 1) a\nGROUP BY 1, technology\n) a\nGROUP BY 1, technology",
           "refId": "D",
           "select": [
             [
@@ -2169,7 +2194,7 @@
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select \n$__timeGroupAlias(a.\"time\",$__interval),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\", \n--sum(\"AMIRIS Awarded Energy\"- \"ASSUME Actual dispatch\") as \"Difference\", \n--a.\"agent\",\nc.\"technology\"\nfrom\n(SELECT\n  time as \"time\",\n  avg(power) AS \"ASSUME Actual dispatch\",\n  SUBSTRING(unit,27) as \"agent\",\n  simulation,\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  LOWER(simulation) = '$scenario'\nGROUP BY 1, unit, power, simulation\nORDER BY 1) a\njoin power_plant_meta c on a.unit = c.index and c.simulation=a.simulation\nwhere c.technology like 'lignite'\nGROUP BY 1, c.technology",
+          "rawSql": "-- select average through time aggregation\nselect \n$__timeGroupAlias(a.\"time\",$__interval),\navg(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom (\nselect \n-- select sum over all units\n$__timeGroupAlias(a.\"time\",'1h'),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom\n(\n  -- select average per unit - remove duplicate sent data\n  SELECT\n  $__timeGroupAlias(time,'1h'),\n  avg(power) AS \"ASSUME Actual dispatch\",\n  unit_dispatch.simulation,\n  technology,\n  unit\nFROM unit_dispatch\njoin power_plant_meta c on unit = c.index and c.simulation=unit_dispatch.simulation\nwhere c.technology = 'lignite'\nand\n  $__timeFilter(time) AND\n  LOWER(unit_dispatch.simulation) = '$scenario'\nGROUP BY 1, unit_dispatch.simulation, c.technology, unit\nORDER BY 1) a\nGROUP BY 1, technology\n) a\nGROUP BY 1, technology",
           "refId": "A",
           "select": [
             [
@@ -3294,31 +3319,6 @@
                 "value": "kwatth"
               }
             ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "AMIRIS Storage Dispatch",
-                  "ENTSO-E Data"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
           }
         ]
       },
@@ -3353,7 +3353,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select \n$__timeGroupAlias(a.\"time\",$__interval),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\", \n--sum(\"AMIRIS Awarded Energy\"- \"ASSUME Actual dispatch\") as \"Difference\", \n--a.\"agent\",\nc.\"technology\"\nfrom\n(SELECT\n  time as \"time\",\n  avg(power) AS \"ASSUME Actual dispatch\",\n  SUBSTRING(unit,27) as \"agent\",\n  simulation,\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  LOWER(simulation) = '$scenario'\nGROUP BY 1, unit, power, simulation\nORDER BY 1) a\njoin power_plant_meta c on a.unit = c.index and c.simulation=a.simulation\nwhere c.technology like '%storage%'\nGROUP BY 1, c.technology",
+          "rawSql": "-- select average through time aggregation\nselect \n$__timeGroupAlias(a.\"time\",$__interval),\navg(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom (\nselect \n-- select sum over all units\n$__timeGroupAlias(a.\"time\",'1h'),\nsum(\"ASSUME Actual dispatch\") as \"ASSUME Actual dispatch\",\ntechnology\nfrom\n(\n  -- select average per unit - remove duplicate sent data\n  SELECT\n  $__timeGroupAlias(time,'1h'),\n  avg(power) AS \"ASSUME Actual dispatch\",\n  unit_dispatch.simulation,\n  technology,\n  unit\nFROM unit_dispatch\njoin power_plant_meta c on unit = c.index and c.simulation=unit_dispatch.simulation\nwhere c.technology like '%storage%'\nand\n  $__timeFilter(time) AND\n  LOWER(unit_dispatch.simulation) = '$scenario'\nGROUP BY 1, unit_dispatch.simulation, c.technology, unit\nORDER BY 1) a\nGROUP BY 1, technology\n) a\nGROUP BY 1, technology",
           "refId": "A",
           "select": [
             [
@@ -3466,7 +3466,7 @@
           "placement": "right",
           "showLegend": true,
           "sortBy": "Value",
-          "sortDesc": false,
+          "sortDesc": true,
           "values": [
             "value"
           ]
@@ -3582,45 +3582,7 @@
           "mappings": [],
           "unit": "megwatt"
         },
-        "overrides": [
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "biomass",
-                  "fossil_brown_coal/lignite",
-                  "fossil_coal-derived_gas",
-                  "fossil_hard_coal",
-                  "fossil_oil",
-                  "fossil_oil_shale",
-                  "fossil_peat",
-                  "geothermal",
-                  "hydro_pumped_storage",
-                  "hydro_run-of-river_and_poundage",
-                  "nuclear",
-                  "wind_offshore",
-                  "wind_onshore",
-                  "solar"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "h": 12,
@@ -3639,6 +3601,8 @@
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
+          "sortBy": "Value",
+          "sortDesc": false,
           "values": [
             "value"
           ]
@@ -3668,7 +3632,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  index AS \"time\",\n  biomass,\n  \"fossil_brown_coal/lignite\",\n  \"fossil_coal-derived_gas\",\n  fossil_gas,\n  fossil_hard_coal,\n  fossil_oil,\n  fossil_oil_shale,\n  fossil_peat,\n  geothermal,\n  hydro_pumped_storage,\n  \"hydro_run-of-river_and_poundage\",\n  nuclear,\n  wind_offshore,\n  wind_onshore,\n  solar\nFROM entsoe.query_installed_generation_capacity\nWHERE\n  country = 'DE'\n  and index < $__timeTo() \nORDER BY 1",
+          "rawSql": "SELECT\n  index AS \"time\",\n  biomass,\n  \"fossil_brown_coal/lignite\" as lignite,\n  \"fossil_coal-derived_gas\"+fossil_gas as gas,\n  fossil_hard_coal as hard_coal,\n  fossil_oil as oil,\n  --fossil_oil_shale,\n  --fossil_peat,\n  geothermal,\n  hydro_pumped_storage as hydro_storage,\n  \"hydro_run-of-river_and_poundage\" as hydro,\n  nuclear,\n  wind_offshore,\n  wind_onshore,\n  solar\nFROM entsoe.query_installed_generation_capacity\nWHERE\n  country = 'DE'\n  and index < $__timeTo() \nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -4660,6 +4624,6 @@
   "timezone": "",
   "title": "ENTSO-E Comparison",
   "uid": "QFWaoTOI2",
-  "version": 21,
+  "version": 4,
   "weekStart": ""
 }
