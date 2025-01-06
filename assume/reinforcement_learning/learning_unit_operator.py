@@ -77,7 +77,7 @@ class RLUnitsOperator(UnitsOperator):
 
                 self.rl_units.append(unit)
 
-                # prepare scaled foecasts for the RL staretgy as observations
+                # prepare scaled forecasts for the RL strategy as observations
                 unit.bidding_strategies[market.market_id].prepare_observations(
                     unit, market.market_id
                 )

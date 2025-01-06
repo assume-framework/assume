@@ -135,6 +135,16 @@ class UnitsOperator(Role):
         """
         self.units[unit.id] = unit
 
+        # check if unit has learning strategy for any of the available markets
+        # quick fix so that final run with learning doesn't throw an error
+        if unit.unit_operator == "Operator-RL":
+            for market in self.available_markets:
+                # prepare scaled forecasts for the RL strategy as observations
+                unit.bidding_strategies[market.market_id].prepare_observations(
+                    unit, market.market_id
+                )
+                break  # do we need this? copied it from learning_unit_operator.
+
     def participate(self, market: MarketConfig) -> bool:
         """
         Method which decides if we want to participate on a given Market.

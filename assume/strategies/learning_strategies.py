@@ -55,8 +55,12 @@ class AbstractLearningStrategy(LearningStrategy):
         # scaling factors for the observations
         upper_scaling_factor_price = max(unit.forecaster[f"price_{market_id}"])
         lower_scaling_factor_price = min(unit.forecaster[f"price_{market_id}"])
-        upper_scaling_factor_res_load = max(unit.forecaster[f"residual_load_{market_id}"])
-        lower_scaling_factor_res_load = min(unit.forecaster[f"residual_load_{market_id}"])
+        upper_scaling_factor_res_load = max(
+            unit.forecaster[f"residual_load_{market_id}"]
+        )
+        lower_scaling_factor_res_load = min(
+            unit.forecaster[f"residual_load_{market_id}"]
+        )
 
         self.scaled_res_load_obs = min_max_scale(
             unit.forecaster[f"residual_load_{market_id}"],
@@ -64,7 +68,7 @@ class AbstractLearningStrategy(LearningStrategy):
             upper_scaling_factor_res_load,
         )
 
-        self.scaled_pices_obs = min_max_scale(
+        self.scaled_prices_obs = min_max_scale(
             unit.forecaster[f"price_{market_id}"],
             lower_scaling_factor_price,
             upper_scaling_factor_price,
@@ -436,19 +440,19 @@ class RLStrategy(AbstractLearningStrategy):
                 start : end_excl + forecast_len
             ]
 
-        if end_excl + forecast_len > self.scaled_pices_obs.index[-1]:
-            scaled_price_forecast = self.scaled_pices_obs.loc[start:]
+        if end_excl + forecast_len > self.scaled_prices_obs.index[-1]:
+            scaled_price_forecast = self.scaled_prices_obs.loc[start:]
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    self.scaled_pices_obs.iloc[
+                    self.scaled_prices_obs.iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
             )
 
         else:
-            scaled_price_forecast = self.scaled_pices_obs.loc[
+            scaled_price_forecast = self.scaled_prices_obs.loc[
                 start : end_excl + forecast_len
             ]
 
@@ -462,8 +466,7 @@ class RLStrategy(AbstractLearningStrategy):
 
         # marginal cost
         scaled_marginal_cost = current_costs / self.max_bid_price
-
-        # concat all obsverations into one array
+        # concat all observations into one array
         observation = np.concatenate(
             [
                 scaled_res_load_forecast,
@@ -1024,19 +1027,19 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 start : end_excl + forecast_len
             ]
 
-        if end_excl + forecast_len > self.scaled_pices_obs.index[-1]:
-            scaled_price_forecast = self.scaled_pices_obs.loc[start:]
+        if end_excl + forecast_len > self.scaled_prices_obs.index[-1]:
+            scaled_price_forecast = self.scaled_prices_obs.loc[start:]
             scaled_price_forecast = np.concatenate(
                 [
                     scaled_price_forecast,
-                    self.scaled_pices_obs.iloc[
+                    self.scaled_prices_obs.iloc[
                         : self.foresight - len(scaled_price_forecast)
                     ],
                 ]
             )
 
         else:
-            scaled_price_forecast = self.scaled_pices_obs.loc[
+            scaled_price_forecast = self.scaled_prices_obs.loc[
                 start : end_excl + forecast_len
             ]
 
