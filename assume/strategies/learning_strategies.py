@@ -363,7 +363,10 @@ class RLStrategy(AbstractLearningStrategy):
                 # if we are not in the initial exploration phase we choose the action with the actor neural net
                 # and add noise to the action
 
-                if self.actor.original_implementation:
+                if (
+                    hasattr(self.actor, "original_implementation")
+                    and self.actor.original_implementation
+                ):
                     # already sampled from normal distribution, no noise needed
                     curr_action = self.actor(next_observation).detach()
 
