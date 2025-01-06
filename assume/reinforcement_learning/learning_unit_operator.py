@@ -133,7 +133,10 @@ class RLUnitsOperator(UnitsOperator):
                     "unit": unit.id,
                 }
 
-                if isinstance(strategy, RLAdvancedOrderStrategy):
+                if (
+                    isinstance(strategy, RLAdvancedOrderStrategy)
+                    or strategy.act_dim > 2
+                ):
                     output_dict.update(
                         {
                             "profit": unit.outputs["profit"].loc[products_index].sum(),

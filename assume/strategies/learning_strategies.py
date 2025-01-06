@@ -11,7 +11,7 @@ import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import min_max_scale
+from assume.common.utils import get_products_index, min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
@@ -148,7 +148,7 @@ class RLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=50, act_dim=48, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
@@ -242,15 +242,20 @@ class RLStrategy(AbstractLearningStrategy):
         orderbook entries.
         """
 
-        bid_quantity_inflex, bid_price_inflex = 0, 0
-        bid_quantity_flex, bid_price_flex = 0, 0
+        # bid_quantity_inflex, bid_price_inflex = 0, 0
+        # bid_quantity_flex, bid_price_flex = 0, 0
 
-        start = product_tuples[0][0]
-        end = product_tuples[0][1]
+        first_start = product_tuples[0][0]
+        final_end = product_tuples[-1][1]
+
         # get technical bounds for the unit output from the unit
-        min_power, max_power = unit.calculate_min_max_power(start, end)
-        min_power = min_power[0]
-        max_power = max_power[0]
+        op_time = unit.get_operation_time(first_start)
+        previous_power = unit.get_output_before(first_start)
+        min_power_values, max_power_values = unit.calculate_min_max_power(
+            first_start, final_end
+        )
+        # min_power = min_power[0]
+        # max_power = max_power[0]
 
         # =============================================================================
         # 1. Get the Observations, which are the basis of the action decision
@@ -258,8 +263,10 @@ class RLStrategy(AbstractLearningStrategy):
         next_observation = self.create_observation(
             unit=unit,
             market_id=market_config.market_id,
-            start=start,
-            end=end,
+            start=first_start,
+            end=product_tuples[0][
+                1
+            ],  # TODO: quick fix, so that forecast_horizon is not extended after last product end which otherwise provided the wrong forecasts
         )
 
         # =============================================================================
@@ -274,43 +281,88 @@ class RLStrategy(AbstractLearningStrategy):
         # we can use our domain knowledge to guide the bid formulation
         bid_prices = actions * self.max_bid_price
 
+        # reshape for multi-step bidding with flex and inflex
+        bid_prices = bid_prices.reshape(-1, 2)
+
         # 3.1 formulate the bids for Pmin
         # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
-        bid_quantity_inflex = min_power
-        bid_price_inflex = min(bid_prices)
+        bid_prices_inflex = th.min(bid_prices, dim=1).values
 
         # 3.1 formulate the bids for Pmax - Pmin
-        # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
-        bid_quantity_flex = max_power - bid_quantity_inflex
-        bid_price_flex = max(bid_prices)
+        # Pmax, the maximum run capacity, - Pmin is the the remaining flexible part of the bid
+        bid_prices_flex = th.max(bid_prices, dim=1).values
 
         # actually formulate bids in orderbook format
-        bids = [
-            {
-                "start_time": start,
-                "end_time": end,
-                "only_hours": None,
-                "price": bid_price_inflex,
-                "volume": bid_quantity_inflex,
-                "node": unit.node,
-            },
-            {
-                "start_time": start,
-                "end_time": end,
-                "only_hours": None,
-                "price": bid_price_flex,
-                "volume": bid_quantity_flex,
-                "node": unit.node,
-            },
-        ]
+        bids = []
+
+        for product, bid_price_inflex, bid_price_flex, min_power, max_power in zip(
+            product_tuples,
+            bid_prices_inflex,
+            bid_prices_flex,
+            min_power_values,
+            max_power_values,
+        ):
+            start = product[0]
+            end = product[1]
+
+            bid_quantity_inflex = 0
+            bid_quantity_flex = 0
+
+            current_power = unit.outputs["energy"].at[start]
+
+            # get technical bounds for the unit output from the unit
+            # adjust for ramp speed
+            max_power = unit.calculate_ramp(
+                op_time, previous_power, max_power, current_power
+            )
+            # adjust for ramp speed
+            min_power = unit.calculate_ramp(
+                op_time, previous_power, min_power, current_power
+            )
+
+            # 3.1 formulate the bids for Pmin
+            bid_quantity_inflex = min_power
+
+            # 3.2 formulate the bids for Pmax - Pmin
+            # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
+            if op_time <= -unit.min_down_time or op_time > 0:
+                bid_quantity_flex = max_power - bid_quantity_inflex
+
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": bid_price_inflex,
+                    "volume": bid_quantity_inflex,
+                    "node": unit.node,
+                }
+            )
+
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": bid_price_flex,
+                    "volume": bid_quantity_flex,
+                    "node": unit.node,
+                }
+            )
+
+            # calculate previous power with planned dispatch (bid_quantity)
+            previous_power = bid_quantity_inflex + bid_quantity_flex + current_power
+            op_time = max(op_time, 0) + 1 if previous_power > 0 else min(op_time, 0) - 1
 
         # store results in unit outputs as lists to be written to the buffer for learning
         unit.outputs["rl_observations"].append(next_observation)
         unit.outputs["rl_actions"].append(actions)
 
         # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"].at[start] = actions
-        unit.outputs["exploration_noise"].at[start] = noise
+        unit.outputs["actions"].at[first_start] = actions
+        unit.outputs["exploration_noise"].at[first_start] = noise
+
+        bids = self.remove_empty_bids(bids)
 
         return bids
 
@@ -470,6 +522,7 @@ class RLStrategy(AbstractLearningStrategy):
                 start : end_excl + forecast_len
             ]
 
+        # TODO: dependent on horizon (e.g. adjust to last 24h); be careful of dependencies
         # get last accepted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
         current_costs = unit.calculate_marginal_cost(start, current_volume)
@@ -529,80 +582,152 @@ class RLStrategy(AbstractLearningStrategy):
         # so we can calculate the profit
 
         product_type = marketconfig.product_type
+        products_index = get_products_index(orderbook)
 
-        profit = 0
-        reward = 0
-        opportunity_cost = 0
-        costs = 0
+        max_power_values = (
+            unit.forecaster.get_availability(unit.id)[products_index] * unit.max_power
+        )
 
-        # iterate over all orders in the orderbook, to calculate order specific profit
+        # Initialize intermediate results as numpy arrays for better performance
+        profit = np.zeros(len(products_index))
+        reward = np.zeros(len(products_index))
+        opportunity_cost = np.zeros(len(products_index))
+        costs = np.zeros(len(products_index))
+
+        # Map products_index to their positions for faster updates
+        index_map = {time: i for i, time in enumerate(products_index)}
+
         for order in orderbook:
             start = order["start_time"]
-            end = order["end_time"]
-            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-            end_excl = end - unit.index.freq
+            end_excl = order["end_time"] - unit.index.freq
 
-            # depending on way the unit calculates marginal costs we take costs
-            marginal_cost = unit.calculate_marginal_cost(
-                start, unit.outputs[product_type].at[start]
-            )
-
-            duration = (end - start) / timedelta(hours=1)
-
+            order_times = unit.index[start:end_excl]
             accepted_volume = order.get("accepted_volume", 0)
             accepted_price = order.get("accepted_price", 0)
 
-            # calculate profit as income - running_cost from this event
-            order_profit = accepted_price * accepted_volume * duration
-            order_cost = marginal_cost * accepted_volume * duration
+            for start, max_power in zip(order_times, max_power_values):
+                idx = index_map.get(start)
 
-            # collect profit and opportunity cost for all orders
-            profit += order_profit
-            costs += order_cost
+                marginal_cost = unit.calculate_marginal_cost(
+                    start, unit.outputs[product_type].at[start]
+                )
 
-        # calculate opportunity cost
-        # as the loss of income we have because we are not running at full power
-        opportunity_cost = (
-            (accepted_price - marginal_cost)
-            * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
-            * duration
-        )
+                if isinstance(accepted_volume, dict):
+                    accepted_volume = accepted_volume.get(start, 0)
+                else:
+                    accepted_volume = accepted_volume
 
-        # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-        opportunity_cost = max(opportunity_cost, 0)
+                if isinstance(accepted_price, dict):
+                    accepted_price = accepted_price.get(start, 0)
+                else:
+                    accepted_price = accepted_price
 
-        # consideration of start-up costs, which are evenly divided between the
-        # upward and downward regulation events
-        if (
-            unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].loc[start - unit.index.freq] == 0
-        ):
-            costs += unit.hot_start_cost / 2
-        elif (
-            unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].loc[start - unit.index.freq] != 0
-        ):
-            costs += unit.hot_start_cost / 2
+                price_difference = accepted_price - marginal_cost
 
-        profit = profit - costs
+                # calculate opportunity cost
+                # as the loss of income we have because we are not running at full power
+                order_opportunity_cost = price_difference * (
+                    max_power - unit.outputs[product_type].at[start]
+                )
+                # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
+                # don't consider opportunity_cost more than once! Always the same for one timestep and one market
+                opportunity_cost[idx] = max(order_opportunity_cost, 0)
+                profit[idx] += accepted_price * accepted_volume
 
-        # ---------------------------
-        # 4.1 Calculate Reward
-        # The straight forward implementation would be reward = profit, yet we would like to give the agent more guidance
-        # in the learning process, so we add a regret term to the reward, which is the opportunity cost
-        # define the reward and scale it
+        # consideration of start-up costs
+        for i, start in enumerate(products_index):
+            op_time = unit.get_operation_time(start)
 
+            output = unit.outputs[product_type].at[start]
+            marginal_cost = unit.calculate_marginal_cost(start, output)
+            costs[i] += marginal_cost * output
+
+            if output != 0 and op_time < 0:
+                start_up_cost = unit.get_starting_costs(op_time)
+                costs[i] += start_up_cost
+
+        profit -= costs
         scaling = 0.1 / unit.max_power
-        regret_scale = 0.2
-        reward = float(profit - regret_scale * opportunity_cost) * scaling
+        regret_scale = 0.6  # tests with example 02a showed that regret needed to be of higher importance to incentivize strategic bidding (before, bids above mc of back-up pp_7 were often given)
+        reward = (profit - regret_scale * opportunity_cost) * scaling
 
         # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
-        unit.outputs["total_costs"].loc[start:end_excl] = costs
+        unit.outputs["profit"].loc[products_index] = profit
+        unit.outputs["reward"].loc[products_index] = reward
+        unit.outputs["regret"].loc[products_index] = opportunity_cost
+        unit.outputs["total_costs"].loc[products_index] = costs
 
-        unit.outputs["rl_rewards"].append(reward)
+        unit.outputs["rl_rewards"].append(reward.sum())
+
+        # TODO: check different behavior!
+        # # iterate over all orders in the orderbook, to calculate order specific profit
+        # for order in orderbook:
+        #     start = order["start_time"]
+        #     end = order["end_time"]
+        #     # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+        #     end_excl = end - unit.index.freq
+
+        #     # depending on way the unit calculates marginal costs we take costs
+        #     marginal_cost = unit.calculate_marginal_cost(
+        #         start, unit.outputs[product_type].at[start]
+        #     )
+
+        #     duration = (end - start) / timedelta(hours=1)
+
+        #     accepted_volume = order.get("accepted_volume", 0)
+        #     accepted_price = order.get("accepted_price", 0)
+
+        #     # calculate profit as income - running_cost from this event
+        #     order_profit = accepted_price * accepted_volume * duration
+        #     order_cost = marginal_cost * accepted_volume * duration
+
+        #     # collect profit and opportunity cost for all orders
+        #     profit += order_profit
+        #     costs += order_cost
+
+        # # calculate opportunity cost
+        # # as the loss of income we have because we are not running at full power
+        # opportunity_cost = (
+        #     (accepted_price - marginal_cost)
+        #     * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
+        #     * duration
+        # )
+
+        # # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
+        # opportunity_cost = max(opportunity_cost, 0)
+
+        # # consideration of start-up costs, which are evenly divided between the
+        # # upward and downward regulation events
+        # if (
+        #     unit.outputs[product_type].at[start] != 0
+        #     and unit.outputs[product_type].loc[start - unit.index.freq] == 0
+        # ):
+        #     costs += unit.hot_start_cost / 2
+        # elif (
+        #     unit.outputs[product_type].at[start] == 0
+        #     and unit.outputs[product_type].loc[start - unit.index.freq] != 0
+        # ):
+        #     costs += unit.hot_start_cost / 2
+
+        # profit = profit - costs
+
+        # # ---------------------------
+        # # 4.1 Calculate Reward
+        # # The straight forward implementation would be reward = profit, yet we would like to give the agent more guidance
+        # # in the learning process, so we add a regret term to the reward, which is the opportunity cost
+        # # define the reward and scale it
+
+        # scaling = 0.1 / unit.max_power
+        # regret_scale = 0.2
+        # reward = float(profit - regret_scale * opportunity_cost) * scaling
+
+        # # store results in unit outputs which are written to database by unit operator
+        # unit.outputs["profit"].loc[start:end_excl] += profit
+        # unit.outputs["reward"].loc[start:end_excl] = reward
+        # unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
+        # unit.outputs["total_costs"].loc[start:end_excl] = costs
+
+        # unit.outputs["rl_rewards"].append(reward)
 
 
 class StorageRLStrategy(AbstractLearningStrategy):

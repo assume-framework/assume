@@ -638,7 +638,14 @@ class MarketRole(MarketMechanism, Role):
                     }
                 else:
                     order["accepted_volume"] = 0.0
-                    order["accepted_price"] = market_meta[0]["price"]
+                    order["accepted_price"] = next(
+                        (
+                            product["price"]
+                            for product in market_meta
+                            if product.get("product_start") == order["start_time"]
+                        ),
+                        None,
+                    )
 
         self.open_auctions - set(market_products)
 
