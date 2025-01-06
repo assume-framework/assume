@@ -362,11 +362,22 @@ class RLStrategy(AbstractLearningStrategy):
             else:
                 # if we are not in the initial exploration phase we choose the action with the actor neural net
                 # and add noise to the action
-                curr_action = self.actor(next_observation).detach()
-                noise = th.tensor(
-                    self.action_noise.noise(), device=self.device, dtype=self.float_type
-                )
-                curr_action += noise
+
+                if self.actor.original_implementation:
+                    # already sampled from normal distribution, no noise needed
+                    curr_action = self.actor(next_observation).detach()
+
+                    # noise is an tensor with zeros, because we don't need it
+                    noise = th.zeros(self.act_dim, dtype=self.float_type)
+                else:
+                    curr_action = self.actor(next_observation).detach()
+                    noise = th.tensor(
+                        self.action_noise.noise(),
+                        device=self.device,
+                        dtype=self.float_type,
+                    )
+                    curr_action += noise
+
         else:
             # if we are not in learning mode we just use the actor neural net to get the action without adding noise
             curr_action = self.actor(next_observation).detach()
