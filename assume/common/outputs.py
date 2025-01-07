@@ -28,6 +28,7 @@ from assume.common.utils import (
     calculate_content_size,
     check_for_tensors,
     separate_orders,
+    tensor_board_intro
 )
 
 logger = logging.getLogger(__name__)
@@ -710,7 +711,8 @@ class WriteOutput(Role):
         
         # store episodic evalution data in tensorboard
         if self.episode:
-            
+            if self.episode == 1:
+                self.writer.add_text('TensorBoard Introduction', tensor_board_intro)
             query = f"""
             SELECT 
                 datetime as dt, 
@@ -764,7 +766,7 @@ class WriteOutput(Role):
                     lr = float(time_df["lr"].values[0])
 
                     # store the data in tensorboard
-                    x_index = (self.episode - 1) * len(datetimes) + i
+                    x_index = (self.episode - 1 - self.episodes_collecting_initial_experience) * len(datetimes) + i
                     self.writer.add_scalars(f"a) reward", rewards, x_index)
                     self.writer.add_scalars(f"b) profit", profits, x_index)
                     self.writer.add_scalars(f"c) regret", regrets, x_index)
