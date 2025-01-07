@@ -499,6 +499,8 @@ class World:
             dict[str, BaseStrategy]: The bidding strategies for the unit.
         """
         bidding_strategies = {}
+        strategy_instances = {}  # Cache to store created instances
+
         for market_id, strategy in unit_params["bidding_strategies"].items():
             if not strategy:
                 continue
@@ -509,12 +511,16 @@ class World:
                     the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
                 )
 
-            bidding_params = unit_params.get("bidding_params", self.bidding_params)
+            if strategy not in strategy_instances:
+                # Create and cache the strategy instance if not already created
+                bidding_params = unit_params.get("bidding_params", self.bidding_params)
+                strategy_instances[strategy] = self.bidding_strategies[strategy](
+                    unit_id=unit_id,
+                    **bidding_params,
+                )
 
-            bidding_strategies[market_id] = self.bidding_strategies[strategy](
-                unit_id=unit_id,
-                **bidding_params,
-            )
+            # Use the cached instance for this market
+            bidding_strategies[market_id] = strategy_instances[strategy]
 
         return bidding_strategies
 
