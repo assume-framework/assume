@@ -28,8 +28,8 @@ from assume.common.utils import (
     calculate_content_size,
     check_for_tensors,
     separate_orders,
-    tensor_board_intro
 )
+from docs.tensorboard_info import tensor_board_intro
 
 logger = logging.getLogger(__name__)
 
@@ -711,7 +711,7 @@ class WriteOutput(Role):
         
         # store episodic evalution data in tensorboard
         if self.episode:
-            if self.episode == 1:
+            if self.episode == 1 and not self.perform_evaluation:
                 self.writer.add_text('TensorBoard Introduction', tensor_board_intro)
             query = f"""
             SELECT 
