@@ -18,6 +18,9 @@ Upcoming Release
 - **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
   This allows for a more robust scaling of the observation space for future analysis.
 
+**Bugfixes:**
+- **Learning Strategy with Different Simulation Time Steps**: Fixed an issue where the learning strategies were failing with simulation time steps other than one hour, such as 15 or 30 minutes.
+
 
 v0.5.0 - (10th December 2024)
 ===========================================
