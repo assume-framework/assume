@@ -35,6 +35,7 @@ class Learning(Role):
     def __init__(
         self,
         learning_config: LearningConfig,
+        episodes_collecting_initial_experience: int,
         start: datetime = None,
         end: datetime = None,
     ):
@@ -105,12 +106,7 @@ class Learning(Role):
         else:
             self.calc_noise_from_progress = lambda x: noise_dt
 
-        # if we do not have initial experience collected we will get an error as no samples are available on the
-        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
-
-        self.episodes_collecting_initial_experience = max(
-            learning_config.get("episodes_collecting_initial_experience", 5), 1
-        )
+        self.episodes_collecting_initial_experience = episodes_collecting_initial_experience
         
         self.datetime = None
         self.train_freq = learning_config.get("train_freq", "24h")

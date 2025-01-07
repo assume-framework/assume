@@ -4,6 +4,9 @@
 
 import logging
 import shutil
+import os
+# Turn off TF onednn optimizations to avoid memory leaks
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing import Lock
@@ -62,6 +65,7 @@ class WriteOutput(Role):
         export_csv_path: str = "",
         save_frequency_hours: int = None,
         learning_mode: bool = False,
+        episodes_collecting_initial_experience: int = 0,
         perform_evaluation: bool = False,
         additional_kpis: dict[str, OutputDef] = {},
         max_dfs_size_mb: int = 300,
@@ -86,6 +90,7 @@ class WriteOutput(Role):
 
         self.learning_mode = learning_mode
         self.perform_evaluation = perform_evaluation
+        self.episodes_collecting_initial_experience = episodes_collecting_initial_experience
 
         # get episode number if in learning or evaluation mode
         self.episode = None
@@ -277,11 +282,15 @@ class WriteOutput(Role):
         df["learning_mode"] = self.learning_mode
         df["perform_evaluation"] = self.perform_evaluation
         df["episode"] = self.episode
+        if self.episode <= self.episodes_collecting_initial_experience:
+            df["initial_exploration"] = True
+        else:
+            df["initial_exploration"] = False
+        # Add missing learning_params columns in case of initial_exploration
         if "critic_loss" not in df.columns:
             df["critic_loss"] = None
         if "learning_rate" not in df.columns:
             df["learning_rate"] = None
-
 
         return df
     
@@ -716,14 +725,15 @@ class WriteOutput(Role):
             FROM rl_params 
             WHERE episode = '{self.episode}' 
             AND simulation = '{self.simulation_id}'
-            And perform_evaluation = False
+            AND perform_evaluation = False
+            AND initial_exploration = False
             """
             try:
                 rl_params_df = pd.read_sql(query, self.db)
                 rl_params_df["dt"] = pd.to_datetime(rl_params_df["dt"])
                 # replace all NaN values with 0 to allow for plotting
                 rl_params_df = rl_params_df.fillna(0., downcast = 'infer')
-                print(rl_params_df)
+
                 # loop over all datetimes as tensorboard does not allow to store time series
                 datetimes = rl_params_df["dt"].unique()
                 for i, time in enumerate(datetimes):
