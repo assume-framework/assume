@@ -98,6 +98,8 @@ class Storage(SupportsMinMaxCharge):
 
         self.max_soc = max_soc
         self.min_soc = min_soc
+        if initial_soc is None:
+            initial_soc = max_soc / 2
         self.initial_soc = initial_soc
 
         self.max_power_charge = -abs(max_power_charge)
@@ -325,7 +327,11 @@ class Storage(SupportsMinMaxCharge):
         return min_power_charge, max_power_charge
 
     def calculate_min_max_discharge(
-        self, start: datetime, end: datetime, product_type="energy"
+        self,
+        start: datetime,
+        end: datetime,
+        product_type = "energy",
+        soc = None,
     ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max discharging power for the given time period.
@@ -362,10 +368,11 @@ class Storage(SupportsMinMaxCharge):
             min_power_discharge < max_power_discharge, min_power_discharge, 0
         )
 
+        if soc is None:
+            soc = self.get_soc_before(start)
+
         # restrict according to min_soc
-        max_soc_discharge = self.calculate_soc_max_discharge(
-            self.outputs["soc"].at[start]
-        )
+        max_soc_discharge = self.calculate_soc_max_discharge(soc)
         max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge
