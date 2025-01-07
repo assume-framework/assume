@@ -289,9 +289,9 @@ class WriteOutput(Role):
             df["initial_exploration"] = False
         # Add missing learning_params columns in case of initial_exploration
         if "critic_loss" not in df.columns:
-            df["critic_loss"] = None
+            df["critic_loss"] = np.nan
         if "learning_rate" not in df.columns:
-            df["learning_rate"] = None
+            df["learning_rate"] = np.nan
 
         return df
     
@@ -460,7 +460,7 @@ class WriteOutput(Role):
         if "rl_params" in self.write_buffers and "learning_params" in self.write_buffers:
             df1 = pd.DataFrame(self.write_buffers["rl_params"])
             df2 = pd.DataFrame(self.write_buffers["learning_params"])
-            merged_df = pd.merge(df1, df2, how = 'outer').convert_dtypes()
+            merged_df = pd.merge(df1, df2, how = 'outer')
             merged_list = merged_df.to_dict('records')
             self.write_buffers["rl_params"] = merged_list
             del self.write_buffers["learning_params"]
@@ -734,7 +734,7 @@ class WriteOutput(Role):
                 rl_params_df = pd.read_sql(query, self.db)
                 rl_params_df["dt"] = pd.to_datetime(rl_params_df["dt"])
                 # replace all NaN values with 0 to allow for plotting
-                rl_params_df = rl_params_df.fillna(0., downcast = 'infer')
+                rl_params_df = rl_params_df.fillna(0.)
 
                 # loop over all datetimes as tensorboard does not allow to store time series
                 datetimes = rl_params_df["dt"].unique()
@@ -750,7 +750,7 @@ class WriteOutput(Role):
                         rewards[unit] = unit_df["reward"].values[0]
                         profits[unit] = unit_df["profit"].values[0]
                         regrets[unit] = unit_df["regret"].values[0]
-                        losses[unit] = float(unit_df["loss"].values[0])
+                        losses[unit] = unit_df["loss"].values[0]
 
                     # Add the averages over the units to the dictionaries
                     rewards["avg"] = sum(rewards.values()) / len(rewards)
@@ -763,7 +763,7 @@ class WriteOutput(Role):
                     noise_1 = time_df["noise_1"].abs().mean()
 
                     # get the learning rate
-                    lr = float(time_df["lr"].values[0])
+                    lr = time_df["lr"].values[0]
 
                     # store the data in tensorboard
                     x_index = (self.episode - 1 - self.episodes_collecting_initial_experience) * len(datetimes) + i
