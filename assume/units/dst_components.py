@@ -675,6 +675,159 @@ class PVPlant:
         return model_block
 
 
+class GrindingMill:
+    """
+    A class to represent a generic grinding mill unit in an energy system model.
+
+    This class handles both raw material milling and cement grinding by modeling electricity consumption,
+    material flow, and operational constraints such as ramp rates, availability profiles, and maximum operating hours.
+
+    Args:
+        max_power (float): Maximum allowable power input to the mill.
+        efficiency (float): Efficiency of the mill, defined as the ratio of material output to power input.
+        time_steps (list[int]): A list of time steps over which the mill operates.
+        max_operating_hours (int): Maximum number of operating hours per day.
+        availability_profile (list[int] | None): Time series indicating the availability of the mill (1 for available, 0 for unavailable).
+        ramp_up (float | None, optional): Maximum allowed increase in power input per time step. Defaults to `max_power` if not provided.
+        ramp_down (float | None, optional): Maximum allowed decrease in power input per time step. Defaults to `max_power` if not provided.
+        min_operating_steps (int, optional): Minimum number of consecutive time steps the mill must operate once started. Defaults to 0.
+        min_down_steps (int, optional): Minimum number of consecutive time steps the mill must remain off after being shut down. Defaults to 0.
+        initial_operational_status (int, optional): The initial operational status of the mill (0 for off, 1 for on). Defaults to 1.
+        specific_electricity_consumption (float): Electricity consumption per ton of material output (MWh/tonne).
+
+    Returns:
+        pyo.Block: A Pyomo block representing the grinding mill with variables and constraints.
+    """
+
+    def __init__(
+        self,
+        max_power,
+        min_power,
+        efficiency,
+        time_steps,
+        max_operating_hours: int = 0,
+        availability_profile="yes",
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        min_operating_steps=0,
+        min_down_steps=0,
+        initial_operational_status=1,
+        specific_electricity_consumption=0.0,
+    ):
+        super().__init__()
+
+        self.max_power = max_power
+        self.min_power = min_power
+        self.efficiency = efficiency
+        self.time_steps = time_steps
+        self.availability_profile = availability_profile
+        self.ramp_up = max_power if ramp_up is None else ramp_up
+        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.max_operating_hours = max_operating_hours
+        self.min_operating_steps = min_operating_steps
+        self.min_down_steps = min_down_steps
+        self.initial_operational_status = initial_operational_status
+        self.specific_electricity_consumption = specific_electricity_consumption
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        # Define parameters
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.efficiency = pyo.Param(initialize=self.efficiency)
+        model_block.max_operating_hours = pyo.Param(initialize=self.max_operating_hours)
+        model_block.grinder_availability_profile = pyo.Param(
+            self.time_steps,
+            initialize={t: 1 for t in self.time_steps},
+        )
+        model_block.specific_electricity_consumption = pyo.Param(
+            initialize=self.specific_electricity_consumption
+        )
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.initial_operational_status = pyo.Param(
+            initialize=self.initial_operational_status
+        )
+
+        # Define variables
+        model_block.power_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
+        )
+        model_block.material_input = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.material_output = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.operating_hours = pyo.Var(self.time_steps, within=pyo.Binary)
+        model_block.operating_cost = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+
+        # Constraints
+
+        @model_block.Constraint(self.time_steps)
+        def material_input_output_relation(b, t):
+            return b.material_input[t] == b.material_output[t] / b.efficiency
+
+        @model_block.Constraint(self.time_steps)
+        def material_flow_constraint(b, t):
+            return (
+                b.power_in[t]
+                == b.material_output[t] * b.specific_electricity_consumption
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_constraint_rule(b, t):
+            return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+
+        @model_block.Constraint(range(len(self.time_steps) // 24))
+        def daily_max_operating_hours_constraint(b, d):
+            time_indices = [idx for idx in self.time_steps if idx // 24 == d]
+            return (
+                sum(b.operating_hours[idx] for idx in time_indices)
+                <= b.max_operating_hours
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def operation_hours_binding_constraint(b, t):
+            big_M = self.max_power  # Use max_power as the scaling factor
+            if self.availability_profile == "no":
+                return (
+                    b.power_in[t]
+                    <= b.operating_hours[t] * big_M * b.grinder_availability_profile[t]
+                )
+            elif self.availability_profile == "yes":
+                return (
+                    b.power_in[t]
+                    <= b.operating_hours[t]
+                    * big_M
+                    * model.grinder_availability_profile[t]
+                )
+
+        # Ramp-up constraint and ramp-down constraints
+        add_ramping_constraints(
+            model_block=model_block,
+            time_steps=self.time_steps,
+        )
+
+        # Define additional variables and constraints for startup/shutdown and operational status
+        if (
+            self.min_operating_steps > 1
+            or self.min_down_steps > 1
+            or self.max_power > 0
+        ):
+            add_min_up_down_time_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+            )
+
+        return model_block
+
+
 class Electrolyser:
     """
     A class to represent an electrolyser unit used for hydrogen production through electrolysis.
@@ -805,6 +958,225 @@ class Electrolyser:
             self.min_operating_steps > 1
             or self.min_down_steps > 1
             or self.min_power > 0
+        ):
+            add_min_up_down_time_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+            )
+
+        return model_block
+
+
+class ClinkerSystem:
+    """
+    A class to represent the clinker production system in a cement plant model.
+
+    This class models the relationships and constraints governing clinker production,
+    including material flow, thermal energy consumption, electricity consumption, emissions,
+    and operational constraints such as ramping and operating hours.
+
+    Args:
+        max_clinker_production (float): Maximum allowable clinker production (tonnes).
+        clinker_to_cement_ratio (float): Ratio of clinker to cement production (dimensionless).
+        limestone_to_clinker_ratio (float): Ratio of limestone to clinker production (dimensionless).
+        thermal_consumption_value (float): Thermal energy consumption per tonne of clinker (GJ/tonne).
+        electricity_consumption_value (float): Electricity consumption per tonne of clinker (kWh/tonne).
+        emission_factor (float): Emission factor for clinker production (t CO2/tonne clinker).
+        time_steps (list[int]): Time steps over which the system operates.
+        max_operating_hours (int): Maximum allowable operating hours per day.
+        availability_profile (list[int] | None): Time series indicating availability (1 for available, 0 for unavailable).
+        ramp_up (float | None): Maximum allowed increase in clinker production per time step.
+        ramp_down (float | None): Maximum allowed decrease in clinker production per time step.
+        min_operating_steps (int): Minimum consecutive operating steps required.
+        min_down_steps (int): Minimum consecutive downtime steps required.
+        initial_operational_status (int): Initial operational status of the system (0 for off, 1 for on).
+        fuel_type (str): Type of fuel used ("natural_gas", "hydrogen", "electricity", "biofuel", "fuelmix").
+
+    Returns:
+        pyo.Block: A Pyomo block representing the clinker system with variables and constraints.
+    """
+
+    def __init__(
+        self,
+        min_power,
+        max_power,
+        clinker_to_cement_ratio,
+        limestone_to_clinker_ratio,
+        specific_thermal_consumption,
+        specific_electricity_consumption,
+        calcination_emission_factor,
+        time_steps,
+        max_operating_hours,
+        availability_profile="yes",
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        min_operating_steps=0,
+        min_down_steps=0,
+        initial_operational_status=1,
+        fuel_type="natural_gas",
+    ):
+        super().__init__()
+
+        self.max_power = max_power
+        self.min_power = min_power
+        self.clinker_to_cement_ratio = clinker_to_cement_ratio
+        self.limestone_to_clinker_ratio = limestone_to_clinker_ratio
+        self.specific_thermal_consumption = specific_thermal_consumption
+        self.specific_electricity_consumption = specific_electricity_consumption
+        self.calcination_emission_factor = calcination_emission_factor
+        self.time_steps = time_steps
+        self.max_operating_hours = max_operating_hours
+        self.availability_profile = availability_profile
+        self.ramp_up = max_power if ramp_up is None else ramp_up
+        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.min_operating_steps = min_operating_steps
+        self.min_down_steps = min_down_steps
+        self.initial_operational_status = initial_operational_status
+        self.fuel_type = fuel_type
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        # Define parameters
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.clinker_to_cement_ratio = pyo.Param(
+            initialize=self.clinker_to_cement_ratio
+        )
+        model_block.limestone_to_clinker_ratio = pyo.Param(
+            initialize=self.limestone_to_clinker_ratio
+        )
+        model_block.specific_thermal_consumption = pyo.Param(
+            initialize=self.specific_thermal_consumption
+        )
+        model_block.specific_electricity_consumption = pyo.Param(
+            initialize=self.specific_electricity_consumption
+        )
+        model_block.calcination_emission_factor = pyo.Param(
+            initialize=self.calcination_emission_factor
+        )
+        model_block.max_operating_hours = pyo.Param(initialize=self.max_operating_hours)
+        model_block.clinker_availability_profile = pyo.Param(
+            self.time_steps,
+            initialize={t: 1 for t in self.time_steps},
+        )
+
+        # Define variables
+        model_block.clinker_output = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.raw_meal = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.cement_production = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.thermal_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.power_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
+        )
+        model_block.calcination_emissions = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.operating_hours = pyo.Var(self.time_steps, within=pyo.Binary)
+        model_block.operating_cost = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.initial_operational_status = pyo.Param(
+            initialize=self.initial_operational_status
+        )
+
+        # Constraints
+        @model_block.Constraint(self.time_steps)
+        def clinker_to_cement_constraint(b, t):
+            return (
+                b.clinker_output[t]
+                == b.cement_production[t] * b.clinker_to_cement_ratio
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def raw_meal_requirement_constraint(b, t):
+            return b.raw_meal[t] == b.clinker_output[t] * b.limestone_to_clinker_ratio
+
+        @model_block.Constraint(self.time_steps)
+        def thermal_energy_constraint(b, t):
+            return (
+                b.thermal_in[t] == b.clinker_output[t] * b.specific_thermal_consumption
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def electricity_constraint(b, t):
+            return (
+                b.power_in[t]
+                == b.clinker_output[t] * b.specific_electricity_consumption
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def calcination_emissions_constraint(b, t):
+            return (
+                b.calcination_emissions[t]
+                == b.clinker_output[t] * b.calcination_emission_factor
+            )
+
+        # Operating cost based on fuel type
+        # Map fuel types to price
+        fuel_price_mapping = {
+            "electricity": model.electricity_price,
+            "natural_gas": model.natural_gas_price,
+            "hydrogen": model.hydrogen_price,
+            # "biofuel": model.biofuel_price,
+            # "fuelmix": model.fuelmix_price,
+        }
+
+        if self.fuel_type not in fuel_price_mapping:
+            raise ValueError(f"Unsupported fuel type: {self.fuel_type}")
+
+        @model_block.Constraint(self.time_steps)
+        def clinker_operating_cost_constraint(b, t):
+            return (
+                b.operating_cost[t]
+                == b.power_in[t] * model.electricity_price[t]
+                + b.thermal_in[t] * fuel_price_mapping[self.fuel_type][t]
+                # + b.raw_meal[t] * model.lime_price[t]
+            )
+
+        @model_block.Constraint(range(len(self.time_steps) // 24))
+        def daily_max_operating_hours_constraint(b, d):
+            time_indices = [idx for idx in self.time_steps if idx // 24 == d]
+            return (
+                sum(b.operating_hours[idx] for idx in time_indices)
+                <= b.max_operating_hours
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def operation_hours_binding_constraint(b, t):
+            big_M = self.max_power  # Use max_power as the scaling factor
+            if self.availability_profile == "no":
+                return (
+                    b.power_in[t]
+                    <= b.operating_hours[t] * big_M * b.clinker_availability_profile[t]
+                )
+            elif self.availability_profile == "yes":
+                return (
+                    b.power_in[t]
+                    <= b.operating_hours[t]
+                    * big_M
+                    * model.clinker_availability_profile[t]
+                )
+
+        # Ramp-up constraint and ramp-down constraints
+        add_ramping_constraints(
+            model_block=model_block,
+            time_steps=self.time_steps,
+        )
+
+        # Define additional variables and constraints for startup/shutdown and operational status
+        if (
+            self.min_operating_steps > 1
+            or self.min_down_steps > 1
+            or self.max_power > 0
         ):
             add_min_up_down_time_constraints(
                 model_block=model_block,
@@ -1581,6 +1953,193 @@ class SeasonalHydrogenStorage(GenericStorage):
         return model_block
 
 
+class CCSSystem:
+    """
+    A class to represent the Carbon Capture and Storage (CCS) system in an energy system model.
+
+    This class models CO₂ capture, storage, and associated energy requirements and operational constraints.
+
+    Args:
+        capture_efficiency (float): Fraction of CO₂ emissions captured (0 <= efficiency <= 1).
+        energy_consumption_per_CO2 (float): Energy required to capture CO₂ (MWh/t CO₂).
+        storage_capacity (float): Maximum storage tank capacity for CO₂ (t CO₂).
+        max_processing_rate (float): Maximum rate of CO₂ processing (t CO₂/h).
+        max_operating_hours (int): Maximum operating hours per day.
+        time_steps (list[int]): A list of time steps over which the system operates.
+        ramp_up (float | None): Maximum allowed increase in CO₂ capture per time step.
+        ramp_down (float | None): Maximum allowed decrease in CO₂ capture per time step.
+        min_operating_steps (int, optional): Minimum consecutive operating steps required.
+        min_down_steps (int, optional): Minimum consecutive downtime steps required.
+    """
+
+    def __init__(
+        self,
+        min_power,
+        max_power,
+        efficiency,
+        specific_electricity_consumption,
+        max_capacity,
+        max_processing_rate,
+        max_operating_hours,
+        time_steps,
+        ramp_up=None,
+        ramp_down=None,
+        min_operating_steps=0,
+        min_down_steps=0,
+    ):
+        self.max_power = max_power
+        self.min_power = min_power
+        self.efficiency = efficiency
+        self.specific_electricity_consumption = specific_electricity_consumption
+        self.max_capacity = max_capacity
+        self.max_processing_rate = max_processing_rate
+        self.max_operating_hours = max_operating_hours
+
+        self.time_steps = time_steps
+        self.ramp_up = ramp_up if ramp_up is not None else max_power
+        self.ramp_down = ramp_down if ramp_down is not None else max_power
+        self.min_operating_steps = min_operating_steps
+        self.min_down_steps = min_down_steps
+
+    def add_to_model(self, model, model_block):
+        # Define parameters
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.capture_efficiency = pyo.Param(initialize=self.efficiency)
+        model_block.specific_electricity_consumption = pyo.Param(
+            initialize=self.specific_electricity_consumption
+        )
+        model_block.max_capacity = pyo.Param(initialize=self.max_capacity)
+        model_block.operating_cost = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.max_processing_rate = pyo.Param(initialize=self.max_processing_rate)
+        model_block.max_operating_hours = pyo.Param(initialize=self.max_operating_hours)
+
+        # Define variables
+        model_block.gross_emission = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.CO2_captured = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.CO2_bypass = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.CO2_storage = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, self.max_capacity),
+        )
+        model_block.power_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.processing_time = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.operating_hours = pyo.Var(self.time_steps, within=pyo.Binary)
+
+        # Constraints
+        @model_block.Constraint(self.time_steps)
+        def CO2_capture_constraint(b, t):
+            """
+            Split emissions into captured and bypassed CO₂ based on capture efficiency.
+            """
+            return b.CO2_captured[t] == b.gross_emission[t] * b.capture_efficiency
+
+        @model_block.Constraint(self.time_steps)
+        def CO2_bypass_constraint(b, t):
+            """
+            Define CO₂ bypass as the remaining uncaptured emissions.
+            """
+            return b.CO2_bypass[t] == b.gross_emission[t] * (1 - b.capture_efficiency)
+
+        @model_block.Constraint(self.time_steps)
+        def energy_consumption_constraint(b, t):
+            """
+            Calculate energy required for CO₂ capture based on captured quantity.
+            """
+            return (
+                b.power_in[t] == b.CO2_captured[t] * b.specific_electricity_consumption
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def storage_tank_balance_constraint(b, t):
+            """
+            Balance the CO₂ storage tank based on captured emissions and processing capacity.
+            """
+            if t == 0:
+                return (
+                    b.CO2_storage[t]
+                    == b.CO2_captured[t] - b.processing_time[t] * b.max_processing_rate
+                )
+            else:
+                return (
+                    b.CO2_storage[t]
+                    == b.CO2_storage[t - 1]
+                    + b.CO2_captured[t]
+                    - b.processing_time[t] * b.max_processing_rate
+                )
+
+        @model_block.Constraint(self.time_steps)
+        def tank_capacity_constraint(b, t):
+            """
+            Ensure CO₂ storage does not exceed maximum capacity.
+            """
+            return b.CO2_storage[t] <= b.max_capacity
+
+        @model_block.Constraint(self.time_steps)
+        def processing_time_constraint(b, t):
+            """
+            Define minimum processing time based on CO₂ storage and processing rate.
+            """
+            return b.processing_time[t] >= b.CO2_storage[t] / b.max_processing_rate
+
+        @model_block.Constraint(self.time_steps)
+        def operation_hours_binding_constraint(b, t):
+            """
+            Limit CO₂ capture operation based on binary operating hours variable.
+            """
+            big_M = self.max_capacity
+            return b.CO2_captured[t] <= b.operating_hours[t] * big_M
+
+        @model_block.Constraint(range(len(self.time_steps) // 24))
+        def daily_max_operating_hours_constraint(b, d):
+            """
+            Enforce maximum daily operating hours.
+            """
+            time_indices = [idx for idx in self.time_steps if idx // 24 == d]
+            return (
+                sum(b.operating_hours[idx] for idx in time_indices)
+                <= b.max_operating_hours
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_ccs_constraint(b, t):
+            return (
+                b.operating_cost[t]
+                == b.power_in[t] * model.electricity_price[t]
+                + b.CO2_bypass[t] * model.co2_price[t]
+            )
+
+        # Ramp-up constraint and ramp-down constraints
+        add_ramping_constraints(
+            model_block=model_block,
+            time_steps=self.time_steps,
+        )
+
+        # Define additional variables and constraints for startup/shutdown and operational status
+        if (
+            self.min_operating_steps > 1
+            or self.min_down_steps > 1
+            or self.max_power > 0
+        ):
+            add_min_up_down_time_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+            )
+
+        return model_block
+
+
 class DRIStorage(GenericStorage):
     """
     A class to represent a Direct Reduced Iron (DRI) storage unit in an energy system model.
@@ -1670,6 +2229,12 @@ demand_side_technologies: dict = {
     "electric_vehicle": ElectricVehicle,
     "generic_storage": GenericStorage,
     "pv_plant": PVPlant,
+    "raw_material_mill": GrindingMill,
+    "cement_mill": GrindingMill,
+    "clinker_system": ClinkerSystem,
+    "ccs_system": CCSSystem,
+    "clinker_inventory": GenericStorage,
+    "cement_inventory": GenericStorage,
 }
 
 
