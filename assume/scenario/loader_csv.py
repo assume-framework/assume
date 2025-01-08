@@ -100,6 +100,10 @@ def load_file(
                 return None
 
             if df.index.freq < index.freq:
+                logger.warning(
+                    f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
+                    "Resampling using mean(). Make sure this is what you want and your data is in units of power."
+                )
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")
 
@@ -454,6 +458,7 @@ def load_config_and_create_forecaster(
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
+    exchanges_units = load_file(path=path, config=config, file_name="exchanges_units")
 
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
@@ -475,8 +480,8 @@ def load_config_and_create_forecaster(
     demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
     if demand_df is None:
         raise ValueError("No demand time series was provided!")
-    cross_border_flows_df = load_file(
-        path=path, config=config, file_name="cross_border_flows", index=index
+    exchanges_df = load_file(
+        path=path, config=config, file_name="exchanges_df", index=index
     )
     availability = load_file(
         path=path, config=config, file_name="availability_df", index=index
@@ -514,7 +519,7 @@ def load_config_and_create_forecaster(
 
     forecaster.set_forecast(forecasts_df)
     forecaster.set_forecast(demand_df)
-    forecaster.set_forecast(cross_border_flows_df)
+    forecaster.set_forecast(exchanges_df)
     forecaster.set_forecast(availability, prefix="availability_")
     forecaster.set_forecast(electricity_prices_df)
     forecaster.set_forecast(price_forecast_df, "price_")
@@ -533,6 +538,7 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
+        "exchanges_units": exchanges_units,
         "dsm_units": dsm_units,
         "forecaster": forecaster,
     }
@@ -575,6 +581,7 @@ def setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
+    exchanges_units = scenario_data["exchanges_units"]
     dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
@@ -687,6 +694,13 @@ def setup_world(
         learning_mode=learning_config["learning_mode"],
     )
 
+    exchanges_plants = read_units(
+        units_df=exchanges_units,
+        unit_type="exchanges",
+        forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
+    )
+
     if dsm_units is not None:
         for unit_type, units_df in dsm_units.items():
             dsm_units = read_units(
@@ -704,6 +718,8 @@ def setup_world(
     for op, op_units in str_plants.items():
         units[op].extend(op_units)
     for op, op_units in dem_plants.items():
+        units[op].extend(op_units)
+    for op, op_units in exchanges_plants.items():
         units[op].extend(op_units)
 
     # if distributed_role is true - there is a manager available
