@@ -5,7 +5,7 @@
 import copy
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import dateutil.rrule as rr
@@ -364,6 +364,7 @@ def read_units(
     unit_type: str,
     forecaster: Forecaster,
     world_bidding_strategies: dict[str, BaseStrategy],
+    learning_mode: bool = False,
 ) -> dict[str, list[dict]]:
     """
     Read units from a dataframe and only add them to a dictionary.
@@ -374,6 +375,7 @@ def read_units(
         unit_type (str): The type of the unit.
         forecaster (Forecaster): The forecaster used for adding the units.
         world_bidding_strategies (dict[str, BaseStrategy]): The strategies available in the world
+        learning_mode (bool, optional): Whether the world is in learning mode. Defaults to False.
     """
     if units_df is None:
         return {}
@@ -389,11 +391,17 @@ def read_units(
             if key.startswith("bidding_") and unit_params[key]
         }
         unit_params["bidding_strategies"] = bidding_strategies
-        operator_id = adjust_unit_operator_for_learning(
-            bidding_strategies,
-            world_bidding_strategies,
-            unit_params["unit_operator"],
-        )
+
+        # adjust the unit operator to Operator-RL if learning mode is enabled
+        if learning_mode:
+            operator_id = adjust_unit_operator_for_learning(
+                bidding_strategies,
+                world_bidding_strategies,
+                unit_params["unit_operator"],
+            )
+        else:
+            operator_id = unit_params["unit_operator"]
+
         del unit_params["unit_operator"]
         units_dict[operator_id].append(
             dict(
@@ -439,7 +447,7 @@ def load_config_and_create_forecaster(
 
     index = pd.date_range(
         start=start,
-        end=end + timedelta(days=1),
+        end=end,
         freq=config["time_step"],
     )
 
@@ -536,8 +544,8 @@ def setup_world(
     study_case: str,
     perform_evaluation: bool = False,
     terminate_learning: bool = False,
-    episode: int = 0,
-    eval_episode: int = 0,
+    episode: int = 1,
+    eval_episode: int = 1,
 ) -> None:
     """
     Load a scenario from a given path.
@@ -550,8 +558,8 @@ def setup_world(
         study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
-        episode (int, optional): The episode number for learning. Defaults to 0.
-        eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
+        episode (int, optional): The episode number for learning. Defaults to 1.
+        eval_episode (int, optional): The episode number for evaluation. Defaults to 1.
 
     Raises:
         ValueError: If the specified scenario or study case is not found in the provided inputs.
@@ -660,6 +668,7 @@ def setup_world(
         unit_type="power_plant",
         forecaster=forecaster,
         world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_config["learning_mode"],
     )
 
     str_plants = read_units(
@@ -667,6 +676,7 @@ def setup_world(
         unit_type="storage",
         forecaster=forecaster,
         world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_config["learning_mode"],
     )
 
     dem_plants = read_units(
@@ -674,6 +684,7 @@ def setup_world(
         unit_type="demand",
         forecaster=forecaster,
         world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_config["learning_mode"],
     )
 
     if dsm_units is not None:
@@ -683,6 +694,7 @@ def setup_world(
                 unit_type=unit_type,
                 forecaster=forecaster,
                 world_bidding_strategies=world.bidding_strategies,
+                learning_mode=learning_config["learning_mode"],
             )
         for op, op_units in dsm_units.items():
             units[op].extend(op_units)
@@ -726,10 +738,6 @@ def load_scenario_folder(
     inputs_path: str,
     scenario: str,
     study_case: str,
-    perform_evaluation: bool = False,
-    terminate_learning: bool = False,
-    episode: int = 1,
-    eval_episode: int = 1,
 ):
     """
     Load a scenario from a given path.
@@ -741,29 +749,12 @@ def load_scenario_folder(
         inputs_path (str): The path to the folder containing input files necessary for the scenario.
         scenario (str): The name of the scenario to be loaded.
         study_case (str): The specific study case within the scenario to be loaded.
-        perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
-        terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
-        episode (int, optional): The episode number for learning. Defaults to 0.
-        eval_episode (int, optional): The episode number for evaluation. Defaults to 0.
 
     Raises:
         ValueError: If the specified scenario or study case is not found in the provided inputs.
 
-    Example:
-        >>> load_scenario_folder(
-            world=world,
-            inputs_path="/path/to/inputs",
-            scenario="scenario_name",
-            study_case="study_case_name",
-            perform_evaluation=False,
-            episode=1,
-            eval_episode=1,
-            trained_policies_save_path="",
-        )
-
     Notes:
         - The function sets up the world environment based on the provided inputs and configuration files.
-        - If `perform_evaluation` is set to True, the function performs evaluation using the specified evaluation episode number.
         - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
         - After calling this function, the world environment is prepared for further simulation and analysis.
 
@@ -776,10 +767,6 @@ def load_scenario_folder(
         world=world,
         scenario_data=scenario_data,
         study_case=study_case,
-        perform_evaluation=perform_evaluation,
-        terminate_learning=terminate_learning,
-        episode=episode,
-        eval_episode=eval_episode,
     )
 
 
@@ -878,7 +865,6 @@ def run_learning(
     # initialize policies already here to set the obs_dim and act_dim in the learning role
     actors_and_critics = None
     world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
-    world.output_role.delete_similar_runs()
 
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
@@ -928,14 +914,12 @@ def run_learning(
         range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
     ):
-        # TODO normally, loading twice should not create issues, somehow a scheduling issue is raised currently
-        if episode != 1:
-            setup_world(
-                world=world,
-                scenario_data=scenario_data,
-                study_case=study_case,
-                episode=episode,
-            )
+        setup_world(
+            world=world,
+            scenario_data=scenario_data,
+            study_case=study_case,
+            episode=episode,
+        )
 
         # -----------------------------------------
         # Give the newly initialized learning role the needed information across episodes
@@ -993,13 +977,12 @@ def run_learning(
 
         world.reset()
 
-        # if at end of simulation save last policies
-        if episode == (world.learning_role.training_episodes):
-            world.learning_role.rl_algorithm.save_params(
-                directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
-            )
+    # save the last policies at the end of the training
+    world.learning_role.rl_algorithm.save_params(
+        directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
+    )
 
-        # container shutdown implicitly with new initialisation
+    # container shutdown implicitly with new initialisation
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
     world.export_csv_path = temp_csv_path

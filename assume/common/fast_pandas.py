@@ -311,6 +311,9 @@ class FastSeries:
         self._index = index
         self._name = name
 
+        if isinstance(value, pd.Series) and is_datetime64_any_dtype(value.index):
+            value = value[self.start : self.end]
+
         count = len(self.index)  # Use index length directly
         self._data = (
             np.full(count, value, dtype=np.float64)
@@ -720,27 +723,29 @@ class FastSeries:
         Returns:
             str: String representation of the FastSeries.
         """
+        repr_string = f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, freq='{self.freq}', dtype={self.dtype})\n\nData Preview:\n"
         if len(self) == 0:
-            return f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, freq='{self.freq}', dtype={self.dtype})\n\nData Preview:\n[Empty Series]"
+            return repr_string + "[Empty Series]"
 
-        data_preview = np.concatenate(
-            (self.data[:preview_length], self.data[-preview_length:])
-        )
-        dates_preview = (
-            self.index.get_date_list()[:preview_length]
-            + self.index.get_date_list()[-preview_length:]
-        )
+        if len(self.index.get_date_list()) <= 2 * preview_length:
+            preview_str = "\n".join(
+                f"{date}: {value}"
+                for date, value in zip(self.index.get_date_list(), self.data)
+            )
+        else:
+            first_dates = self.index.get_date_list()[:preview_length]
+            last_dates = self.index.get_date_list()[-preview_length:]
+            first_str = "\n".join(
+                f"{date}: {value}"
+                for date, value in zip(first_dates, self.data[:preview_length])
+            )
+            last_str = "\n".join(
+                f"{date}: {value}"
+                for date, value in zip(last_dates, self.data[-preview_length:])
+            )
+            preview_str = first_str + "\n...\n" + last_str
 
-        preview_str = "\n".join(
-            f"{date}: {value}" for date, value in zip(dates_preview, data_preview)
-        )
-
-        metadata = (
-            f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, "
-            f"freq='{self.freq}', dtype={self.dtype})"
-        )
-
-        return f"{metadata}\n\nData Preview:\n{preview_str}\n{'...' if len(self) > 2 * preview_length else ''}"
+        return f"{repr_string}{preview_str}"
 
     def __str__(self) -> str:
         """

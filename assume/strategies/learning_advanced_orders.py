@@ -255,6 +255,13 @@ class RLAdvancedOrderStrategy(RLStrategy):
             The scaling factors are defined by the maximum residual load, the maximum bid price
             and the maximum capacity of the unit.
         """
+
+        # check if scaled observations are already available and if not prepare them
+        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
+            self, "scaled_prices_obs"
+        ):
+            self.prepare_observations(unit, market_id)
+
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - unit.index.freq
 
@@ -264,64 +271,52 @@ class RLAdvancedOrderStrategy(RLStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
-        scaling_factor_res_load = self.max_demand
-
-        # price forecast
-        scaling_factor_price = self.max_bid_price
-
-        # total capacity and marginal cost
-        scaling_factor_total_capacity = unit.max_power
-
-        # marginal cost
-        # Obs[2*foresight+1:2*foresight+2]
-        scaling_factor_marginal_cost = self.max_bid_price
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
-        product_len = (end - start) / unit.index.freq
-        if (
-            end_excl + forecast_len
-            > unit.forecaster[f"residual_load_{market_id}"].index[-1]
-        ):
-            scaled_res_load_forecast = (
-                unit.forecaster[f"residual_load_{market_id}"][
-                    -int(product_len + self.foresight - 1) :
+        if end_excl + forecast_len > self.scaled_res_load_obs.index[-1]:
+            scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
+
+            scaled_res_load_forecast = np.concatenate(
+                [
+                    scaled_res_load_forecast,
+                    self.scaled_res_load_obs.iloc[
+                        : self.foresight - len(scaled_res_load_forecast)
+                    ],
                 ]
-                / scaling_factor_res_load
             )
 
         else:
-            scaled_res_load_forecast = (
-                unit.forecaster[f"residual_load_{market_id}"].loc[
-                    start : end_excl + forecast_len
-                ]
-                / scaling_factor_res_load
-            )
+            scaled_res_load_forecast = self.scaled_res_load_obs.loc[
+                start : end_excl + forecast_len
+            ]
 
-        if end_excl + forecast_len > unit.forecaster[f"price_{market_id}"].index[-1]:
-            scaled_price_forecast = (
-                unit.forecaster[f"price_{market_id}"][
-                    -int(product_len + self.foresight - 1) :
+        if end_excl + forecast_len > self.scaled_prices_obs.index[-1]:
+            scaled_price_forecast = self.scaled_prices_obs.loc[start:]
+            scaled_price_forecast = np.concatenate(
+                [
+                    scaled_price_forecast,
+                    self.scaled_prices_obs.iloc[
+                        : self.foresight - len(scaled_price_forecast)
+                    ],
                 ]
-                / scaling_factor_price
             )
 
         else:
-            scaled_price_forecast = (
-                unit.forecaster[f"price_{market_id}"].loc[
-                    start : end_excl + forecast_len
-                ]
-                / scaling_factor_price
-            )
+            scaled_price_forecast = self.scaled_prices_obs.loc[
+                start : end_excl + forecast_len
+            ]
 
         # get last accepted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
-
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
         # scale unit outputs
-        scaled_max_power = current_volume / scaling_factor_total_capacity
-        scaled_marginal_cost = current_costs / scaling_factor_marginal_cost
+        # if unit is not running, total dispatch is 0
+        scaled_total_dispatch = current_volume / unit.max_power
+
+        # marginal cost
+        scaled_marginal_cost = current_costs / self.max_bid_price
 
         # calculate the time the unit has to continue to run or be down
         op_time = unit.get_operation_time(start)
@@ -339,7 +334,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
                 scaled_res_load_forecast,
                 scaled_price_forecast,
                 np.array(
-                    [scaled_must_run_time, scaled_max_power, scaled_marginal_cost]
+                    [scaled_must_run_time, scaled_total_dispatch, scaled_marginal_cost]
                 ),
             ]
         )

@@ -49,10 +49,17 @@ class MarketMechanism:
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
         self.marketconfig = marketconfig
+        # calculate last possible market opening as the difference between the market end
+        # and the length of the longest product plus the delivery time of the products
+        self.last_market_opening = marketconfig.opening_hours._until - max(
+            market_product.duration * market_product.count
+            + market_product.first_delivery
+            for market_product in marketconfig.market_products
+        )
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
-    ) -> tuple[Orderbook, Orderbook, list[dict]]:
+    ) -> tuple[Orderbook, Orderbook, list[dict], dict[tuple, float]]:
         """
         Clears the market.
 
@@ -263,7 +270,7 @@ class MarketRole(MarketMechanism, Role):
 
         # schedule the next opening too
         next_opening = self.marketconfig.opening_hours.after(market_open)
-        if next_opening:
+        if next_opening <= self.last_market_opening:
             next_opening_ts = datetime2timestamp(next_opening)
             self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
             logger.debug(
@@ -603,6 +610,12 @@ class MarketRole(MarketMechanism, Role):
         Args:
             market_products (list[MarketProduct]): The products to be traded.
         """
+        if not self.all_orders:
+            logger.warning(
+                f"[{self.context.current_timestamp}] The order book for market {self.marketconfig.market_id} with products {market_products} is empty. No orders were found."
+            )
+            return
+
         try:
             (accepted_orderbook, rejected_orderbook, market_meta, flows) = self.clear(
                 self.all_orders, market_products
@@ -663,12 +676,7 @@ class MarketRole(MarketMechanism, Role):
                 receiver_addr=agent,
             )
         # store order book in db agent
-        if not accepted_orderbook:
-            logger.warning(
-                f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.market_id} are empty!"
-            )
-        all_orders = accepted_orderbook + rejected_orderbook
-        await self.store_order_book(all_orders)
+        await self.store_order_book(accepted_orderbook + rejected_orderbook)
 
         for meta in market_meta:
             logger.debug(

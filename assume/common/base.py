@@ -522,7 +522,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The SoC before the given datetime.
         """
-        if dt - self.index.freq <= self.index[0]:
+        if dt - self.index.freq < self.index[0]:
             return self.initial_soc
         else:
             return self.outputs["soc"].at[dt - self.index.freq]
