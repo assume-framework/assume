@@ -47,7 +47,7 @@ Attributes
 
 - **Technology**: Represents components such as Electrolyser, DRI Plant, Hydrogen Storage, and Electric Arc Furnace.
 - **Node**: Connection point in the energy system.
-- **Bidding Strategy**: Defines how the steel plant bids in electricity markets. Example: `NaiveDASteelplantStrategy`.
+- **Bidding Strategy**: Defines how the steel plant bids in electricity markets. Example: `NaiveDADSMStrategy`.
 - **Objective**: Optimization target, such as minimizing operational costs.
 - **Flexibility Measure**: Load-shifting to optimize flexibility.
 
@@ -98,7 +98,7 @@ Strategies for Bidding
 
 Several naive bidding strategies are implemented for managing how agents participate in electricity markets. These strategies define how energy bids are created for different agent types.
 
-- **NaiveDASteelplantStrategy**: Optimizes steel plant operations and generates bids based on marginal costs.
+- **NaiveDADSMStrategy**: Optimizes steel plant operations and generates bids based on marginal costs.
 - **NaiveDABuildingStrategy**: Manages the bidding process for residential agents, calculating bids based on optimal energy use and load-shifting.
 - **Redispatch Strategies**: Adjust operations based on redispatch market signals, focusing on reducing operational costs or maximizing flexibility.
 
