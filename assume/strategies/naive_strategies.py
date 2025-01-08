@@ -155,8 +155,21 @@ class NaiveDADSMStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market.
+
+        Args:
+            unit (SupportsMinMax): The unit to be dispatched.
+            market_config (MarketConfig): The market configuration.
+            product_tuples (list[Product]): The list of all products the unit can offer.
+
+        Returns:
+            Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
+        """
+
         # calculate the optimal operation of the unit
-        unit.calculate_optimal_operation_if_needed()
+        unit.determine_optimal_operation_without_flex()
 
         bids = []
         for product in product_tuples:
@@ -168,6 +181,7 @@ class NaiveDADSMStrategy(BaseStrategy):
 
             volume = unit.opt_power_requirement.at[start]
             marginal_price = unit.calculate_marginal_cost(start, volume)
+
             bids.append(
                 {
                     "start_time": start,

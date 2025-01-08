@@ -1670,6 +1670,7 @@ demand_side_technologies: dict = {
     "electric_vehicle": ElectricVehicle,
     "generic_storage": GenericStorage,
     "pv_plant": PVPlant,
+    "thermal_storage": GenericStorage,
 }
 
 

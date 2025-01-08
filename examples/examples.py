@@ -63,6 +63,10 @@ available_examples = {
     },
     # example_01f is used in the tutorial notebook #5: Market configuration comparison example
     # example_01g is used in the tutorial notebook #6: Advanced order types example
+    "small_household": {
+        "scenario": "example_01h",
+        "study_case": "eom",
+    },
     #
     # DRL references case for learning advancement testing
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
@@ -91,6 +95,10 @@ available_examples = {
     },
     "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
+    "experiment": {
+        "scenario": "experiment",
+        "study_case": "eom",
+    },
 }
 
 
@@ -105,9 +113,7 @@ if __name__ == "__main__":
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
     data_format = "local_db"  # "local_db" or "timescale"
-
-    # select the example to run from the available examples above
-    example = "small"
+    example = "experiment"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
