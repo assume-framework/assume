@@ -501,6 +501,9 @@ class World:
         bidding_strategies = {}
         strategy_instances = {}  # Cache to store created instances
 
+        # Extract bidding parameters outside the loop
+        bidding_params = unit_params.get("bidding_params", self.bidding_params)
+
         for market_id, strategy in unit_params["bidding_strategies"].items():
             if not strategy:
                 continue
@@ -513,7 +516,6 @@ class World:
 
             if strategy not in strategy_instances:
                 # Create and cache the strategy instance if not already created
-                bidding_params = unit_params.get("bidding_params", self.bidding_params)
                 strategy_instances[strategy] = self.bidding_strategies[strategy](
                     unit_id=unit_id,
                     **bidding_params,
