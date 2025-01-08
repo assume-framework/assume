@@ -20,6 +20,9 @@ Upcoming Release
 - **Allow multi-market bidding strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
   the strategy is only created once and the same instance is used for all of these markets.
 
+**Bugfixes:**
+- **Learning Strategy with Different Simulation Time Steps**: Fixed an issue where the learning strategies were failing with simulation time steps other than one hour, such as 15 or 30 minutes.
+
 
 v0.5.0 - (10th December 2024)
 ===========================================
