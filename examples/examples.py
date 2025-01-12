@@ -95,7 +95,8 @@ available_examples = {
     # paper risk examples
     "paper_risk_O45Strom": {"scenario": "example_06a", "study_case": "base"},
     "paper_risk_O45H2": {"scenario": "example_06b", "study_case": "base"},
-    "test_steel": {"scenario": "experiment", "study_case": "test_steel"},
+    "experiment": {"scenario": "experiment", "study_case": "test_steel"},
+    "steel_plant": {"scenario": "optimisation", "study_case": "base"},
 }
 
 
@@ -112,7 +113,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "test_steel"
+    example = "steel_plant"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

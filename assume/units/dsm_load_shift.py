@@ -17,7 +17,7 @@ from pyomo.opt import (
 from assume.common.fast_pandas import FastSeries
 from assume.units.dst_components import demand_side_technologies
 
-SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["gurobi", "cplex"]  # ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
@@ -365,6 +365,7 @@ class DSMFlex:
         """
         # create an instance of the model
         instance = self.model.create_instance()
+        print("Optimisation Started!")
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
         if switch_flex_off:
             instance = self.switch_to_opt(instance)
@@ -539,7 +540,7 @@ class DSMFlex:
             plt.legend()
 
         plt.tight_layout()
-        # plt.show()
+        plt.show()
 
     def determine_optimal_operation_with_flex(self):
         """
