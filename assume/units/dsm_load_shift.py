@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -557,6 +558,38 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
+        # Extract time series data for variable cost and total power input
+        time_steps = list(instance.time_steps)
+        variable_cost_series = [
+            pyo.value(instance.variable_cost[t]) for t in time_steps
+        ]
+        total_power_input_series = [
+            pyo.value(instance.total_power_input[t]) for t in time_steps
+        ]
+
+        # Save time series data to attributes
+        self.opt_power_requirement = FastSeries(
+            index=self.index, value=total_power_input_series
+        )
+        self.variable_cost_series = FastSeries(
+            index=self.index, value=variable_cost_series
+        )
+
+        # Save to Excel
+        data = {
+            "Time Step": time_steps,
+            "Variable Cost": variable_cost_series,
+            "Total Power Input": total_power_input_series,
+        }
+        df = pd.DataFrame(data)
+        df.to_excel("./examples/outputs/opt_power_requirement.xlsx", index=False)
+        logger.debug(
+            f"Time series data saved to {"./examples/outputs/opt_power_requirement.xlsx"}"
+        )
+
+        # Calculate total cost
+        self.total_cost = sum(variable_cost_series)
+
         # Extract power input for raw material mill, clinker system, and cement mill
 
         electrolyser_power_in = (
@@ -691,9 +724,9 @@ class DSMFlex:
                 label="State of Charge (SOC)",
                 color="blue",
             )
-            plt.title("Hydrogen Buffer Storage")
+            plt.title("Clinker Buffer Storage")
             plt.xlabel("Time Steps")
-            plt.ylabel("Hydrogen (units)")
+            plt.ylabel("Clinker buffer (units)")
             plt.legend()
 
         # if ccs_system_power_in:
