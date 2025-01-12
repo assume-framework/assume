@@ -853,6 +853,7 @@ class DRIPlant:
         ramp_down: float | None = None,
         min_operating_steps: int = 0,
         min_down_steps: int = 0,
+        max_operating_hours: int = 0,
         initial_operational_status: int = 1,
         natural_gas_co2_factor: float = 0.5,
         **kwargs,
@@ -873,6 +874,7 @@ class DRIPlant:
         self.ramp_down = max_power if ramp_down is None else ramp_down
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
+        self.max_operating_hours = max_operating_hours
         self.initial_operational_status = initial_operational_status
         self.kwargs = kwargs
 
@@ -964,6 +966,7 @@ class DRIPlant:
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
         model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.max_operating_hours = pyo.Param(initialize=self.max_operating_hours)
         model_block.initial_operational_status = pyo.Param(
             initialize=self.initial_operational_status
         )
@@ -981,6 +984,7 @@ class DRIPlant:
         model_block.co2_emission = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.dri_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.operating_hours = pyo.Var(self.time_steps, within=pyo.Binary)
         model_block.operating_cost = pyo.Var(
             self.time_steps, within=pyo.NonNegativeReals
         )
@@ -1050,6 +1054,47 @@ class DRIPlant:
 
             return b.operating_cost[t] == operating_cost
 
+        @model_block.Constraint(range(len(self.time_steps) // 24))
+        def daily_max_operating_hours_constraint(b, d):
+            time_indices = [idx for idx in self.time_steps if idx // 24 == d]
+            return (
+                sum(b.operating_hours[idx] for idx in time_indices)
+                <= b.max_operating_hours
+            )
+
+        # @model_block.Constraint(range(len(self.time_steps) // 24))
+        # def daily_max_energy_constraint(b, d):
+        #     """
+        #     Limits the total energy usage over a 24-hour period.
+        #     """
+        #     time_indices = [idx for idx in self.time_steps if idx // 24 == d]
+        #     return (
+        #         sum(b.power_in[idx] for idx in time_indices)
+        #         <= b.max_operating_hours * self.max_power
+        #     )
+
+        # @model_block.Constraint(self.time_steps)
+        # def operation_hours_binding_constraint(b, t):
+        #     big_M = self.max_power  # Use max_power as the scaling factor
+        #     return (
+        #         b.power_in[t]
+        #         <= b.operating_hours[t] * big_M
+        #     )
+
+        @model_block.Constraint(self.time_steps)
+        def operation_hours_binding_constraint(b, t):
+            """
+            Enforces power consumption behavior based on operating hours:
+            - When operating_hours[t] == 1: power_in[t] between min_power and max_power.
+            - When operating_hours[t] == 0: power_in[t] is fixed at min_power.
+            """
+
+            return (
+                b.power_in[t]
+                >= b.operating_hours[t] * b.min_power
+                + (1 - b.operating_hours[t]) * b.min_power
+            )
+
         # Ramp-up constraint and ramp-down constraints
         add_ramping_constraints(
             model_block=model_block,
@@ -1105,6 +1150,7 @@ class ElectricArcFurnace:
         ramp_down: float | None = None,
         min_operating_steps: int = 0,
         min_down_steps: int = 0,
+        max_operating_hours: int = 0,
         initial_operational_status: int = 1,
         **kwargs,
     ):
@@ -1121,6 +1167,7 @@ class ElectricArcFurnace:
         self.ramp_down = max_power if ramp_down is None else ramp_down
         self.min_operating_steps = min_operating_steps
         self.min_down_steps = min_down_steps
+        self.max_operating_hours = max_operating_hours
         self.initial_operational_status = initial_operational_status
         self.kwargs = kwargs
 
@@ -1192,6 +1239,7 @@ class ElectricArcFurnace:
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
         model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.max_operating_hours = pyo.Param(initialize=self.max_operating_hours)
         model_block.initial_operational_status = pyo.Param(
             initialize=self.initial_operational_status
         )
@@ -1202,6 +1250,7 @@ class ElectricArcFurnace:
             within=pyo.NonNegativeReals,
             bounds=(0, model_block.max_power),
         )
+        model_block.operating_hours = pyo.Var(self.time_steps, within=pyo.Binary)
         model_block.dri_input = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.steel_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operating_cost = pyo.Var(
@@ -1241,6 +1290,19 @@ class ElectricArcFurnace:
                 + b.co2_emission[t] * model.co2_price[t]
                 + b.lime_demand[t] * model.lime_price[t]
             )
+
+        @model_block.Constraint(range(len(self.time_steps) // 24))
+        def daily_max_operating_hours_constraint(b, d):
+            time_indices = [idx for idx in self.time_steps if idx // 24 == d]
+            return (
+                sum(b.operating_hours[idx] for idx in time_indices)
+                <= b.max_operating_hours
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def operation_hours_binding_constraint(b, t):
+            big_M = self.max_power  # Use max_power as the scaling factor
+            return b.power_in[t] <= b.operating_hours[t] * big_M
 
         # Ramp-up constraint and ramp-down constraints
         add_ramping_constraints(

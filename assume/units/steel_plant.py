@@ -6,10 +6,6 @@ import logging
 from datetime import datetime
 
 import pyomo.environ as pyo
-from pyomo.opt import (
-    SolverFactory,
-    check_available_solvers,
-)
 
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import Forecaster
@@ -36,11 +32,12 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         location (tuple[float, float]): The location of the unit.
         components (dict[str, dict]): The components of the unit such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace.
         objective (str): The objective of the unit, e.g. minimize variable cost ("min_variable_cost").
-        flexibility_measure (str): The flexibility measure of the unit, e.g. maximum load shift ("max_load_shift").
+        flexibility_measure (str): The flexibility measure of the unit, e.g. maximum load shift ("cost_based_load_shift").
         demand (float): The demand of the unit - the amount of steel to be produced.
         cost_tolerance (float): The cost tolerance of the unit - the maximum cost that can be tolerated when shifting the load.
     """
 
+    # Compatible Technologies
     required_technologies = ["dri_plant", "eaf"]
     optional_technologies = ["electrolyser", "hydrogen_buffer_storage", "dri_storage"]
 
@@ -55,9 +52,11 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         location: tuple[float, float] = (0.0, 0.0),
         components: dict[str, dict] = None,
         objective: str = None,
-        flexibility_measure: str = "max_load_shift",
+        flexibility_measure: str = "",
         demand: float = 0,
         cost_tolerance: float = 10,
+        congestion_threshold: float = 0,
+        peak_load_cap: float = 0,
         **kwargs,
     ):
         super().__init__(
@@ -98,14 +97,25 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.lime_price = self.forecaster.get_price("lime")
         self.co2_price = self.forecaster.get_price("co2")
 
+        # Calculate congestion forecast and set it as a forecast column in the forecaster
+        self.congestion_signal = self.forecaster[f"{node}_congestion_severity"]
+        self.renewable_utilisation_signal = self.forecaster[
+            f"{node}_renewable_utilisation"
+        ]
+
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
+        self.congestion_threshold = congestion_threshold
+        self.peak_load_cap = peak_load_cap
 
         # Check for the presence of components
         self.has_h2storage = "hydrogen_buffer_storage" in self.components.keys()
         self.has_dristorage = "dri_storage" in self.components.keys()
         self.has_electrolyser = "electrolyser" in self.components.keys()
+
+        self.opt_power_requirement = None
+        self.flex_power_requirement = None
 
         # Main Model part
         self.model = pyo.ConcreteModel()
@@ -119,25 +129,15 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.define_constraints()
         self.define_objective_opt()
 
-        if self.flexibility_measure == "max_load_shift":
-            self.flexibility_cost_tolerance(self.model)
+        self.determine_optimal_operation_without_flex(switch_flex_off=False)
+
+        # Apply the flexibility function based on flexibility measure
+        if self.flexibility_measure in DSMFlex.flexibility_map:
+            DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
+        else:
+            raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
+
         self.define_objective_flex()
-
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
-
-        self.solver = SolverFactory(solvers[0])
-        self.solver_options = {
-            "output_flag": False,
-            "log_to_console": False,
-            "LogToConsole": 0,
-        }
-
-        self.opt_power_requirement = None
-        self.flex_power_requirement = None
-
-        self.variable_cost_series = None
 
     def define_sets(self) -> None:
         """
@@ -270,16 +270,16 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                     == self.model.dsm_blocks["eaf"].dri_input[t]
                 )
 
-        # Constraint for material flow from dri plant to Electric Arc Furnace
-        @self.model.Constraint(self.model.time_steps)
-        def shaft_to_arc_furnace_material_flow_constraint(m, t):
-            """
-            Ensures the material flow from the DRI plant to the Electric Arc Furnace.
-            """
-            return (
-                self.model.dsm_blocks["dri_plant"].dri_output[t]
-                == self.model.dsm_blocks["eaf"].dri_input[t]
-            )
+        # # Constraint for material flow from dri plant to Electric Arc Furnace
+        # @self.model.Constraint(self.model.time_steps)
+        # def shaft_to_arc_furnace_material_flow_constraint(m, t):
+        #     """
+        #     Ensures the material flow from the DRI plant to the Electric Arc Furnace.
+        #     """
+        #     return (
+        #         self.model.dsm_blocks["dri_plant"].dri_output[t]
+        #         == self.model.dsm_blocks["eaf"].dri_input[t]
+        #     )
 
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
@@ -311,7 +311,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             )
             if self.has_electrolyser:
                 power_input += self.model.dsm_blocks["electrolyser"].power_in[t]
-            return m.total_power_input[t] == power_input
+            return self.model.total_power_input[t] == power_input
 
         # Constraint for variable cost per time step
         @self.model.Constraint(self.model.time_steps)
@@ -359,31 +359,62 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         Args:
             model (pyomo.ConcreteModel): The Pyomo model.
         """
-        if self.flexibility_measure == "max_load_shift":
+        if self.flexibility_measure == "cost_based_load_shift":
 
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule_flex(m):
                 """
                 Maximizes the load shift over all time steps.
                 """
-                maximise_load_shift = sum(
-                    m.load_shift[t] for t in self.model.time_steps
+
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_pos[t] for t in m.time_steps
                 )
+
                 return maximise_load_shift
+
+        elif self.flexibility_measure == "congestion_management_flexibility":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * m.congestion_indicator[t]
+                    for t in m.time_steps
+                )
+
+                return maximise_load_shift
+
+        elif self.flexibility_measure == "peak_load_shifting":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
+                )
+
+                return maximise_load_shift
+
+        elif self.flexibility_measure == "renewable_utilisation":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load increase over all time steps based on renewable surplus.
+                """
+                maximise_renewable_utilisation = pyo.quicksum(
+                    m.load_shift_pos[t] * m.renewable_signal[t] for t in m.time_steps
+                )
+
+                return maximise_renewable_utilisation
 
         else:
             raise ValueError(f"Unknown objective: {self.flexibility_measure}")
-
-    def calculate_optimal_operation_if_needed(self):
-        if (
-            self.opt_power_requirement is not None
-            and self.flex_power_requirement is None
-            and self.flexibility_measure == "max_load_shift"
-        ):
-            self.determine_optimal_operation_with_flex()
-
-        if self.opt_power_requirement is None and self.objective == "min_variable_cost":
-            self.determine_optimal_operation_without_flex()
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """

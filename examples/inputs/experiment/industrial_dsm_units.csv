@@ -1,8 +1,5 @@
-name,unit_type,technology,node,bidding_EOM,unit_operator,objective,flexibility_measure,cost_tolerance,demand,fuel_type,max_power,min_power,ramp_up,ramp_down,min_operating_steps,min_down_steps,efficiency,specific_thermal_consumption,specific_electricity_consumption,clinker_to_cement_ratio,limestone_to_clinker_ratio,specific_hydrogen_consumption,specific_iron_ore_consumption,calcination_emission_factor,start_price,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_operating_hours,availability_profile,max_processing_rate
-A360,cement_plant,clinker_system,south,naive_da_dsm,dsm_operator,min_variable_cost,cost_based_load_shift,0,1000,hydrogen,50,0,50,50,0,0,,2,0.5,0.7,1.5,,,0.6,,,,,,,,,,24,no,
-A360,cement_plant,cement_mill,,,,,,,,,100,0,100,100,0,0,1,,1,,,,,,,,,,,,,,,24,no,
-A360,cement_plant,electrolyser,,,,,,,,,100,0,100,100,0,0,0.9,,,,,,,,,,,,,,,,,,,
-A360,cement_plant,ccs_system,,,,,,,,,100,0,100,100,0,0,0.9,,0.2,,,,,,,100,,,,,,,,24,,1
-A360,cement_plant,hydrogen_buffer_storage,,,,,,,,,,,100,100,,,,,,,,,,,,100,0,100,100,0,0,1,1,,,
-A360,cement_plant,clinker_inventory,,,,,,,,,,,1000,1000,,,,,,,,,,,,1000,0,1000,1000,0,0,1,1,,,
-A360,cement_plant,cement_inventory,,,,,,,,,,,1000,1000,,,,,,,,,,,,1000,0,1000,1000,0,0,1,1,,,
+name,unit_type,technology,node,bidding_EOM,unit_operator,objective,flexibility_measure,cost_tolerance,demand,fuel_type,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,lime_co2_factor,specific_dri_demand,specific_electricity_consumption,specific_natural_gas_consumption,specific_hydrogen_consumption,specific_iron_ore_consumption,specific_lime_demand,start_price,max_capacity,min_capacity,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_operating_hours
+A360,steel_plant,dri_plant,south,naive_da_dsm,dsm_operator_1,min_variable_cost,cost_based_load_shift,20,10000,hydrogen,100,30,100,100,0,0,,,,0.3,1.9,1.83,1.43,,,,,,,,,20
+A360,steel_plant,eaf,south,,dsm_operator_1,,,,,hydrogen,100,0,100,100,0,0,,1.2,1.09,0.44,,,,0.046,,,,,,,,24
+A360,steel_plant,dri_storage,south,,dsm_operator_1,,,,,,500,0,500,500,,,,,,,,,,,,500,0,0,0,1,1,
+A360,steel_plant,electrolyser,south,,dsm_operator_1,,,,,,500,0,500,500,0,0,1,,,,,,,,,,,,,,,

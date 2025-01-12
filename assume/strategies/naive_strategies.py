@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
@@ -156,7 +157,7 @@ class NaiveDADSMStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit
-        unit.calculate_optimal_operation_if_needed()
+        unit.determine_optimal_operation_without_flex()
 
         bids = []
         for product in product_tuples:

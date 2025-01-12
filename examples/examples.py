@@ -11,7 +11,7 @@ from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
-csv_path = "./examples/outputs"
+csv_path = ""  # ./examples/outputs
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -95,6 +95,7 @@ available_examples = {
     # paper risk examples
     "paper_risk_O45Strom": {"scenario": "example_06a", "study_case": "base"},
     "paper_risk_O45H2": {"scenario": "example_06b", "study_case": "base"},
+    "test_steel": {"scenario": "experiment", "study_case": "test_steel"},
 }
 
 
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "paper_risk_O45Strom"
+    example = "test_steel"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
