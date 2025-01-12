@@ -270,17 +270,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                     == self.model.dsm_blocks["eaf"].dri_input[t]
                 )
 
-        # # Constraint for material flow from dri plant to Electric Arc Furnace
-        # @self.model.Constraint(self.model.time_steps)
-        # def shaft_to_arc_furnace_material_flow_constraint(m, t):
-        #     """
-        #     Ensures the material flow from the DRI plant to the Electric Arc Furnace.
-        #     """
-        #     return (
-        #         self.model.dsm_blocks["dri_plant"].dri_output[t]
-        #         == self.model.dsm_blocks["eaf"].dri_input[t]
-        #     )
-
     def define_constraints(self):
         @self.model.Constraint(self.model.time_steps)
         def steel_output_association_constraint(m, t):

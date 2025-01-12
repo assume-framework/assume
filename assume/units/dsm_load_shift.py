@@ -539,7 +539,7 @@ class DSMFlex:
             plt.legend()
 
         plt.tight_layout()
-        plt.show()
+        # plt.show()
 
     def determine_optimal_operation_with_flex(self):
         """

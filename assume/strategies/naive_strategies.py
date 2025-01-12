@@ -158,6 +158,20 @@ class NaiveDADSMStrategy(BaseStrategy):
     ) -> Orderbook:
         # calculate the optimal operation of the unit
         unit.determine_optimal_operation_without_flex()
+        # Retrieve power requirements data
+        opt_power_requirement = unit.opt_power_requirement
+
+        # Convert FastSeries to Pandas Series
+        opt_power_requirement_pd = opt_power_requirement.as_pd_series(
+            name="Optimal Power Requirement"
+        )
+
+        # Save the Pandas Series to an Excel file
+        opt_power_requirement_pd.to_excel(
+            "./examples/outputs/opt_power_requirement.xlsx",
+            sheet_name="Power Requirement",
+        )
+        print("Finished extracting in the excel")
 
         bids = []
         for product in product_tuples:

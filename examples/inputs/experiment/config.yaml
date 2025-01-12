@@ -24,4 +24,3 @@ test_steel:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-
