@@ -28,7 +28,7 @@ nuts_config = os.getenv("NUTS_CONFIG", default_nuts_config).split(",")
 nuts_config = [n.strip() for n in nuts_config]
 nuts_config = "nuts3"
 year = 2023
-random = True
+random = False
 type = "random" if random else "static"
 if isinstance(nuts_config, str):
     study_case = f"{nuts_config}_{type}_{year}"
