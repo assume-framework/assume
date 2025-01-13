@@ -58,6 +58,8 @@ def load_oeds(
 
     if not nuts_config or nuts_config == "nuts3":
         nuts_config = list(infra_interface.plz_nuts["nuts3"].unique())
+    elif nuts_config == "nuts0":
+        nuts_config = ["DE"]
     elif nuts_config == "nuts1":
         nuts_config = list(infra_interface.plz_nuts["nuts1"].unique())
     elif nuts_config == "nuts2":
@@ -115,26 +117,26 @@ def load_oeds(
             ),
         )
 
-    # for each area - add demand and generation
-    total_demand = infra_interface.get_country_demand(start, end, "DE")
-    total_demand = total_demand.resample("h").mean()
-    sum_demand = total_demand/len(nuts_config)
-    # TODO only works for whole DE simulation
     for area in nuts_config:
         logger.info(f"loading config {area} for {year}")
         config_path = Path.home() / ".assume" / f"{area}_{year}"
         if not config_path.is_dir():
             logger.info("query database time series")
-            # demand from OEP is not nearly as accurate as ENTSO-E
-            # demand = infra_interface.get_demand_series_in_area(area, year)
-            # demand = demand.resample("h").mean()
+            if area == "DE":
+                # for each area - add demand and generation
+                demand = infra_interface.get_country_demand(start, end, "DE")
+                solar, wind = infra_interface.get_country_renewables(start, end, "DE")
+            else:
+                demand = infra_interface.get_demand_series_in_area(area, year)            
+                # TODO add battery_power as storage
+                solar, wind, battery_power = infra_interface.get_renewables_series_in_area(
+                    area,
+                    start,
+                    end,
+                )
+            
+            demand = demand.resample("h").mean()
             # demand in MW
-            # TODO add battery_power as storage
-            solar, wind, battery_power = infra_interface.get_renewables_series_in_area(
-                area,
-                start,
-                end,
-            )
             try:
                 config_path.mkdir(parents=True, exist_ok=True)
                 # demand.to_csv(config_path / "demand.csv")
@@ -146,9 +148,9 @@ def load_oeds(
                 shutil.rmtree(config_path, ignore_errors=True)
         else:
             logger.info("use existing local time series")
-            # demand = pd.read_csv(
-            #     config_path / "demand.csv", index_col=0, parse_dates=True
-            # ).squeeze()
+            demand = pd.read_csv(
+                config_path / "demand.csv", index_col=0, parse_dates=True
+            ).squeeze()
             solar = pd.read_csv(
                 config_path / "solar.csv", index_col=0, parse_dates=True
             ).squeeze()
@@ -158,7 +160,8 @@ def load_oeds(
 
         lat, lon = infra_interface.get_lat_lon_area(area)
 
-        # sum_demand = demand.sum(axis=1)
+        if isinstance(demand, pd.DataFrame):
+            demand = demand.sum(axis=1)
 
         world.add_unit_operator(f"demand_{area}")
         world.add_unit(
@@ -168,14 +171,14 @@ def load_oeds(
             # the unit_params have no hints
             {
                 "min_power": 0,
-                "max_power": sum_demand.max(),
+                "max_power": demand.max(),
                 "bidding_strategies": bidding_strategies["demand"],
                 "technology": "demand",
                 "location": (lat, lon),
                 "node": area,
                 "price": 1e3,
             },
-            NaiveForecast(index, demand=sum_demand),
+            NaiveForecast(index, demand=demand),
         )
 
         world.add_unit_operator(f"renewables{area}")

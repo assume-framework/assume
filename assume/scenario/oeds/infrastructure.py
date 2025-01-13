@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import math
 from datetime import datetime, timedelta
 
 import holidays
@@ -47,7 +48,7 @@ class InfrastructureInterface:
             "weather",
             "opec",
             "instrat_pl",
-            "entsoe"
+            "entsoe",
         ),
     ):
         self.databases = {}
@@ -58,6 +59,7 @@ class InfrastructureInterface:
             self.databases[db] = create_engine(
                 f"{db_server_uri}?options=--search_path={schema_name}",
                 connect_args={"application_name": name},
+                pool_pre_ping=True,
             )
         self.setup()
 
@@ -218,7 +220,7 @@ class InfrastructureInterface:
             if plz not in self.plz_nuts.index:
                 raise Exception("invalid plz code")
 
-        longitude, latitude = self.get_lat_lon_area(area)
+        latitude, longitude = self.get_lat_lon_area(area)
 
         query = f"""
             SELECT ev."EinheitMastrNummer" as "unitID",
@@ -317,7 +319,7 @@ class InfrastructureInterface:
             if plz not in self.plz_nuts.index:
                 raise Exception("invalid plz code")
 
-        longitude, latitude = self.get_lat_lon_area(area)
+        latitude, longitude = self.get_lat_lon_area(area)
         plz_codes_str = "', '".join([str(x) for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
@@ -434,7 +436,7 @@ class InfrastructureInterface:
             if plz not in self.plz_nuts.index:
                 raise Exception("invalid plz code")
 
-        longitude, latitude = self.get_lat_lon_area(area)
+        latitude, longitude = self.get_lat_lon_area(area)
         plz_codes_str = "', '".join([str(x) for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
@@ -470,7 +472,11 @@ class InfrastructureInterface:
         if df.empty:
             return df
         # all WEA with nan set height to mean value
-        df["height"] = df["height"].fillna(df["height"].mean())
+        if math.isnan(df["height"].mean()):
+            mean_height = 80
+        else:
+            mean_height = df["height"].mean() == float("nan")
+        df["height"] = df["height"].fillna(mean_height)
         # all WEA with nan set height to mean diameter
         df["diameter"] = df["diameter"].fillna(df["diameter"].mean())
         # all WEA with na are on shore and not allocated to a sea cluster
@@ -509,7 +515,7 @@ class InfrastructureInterface:
             if plz not in self.plz_nuts.index:
                 raise Exception("invalid plz code")
 
-        longitude, latitude = self.get_lat_lon_area(area)
+        latitude, longitude  = self.get_lat_lon_area(area)
         plz_codes_str = "', '".join([str(x) for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
@@ -550,7 +556,7 @@ class InfrastructureInterface:
             if plz not in self.plz_nuts.index:
                 raise Exception("invalid plz code")
 
-        longitude, latitude = self.get_lat_lon_area(area)
+        latitude, longitude = self.get_lat_lon_area(area)
         plz_codes_str = "', '".join([str(x) for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
@@ -590,7 +596,7 @@ class InfrastructureInterface:
             if plz not in self.plz_nuts.index:
                 raise Exception("invalid plz code")
 
-        longitude, latitude = self.get_lat_lon_area(area)
+        latitude, longitude = self.get_lat_lon_area(area)
         plz_codes_str = "', '".join([str(x) for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
@@ -661,6 +667,11 @@ class InfrastructureInterface:
         return storages
 
     def get_demand_in_area(self, area):
+        """
+        gets localized demand for a given area
+        absolute values are taken from something like 2016
+        useful for scaling, but not so much for new simulations
+        """
         if area == "DE91C":
             # nuts areas changed: https://en.wikipedia.org/wiki/NUTS_statistical_regions_of_Germany#Older_Version
             # upstream issue: https://github.com/openego/data_processing/issues/379
@@ -694,7 +705,7 @@ class InfrastructureInterface:
             if plz not in self.plz_nuts.index:
                 raise Exception("invalid plz code")
 
-        longitude, latitude = self.get_lat_lon_area(area)
+        latitude, longitude = self.get_lat_lon_area(area)
         plz_codes_str = "', '".join([str(x) for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
@@ -844,7 +855,7 @@ class InfrastructureInterface:
 
     def get_offshore_wind_series(self, start: datetime, end: datetime):
         area = "DEF02"
-        longitude, latitude = self.get_lat_lon_area(area)
+        latitude, longitude = self.get_lat_lon_area(area)
         weather_df = self.get_weather_param(
             WEATHER_PARAMS_ECMWF,
             start,
@@ -860,7 +871,7 @@ class InfrastructureInterface:
         self, area: str | int, start: datetime, end: datetime
     ):
         # prepare weather
-        longitude, latitude = self.get_lat_lon_area(area)
+        latitude, longitude = self.get_lat_lon_area(area)
         location = Location(latitude, longitude, tz="Europe/Berlin")
         date_range = pd.date_range(start=start, end=end, freq="h")
         sun_position = location.get_solarposition(date_range)
@@ -916,7 +927,7 @@ class InfrastructureInterface:
         end: datetime,
         country: str = "DE",
     ):
-        """returns price of CO2 equivalents per ton from EU ETS trading"""
+        """returns actual entsoe demand of the given country for the given time"""
         query = f"""
 SELECT
   "index" as time,
@@ -930,6 +941,27 @@ ORDER BY 1
             return pd.read_sql_query(query, connection, index_col="time")[
                 "actual_load"
             ].tz_localize(None)
+
+    def get_country_renewables(
+        self,
+        start: datetime,
+        end: datetime,
+        country: str = "DE",
+    ):
+        """returns renewables generation of a country from entsoe"""
+        query = f"""
+SELECT
+  "index" as time,
+  solar,
+  wind_onshore,
+  wind_offshore
+FROM query_generation
+WHERE
+  index BETWEEN '{start}' AND '{end}' AND country = '{country}'
+ORDER BY 1
+"""
+        with self.databases["entsoe"].connect() as connection:
+            return pd.read_sql_query(query, connection, index_col="time")
 
     def get_grid_nodes(self):
         # get scigrid
