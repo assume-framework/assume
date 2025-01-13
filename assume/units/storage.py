@@ -330,8 +330,8 @@ class Storage(SupportsMinMaxCharge):
         self,
         start: datetime,
         end: datetime,
-        product_type = "energy",
-        soc = None,
+        product_type="energy",
+        soc=None,
     ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max discharging power for the given time period.
