@@ -255,6 +255,13 @@ class RLAdvancedOrderStrategy(RLStrategy):
             The scaling factors are defined by the maximum residual load, the maximum bid price
             and the maximum capacity of the unit.
         """
+
+        # check if scaled observations are already available and if not prepare them
+        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
+            self, "scaled_prices_obs"
+        ):
+            self.prepare_observations(unit, market_id)
+
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - unit.index.freq
 

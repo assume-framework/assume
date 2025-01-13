@@ -76,11 +76,6 @@ class RLUnitsOperator(UnitsOperator):
                 )
 
                 self.rl_units.append(unit)
-
-                # prepare scaled forecasts for the RL strategy as observations
-                unit.bidding_strategies[market.market_id].prepare_observations(
-                    unit, market.market_id
-                )
                 break
 
     def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict) -> None:

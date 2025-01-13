@@ -364,6 +364,7 @@ def read_units(
     unit_type: str,
     forecaster: Forecaster,
     world_bidding_strategies: dict[str, BaseStrategy],
+    learning_mode: bool = False,
 ) -> dict[str, list[dict]]:
     """
     Read units from a dataframe and only add them to a dictionary.
@@ -374,6 +375,7 @@ def read_units(
         unit_type (str): The type of the unit.
         forecaster (Forecaster): The forecaster used for adding the units.
         world_bidding_strategies (dict[str, BaseStrategy]): The strategies available in the world
+        learning_mode (bool, optional): Whether the world is in learning mode. Defaults to False.
     """
     if units_df is None:
         return {}
@@ -389,11 +391,17 @@ def read_units(
             if key.startswith("bidding_") and unit_params[key]
         }
         unit_params["bidding_strategies"] = bidding_strategies
-        operator_id = adjust_unit_operator_for_learning(
-            bidding_strategies,
-            world_bidding_strategies,
-            unit_params["unit_operator"],
-        )
+
+        # adjust the unit operator to Operator-RL if learning mode is enabled
+        if learning_mode:
+            operator_id = adjust_unit_operator_for_learning(
+                bidding_strategies,
+                world_bidding_strategies,
+                unit_params["unit_operator"],
+            )
+        else:
+            operator_id = unit_params["unit_operator"]
+
         del unit_params["unit_operator"]
         units_dict[operator_id].append(
             dict(
@@ -660,6 +668,7 @@ def setup_world(
         unit_type="power_plant",
         forecaster=forecaster,
         world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_config["learning_mode"],
     )
 
     str_plants = read_units(
@@ -667,6 +676,7 @@ def setup_world(
         unit_type="storage",
         forecaster=forecaster,
         world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_config["learning_mode"],
     )
 
     dem_plants = read_units(
@@ -674,6 +684,7 @@ def setup_world(
         unit_type="demand",
         forecaster=forecaster,
         world_bidding_strategies=world.bidding_strategies,
+        learning_mode=learning_config["learning_mode"],
     )
 
     if dsm_units is not None:
@@ -683,6 +694,7 @@ def setup_world(
                 unit_type=unit_type,
                 forecaster=forecaster,
                 world_bidding_strategies=world.bidding_strategies,
+                learning_mode=learning_config["learning_mode"],
             )
         for op, op_units in dsm_units.items():
             units[op].extend(op_units)
