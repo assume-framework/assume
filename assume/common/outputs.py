@@ -52,6 +52,8 @@ class WriteOutput(Role):
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
+        episodes_collecting_initial_experience: Number of episodes collecting initial experience. Defaults to 0.
+        tensorboard_path (str, optional): The path for storing tensorboard logs. Defaults to "".
         perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
         max_dfs_size_mb (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
@@ -67,6 +69,7 @@ class WriteOutput(Role):
         save_frequency_hours: int = None,
         learning_mode: bool = False,
         episodes_collecting_initial_experience: int = 0,
+        tensorboard_path: str = "logs/tensorboard",
         perform_evaluation: bool = False,
         additional_kpis: dict[str, OutputDef] = {},
         max_dfs_size_mb: int = 300,
@@ -112,7 +115,7 @@ class WriteOutput(Role):
         self.locks = defaultdict(lambda: Lock())
 
         # initialize tensorboard writer for episodic evaluation
-        self.writer = SummaryWriter("logs/tensorboard")
+        self.writer = SummaryWriter(tensorboard_path)
 
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {

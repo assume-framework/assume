@@ -2,8 +2,10 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import os
 import copy
 import logging
+import shutil
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -862,7 +864,11 @@ def run_learning(
         accept = input(
             f"{save_path=} exists - should we overwrite current learnings? (y/N) "
         )
-        if not accept.lower().startswith("y"):
+        if accept.lower().startswith("y"):
+            # remove existing tensorboard log directory
+            if os.path.exists(save_path):
+                shutil.rmtree(save_path, ignore_errors=True)
+        else:
             # stop here - do not start learning or save anything
             raise AssumeException("don't overwrite existing strategies")
 

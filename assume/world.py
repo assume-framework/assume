@@ -324,6 +324,7 @@ class World:
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
             episodes_collecting_initial_experience = self.episodes_collecting_initial_experience,
+            tensorboard_path=f"{self.learning_config.get("trained_policies_save_path", "logs")}/tensorboard",
             perform_evaluation=self.perform_evaluation,
             additional_kpis=self.additional_kpis,
         )
