@@ -412,7 +412,7 @@ class Learning(Role):
                     "datetime" : self.datetime + step * pd.Timedelta(freq)
                 }
 
-            output_list.append(critic_losses)
+                output_list.append(critic_losses)
             
         if db_addr:
             self.context.schedule_instant_message(
