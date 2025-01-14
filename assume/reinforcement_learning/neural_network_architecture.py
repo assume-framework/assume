@@ -147,7 +147,7 @@ class LSTMActor(Actor):
         float_type,
         unique_obs_dim: int = 0,
         num_timeseries_obs_dim: int = 2,
-        original_implementation: bool = True,  # TODO: as config item. can only be manually changed right now.
+        original_implementation: bool = False,
         *args,
         **kwargs,
     ):

@@ -148,9 +148,10 @@ class RLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=50, act_dim=48, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
+        self.act_dim = kwargs.get("action_dimension", 2)
 
         # defines bounds of actions space
         self.max_bid_price = kwargs.get("max_bid_price", 100)
@@ -162,6 +163,7 @@ class RLStrategy(AbstractLearningStrategy):
         # based on learning config
         self.algorithm = kwargs.get("algorithm", "matd3")
         actor_architecture = kwargs.get("actor_architecture", "mlp")
+        self.original_implementation = kwargs.get("original_implementation", None)
 
         if actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
@@ -529,6 +531,7 @@ class RLStrategy(AbstractLearningStrategy):
             ]
 
         # TODO: dependent on horizon (e.g. adjust to last 24h); be careful of dependencies
+        # last output only available 1h before clearing must be treated differently in 24h bidding (not available)
         # get last accepted bid volume and the current marginal costs of the unit
         current_volume = unit.get_output_before(start)
         current_costs = unit.calculate_marginal_cost(start, current_volume)
