@@ -1,9 +1,3 @@
-<!--
-SPDX-FileCopyrightText: ASSUME Developers
-
-SPDX-License-Identifier: AGPL-3.0-or-later
--->
-
 ---
 title: 'ASSUME - Agent-based Simulation for Studying and Understanding Market Evolution'
 tags:
@@ -43,8 +37,6 @@ affiliations:
 date: 13 November 2024
 bibliography: paper.bib
 ---
-
-<!-- pandoc -s paper.md -o paper.pdf --bibliography paper.bib --csl=apa.csl --filter pandoc-citeproc --pdf-engine=xelatex-->
 
 # Summary
 
