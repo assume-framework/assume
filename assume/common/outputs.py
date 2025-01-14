@@ -478,10 +478,7 @@ class WriteOutput(Role):
                 data_list.clear()
             # concat all dataframes
             # use join='outer' to keep all columns and fill missing values with NaN
-            if df is None:
-                continue
-
-            if df.empty:
+            if df is None or df.empty:
                 continue
 
             # check for tensors and convert them to floats

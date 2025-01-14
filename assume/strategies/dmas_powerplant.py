@@ -432,6 +432,19 @@ class DmasPowerplantStrategy(BaseStrategy):
         defines how it is dispatched to the market
         Returns a list of bids that the unit operator will submit to the market
 
+        This works by optimizing multiple times for different pricing levels.
+        From the optimization result, the relevant block bid scenarios are created.
+        For the efficiency, a good price forecast is required.
+
+        The power plant assumes, that it is started in the first hour as a base block if possible.
+        As it is not possible to combine block bids with exclusive bids, a few decisions on the behavior have to be made.
+        One of these is the decision of to which block hours the startup cost should be added.
+        Ideally, the difference is negligible, as the market takes care of the result optimization.
+        Yet this can have a significant impact if the decision has to be made if the startup cost
+        should be added to the last hour of the current clearing or to the first hours of the following.
+
+        TODO: ramp_down constraints are not yet respected by adding an additional block for the next day
+
         Args:
           unit(SupportsMinMax): unit to dispatch
           market_config(MarketConfig): market configuration
@@ -494,7 +507,9 @@ class DmasPowerplantStrategy(BaseStrategy):
                 )
             )
 
-        order_book, last_power, block_number = {}, np.zeros(hour_count), 0
+        order_book = {}
+        last_power = np.zeros(hour_count)
+        block_number = 0
         tr = np.arange(hour_count)
         links = {i: None for i in tr}
 
@@ -505,6 +520,10 @@ class DmasPowerplantStrategy(BaseStrategy):
 
         index = 0
         runtime = unit.get_operation_time(start)
+
+        # TODO add ramping constraints from
+        # unit.calculate_ramp(runtime, last_power, unit.min_power)
+        # unit.ramp_down
 
         while index < len(self.steps):
             step = self.steps[index]

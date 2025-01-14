@@ -608,7 +608,7 @@ class CsvForecaster(Forecaster):
         self.forecasts = fast_forecasts
 
 
-class RandomForecaster(CsvForecaster):
+class RandomCsvForecaster(CsvForecaster):
     """
     This class represents a forecaster that generates forecasts using random noise. It inherits
     from the `CsvForecaster` class and initializes with the provided index, power plants, and
@@ -625,7 +625,7 @@ class RandomForecaster(CsvForecaster):
         sigma (float): The standard deviation of the noise.
 
     Example:
-        >>> forecaster = RandomForecaster(index=pd.Series([1, 2, 3]))
+        >>> forecaster = RandomCsvForecaster(index=pd.Series([1, 2, 3]))
         >>> forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
         >>> print(forecaster['location_1_temperature'])
 
