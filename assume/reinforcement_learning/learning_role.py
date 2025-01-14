@@ -400,13 +400,10 @@ class Learning(Role):
         if self.datetime == None:
             self.datetime = pd.to_datetime(self.context.data.get("train_start"))
         freq = self.context.data.get("freq")
-        
-        steps_per_training = int(pd.Timedelta(self.train_freq) / pd.Timedelta(freq))
 
         output_list = []
-
         
-        for step in range(steps_per_training):
+        for step in range(self.gradient_steps):
             for critic, value in critic_losses_list[step].items():
                 critic_losses = {
                     "unit" : critic,
