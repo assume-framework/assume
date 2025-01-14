@@ -69,10 +69,8 @@ available_examples = {
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     # DRL cases with lstm instead of mlp as actor neural network architecture
-    "small_learning_1_lstm": {
-        "scenario": "example_02a",
-        "study_case": "base_lstm_original",
-    },
+    "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
+    "small_learning_1_lstm_original": {"scenario": "example_02a", "study_case": "base_lstm_original"},
     "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
     "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "dam"},
@@ -110,51 +108,52 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_learning_1_lstm"
+    examples = ["small_learning_1", "small_learning_1_lstm", "small_learning_1_lstm_original"]
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-    # create world
-    world = World(database_uri=db_uri, export_csv_path=csv_path)
+    for example in examples:
+        # create world
+        world = World(database_uri=db_uri, export_csv_path=csv_path)
 
-    # load scenario
-    load_scenario_folder(
-        world,
-        inputs_path="examples/inputs",
-        scenario=available_examples[example]["scenario"],
-        study_case=available_examples[example]["study_case"],
-    )
-
-    # to add custom bidding strategies, you need to import them
-    # and add them to the world as follows:
-    # from custom_bidding_strategy import CustomBiddingStrategy
-    # world.bidding_strategies["custom_bidding_strategy"] = CustomBiddingStrategy
-
-    # to add a custom unit type, you need to import it
-    # and add it to the world as follows:
-    # from custom_unit import CustomUnit
-    # world.unit_types["custom_unit"] = CustomUnit
-
-    # next you need to load and add the custom units to the scenario
-    # from assume import load_custom_units
-    # load_custom_units(
-    #     world,
-    #     inputs_path="examples/inputs",
-    #     scenario=availabe_examples[example]["scenario"],
-    #     file_name="custom_units",
-    #     unit_type="custom_unit",
-    # )
-
-    if world.learning_config.get("learning_mode", False):
-        # run learning if learning mode is enabled
-        run_learning(
+        # load scenario
+        load_scenario_folder(
             world,
             inputs_path="examples/inputs",
             scenario=available_examples[example]["scenario"],
             study_case=available_examples[example]["study_case"],
         )
 
-    world.run()
+        # to add custom bidding strategies, you need to import them
+        # and add them to the world as follows:
+        # from custom_bidding_strategy import CustomBiddingStrategy
+        # world.bidding_strategies["custom_bidding_strategy"] = CustomBiddingStrategy
+
+        # to add a custom unit type, you need to import it
+        # and add it to the world as follows:
+        # from custom_unit import CustomUnit
+        # world.unit_types["custom_unit"] = CustomUnit
+
+        # next you need to load and add the custom units to the scenario
+        # from assume import load_custom_units
+        # load_custom_units(
+        #     world,
+        #     inputs_path="examples/inputs",
+        #     scenario=availabe_examples[example]["scenario"],
+        #     file_name="custom_units",
+        #     unit_type="custom_unit",
+        # )
+
+        if world.learning_config.get("learning_mode", False):
+            # run learning if learning mode is enabled
+            run_learning(
+                world,
+                inputs_path="examples/inputs",
+                scenario=available_examples[example]["scenario"],
+                study_case=available_examples[example]["study_case"],
+            )
+
+        world.run()

@@ -10,21 +10,22 @@ base:
   save_frequency_hours: null
 
   learning_config:
+    action_dimension: 2
     continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
     learning_rate_schedule: linear
-    training_episodes: 50
-    episodes_collecting_initial_experience: 5
+    training_episodes: 200
+    episodes_collecting_initial_experience: 20
     train_freq: 24h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
     device: cpu
     action_noise_schedule: linear
-    noise_sigma: 0.1
+    noise_sigma: 0.3
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
@@ -47,7 +48,7 @@ base:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-base_lstm_regret:
+base_lstm:
   start_date: 2019-02-28 22:00
   end_date: 2019-03-31 02:00
   time_step: 1h
@@ -55,25 +56,24 @@ base_lstm_regret:
   save_frequency_hours: null
 
   learning_config:
+    action_dimension: 48
     continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 50
-    episodes_collecting_initial_experience: 5
+    training_episodes: 1000
+    episodes_collecting_initial_experience: 50
     train_freq: 24h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
     device: cpu
     action_noise_schedule: linear
-    noise_sigma: 0.1
+    noise_sigma: 0.3
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
-    early_stopping_steps: 10
-    early_stopping_threshold: 0.05
     actor_architecture: lstm
 
   markets_config:
@@ -102,25 +102,25 @@ base_lstm_original:
   save_frequency_hours: null
 
   learning_config:
+    action_dimension: 48
     continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 50
-    episodes_collecting_initial_experience: 5
+    training_episodes: 1000
+    episodes_collecting_initial_experience: 50
     train_freq: 24h
     gradient_steps: -1
     batch_size: 256
     gamma: 0.99
     device: cpu
-    noise_sigma: 0.1
+    noise_sigma: 0.3
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
-    early_stopping_steps: 10
-    early_stopping_threshold: 0.05
     actor_architecture: lstm
+    original_implementation: true
 
   markets_config:
     EOM:
