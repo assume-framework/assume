@@ -147,7 +147,7 @@ class LSTMActor(Actor):
         float_type,
         unique_obs_dim: int = 0,
         num_timeseries_obs_dim: int = 2,
-        original_implementation: bool = False,
+        original_implementation: bool = True,  # TODO: as config item. can only be manually changed right now.
         *args,
         **kwargs,
     ):
@@ -230,8 +230,7 @@ class LSTMActor(Actor):
             std = F.softplus(self.std_layer(x))
 
             normal_dist = th.distributions.Normal(mean, std)
-
-            x = normal_dist.sample()
+            x = normal_dist.rsample()
 
         else:  # adjusted to resemble MLPActor
             x1, x2 = obs.split(
