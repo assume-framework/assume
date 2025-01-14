@@ -18,11 +18,10 @@ authors:
     corresponding: true
     equal-contrib: true
     affiliation: 1
-    "affiliation": 1
   - name: Nick Harder
     orcid: 0000-0003-1897-3671
     equal-contrib: true
-    "affiliation": 2
+    affiliation: 2
   - name: Kim K. Miskiw
     orcid: 0009-0009-1389-4844
     equal-contrib: true
