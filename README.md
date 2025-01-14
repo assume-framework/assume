@@ -86,7 +86,17 @@ This will launch a container for TimescaleDB and Grafana with preconfigured dash
 
 If you intend to use the reinforcement learning capabilities of ASSUME and train your agents, make sure to install Torch. Detailed installation instructions can be found [here](https://pytorch.org/get-started/locally/).
 
+### Using TensorBoard to display Learning Metrics
 
+When running an example with learning capabilities, you can start TensorBoard to observe the learning process. Use the following shell command to start TensorBoard:
+```shell
+tensorboard --logdir "examples/inputs/path_to_tensorboard_log_dir"
+```
+while replacing `"path_to_tensorboard_log_dir"` with the correct logging path that differs according to the example investigated.
+
+You can then head to `http://localhost:6006/` to view and evaluate the training process parameters.
+
+Please note that TensorBoard has to be shut down via `Ctrl + C` every time you want to start a new simulation run. This also applies if you use the same folder structure and want to overwrite existing results.
 
 ## Trying out ASSUME and the provided Examples
 
