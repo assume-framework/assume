@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import shutil
 import os
+import shutil
+
 # Turn off TF onednn optimizations to avoid memory leaks
-os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing import Lock
@@ -21,7 +22,6 @@ from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from psycopg2.errors import UndefinedColumn
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
-from torch.utils.tensorboard import SummaryWriter
 
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
@@ -94,7 +94,9 @@ class WriteOutput(Role):
 
         self.learning_mode = learning_mode
         self.perform_evaluation = perform_evaluation
-        self.episodes_collecting_initial_experience = episodes_collecting_initial_experience
+        self.episodes_collecting_initial_experience = (
+            episodes_collecting_initial_experience
+        )
 
         # get episode number if in learning or evaluation mode
         self.episode = None
@@ -115,7 +117,10 @@ class WriteOutput(Role):
         self.locks = defaultdict(lambda: Lock())
 
         # initialize tensorboard writer for episodic evaluation
-        self.writer = SummaryWriter(tensorboard_path)
+        if learning_mode:
+            from torch.utils.tensorboard import SummaryWriter
+
+            self.writer = SummaryWriter(tensorboard_path)
 
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {
@@ -251,7 +256,7 @@ class WriteOutput(Role):
             "market_dispatch",
             "unit_dispatch",
             "rl_params",
-            "learning_params"
+            "learning_params",
         ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
@@ -297,7 +302,7 @@ class WriteOutput(Role):
             df["learning_rate"] = np.nan
 
         return df
-    
+
     def convert_market_results(self, market_results: list[dict]):
         """
         Convert market results to a dataframe.
@@ -460,11 +465,14 @@ class WriteOutput(Role):
             return
 
         # Merge learning_params to rl_params before uploading to db
-        if "rl_params" in self.write_buffers and "learning_params" in self.write_buffers:
+        if (
+            "rl_params" in self.write_buffers
+            and "learning_params" in self.write_buffers
+        ):
             df1 = pd.DataFrame(self.write_buffers["rl_params"])
             df2 = pd.DataFrame(self.write_buffers["learning_params"])
-            merged_df = pd.merge(df1, df2, how = 'outer')
-            merged_list = merged_df.to_dict('records')
+            merged_df = pd.merge(df1, df2, how="outer")
+            merged_list = merged_df.to_dict("records")
             self.write_buffers["rl_params"] = merged_list
             del self.write_buffers["learning_params"]
         # if only learning_params are present, rename them to rl_params
@@ -711,24 +719,24 @@ class WriteOutput(Role):
         if self.db is not None and not df.empty:
             with self.db.begin() as db:
                 df.to_sql("kpis", db, if_exists="append", index=None)
-        
+
         # store episodic evalution data in tensorboard
-        if self.episode:
+        if self.episode and self.learning_mode:
             if self.episode == 1 and not self.perform_evaluation:
-                self.writer.add_text('TensorBoard Introduction', tensor_board_intro)
+                self.writer.add_text("TensorBoard Introduction", tensor_board_intro)
             query = f"""
-            SELECT 
-                datetime as dt, 
-                unit, 
-                profit, 
-                reward, 
-                regret, 
+            SELECT
+                datetime as dt,
+                unit,
+                profit,
+                reward,
+                regret,
                 critic_loss as loss,
                 learning_rate as lr,
-                exploration_noise_0 as noise_0, 
-                exploration_noise_1 as noise_1 
-            FROM rl_params 
-            WHERE episode = '{self.episode}' 
+                exploration_noise_0 as noise_0,
+                exploration_noise_1 as noise_1
+            FROM rl_params
+            WHERE episode = '{self.episode}'
             AND simulation = '{self.simulation_id}'
             AND perform_evaluation = False
             AND initial_exploration = False
@@ -737,7 +745,7 @@ class WriteOutput(Role):
                 rl_params_df = pd.read_sql(query, self.db)
                 rl_params_df["dt"] = pd.to_datetime(rl_params_df["dt"])
                 # replace all NaN values with 0 to allow for plotting
-                rl_params_df = rl_params_df.fillna(0.)
+                rl_params_df = rl_params_df.fillna(0.0)
 
                 # loop over all datetimes as tensorboard does not allow to store time series
                 datetimes = rl_params_df["dt"].unique()
@@ -760,7 +768,7 @@ class WriteOutput(Role):
                     profits["avg"] = sum(profits.values()) / len(profits)
                     regrets["avg"] = sum(regrets.values()) / len(regrets)
                     losses["avg"] = sum(losses.values()) / len(losses)
-                    
+
                     # calculate the average noise
                     noise_0 = time_df["noise_0"].abs().mean()
                     noise_1 = time_df["noise_1"].abs().mean()
@@ -769,14 +777,16 @@ class WriteOutput(Role):
                     lr = time_df["lr"].values[0]
 
                     # store the data in tensorboard
-                    x_index = (self.episode - 1 - self.episodes_collecting_initial_experience) * len(datetimes) + i
-                    self.writer.add_scalars(f"a) reward", rewards, x_index)
-                    self.writer.add_scalars(f"b) profit", profits, x_index)
-                    self.writer.add_scalars(f"c) regret", regrets, x_index)
-                    self.writer.add_scalars(f"d) loss", losses, x_index)
-                    self.writer.add_scalar(f"e) learning rate", lr, x_index)
-                    self.writer.add_scalar(f"f) noise_0", noise_0, x_index)
-                    self.writer.add_scalar(f"g) noise_1", noise_1, x_index)
+                    x_index = (
+                        self.episode - 1 - self.episodes_collecting_initial_experience
+                    ) * len(datetimes) + i
+                    self.writer.add_scalars("a) reward", rewards, x_index)
+                    self.writer.add_scalars("b) profit", profits, x_index)
+                    self.writer.add_scalars("c) regret", regrets, x_index)
+                    self.writer.add_scalars("d) loss", losses, x_index)
+                    self.writer.add_scalar("e) learning rate", lr, x_index)
+                    self.writer.add_scalar("f) noise_0", noise_0, x_index)
+                    self.writer.add_scalar("g) noise_1", noise_1, x_index)
             except (ProgrammingError, OperationalError, DataError):
                 return
             except Exception as e:
@@ -809,6 +819,6 @@ class WriteOutput(Role):
         """
         Deletes the WriteOutput instance.
         """
-        if hasattr(self, 'writer'):
+        if hasattr(self, "writer"):
             self.writer.flush()
             self.writer.close()

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Module containing TensorBoard documentation."""
 
 tensor_board_intro = """
@@ -13,11 +17,11 @@ To view the training results, navigate to the "SCALARS" page in TensorBoard. Her
 
 The following parameters are being tracked and displayed:
 
-a) Reward 
-b) Profit 
-c) Regret 
-d) Loss 
-e) Learning Rate 
+a) Reward
+b) Profit
+c) Regret
+d) Loss
+e) Learning Rate
 f) Noise Parameters
 
 ## Visualization Settings

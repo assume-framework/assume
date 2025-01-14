@@ -48,6 +48,7 @@ dependencies = [
 [project.optional-dependencies]
 learning = [
     "torch >=2.0.1",
+    "tensorboard >=2.7.0",
 ]
 network = [
     "pypsa <=0.30.3",
