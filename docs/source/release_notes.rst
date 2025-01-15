@@ -10,11 +10,21 @@ Upcoming Release
 =======================
 
 **New Features:**
-  - **Building Demand Side Unit**: Added a new building demand side unit to the framework, enabling users to model the demand side management of a building. This feature allows
-    for more detailed and accurate simulations of building energy consumption patterns and market interactions. The building demand side unit can be configured with
-    different components, such as generic storage, heat pump, boiler, thermal storage, electric vehicle, and photovoltaic system, to reflect the specific characteristics of
-    building energy systems. The building demand side unit can be optimized to minimize costs or to maximize the available flexibility, depending on the user's requirements.
+  - **Building Demand Side Unit**: Added a demand side agent, "building demand side unit" to the framework, enabling users to model a residential/building unit with building components. This feature allows
+    for more detailed modeling of a building type and its technology configuration and market interactions.  This feature allows users to model a building type and integrate building-specific components such as:
+      - Generic storage
+      - Heat pump
+      - Boilers
+      - Thermal storage
+      - Electric vehicle
+      - Photovoltaic system
+    The agent type can be optimized to minimize costs or to maximize the load shift, depending on the user's requirements. This agent also has an attribute to be a Prosumer or a Consumer.
     A tutorial and detailed documentation on how to use this feature are coming soon.
+  - **Flexibility module**: The latest release introduces Flexibility Measures designed for the Demand Side Agents The measures in the module allow the Demand Side Agents for planning flexibility bids while interacting dynamically with energy markets.
+      - *Congestion Management:* Maximising load shift during periods of high congestion in the grid to alleviate stress on the power network.  A node-specific forecast provided by the grid operator that indicates the level of congestion in different areas of the grid.
+      - *Peak Load Shifting:* Shifting peak load according to defined peak load limits, thereby reducing strain on the grid and avoiding high peak demand.
+      - *Renewable Utilization:* Increase the utilization of renewable energy by synchronizing operations with periods of high renewable energy availability of a given node/location.
+      - *Cost-Based Load Shifting:* Shifting the operations by adhering to a predefined cost tolerance, ensuring that operational costs remain within acceptable limits while meeting production goals.
 
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
