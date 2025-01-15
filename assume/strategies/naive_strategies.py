@@ -156,7 +156,7 @@ class NaiveDADSMStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit
-        unit.calculate_optimal_operation_if_needed()
+        unit.determine_optimal_operation_with_flex()
 
         bids = []
         for product in product_tuples:
@@ -167,7 +167,7 @@ class NaiveDADSMStrategy(BaseStrategy):
             start = product[0]
 
             volume = unit.opt_power_requirement.at[start]
-            marginal_price = unit.calculate_marginal_cost(start, volume)
+            marginal_price = 3000
             bids.append(
                 {
                     "start_time": start,
@@ -195,7 +195,7 @@ class NaiveRedispatchDSMStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit according to the objective function
-        unit.calculate_optimal_operation_if_needed()
+        unit.determine_optimal_operation_with_flex()
 
         bids = []
         for product in product_tuples:
