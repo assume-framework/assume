@@ -6,12 +6,9 @@ import logging
 
 import pandas as pd
 import pyomo.environ as pyo
-from pyomo.opt import (
-    SolverFactory,
-    check_available_solvers,
-)
 
 from assume.common.base import SupportsMinMax
+from assume.common.forecasts import Forecaster
 from assume.units.dsm_load_shift import DSMFlex
 
 SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
@@ -24,22 +21,29 @@ logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 class HydrogenPlant(DSMFlex, SupportsMinMax):
     """
-    Represents a hydrogen plant in the energy system, including electrolyser and optional seasonal hydrogen storage.
+    Represents a hydrogen plant in an energy system. This includes an electrolyser for hydrogen production and optional seasonal hydrogen storage.
 
     Args:
-        id (str): Unique identifier of the plant.
-        unit_operator (str): Operator of the plant.
-        bidding_strategies (dict): Bidding strategies.
-        node (str): Node location of the plant.
-        index (pd.DatetimeIndex): Time index for plant data.
-        location (tuple): Plant's geographical location.
-        components (dict): Components including electrolyser and hydrogen storage.
-        objective (str): Optimization objective.
-        flexibility_measure (str): Flexibility measure for load shifting.
-        demand (float): Hydrogen demand.
-        cost_tolerance (float): Maximum allowable cost increase.
+        id (str): Unique identifier for the hydrogen plant.
+        unit_operator (str): The operator responsible for the plant.
+        bidding_strategies (dict): A dictionary of bidding strategies that define how the plant participates in energy markets.
+        forecaster (Forecaster): A forecaster used to get key variables such as fuel or electricity prices.
+        technology (str, optional): The technology used by the plant. Default is "hydrogen_plant".
+        components (dict, optional): A dictionary describing the components of the plant, such as electrolyser and hydrogen seasonal storage. Default is an empty dictionary.
+        objective (str, optional): The objective function of the plant, typically to minimize variable costs. Default is "min_variable_cost".
+        flexibility_measure (str, optional): The flexibility measure used for the plant, such as "max_load_shift". Default is "max_load_shift".
+        demand (float, optional): The hydrogen production demand, representing how much hydrogen needs to be produced. Default is 0.
+        cost_tolerance (float, optional): The maximum allowable increase in cost when shifting load. Default is 10.
+        node (str, optional): The node location where the plant is connected within the energy network. Default is "node0".
+        location (tuple[float, float], optional): The geographical coordinates (latitude, longitude) of the hydrogen plant. Default is (0.0, 0.0).
+        **kwargs: Additional keyword arguments to support more specific configurations or parameters.
+
+    Attributes:
+        required_technologies (list): A list of required technologies for the plant, such as electrolyser.
+        optional_technologies (list): A list of optional technologies, such as hydrogen seasonal storage.
     """
 
+    # Required and optional technologies for the hydrogen plant
     required_technologies = ["electrolyser"]
     optional_technologies = ["hydrogen_seasonal_storage"]
 
@@ -48,15 +52,15 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
-        technology: str = "hydrogen_plant",
-        node: str = "node0",
-        index: pd.DatetimeIndex = None,
-        location: tuple[float, float] = (0.0, 0.0),
+        forecaster: Forecaster,
         components: dict[str, dict] = None,
-        objective: str = None,
+        technology: str = "hydrogen_plant",
+        objective: str = "min_variable_cost",
         flexibility_measure: str = "max_load_shift",
         demand: float = 0,
         cost_tolerance: float = 10,
+        node: str = "node0",
+        location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
         super().__init__(
@@ -65,7 +69,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             technology=technology,
             components=components,
             bidding_strategies=bidding_strategies,
-            index=index,
+            forecaster=forecaster,
             node=node,
             location=location,
             **kwargs,
@@ -102,42 +106,8 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         )
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
-        # Define the Pyomo model
-        self.model = pyo.ConcreteModel()
-        self.define_sets()
-        self.define_parameters()
-        self.define_variables()
-
-        self.initialize_components()
-        self.initialize_process_sequence()
-
-        self.define_constraints()
-        self.define_objective_opt()
-
-        if self.flexibility_measure == "max_load_shift":
-            self.flexibility_cost_tolerance(self.model)
-        self.define_objective_flex()
-
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
-
-        self.solver = SolverFactory(solvers[0])
-        self.solver_options = {
-            "output_flag": False,
-            "log_to_console": False,
-            "LogToConsole": 0,
-        }
-
-        self.opt_power_requirement = None
-        self.flex_power_requirement = None
-
-        self.variable_cost_series = None
-
-    def define_sets(self):
-        self.model.time_steps = pyo.Set(
-            initialize=[idx for idx, _ in enumerate(self.index)]
-        )
+        # Initialize the model
+        self.setup_model()
 
     def define_parameters(self):
         self.model.electricity_price = pyo.Param(
@@ -249,31 +219,6 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 == self.model.dsm_blocks["electrolyser"].operating_cost[t]
             )
 
-    def define_objective_opt(self):
-        if self.objective == "min_variable_cost":
-
-            @self.model.Objective(sense=pyo.minimize)
-            def obj_rule_opt(m):
-                return sum(self.model.variable_cost[t] for t in self.model.time_steps)
-
-    def define_objective_flex(self):
-        if self.flexibility_measure == "max_load_shift":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                return sum(m.load_shift[t] for t in self.model.time_steps)
-
-    def calculate_optimal_operation_if_needed(self):
-        if (
-            self.opt_power_requirement is not None
-            and self.flex_power_requirement is None
-            and self.flexibility_measure == "max_load_shift"
-        ):
-            self.determine_optimal_operation_with_flex()
-
-        if self.opt_power_requirement is None and self.objective == "min_variable_cost":
-            self.determine_optimal_operation_without_flex()
-
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
         Calculate the marginal cost of the unit based on the provided time and power.
@@ -288,32 +233,10 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         # Initialize marginal cost
         marginal_cost = 0
 
-        if self.opt_power_requirement[start] > 0:
+        if self.opt_power_requirement.at[start] > 0:
             marginal_cost = (
-                self.variable_cost_series[start] / self.opt_power_requirement[start]
+                self.variable_cost_series.at[start]
+                / self.opt_power_requirement.at[start]
             )
 
         return marginal_cost
-
-    def as_dict(self) -> dict:
-        """
-        Returns the attributes of the unit as a dictionary, including specific attributes.
-
-        Returns:
-            dict: The attributes of the unit as a dictionary.
-        """
-        # Assuming unit_dict is a dictionary that you want to save to the database
-        components_list = [component for component in self.model.dsm_blocks.keys()]
-
-        # Convert the list to a delimited string
-        components_string = ",".join(components_list)
-
-        unit_dict = super().as_dict()
-        unit_dict.update(
-            {
-                "unit_type": "demand",
-                "components": components_string,
-            }
-        )
-
-        return unit_dict

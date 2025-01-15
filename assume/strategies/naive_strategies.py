@@ -209,7 +209,7 @@ class NaiveRedispatchDSMStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit according to the objective function
-        unit.calculate_optimal_operation_if_needed()
+        unit.determine_optimal_operation_with_flex()
 
         bids = []
         for product in product_tuples:
