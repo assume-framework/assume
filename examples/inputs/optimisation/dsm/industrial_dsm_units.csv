@@ -1,5 +1,5 @@
 name,unit_type,technology,node,bidding_EOM,unit_operator,objective,flexibility_measure,cost_tolerance,demand,fuel_type,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,lime_co2_factor,specific_dri_demand,specific_electricity_consumption,specific_natural_gas_consumption,specific_hydrogen_consumption,specific_iron_ore_consumption,specific_lime_demand,start_price,max_capacity,min_capacity,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_operating_hours
-A360,steel_plant,dri_plant,south,naive_da_dsm,dsm_operator_1,min_variable_cost,cost_based_load_shift,20,1000,hydrogen,100,0,100,100,0,0,,,,0.3,0.9,1.83,1.43,,5,,,,,,,24
-A360,steel_plant,eaf,south,,dsm_operator_1,,,,,hydrogen,100,0,100,100,0,0,,1.2,1.09,0.44,,,,0.046,5,,,,,,,24
+A360,steel_plant,dri_plant,south,naive_da_dsm,dsm_operator_1,min_variable_cost,cost_based_load_shift,20,3800,hydrogen,1.5,0,1.5,1.5,0,0,,,,0.3,0.9,1.83,1.43,,5,,,,,,,4200
+A360,steel_plant,eaf,south,,dsm_operator_1,,,,,hydrogen,0.5,0,0.5,0.5,0,0,,1.2,1.09,0.44,,,,0.046,5,,,,,,,4320
+A360,steel_plant,electrolyser,south,,dsm_operator_1,,,,,,1.5,0,1.5,1.5,0,0,0.86,,,,,,,,,,,,,,,
 A360,steel_plant,dri_storage,south,,dsm_operator_1,,,,,,73,0,73,73,,,,,,,,,,,,73,0,0,0,1,1,
-A360,steel_plant,electrolyser,south,,dsm_operator_1,,,,,,100,,100,100,,,0.86,,,,,,,,,,,,,,,

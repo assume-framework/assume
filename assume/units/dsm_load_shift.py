@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 
 import matplotlib.pyplot as plt
+import pandas as pd  # Remove it
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -408,6 +409,46 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
+        # Extract time series data for variable cost and total power input
+        time_steps = list(instance.time_steps)
+        variable_cost_series = [
+            pyo.value(instance.variable_cost[t]) for t in time_steps
+        ]
+        total_power_input_series = [
+            pyo.value(instance.total_power_input[t]) for t in time_steps
+        ]
+        total_hydrogen_gas_series = [
+            pyo.value(instance.dsm_blocks["dri_plant"].hydrogen_in[t])
+            for t in time_steps
+        ]
+
+        # Save time series data to attributes
+        self.opt_power_requirement = FastSeries(
+            index=self.index, value=total_power_input_series
+        )
+        self.variable_cost_series = FastSeries(
+            index=self.index, value=variable_cost_series
+        )
+
+        # Save to Excel
+        data = {
+            "Time Step": time_steps,
+            "Variable Cost": variable_cost_series,
+            "Total Power Input": total_power_input_series,
+            "hydrogen_gas": total_hydrogen_gas_series,
+        }
+        df = pd.DataFrame(data)
+        df.to_excel(
+            "./examples/outputs/H2_electrolyser_DRI_inflex_6a_optimistic.xlsx",
+            index=False,
+        )
+        logger.debug(
+            f"Time series data saved to {"./examples/outputs/H2_electrolyser_DRI_inflex_6a_optimistic.xlsx"}"
+        )
+
+        # Calculate total cost
+        self.total_cost = sum(variable_cost_series)
+
         # Extract power input for raw material mill, clinker system, and cement mill
 
         electrolyser_power_in = (
@@ -421,7 +462,7 @@ class DSMFlex:
 
         dri_fuel = (
             [
-                pyo.value(instance.dsm_blocks["dri_plant"].power_in[t])
+                pyo.value(instance.dsm_blocks["dri_plant"].hydrogen_in[t])
                 for t in instance.time_steps
             ]
             if "dri_plant" in instance.dsm_blocks
@@ -430,7 +471,7 @@ class DSMFlex:
 
         # eaf_fuel = (
         #     [
-        #         pyo.value(instance.dsm_blocks["eaf"].power_in[t])
+        #         pyo.value(instance.total_power_input[t])
         #         for t in instance.time_steps
         #     ]
         #     if "eaf" in instance.dsm_blocks
@@ -488,10 +529,10 @@ class DSMFlex:
             plt.plot(
                 time_steps,
                 dri_fuel,
-                label="dri naturalgas",
+                label="dri hydrogen gas",
                 color="blue",
             )
-            plt.title("dri natural gas")
+            plt.title("dri hydrogen gas")
             plt.xlabel("Time Steps")
             plt.ylabel("Power (MW)")
             plt.legend()
@@ -502,10 +543,10 @@ class DSMFlex:
         #     plt.plot(
         #         time_steps,
         #         eaf_fuel,
-        #         label="EAF_power_in",
+        #         label="Total power",
         #         color="orange",
         #     )
-        #     plt.title("EAF_power_in")
+        #     plt.title("Total power")
         #     plt.xlabel("Time Steps")
         #     plt.ylabel("Power (MW)")
         #     plt.legend()

@@ -1054,9 +1054,9 @@ class DRIPlant:
 
             return b.operating_cost[t] == operating_cost
 
-        @model_block.Constraint(range(len(self.time_steps) // 24))
+        @model_block.Constraint(range(len(self.time_steps) // 4320))
         def daily_max_operating_hours_constraint(b, d):
-            time_indices = [idx for idx in self.time_steps if idx // 24 == d]
+            time_indices = [idx for idx in self.time_steps if idx // 4320 == d]
             return (
                 sum(b.operating_hours[idx] for idx in time_indices)
                 <= b.max_operating_hours
