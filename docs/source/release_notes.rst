@@ -25,6 +25,9 @@ Upcoming Release
   This allows for a more robust scaling of the observation space for future analysis.
 - **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
   This allows for a more robust scaling of the observation space for future analysis.
+- **Allow multi-market bidding strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
+  the strategy is only created once and the same instance is used for all of these markets.
+- **Improve Storage behavior**: Storages were using the current unmodified SoC instead of the final SoC of last hour, leading to always using the initial value to calculate discharge possibility.(#524)
 
 
 v0.5.0 - (10th December 2024)
