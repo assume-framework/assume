@@ -207,19 +207,32 @@ class TensorBoardLogger:
 
         mode = "train" if not self.perform_evaluation else "eval"
         
-        # Define query based on mode
-        base_columns = "datetime as dt, unit, profit, reward"
-        train_columns = ", regret, critic_loss as loss, learning_rate as lr, exploration_noise_0 as noise_0, exploration_noise_1 as noise_1"
-        
+        # columns specific to the training mode.
+        train_columns = """, 
+            AVG(regret) AS regret, 
+            AVG(critic_loss) AS loss, 
+            AVG(learning_rate) AS lr, 
+            AVG(exploration_noise_0) AS noise_0, 
+            AVG(exploration_noise_1) AS noise_1
+            """
+
+        # To aggregate by hour instead of day, replace '%Y-%m-%d' with '%Y-%m-%d %H'
+        # To aggregate by month instead of day, replace '%Y-%m-%d' with '%Y-%m'
         query = f"""
-            SELECT {base_columns}{train_columns if mode == 'train' else ''}
+            SELECT 
+            strftime('%Y-%m-%d', datetime) AS dt,
+            unit,
+            AVG(profit) AS profit,
+            AVG(reward) AS reward
+            {train_columns if mode == 'train' else ''}
             FROM rl_params
             WHERE episode = '{self.episode}'
             AND simulation = '{self.simulation_id}'
             AND perform_evaluation = {self.perform_evaluation}
             {' AND initial_exploration = False' if mode == 'train' else ''}
+            GROUP BY dt
+            ORDER BY dt
         """
-
         try:
             # Add intro text for first episode
             if self.episode == 1 and mode == "train":
