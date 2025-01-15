@@ -8,6 +8,7 @@ import pandas as pd
 import pyomo.environ as pyo
 
 from assume.common.base import SupportsMinMax
+from assume.common.forecasts import Forecaster
 from assume.units.dsm_load_shift import DSMFlex
 
 SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
@@ -20,22 +21,29 @@ logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 class HydrogenPlant(DSMFlex, SupportsMinMax):
     """
-    Represents a hydrogen plant in the energy system, including electrolyser and optional seasonal hydrogen storage.
+    Represents a hydrogen plant in an energy system. This includes an electrolyser for hydrogen production and optional seasonal hydrogen storage.
 
     Args:
-        id (str): Unique identifier of the plant.
-        unit_operator (str): Operator of the plant.
-        bidding_strategies (dict): Bidding strategies.
-        node (str): Node location of the plant.
-        index (pd.DatetimeIndex): Time index for plant data.
-        location (tuple): Plant's geographical location.
-        components (dict): Components including electrolyser and hydrogen storage.
-        objective (str): Optimization objective.
-        flexibility_measure (str): Flexibility measure for load shifting.
-        demand (float): Hydrogen demand.
-        cost_tolerance (float): Maximum allowable cost increase.
+        id (str): Unique identifier for the hydrogen plant.
+        unit_operator (str): The operator responsible for the plant.
+        bidding_strategies (dict): A dictionary of bidding strategies that define how the plant participates in energy markets.
+        forecaster (Forecaster): A forecaster used to get key variables such as fuel or electricity prices.
+        technology (str, optional): The technology used by the plant. Default is "hydrogen_plant".
+        components (dict, optional): A dictionary describing the components of the plant, such as electrolyser and hydrogen seasonal storage. Default is an empty dictionary.
+        objective (str, optional): The objective function of the plant, typically to minimize variable costs. Default is "min_variable_cost".
+        flexibility_measure (str, optional): The flexibility measure used for the plant, such as "max_load_shift". Default is "max_load_shift".
+        demand (float, optional): The hydrogen production demand, representing how much hydrogen needs to be produced. Default is 0.
+        cost_tolerance (float, optional): The maximum allowable increase in cost when shifting load. Default is 10.
+        node (str, optional): The node location where the plant is connected within the energy network. Default is "node0".
+        location (tuple[float, float], optional): The geographical coordinates (latitude, longitude) of the hydrogen plant. Default is (0.0, 0.0).
+        **kwargs: Additional keyword arguments to support more specific configurations or parameters.
+
+    Attributes:
+        required_technologies (list): A list of required technologies for the plant, such as electrolyser.
+        optional_technologies (list): A list of optional technologies, such as hydrogen seasonal storage.
     """
 
+    # Required and optional technologies for the hydrogen plant
     required_technologies = ["electrolyser"]
     optional_technologies = ["hydrogen_seasonal_storage"]
 
@@ -44,15 +52,15 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
-        technology: str = "hydrogen_plant",
-        node: str = "node0",
-        index: pd.DatetimeIndex = None,
-        location: tuple[float, float] = (0.0, 0.0),
+        forecaster: Forecaster,
         components: dict[str, dict] = None,
-        objective: str = None,
+        technology: str = "hydrogen_plant",
+        objective: str = "min_variable_cost",
         flexibility_measure: str = "max_load_shift",
         demand: float = 0,
         cost_tolerance: float = 10,
+        node: str = "node0",
+        location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
         super().__init__(
@@ -61,7 +69,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             technology=technology,
             components=components,
             bidding_strategies=bidding_strategies,
-            index=index,
+            forecaster=forecaster,
             node=node,
             location=location,
             **kwargs,

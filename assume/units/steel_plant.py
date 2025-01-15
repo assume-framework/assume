@@ -21,23 +21,35 @@ logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 class SteelPlant(DSMFlex, SupportsMinMax):
     """
-    The SteelPlant class represents a steel plant unit in the energy system.
+    The SteelPlant class represents a steel plant unit within an energy system, which can
+    include various components like Direct Reduced Iron (DRI) plants,
+    Electric Arc Furnaces (EAF), and other supporting technologies. The class models a unit
+    that consumes energy for steel production and may also implement flexibility strategies
+    like cost-based load shifting.
 
     Args:
-        id (str): The unique identifier of the unit.
-        unit_operator (str): The operator of the unit.
-        bidding_strategies (dict): The bidding strategies of the unit.
-        technology (str): The technology of the unit.
-        node (str): The node of the unit.
-        location (tuple[float, float]): The location of the unit.
-        components (dict[str, dict]): The components of the unit such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace.
-        objective (str): The objective of the unit, e.g. minimize variable cost ("min_variable_cost").
-        flexibility_measure (str): The flexibility measure of the unit, e.g. "cost_based_load_shift".
-        demand (float): The demand of the unit - the amount of steel to be produced.
-        cost_tolerance (float): The cost tolerance of the unit - the maximum cost that can be tolerated when shifting the load.
+        id (str): A unique identifier for the steel plant unit.
+        unit_operator (str): The operator responsible for the steel plant.
+        bidding_strategies (dict): A dictionary of bidding strategies, which define how the unit participates in energy markets.
+        forecaster (Forecaster): A forecaster used to get key variables such as fuel or electricity prices.
+        technology (str, optional): The technology of the steel plant. Default is "steel_plant".
+        components (dict, optional): A dictionary describing the components of the steel plant, such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace. Default is an empty dictionary.
+        objective (str, optional): The objective function for the steel plant, typically focused on minimizing variable costs. Default is "min_variable_cost".
+        flexibility_measure (str, optional): The flexibility measure for the steel plant, such as "cost_based_load_shift". Default is "max_load_shift".
+        demand (float, optional): The steel production demand, representing the amount of steel that needs to be produced. Default is 0.
+        cost_tolerance (float, optional): The maximum allowable cost variation when shifting the load, used in flexibility measures. Default is 10.
+        congestion_threshold (float, optional): The threshold for congestion management in the plant’s energy system. Default is 0.
+        peak_load_cap (float, optional): The peak load capacity of the steel plant. Default is 0.
+        node (str, optional): The network node where the steel plant is located in the energy system. Default is "node0".
+        location (tuple[float, float], optional): A tuple representing the geographical coordinates (latitude, longitude) of the steel plant. Default is (0.0, 0.0).
+        **kwargs: Additional keyword arguments that may be passed to support more specific configurations.
+
+    Attributes:
+        required_technologies (list): A list of required technologies for the plant to function, such as DRI plant and EAF.
+        optional_technologies (list): A list of optional technologies that could enhance the plant, such as electrolyser or storage systems.
     """
 
-    # Compatible Technologies
+    # Required and optional technologies for the steel plant
     required_technologies = ["dri_plant", "eaf"]
     optional_technologies = ["electrolyser", "hydrogen_buffer_storage", "dri_storage"]
 
@@ -47,16 +59,16 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         unit_operator: str,
         bidding_strategies: dict,
         forecaster: Forecaster,
-        technology: str = "steel_plant",
-        node: str = "node0",
-        location: tuple[float, float] = (0.0, 0.0),
         components: dict[str, dict] = None,
-        objective: str = None,
-        flexibility_measure: str = "",
+        technology: str = "steel_plant",
+        objective: str = "min_variable_cost",
+        flexibility_measure: str = "max_load_shift",
         demand: float = 0,
         cost_tolerance: float = 10,
         congestion_threshold: float = 0,
         peak_load_cap: float = 0,
+        node: str = "node0",
+        location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
         super().__init__(
