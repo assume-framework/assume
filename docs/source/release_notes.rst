@@ -19,6 +19,7 @@ Upcoming Release
   This allows for a more robust scaling of the observation space for future analysis.
 - **Allow multi-market bidding strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
   the strategy is only created once and the same instance is used for all of these markets.
+- **Improve Storage behavior**: Storages were using the current unmodified SoC instead of the final SoC of last hour, leading to always using the initial value to calculate discharge possibility.(#524)
 
 **Bugfixes:**
 - **Learning Strategy with Different Simulation Time Steps**: Fixed an issue where the learning strategies were failing with simulation time steps other than one hour, such as 15 or 30 minutes.
