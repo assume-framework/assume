@@ -196,71 +196,71 @@ class TensorBoardLogger:
             episode = self.simulation_id.split("_")[-1]
             if episode.isdigit():
                 self.episode = int(episode)
+            
+    def update_tensorboard(self):
+        """Store episodic evaluation data in tensorboard"""
+        if not (self.episode and self.learning_mode):
+            return
 
-    def update_tensorboard (self):
-        """
-        Store episodic evalution data in tensorboard
-        """
-        if self.episode and self.learning_mode:
-            if self.episode == 1 and not self.perform_evaluation:
-                self.writer.add_text("TensorBoard Introduction", tensor_board_intro)
-            query = f"""
-            SELECT
-                datetime as dt,
-                unit,
-                profit,
-                reward,
-                regret,
-                critic_loss as loss,
-                learning_rate as lr,
-                exploration_noise_0 as noise_0,
-                exploration_noise_1 as noise_1
+        mode = "train" if not self.perform_evaluation else "eval"
+        
+        # Define query based on mode
+        base_columns = "datetime as dt, unit, profit, reward"
+        train_columns = ", regret, critic_loss as loss, learning_rate as lr, exploration_noise_0 as noise_0, exploration_noise_1 as noise_1"
+        
+        query = f"""
+            SELECT {base_columns}{train_columns if mode == 'train' else ''}
             FROM rl_params
             WHERE episode = '{self.episode}'
             AND simulation = '{self.simulation_id}'
-            AND perform_evaluation = False
-            AND initial_exploration = False
-            """
-            try:
-                rl_params_df = pd.read_sql(query, self.db)
-                rl_params_df["dt"] = pd.to_datetime(rl_params_df["dt"])
-                # replace all NaN values with 0 to allow for plotting
-                rl_params_df = rl_params_df.fillna(0.0)
+            AND perform_evaluation = {self.perform_evaluation}
+            {' AND initial_exploration = False' if mode == 'train' else ''}
+        """
 
-                # loop over all datetimes as tensorboard does not allow to store time series
-                datetimes = rl_params_df["dt"].unique()
+        try:
+            # Add intro text for first episode
+            if self.episode == 1 and mode == "train":
+                self.writer.add_text("TensorBoard Introduction", tensor_board_intro)
+
+            # Process dataframe
+            df = pd.read_sql(query, self.db)
+            df["dt"] = pd.to_datetime(df["dt"])
+            df = df.fillna(0.0)
+
+            # Calculate x_index
+            datetimes = df["dt"].unique()
+            x_index = (self.episode - 1) * len(datetimes)
+            if mode == "train":
+                x_index -= self.episodes_collecting_initial_experience * len(datetimes)
+
+            # Process metrics for each timestamp
+            for i, time in enumerate(datetimes):
+                time_df = df[df["dt"] == time]
                 
-                for i, time in enumerate(datetimes):
-                    time_df = rl_params_df[rl_params_df["dt"] == time]
-                    
-                    # efficient implementation for unit specific metrics  
-                    metrics = ['reward', 'profit', 'regret', 'loss']
-                    dicts = {
-                        metric: {**time_df.set_index('unit')[metric].to_dict(), 
-                                'avg': time_df[metric].mean()}
-                        for metric in metrics
+                # Build metrics dictionary
+                unit_metrics = ['reward', 'profit'] + (['regret', 'loss'] if mode == "train" else [])
+                metric_dicts = {
+                    metric: {
+                        **time_df.set_index('unit')[metric].to_dict(),
+                        'avg': time_df[metric].mean()
+                    }
+                    for metric in unit_metrics
+                }
+
+                # Add training-specific metrics
+                if mode == "train":
+                    metric_dicts['lr'] = {"learning_rate": time_df["lr"].iloc[0]}
+                    metric_dicts['noise'] = {
+                        f'_{i}': time_df[f'noise_{i}'].abs().mean()
+                        for i in range(2)
                     }
 
-                    # calculate the average noise
-                    noise_0 = time_df["noise_0"].abs().mean()
-                    noise_1 = time_df["noise_1"].abs().mean()
+                # Write to tensorboard
+                for order, (metric, values) in enumerate(metric_dicts.items()):
+                    self.writer.add_scalars(f"{mode}/{order}) {metric}", values, x_index + i)
 
-                    # get the learning rate
-                    lr = time_df["lr"].values[0]
-
-                    # store the data in tensorboard
-                    x_index = (
-                        self.episode - 1 - self.episodes_collecting_initial_experience
-                    ) * len(datetimes) + i
-                    self.writer.add_scalars("a) reward", dicts['reward'], x_index)
-                    self.writer.add_scalars("b) profit", dicts['profit'], x_index)
-                    self.writer.add_scalars("c) regret", dicts['regret'], x_index)
-                    self.writer.add_scalars("d) loss", dicts['loss'], x_index)
-                    self.writer.add_scalar("e) learning rate", lr, x_index)
-                    self.writer.add_scalar("f) noise_0", noise_0, x_index)
-                    self.writer.add_scalar("g) noise_1", noise_1, x_index)
-            except (ProgrammingError, OperationalError, DataError):
-                return
-            except Exception as e:
-                logger.error("could not read query: %s", e)
-                return
+        except (ProgrammingError, OperationalError, DataError):
+            return
+        except Exception as e:
+            logger.error("could not read query: %s", e)
+            return

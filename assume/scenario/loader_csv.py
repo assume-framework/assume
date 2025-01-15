@@ -962,6 +962,8 @@ def run_learning(
 
             world.run()
 
+            world.tensor_board_logger.update_tensorboard()
+
             total_rewards = world.output_role.get_sum_reward()
 
             if len(total_rewards) == 0:

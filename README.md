@@ -96,7 +96,7 @@ while replacing `"path_to_tensorboard_log_dir"` with the correct logging path th
 
 You can then head to `http://localhost:6006/` to view and evaluate the training process parameters.
 
-Please note that TensorBoard has to be shut down via `Ctrl + C` every time you want to start a new simulation run. This also applies if you use the same folder structure and want to overwrite existing results.
+Please note that TensorBoard should be shut down via `Ctrl + C` every time you want to start a new simulation run in the same folder structure and want to overwrite existing results.
 
 ## Trying out ASSUME and the provided Examples
 
