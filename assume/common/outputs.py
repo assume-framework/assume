@@ -29,7 +29,6 @@ from assume.common.utils import (
     check_for_tensors,
     separate_orders,
 )
-from docs.tensorboard_info import tensor_board_intro
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +52,6 @@ class WriteOutput(Role):
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         episodes_collecting_initial_experience: Number of episodes collecting initial experience. Defaults to 0.
-        tensorboard_path (str, optional): The path for storing tensorboard logs. Defaults to "".
         perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
         max_dfs_size_mb (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
@@ -69,7 +67,6 @@ class WriteOutput(Role):
         save_frequency_hours: int = None,
         learning_mode: bool = False,
         episodes_collecting_initial_experience: int = 0,
-        tensorboard_path: str = "logs/tensorboard",
         perform_evaluation: bool = False,
         additional_kpis: dict[str, OutputDef] = {},
         max_dfs_size_mb: int = 300,
@@ -115,12 +112,6 @@ class WriteOutput(Role):
         # initializes dfs for storing and writing asynchronous
         self.write_buffers: dict = defaultdict(list)
         self.locks = defaultdict(lambda: Lock())
-
-        # initialize tensorboard writer for episodic evaluation
-        if learning_mode:
-            from torch.utils.tensorboard import SummaryWriter
-
-            self.writer = SummaryWriter(tensorboard_path)
 
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {
@@ -720,70 +711,6 @@ class WriteOutput(Role):
             with self.db.begin() as db:
                 df.to_sql("kpis", db, if_exists="append", index=None)
 
-        # store episodic evalution data in tensorboard
-        if self.episode and self.learning_mode:
-            if self.episode == 1 and not self.perform_evaluation:
-                self.writer.add_text("TensorBoard Introduction", tensor_board_intro)
-            query = f"""
-            SELECT
-                datetime as dt,
-                unit,
-                profit,
-                reward,
-                regret,
-                critic_loss as loss,
-                learning_rate as lr,
-                exploration_noise_0 as noise_0,
-                exploration_noise_1 as noise_1
-            FROM rl_params
-            WHERE episode = '{self.episode}'
-            AND simulation = '{self.simulation_id}'
-            AND perform_evaluation = False
-            AND initial_exploration = False
-            """
-            try:
-                rl_params_df = pd.read_sql(query, self.db)
-                rl_params_df["dt"] = pd.to_datetime(rl_params_df["dt"])
-                # replace all NaN values with 0 to allow for plotting
-                rl_params_df = rl_params_df.fillna(0.0)
-
-                # loop over all datetimes as tensorboard does not allow to store time series
-                datetimes = rl_params_df["dt"].unique()
-                
-                for i, time in enumerate(datetimes):
-                    time_df = rl_params_df[rl_params_df["dt"] == time]
-                    
-                    # efficient implementation for unit specific metrics  
-                    metrics = ['reward', 'profit', 'regret', 'loss']
-                    dicts = {
-                        metric: {**time_df.set_index('unit')[metric].to_dict(), 
-                                'avg': time_df[metric].mean()}
-                        for metric in metrics
-                    }
-
-                    # calculate the average noise
-                    noise_0 = time_df["noise_0"].abs().mean()
-                    noise_1 = time_df["noise_1"].abs().mean()
-
-                    # get the learning rate
-                    lr = time_df["lr"].values[0]
-
-                    # store the data in tensorboard
-                    x_index = (
-                        self.episode - 1 - self.episodes_collecting_initial_experience
-                    ) * len(datetimes) + i
-                    self.writer.add_scalars("a) reward", dicts['reward'], x_index)
-                    self.writer.add_scalars("b) profit", dicts['profit'], x_index)
-                    self.writer.add_scalars("c) regret", dicts['regret'], x_index)
-                    self.writer.add_scalars("d) loss", dicts['loss'], x_index)
-                    self.writer.add_scalar("e) learning rate", lr, x_index)
-                    self.writer.add_scalar("f) noise_0", noise_0, x_index)
-                    self.writer.add_scalar("g) noise_1", noise_1, x_index)
-            except (ProgrammingError, OperationalError, DataError):
-                return
-            except Exception as e:
-                logger.error("could not read query: %s", e)
-                return
 
     def get_sum_reward(self):
         """

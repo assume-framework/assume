@@ -154,6 +154,8 @@ class World:
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
+        self.tensor_board_logger = None
+
     def setup(
         self,
         start: datetime,
@@ -261,6 +263,7 @@ class World:
         if self.learning_mode or self.perform_evaluation:
             # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
+            from assume.reinforcement_learning.learning_utils import TensorBoardLogger
 
             self.learning_role = Learning(
                 self.learning_config, 
@@ -298,6 +301,16 @@ class World:
         
             self.learning_operators[id] = learning_role_agent
 
+            self.tensor_board_logger = TensorBoardLogger(
+                simulation_id = id,
+                db_uri = self.db_uri,
+                tensorboard_path = f"{self.learning_config.get("trained_policies_save_path", "logs")}/tensorboard",
+                learning_mode = self.learning_mode,
+                episodes_collecting_initial_experience = self.episodes_collecting_initial_experience,
+                perform_evaluation = self.perform_evaluation,
+            )
+
+
 
     def setup_output_agent(self, simulation_id: str, save_frequency_hours: int) -> None:
         """
@@ -324,7 +337,6 @@ class World:
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
             episodes_collecting_initial_experience = self.episodes_collecting_initial_experience,
-            tensorboard_path=f"{self.learning_config.get("trained_policies_save_path", "logs")}/tensorboard",
             perform_evaluation=self.perform_evaluation,
             additional_kpis=self.additional_kpis,
         )

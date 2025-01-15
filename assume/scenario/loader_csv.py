@@ -933,6 +933,8 @@ def run_learning(
 
         world.run()
 
+        world.tensor_board_logger.update_tensorboard()
+
         # -----------------------------------------
         # Store updated information across episodes
         inter_episodic_data = world.learning_role.get_inter_episodic_data()

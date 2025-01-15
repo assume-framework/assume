@@ -2,19 +2,25 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
+
 from collections.abc import Callable
 from datetime import datetime
 from typing import TypedDict
+from sqlalchemy import create_engine
+from torch.utils.tensorboard import SummaryWriter
+from docs.tensorboard_info import tensor_board_intro
+from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 import numpy as np
 import torch as th
-
-
+import pandas as pd
 class ObsActRew(TypedDict):
     observation: list[th.Tensor]
     action: list[th.Tensor]
     reward: list[th.Tensor]
 
+logger = logging.getLogger(__name__)
 
 observation_dict = dict[list[datetime], ObsActRew]
 
@@ -153,3 +159,108 @@ def constant_schedule(val: float) -> Schedule:
         return val
 
     return func
+
+class TensorBoardLogger:
+    """
+    Initializes an instance of the TensorBoardLogger class.
+
+    Args:
+    learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
+    episodes_collecting_initial_experience: Number of episodes collecting initial experience. Defaults to 0.
+    tensorboard_path (str, optional): The path for storing tensorboard logs. Defaults to "".
+    perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
+    """
+    def __init__(
+        self,
+        db_uri: str,
+        simulation_id: str,
+        tensorboard_path: str = "logs/tensorboard",
+        learning_mode: bool = False,
+        episodes_collecting_initial_experience: int = 0,
+        perform_evaluation: bool = False,
+        ):
+
+        self.simulation_id = simulation_id
+        self.learning_mode = learning_mode
+        self.perform_evaluation = perform_evaluation
+        self.episodes_collecting_initial_experience = episodes_collecting_initial_experience
+        
+        self.writer = SummaryWriter(tensorboard_path)
+        self.db_uri = db_uri
+        if self.db_uri:
+            self.db = create_engine(self.db_uri)
+
+        # get episode number if in learning or evaluation mode
+        self.episode = None
+        if self.learning_mode or self.perform_evaluation:
+            episode = self.simulation_id.split("_")[-1]
+            if episode.isdigit():
+                self.episode = int(episode)
+
+    def update_tensorboard (self):
+        """
+        Store episodic evalution data in tensorboard
+        """
+        if self.episode and self.learning_mode:
+            if self.episode == 1 and not self.perform_evaluation:
+                self.writer.add_text("TensorBoard Introduction", tensor_board_intro)
+            query = f"""
+            SELECT
+                datetime as dt,
+                unit,
+                profit,
+                reward,
+                regret,
+                critic_loss as loss,
+                learning_rate as lr,
+                exploration_noise_0 as noise_0,
+                exploration_noise_1 as noise_1
+            FROM rl_params
+            WHERE episode = '{self.episode}'
+            AND simulation = '{self.simulation_id}'
+            AND perform_evaluation = False
+            AND initial_exploration = False
+            """
+            try:
+                rl_params_df = pd.read_sql(query, self.db)
+                rl_params_df["dt"] = pd.to_datetime(rl_params_df["dt"])
+                # replace all NaN values with 0 to allow for plotting
+                rl_params_df = rl_params_df.fillna(0.0)
+
+                # loop over all datetimes as tensorboard does not allow to store time series
+                datetimes = rl_params_df["dt"].unique()
+                
+                for i, time in enumerate(datetimes):
+                    time_df = rl_params_df[rl_params_df["dt"] == time]
+                    
+                    # efficient implementation for unit specific metrics  
+                    metrics = ['reward', 'profit', 'regret', 'loss']
+                    dicts = {
+                        metric: {**time_df.set_index('unit')[metric].to_dict(), 
+                                'avg': time_df[metric].mean()}
+                        for metric in metrics
+                    }
+
+                    # calculate the average noise
+                    noise_0 = time_df["noise_0"].abs().mean()
+                    noise_1 = time_df["noise_1"].abs().mean()
+
+                    # get the learning rate
+                    lr = time_df["lr"].values[0]
+
+                    # store the data in tensorboard
+                    x_index = (
+                        self.episode - 1 - self.episodes_collecting_initial_experience
+                    ) * len(datetimes) + i
+                    self.writer.add_scalars("a) reward", dicts['reward'], x_index)
+                    self.writer.add_scalars("b) profit", dicts['profit'], x_index)
+                    self.writer.add_scalars("c) regret", dicts['regret'], x_index)
+                    self.writer.add_scalars("d) loss", dicts['loss'], x_index)
+                    self.writer.add_scalar("e) learning rate", lr, x_index)
+                    self.writer.add_scalar("f) noise_0", noise_0, x_index)
+                    self.writer.add_scalar("g) noise_1", noise_1, x_index)
+            except (ProgrammingError, OperationalError, DataError):
+                return
+            except Exception as e:
+                logger.error("could not read query: %s", e)
+                return
