@@ -399,20 +399,22 @@ class Learning(Role):
         # Initialize datetime the first time the function is called
         if self.datetime == None:
             self.datetime = pd.to_datetime(self.context.data.get("train_start"))
-        freq = self.context.data.get("freq")
 
-        output_list = []
+        freq_timedelta = pd.Timedelta(self.context.data.get("freq"))
+        # This is for padding the output list when the gradient steps are not identical to the train frequency
+        time_steps = int(pd.Timedelta(self.train_freq) / (freq_timedelta * self.gradient_steps))
         
-        for step in range(self.gradient_steps):
-            for critic, value in critic_losses_list[step].items():
-                critic_losses = {
-                    "unit" : critic,
-                    "critic_loss" : value,
-                    "learning_rate" : learning_rate,
-                    "datetime" : self.datetime + step * pd.Timedelta(freq)
-                }
-
-                output_list.append(critic_losses)
+        output_list = [
+            {
+                "unit": u_id,
+                "critic_loss": loss,
+                "learning_rate": learning_rate,
+                "datetime": self.datetime + ((time_step * self.gradient_steps + gradient_step) * freq_timedelta)
+            }
+            for time_step in range(time_steps)
+            for gradient_step in range(self.gradient_steps)
+            for u_id, loss in critic_losses_list[gradient_step].items()
+        ]
             
         if db_addr:
             self.context.schedule_instant_message(
