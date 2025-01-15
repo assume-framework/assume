@@ -749,25 +749,17 @@ class WriteOutput(Role):
 
                 # loop over all datetimes as tensorboard does not allow to store time series
                 datetimes = rl_params_df["dt"].unique()
+                
                 for i, time in enumerate(datetimes):
                     time_df = rl_params_df[rl_params_df["dt"] == time]
-                    rewards = {}
-                    profits = {}
-                    regrets = {}
-                    losses = {}
-
-                    # loop over all units and store the reward, profit and regret
-                    for unit, unit_df in time_df.groupby("unit"):
-                        rewards[unit] = unit_df["reward"].values[0]
-                        profits[unit] = unit_df["profit"].values[0]
-                        regrets[unit] = unit_df["regret"].values[0]
-                        losses[unit] = unit_df["loss"].values[0]
-
-                    # Add the averages over the units to the dictionaries
-                    rewards["avg"] = sum(rewards.values()) / len(rewards)
-                    profits["avg"] = sum(profits.values()) / len(profits)
-                    regrets["avg"] = sum(regrets.values()) / len(regrets)
-                    losses["avg"] = sum(losses.values()) / len(losses)
+                    
+                    # efficient implementation for unit specific metrics  
+                    metrics = ['reward', 'profit', 'regret', 'loss']
+                    dicts = {
+                        metric: {**time_df.set_index('unit')[metric].to_dict(), 
+                                'avg': time_df[metric].mean()}
+                        for metric in metrics
+                    }
 
                     # calculate the average noise
                     noise_0 = time_df["noise_0"].abs().mean()
@@ -780,10 +772,10 @@ class WriteOutput(Role):
                     x_index = (
                         self.episode - 1 - self.episodes_collecting_initial_experience
                     ) * len(datetimes) + i
-                    self.writer.add_scalars("a) reward", rewards, x_index)
-                    self.writer.add_scalars("b) profit", profits, x_index)
-                    self.writer.add_scalars("c) regret", regrets, x_index)
-                    self.writer.add_scalars("d) loss", losses, x_index)
+                    self.writer.add_scalars("a) reward", dicts['reward'], x_index)
+                    self.writer.add_scalars("b) profit", dicts['profit'], x_index)
+                    self.writer.add_scalars("c) regret", dicts['regret'], x_index)
+                    self.writer.add_scalars("d) loss", dicts['loss'], x_index)
                     self.writer.add_scalar("e) learning rate", lr, x_index)
                     self.writer.add_scalar("f) noise_0", noise_0, x_index)
                     self.writer.add_scalar("g) noise_1", noise_1, x_index)
