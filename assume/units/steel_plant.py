@@ -32,7 +32,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         location (tuple[float, float]): The location of the unit.
         components (dict[str, dict]): The components of the unit such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace.
         objective (str): The objective of the unit, e.g. minimize variable cost ("min_variable_cost").
-        flexibility_measure (str): The flexibility measure of the unit, e.g. maximum load shift ("cost_based_load_shift").
+        flexibility_measure (str): The flexibility measure of the unit, e.g. "cost_based_load_shift".
         demand (float): The demand of the unit - the amount of steel to be produced.
         cost_tolerance (float): The cost tolerance of the unit - the maximum cost that can be tolerated when shifting the load.
     """
@@ -114,38 +114,8 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.has_dristorage = "dri_storage" in self.components.keys()
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
-        self.opt_power_requirement = None
-        self.flex_power_requirement = None
-
-        # Main Model part
-        self.model = pyo.ConcreteModel()
-        self.define_sets()
-        self.define_parameters()
-        self.define_variables()
-
-        self.initialize_components()
-        self.initialize_process_sequence()
-
-        self.define_constraints()
-        self.define_objective_opt()
-
-        self.determine_optimal_operation_without_flex(switch_flex_off=False)
-
-        # Apply the flexibility function based on flexibility measure
-        if self.flexibility_measure in DSMFlex.flexibility_map:
-            DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
-        else:
-            raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
-
-        self.define_objective_flex()
-
-    def define_sets(self) -> None:
-        """
-        Defines the sets for the Pyomo model.
-        """
-        self.model.time_steps = pyo.Set(
-            initialize=[idx for idx, _ in enumerate(self.index)]
-        )
+        # Initialize the model
+        self.setup_model()
 
     def define_parameters(self):
         """
@@ -329,93 +299,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
             return self.model.variable_cost[t] == variable_cost
 
-    def define_objective_opt(self):
-        """
-        Defines the objective for the optimization model.
-
-        Args:
-            model (pyomo.ConcreteModel): The Pyomo model.
-        """
-        if self.objective == "min_variable_cost" or "recalculate":
-
-            @self.model.Objective(sense=pyo.minimize)
-            def obj_rule_opt(m):
-                """
-                Minimizes the total variable cost over all time steps.
-                """
-                total_variable_cost = sum(
-                    self.model.variable_cost[t] for t in self.model.time_steps
-                )
-
-                return total_variable_cost
-
-        else:
-            raise ValueError(f"Unknown objective: {self.objective}")
-
-    def define_objective_flex(self):
-        """
-        Defines the flexibility objective for the optimization model.
-
-        Args:
-            model (pyomo.ConcreteModel): The Pyomo model.
-        """
-        if self.flexibility_measure == "cost_based_load_shift":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                """
-                Maximizes the load shift over all time steps.
-                """
-
-                maximise_load_shift = pyo.quicksum(
-                    m.load_shift_pos[t] for t in m.time_steps
-                )
-
-                return maximise_load_shift
-
-        elif self.flexibility_measure == "congestion_management_flexibility":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                """
-                Maximizes the load shift over all time steps.
-                """
-                maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t] * m.congestion_indicator[t]
-                    for t in m.time_steps
-                )
-
-                return maximise_load_shift
-
-        elif self.flexibility_measure == "peak_load_shifting":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                """
-                Maximizes the load shift over all time steps.
-                """
-                maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
-                )
-
-                return maximise_load_shift
-
-        elif self.flexibility_measure == "renewable_utilisation":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                """
-                Maximizes the load increase over all time steps based on renewable surplus.
-                """
-                maximise_renewable_utilisation = pyo.quicksum(
-                    m.load_shift_pos[t] * m.renewable_signal[t] for t in m.time_steps
-                )
-
-                return maximise_renewable_utilisation
-
-        else:
-            raise ValueError(f"Unknown objective: {self.flexibility_measure}")
-
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculate the marginal cost of the unit based on the provided time and power.
@@ -437,26 +320,3 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             )
 
         return marginal_cost
-
-    def as_dict(self) -> dict:
-        """
-        Returns the attributes of the unit as a dictionary, including specific attributes.
-
-        Returns:
-            dict: The attributes of the unit as a dictionary.
-        """
-        # Assuming unit_dict is a dictionary that you want to save to the database
-        components_list = [component for component in self.model.dsm_blocks.keys()]
-
-        # Convert the list to a delimited string
-        components_string = ",".join(components_list)
-
-        unit_dict = super().as_dict()
-        unit_dict.update(
-            {
-                "unit_type": "demand",
-                "components": components_string,
-            }
-        )
-
-        return unit_dict

@@ -98,32 +98,8 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         )
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
-        # Define the Pyomo model
-        self.model = pyo.ConcreteModel()
-        self.define_sets()
-        self.define_parameters()
-        self.define_variables()
-
-        self.initialize_components()
-        self.initialize_process_sequence()
-
-        self.define_constraints()
-        self.define_objective_opt()
-
-        self.determine_optimal_operation_without_flex(switch_flex_off=False)
-
-        # Apply the flexibility function based on flexibility measure
-        if self.flexibility_measure in DSMFlex.flexibility_map:
-            DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
-        else:
-            raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
-
-        self.define_objective_flex()
-
-    def define_sets(self):
-        self.model.time_steps = pyo.Set(
-            initialize=[idx for idx, _ in enumerate(self.index)]
-        )
+        # Initialize the model
+        self.setup_model()
 
     def define_parameters(self):
         self.model.electricity_price = pyo.Param(
@@ -235,77 +211,6 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 == self.model.dsm_blocks["electrolyser"].operating_cost[t]
             )
 
-    def define_objective_opt(self):
-        if self.objective == "min_variable_cost":
-
-            @self.model.Objective(sense=pyo.minimize)
-            def obj_rule_opt(m):
-                return sum(self.model.variable_cost[t] for t in self.model.time_steps)
-
-    def define_objective_flex(self):
-        """
-        Defines the flexibility objective for the optimization model.
-
-        Args:
-            model (pyomo.ConcreteModel): The Pyomo model.
-        """
-        if self.flexibility_measure == "cost_based_load_shift":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                """
-                Maximizes the load shift over all time steps.
-                """
-
-                maximise_load_shift = pyo.quicksum(
-                    m.load_shift_pos[t] for t in m.time_steps
-                )
-
-                return maximise_load_shift
-
-        elif self.flexibility_measure == "congestion_management_flexibility":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                """
-                Maximizes the load shift over all time steps.
-                """
-                maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t] * m.congestion_indicator[t]
-                    for t in m.time_steps
-                )
-
-                return maximise_load_shift
-
-        elif self.flexibility_measure == "peak_load_shifting":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                """
-                Maximizes the load shift over all time steps.
-                """
-                maximise_load_shift = pyo.quicksum(
-                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
-                )
-
-                return maximise_load_shift
-
-        elif self.flexibility_measure == "renewable_utilisation":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                """
-                Maximizes the load increase over all time steps based on renewable surplus.
-                """
-                maximise_renewable_utilisation = pyo.quicksum(
-                    m.load_shift_pos[t] * m.renewable_signal[t] for t in m.time_steps
-                )
-
-                return maximise_renewable_utilisation
-
-        else:
-            raise ValueError(f"Unknown objective: {self.flexibility_measure}")
-
     def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
         """
         Calculate the marginal cost of the unit based on the provided time and power.
@@ -320,32 +225,10 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         # Initialize marginal cost
         marginal_cost = 0
 
-        if self.opt_power_requirement[start] > 0:
+        if self.opt_power_requirement.at[start] > 0:
             marginal_cost = (
-                self.variable_cost_series[start] / self.opt_power_requirement[start]
+                self.variable_cost_series.at[start]
+                / self.opt_power_requirement.at[start]
             )
 
         return marginal_cost
-
-    def as_dict(self) -> dict:
-        """
-        Returns the attributes of the unit as a dictionary, including specific attributes.
-
-        Returns:
-            dict: The attributes of the unit as a dictionary.
-        """
-        # Assuming unit_dict is a dictionary that you want to save to the database
-        components_list = [component for component in self.model.dsm_blocks.keys()]
-
-        # Convert the list to a delimited string
-        components_string = ",".join(components_list)
-
-        unit_dict = super().as_dict()
-        unit_dict.update(
-            {
-                "unit_type": "demand",
-                "components": components_string,
-            }
-        )
-
-        return unit_dict

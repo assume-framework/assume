@@ -92,6 +92,63 @@ class DSMFlex:
                     self.model, self.model.dsm_blocks[technology]
                 )
 
+    def setup_model(self):
+        # Initialize the Pyomo model
+        # along with optimal and flexibility constraints
+        # and the objective functions
+
+        self.model = pyo.ConcreteModel()
+        self.define_sets()
+        self.define_parameters()
+        self.define_variables()
+
+        self.initialize_components()
+        self.initialize_process_sequence()
+
+        self.define_constraints()
+        self.define_objective_opt()
+
+        self.determine_optimal_operation_without_flex(switch_flex_off=False)
+
+        # Modify the model to include the flexibility measure constraints
+        # as well as add a new objective function to the model
+        # to maximize the flexibility measure
+        if self.flexibility_measure in DSMFlex.flexibility_map:
+            DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
+        else:
+            raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
+
+    def define_sets(self) -> None:
+        """
+        Defines the sets for the Pyomo model.
+        """
+        self.model.time_steps = pyo.Set(
+            initialize=[idx for idx, _ in enumerate(self.index)]
+        )
+
+    def define_objective_opt(self):
+        """
+        Defines the objective for the optimization model.
+
+        Args:
+            model (pyomo.ConcreteModel): The Pyomo model.
+        """
+        if self.objective == "min_variable_cost" or "recalculate":
+
+            @self.model.Objective(sense=pyo.minimize)
+            def obj_rule_opt(m):
+                """
+                Minimizes the total variable cost over all time steps.
+                """
+                total_variable_cost = pyo.quicksum(
+                    self.model.variable_cost[t] for t in self.model.time_steps
+                )
+
+                return total_variable_cost
+
+        else:
+            raise ValueError(f"Unknown objective: {self.objective}")
+
     def cost_based_flexibility(self, model):
         """
         Modify the optimization model to include constraints for flexibility within cost tolerance.
@@ -147,6 +204,18 @@ class DSMFlex:
                         == self.model.dsm_blocks["eaf"].power_in[t]
                         + self.model.dsm_blocks["dri_plant"].power_in[t]
                     )
+
+        @self.model.Objective(sense=pyo.maximize)
+        def obj_rule_flex(m):
+            """
+            Maximizes the load shift over all time steps.
+            """
+
+            maximise_load_shift = pyo.quicksum(
+                m.load_shift_pos[t] for t in m.time_steps
+            )
+
+            return maximise_load_shift
 
     def grid_congestion_management(self, model):
         """
@@ -207,6 +276,17 @@ class DSMFlex:
                     == self.model.dsm_blocks["eaf"].power_in[t]
                     + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
+
+        @self.model.Objective(sense=pyo.maximize)
+        def obj_rule_flex(m):
+            """
+            Maximizes the load shift over all time steps.
+            """
+            maximise_load_shift = pyo.quicksum(
+                m.load_shift_neg[t] * m.congestion_indicator[t] for t in m.time_steps
+            )
+
+            return maximise_load_shift
 
     def peak_load_shifting_flexibility(self, model):
         """
@@ -294,6 +374,17 @@ class DSMFlex:
                     <= peak_load_cap_value
                 )
 
+        @self.model.Objective(sense=pyo.maximize)
+        def obj_rule_flex(m):
+            """
+            Maximizes the load shift over all time steps.
+            """
+            maximise_load_shift = pyo.quicksum(
+                m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
+            )
+
+            return maximise_load_shift
+
     def renewable_utilisation(self, model):
         """
         Implements flexibility based on the renewable utilisation signal. The normalized renewable intensity
@@ -357,6 +448,17 @@ class DSMFlex:
                     == m.dsm_blocks["eaf"].power_in[t]
                     + m.dsm_blocks["dri_plant"].power_in[t]
                 )
+
+        @self.model.Objective(sense=pyo.maximize)
+        def obj_rule_flex(m):
+            """
+            Maximizes the load increase over all time steps based on renewable surplus.
+            """
+            maximise_renewable_utilisation = pyo.quicksum(
+                m.load_shift_pos[t] * m.renewable_signal[t] for t in m.time_steps
+            )
+
+            return maximise_renewable_utilisation
 
     def determine_optimal_operation_without_flex(self, switch_flex_off=True):
         """
@@ -506,3 +608,26 @@ class DSMFlex:
         instance.total_cost = self.total_cost
 
         return instance
+
+    def as_dict(self) -> dict:
+        """
+        Returns the attributes of the unit as a dictionary, including specific attributes.
+
+        Returns:
+            dict: The attributes of the unit as a dictionary.
+        """
+        # Assuming unit_dict is a dictionary that you want to save to the database
+        components_list = [component for component in self.model.dsm_blocks.keys()]
+
+        # Convert the list to a delimited string
+        components_string = ",".join(components_list)
+
+        unit_dict = super().as_dict()
+        unit_dict.update(
+            {
+                "unit_type": "demand",
+                "components": components_string,
+            }
+        )
+
+        return unit_dict
