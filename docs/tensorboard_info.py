@@ -11,12 +11,13 @@ Welcome to the TensorBoard visualization interface for the reinforcement learnin
 
 ## Accessing the Data
 
-To view the training results, navigate to the "SCALARS" page in TensorBoard. Here you'll find various metrics tracked during the training process, visualized as interactive plots.
+To view the training and evaluation results, navigate to the "SCALARS" page in TensorBoard. Here you'll find various metrics tracked during the training process, visualized as interactive plots.
 
 ## Available Parameters
 
 The following parameters are being tracked and displayed:
 
+### Training Metrics:
 a) Reward
 b) Profit
 c) Regret
@@ -24,14 +25,23 @@ d) Loss
 e) Learning Rate
 f) Noise Parameters
 
+### Evaluation Metrics:
+a) Reward
+b) Profit
+
 ## Visualization Settings
 
 For optimal visualization of the training progress:
 
-- Set the smoothing parameter to 0.99 for all metrics except the learning rate
+- Set the smoothing parameter to 0,999 for all metrics except the learning rate
 - For the learning rate visualization, set smoothing to 0.0 to see the exact values
 - The x-axis represents time in hours, displayed as consecutive integers over the episodes
 - Data display begins after the initial exploration phase, as early results are random due to the exploration nature of the RL algorithm
+
+## Using Regex Filters
+
+To focus on specific metrics or units, use the regex filter option ion the left of the SCALARS page. This allows you to display only the data you're interested in, making it easier to analyze the results.
+You can filter by unit name, display only averaged values or filter different study cases.
 
 ## Interactive Features
 

@@ -165,10 +165,13 @@ class TensorBoardLogger:
     Initializes an instance of the TensorBoardLogger class.
 
     Args:
-    learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
-    episodes_collecting_initial_experience: Number of episodes collecting initial experience. Defaults to 0.
-    tensorboard_path (str, optional): The path for storing tensorboard logs. Defaults to "".
-    perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
+    db_uri (str): URI for connecting to the database.
+    simulation_id (str): The unique identifier for the simulation.
+    tensorboard_path (str, optional): Path for storing tensorboard logs.
+    learning_mode (bool, optional): Whether the simulation is in learning mode. Defaults to False.
+    episodes_collecting_initial_experience (int, optional): Number of episodes for initial experience collection. Defaults to 0.
+    perform_evaluation (bool, optional): Whether the simulation is in evaluation mode. Defaults to False.
+    
     """
     def __init__(
         self,
@@ -249,15 +252,15 @@ class TensorBoardLogger:
 
                 # Add training-specific metrics
                 if mode == "train":
-                    metric_dicts['lr'] = {"learning_rate": time_df["lr"].iloc[0]}
+                    metric_dicts['learning rate'] = {'': time_df["lr"].iloc[0]}
                     metric_dicts['noise'] = {
-                        f'_{i}': time_df[f'noise_{i}'].abs().mean()
+                        f'{i}': time_df[f'noise_{i}'].abs().mean()
                         for i in range(2)
                     }
-
+                plot_order = ["a)", "b)", "c)", "d)", "e)", "f)"]
                 # Write to tensorboard
                 for order, (metric, values) in enumerate(metric_dicts.items()):
-                    self.writer.add_scalars(f"{mode}/{order}) {metric}", values, x_index + i)
+                    self.writer.add_scalars(f"{mode}/{plot_order[order]} {metric}", values, x_index + i)
 
         except (ProgrammingError, OperationalError, DataError):
             return

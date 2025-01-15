@@ -304,7 +304,7 @@ class World:
             self.tensor_board_logger = TensorBoardLogger(
                 simulation_id = id,
                 db_uri = self.db_uri,
-                tensorboard_path = f"{self.learning_config.get("trained_policies_save_path", "logs")}/tensorboard",
+                tensorboard_path = f"{self.learning_config.get("trained_policies_save_path", "logs")}/TB",
                 learning_mode = self.learning_mode,
                 episodes_collecting_initial_experience = self.episodes_collecting_initial_experience,
                 perform_evaluation = self.perform_evaluation,
