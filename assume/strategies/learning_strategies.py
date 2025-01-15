@@ -1077,3 +1077,63 @@ class StorageRLStrategy(AbstractLearningStrategy):
         )
 
         return observation.detach().clone()
+
+
+class RedispatchRLStrategy(RLStrategy):
+    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
+        market_id = market_config.market_id
+
+        if market_id == "EOM":
+            return super().calculate_bids(unit, market_config, product_tuples, **kwargs)
+        elif market_id == "redispatch":
+            return self.calculate_redispatch_bids(
+                unit, market_config, product_tuples, **kwargs
+            )
+
+    def calculate_redispatch_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param market_config: the market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: list of all products the unit can offer
+        :type product_tuples: list[Product]
+        :return: the bids consisting of the start time, end time, only hours, price and volume.
+        :rtype: Orderbook
+        """
+        start = product_tuples[0][0]
+        # end_all = product_tuples[-1][1]
+        previous_power = unit.get_output_before(start)
+        min_power, max_power = unit.min_power, unit.max_power
+
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            current_power = unit.outputs["energy"].at[start]
+            marginal_cost = unit.calculate_marginal_cost(
+                start, previous_power
+            )  # calculation of the marginal costs
+
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": marginal_cost,
+                    "volume": current_power,
+                    "max_power": max_power,
+                    "min_power": min_power,
+                    "node": unit.node,
+                }
+            )
+
+        return bids
