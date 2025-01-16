@@ -168,8 +168,9 @@ class NaiveDADSMStrategy(BaseStrategy):
             Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
         """
 
-        # calculate the optimal operation of the unit
-        unit.determine_optimal_operation_without_flex()
+        # check if unit has opt_power_requirement attribute
+        if not hasattr(unit, "opt_power_requirement"):
+            unit.determine_optimal_operation_without_flex()
 
         bids = []
         for product in product_tuples:

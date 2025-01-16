@@ -1,8 +1,8 @@
 name,unit_type,technology,node,bidding_EOM,fuel_type,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,charging_profile,uses_power_profile,availability_periods,demand,rated_power,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,cop,max_capacity,min_capacity,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_charging_rate,max_discharging_rate,sells_energy_to_market
-A360_building,building,pv_plant,north,naive_dsm,,,dsm_operator_1,min_variable_cost,,,,No,,,,3.8,0,,,,,,,,,,,,,,,
+A360_building,building,pv_plant,north,naive_da_dsm,,,dsm_operator_1,min_variable_cost,,,,No,,,,3.8,0,,,,,,,,,,,,,,,
 A360_building,building,heat_pump,north,,,,,,,,,,,,,2,,,,,,,2.8,,,,,,,,,
 A360_building,building,generic_storage,north,,,,,,,,,,,,,,,0.002,0.002,,,,,0.0362,0.0015,0.0015,,0.9731,0.9731,0.002,0.002,Yes
-A361_building,building,pv_plant,north,naive_dsm,,,dsm_operator_1,min_variable_cost,,,,Yes,,,,1.4,0,,,,,,,,,,,,,,,
-A361_building,building,boiler,north,naive_dsm,natural_gas,,,min_variable_cost,,,,,,,,1.5,0,,,,,0.9,,,,,,,,,,
-A362_building,building,pv_plant,north,naive_dsm,,,dsm_operator_1,min_variable_cost,,,,No,,,,3,0,,,,,,,,,,,,,,,
+A361_building,building,pv_plant,north,naive_da_dsm,,,dsm_operator_1,min_variable_cost,,,,Yes,,,,1.4,0,,,,,,,,,,,,,,,
+A361_building,building,boiler,north,naive_da_dsm,natural_gas,,,min_variable_cost,,,,,,,,1.5,0,,,,,0.9,,,,,,,,,,
+A362_building,building,pv_plant,north,naive_da_dsm,,,dsm_operator_1,min_variable_cost,,,,No,,,,3,0,,,,,,,,,,,,,,,
 A362_building,building,generic_storage,north,,,,,,,,,,,,,,,0.002,0.002,,,,,0.0362,0.0015,0.0015,,0.9731,0.9731,0.002,0.002,No

@@ -4,7 +4,6 @@
 
 import logging
 
-import pandas as pd
 import pyomo.environ as pyo
 
 from assume.common.base import SupportsMinMax
@@ -148,7 +147,7 @@ class Building(DSMFlex, SupportsMinMax):
             ] = pv_profile
 
         # Initialize the model
-        self.setup_model(presolve=False)
+        self.setup_model(presolve=True)
 
     def define_parameters(self):
         """
@@ -327,27 +326,3 @@ class Building(DSMFlex, SupportsMinMax):
                 Equality condition defining the variable cost.
             """
             return m.variable_cost[t] == m.total_power_input[t] * m.electricity_price[t]
-
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
-        """
-        Calculates the marginal cost of operating the building unit at a specific time and power level.
-
-        The marginal cost represents the additional cost incurred by increasing the power output by one unit.
-
-        Args:
-            start (pd.Timestamp): The start time of the dispatch period.
-            power (float): The power output level of the unit during the dispatch.
-
-        Returns:
-            float: The marginal cost of the unit for the given power level. Returns 0 if there is no power requirement.
-        """
-        # Initialize marginal cost
-        marginal_cost = 0
-        epsilon = 1e-3
-
-        if self.opt_power_requirement.at[start] > epsilon:
-            marginal_cost = abs(
-                self.variable_cost_series.at[start]
-                / self.opt_power_requirement.at[start]
-            )
-        return marginal_cost

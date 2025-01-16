@@ -4,6 +4,7 @@
 
 import logging
 from collections.abc import Callable
+from datetime import datetime
 
 import pyomo.environ as pyo
 from pyomo.opt import (
@@ -646,6 +647,27 @@ class DSMFlex:
         instance.total_cost = self.total_cost
 
         return instance
+
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
+        """
+        Calculates the marginal cost of operating the building unit at a specific time and power level.
+
+        The marginal cost represents the additional cost incurred by increasing the power output by one unit.
+
+        Args:
+            start (datetime): The start time of the dispatch period.
+            power (float): The power output level of the unit during the dispatch.
+
+        Returns:
+            float: The marginal cost of the unit for the given power level. Returns 0 if there is no power requirement.
+        """
+        # Initialize marginal cost
+        marginal_cost = 0
+        epsilon = 1e-3
+
+        if power > epsilon:
+            marginal_cost = abs(self.variable_cost_series.at[start] / power)
+        return marginal_cost
 
     def as_dict(self) -> dict:
         """

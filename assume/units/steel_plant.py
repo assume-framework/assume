@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import datetime
 
 import pyomo.environ as pyo
 
@@ -362,25 +361,3 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 variable_cost += m.dsm_blocks["electrolyser"].operating_cost[t]
 
             return m.variable_cost[t] == variable_cost
-
-    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
-        """
-        Calculate the marginal cost of the unit based on the provided time and power.
-
-        Args:
-            start (datetime.datetime): The start time of the dispatch.
-            power (float): The power output of the unit.
-
-        Returns:
-            float: the marginal cost of the unit for the given power.
-        """
-        # Initialize marginal cost
-        marginal_cost = 0
-        epsilon = 1e-3
-
-        if self.opt_power_requirement.at[start] > epsilon:
-            marginal_cost = abs(
-                self.variable_cost_series.at[start]
-                / self.opt_power_requirement.at[start]
-            )
-        return marginal_cost
