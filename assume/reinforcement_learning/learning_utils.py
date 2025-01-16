@@ -220,17 +220,17 @@ class TensorBoardLogger:
         # To aggregate by month instead of day, replace '%Y-%m-%d' with '%Y-%m'
         query = f"""
             SELECT 
-            strftime('%Y-%m-%d', datetime) AS dt,
-            unit,
-            AVG(profit) AS profit,
-            AVG(reward) AS reward
-            {train_columns if mode == 'train' else ''}
+                strftime('%Y-%m-%d', datetime) AS dt,
+                unit,
+                AVG(profit) AS profit,
+                AVG(reward) AS reward
+                {train_columns if mode == 'train' else ''}
             FROM rl_params
             WHERE episode = '{self.episode}'
             AND simulation = '{self.simulation_id}'
             AND perform_evaluation = {self.perform_evaluation}
             {' AND initial_exploration = False' if mode == 'train' else ''}
-            GROUP BY dt
+            GROUP BY dt, unit
             ORDER BY dt
         """
         try:
