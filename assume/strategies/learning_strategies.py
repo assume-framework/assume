@@ -1081,14 +1081,14 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
 class RedispatchRLStrategy(RLStrategy):
     def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
-        market_id = market_config.market_id
-
-        if market_id == "EOM":
-            return super().calculate_bids(unit, market_config, product_tuples, **kwargs)
-        elif market_id == "redispatch":
+        if market_config.market_mechanism == "redispatch":
             return self.calculate_redispatch_bids(
                 unit, market_config, product_tuples, **kwargs
             )
+        else:
+            bids = super().calculate_bids(unit, market_config, product_tuples, **kwargs)
+            unit.outputs["eom_bids"].loc[product_tuples[0][0]] = bids[1]["price"]
+            return bids
 
     def calculate_redispatch_bids(
         self,
@@ -1112,23 +1112,23 @@ class RedispatchRLStrategy(RLStrategy):
         """
         start = product_tuples[0][0]
         # end_all = product_tuples[-1][1]
-        previous_power = unit.get_output_before(start)
+        # previous_power = unit.get_output_before(start)
         min_power, max_power = unit.min_power, unit.max_power
 
         bids = []
         for product in product_tuples:
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
-            marginal_cost = unit.calculate_marginal_cost(
-                start, previous_power
-            )  # calculation of the marginal costs
-
+            # marginal_cost = unit.calculate_marginal_cost(
+            #     start, previous_power
+            # )  # calculation of the marginal costs
+            price = unit.outputs["eom_bids"].at[start]
             bids.append(
                 {
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": marginal_cost,
+                    "price": price.item(),
                     "volume": current_power,
                     "max_power": max_power,
                     "min_power": min_power,
@@ -1137,3 +1137,155 @@ class RedispatchRLStrategy(RLStrategy):
             )
 
         return bids
+
+    def calculate_reward(self, unit, marketconfig, orderbook):
+        if marketconfig.market_mechanism == "redispatch":
+            return self.calculate_redispatch_reward(unit, marketconfig, orderbook)
+        else:
+            return self.calculate_EOM_profit(unit, marketconfig, orderbook)
+
+    def calculate_redispatch_reward(
+        self,
+        unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        revenue = 0
+        costs = 0
+        profit = 0
+
+        reward = 0
+
+        orderbook[0]["accepted_volume"] = -orderbook[0]["volume"]
+        orderbook[0]["accepted_price"] = orderbook[0]["price"]
+
+        # iterate over all orders in the orderbook, to calculate order specific profit
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+            end_excl = end - unit.index.freq
+
+            # depending on way the unit calculates marginal costs we take costs
+            marginal_cost = unit.outputs["marginal_cost"].at[start]
+
+            duration = (end - start) / timedelta(hours=1)
+
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_price = order.get("accepted_price", 0)
+
+            # calculate profit as income - running_cost from this event
+            order_revenue = accepted_price * accepted_volume * duration
+            order_cost = marginal_cost * accepted_volume * duration
+
+            # collect profit and opportunity cost for all orders
+            revenue += order_revenue
+            costs += order_cost
+
+        profit = revenue - costs
+
+        # store results in unit outputs which are written to database by unit operator
+        unit.outputs["profit"].loc[start:end_excl] += profit
+        unit.outputs["total_costs"].loc[start:end_excl] += costs
+
+        # calculate reward
+        scaling = 0.1 / unit.max_power
+        reward = unit.outputs["profit"].loc[start:end_excl].sum() * scaling
+        unit.outputs["reward"].loc[start:end_excl] = reward
+
+        unit.outputs["rl_rewards"].append(reward)
+
+    def calculate_EOM_profit(
+        self,
+        unit,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        """
+        Calculates the reward for the unit based on profits, costs, and opportunity costs from market transactions.
+
+        Args
+        ----
+        unit : SupportsMinMax
+            The unit for which to calculate the reward.
+        marketconfig : MarketConfig
+            Market configuration settings.
+        orderbook : Orderbook
+            Orderbook containing executed bids and details.
+
+        Notes
+        -----
+        The reward is computed by combining the following:
+        - **Profit**: Income from accepted bids minus marginal and start-up costs.
+        - **Opportunity Cost**: Penalty for underutilizing capacity, calculated as potential lost income.
+        - **Regret Term**: A scaled regret term penalizes high opportunity costs to guide effective bidding.
+
+        The reward is scaled and stored along with other outputs in the unit’s data to support learning.
+        """
+        # function is called after the market is cleared and we get the market feedback,
+        # so we can calculate the profit
+
+        product_type = marketconfig.product_type
+
+        revenue = 0
+        costs = 0
+        profit = 0
+
+        opportunity_cost = 0
+
+        # iterate over all orders in the orderbook, to calculate order specific profit
+        for order in orderbook:
+            start = order["start_time"]
+            end = order["end_time"]
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+            end_excl = end - unit.index.freq
+
+            # depending on way the unit calculates marginal costs we take costs
+            marginal_cost = unit.calculate_marginal_cost(
+                start, unit.outputs[product_type].at[start]
+            )
+            unit.outputs["marginal_cost"].at[start] = marginal_cost
+
+            duration = (end - start) / timedelta(hours=1)
+
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_price = order.get("accepted_price", 0)
+
+            # calculate profit as income - running_cost from this event
+            order_revenue = accepted_price * accepted_volume * duration
+            order_cost = marginal_cost * accepted_volume * duration
+
+            # collect profit and opportunity cost for all orders
+            revenue += order_revenue
+            costs += order_cost
+
+        # calculate opportunity cost
+        # as the loss of income we have because we are not running at full power
+        opportunity_cost = (
+            (accepted_price - marginal_cost)
+            * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
+            * duration
+        )
+
+        # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
+        opportunity_cost = max(opportunity_cost, 0)
+
+        # consideration of start-up costs, which are evenly divided between the
+        # upward and downward regulation events
+        if (
+            unit.outputs[product_type].at[start] != 0
+            and unit.outputs[product_type].loc[start - unit.index.freq] == 0
+        ):
+            costs += unit.hot_start_cost / 2
+        elif (
+            unit.outputs[product_type].at[start] == 0
+            and unit.outputs[product_type].loc[start - unit.index.freq] != 0
+        ):
+            costs += unit.hot_start_cost / 2
+
+        profit = revenue - costs
+
+        # store results in unit outputs which are written to database by unit operator
+        unit.outputs["profit"].loc[start:end_excl] += profit
+        unit.outputs["opportunity_cost"].loc[start:end_excl] = opportunity_cost
+        unit.outputs["total_costs"].loc[start:end_excl] = costs

@@ -52,11 +52,13 @@ try:
     from assume.strategies.learning_strategies import (
         RLStrategy,
         StorageRLStrategy,
+        RedispatchRLStrategy,
     )
 
     bidding_strategies["pp_learning"] = RLStrategy
     bidding_strategies["storage_learning"] = StorageRLStrategy
     bidding_strategies["learning_advanced_orders"] = RLAdvancedOrderStrategy
+    bidding_strategies["redispatch_learning"] = RedispatchRLStrategy
 
 except ImportError:
     pass
