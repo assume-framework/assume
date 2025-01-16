@@ -46,6 +46,13 @@ class DSMFlex:
     def initialize_solver(self, solver=None):
         # Define a solver
         solvers = check_available_solvers(*SOLVERS)
+
+        # raise an error if no solver is available
+        if not solvers:
+            raise ValueError(
+                "None of ['appsi_highs', 'gurobi', 'glpk', 'cbc', 'cplex'] are available"
+            )
+
         solver = solver if solver in solvers else solvers[0]
         if solver == "gurobi":
             self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
@@ -92,7 +99,7 @@ class DSMFlex:
                     self.model, self.model.dsm_blocks[technology]
                 )
 
-    def setup_model(self):
+    def setup_model(self, presolve=True):
         # Initialize the Pyomo model
         # along with optimal and flexibility constraints
         # and the objective functions
@@ -108,7 +115,10 @@ class DSMFlex:
         self.define_constraints()
         self.define_objective_opt()
 
-        self.determine_optimal_operation_without_flex(switch_flex_off=False)
+        # Solve the model to determine the optimal operation without flexibility
+        # and store the results to be used in the flexibility mode later
+        if presolve:
+            self.determine_optimal_operation_without_flex(switch_flex_off=False)
 
         # Modify the model to include the flexibility measure constraints
         # as well as add a new objective function to the model
@@ -133,7 +143,7 @@ class DSMFlex:
         Args:
             model (pyomo.ConcreteModel): The Pyomo model.
         """
-        if self.objective == "min_variable_cost" or "recalculate":
+        if self.objective == "min_variable_cost":
 
             @self.model.Objective(sense=pyo.minimize)
             def obj_rule_opt(m):

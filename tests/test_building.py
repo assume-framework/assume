@@ -7,6 +7,7 @@ import pyomo.environ as pyo
 import pytest
 from pyomo.opt import SolverFactory
 
+from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import CsvForecaster
 from assume.common.market_objects import MarketConfig
 from assume.strategies.naive_strategies import NaiveDADSMStrategy
@@ -101,42 +102,46 @@ def default_flexibility_measure():
 @pytest.fixture
 def ev_availability_profile():
     # Create an availability profile as a pandas Series (1 = available, 0 = unavailable)
-    return pd.Series([1, 0, 1, 1, 0, 1, 1, 0, 1, 1], index=range(10))
+    return pd.Series(
+        [1, 0, 1, 1, 0, 1, 1, 0, 1, 1],
+        index=pd.date_range("2023-01-01", periods=10, freq="h"),
+    )
 
 
 # Fixtures for Price and Forecast Data
 @pytest.fixture
 def price_profile():
-    return pd.Series([50, 45, 55, 40, 1000, 55, 1000, 65, 45, 70], index=range(10))
+    return pd.Series(
+        [50, 45, 55, 40, 1000, 55, 1000, 65, 45, 70],
+        index=pd.date_range("2023-01-01", periods=10, freq="h"),
+    )
 
 
 @pytest.fixture
 def index():
-    return range(10)  # Integer-based index
+    return pd.date_range("2023-01-01", periods=10, freq="h")
 
 
 @pytest.fixture
-def forecast(price_profile):
+def forecaster(price_profile):
+    index = pd.date_range("2023-01-01", periods=10, freq="h")
     forecaster = CsvForecaster(
-        index=range(10),
+        index=index,
         powerplants_units=[],  # Add appropriate values
         demand_units=[],
+        market_configs=[],
     )
-    forecaster.forecasts = pd.DataFrame()
     forecaster.forecasts["price_EOM"] = price_profile
-    forecaster.forecasts["fuel_price_natural gas"] = pd.Series(
-        [30] * 10, index=range(10)
+    forecaster.forecasts["fuel_price_natural gas"] = pd.Series([30] * 10, index=index)
+    forecaster.forecasts["building_heat_demand"] = pd.Series([50] * 10, index=index)
+    forecaster.forecasts["ev_load_profile"] = pd.Series([5] * 10, index=index)
+    forecaster.forecasts["battery_load_profile"] = pd.Series([3] * 10, index=index)
+    forecaster.forecasts["building_load_profile"] = pd.Series([20] * 10, index=index)
+    forecaster.forecasts["availability_solar"] = pd.Series([0.25] * 10, index=index)
+    forecaster.forecasts["building_pv_power_profile"] = pd.Series(
+        [10] * 10, index=index
     )
-    forecaster.forecasts["heat_demand"] = pd.Series([50] * 10, index=range(10))
-    forecaster.forecasts["ev_load_profile"] = pd.Series([5] * 10, index=range(10))
-    forecaster.forecasts["battery_load_profile"] = pd.Series([3] * 10, index=range(10))
-    forecaster.forecasts["building_load_profile"] = pd.Series(
-        [50] * 10, index=range(10)
-    )
-    forecaster.forecasts["availability_solar"] = pd.Series([0.25] * 10, index=range(10))
-    forecaster.forecasts["test_building_pv_power_profile"] = pd.Series(
-        [10] * 10, index=range(10)
-    )  # Adjust key as needed
+    forecaster.convert_forecasts_to_fast_series()
     # If the Building class expects specific keys for EV availability, add them here
     # forecaster.forecasts["electric_vehicle_availability"] = ev_availability_profile
     return forecaster
@@ -199,28 +204,23 @@ def available_solver():
 
 
 # Test Cases
-
-
 def test_building_initialization_heatpump(
-    forecast,
-    index,
+    forecaster,
     building_components_heatpump,
-    available_solver,
     default_objective,
     default_flexibility_measure,
 ):
     building = Building(
-        id="building_heatpump",
+        id="building",
         unit_operator="operator_hp",
-        index=index,
         bidding_strategies={"EOM": NaiveDADSMStrategy()},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
-        forecaster=forecast,
+        forecaster=forecaster,
     )
 
-    assert building.id == "building_heatpump"
+    assert building.id == "building"
     assert building.unit_operator == "operator_hp"
     assert building.components == building_components_heatpump
     assert building.has_heatpump is True
@@ -230,27 +230,28 @@ def test_building_initialization_heatpump(
     assert building.has_battery_storage is True
     assert building.has_pv is True
 
+    # check that values are set correctly for inflex_demand, heat_demand and electricity_price
+    assert all(building.inflex_demand == forecaster.forecasts["building_load_profile"])
+    assert all(building.heat_demand == forecaster.forecasts["building_heat_demand"])
+    assert all(building.electricity_price == forecaster.forecasts["price_EOM"])
+
 
 def test_building_initialization_boiler(
-    forecast,
-    index,
+    forecaster,
     building_components_boiler,
-    available_solver,
     default_objective,
     default_flexibility_measure,
 ):
     building = Building(
-        id="building_boiler",
+        id="building",
         unit_operator="operator_boiler",
-        index=index,
         bidding_strategies={},
         components=building_components_boiler,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
-        forecaster=forecast,  # Passed via **kwargs
+        forecaster=forecaster,  # Passed via **kwargs
     )
 
-    assert building.id == "building_boiler"
     assert building.unit_operator == "operator_boiler"
     assert building.components == building_components_boiler
     assert building.has_heatpump is False
@@ -262,20 +263,19 @@ def test_building_initialization_boiler(
 
 
 def test_building_initialization_invalid_component(
-    forecast, index, available_solver, default_objective, default_flexibility_measure
+    forecaster, default_objective, default_flexibility_measure
 ):
     invalid_components = {"invalid_component": {"some_param": 123}}
 
     with pytest.raises(ValueError) as exc_info:
         Building(
-            id="building_invalid",
+            id="building",
             unit_operator="operator_invalid",
-            index=index,
             bidding_strategies={},
             components=invalid_components,
             objective=default_objective,
             flexibility_measure=default_flexibility_measure,
-            forecaster=forecast,
+            forecaster=forecaster,
         )
 
     # Match the actual error message
@@ -291,22 +291,20 @@ def test_solver_availability():
 
 
 def test_building_optimization_heatpump(
-    forecast,
+    forecaster,
     index,
     building_components_heatpump,
-    available_solver,
     default_objective,
     default_flexibility_measure,
 ):
     building = Building(
-        id="building_heatpump",
+        id="building",
         unit_operator="operator_hp",
-        index=index,
         bidding_strategies={},
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
         components=building_components_heatpump,
-        forecaster=forecast,  # Passed via **kwargs
+        forecaster=forecaster,  # Passed via **kwargs
     )
 
     # Perform optimization
@@ -315,48 +313,29 @@ def test_building_optimization_heatpump(
     # Check if optimal power requirement is calculated
     assert building.opt_power_requirement is not None
     assert len(building.opt_power_requirement) == len(index)
-    assert isinstance(building.opt_power_requirement, pd.Series)
+    assert isinstance(building.opt_power_requirement, FastSeries)
 
     # Check if variable cost series is calculated
     assert building.variable_cost_series is not None
     assert len(building.variable_cost_series) == len(index)
-    assert isinstance(building.variable_cost_series, pd.Series)
-
-    # Check additional outputs if components exist
-    if building.has_battery_storage:
-        assert "soc" in building.outputs
-        assert len(building.outputs["soc"]) == len(index)
-        assert isinstance(building.outputs["soc"], pd.Series)
-
-    if building.has_ev:
-        assert "ev_soc" in building.outputs
-        assert len(building.outputs["ev_soc"]) == len(index)
-        assert isinstance(building.outputs["ev_soc"], pd.Series)
-
-    # Optional: Verify that the optimization was successful
-    # Note: Depending on how the Building class stores solver results, adjust accordingly
-    # For example, if building.model is updated with solver results:
-    # assert building.model.solver.status == SolverStatus.ok
-    # assert building.model.solver.termination_condition == TerminationCondition.optimal
+    assert isinstance(building.variable_cost_series, FastSeries)
 
 
 def test_building_optimization_boiler(
-    forecast,
+    forecaster,
     index,
     building_components_boiler,
-    available_solver,
     default_objective,
     default_flexibility_measure,
 ):
     building = Building(
-        id="building_boiler",
+        id="building",
         unit_operator="operator_boiler",
-        index=index,
         bidding_strategies={},
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
         components=building_components_boiler,
-        forecaster=forecast,  # Passed via **kwargs
+        forecaster=forecaster,
     )
 
     # Perform optimization
@@ -365,50 +344,36 @@ def test_building_optimization_boiler(
     # Check if optimal power requirement is calculated
     assert building.opt_power_requirement is not None
     assert len(building.opt_power_requirement) == len(index)
-    assert isinstance(building.opt_power_requirement, pd.Series)
+    assert isinstance(building.opt_power_requirement, FastSeries)
 
     # Check if variable cost series is calculated
     assert building.variable_cost_series is not None
     assert len(building.variable_cost_series) == len(index)
-    assert isinstance(building.variable_cost_series, pd.Series)
-
-    # Check additional outputs if components exist
-    if building.has_battery_storage:
-        assert "soc" in building.outputs
-        assert len(building.outputs["soc"]) == len(index)
-        assert isinstance(building.outputs["soc"], pd.Series)
-
-    if building.has_ev:
-        assert "ev_soc" in building.outputs
-        assert len(building.outputs["ev_soc"]) == len(index)
-        assert isinstance(building.outputs["ev_soc"], pd.Series)
+    assert isinstance(building.variable_cost_series, FastSeries)
 
 
 def test_building_marginal_cost_calculation_heatpump(
-    forecast,
-    index,
+    forecaster,
     building_components_heatpump,
-    available_solver,
     default_objective,
     default_flexibility_measure,
 ):
     building = Building(
-        id="building_heatpump",
+        id="building",
         unit_operator="operator_hp",
-        index=index,
         bidding_strategies={},
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
         components=building_components_heatpump,
-        forecaster=forecast,  # Passed via **kwargs
+        forecaster=forecaster,  # Passed via **kwargs
     )
 
     building.determine_optimal_operation_without_flex()
 
     # Select a timestamp to test
-    test_time = 0  # Using integer index
-    power = building.opt_power_requirement[test_time]
-    variable_cost = building.variable_cost_series[test_time]
+    test_time = building.index[0]
+    power = building.opt_power_requirement.at[test_time]
+    variable_cost = building.variable_cost_series.at[test_time]
 
     if power != 0:
         expected_marginal_cost = abs(variable_cost / power)
@@ -421,30 +386,27 @@ def test_building_marginal_cost_calculation_heatpump(
 
 
 def test_building_marginal_cost_calculation_boiler(
-    forecast,
-    index,
+    forecaster,
     building_components_boiler,
-    available_solver,
     default_objective,
     default_flexibility_measure,
 ):
     building = Building(
-        id="building_boiler",
+        id="building",
         unit_operator="operator_boiler",
-        index=index,
         bidding_strategies={},
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
         components=building_components_boiler,
-        forecaster=forecast,  # Passed via **kwargs
+        forecaster=forecaster,  # Passed via **kwargs
     )
 
     building.determine_optimal_operation_without_flex()
 
     # Select a timestamp to test
-    test_time = 1  # Using integer index
-    power = building.opt_power_requirement[test_time]
-    variable_cost = building.variable_cost_series[test_time]
+    test_time = building.index[0]
+    power = building.opt_power_requirement.at[test_time]
+    variable_cost = building.variable_cost_series.at[test_time]
 
     if power != 0:
         expected_marginal_cost = abs(variable_cost / power)
@@ -457,22 +419,19 @@ def test_building_marginal_cost_calculation_boiler(
 
 
 def test_building_objective_function_heatpump(
-    forecast,
-    index,
+    forecaster,
     building_components_heatpump,
-    available_solver,
     default_objective,
     default_flexibility_measure,
 ):
     building = Building(
-        id="building_heatpump",
+        id="building",
         unit_operator="operator_hp",
-        index=index,
         bidding_strategies={},
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
         components=building_components_heatpump,
-        forecaster=forecast,  # Passed via **kwargs
+        forecaster=forecaster,  # Passed via **kwargs
     )
 
     # Access the objective function
@@ -483,41 +442,39 @@ def test_building_objective_function_heatpump(
 
 
 def test_building_objective_function_invalid(
-    forecast, index, building_components_heatpump, available_solver
+    forecaster,
+    building_components_heatpump,
 ):
     with pytest.raises(ValueError) as exc_info:
         Building(
-            id="building_invalid_objective",
+            id="building",
             unit_operator="operator_invalid",
-            index=index,
             bidding_strategies={},
             components=building_components_heatpump,
             objective="unknown_objective",
-            forecaster=forecast,  # Passed via **kwargs
+            forecaster=forecaster,  # Passed via **kwargs
         )
 
     assert "Unknown objective: unknown_objective" in str(exc_info.value)
 
 
 def test_building_no_available_solvers(
-    forecast,
-    index,
+    forecaster,
     building_components_heatpump,
     monkeypatch,  # Add the monkeypatch fixture
 ):
     # Override the check_available_solvers to return an empty list
     monkeypatch.setattr(
-        "assume.units.building.check_available_solvers", lambda *args: []
+        "assume.units.dsm_load_shift.check_available_solvers", lambda *args: []
     )
 
     with pytest.raises(Exception) as exc_info:
         Building(
-            id="building_no_solvers",
+            id="building",
             unit_operator="operator_nosolver",
-            index=index,
             bidding_strategies={},
             components=building_components_heatpump,
-            forecaster=forecast,  # Passed via **kwargs
+            forecaster=forecaster,  # Passed via **kwargs
         )
     assert (
         "None of ['appsi_highs', 'gurobi', 'glpk', 'cbc', 'cplex'] are available"
@@ -526,34 +483,30 @@ def test_building_no_available_solvers(
 
 
 def test_building_define_constraints_heatpump(
-    forecast,
-    index,
+    forecaster,
     building_components_heatpump,
-    available_solver,
     default_objective,
     default_flexibility_measure,
 ):
     building = Building(
-        id="building_constraints_hp",
+        id="building",
         unit_operator="operator_constraints_hp",
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
-        index=index,
         bidding_strategies={},
         components=building_components_heatpump,
-        forecaster=forecast,  # Passed via **kwargs
+        forecaster=forecaster,  # Passed via **kwargs
     )
 
     # Check if constraints are defined
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "total_power_input_constraint" in constraints
     if building.has_heatpump:
-        assert "heat_flow_constraint" in constraints
+        assert "heating_demand_balance_constraint" in constraints
 
 
 def test_building_missing_required_component(
-    forecast,
-    index,
+    forecaster,
     building_components_heatpump,
     default_objective,
     default_flexibility_measure,
@@ -570,14 +523,13 @@ def test_building_missing_required_component(
 
     with pytest.raises(ValueError) as exc_info:
         Building(
-            id="building_test",
+            id="building",
             unit_operator="operator_hp",
-            index=index,
             bidding_strategies={},
             components=incomplete_components,
             objective=default_objective,
             flexibility_measure=default_flexibility_measure,
-            forecaster=forecast,
+            forecaster=forecaster,
         )
 
     # Assert the correct error message
@@ -589,69 +541,8 @@ def test_building_missing_required_component(
     Building.required_technologies = []
 
 
-def test_building_ev_discharge_constraint(
-    forecast,
-    index,
-    building_components_heatpump,
-    default_objective,
-    default_flexibility_measure,
-):
-    """
-    Test that the discharge_ev_to_market_constraint is correctly defined
-    when the EV is not allowed to sell energy to the market.
-    """
-    # Modify the EV configuration to disallow selling energy to the market
-    building_components_heatpump["electric_vehicle"]["sells_energy_to_market"] = "false"
-
-    building = Building(
-        id="building_ev_test",
-        unit_operator="operator_hp",
-        index=index,
-        bidding_strategies={},
-        components=building_components_heatpump,
-        objective=default_objective,
-        flexibility_measure=default_flexibility_measure,
-        forecaster=forecast,
-    )
-
-    # Verify that the constraint is defined
-    constraints = list(building.model.component_map(pyo.Constraint).keys())
-    assert "discharge_ev_to_market_constraint" in constraints
-
-
-def test_building_battery_discharge_constraint_simple(
-    forecast,
-    index,
-    building_components_heatpump,
-    default_objective,
-    default_flexibility_measure,
-):
-    """
-    Test that the discharge_battery_to_market_constraint is defined
-    when the battery is not allowed to sell energy to the market.
-    """
-    # Modify the battery configuration to disallow selling energy to the market
-    building_components_heatpump["generic_storage"]["sells_energy_to_market"] = "false"
-
-    building = Building(
-        id="building_battery_test",
-        unit_operator="operator_hp",
-        index=index,
-        bidding_strategies={},
-        components=building_components_heatpump,
-        objective=default_objective,
-        flexibility_measure=default_flexibility_measure,
-        forecaster=forecast,
-    )
-
-    # Verify that the constraint is defined
-    constraints = list(building.model.component_map(pyo.Constraint).keys())
-    assert "discharge_battery_to_market_constraint" in constraints
-
-
 def test_building_solver_infeasibility_logging(
-    forecast,
-    index,
+    forecaster,
     building_components_heatpump,
     default_objective,
     default_flexibility_measure,
@@ -661,14 +552,13 @@ def test_building_solver_infeasibility_logging(
     """
     # Create a Building instance
     building = Building(
-        id="building_solver_test",
+        id="building",
         unit_operator="operator_hp",
-        index=index,
         bidding_strategies={},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
-        forecaster=forecast,
+        forecaster=forecaster,
     )
 
     # Mock the solver to simulate infeasibility
@@ -694,10 +584,9 @@ def test_building_solver_infeasibility_logging(
 
 
 def test_building_bidding_strategy_execution(
-    forecast,
+    forecaster,
     index,
     building_components_heatpump,
-    available_solver,
     default_objective,
     default_flexibility_measure,
 ):
@@ -707,14 +596,13 @@ def test_building_bidding_strategy_execution(
     """
     # Create the Building instance with a NaiveDADSMStrategy
     building = Building(
-        id="building_heatpump",
+        id="building",
         unit_operator="operator_hp",
-        index=index,
         bidding_strategies={"EOM": NaiveDADSMStrategy()},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
-        forecaster=forecast,
+        forecaster=forecaster,
     )
 
     # Create dummy market configuration and product tuples
@@ -744,11 +632,6 @@ def test_building_bidding_strategy_execution(
         assert bid["price"] >= 0  # Marginal price should be non-negative
 
 
-# ----------------------------
-# Additional Helper Tests (Optional)
-# ----------------------------
-
-
 def test_building_get_available_solvers():
     available_solvers = check_available_solvers(*SOLVERS)
     assert isinstance(available_solvers, list)
@@ -756,32 +639,8 @@ def test_building_get_available_solvers():
         assert SolverFactory(solver).available()
 
 
-def test_str_to_bool_invalid_value_in_building():
-    """
-    Test that str_to_bool raises ValueError when an invalid value is passed
-    within the Building context.
-    """
-    invalid_components = {
-        "electric_vehicle": {"sells_energy_to_market": "invalid_value"}
-    }
-
-    with pytest.raises(ValueError) as exc_info:
-        Building(
-            id="building_invalid_str_to_bool",
-            unit_operator="operator_invalid",
-            index=range(10),
-            bidding_strategies={},
-            components=invalid_components,
-            objective="min_variable_cost",
-            flexibility_measure="cost_based_load_shift",
-            forecaster=None,  # Replace with a suitable forecaster if necessary
-        )
-    assert "Invalid truth value: 'invalid_value'" in str(exc_info.value)
-
-
 def test_building_unknown_flexibility_measure(
-    forecast,
-    index,
+    forecaster,
     building_components_heatpump,
     default_objective,
 ):
@@ -792,20 +651,158 @@ def test_building_unknown_flexibility_measure(
 
     with pytest.raises(ValueError) as exc_info:
         Building(
-            id="building_unknown_flex",
+            id="building",
             unit_operator="operator_hp",
-            index=index,
             bidding_strategies={},
             components=building_components_heatpump,
             objective=default_objective,
             flexibility_measure=invalid_flexibility_measure,
-            forecaster=forecast,
+            forecaster=forecaster,
         )
 
     # Assert the correct error message
     assert f"Unknown flexibility measure: {invalid_flexibility_measure}" in str(
         exc_info.value
     )
+
+
+def test_building_prosumer_constraint(forecaster, building_components_heatpump):
+    """
+    Test that the `grid_export_constraint` is correctly applied when the building is not a prosumer.
+    """
+    # Create a building instance with is_prosumer set to "No"
+    building = Building(
+        id="building",
+        unit_operator="operator_hp",
+        bidding_strategies={},
+        components=building_components_heatpump,
+        forecaster=forecaster,
+        is_prosumer="No",
+    )
+
+    constraints = list(building.model.component_map(pyo.Constraint).keys())
+    assert (
+        "grid_export_constraint" in constraints
+    ), "Non-prosumer should have grid export constraint."
+
+
+def test_building_prosumer_no_constraint(forecaster, building_components_heatpump):
+    """
+    Test that the `grid_export_constraint` is NOT applied when the building is a prosumer.
+    """
+    building = Building(
+        id="building",
+        unit_operator="operator_hp",
+        bidding_strategies={},
+        components=building_components_heatpump,
+        forecaster=forecaster,
+        is_prosumer="Yes",
+    )
+
+    constraints = list(building.model.component_map(pyo.Constraint).keys())
+    assert (
+        "grid_export_constraint" not in constraints
+    ), "Prosumer should not have grid export constraint."
+
+
+def test_prosumer_energy_export(forecaster, building_components_heatpump):
+    """
+    Ensure that a prosumer building can export excess energy to the grid when applicable.
+    """
+    building = Building(
+        id="building",
+        unit_operator="operator_hp",
+        bidding_strategies={},
+        components=building_components_heatpump,
+        forecaster=forecaster,
+        is_prosumer="Yes",
+    )
+
+    # Run optimization
+    building.determine_optimal_operation_without_flex()
+
+    # Verify that some power can be negative (exported to the grid)
+    export_possible = any(building.opt_power_requirement < 0)
+    assert export_possible, "Prosumer should be able to export power to the grid."
+
+    # check that power is negative when price is 1000
+    for idx in building.index:
+        if building.forecaster.forecasts["price_EOM"].at[idx] == 1000:
+            assert (
+                building.opt_power_requirement.at[idx] <= 0
+            ), "Prosumer should be able to export power to the grid."
+
+
+def test_non_prosumer_no_energy_export(forecaster, building_components_heatpump):
+    """
+    Ensure that a non-prosumer building does not export energy to the grid.
+    """
+    building = Building(
+        id="building",
+        unit_operator="operator_hp",
+        bidding_strategies={},
+        components=building_components_heatpump,
+        forecaster=forecaster,
+        is_prosumer="No",
+    )
+
+    # Run optimization
+    building.determine_optimal_operation_without_flex()
+
+    # Verify that power input is never negative (no export to the grid)
+    assert all(
+        building.opt_power_requirement >= 0
+    ), "Non-prosumer should not be able to export power."
+
+    # check that power is zero when price is 1000
+    for idx in building.index:
+        if building.forecaster.forecasts["price_EOM"].at[idx] == 1000:
+            assert (
+                building.opt_power_requirement.at[idx] == 0
+            ), "Prosumer should be able to export power to the grid."
+
+
+def test_building_constraint_enforcement(forecaster, building_components_heatpump):
+    """
+    Test that all relevant constraints are being applied in the Pyomo model.
+    """
+    building = Building(
+        id="building",
+        unit_operator="operator_hp",
+        bidding_strategies={},
+        components=building_components_heatpump,
+        forecaster=forecaster,
+    )
+
+    constraints = list(building.model.component_map(pyo.Constraint).keys())
+    assert (
+        "total_power_input_constraint" in constraints
+    ), "Total power input constraint should be enforced."
+    assert (
+        "variable_cost_constraint" in constraints
+    ), "Variable cost constraint should be enforced."
+    if building.has_heatpump:
+        assert (
+            "heating_demand_balance_constraint" in constraints
+        ), "Heating demand constraint should be enforced."
+
+
+def test_invalid_prosumer_value(forecaster, building_components_heatpump):
+    """
+    Test that an invalid prosumer value raises a ValueError.
+    """
+    with pytest.raises(ValueError) as exc_info:
+        Building(
+            id="building",
+            unit_operator="operator_invalid",
+            bidding_strategies={},
+            components=building_components_heatpump,
+            forecaster=forecaster,
+            is_prosumer="maybe",  # Invalid boolean string
+        )
+    assert "Invalid truth value" in str(
+        exc_info.value
+    ), "Invalid is_prosumer value should raise an error."
 
 
 if __name__ == "__main__":
