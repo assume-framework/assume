@@ -423,7 +423,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  \n  sum(volume::float) OVER (PARTITION BY market_id ORDER BY price asc, unit_id) AS \"Volume\",\n  price::float AS \"Price\", unit_id,\n  1/(volume - accepted_volume +1)/2 as size\n  --'rgba(255,255,255,1)' as delta\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n  simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume > 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, price, market_id --, bid_id\nORDER BY price asc\n\n-- ",
+          "rawSql": "SELECT\n  \n  sum(volume::float) OVER (PARTITION BY market_id ORDER BY price asc, unit_id) AS \"Volume\",\n  price::float AS \"Price\", unit_id,\n  1/(volume - accepted_volume +1)/2 as size\n  --'rgba(255,255,255,1)' as delta\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume > 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, price, market_id --, bid_id\nORDER BY price asc\n\n-- ",
           "refId": "Volume",
           "select": [
             [
@@ -493,7 +493,7 @@
           }
         }
       ],
-      "title": "Merit Order $market",
+      "title": "Merit Order $market at $min_time",
       "type": "xychart"
     },
     {
@@ -516,7 +516,7 @@
             "barAlignment": 0,
             "barWidthFactor": 0.6,
             "drawStyle": "line",
-            "fillOpacity": 18,
+            "fillOpacity": 76,
             "gradientMode": "none",
             "hideFrom": {
               "legend": false,
@@ -556,7 +556,158 @@
           },
           "unit": "megwatt"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume solar"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume wind_offshore"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume wind_onshore"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume biomass"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume gas"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume hard coal"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume hydro"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume lignite"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#a52a2a",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume nuclear"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume oil"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#120c12",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
       },
       "gridPos": {
         "h": 9,
@@ -693,7 +844,7 @@
           ]
         }
       ],
-      "title": "Dispatch by technology",
+      "title": "Market result by technology",
       "type": "timeseries"
     },
     {
@@ -1625,7 +1776,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1759,7 +1911,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1900,7 +2053,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2130,7 +2284,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4963,8 +5118,8 @@
     "list": [
       {
         "current": {
-          "text": "example_01c_eom_only",
-          "value": "example_01c_eom_only"
+          "text": "world_mastr_nuts0_random_2023",
+          "value": "world_mastr_nuts0_random_2023"
         },
         "datasource": {
           "type": "postgres",
@@ -5004,10 +5159,10 @@
       {
         "current": {
           "text": [
-            "Biomass"
+            "conventionalDE_gas_1"
           ],
           "value": [
-            "Biomass"
+            "conventionalDE_gas_1"
           ]
         },
         "datasource": {
@@ -5029,10 +5184,10 @@
       {
         "current": {
           "text": [
-            "demand_CRM_neg"
+            "demand_DE1"
           ],
           "value": [
-            "demand_CRM_neg"
+            "demand_DE1"
           ]
         },
         "datasource": {
@@ -5054,10 +5209,10 @@
       {
         "current": {
           "text": [
-            "Storage 1"
+            "storageDE_SSE900014446378"
           ],
           "value": [
-            "Storage 1"
+            "storageDE_SSE900014446378"
           ]
         },
         "datasource": {
@@ -5075,12 +5230,27 @@
         "regex": "",
         "sort": 1,
         "type": "query"
+      },
+      {
+        "current": {
+          "text": "2023-01-01 01:00:00",
+          "value": "2023-01-01 01:00:00"
+        },
+        "definition": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
+        "description": "The minimum time we have in the time range.\nUsed for the merit order plot title",
+        "hide": 2,
+        "name": "min_time",
+        "options": [],
+        "query": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
       }
     ]
   },
   "time": {
-    "from": "2019-01-01T00:00:00.003Z",
-    "to": "2019-01-03T00:00:00.762Z"
+    "from": "2022-12-30T10:00:00.000Z",
+    "to": "2023-01-06T14:00:00.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -5095,6 +5265,6 @@
   "timezone": "utc",
   "title": "ASSUME: Main overview",
   "uid": "ee6wyk2qb0ruoe",
-  "version": 2,
+  "version": 19,
   "weekStart": ""
 }
