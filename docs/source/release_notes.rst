@@ -8,6 +8,9 @@ Release Notes
 
 Upcoming Release
 =======================
+.. warning::
+  The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
+  e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 **New Features:**
   - **Building Demand Side Unit**: Added a demand side agent, "building demand side unit" to the framework, enabling users to model a residential/building unit with building components. This feature allows
@@ -25,10 +28,6 @@ Upcoming Release
       - *Peak Load Shifting:* Shifting peak load according to defined peak load limits, thereby reducing strain on the grid and avoiding high peak demand.
       - *Renewable Utilization:* Increase the utilization of renewable energy by synchronizing operations with periods of high renewable energy availability of a given node/location.
       - *Cost-Based Load Shifting:* Shifting the operations by adhering to a predefined cost tolerance, ensuring that operational costs remain within acceptable limits while meeting production goals.
-
-.. warning::
-  The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
-  e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 **Improvements:**
 - **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
