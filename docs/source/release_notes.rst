@@ -13,20 +13,20 @@ Upcoming Release
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 **Improvements:**
-- **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
+- **Learning Observation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
   This allows for a more robust scaling of the observation space for future analysis.
-- **Learning Opservation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
-  This allows for a more robust scaling of the observation space for future analysis.
-- **Allow multi-market bidding strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
+- **Allow Multi-Market Bidding Strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
   the strategy is only created once and the same instance is used for all of these markets.
-- **Improve Storage behavior**: Storages were using the current unmodified SoC instead of the final SoC of last hour, leading to always using the initial value to calculate discharge possibility.(#524)
+- **Improve Storage Behavior**: Storages were using the current unmodified SoC instead of the final SoC of last hour, leading to always using the initial value to calculate discharge possibility.(#524)
 
+**Bug Fixes:**
+- **Update PyPSA Version:** Fixes example "small_with_redispatch"; adjustments to tutorials 10 and 11 to remove DeprecationWarnings.
 
 v0.5.0 - (10th December 2024)
 ===========================================
 
 **New Features:**
-- **Learning rate and noise scheduling**: Added the possibility to schedule the learning rate and action noise in the learning process. This feature
+- **Learning Rate and Noise Scheduling**: Added the possibility to schedule the learning rate and action noise in the learning process. This feature
   enables streamlining the learning progress. Currently, only "linear" decay available by setting the `learning_rate_schedule` and
   `action_noise_schedule` in the learning config to "linear". Defaults to no decay if not provided. It decays `learning_rate`/ `noise_dt`
   linearly from starting value to 0 over given `training_episodes` which can be adjusted by the user. The schedule parameters (e.g. end value
