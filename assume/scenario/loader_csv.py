@@ -495,17 +495,8 @@ def load_config_and_create_forecaster(
         )
         availability = normalize_availability(powerplant_units, availability)
 
-    electricity_prices_df = load_file(
-        path=path, config=config, file_name="electricity_prices", index=index
-    )
-    price_forecast_df = load_file(
-        path=path, config=config, file_name="price_forecasts", index=index
-    )
     fuel_prices_df = load_file(
         path=path, config=config, file_name="fuel_prices_df", index=index
-    )
-    temperature_df = load_file(
-        path=path, config=config, file_name="temperature", index=index
     )
 
     buses = load_file(path=path, config=config, file_name="buses")
@@ -524,10 +515,7 @@ def load_config_and_create_forecaster(
     forecaster.set_forecast(demand_df)
     forecaster.set_forecast(cross_border_flows_df)
     forecaster.set_forecast(availability, prefix="availability_")
-    forecaster.set_forecast(electricity_prices_df)
-    forecaster.set_forecast(price_forecast_df, "price_")
     forecaster.set_forecast(fuel_prices_df, prefix="fuel_price_")
-    forecaster.set_forecast(temperature_df)
     forecaster.calc_forecast_if_needed()
 
     forecaster.convert_forecasts_to_fast_series()
