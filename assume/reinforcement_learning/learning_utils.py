@@ -220,11 +220,19 @@ class TensorBoardLogger:
             AVG(exploration_noise_1) AS noise_1
             """
 
-        # To aggregate by hour instead of day, replace '%Y-%m-%d' with '%Y-%m-%d %H'
-        # To aggregate by month instead of day, replace '%Y-%m-%d' with '%Y-%m'
+        # Use appropriate date function and parameter style based on database type
+        if self.db.dialect.name == 'sqlite':
+            # To aggregate by hour instead of day, replace '%Y-%m-%d' with '%Y-%m-%d %H'
+            # To aggregate by month instead of day, replace '%Y-%m-%d' with '%Y-%m'
+            date_func = f"strftime('%Y-%m-%d', datetime)"
+        elif self.db.dialect.name == 'postgresql':
+            # To aggregate by hour instead of day, replace 'YYYY-MM-DD' with 'YYYY-MM-DD HH24'
+            # To aggregate by month instead of day, replace 'YYYY-MM-DD' with 'YYYY-MM'
+            date_func = f"TO_CHAR(datetime, 'YYYY-MM-DD')"
+
         query = f"""
             SELECT 
-                strftime('%Y-%m-%d', datetime) AS dt,
+                {date_func} AS dt,
                 unit,
                 AVG(profit) AS profit,
                 AVG(reward) AS reward
@@ -233,7 +241,7 @@ class TensorBoardLogger:
             WHERE episode = '{self.episode}'
             AND simulation = '{self.simulation_id}'
             AND perform_evaluation = {self.perform_evaluation}
-            {' AND initial_exploration = False' if mode == 'train' else ''}
+            {'AND initial_exploration = False' if mode == 'train' else ''}
             GROUP BY dt, unit
             ORDER BY dt
         """
