@@ -3,11 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import os
 import shutil
 
-# Turn off TF onednn optimizations to avoid memory leaks
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing import Lock
@@ -733,11 +730,3 @@ class WriteOutput(Role):
         rewards_by_unit = np.array(rewards_by_unit)
 
         return rewards_by_unit
-
-    def __del__(self):
-        """
-        Deletes the WriteOutput instance.
-        """
-        if hasattr(self, "writer"):
-            self.writer.flush()
-            self.writer.close()

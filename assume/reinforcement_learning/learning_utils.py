@@ -3,6 +3,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import os
+
+# Turn off TF onednn optimizations to avoid memory leaks
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 from collections.abc import Callable
 from datetime import datetime
@@ -280,3 +284,11 @@ class TensorBoardLogger:
         except Exception as e:
             logger.error("could not read query: %s", e)
             return
+        
+    def __del__(self):
+        """
+        Deletes the WriteOutput instance.
+        """
+        if hasattr(self, "writer"):
+            self.writer.flush()
+            self.writer.close()

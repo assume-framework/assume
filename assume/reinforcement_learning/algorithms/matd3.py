@@ -396,7 +396,7 @@ class TD3(RLAlgorithm):
             This function implements the TD3 algorithm's key step for policy improvement and exploration.
         
         Returns:
-            tuple: (learning_rate, average_critic_loss) where:
+            tuple: (learning_rate, critic_losses) where:
                 - learning_rate (float): The current learning rate
                 - critic_losses (list[dict]): Critic losses for each agent in each gradient step
         """

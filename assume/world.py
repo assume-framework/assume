@@ -72,6 +72,7 @@ class World:
         clearing_mechanisms (dict[str, MarketRole]): The clearing mechanisms for the world instance.
         addresses (list[str]): The addresses for the world instance.
         loop (asyncio.AbstractEventLoop): The event loop for the world instance.
+        tensor_board_logger (TensorBoardLogger): The tensor board logger for the world instance.
         clock (ExternalClock): The external clock for the world instance.
         start (datetime.datetime): The start datetime for the simulation.
         end (datetime.datetime): The end datetime for the simulation.
