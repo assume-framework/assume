@@ -165,6 +165,8 @@ def load_dsm_units(
         "unit_type",
         "node",
         "flexibility_measure",
+        "congestion_threshold",
+        "peak_load_cap",
     ]
     # Filter the common columns to only include those that exist in the DataFrame
     common_columns = [col for col in common_columns if col in dsm_units.columns]
@@ -507,11 +509,16 @@ def load_config_and_create_forecaster(
         path=path, config=config, file_name="temperature", index=index
     )
 
+    buses = load_file(path=path, config=config, file_name="buses")
+    lines = load_file(path=path, config=config, file_name="lines")
+
     forecaster = CsvForecaster(
         index=index,
         powerplants_units=powerplant_units,
         demand_units=demand_units,
         market_configs=config["markets_config"],
+        buses=buses,
+        lines=lines,
     )
 
     forecaster.set_forecast(forecasts_df)

@@ -23,7 +23,7 @@ class PowerPlant(SupportsMinMax):
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
-        index (pandas.DatetimeIndex): The index of the unit.
+        forecaster (Forecaster): A forecaster used to get key variables such as fuel or electricity prices.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
         efficiency (float, optional): The efficiency of the power plant in converting fuel to electricity. Defaults to 1.0.

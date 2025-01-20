@@ -89,21 +89,23 @@ class CsvForecaster(Forecaster):
     """
     This class represents a forecaster that provides timeseries for forecasts derived from existing files.
 
-    It initializes with the provided index. It includes methods to retrieve forecasts for specific columns,
-    availability of units, and prices of fuel types, returning the corresponding timeseries as pandas Series.
+    It initializes with the provided index and configuration data, including power plants, demand units,
+    and market configurations. The forecaster also supports optional inputs like DSM (demand-side management) units,
+    buses, and lines for more advanced forecasting scenarios.
 
-    Attributes:
-        index (pandas.Series): The index of the forecasts.
-        powerplants_units (dict[str, pandas.Series]): The power plants.
+    Methods are included to retrieve forecasts for specific columns, availability of units,
+    and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
     Args:
-        index (pandas.Series): The index of the forecasts.
-        powerplants_units (dict[str, pandas.Series]): The power plants.
-
-    Example:
-        >>> forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
-        >>> forecast = forecaster['temperature']
-        >>> print(forecast)
+        index (pd.Series): The index of the forecasts.
+        powerplants_units (pd.DataFrame): A DataFrame containing information about power plants.
+        demand_units (pd.DataFrame): A DataFrame with demand unit data.
+        market_configs (dict[str, dict]): Configuration details for the markets.
+        buses (pd.DataFrame | None, optional): A DataFrame of buses information. Defaults to None.
+        lines (pd.DataFrame | None, optional): A DataFrame of line information. Defaults to None.
+        save_path (str, optional): Path where the forecasts should be saved. Defaults to an empty string.
+        *args (object): Additional positional arguments.
+        **kwargs (object): Additional keyword arguments.
 
     """
 
@@ -112,7 +114,9 @@ class CsvForecaster(Forecaster):
         index: pd.Series,
         powerplants_units: pd.DataFrame,
         demand_units: pd.DataFrame,
-        market_configs: dict = {},
+        market_configs: dict[str, dict],
+        buses: pd.DataFrame | None = None,
+        lines: pd.DataFrame | None = None,
         save_path: str = "",
         *args,
         **kwargs,
@@ -122,6 +126,9 @@ class CsvForecaster(Forecaster):
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
         self.market_configs = market_configs
+        self.buses = buses
+        self.lines = lines
+
         self.forecasts = pd.DataFrame(index=index)
         self.save_path = save_path
 
@@ -191,24 +198,51 @@ class CsvForecaster(Forecaster):
         """
         Calculates the forecasts if they are not already calculated.
 
-        This method calculates price forecast and residual load forecast for available markets, if
-        these don't already exist.
+        This method calculates price forecast and residual load forecast for available markets,
+        and other necessary forecasts if they don't already exist.
         """
+        self.add_missing_availability_columns()
+        self.calculate_market_forecasts()
 
-        cols = []
-        for pp in self.powerplants_units.index:
-            col = f"availability_{pp}"
-            if col not in self.forecasts.columns:
-                s = pd.Series(1, index=self.forecasts.index)
-                s.name = col
-                cols.append(s)
-        cols.append(self.forecasts)
-        self.forecasts = pd.concat(cols, axis=1).copy()
+        # the following forecasts are only calculated if buses and lines are available
+        # and self.demand_units have a node column
+        if self.buses is not None and self.lines is not None:
+            # check if the demand_units have a node column and
+            # if the nodes are available in the buses
+            if (
+                "node" in self.demand_units.columns
+                and self.demand_units["node"].isin(self.buses.index).all()
+            ):
+                self.add_node_congestion_signals()
+                self.add_utilisation_forecasts()
+            else:
+                self.logger.warning(
+                    "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
+                    "Either 'node' column is missing in demand_units or nodes are not available in buses."
+                )
 
+    def add_missing_availability_columns(self):
+        """Add missing availability columns to the forecasts."""
+        missing_cols = [
+            f"availability_{pp}"
+            for pp in self.powerplants_units.index
+            if f"availability_{pp}" not in self.forecasts.columns
+        ]
+
+        if missing_cols:
+            # Create a DataFrame with the missing columns initialized to 1
+            missing_data = pd.DataFrame(
+                1, index=self.forecasts.index, columns=missing_cols
+            )
+            # Append the missing columns to the forecasts
+            self.forecasts = pd.concat([self.forecasts, missing_data], axis=1).copy()
+
+    def calculate_market_forecasts(self):
+        """Calculate market-specific price and residual load forecasts."""
         for market_id, config in self.market_configs.items():
             if config["product_type"] != "energy":
                 self.logger.warning(
-                    f"Price forecast could be calculated for {market_id}. It can only be calculated for energy only markets for now"
+                    f"Price forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
                 )
                 continue
 
@@ -221,6 +255,29 @@ class CsvForecaster(Forecaster):
                 self.forecasts[f"residual_load_{market_id}"] = (
                     self.calculate_residual_load_forecast(market_id=market_id)
                 )
+
+    def add_node_congestion_signals(self):
+        """Add node-specific congestion signals to the forecasts."""
+        node_congestion_signal_df = self.calculate_node_specific_congestion_forecast()
+        for col in node_congestion_signal_df.columns:
+            if col not in self.forecasts.columns:
+                self.forecasts[col] = node_congestion_signal_df[col]
+
+    def add_utilisation_forecasts(self):
+        """Add renewable utilisation forecasts if missing."""
+        utilisation_columns = [
+            f"{node}_renewable_utilisation"
+            for node in self.demand_units["node"].unique()
+        ]
+        utilisation_columns.append("all_nodes_renewable_utilisation")
+
+        if not all(col in self.forecasts.columns for col in utilisation_columns):
+            renewable_utilisation_forecast = (
+                self.calculate_renewable_utilisation_forecast()
+            )
+            for col in renewable_utilisation_forecast.columns:
+                if col not in self.forecasts.columns:
+                    self.forecasts[col] = renewable_utilisation_forecast[col]
 
     def get_registered_market_participants(self, market_id):
         """
@@ -299,7 +356,7 @@ class CsvForecaster(Forecaster):
 
         """
 
-        # calculate infeed of renewables and residual demand_df
+        # calculate infeed of renewables and residual demand
         # check if max_power is a series or a float
 
         # select only those power plant units, which have a bidding strategy for the specific market_id
@@ -379,6 +436,131 @@ class CsvForecaster(Forecaster):
         marginal_cost = fuel_cost + emissions_cost + additional_cost
 
         return marginal_cost
+
+    def calculate_node_specific_congestion_forecast(self) -> pd.DataFrame:
+        """
+        Calculates a collective node-specific congestion signal by aggregating the congestion severity of all
+        transmission lines connected to each node, taking into account powerplant load based on availability factors.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns for each node, where each column represents the collective
+                          congestion signal time series for that node.
+        """
+        # Step 1: Calculate powerplant load using availability factors
+        availability_factor_df = pd.DataFrame(
+            index=self.index, columns=self.powerplants_units.index, data=0.0
+        )
+
+        # Calculate load for each powerplant based on availability factor and max power
+        for pp, max_power in self.powerplants_units["max_power"].items():
+            availability_factor_df[pp] = (
+                self.forecasts[f"availability_{pp}"] * max_power
+            )
+
+        # Step 2: Calculate net load for each node (demand - generation)
+        net_load_by_node = {}
+
+        for node in self.demand_units["node"].unique():
+            # Calculate total demand for this node
+            node_demand_units = self.demand_units[
+                self.demand_units["node"] == node
+            ].index
+            node_demand = self.forecasts[node_demand_units].sum(axis=1)
+
+            # Calculate total generation for this node by summing powerplant loads
+            node_generation_units = self.powerplants_units[
+                self.powerplants_units["node"] == node
+            ].index
+            node_generation = availability_factor_df[node_generation_units].sum(axis=1)
+
+            # Calculate net load (demand - generation)
+            net_load_by_node[node] = node_demand - node_generation
+
+        # Step 3: Calculate line-specific congestion severity
+        line_congestion_severity = pd.DataFrame(index=self.index)
+
+        for line_id, line_data in self.lines.iterrows():
+            node1, node2 = line_data["bus0"], line_data["bus1"]
+            line_capacity = line_data["s_nom"]
+
+            # Calculate net load for the line as the sum of net loads from both connected nodes
+            line_net_load = net_load_by_node[node1] + net_load_by_node[node2]
+            congestion_severity = line_net_load / line_capacity
+
+            # Store the line-specific congestion severity in DataFrame
+            line_congestion_severity[f"{line_id}_congestion_severity"] = (
+                congestion_severity
+            )
+
+        # Step 4: Calculate node-specific congestion signal by aggregating connected lines
+        node_congestion_signal = pd.DataFrame(index=self.index)
+
+        for node in self.demand_units["node"].unique():
+            # Find all lines connected to this node
+            connected_lines = self.lines[
+                (self.lines["bus0"] == node) | (self.lines["bus1"] == node)
+            ].index
+
+            # Collect all relevant line congestion severities
+            relevant_lines = [
+                f"{line_id}_congestion_severity" for line_id in connected_lines
+            ]
+
+            # Ensure only existing columns are used to avoid KeyError
+            relevant_lines = [
+                line
+                for line in relevant_lines
+                if line in line_congestion_severity.columns
+            ]
+
+            # Aggregate congestion severities for this node (use max or mean)
+            if relevant_lines:
+                node_congestion_signal[f"{node}_congestion_severity"] = (
+                    line_congestion_severity[relevant_lines].max(axis=1)
+                )
+
+        return node_congestion_signal
+
+    def calculate_renewable_utilisation_forecast(self) -> pd.DataFrame:
+        """
+        Calculates the renewable utilisation forecast by summing the available renewable generation
+        for each node and an overall 'all_nodes' summary.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns for each node, where each column represents the renewable
+                        utilisation signal time series for that node and a column for total utilisation across all nodes.
+        """
+        # Initialize a DataFrame to store renewable utilisation for each node
+        renewable_utilisation = pd.DataFrame(index=self.index)
+
+        # Identify renewable power plants by filtering `powerplants_units` DataFrame
+        renewable_plants = self.powerplants_units[
+            self.powerplants_units["fuel_type"] == "renewable"
+        ]
+
+        # Calculate utilisation based on availability and max power for each renewable plant
+        for node in self.demand_units["node"].unique():
+            node_renewable_sum = pd.Series(0, index=self.index)
+
+            # Filter renewable plants in this specific node
+            node_renewable_plants = renewable_plants[renewable_plants["node"] == node]
+
+            for pp in node_renewable_plants.index:
+                max_power = node_renewable_plants.loc[pp, "max_power"]
+                availability_col = f"availability_{pp}"
+
+                # Calculate renewable power based on availability and max capacity
+                if availability_col in self.forecasts.columns:
+                    node_renewable_sum += self.forecasts[availability_col] * max_power
+
+            # Store the node-specific renewable utilisation
+            renewable_utilisation[f"{node}_renewable_utilisation"] = node_renewable_sum
+
+        # Calculate the total renewable utilisation across all nodes
+        all_nodes_sum = renewable_utilisation.sum(axis=1)
+        renewable_utilisation["all_nodes_renewable_utilisation"] = all_nodes_sum
+
+        return renewable_utilisation
 
     def save_forecasts(self, path=None):
         """
