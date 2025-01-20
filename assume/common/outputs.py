@@ -244,7 +244,7 @@ class WriteOutput(Role):
             "market_dispatch",
             "unit_dispatch",
             "rl_params",
-            "learning_params",
+            "rl_critic_params",
         ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
@@ -283,7 +283,7 @@ class WriteOutput(Role):
             df["initial_exploration"] = True
         else:
             df["initial_exploration"] = False
-        # Add missing learning_params columns in case of initial_exploration
+        # Add missing rl_critic_params columns in case of initial_exploration
         if "critic_loss" not in df.columns:
             df["critic_loss"] = np.nan
         if "learning_rate" not in df.columns:
@@ -452,21 +452,21 @@ class WriteOutput(Role):
         if not self.db and not self.export_csv_path:
             return
 
-        # Merge learning_params to rl_params before uploading to db
+        # Merge rl_critic_params to rl_params before uploading to db
         if (
             "rl_params" in self.write_buffers
-            and "learning_params" in self.write_buffers
+            and "rl_critic_params" in self.write_buffers
         ):
             df1 = pd.DataFrame(self.write_buffers["rl_params"])
-            df2 = pd.DataFrame(self.write_buffers["learning_params"])
+            df2 = pd.DataFrame(self.write_buffers["rl_critic_params"])
             merged_df = pd.merge(df1, df2, how="outer")
             merged_list = merged_df.to_dict("records")
             self.write_buffers["rl_params"] = merged_list
-            del self.write_buffers["learning_params"]
-        # if only learning_params are present, rename them to rl_params
-        elif "learning_params" in self.write_buffers:
-            self.write_buffers["rl_params"] = self.write_buffers["learning_params"]
-            del self.write_buffers["learning_params"]
+            del self.write_buffers["rl_critic_params"]
+        # if only rl_critic_params are present, rename them to rl_params
+        elif "rl_critic_params" in self.write_buffers:
+            self.write_buffers["rl_params"] = self.write_buffers["rl_critic_params"]
+            del self.write_buffers["rl_critic_params"]
 
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:

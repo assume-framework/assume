@@ -301,7 +301,7 @@ class Learning(Role):
         """
         if self.episodes_done >= self.episodes_collecting_initial_experience:
             learning_rate, critic_losses = self.rl_algorithm.update_policy()
-            self.write_learning_params_to_output(learning_rate, critic_losses)
+            self.write_rl_critic_params_to_output(learning_rate, critic_losses)
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """
@@ -378,7 +378,7 @@ class Learning(Role):
                         return True
             return False
    
-    def write_learning_params_to_output(self, learning_rate : float, critic_losses_list : list[dict]) -> None:
+    def write_rl_critic_params_to_output(self, learning_rate : float, critic_losses_list : list[dict]) -> None:
         """
         Writes learning parameters and critic losses to output at specified time intervals.
 
@@ -421,7 +421,7 @@ class Learning(Role):
                 receiver_addr=db_addr,
                 content={
                     "context": "write_results",
-                    "type": "learning_params",
+                    "type": "rl_critic_params",
                     "data": output_list,
                 },
             )
