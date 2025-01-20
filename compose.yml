@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-version: "3.9"
 services:
   assume_db:
     image: timescaledev/timescaledb-ha:pg15-oss
