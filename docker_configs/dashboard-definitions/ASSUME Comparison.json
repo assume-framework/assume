@@ -348,8 +348,6 @@
           "sort": "none"
         }
       },
-      "repeat": "market",
-      "repeatDirection": "h",
       "targets": [
         {
           "datasource": {
