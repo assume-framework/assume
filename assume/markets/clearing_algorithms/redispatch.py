@@ -15,7 +15,7 @@ from assume.common.grid_utils import (
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import suppress_output
+from assume.common.utils import check_for_tensors, suppress_output
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -115,6 +115,8 @@ class RedispatchMarketRole(MarketRole):
         orderbook_df = pd.DataFrame(orderbook)
         orderbook_df["accepted_volume"] = 0.0
         orderbook_df["accepted_price"] = 0.0
+
+        orderbook = check_for_tensors(orderbook)
 
         # Now you can pivot the DataFrame
         volume_pivot = orderbook_df.pivot(

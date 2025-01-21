@@ -148,7 +148,18 @@ class RLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+        # check if kwargs contains arguments on obs_dim, act_dim, unique_obs_dim
+        obs_dim = kwargs.pop("obs_dim", 50)
+        act_dim = kwargs.pop("act_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+
+        super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         self.unit_id = kwargs["unit_id"]
 
@@ -1080,14 +1091,18 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
 
 class RedispatchRLStrategy(RLStrategy):
+    def __init__(self, *args, **kwargs):
+        super().__init__(act_dim=1, *args, **kwargs)
+
     def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
         if market_config.market_mechanism == "redispatch":
             return self.calculate_redispatch_bids(
                 unit, market_config, product_tuples, **kwargs
             )
         else:
-            bids = super().calculate_bids(unit, market_config, product_tuples, **kwargs)
-            unit.outputs["eom_bids"].loc[product_tuples[0][0]] = bids[1]["price"]
+            bids = self.calculate_EOM_bids(
+                unit, market_config, product_tuples, **kwargs
+            )
             return bids
 
     def calculate_redispatch_bids(
@@ -1097,19 +1112,6 @@ class RedispatchRLStrategy(RLStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        """
-        Takes information from a unit that the unit operator manages and
-        defines how it is dispatched to the market
-
-        :param unit: the unit to be dispatched
-        :type unit: SupportsMinMax
-        :param market_config: the market configuration
-        :type market_config: MarketConfig
-        :param product_tuples: list of all products the unit can offer
-        :type product_tuples: list[Product]
-        :return: the bids consisting of the start time, end time, only hours, price and volume.
-        :rtype: Orderbook
-        """
         start = product_tuples[0][0]
         # end_all = product_tuples[-1][1]
         # previous_power = unit.get_output_before(start)
@@ -1138,6 +1140,66 @@ class RedispatchRLStrategy(RLStrategy):
 
         return bids
 
+    def calculate_EOM_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        # get technical bounds for the unit output from the unit
+        min_power, max_power = unit.calculate_min_max_power(start, end)
+        min_power = min_power[0]
+        max_power = max_power[0]
+
+        # =============================================================================
+        # 1. Get the Observations, which are the basis of the action decision
+        # =============================================================================
+        next_observation = self.create_observation(
+            unit=unit,
+            market_id=market_config.market_id,
+            start=start,
+            end=end,
+        )
+
+        # =============================================================================
+        # 2. Get the Actions, based on the observations
+        # =============================================================================
+        actions, noise = self.get_actions(next_observation)
+
+        # =============================================================================
+        # 3. Transform Actions into bids
+        # =============================================================================
+        # actions are in the range [-1,1], we need to transform them into actual bids
+        # we can use our domain knowledge to guide the bid formulation
+        bid_price = actions * self.max_bid_price
+
+        # actually formulate bids in orderbook format
+        bids = [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price,
+                "volume": max_power,
+                "node": unit.node,
+            },
+        ]
+
+        unit.outputs["eom_bids"].loc[product_tuples[0][0]] = bid_price
+
+        # store results in unit outputs as lists to be written to the buffer for learning
+        unit.outputs["rl_observations"].append(next_observation)
+        unit.outputs["rl_actions"].append(actions)
+
+        # store results in unit outputs as series to be written to the database by the unit operator
+        unit.outputs["actions"].at[start] = actions
+        unit.outputs["exploration_noise"].at[start] = noise
+
+        return bids
+
     def calculate_reward(self, unit, marketconfig, orderbook):
         if marketconfig.market_mechanism == "redispatch":
             return self.calculate_redispatch_reward(unit, marketconfig, orderbook)
@@ -1155,9 +1217,6 @@ class RedispatchRLStrategy(RLStrategy):
         profit = 0
 
         reward = 0
-
-        orderbook[0]["accepted_volume"] = -orderbook[0]["volume"]
-        orderbook[0]["accepted_price"] = orderbook[0]["price"]
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
