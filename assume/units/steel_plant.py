@@ -6,10 +6,6 @@ import logging
 from datetime import datetime
 
 import pyomo.environ as pyo
-from pyomo.opt import (
-    SolverFactory,
-    check_available_solvers,
-)
 
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import Forecaster
@@ -25,22 +21,35 @@ logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 class SteelPlant(DSMFlex, SupportsMinMax):
     """
-    The SteelPlant class represents a steel plant unit in the energy system.
+    The SteelPlant class represents a steel plant unit within an energy system, which can
+    include various components like Direct Reduced Iron (DRI) plants,
+    Electric Arc Furnaces (EAF), and other supporting technologies. The class models a unit
+    that consumes energy for steel production and may also implement flexibility strategies
+    like cost-based load shifting.
 
     Args:
-        id (str): The unique identifier of the unit.
-        unit_operator (str): The operator of the unit.
-        bidding_strategies (dict): The bidding strategies of the unit.
-        technology (str): The technology of the unit.
-        node (str): The node of the unit.
-        location (tuple[float, float]): The location of the unit.
-        components (dict[str, dict]): The components of the unit such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace.
-        objective (str): The objective of the unit, e.g. minimize variable cost ("min_variable_cost").
-        flexibility_measure (str): The flexibility measure of the unit, e.g. maximum load shift ("max_load_shift").
-        demand (float): The demand of the unit - the amount of steel to be produced.
-        cost_tolerance (float): The cost tolerance of the unit - the maximum cost that can be tolerated when shifting the load.
+        id (str): A unique identifier for the steel plant unit.
+        unit_operator (str): The operator responsible for the steel plant.
+        bidding_strategies (dict): A dictionary of bidding strategies, which define how the unit participates in energy markets.
+        forecaster (Forecaster): A forecaster used to get key variables such as fuel or electricity prices.
+        technology (str, optional): The technology of the steel plant. Default is "steel_plant".
+        components (dict, optional): A dictionary describing the components of the steel plant, such as Electrolyser, DRI Plant, DRI Storage, and Electric Arc Furnace. Default is an empty dictionary.
+        objective (str, optional): The objective function for the steel plant, typically focused on minimizing variable costs. Default is "min_variable_cost".
+        flexibility_measure (str, optional): The flexibility measure for the steel plant, such as "cost_based_load_shift". Default is "max_load_shift".
+        demand (float, optional): The steel production demand, representing the amount of steel that needs to be produced. Default is 0.
+        cost_tolerance (float, optional): The maximum allowable cost variation when shifting the load, used in flexibility measures. Default is 10.
+        congestion_threshold (float, optional): The threshold for congestion management in the plant’s energy system. Default is 0.
+        peak_load_cap (float, optional): The peak load capacity of the steel plant. Default is 0.
+        node (str, optional): The network node where the steel plant is located in the energy system. Default is "node0".
+        location (tuple[float, float], optional): A tuple representing the geographical coordinates (latitude, longitude) of the steel plant. Default is (0.0, 0.0).
+        **kwargs: Additional keyword arguments that may be passed to support more specific configurations.
+
+    Attributes:
+        required_technologies (list): A list of required technologies for the plant to function, such as DRI plant and EAF.
+        optional_technologies (list): A list of optional technologies that could enhance the plant, such as electrolyser or storage systems.
     """
 
+    # Required and optional technologies for the steel plant
     required_technologies = ["dri_plant", "eaf"]
     optional_technologies = ["electrolyser", "hydrogen_buffer_storage", "dri_storage"]
 
@@ -50,14 +59,16 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         unit_operator: str,
         bidding_strategies: dict,
         forecaster: Forecaster,
-        technology: str = "steel_plant",
-        node: str = "node0",
-        location: tuple[float, float] = (0.0, 0.0),
         components: dict[str, dict] = None,
-        objective: str = None,
+        technology: str = "steel_plant",
+        objective: str = "min_variable_cost",
         flexibility_measure: str = "max_load_shift",
         demand: float = 0,
         cost_tolerance: float = 10,
+        congestion_threshold: float = 0,
+        peak_load_cap: float = 0,
+        node: str = "node0",
+        location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
         super().__init__(
@@ -98,54 +109,25 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.lime_price = self.forecaster.get_price("lime")
         self.co2_price = self.forecaster.get_price("co2")
 
+        # Calculate congestion forecast and set it as a forecast column in the forecaster
+        self.congestion_signal = self.forecaster[f"{node}_congestion_severity"]
+        self.renewable_utilisation_signal = self.forecaster[
+            f"{node}_renewable_utilisation"
+        ]
+
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
+        self.congestion_threshold = congestion_threshold
+        self.peak_load_cap = peak_load_cap
 
         # Check for the presence of components
         self.has_h2storage = "hydrogen_buffer_storage" in self.components.keys()
         self.has_dristorage = "dri_storage" in self.components.keys()
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
-        # Main Model part
-        self.model = pyo.ConcreteModel()
-        self.define_sets()
-        self.define_parameters()
-        self.define_variables()
-
-        self.initialize_components()
-        self.initialize_process_sequence()
-
-        self.define_constraints()
-        self.define_objective_opt()
-
-        if self.flexibility_measure == "max_load_shift":
-            self.flexibility_cost_tolerance(self.model)
-        self.define_objective_flex()
-
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
-
-        self.solver = SolverFactory(solvers[0])
-        self.solver_options = {
-            "output_flag": False,
-            "log_to_console": False,
-            "LogToConsole": 0,
-        }
-
-        self.opt_power_requirement = None
-        self.flex_power_requirement = None
-
-        self.variable_cost_series = None
-
-    def define_sets(self) -> None:
-        """
-        Defines the sets for the Pyomo model.
-        """
-        self.model.time_steps = pyo.Set(
-            initialize=[idx for idx, _ in enumerate(self.index)]
-        )
+        # Initialize the model
+        self.setup_model()
 
     def define_parameters(self):
         """
@@ -311,7 +293,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             )
             if self.has_electrolyser:
                 power_input += self.model.dsm_blocks["electrolyser"].power_in[t]
-            return m.total_power_input[t] == power_input
+            return self.model.total_power_input[t] == power_input
 
         # Constraint for variable cost per time step
         @self.model.Constraint(self.model.time_steps)
@@ -328,62 +310,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 variable_cost += self.model.dsm_blocks["electrolyser"].operating_cost[t]
 
             return self.model.variable_cost[t] == variable_cost
-
-    def define_objective_opt(self):
-        """
-        Defines the objective for the optimization model.
-
-        Args:
-            model (pyomo.ConcreteModel): The Pyomo model.
-        """
-        if self.objective == "min_variable_cost" or "recalculate":
-
-            @self.model.Objective(sense=pyo.minimize)
-            def obj_rule_opt(m):
-                """
-                Minimizes the total variable cost over all time steps.
-                """
-                total_variable_cost = sum(
-                    self.model.variable_cost[t] for t in self.model.time_steps
-                )
-
-                return total_variable_cost
-
-        else:
-            raise ValueError(f"Unknown objective: {self.objective}")
-
-    def define_objective_flex(self):
-        """
-        Defines the flexibility objective for the optimization model.
-
-        Args:
-            model (pyomo.ConcreteModel): The Pyomo model.
-        """
-        if self.flexibility_measure == "max_load_shift":
-
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule_flex(m):
-                """
-                Maximizes the load shift over all time steps.
-                """
-                maximise_load_shift = sum(
-                    m.load_shift[t] for t in self.model.time_steps
-                )
-                return maximise_load_shift
-
-        else:
-            raise ValueError(f"Unknown objective: {self.flexibility_measure}")
-
-    def calculate_optimal_operation_if_needed(self):
-        if (
-            self.opt_power_requirement is not None
-            and self.flex_power_requirement is None
-            and self.flexibility_measure == "max_load_shift"
-        ):
-            self.determine_optimal_operation_with_flex()
-
-        if self.opt_power_requirement is None and self.objective == "min_variable_cost":
-            self.determine_optimal_operation_without_flex()
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
@@ -406,26 +332,3 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             )
 
         return marginal_cost
-
-    def as_dict(self) -> dict:
-        """
-        Returns the attributes of the unit as a dictionary, including specific attributes.
-
-        Returns:
-            dict: The attributes of the unit as a dictionary.
-        """
-        # Assuming unit_dict is a dictionary that you want to save to the database
-        components_list = [component for component in self.model.dsm_blocks.keys()]
-
-        # Convert the list to a delimited string
-        components_string = ",".join(components_list)
-
-        unit_dict = super().as_dict()
-        unit_dict.update(
-            {
-                "unit_type": "demand",
-                "components": components_string,
-            }
-        )
-
-        return unit_dict

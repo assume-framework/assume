@@ -130,7 +130,10 @@ def test_soc_constraint(storage_unit):
     storage_unit.outputs["capacity_neg"][start] = -50
     storage_unit.outputs["capacity_pos"][start] = 30
 
-    storage_unit.outputs["soc"][start] = 0.05 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start - timedelta(hours=1)] = (
+        0.05 * storage_unit.max_soc
+    )
+    assert storage_unit.get_soc_before(start) == 0.05 * storage_unit.max_soc
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )

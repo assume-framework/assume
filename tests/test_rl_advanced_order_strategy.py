@@ -59,7 +59,6 @@ def test_learning_advanced_orders(mock_market_config, power_plant):
     ]
 
     strategy = power_plant.bidding_strategies["EOM"]
-    strategy.prepare_observations(power_plant, mc.market_id)
 
     strategy.order_types = ["SB"]
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)

@@ -25,16 +25,15 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 2,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 2,
         "w": 24,
@@ -51,49 +50,16 @@
         "content": "# Welcome to ASSUMES Learning Dashboard\n",
         "mode": "markdown"
       },
-      "pluginVersion": "10.4.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": false,
-          "rawSql": "SELECT\n  datetime AS \"time\",\n  power\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime)\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "power"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_dispatch",
-          "timeColumn": "datetime",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
+      "pluginVersion": "11.4.0",
+      "title": "",
       "type": "text"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 10,
         "w": 5,
@@ -110,50 +76,16 @@
         "content": "#### Introduction\n\nHere we visualize the results of the reinforcement learning process for the specified units that use a learning strategy. \nReinforcement Learning is a machine learning paradigm where an agent learns to make a sequence of decisions in an environment to maximize a reward signal. \nThe agent explores the environment, takes actions, and receives feedback in the form of rewards. \nThe goal is to learn a strategy (policy) that guides the agent to make actions that lead to the highest cumulative reward over time. \nTo better understand the agent's learning process, we use visualizations that illustrate key aspects of its journey.",
         "mode": "markdown"
       },
-      "pluginVersion": "10.4.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": false,
-          "rawSql": "SELECT\n  datetime AS \"time\",\n  power\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime)\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "power"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_dispatch",
-          "timeColumn": "datetime",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
+      "pluginVersion": "11.4.0",
       "title": " ",
       "type": "text"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 10,
         "w": 19,
@@ -170,41 +102,8 @@
         "content": "#### How to use the dashboard\n\nThis interactive tool is designed to help you gain insights into the learning journey of our reinforcement learning (RL) agent. \nTo understand the dashboard take note of the following three points:\n\n##### 1. Division of the Dashboard:\nThe dashboard is divided into two parts. \nThe upper part summarizes the results for all learning units over all simulated episodes. \nThe lower part focuses the results on specific units and episodes, which you can select according to the second point.\n\n\n##### 2. Selection of Metrics and Simulation Subsets:\nThe dashboard is devided in system wide plots and specific plots for certain episodes, timeframes and learning units.\nOn the top of the dashboard, you'll find a list of available choices for the episode of the simualtion and a list of RL units. \nChoose the ones you're interested in by selecting their names in the list. The selected metrics will be displayed on the choice-specific visualization area.\n\n\n##### 3. Interaction with Plots:\nThe plots are interactive. You can zoom in and out, click on data points to view specific details etc.\nIn the upper left corner of each plot you find additional information about the depicted data.\n\nIf you need some guidance for interpreting the results, you can orient yourself on the follwing steps:\n\n1. Understand Learning Trends: \nObserve how reward, regret, and other metrics change over time. \nLook for trends such as increasing rewards, or decreasing regret. Take note of the evaluation runs, which are done every x episodes. There the exploration isturned off and a \"normal run\" with the currently learned policies is made. \nWhile the reward in all learning episodes can fluctuate you should see a clear rising trend in the evaluation reward. the \n2. Examine Policy and Action Patterns: \nVisualize the agent's learned policy and action distribution. Do you see some pattern in the agents actions. Do these patterns make sense with regard to your domain knowledge?\n5. Compare Different Strategies: \nFor an easy comparison we introduced the ASSUME Comparison dashboard. There you can easily compare two runs with and without learning. Analyse different behaviour of the agents there. \n6. Experiment and Learn: \nUse this tool to experiment with different settings and learn about RL agent behavior. \nIt's a great way to develop a deeper understanding of RL concepts.",
         "mode": "markdown"
       },
-      "pluginVersion": "10.4.2",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": false,
-          "rawSql": "SELECT\n  datetime AS \"time\",\n  power\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime)\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "power"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_dispatch",
-          "timeColumn": "datetime",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
+      "pluginVersion": "11.4.0",
+      "title": "",
       "type": "text"
     },
     {
@@ -298,18 +197,19 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 100
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'\nand learning_mode is true",
+          "rawSql": "SELECT\n  episode,\n  avg(reward) as profit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -355,6 +255,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "rl_params",
           "timeColumn": "index",
           "timeColumnType": "timestamp",
@@ -368,54 +285,6 @@
         }
       ],
       "title": "Average REWARD of all learning units",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
       "type": "barchart"
     },
     {
@@ -496,18 +365,19 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 100
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_eval_[1-9]+'\nand perform_evaluation is true",
+          "rawSql": "SELECT\n  episode,\n  avg(reward) as reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_eval_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -553,6 +423,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "rl_params",
           "timeColumn": "index",
           "timeColumnType": "timestamp",
@@ -634,6 +521,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -755,7 +643,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -810,6 +698,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -897,6 +786,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -956,7 +846,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1084,7 +975,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "10.4.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1171,7 +1062,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1184,7 +1076,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "reward (mean)"
+              "options": "reward"
             },
             "properties": [
               {
@@ -1227,7 +1119,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 100
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1239,7 +1131,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true",
+          "rawSql": "SELECT\n  episode,\n  avg(reward) as reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -1315,54 +1207,6 @@
         }
       ],
       "title": "Avg. REWARD of unit $rl_unit",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
       "type": "barchart"
     },
     {
@@ -1401,7 +1245,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1414,7 +1259,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "regret (mean)"
+              "options": "regret"
             },
             "properties": [
               {
@@ -1457,7 +1302,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 100
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1469,7 +1314,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  regret\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true",
+          "rawSql": "SELECT\n  episode,\n  avg(regret) as regret\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -1545,60 +1390,6 @@
         }
       ],
       "title": "Avg. REGRET of unit $rl_unit",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "regret": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
       "type": "barchart"
     },
     {
@@ -1637,7 +1428,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1693,7 +1485,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 100
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1768,9 +1560,18 @@
           "id": "calculateField",
           "options": {
             "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "index"
+                }
+              },
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "episode"
+                }
+              }
             },
             "mode": "binary",
             "reduce": {
@@ -1849,7 +1650,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1862,7 +1664,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "profit (sum)"
+              "options": "profit"
             },
             "properties": [
               {
@@ -1905,7 +1707,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 100
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1917,7 +1719,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  profit\nFROM rl_params\nWHERE simulation ~ '^${simulation}_[1-9]+'  AND\n      unit = '$rl_unit' AND learning_mode is true",
+          "rawSql": "SELECT\n  episode,\n  sum(profit) as profit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -1993,66 +1795,6 @@
         }
       ],
       "title": "Total PROFIT of unit $rl_unit",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "profit": {
-                "aggregations": [
-                  "sum"
-                ],
-                "operation": "aggregate"
-              },
-              "regret": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
       "type": "barchart"
     },
     {
@@ -2072,6 +1814,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2102,7 +1845,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2158,6 +1902,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2230,6 +1975,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2260,7 +2006,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2316,6 +2063,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2389,6 +2137,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2419,7 +2168,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2449,6 +2199,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2504,6 +2255,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2534,7 +2286,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2564,7 +2317,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2619,6 +2372,7 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2649,7 +2403,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2679,7 +2434,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2718,16 +2473,16 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "example_02a_harder_run_4",
-          "value": "example_02a_harder_run_4"
+          "text": "example_02a_base",
+          "value": "example_02a_base"
         },
         "datasource": {
           "type": "postgres",
@@ -2735,21 +2490,17 @@
         },
         "definition": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere perform_evaluation is False and learning_mode is True",
         "description": "Can choose which simulation we want to show ",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "simulation",
         "options": [],
         "query": "SELECT DISTINCT\nSUBSTRING(m.simulation, 0, LENGTH(m.simulation) +1  - strpos(REVERSE(m.simulation),'_')) AS market_simulation\nFROM rl_params m\nwhere perform_evaluation is False and learning_mode is True",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
           "text": "pp_6",
           "value": "pp_6"
         },
@@ -2759,22 +2510,17 @@
         },
         "definition": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'",
         "description": "All units that have an reinforcment learning strategy and hence have the Rl specific parameteres logged",
-        "hide": 0,
         "includeAll": false,
         "label": "rl_unit",
-        "multi": false,
         "name": "rl_unit",
         "options": [],
         "query": "SELECT DISTINCT unit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
           "text": "1551402000000",
           "value": "1551402000000"
         },
@@ -2785,14 +2531,11 @@
         "definition": "",
         "hide": 2,
         "includeAll": false,
-        "multi": false,
         "name": "timeRange",
         "options": [],
         "query": "SELECT MIN(datetime), MAX(datetime) FROM rl_params",
         "refresh": 1,
         "regex": "",
-        "skipUrlSync": false,
-        "sort": 0,
         "type": "query"
       }
     ]

@@ -4,10 +4,17 @@
 
 import logging
 from collections.abc import Callable
+from collections.abc import Callable
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import pyomo.environ as pyo
+from pyomo.opt import (
+    SolverFactory,
+    SolverStatus,
+    TerminationCondition,
+    check_available_solvers,
+)
 from pyomo.opt import (
     SolverFactory,
     SolverStatus,
@@ -38,10 +45,38 @@ class DSMFlex:
     }
     big_M = 10000000
 
+    # Mapping of flexibility measures to their respective functions
+    flexibility_map: dict[str, Callable[[pyo.ConcreteModel], None]] = {
+        "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
+        "congestion_management_flexibility": lambda self,
+        model: self.grid_congestion_management(model),
+        "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(
+            model
+        ),
+        "renewable_utilisation": lambda self, model: self.renewable_utilisation(
+            model,
+        ),
+    }
+    big_M = 10000000
+
     def __init__(self, components, **kwargs):
         super().__init__(**kwargs)
 
         self.components = components
+
+        self.initialize_solver()
+
+    def initialize_solver(self, solver=None):
+        # Define a solver
+        solvers = check_available_solvers(*SOLVERS)
+        solver = solver if solver in solvers else solvers[0]
+        if solver == "gurobi":
+            self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
+        elif solver == "appsi_highs":
+            self.solver_options = {"output_flag": False, "log_to_console": False}
+        else:
+            self.solver_options = {}
+        self.solver = SolverFactory(solver)
 
         self.initialize_solver()
 
@@ -519,6 +554,8 @@ class DSMFlex:
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
         if switch_flex_off:
             instance = self.switch_to_opt(instance)
+        if switch_flex_off:
+            instance = self.switch_to_opt(instance)
         # solve the instance
         results = self.solver.solve(instance, options=self.solver_options)
 
@@ -776,6 +813,18 @@ class DSMFlex:
                 "Termination Condition: ", results.solver.termination_condition
             )
 
+        # Compute adjusted total power input with load shift applied
+        adjusted_total_power_input = []
+        for t in instance.time_steps:
+            # Calculate the load-shifted value of total_power_input
+            adjusted_power = (
+                instance.total_power_input[t].value
+                + instance.load_shift_pos[t].value
+                - instance.load_shift_neg[t].value
+            )
+            adjusted_total_power_input.append(adjusted_power)
+
+        # Assign this list to flex_power_requirement as a pandas Series
         # Compute adjusted total power input with load shift applied
         adjusted_total_power_input = []
         for t in instance.time_steps:
