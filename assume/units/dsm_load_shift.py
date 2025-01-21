@@ -439,11 +439,11 @@ class DSMFlex:
         }
         df = pd.DataFrame(data)
         df.to_excel(
-            "./examples/outputs/H2_electrolyser_DRI_flex_6a_base.xlsx",
+            "./examples/outputs/H2_electrolyser_DRI_flex_6b_pessimistic.xlsx",
             index=False,
         )
         logger.debug(
-            f"Time series data saved to {"./examples/outputs/H2_electrolyser_DRI_flex_6a_base.xlsx"}"
+            f"Time series data saved to {"./examples/outputs/H2_electrolyser_DRI_flex_6b_pessimistic.xlsx"}"
         )
 
         # Calculate total cost
