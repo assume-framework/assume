@@ -7,6 +7,7 @@ import contextlib
 import inspect
 import logging
 import os
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -26,9 +27,13 @@ logger = logging.getLogger(__name__)
 
 freq_map = {
     "h": rr.HOURLY,
+    "hour": rr.HOURLY,
     "m": rr.MINUTELY,
+    "min": rr.MINUTELY,
     "d": rr.DAILY,
+    "day": rr.DAILY,
     "w": rr.WEEKLY,
+    "week": rr.WEEKLY,
 }
 
 
@@ -448,8 +453,17 @@ def convert_to_rrule_freq(string: str) -> tuple[int, int]:
     Returns:
         tuple[int, int]: The rrule frequency and interval.
     """
-    freq = freq_map[string[-1]]
-    interval = int(string[:-1])
+
+    # try to identify the frequency and raise an error if it is not found
+    try:
+        freq = freq_map["".join(re.findall(r"\D", string))]
+    except KeyError:
+        raise ValueError(
+            f"Frequency '{string}' not supported. Supported frequencies are {list(freq_map.keys())}"
+        )
+
+    interval = int("".join(re.findall(r"\d", string)))
+
     return freq, interval
 
 
