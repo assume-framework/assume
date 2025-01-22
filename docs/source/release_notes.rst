@@ -12,6 +12,10 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+- **Tensorboard Integration:** To enable better monitoring of the learning prograss and comparison between different runs, we added the possibility to use Tensorboard for logging the learning progress.
+  To use this feature, please follow the instructions in the README.
+
 **Improvements:**
 - **Learning Observation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
   This allows for a more robust scaling of the observation space for future analysis.
