@@ -3,28 +3,17 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import os
-
-# Turn off TF onednn optimizations to avoid memory leaks
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 from collections.abc import Callable
 from datetime import datetime
 from typing import TypedDict
-from sqlalchemy import create_engine
-from torch.utils.tensorboard import SummaryWriter
-from docs.tensorboard_info import tensor_board_intro
-from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 
 import numpy as np
 import torch as th
-import pandas as pd
 class ObsActRew(TypedDict):
     observation: list[th.Tensor]
     action: list[th.Tensor]
     reward: list[th.Tensor]
-
-logger = logging.getLogger(__name__)
 
 observation_dict = dict[list[datetime], ObsActRew]
 
@@ -163,140 +152,3 @@ def constant_schedule(val: float) -> Schedule:
         return val
 
     return func
-
-class TensorBoardLogger:
-    """
-    Initializes an instance of the TensorBoardLogger class.
-
-    Args:
-    db_uri (str): URI for connecting to the database.
-    simulation_id (str): The unique identifier for the simulation.
-    tensorboard_path (str, optional): Path for storing tensorboard logs.
-    learning_mode (bool, optional): Whether the simulation is in learning mode. Defaults to False.
-    episodes_collecting_initial_experience (int, optional): Number of episodes for initial experience collection. Defaults to 0.
-    perform_evaluation (bool, optional): Whether the simulation is in evaluation mode. Defaults to False.
-    
-    """
-    def __init__(
-        self,
-        db_uri: str,
-        simulation_id: str,
-        tensorboard_path: str = "logs/tensorboard",
-        learning_mode: bool = False,
-        episodes_collecting_initial_experience: int = 0,
-        perform_evaluation: bool = False,
-        ):
-
-        self.simulation_id = simulation_id
-        self.learning_mode = learning_mode
-        self.perform_evaluation = perform_evaluation
-        self.episodes_collecting_initial_experience = episodes_collecting_initial_experience
-        
-        self.writer = SummaryWriter(tensorboard_path)
-        self.db_uri = db_uri
-        if self.db_uri:
-            self.db = create_engine(self.db_uri)
-
-        # get episode number if in learning or evaluation mode
-        self.episode = None
-        if self.learning_mode or self.perform_evaluation:
-            episode = self.simulation_id.split("_")[-1]
-            if episode.isdigit():
-                self.episode = int(episode)
-            
-    def update_tensorboard(self):
-        """Store episodic evaluation data in tensorboard"""
-        if not (self.episode and self.learning_mode):
-            return
-
-        mode = "train" if not self.perform_evaluation else "eval"
-        
-        # columns specific to the training mode.
-        train_columns = """, 
-            AVG(regret) AS regret, 
-            AVG(critic_loss) AS loss, 
-            AVG(learning_rate) AS lr, 
-            AVG(exploration_noise_0) AS noise_0, 
-            AVG(exploration_noise_1) AS noise_1
-            """
-
-        # Use appropriate date function and parameter style based on database type
-        if self.db.dialect.name == 'sqlite':
-            # To aggregate by hour instead of day, replace '%Y-%m-%d' with '%Y-%m-%d %H'
-            # To aggregate by month instead of day, replace '%Y-%m-%d' with '%Y-%m'
-            date_func = f"strftime('%Y-%m-%d', datetime)"
-        elif self.db.dialect.name == 'postgresql':
-            # To aggregate by hour instead of day, replace 'YYYY-MM-DD' with 'YYYY-MM-DD HH24'
-            # To aggregate by month instead of day, replace 'YYYY-MM-DD' with 'YYYY-MM'
-            date_func = f"TO_CHAR(datetime, 'YYYY-MM-DD')"
-
-        query = f"""
-            SELECT 
-                {date_func} AS dt,
-                unit,
-                AVG(profit) AS profit,
-                AVG(reward) AS reward
-                {train_columns if mode == 'train' else ''}
-            FROM rl_params
-            WHERE episode = '{self.episode}'
-            AND simulation = '{self.simulation_id}'
-            AND perform_evaluation = {self.perform_evaluation}
-            {'AND initial_exploration = False' if mode == 'train' else ''}
-            GROUP BY dt, unit
-            ORDER BY dt
-        """
-        try:
-            # Add intro text for first episode
-            if self.episode == 1 and mode == "train":
-                self.writer.add_text("TensorBoard Introduction", tensor_board_intro)
-
-            # Process dataframe
-            df = pd.read_sql(query, self.db)
-            df["dt"] = pd.to_datetime(df["dt"])
-            df = df.fillna(0.0)
-
-            # Calculate x_index
-            datetimes = df["dt"].unique()
-            x_index = (self.episode - 1) * len(datetimes)
-            if mode == "train":
-                x_index -= self.episodes_collecting_initial_experience * len(datetimes)
-
-            # Process metrics for each timestamp
-            for i, time in enumerate(datetimes):
-                time_df = df[df["dt"] == time]
-                
-                # Build metrics dictionary
-                unit_metrics = ['reward', 'profit'] + (['regret', 'loss'] if mode == "train" else [])
-                metric_dicts = {
-                    metric: {
-                        **time_df.set_index('unit')[metric].to_dict(),
-                        'avg': time_df[metric].mean()
-                    }
-                    for metric in unit_metrics
-                }
-
-                # Add training-specific metrics
-                if mode == "train":
-                    metric_dicts['learning rate'] = {'': time_df["lr"].iloc[0]}
-                    metric_dicts['noise'] = {
-                        f'{i}': time_df[f'noise_{i}'].abs().mean()
-                        for i in range(2)
-                    }
-                plot_order = ["a)", "b)", "c)", "d)", "e)", "f)"]
-                # Write to tensorboard
-                for order, (metric, values) in enumerate(metric_dicts.items()):
-                    self.writer.add_scalars(f"{mode}/{plot_order[order]} {metric}", values, x_index + i)
-
-        except (ProgrammingError, OperationalError, DataError):
-            return
-        except Exception as e:
-            logger.error("could not read query: %s", e)
-            return
-        
-    def __del__(self):
-        """
-        Deletes the WriteOutput instance.
-        """
-        if hasattr(self, "writer"):
-            self.writer.flush()
-            self.writer.close()

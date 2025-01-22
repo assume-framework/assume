@@ -264,7 +264,7 @@ class World:
         if self.learning_mode or self.perform_evaluation:
             # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
-            from assume.reinforcement_learning.learning_utils import TensorBoardLogger
+            from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
             self.learning_role = Learning(
                 self.learning_config, 
