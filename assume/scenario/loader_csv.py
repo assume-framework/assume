@@ -576,6 +576,17 @@ def setup_world(
 
     # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
+    # if save_frequency_hours is set to 0, disable saving
+    save_frequency_hours = None if save_frequency_hours == 0 else save_frequency_hours
+    # check that save_frequency_hours is either None or an integer and raise an error if not with a hint for the user
+    if save_frequency_hours is not None and (
+        not isinstance(save_frequency_hours, int) or save_frequency_hours <= 0
+    ):
+        raise ValueError(
+            f"save_frequency_hours argument in the config file must be either null or a positive integer. "
+            f"Current value: {save_frequency_hours}."
+        )
+
     # Disable save frequency if CSV export is enabled
     if world.export_csv_path and save_frequency_hours is not None:
         save_frequency_hours = None
