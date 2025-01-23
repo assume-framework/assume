@@ -58,7 +58,7 @@ base_case:
 
 learning_coal:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-31 23:45
+  end_date: 2019-01-06 00:00
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
@@ -76,7 +76,7 @@ learning_coal:
     action_noise_schedule: linear
     noise_dt: 1
     noise_scale: 1
-    noise_sigma: 0.1
+    noise_sigma: 0.2
     train_freq: 24h
     trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
     training_episodes: 100
@@ -107,7 +107,7 @@ learning_coal:
       #  zones_identifier: zone_id
 
     Redispatch:
-      operator: Redispatch_operator
+      operator: network_operator
       product_type: energy
       start_date: 2019-01-01 02:00
       products:
@@ -134,7 +134,7 @@ learning_coal:
 
 learning_gas:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-31 23:45
+  end_date: 2019-01-06 00:00
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
@@ -152,7 +152,7 @@ learning_gas:
     action_noise_schedule: linear
     noise_dt: 1
     noise_scale: 1
-    noise_sigma: 0.1
+    noise_sigma: 0.2
     train_freq: 24h
     trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
     training_episodes: 100
@@ -183,7 +183,7 @@ learning_gas:
       #  zones_identifier: zone_id
 
     Redispatch:
-      operator: Redispatch_operator
+      operator: network_operator
       product_type: energy
       start_date: 2019-01-01 02:00
       products:
@@ -210,7 +210,7 @@ learning_gas:
 
 learning_oil:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-31 23:45
+  end_date: 2019-01-06 00:00
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
@@ -228,7 +228,7 @@ learning_oil:
     action_noise_schedule: linear
     noise_dt: 1
     noise_scale: 1
-    noise_sigma: 0.1
+    noise_sigma: 0.2
     train_freq: 24h
     trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
     training_episodes: 100
@@ -259,7 +259,7 @@ learning_oil:
       #  zones_identifier: zone_id
 
     Redispatch:
-      operator: Redispatch_operator
+      operator: network_operator
       product_type: energy
       start_date: 2019-01-01 02:00
       products:
@@ -286,7 +286,7 @@ learning_oil:
 
 learning_all3:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-31 23:45
+  end_date: 2019-01-06 00:00
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
@@ -304,7 +304,7 @@ learning_all3:
     action_noise_schedule: linear
     noise_dt: 1
     noise_scale: 1
-    noise_sigma: 0.1
+    noise_sigma: 0.2
     train_freq: 24h
     trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
     training_episodes: 100
@@ -335,7 +335,7 @@ learning_all3:
       #  zones_identifier: zone_id
 
     Redispatch:
-      operator: Redispatch_operator
+      operator: network_operator
       product_type: energy
       start_date: 2019-01-01 02:00
       products:

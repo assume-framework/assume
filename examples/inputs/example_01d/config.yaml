@@ -105,7 +105,7 @@ learning_case:
     gamma: 0.99
     device: cpu
     action_noise_schedule: linear
-    noise_sigma: 0.1
+    noise_sigma: 0.2
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
