@@ -460,7 +460,7 @@ def load_config_and_create_forecaster(
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
-    exchanges_units = load_file(path=path, config=config, file_name="exchanges_units")
+    exchange_units = load_file(path=path, config=config, file_name="exchange_units")
 
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
@@ -482,6 +482,7 @@ def load_config_and_create_forecaster(
     demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
     if demand_df is None:
         raise ValueError("No demand time series was provided!")
+
     exchanges_df = load_file(
         path=path, config=config, file_name="exchanges_df", index=index
     )
@@ -499,17 +500,8 @@ def load_config_and_create_forecaster(
         )
         availability = normalize_availability(powerplant_units, availability)
 
-    electricity_prices_df = load_file(
-        path=path, config=config, file_name="electricity_prices", index=index
-    )
-    price_forecast_df = load_file(
-        path=path, config=config, file_name="price_forecasts", index=index
-    )
     fuel_prices_df = load_file(
         path=path, config=config, file_name="fuel_prices_df", index=index
-    )
-    temperature_df = load_file(
-        path=path, config=config, file_name="temperature", index=index
     )
 
     buses = load_file(path=path, config=config, file_name="buses")
@@ -528,10 +520,7 @@ def load_config_and_create_forecaster(
     forecaster.set_forecast(demand_df)
     forecaster.set_forecast(exchanges_df)
     forecaster.set_forecast(availability, prefix="availability_")
-    forecaster.set_forecast(electricity_prices_df)
-    forecaster.set_forecast(price_forecast_df, "price_")
     forecaster.set_forecast(fuel_prices_df, prefix="fuel_price_")
-    forecaster.set_forecast(temperature_df)
     forecaster.calc_forecast_if_needed()
 
     forecaster.convert_forecasts_to_fast_series()
@@ -545,7 +534,7 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
-        "exchanges_units": exchanges_units,
+        "exchange_units": exchange_units,
         "dsm_units": dsm_units,
         "forecaster": forecaster,
     }
@@ -588,7 +577,7 @@ def setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
-    exchanges_units = scenario_data["exchanges_units"]
+    exchange_units = scenario_data["exchange_units"]
     dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
@@ -713,8 +702,8 @@ def setup_world(
     )
 
     exchanges_plants = read_units(
-        units_df=exchanges_units,
-        unit_type="exchanges",
+        units_df=exchange_units,
+        unit_type="exchange",
         forecaster=forecaster,
         world_bidding_strategies=world.bidding_strategies,
     )

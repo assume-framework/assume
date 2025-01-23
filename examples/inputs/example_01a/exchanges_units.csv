@@ -1,3 +1,0 @@
-name,technology,direction,bidding_EOM,max_power,min_power,price,unit_operator
-import,n/a,import,naive_eom,1000000,0,0,eom_de
-export,n/a,export,naive_eom,1000000,0,2999,eom_de

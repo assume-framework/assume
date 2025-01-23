@@ -1,4 +1,4 @@
-datetime,import,export
+datetime,exchange_import,exchange_export
 2019-01-01 00:00:00,439.32,549.15
 2019-01-01 00:15:00,434.6,543.25
 2019-01-01 00:30:00,429.52,536.9
