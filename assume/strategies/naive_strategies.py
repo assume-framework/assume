@@ -158,9 +158,9 @@ class NaiveDADSMStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit
-        unit.determine_optimal_operation_without_flex()
-        # unit.determine_optimal_operation_with_flex()
-        # self.plot_power_requirements(unit)
+        # unit.determine_optimal_operation_without_flex()
+        unit.determine_optimal_operation_with_flex()
+        self.plot_power_requirements(unit)
 
         bids = []
         for product in product_tuples:
@@ -171,7 +171,7 @@ class NaiveDADSMStrategy(BaseStrategy):
             start = product[0]
 
             volume = unit.opt_power_requirement.at[start]
-            marginal_price = 3000
+            marginal_price = unit.calculate_marginal_cost.at[start]
             bids.append(
                 {
                     "start_time": start,
@@ -193,7 +193,7 @@ class NaiveDADSMStrategy(BaseStrategy):
         """
         # Retrieve power requirements data
         opt_power_requirement = unit.opt_power_requirement
-        # flex_power_requirement = unit.flex_power_requirement
+        flex_power_requirement = unit.flex_power_requirement
 
         # Plotting
         plt.figure(figsize=(10, 6))
@@ -203,13 +203,13 @@ class NaiveDADSMStrategy(BaseStrategy):
             label="Optimal Power Requirement",
             color="blue",
         )
-        # plt.plot(
-        #     flex_power_requirement.index,
-        #     flex_power_requirement,
-        #     label="Flex Power Requirement",
-        #     color="orange",
-        #     linestyle="--",
-        # )
+        plt.plot(
+            flex_power_requirement.index,
+            flex_power_requirement,
+            label="Flex Power Requirement",
+            color="orange",
+            linestyle="--",
+        )
 
         # Labels and title
         plt.xlabel("Time")

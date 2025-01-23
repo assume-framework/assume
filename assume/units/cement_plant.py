@@ -97,6 +97,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
         self.hydrogen_price = self.forecaster["price_hydrogen"]
         self.electricity_price = self.forecaster["price_EOM"]
+        self.electricity_price_flex = self.forecaster["price_EOM_flex"]
         self.grinder_availability_profile = self.forecaster[
             "grinder_availability_profile"
         ]
@@ -808,6 +809,20 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 )
 
                 return maximise_load_shift
+            
+        if self.flexibility_measure == "electricity_price_signal_based_flexibility":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+
+                total_variable_cost = sum(
+                    self.model.variable_cost[t] for t in self.model.time_steps
+                )
+
+                return total_variable_cost
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
