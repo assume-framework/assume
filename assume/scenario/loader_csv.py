@@ -677,7 +677,7 @@ def setup_world(
     logger.info("Read units from file")
 
     units = defaultdict(list)
-    pwp_plants = read_units(
+    powerplant_units = read_units(
         units_df=powerplant_units,
         unit_type="power_plant",
         forecaster=forecaster,
@@ -685,7 +685,7 @@ def setup_world(
         learning_mode=learning_config["learning_mode"],
     )
 
-    str_plants = read_units(
+    storage_units = read_units(
         units_df=storage_units,
         unit_type="storage",
         forecaster=forecaster,
@@ -693,7 +693,7 @@ def setup_world(
         learning_mode=learning_config["learning_mode"],
     )
 
-    dem_plants = read_units(
+    demand_units = read_units(
         units_df=demand_units,
         unit_type="demand",
         forecaster=forecaster,
@@ -701,7 +701,7 @@ def setup_world(
         learning_mode=learning_config["learning_mode"],
     )
 
-    exchanges_plants = read_units(
+    exchange_units = read_units(
         units_df=exchange_units,
         unit_type="exchange",
         forecaster=forecaster,
@@ -720,13 +720,13 @@ def setup_world(
         for op, op_units in dsm_units.items():
             units[op].extend(op_units)
 
-    for op, op_units in pwp_plants.items():
+    for op, op_units in powerplant_units.items():
         units[op].extend(op_units)
-    for op, op_units in str_plants.items():
+    for op, op_units in storage_units.items():
         units[op].extend(op_units)
-    for op, op_units in dem_plants.items():
+    for op, op_units in demand_units.items():
         units[op].extend(op_units)
-    for op, op_units in exchanges_plants.items():
+    for op, op_units in exchange_units.items():
         units[op].extend(op_units)
 
     # if distributed_role is true - there is a manager available
