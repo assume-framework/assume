@@ -277,3 +277,70 @@ class NaiveRedispatchStrategy(BaseStrategy):
             )
 
         return bids
+
+
+class NaiveExchangeStrategy(BaseStrategy):
+    """
+    A naive strategy for an exchange unit that bids the defined import and export prices on the market.
+    It submits two bids, one for import and one for export, with the respective prices and volumes.
+    Export bids have negative volumes and are treated as demand on the market.
+    Import bids have positive volumes and are treated as supply on the market.
+
+    Methods
+    -------
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market.
+
+        Args:
+            unit (SupportsMinMax): The unit to be dispatched.
+            market_config (MarketConfig): The market configuration.
+            product_tuples (list[Product]): The list of all products the unit can offer.
+
+        Returns:
+            Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
+        """
+
+        bids = []
+        for product in product_tuples:
+            # for each product, calculate the marginal cost of the unit at the start time of the product
+            # and the volume of the product. Dispatch the order to the market.
+            start = product[0]
+
+            # append import bid
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": unit.price_import,
+                    "volume": unit.volume_import.at[start],
+                    "node": unit.node,
+                }
+            )
+
+            # append export bid
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": unit.price_export,
+                    "volume": unit.volume_export.at[start],
+                    "node": unit.node,
+                }
+            )
+
+        # clean up empty bids
+        bids = self.remove_empty_bids(bids)
+
+        return bids
