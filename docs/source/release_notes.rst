@@ -12,6 +12,10 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+- **Exchange Unit**: A new unit type for modeling **energy trading** between market participants. It supports **buying (importing) and selling (exporting) energy**, with user-defined prices.
+  Check **example_01a**, **example_03**, and the files **"exchange_units.csv"** and **"exchanges_df.csv"** for usage examples.
+
 **Improvements:**
 - **Learning Observation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
   This allows for a more robust scaling of the observation space for future analysis.
