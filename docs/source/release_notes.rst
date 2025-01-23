@@ -12,7 +12,13 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+
+- **Exchange Unit**: A new unit type for modeling **energy trading** between market participants. It supports **buying (importing) and selling (exporting) energy**, with user-defined prices.
+  Check **example_01a**, **example_03**, and the files **"exchange_units.csv"** and **"exchanges_df.csv"** for usage examples.
+
 **Improvements:**
+
 - **Learning Observation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
   This allows for a more robust scaling of the observation space for future analysis.
 - **Allow Multi-Market Bidding Strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
@@ -20,12 +26,14 @@ Upcoming Release
 - **Improve Storage Behavior**: Storages were using the current unmodified SoC instead of the final SoC of last hour, leading to always using the initial value to calculate discharge possibility.(#524)
 
 **Bug Fixes:**
+
 - **Update PyPSA Version:** Fixes example "small_with_redispatch"; adjustments to tutorials 10 and 11 to remove DeprecationWarnings.
 
 v0.5.0 - (10th December 2024)
 ===========================================
 
 **New Features:**
+
 - **Learning Rate and Noise Scheduling**: Added the possibility to schedule the learning rate and action noise in the learning process. This feature
   enables streamlining the learning progress. Currently, only "linear" decay available by setting the `learning_rate_schedule` and
   `action_noise_schedule` in the learning config to "linear". Defaults to no decay if not provided. It decays `learning_rate`/ `noise_dt`
@@ -39,6 +47,7 @@ v0.5.0 - (10th December 2024)
   discharging during off-season or on-season time as well as a target level to be reached at the end of the season.
 
 **Improvements:**
+
 - **Timeseries Performance Optimization:** Switched to a custom `FastIndex` and `FastSeries` class, which is based on the pandas Series
   but utilizes NumPy arrays for internal data storage and indexing. This change significantly improves the
   performance of read and write operations, achieving an average speedup of **2x to 3x** compared to standard
@@ -50,22 +59,25 @@ v0.5.0 - (10th December 2024)
   depending on the size of the simulation (number of units, markets, and time steps).
 
 **Bugfixes:**
-  - **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
-  - **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
-  - **Powerplant**: Remove duplicate `Powerplant.set_dispatch_plan()` which broke multi-market bidding
-  - **CSV scenario loader**: Fixed issue when one extra day was being added to the index, which lead to an error in the simulation when additional data was not available in the input data.
-  - **Market opening schedule**: Fixed issue where the market opening was scheduled even though the simulation was ending before the required products. Now the market opening is only scheduled
-    if the total duration of the market products plus first delivery time fits before the simulation end.
-  - **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
+
+- **Tutorials**: General fixes of the tutorials, to align with updated functionalitites of Assume
+- **Tutorial 07**: Aligned Amiris loader with changes in format in Amiris compare (https://gitlab.com/fame-framework/fame-io/-/issues/203 and https://gitlab.com/fame-framework/fame-io/-/issues/208)
+- **Powerplant**: Remove duplicate `Powerplant.set_dispatch_plan()` which broke multi-market bidding
+- **CSV scenario loader**: Fixed issue when one extra day was being added to the index, which lead to an error in the simulation when additional data was not available in the input data.
+- **Market opening schedule**: Fixed issue where the market opening was scheduled even though the simulation was ending before the required products. Now the market opening is only scheduled
+  if the total duration of the market products plus first delivery time fits before the simulation end.
+- **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
 
 v0.4.3 - (11th November 2024)
 ===========================================
 
 **Improvements:**
-  - **Documentation**: added codespell hook to pre-commit which checks for spelling errors in documentation and code
+
+- **Documentation**: added codespell hook to pre-commit which checks for spelling errors in documentation and code
 
 **Bugfixes:**
-  - **Simulation**: Delete simulation results for same simulation prior to run (as before v0.4.2)
+
+- **Simulation**: Delete simulation results for same simulation prior to run (as before v0.4.2)
 
 **Full Changelog**: [v0.4.2...v0.4.3](https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3)
 
@@ -121,6 +133,7 @@ v0.4.1 (8th October 2024)
 - update GitHub Actions versions (#402)
 
 **Bug Fixes:**
+
 - add compatibility with pyyaml-include (#421)
 - make complex clearing compatible to RL (#430)
 - pin PyPSA to remove DeprecationWarnings for now (#431)

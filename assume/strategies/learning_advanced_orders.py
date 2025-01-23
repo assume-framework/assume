@@ -80,7 +80,6 @@ class RLAdvancedOrderStrategy(RLStrategy):
             unit=unit,
             market_id=market_config.market_id,
             start=start,
-            end=end,
         )
 
         # =============================================================================
@@ -228,7 +227,6 @@ class RLAdvancedOrderStrategy(RLStrategy):
         unit: SupportsMinMax,
         market_id: str,
         start: datetime,
-        end: datetime,
     ):
         """
         Create observation.
@@ -262,9 +260,6 @@ class RLAdvancedOrderStrategy(RLStrategy):
         ):
             self.prepare_observations(unit, market_id)
 
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - unit.index.freq
-
         # get the forecast length depending on the time unit considered in the modelled unit
         forecast_len = (self.foresight - 1) * unit.index.freq
 
@@ -274,7 +269,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
-        if end_excl + forecast_len > self.scaled_res_load_obs.index[-1]:
+        if start + forecast_len > self.scaled_res_load_obs.index[-1]:
             scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
 
             scaled_res_load_forecast = np.concatenate(
@@ -288,10 +283,10 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         else:
             scaled_res_load_forecast = self.scaled_res_load_obs.loc[
-                start : end_excl + forecast_len
+                start : start + forecast_len
             ]
 
-        if end_excl + forecast_len > self.scaled_prices_obs.index[-1]:
+        if start + forecast_len > self.scaled_prices_obs.index[-1]:
             scaled_price_forecast = self.scaled_prices_obs.loc[start:]
             scaled_price_forecast = np.concatenate(
                 [
@@ -304,7 +299,7 @@ class RLAdvancedOrderStrategy(RLStrategy):
 
         else:
             scaled_price_forecast = self.scaled_prices_obs.loc[
-                start : end_excl + forecast_len
+                start : start + forecast_len
             ]
 
         # get last accepted bid volume and the current marginal costs of the unit
