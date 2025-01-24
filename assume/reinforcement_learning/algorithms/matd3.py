@@ -7,7 +7,7 @@ import os
 
 import torch as th
 from torch.nn import functional as F
-from torch.optim import Adam
+from torch.optim import AdamW
 
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
@@ -250,21 +250,17 @@ class TD3(RLAlgorithm):
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
-                unique_obs_dim=unit_strategy.unique_obs_dim,
-                num_timeseries_obs_dim=unit_strategy.num_timeseries_obs_dim,
             ).to(self.device)
 
             unit_strategy.actor_target = self.actor_architecture_class(
                 obs_dim=unit_strategy.obs_dim,
                 act_dim=unit_strategy.act_dim,
                 float_type=self.float_type,
-                unique_obs_dim=unit_strategy.unique_obs_dim,
-                num_timeseries_obs_dim=unit_strategy.num_timeseries_obs_dim,
             ).to(self.device)
             unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
             unit_strategy.actor_target.train(mode=False)
 
-            unit_strategy.actor.optimizer = Adam(
+            unit_strategy.actor.optimizer = AdamW(
                 unit_strategy.actor.parameters(),
                 lr=self.learning_role.calc_lr_from_progress(
                     1
@@ -316,7 +312,7 @@ class TD3(RLAlgorithm):
                 float_type=self.float_type,
             )
 
-            self.learning_role.critics[u_id].optimizer = Adam(
+            self.learning_role.critics[u_id].optimizer = AdamW(
                 self.learning_role.critics[u_id].parameters(),
                 lr=self.learning_role.calc_lr_from_progress(
                     1
@@ -590,5 +586,4 @@ class TD3(RLAlgorithm):
         :param mode: if true, set to training mode, else set to evaluation mode
         """
         for u_id in self.learning_role.rl_strats.keys():
-            self.learning_role.critics[u_id].train(mode)
             self.learning_role.rl_strats[u_id].actor.train(mode)

@@ -29,64 +29,78 @@ class CriticTD3(nn.Module):
         self.obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
         self.act_dim = act_dim * n_agents
 
-        # Q1 architecture
-        if n_agents <= 50:
-            self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-            self.FC1_2 = nn.Linear(512, 256, dtype=float_type)
-            self.FC1_3 = nn.Linear(256, 128, dtype=float_type)
-            self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
+        # Select proper architecture based on `n_agents`
+        if n_agents <= 10:
+            hidden_sizes = [256, 128]  # Shallow network for small `n_agents`
+        elif n_agents <= 50:
+            hidden_sizes = [512, 256, 128]  # Medium network
         else:
-            self.FC1_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype=float_type)
-            self.FC1_2 = nn.Linear(1024, 512, dtype=float_type)
-            self.FC1_3 = nn.Linear(512, 128, dtype=float_type)
-            self.FC1_4 = nn.Linear(128, 1, dtype=float_type)
+            hidden_sizes = [1024, 512, 256, 128]  # Deeper network for large `n_agents`
 
-        # Q2 architecture
-        if n_agents <= 50:
-            self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 512, dtype=float_type)
-            self.FC2_2 = nn.Linear(512, 256, dtype=float_type)
-            self.FC2_3 = nn.Linear(256, 128, dtype=float_type)
-            self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
-        else:
-            self.FC2_1 = nn.Linear(self.obs_dim + self.act_dim, 1024, dtype=float_type)
-            self.FC2_2 = nn.Linear(1024, 512, dtype=float_type)
-            self.FC2_3 = nn.Linear(512, 128, dtype=float_type)
-            self.FC2_4 = nn.Linear(128, 1, dtype=float_type)
+        # First Q-network (Q1)
+        self.q1_layers = self._build_q_network(hidden_sizes, float_type)
+
+        # Second Q-network (Q2) for double Q-learning
+        self.q2_layers = self._build_q_network(hidden_sizes, float_type)
+
+        # Initialize weights properly
+        self._init_weights()
+
+    def _build_q_network(self, hidden_sizes, float_type):
+        """
+        Dynamically creates a Q-network given the chosen hidden layer sizes.
+        """
+        layers = nn.ModuleList()
+        input_dim = (
+            self.obs_dim + self.act_dim
+        )  # Input includes all observations and actions
+
+        for h in hidden_sizes:
+            layers.append(nn.Linear(input_dim, h, dtype=float_type))
+            input_dim = h
+        layers.append(nn.Linear(input_dim, 1, dtype=float_type))  # Output Q-value
+
+        return layers
+
+    def _init_weights(self):
+        """Apply Xavier initialization to all layers."""
+
+        def init_layer(m):
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+
+        self.apply(init_layer)
 
     def forward(self, obs, actions):
         """
-        Forward pass through the network, from observation to actions.
+        Forward pass through both Q-networks.
         """
-        xu = th.cat([obs, actions], 1)
+        xu = th.cat([obs, actions], dim=1)  # Concatenate obs & actions
 
-        x1 = F.relu(self.FC1_1(xu))
-        x1 = F.relu(self.FC1_2(x1))
-        x1 = F.relu(self.FC1_3(x1))
-        x1 = self.FC1_4(x1)
+        # Compute Q1
+        x1 = xu
+        for layer in self.q1_layers[:-1]:  # All hidden layers
+            x1 = F.relu(layer(x1))
+        x1 = self.q1_layers[-1](x1)  # Output layer (no activation)
 
-        x2 = F.relu(self.FC2_1(xu))
-        x2 = F.relu(self.FC2_2(x2))
-        x2 = F.relu(self.FC2_3(x2))
-        x2 = self.FC2_4(x2)
+        # Compute Q2
+        x2 = xu
+        for layer in self.q2_layers[:-1]:  # All hidden layers
+            x2 = F.relu(layer(x2))
+        x2 = self.q2_layers[-1](x2)  # Output layer (no activation)
 
         return x1, x2
 
     def q1_forward(self, obs, actions):
         """
-        Only predict the Q-value using the first network.
-        This allows to reduce computation when all the estimates are not needed
-        (e.g. when updating the policy in TD3).
-
-        Args:
-            obs (torch.Tensor): The observations
-            actions (torch.Tensor): The actions
-
+        Compute only Q1 (used during actor updates).
         """
-        x = th.cat([obs, actions], 1)
-        x = F.relu(self.FC1_1(x))
-        x = F.relu(self.FC1_2(x))
-        x = F.relu(self.FC1_3(x))
-        x = self.FC1_4(x)
+        x = th.cat([obs, actions], dim=1)
+
+        for layer in self.q1_layers[:-1]:  # All hidden layers
+            x = F.relu(layer(x))
+        x = self.q1_layers[-1](x)  # Output layer (no activation)
 
         return x
 
@@ -112,11 +126,24 @@ class MLPActor(Actor):
         self.FC2 = nn.Linear(256, 128, dtype=float_type)
         self.FC3 = nn.Linear(128, act_dim, dtype=float_type)
 
+        # Initialize weights
+        self._init_weights()
+
+    def _init_weights(self):
+        """Apply Xavier initialization to all layers."""
+
+        def init_layer(m):
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+
+        self.apply(init_layer)
+
     def forward(self, obs):
+        """Forward pass for action prediction."""
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
         x = F.softsign(self.FC3(x))
-        # x = th.tanh(self.FC3(x))
 
         return x
 
