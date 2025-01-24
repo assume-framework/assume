@@ -98,10 +98,8 @@ def polyak_update(params, target_params, tau: float):
         tau: the soft update coefficient ("Polyak update", between 0 and 1)
     """
     with th.no_grad():
-        # zip does not raise an exception if length of parameters does not match.
         for param, target_param in zip(params, target_params):
-            target_param.data.mul_(1 - tau)
-            th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
+            target_param.lerp_(param, tau)  # More efficient in-place operation
 
 
 def linear_schedule_func(

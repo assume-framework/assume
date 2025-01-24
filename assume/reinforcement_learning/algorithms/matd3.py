@@ -426,83 +426,77 @@ class TD3(RLAlgorithm):
         for _ in range(self.gradient_steps):
             self.n_updates += 1
 
+            transitions = self.learning_role.buffer.sample(self.batch_size)
+            states, actions, next_states, rewards = (
+                transitions.observations,
+                transitions.actions,
+                transitions.next_observations,
+                transitions.rewards,
+            )
+
+            with th.no_grad():
+                # Select action according to policy and add clipped noise
+                # Select action according to policy and add clipped noise
+                noise = th.randn_like(actions) * self.target_policy_noise
+                noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
+
+                next_actions = th.stack(
+                    [
+                        (
+                            strategy.actor_target(next_states[:, i, :]) + noise[:, i, :]
+                        ).clamp(-1, 1)
+                        for i, strategy in enumerate(
+                            self.learning_role.rl_strats.values()
+                        )
+                    ]
+                )
+
+                next_actions = next_actions.transpose(0, 1).contiguous()
+                next_actions = next_actions.view(-1, n_rl_agents * self.act_dim)
+
+            all_actions = actions.view(self.batch_size, -1)
+
+            # Precompute unique observation parts for all agents
+            unique_obs_from_others = states[
+                :, :, self.obs_dim - self.unique_obs_dim :
+            ].reshape(self.batch_size, n_rl_agents, -1)
+            next_unique_obs_from_others = next_states[
+                :, :, self.obs_dim - self.unique_obs_dim :
+            ].reshape(self.batch_size, n_rl_agents, -1)
+
             for i, u_id in enumerate(self.learning_role.rl_strats.keys()):
                 critic_target = self.learning_role.target_critics[u_id]
                 critic = self.learning_role.critics[u_id]
                 actor = self.learning_role.rl_strats[u_id].actor
-                actor_target = self.learning_role.rl_strats[u_id].actor_target
 
-                # collect new transitions and calculate the next actions only every 100th iteration
-                # to save computation time
-                if i % 100 == 0:
-                    transitions = self.learning_role.buffer.sample(self.batch_size)
-                    states = transitions.observations
-                    actions = transitions.actions
-                    next_states = transitions.next_observations
-                    rewards = transitions.rewards
-
-                    with th.no_grad():
-                        # Select action according to policy and add clipped noise
-                        noise = actions.clone().data.normal_(
-                            0, self.target_policy_noise
-                        )
-                        noise = noise.clamp(
-                            -self.target_noise_clip, self.target_noise_clip
-                        )
-                        next_actions = [
-                            (
-                                self.learning_role.rl_strats[u].actor_target(
-                                    next_states[:, i, :]
-                                )
-                                + noise[:, i, :]
-                            ).clamp(-1, 1)
-                            for i, u in enumerate(self.learning_role.rl_strats.keys())
-                        ]
-                        next_actions = th.stack(next_actions)
-
-                        next_actions = next_actions.transpose(0, 1).contiguous()
-                        next_actions = next_actions.view(-1, n_rl_agents * self.act_dim)
-
-                    all_actions = actions.view(self.batch_size, -1)
-
-                # this takes the unique observations from all other agents assuming that
-                # the unique observations are at the end of the observation vector
-                temp = th.cat(
+                # Efficiently extract unique observations from all other agents
+                other_unique_obs = th.cat(
+                    (unique_obs_from_others[:, :i], unique_obs_from_others[:, i + 1 :]),
+                    dim=1,
+                )
+                other_next_unique_obs = th.cat(
                     (
-                        states[:, :i, self.obs_dim - self.unique_obs_dim :].reshape(
-                            self.batch_size, -1
-                        ),
-                        states[
-                            :, i + 1 :, self.obs_dim - self.unique_obs_dim :
-                        ].reshape(self.batch_size, -1),
+                        next_unique_obs_from_others[:, :i],
+                        next_unique_obs_from_others[:, i + 1 :],
                     ),
-                    axis=1,
+                    dim=1,
                 )
 
-                # the final all_states vector now contains the current agent's observation
-                # and the unique observations from all other agents
+                # Construct final state representations
                 all_states = th.cat(
-                    (states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
-                ).view(self.batch_size, -1)
-
-                # this is the same as above but for the next states
-                temp = th.cat(
                     (
-                        next_states[
-                            :, :i, self.obs_dim - self.unique_obs_dim :
-                        ].reshape(self.batch_size, -1),
-                        next_states[
-                            :, i + 1 :, self.obs_dim - self.unique_obs_dim :
-                        ].reshape(self.batch_size, -1),
+                        states[:, i, :].reshape(self.batch_size, -1),
+                        other_unique_obs.reshape(self.batch_size, -1),
                     ),
-                    axis=1,
+                    dim=1,
                 )
-
-                # the final all_next_states vector now contains the current agent's observation
-                # and the unique observations from all other agents
                 all_next_states = th.cat(
-                    (next_states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
-                ).view(self.batch_size, -1)
+                    (
+                        next_states[:, i, :].reshape(self.batch_size, -1),
+                        other_next_unique_obs.reshape(self.batch_size, -1),
+                    ),
+                    dim=1,
+                )
 
                 with th.no_grad():
                     # Compute the next Q-values: min over all critics targets
@@ -518,13 +512,13 @@ class TD3(RLAlgorithm):
                 current_Q_values = critic(all_states, all_actions)
 
                 # Compute critic loss
-                critic_loss = sum(
-                    F.mse_loss(current_q, target_Q_values)
-                    for current_q in current_Q_values
+                critic_q_values = th.cat(current_Q_values, dim=1)  # Concatenate once
+                critic_loss = F.mse_loss(
+                    critic_q_values, target_Q_values.expand_as(critic_q_values)
                 )
 
                 # Optimize the critics
-                critic.optimizer.zero_grad()
+                critic.optimizer.zero_grad(set_to_none=True)
                 critic_loss.backward()
                 critic.optimizer.step()
 
@@ -534,24 +528,50 @@ class TD3(RLAlgorithm):
                     state_i = states[:, i, :]
                     action_i = actor(state_i)
 
-                    all_actions_clone = actions.clone()
-                    all_actions_clone[:, i, :] = action_i
-                    all_actions_clone = all_actions_clone.view(self.batch_size, -1)
+                    all_actions_clone = actions.detach().clone()
+                    all_actions_clone[:, i, :].copy_(
+                        action_i
+                    )  # Efficient in-place copy
 
+                    # calculate actor loss
                     actor_loss = -critic.q1_forward(
-                        all_states, all_actions_clone
+                        all_states, all_actions_clone.view(self.batch_size, -1)
                     ).mean()
 
-                    actor.optimizer.zero_grad()
+                    actor.optimizer.zero_grad(set_to_none=True)
                     actor_loss.backward()
                     actor.optimizer.step()
 
-                    polyak_update(
-                        critic.parameters(), critic_target.parameters(), self.tau
-                    )
-                    polyak_update(
-                        actor.parameters(), actor_target.parameters(), self.tau
-                    )
+            # Perform batch-wise Polyak update at the end (instead of inside the loop)
+            if self.n_updates % self.policy_delay == 0:
+                # Collect all parameters in a single call to polyak_update
+                all_critic_params = [
+                    p
+                    for u_id in self.learning_role.rl_strats.keys()
+                    for p in self.learning_role.critics[u_id].parameters()
+                ]
+                all_target_critic_params = [
+                    p
+                    for u_id in self.learning_role.rl_strats.keys()
+                    for p in self.learning_role.target_critics[u_id].parameters()
+                ]
+
+                all_actor_params = [
+                    p
+                    for u_id in self.learning_role.rl_strats.keys()
+                    for p in self.learning_role.rl_strats[u_id].actor.parameters()
+                ]
+                all_target_actor_params = [
+                    p
+                    for u_id in self.learning_role.rl_strats.keys()
+                    for p in self.learning_role.rl_strats[
+                        u_id
+                    ].actor_target.parameters()
+                ]
+
+                # Perform batch-wise Polyak update (NO LOOPS)
+                polyak_update(all_critic_params, all_target_critic_params, self.tau)
+                polyak_update(all_actor_params, all_target_actor_params, self.tau)
 
         # self.set_training_mode(False)
 
