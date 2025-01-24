@@ -29,8 +29,8 @@ base_case:
       #  network_path: .
       #  zones_identifier: zone_id
 
-    Redispatch:
-      operator: Redispatch_operator
+    redispatch:
+      operator: network_operator
       product_type: energy
       start_date: 2019-01-01 02:00
       products:
@@ -106,7 +106,7 @@ learning_coal:
       #  network_path: .
       #  zones_identifier: zone_id
 
-    Redispatch:
+    redispatch:
       operator: network_operator
       product_type: energy
       start_date: 2019-01-01 02:00
@@ -182,7 +182,7 @@ learning_gas:
       #  network_path: .
       #  zones_identifier: zone_id
 
-    Redispatch:
+    redispatch:
       operator: network_operator
       product_type: energy
       start_date: 2019-01-01 02:00
@@ -251,14 +251,8 @@ learning_oil:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-      #additional_fields:
-      #  - node
-      #  - bid_type
-      #param_dict:
-      #  network_path: .
-      #  zones_identifier: zone_id
 
-    Redispatch:
+    redispatch:
       operator: network_operator
       product_type: energy
       start_date: 2019-01-01 02:00

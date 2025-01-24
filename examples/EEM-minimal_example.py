@@ -43,7 +43,7 @@ csv_path = "outputs"
 input_path = "inputs"
 scenario = "2_nodes"
 
-for study_case in ["base_case", "learning_oil", "learning_gas", "learning_coal", "learning_all3"]:
+for study_case in ["learning_coal"]:# ["base_case", "learning_oil", "learning_gas", "learning_coal", "learning_all3"]:
 #study_case="base_case"
 #study_case = "learning_coal"
 #study_case = "learning_gas"
@@ -55,16 +55,16 @@ for study_case in ["base_case", "learning_oil", "learning_gas", "learning_coal",
         eom_bidding_list = ["naive_eom"] * 4
         redispatch_bidding_list = ["naive_redispatch"] * 4
     elif study_case == "learning_coal":
-        eom_bidding_list = ["naive_eom"] * 3 + ["pp_learning"]
+        eom_bidding_list = ["naive_eom"] * 3 + ["redispatch_learning"]
         redispatch_bidding_list = ["naive_redispatch"] * 3 + ["redispatch_learning"]
     elif study_case == "learning_gas":
-        eom_bidding_list = ["naive_eom"] * 2 + ["pp_learning"] + ["naive_eom"]
+        eom_bidding_list = ["naive_eom"] * 2 + ["redispatch_learning"] + ["naive_eom"]
         redispatch_bidding_list = ["naive_redispatch"] * 2 + ["redispatch_learning"] + ["naive_redispatch"]
     elif study_case == "learning_oil":
-        eom_bidding_list = ["naive_eom"] + ["pp_learning"] + ["naive_eom"] * 2
+        eom_bidding_list = ["naive_eom"] + ["redispatch_learning"] + ["naive_eom"] * 2
         redispatch_bidding_list = ["naive_redispatch"] + ["redispatch_learning"] + ["naive_redispatch"] * 2
     elif study_case == "learning_all3":
-        eom_bidding_list = ["naive_eom"] + ["pp_learning"] * 3
+        eom_bidding_list = ["naive_eom"] + ["redispatch_learning"] * 3
         redispatch_bidding_list = ["naive_redispatch"] + ["redispatch_learning"] * 3
     elif study_case == "test_redispatch":
         eom_bidding_list = ["naive_eom"] * 3 + ["pp_learning"]
@@ -79,7 +79,7 @@ for study_case in ["base_case", "learning_oil", "learning_gas", "learning_coal",
         "technology": ["wind", "oil", "natural gas", "lignite"],
         "node": ["north", "north", "south", "south"],
         "bidding_EOM": eom_bidding_list,
-        "bidding_Redispatch": redispatch_bidding_list,
+        "bidding_redispatch": redispatch_bidding_list,
         "fuel_type": ["renewable", "oil", "natural gas", "lignite"],
         "max_power": [15000.0, 2000.0, 3000.0, 3000.0],
         "min_power": [0, 0, 0, 0],
@@ -97,7 +97,7 @@ for study_case in ["base_case", "learning_oil", "learning_gas", "learning_coal",
         "name": ["demand_north", "demand_south"],
         "technology": ["inflex_demand", "inflex_demand"],
         "bidding_EOM": ["naive_eom", "naive_eom"],
-        "bidding_Redispatch": ["naive_redispatch", "naive_redispatch"],
+        "bidding_redispatch": ["naive_redispatch", "naive_redispatch"],
         "node": ["north", "south"],
         "max_power": [100000, 100000],
         "min_power": [0, 0],

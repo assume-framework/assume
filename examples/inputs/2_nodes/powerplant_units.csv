@@ -1,5 +1,5 @@
-name,technology,node,bidding_EOM,bidding_Redispatch,fuel_type,max_power,min_power,additional_cost,unit_operator,emission_factor,efficiency
+name,technology,node,bidding_EOM,bidding_redispatch,fuel_type,max_power,min_power,additional_cost,unit_operator,emission_factor,efficiency
 Wind,wind,north,naive_eom,naive_redispatch,renewable,15000.0,0,0,wind operator,0,1.0
-Oil,oil,north,pp_learning,redispatch_learning,oil,2000.0,0,120,oil operator,0,0.3
+Oil,oil,north,naive_eom,naive_redispatch,oil,2000.0,0,120,oil operator,0,0.3
 Gas,natural gas,south,naive_eom,naive_redispatch,natural gas,3000.0,0,80,gas operator,0,0.4
-Coal,lignite,south,naive_eom,naive_redispatch,lignite,3000.0,0,50,coal operator,0,0.5
+Coal,lignite,south,redispatch_learning,redispatch_learning,lignite,3000.0,0,50,coal operator,0,0.5
