@@ -421,7 +421,7 @@ class TD3(RLAlgorithm):
             unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
 
         # set the policy in training mode to enable dropout and batch normalization
-        # self.set_training_mode(True)
+        self.set_training_mode(True)
 
         for _ in range(self.gradient_steps):
             self.n_updates += 1
@@ -520,6 +520,8 @@ class TD3(RLAlgorithm):
                 # Optimize the critics
                 critic.optimizer.zero_grad(set_to_none=True)
                 critic_loss.backward()
+                # Clip the gradients to avoid exploding gradients and stabilize training
+                th.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
                 critic.optimizer.step()
 
                 # Delayed policy updates
@@ -540,30 +542,34 @@ class TD3(RLAlgorithm):
 
                     actor.optimizer.zero_grad(set_to_none=True)
                     actor_loss.backward()
+                    # Clip the gradients to avoid exploding gradients and stabilize training
+                    th.nn.utils.clip_grad_norm_(actor.parameters(), max_norm=1.0)
                     actor.optimizer.step()
 
             # Perform batch-wise Polyak update at the end (instead of inside the loop)
             if self.n_updates % self.policy_delay == 0:
                 # Collect all parameters in a single call to polyak_update
+                rl_keys = list(self.learning_role.rl_strats.keys())
+
                 all_critic_params = [
                     p
-                    for u_id in self.learning_role.rl_strats.keys()
+                    for u_id in rl_keys
                     for p in self.learning_role.critics[u_id].parameters()
                 ]
                 all_target_critic_params = [
                     p
-                    for u_id in self.learning_role.rl_strats.keys()
+                    for u_id in rl_keys
                     for p in self.learning_role.target_critics[u_id].parameters()
                 ]
 
                 all_actor_params = [
                     p
-                    for u_id in self.learning_role.rl_strats.keys()
+                    for u_id in rl_keys
                     for p in self.learning_role.rl_strats[u_id].actor.parameters()
                 ]
                 all_target_actor_params = [
                     p
-                    for u_id in self.learning_role.rl_strats.keys()
+                    for u_id in rl_keys
                     for p in self.learning_role.rl_strats[
                         u_id
                     ].actor_target.parameters()
@@ -573,7 +579,7 @@ class TD3(RLAlgorithm):
                 polyak_update(all_critic_params, all_target_critic_params, self.tau)
                 polyak_update(all_actor_params, all_target_actor_params, self.tau)
 
-        # self.set_training_mode(False)
+        self.set_training_mode(False)
 
     def set_training_mode(self, mode: bool) -> None:
         """
