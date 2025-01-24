@@ -346,6 +346,10 @@ class Learning(Role):
                     logger.info(
                         f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
                     )
+            else:
+                logger.info(
+                    f"Current policy not better than best policy, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+                )
 
             # if we do not see any improvement in the last x evaluation runs we stop the training
             if len(self.rl_eval[metric]) >= self.early_stopping_steps:
