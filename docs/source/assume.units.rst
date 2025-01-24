@@ -61,7 +61,7 @@ Hydrogen Storage
 
 A class representing a hydrogen storage unit.
 
-.. autoclass:: assume.units.dst_components.HydrogenStorage
+.. autoclass:: assume.units.dst_components.HydrogenBufferStorage
    :members:
    :undoc-members:
 

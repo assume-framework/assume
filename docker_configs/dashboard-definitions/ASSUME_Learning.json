@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 2,
   "links": [],
   "panels": [
     {
@@ -191,11 +191,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+'\nand learning_mode is true",
+          "rawSql": "SELECT\n  episode,\n  avg(reward) as profit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -241,6 +242,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "rl_params",
           "timeColumn": "index",
           "timeColumnType": "timestamp",
@@ -254,68 +272,7 @@
         }
       ],
       "title": "Average REWARD of all learning units",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
       "type": "barchart"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 20
-      },
-      "id": 18,
-      "panels": [],
-      "title": "Simulation Wide Data",
-      "type": "row"
     },
     {
       "datasource": {
@@ -402,11 +359,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_eval_[1-9]+'\nand perform_evaluation is true",
+          "rawSql": "SELECT\n  episode,\n  avg(reward) as reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_eval_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -452,6 +410,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "rl_params",
           "timeColumn": "index",
           "timeColumnType": "timestamp",
@@ -856,7 +831,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1071,7 +1047,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1084,7 +1061,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "reward (mean)"
+              "options": "reward"
             },
             "properties": [
               {
@@ -1139,7 +1116,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true",
+          "rawSql": "SELECT\n  episode,\n  avg(reward) as reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -1215,54 +1192,6 @@
         }
       ],
       "title": "Avg. REWARD of unit $rl_unit",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
       "type": "barchart"
     },
     {
@@ -1301,7 +1230,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1314,7 +1244,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "regret (mean)"
+              "options": "regret"
             },
             "properties": [
               {
@@ -1369,7 +1299,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  regret\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true",
+          "rawSql": "SELECT\n  episode,\n  avg(regret) as regret\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -1445,60 +1375,6 @@
         }
       ],
       "title": "Avg. REGRET of unit $rl_unit",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "regret": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
       "type": "barchart"
     },
     {
@@ -1537,7 +1413,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1668,9 +1545,18 @@
           "id": "calculateField",
           "options": {
             "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
+              "left": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "index"
+                }
+              },
+              "right": {
+                "matcher": {
+                  "id": "byName",
+                  "options": "episode"
+                }
+              }
             },
             "mode": "binary",
             "reduce": {
@@ -1749,7 +1635,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -1762,7 +1649,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "profit (sum)"
+              "options": "profit"
             },
             "properties": [
               {
@@ -1817,7 +1704,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime,\n  simulation,\n  unit,\n  (episode::float),\n  profit\nFROM rl_params\nWHERE simulation ~ '^${simulation}_[1-9]+'  AND\n      unit = '$rl_unit' AND learning_mode is true",
+          "rawSql": "SELECT\n  episode,\n  sum(profit) as profit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
           "refId": "A",
           "select": [
             [
@@ -1893,66 +1780,6 @@
         }
       ],
       "title": "Total PROFIT of unit $rl_unit",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "profit": {
-                "aggregations": [
-                  "sum"
-                ],
-                "operation": "aggregate"
-              },
-              "regret": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
       "type": "barchart"
     },
     {
@@ -2003,7 +1830,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2162,7 +1990,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2322,7 +2151,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2439,7 +2269,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2555,7 +2386,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2771,8 +2603,8 @@
     "list": [
       {
         "current": {
-          "text": "example_02a_base_lstm_original",
-          "value": "example_02a_base_lstm_original"
+          "text": "example_02a_base",
+          "value": "example_02a_base"
         },
         "datasource": {
           "type": "postgres",
@@ -2811,8 +2643,8 @@
       },
       {
         "current": {
-          "text": "1551394800000",
-          "value": "1551394800000"
+          "text": "1551402000000",
+          "value": "1551402000000"
         },
         "datasource": {
           "type": "postgres",
