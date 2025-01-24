@@ -397,6 +397,7 @@ class TD3(RLAlgorithm):
         """
 
         logger.debug("Updating Policy")
+
         n_rl_agents = len(self.learning_role.rl_strats.keys())
 
         # update noise decay and learning rate
@@ -419,18 +420,21 @@ class TD3(RLAlgorithm):
             )
             unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
 
+        # set the policy in training mode to enable dropout and batch normalization
+        # self.set_training_mode(True)
+
         for _ in range(self.gradient_steps):
             self.n_updates += 1
-            i = 0
 
-            for u_id in self.learning_role.rl_strats.keys():
+            for i, u_id in enumerate(self.learning_role.rl_strats.keys()):
                 critic_target = self.learning_role.target_critics[u_id]
                 critic = self.learning_role.critics[u_id]
                 actor = self.learning_role.rl_strats[u_id].actor
                 actor_target = self.learning_role.rl_strats[u_id].actor_target
 
+                # collect new transitions and calculate the next actions only every 100th iteration
+                # to save computation time
                 if i % 100 == 0:
-                    # only update target networks every 100 steps, to have delayed network update
                     transitions = self.learning_role.buffer.sample(self.batch_size)
                     states = transitions.observations
                     actions = transitions.actions
@@ -446,17 +450,20 @@ class TD3(RLAlgorithm):
                             -self.target_noise_clip, self.target_noise_clip
                         )
                         next_actions = [
-                            (actor_target(next_states[:, i, :]) + noise[:, i, :]).clamp(
-                                -1, 1
-                            )
-                            for i in range(n_rl_agents)
+                            (
+                                self.learning_role.rl_strats[u].actor_target(
+                                    next_states[:, i, :]
+                                )
+                                + noise[:, i, :]
+                            ).clamp(-1, 1)
+                            for i, u in enumerate(self.learning_role.rl_strats.keys())
                         ]
                         next_actions = th.stack(next_actions)
 
                         next_actions = next_actions.transpose(0, 1).contiguous()
                         next_actions = next_actions.view(-1, n_rl_agents * self.act_dim)
 
-                all_actions = actions.view(self.batch_size, -1)
+                    all_actions = actions.view(self.batch_size, -1)
 
                 # this takes the unique observations from all other agents assuming that
                 # the unique observations are at the end of the observation vector
@@ -477,7 +484,6 @@ class TD3(RLAlgorithm):
                 all_states = th.cat(
                     (states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
                 ).view(self.batch_size, -1)
-                # all_states = states[:, i, :].reshape(self.batch_size, -1)
 
                 # this is the same as above but for the next states
                 temp = th.cat(
@@ -497,7 +503,6 @@ class TD3(RLAlgorithm):
                 all_next_states = th.cat(
                     (next_states[:, i, :].reshape(self.batch_size, -1), temp), axis=1
                 ).view(self.batch_size, -1)
-                # all_next_states = next_states[:, i, :].reshape(self.batch_size, -1)
 
                 with th.no_grad():
                     # Compute the next Q-values: min over all critics targets
@@ -547,4 +552,17 @@ class TD3(RLAlgorithm):
                     polyak_update(
                         actor.parameters(), actor_target.parameters(), self.tau
                     )
-                i += 1
+
+        # self.set_training_mode(False)
+
+    def set_training_mode(self, mode: bool) -> None:
+        """
+        Put the policy in either training or evaluation mode.
+
+        This affects certain modules, such as batch normalisation and dropout.
+
+        :param mode: if true, set to training mode, else set to evaluation mode
+        """
+        for u_id in self.learning_role.rl_strats.keys():
+            self.learning_role.critics[u_id].train(mode)
+            self.learning_role.rl_strats[u_id].actor.train(mode)
