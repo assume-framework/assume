@@ -14,7 +14,7 @@ from assume.common.market_objects import (
     MetaDict,
     Orderbook,
 )
-from assume.common.utils import create_rrule, get_products_index
+from assume.common.utils import convert_tensors, create_rrule, get_products_index
 from assume.strategies import BaseStrategy, LearningStrategy, RLAdvancedOrderStrategy
 from assume.units import BaseUnit
 
@@ -275,4 +275,5 @@ class RLUnitsOperator(UnitsOperator):
                 order["unit_id"] = unit_id
                 orderbook.append(order)
 
-        return orderbook
+        # Convert all CUDA tensors to CPU in one pass
+        return convert_tensors(orderbook)
