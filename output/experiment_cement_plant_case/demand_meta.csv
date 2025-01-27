@@ -1,0 +1,6 @@
+,technology,unit_operator,node,components,simulation,max_power,min_power
+A360,cement_plant,dsm_operator,south,"ccs_system,cement_mill,clinker_inventory,clinker_system,electrolyser,hydrogen_buffer_storage",experiment_cement_plant_case,,
+demand_EOM1,inflex_demand,eom_de1,north,,experiment_cement_plant_case,0,-500
+demand_EOM2,inflex_demand,eom_de1,south,,experiment_cement_plant_case,0,-650
+demand_CRM_pos,reserve_capacity,crm_de,north,,experiment_cement_plant_case,0,-1000000
+demand_CRM_neg,reserve_capacity,crm_de,south,,experiment_cement_plant_case,0,-1000000

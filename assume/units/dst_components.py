@@ -1082,8 +1082,14 @@ class ClinkerSystem:
         )
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
-        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
-        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.min_operating_steps = pyo.Param(
+            initialize=int(self.min_operating_steps),
+            within=pyo.NonNegativeIntegers,
+        )
+        model_block.min_down_steps = pyo.Param(
+            initialize=int(self.min_down_steps),
+            within=pyo.NonNegativeIntegers,
+        )
         model_block.initial_operational_status = pyo.Param(
             initialize=self.initial_operational_status
         )
@@ -1150,21 +1156,35 @@ class ClinkerSystem:
                 <= b.max_operating_hours
             )
 
+        # @model_block.Constraint(self.time_steps)
+        # def operation_hours_binding_constraint(b, t):
+        #     big_M = self.max_power  # Use max_power as the scaling factor
+        #     if self.availability_profile == "no":
+        #         return (
+        #             b.power_in[t]
+        #             <= b.operating_hours[t] * big_M * b.clinker_availability_profile[t]
+        #         )
+        #     elif self.availability_profile == "yes":
+        #         return (
+        #             b.power_in[t]
+        #             <= b.operating_hours[t]
+        #             * big_M
+        #             * model.clinker_availability_profile[t]
+        #         )
+
         @model_block.Constraint(self.time_steps)
         def operation_hours_binding_constraint(b, t):
-            big_M = self.max_power  # Use max_power as the scaling factor
-            if self.availability_profile == "no":
-                return (
-                    b.power_in[t]
-                    <= b.operating_hours[t] * big_M * b.clinker_availability_profile[t]
-                )
-            elif self.availability_profile == "yes":
-                return (
-                    b.power_in[t]
-                    <= b.operating_hours[t]
-                    * big_M
-                    * model.clinker_availability_profile[t]
-                )
+            """
+            Enforces power consumption behavior based on operating hours:
+            - When operating_hours[t] == 1: power_in[t] between min_power and max_power.
+            - When operating_hours[t] == 0: power_in[t] is fixed at min_power.
+            """
+
+            return (
+                b.power_in[t]
+                >= b.operating_hours[t] * b.min_power
+                + (1 - b.operating_hours[t]) * b.min_power
+            )
 
         # Ramp-up constraint and ramp-down constraints
         add_ramping_constraints(

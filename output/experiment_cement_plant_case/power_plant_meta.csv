@@ -1,0 +1,13 @@
+,technology,unit_operator,node,max_power,min_power,emission_factor,efficiency,simulation
+KKW PHILIPPSBURG 2,nuclear,ENBW ENERGIE BADEN-WURTTEMBERG,south,100,10,0.0,0.33,experiment_cement_plant_case
+Reserve unit 4,combined cycle gas turbine,Operator 4,south,100,10,0.2,0.33,experiment_cement_plant_case
+Reserve unit 1,lignite,Operator 1,north,100,10,0.4,0.33,experiment_cement_plant_case
+Reserve unit 2,hard coal,Operator 2,south,100,10,0.3,0.33,experiment_cement_plant_case
+KKW ISAR 2,nuclear,UNIPER,south,100,10,0.0,0.33,experiment_cement_plant_case
+KKW BROKDORF,nuclear,UNIPER,south,100,10,0.0,0.33,experiment_cement_plant_case
+Reserve unit 3,combined cycle gas turbine,Operator 3,north,100,10,0.2,0.33,experiment_cement_plant_case
+Wind onshore,wind_onshore,renewables_operator,north,40,0,0.0,1.0,experiment_cement_plant_case
+Wind offshore,wind_offshore,renewables_operator,north,10,0,0.0,1.0,experiment_cement_plant_case
+Solar,solar,renewables_operator,north,50,0,0.0,1.0,experiment_cement_plant_case
+Hydro,hydro,renewables_operator,north,30,0,0.0,1.0,experiment_cement_plant_case
+Biomass,biomass,renewables_operator,north,50,0,0.0,1.0,experiment_cement_plant_case

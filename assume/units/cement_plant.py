@@ -11,7 +11,7 @@ from assume.common.base import SupportsMinMax
 from assume.common.forecasts import Forecaster
 from assume.units.dsm_load_shift import DSMFlex
 
-SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["gurobi", "appsi_highs", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
@@ -203,12 +203,12 @@ class CementPlant(DSMFlex, SupportsMinMax):
         """
         if self.has_raw_mill and not (
             self.has_clinker_system
-            or self.has_cement_mill
-            or self.has_electrolyser
-            or self.has_ccs_system
-            or self.has_hydrogen_buffer_storage
-            or self.has_clinker_inventory
-            or self.has_cement_inventory
+            and self.has_cement_mill
+            and self.has_electrolyser
+            and self.has_ccs_system
+            and self.has_hydrogen_buffer_storage
+            and self.has_clinker_inventory
+            and self.has_cement_inventory
         ):
 
             @self.model.Constraint(self.model.time_steps)
@@ -222,12 +222,12 @@ class CementPlant(DSMFlex, SupportsMinMax):
 
         if self.has_cement_mill and not (
             self.has_clinker_system
-            or self.has_raw_mill
-            or self.has_electrolyser
-            or self.has_ccs_system
-            or self.has_hydrogen_buffer_storage
-            or self.has_clinker_inventory
-            or self.has_cement_inventory
+            and self.has_raw_mill
+            and self.has_electrolyser
+            and self.has_ccs_system
+            and self.has_hydrogen_buffer_storage
+            and self.has_clinker_inventory
+            and self.has_cement_inventory
         ):
 
             @self.model.Constraint(self.model.time_steps)
@@ -244,11 +244,11 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_cement_mill
             and not (
                 self.has_raw_mill
-                or self.has_electrolyser
-                or self.has_ccs_system
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_electrolyser
+                and self.has_ccs_system
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -268,10 +268,10 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_cement_mill
             and not (
                 self.has_electrolyser
-                or self.has_ccs_system
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_ccs_system
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -301,10 +301,10 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_cement_mill
             and not (
                 self.has_raw_mill
-                or self.has_electrolyser
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_electrolyser
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -324,10 +324,10 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_electrolyser
             and not (
                 self.has_ccs_system
-                or self.has_raw_mill
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_raw_mill
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -358,9 +358,9 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_ccs_system
             and not (
                 self.has_raw_mill
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -390,11 +390,8 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_hydrogen_buffer_storage
             and self.has_ccs_system
             and self.has_cement_mill
-            and (
-                not self.has_raw_mill
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
-            )
+            and self.has_clinker_inventory
+            and (not self.has_raw_mill and self.has_cement_inventory)
         ):
 
             @self.model.Constraint(self.model.time_steps)
@@ -436,7 +433,8 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_ccs_system
             and self.has_cement_mill
             and self.has_clinker_inventory
-            and not (self.has_cement_inventory and self.has_raw_mill)
+            and self.has_cement_inventory
+            and not self.has_raw_mill
         ):
 
             @self.model.Constraint(self.model.time_steps)
@@ -488,10 +486,10 @@ class CementPlant(DSMFlex, SupportsMinMax):
     def define_constraints(self):
         if self.has_raw_mill and not (
             self.has_clinker_system
-            or self.has_cement_mill
-            or self.has_electrolyser
-            or self.has_ccs_system
-            or self.has_hydrogen_buffer_storage
+            and self.has_cement_mill
+            and self.has_electrolyser
+            and self.has_ccs_system
+            and self.has_hydrogen_buffer_storage
         ):
 
             @self.model.Constraint()
@@ -509,12 +507,12 @@ class CementPlant(DSMFlex, SupportsMinMax):
 
         if self.has_cement_mill and not (
             self.has_clinker_system
-            or self.has_raw_mill
-            or self.has_electrolyser
-            or self.has_ccs_system
-            or self.has_hydrogen_buffer_storage
-            or self.has_clinker_inventory
-            or self.has_cement_inventory
+            and self.has_raw_mill
+            and self.has_electrolyser
+            and self.has_ccs_system
+            and self.has_hydrogen_buffer_storage
+            and self.has_clinker_inventory
+            and self.has_cement_inventory
         ):
 
             @self.model.Constraint()
@@ -535,11 +533,11 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_cement_mill
             and not (
                 self.has_raw_mill
-                or self.has_electrolyser
-                or self.has_ccs_system
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_electrolyser
+                and self.has_ccs_system
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -562,10 +560,10 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_cement_mill
             and not (
                 self.has_electrolyser
-                or self.has_ccs_system
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_ccs_system
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -588,10 +586,10 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_cement_mill
             and not (
                 self.has_raw_mill
-                or self.has_electrolyser
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_electrolyser
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -624,10 +622,10 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_electrolyser
             and not (
                 self.has_ccs_system
-                or self.has_raw_mill
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_raw_mill
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -651,9 +649,9 @@ class CementPlant(DSMFlex, SupportsMinMax):
             and self.has_ccs_system
             and not (
                 self.has_raw_mill
-                or self.has_hydrogen_buffer_storage
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_hydrogen_buffer_storage
+                and self.has_clinker_inventory
+                and self.has_cement_inventory
             )
         ):
 
@@ -683,13 +681,13 @@ class CementPlant(DSMFlex, SupportsMinMax):
         if (
             self.has_clinker_system
             and self.has_electrolyser
-            and self.has_hydrogen_buffer_storage
             and self.has_ccs_system
             and self.has_cement_mill
+            and self.has_clinker_inventory
             and not (
                 self.has_raw_mill
-                or self.has_clinker_inventory
-                or self.has_cement_inventory
+                and self.has_cement_inventory
+                and self.has_hydrogen_buffer_storage
             )
         ):
 
@@ -809,7 +807,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 )
 
                 return maximise_load_shift
-            
+
         if self.flexibility_measure == "electricity_price_signal_based_flexibility":
 
             @self.model.Objective(sense=pyo.maximize)

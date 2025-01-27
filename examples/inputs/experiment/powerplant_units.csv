@@ -1,9 +1,13 @@
-name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,node,unit_operator
-Wind onshore,wind_onshore,naive_eom,renewable,0,40,0,1,,,0,north,renewables_operator
-Wind offshore,wind_offshore,naive_eom,renewable,0,10,0,1,,,0,north,renewables_operator
-Solar,solar,naive_eom,renewable,0,50,0,1,,,0,north,renewables_operator
-Hydro,hydro,naive_eom,renewable,0,30,0,1,,,0,north,renewables_operator
-Biomass,biomass,naive_eom,renewable,0,50,0,1,30,30,6,north,renewables_operator
-KKW ISAR 2,nuclear,naive_eom,uranium,0,100,10,0.33,50,50,10.3,south,UNIPER
-KKW BROKDORF,nuclear,naive_eom,uranium,0,100,10,0.33,50,50,10.3,south,UNIPER
-KKW PHILIPPSBURG 2,nuclear,naive_eom,uranium,0,100,10,0.33,50,50,10.3,south,ENBW ENERGIE BADEN-WURTTEMBERG
+name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,bidding_LTM_OTC,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,node,unit_operator
+Wind onshore,wind_onshore,flexable_eom,,,otc_strategy,renewable,0,40,0,1,,,0,north,renewables_operator
+Wind offshore,wind_offshore,flexable_eom,,,otc_strategy,renewable,0,10,0,1,,,0,north,renewables_operator
+Solar,solar,flexable_eom,,,otc_strategy,renewable,0,50,0,1,,,0,north,renewables_operator
+Hydro,hydro,flexable_eom,,,otc_strategy,renewable,0,30,0,1,,,0,north,renewables_operator
+Biomass,biomass,flexable_eom,,,otc_strategy,renewable,0,50,0,1,30,30,6,north,renewables_operator
+KKW ISAR 2,nuclear,flexable_eom,,,otc_strategy,uranium,0,100,10,0.33,50,50,10.3,south,UNIPER
+KKW BROKDORF,nuclear,flexable_eom,,,otc_strategy,uranium,0,100,10,0.33,50,50,10.3,south,UNIPER
+KKW PHILIPPSBURG 2,nuclear,flexable_eom,,,otc_strategy,uranium,0,100,10,0.33,50,50,10.3,south,ENBW ENERGIE BADEN-WURTTEMBERG
+Reserve unit 1,lignite,flexable_eom,flexable_pos_crm,flexable_neg_crm,,lignite,0.4,100,10,0.33,50,50,10.3,north,Operator 1
+Reserve unit 2,hard coal,flexable_eom,flexable_pos_crm,flexable_neg_crm,,hard coal,0.3,100,10,0.33,50,50,10.3,south,Operator 2
+Reserve unit 3,combined cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,,natural gas,0.2,100,10,0.33,50,50,10.3,north,Operator 3
+Reserve unit 4,combined cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,,natural gas,0.2,100,10,0.33,50,50,10.3,south,Operator 4

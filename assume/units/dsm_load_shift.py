@@ -4,17 +4,9 @@
 
 import logging
 from collections.abc import Callable
-from collections.abc import Callable
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import pyomo.environ as pyo
-from pyomo.opt import (
-    SolverFactory,
-    SolverStatus,
-    TerminationCondition,
-    check_available_solvers,
-)
 from pyomo.opt import (
     SolverFactory,
     SolverStatus,
@@ -25,7 +17,7 @@ from pyomo.opt import (
 from assume.common.fast_pandas import FastSeries
 from assume.units.dst_components import demand_side_technologies
 
-SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["gurobi", "appsi_highs", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +26,8 @@ class DSMFlex:
     # Mapping of flexibility measures to their respective functions
     flexibility_map: dict[str, Callable[[pyo.ConcreteModel], None]] = {
         "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
-        "electricity_price_signal_based_flexibility": lambda self, model: self.electricity_price_signal_based_flexibility(model),
+        "electricity_price_signal_based_flexibility": lambda self,
+        model: self.electricity_price_signal_based_flexibility(model),
         "congestion_management_flexibility": lambda self,
         model: self.grid_congestion_management(model),
         "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(
@@ -183,7 +176,10 @@ class DSMFlex:
                 power_input += self.model.dsm_blocks["ccs_system"].power_in[t]
             if self.has_electrolyser:
                 power_input += self.model.dsm_blocks["electrolyser"].power_in[t]
-            return m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t] == power_input
+            return (
+                m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                == power_input
+            )
 
     def electricity_price_signal_based_flexibility(self, model):
         """
@@ -194,12 +190,14 @@ class DSMFlex:
 
         # Add the updated electricity_price component explicitly
         model.add_component(
-        "electricity_price",
-        pyo.Param(
-            model.time_steps,
-            initialize={t: value for t, value in enumerate(self.electricity_price_flex)},
-        ),
-    )
+            "electricity_price",
+            pyo.Param(
+                model.time_steps,
+                initialize={
+                    t: value for t, value in enumerate(self.electricity_price_flex)
+                },
+            ),
+        )
 
     def grid_congestion_management(self, model):
         """
@@ -723,6 +721,19 @@ class DSMFlex:
             index=self.index, value=flex_variable_cost
         )
 
+        # Save to Excel
+        time_steps = list(instance.time_steps)
+        data = {
+            "Time Step": time_steps,
+            "opt_power": self.opt_power_requirement,
+            "flex_power": flex_power_requirement,
+        }
+        df = pd.DataFrame(data)
+        df.to_excel("./examples/outputs/opt_power_requirement.xlsx", index=False)
+        logger.debug(
+            f"Time series data saved to {"./examples/outputs/opt_power_requirement.xlsx"}"
+        )
+
     def switch_to_opt(self, instance):
         """
         Switches the instance to solve a cost based optimisation problem by deactivating the flexibility constraints and objective.
@@ -736,7 +747,7 @@ class DSMFlex:
         if self.flexibility_measure == "electricity_price_signal_based_flexibility":
             instance.obj_rule_flex.deactivate()
             return instance
-        
+
         else:
             # Deactivate the flexibility objective if it exists
             # if hasattr(instance, "obj_rule_flex"):

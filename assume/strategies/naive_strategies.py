@@ -171,7 +171,7 @@ class NaiveDADSMStrategy(BaseStrategy):
             start = product[0]
 
             volume = unit.opt_power_requirement.at[start]
-            marginal_price = unit.calculate_marginal_cost.at[start]
+            marginal_price = unit.calculate_marginal_cost(start=start, power=volume)
             bids.append(
                 {
                     "start_time": start,
@@ -218,6 +218,69 @@ class NaiveDADSMStrategy(BaseStrategy):
         plt.legend()
         plt.grid(True)
         plt.show()
+
+
+class OTC_DSM_Strategy(BaseStrategy):
+    """
+    Strategy for Long-Term Market (LTM) bids based on baseline power threshold.
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Formulate bids for the LTM market.
+
+        Args:
+            unit: The demand-side agent (e.g., cement plant) for which bids are being formulated.
+            market_config: Market configuration containing product details and constraints.
+            product_tuples: List of products for the LTM market (duration and time steps).
+            **kwargs: Additional arguments for bid calculation.
+
+        Returns:
+            Orderbook: Contains bids for the LTM market.
+        """
+        # Determine the optimal operation of the unit
+        unit.determine_optimal_operation_without_flex()
+
+        # Calculate the baseline power threshold (80% of max optimal power requirement)
+        max_power = max(unit.opt_power_requirement)
+        print(max_power)
+        baseline_threshold = 0.8 * max_power
+        # print(baseline_threshold)
+
+        bids = []
+
+        for product in product_tuples:
+            start = product[0]
+            end = product[1]
+
+            # Calculate bid volume as the minimum of the baseline threshold and the optimal power at this time step
+            opt_power = unit.opt_power_requirement.at[start]
+            bid_volume = min(baseline_threshold, opt_power)
+            # print(bid_volume)
+
+            # Calculate the marginal cost for the bid volume
+            marginal_price = unit.calculate_marginal_cost(start=start, power=bid_volume)
+
+            # Add the bid to the list
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": product[2],
+                    "price": marginal_price,
+                    "volume": bid_volume,
+                    "node": unit.node,
+                }
+            )
+        bids = self.remove_empty_bids(bids)
+
+        return bids
 
 
 class NaiveRedispatchDSMStrategy(BaseStrategy):

@@ -1,0 +1,13 @@
+variable,ident,value,simulation
+avg_price,CRM_neg,277.45,experiment_cement_plant_case
+avg_price,CRM_pos,35.885,experiment_cement_plant_case
+avg_price,EOM,1223.2,experiment_cement_plant_case
+avg_price,LTM_OTC,16.532,experiment_cement_plant_case
+total_cost,CRM_neg,1.7698e+07,experiment_cement_plant_case
+total_cost,CRM_pos,8.1682e+05,experiment_cement_plant_case
+total_cost,EOM,6.4891e+07,experiment_cement_plant_case
+total_cost,LTM_OTC,1.3332e+06,experiment_cement_plant_case
+total_volume,CRM_neg,46514,experiment_cement_plant_case
+total_volume,CRM_pos,9113.8,experiment_cement_plant_case
+total_volume,EOM,60168,experiment_cement_plant_case
+total_volume,LTM_OTC,80640,experiment_cement_plant_case
