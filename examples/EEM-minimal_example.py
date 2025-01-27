@@ -43,7 +43,14 @@ csv_path = "outputs"
 input_path = "inputs"
 scenario = "2_nodes"
 
-for study_case in ["learning_coal"]:# ["base_case", "learning_oil", "learning_gas", "learning_coal", "learning_all3"]:
+# powerplant units according to example in Hirth and Schlecht (2024)
+num_wind = 1
+num_diesel = 5
+num_gas = 25
+num_coal = 20
+num_all = num_wind + num_diesel + num_gas + num_coal
+
+for study_case in ["base_case", "learning_diesel", "learning_gas", "learning_coal", "learning_all3"]:
 #study_case="base_case"
 #study_case = "learning_coal"
 #study_case = "learning_gas"
@@ -52,41 +59,39 @@ for study_case in ["learning_coal"]:# ["base_case", "learning_oil", "learning_ga
 #study_case = "learning_coal"
 
     if study_case == "base_case":
-        eom_bidding_list = ["naive_eom"] * 4
-        redispatch_bidding_list = ["naive_redispatch"] * 4
+        eom_bidding_list = ["naive_eom"] * num_all
+        redispatch_bidding_list = ["naive_redispatch"] * num_all
     elif study_case == "learning_coal":
-        eom_bidding_list = ["naive_eom"] * 3 + ["redispatch_learning"]
-        redispatch_bidding_list = ["naive_redispatch"] * 3 + ["redispatch_learning"]
+        eom_bidding_list = ["naive_eom"] * (num_all - num_coal) + ["redispatch_learning"] * num_coal
+        redispatch_bidding_list = ["naive_redispatch"] * (num_all - num_coal) + ["redispatch_learning"] * num_coal
     elif study_case == "learning_gas":
-        eom_bidding_list = ["naive_eom"] * 2 + ["redispatch_learning"] + ["naive_eom"]
-        redispatch_bidding_list = ["naive_redispatch"] * 2 + ["redispatch_learning"] + ["naive_redispatch"]
-    elif study_case == "learning_oil":
-        eom_bidding_list = ["naive_eom"] + ["redispatch_learning"] + ["naive_eom"] * 2
-        redispatch_bidding_list = ["naive_redispatch"] + ["redispatch_learning"] + ["naive_redispatch"] * 2
+        eom_bidding_list = ["naive_eom"] * (num_wind + num_diesel) + ["redispatch_learning"] * num_gas + ["naive_eom"] * num_coal
+        redispatch_bidding_list = ["naive_redispatch"] * (num_wind + num_diesel) + ["redispatch_learning"] * num_gas + ["naive_redispatch"] * num_coal
+    elif study_case == "learning_diesel":
+        eom_bidding_list = ["naive_eom"] * num_wind + ["redispatch_learning"] * num_diesel + ["naive_eom"] * (num_gas + num_coal)
+        redispatch_bidding_list = ["naive_redispatch"] * num_wind + ["redispatch_learning"] * num_diesel + ["naive_redispatch"] * (num_gas + num_coal)
     elif study_case == "learning_all3":
-        eom_bidding_list = ["naive_eom"] + ["redispatch_learning"] * 3
-        redispatch_bidding_list = ["naive_redispatch"] + ["redispatch_learning"] * 3
-    elif study_case == "test_redispatch":
-        eom_bidding_list = ["naive_eom"] * 3 + ["pp_learning"]
-        redispatch_bidding_list = ["naive_redispatch"] * 3 + ["redispatch_learning"]
+        eom_bidding_list = ["naive_eom"] * num_wind + ["redispatch_learning"] * (num_all - num_wind)
+        redispatch_bidding_list = ["naive_redispatch"] * num_wind + ["redispatch_learning"] * (num_all - num_wind)
 
-    # as long as two markets learning is not implemented: choose naive redispatch for all
-    #redispatch_bidding_list = ["naive_redispatch"] * 4
-
+    mc_wind_list = [0 for i in range(num_wind)]
+    mc_diesel_list = [120 + i for i in range(num_diesel)]
+    mc_gas_list = [80 + i for i in range(num_gas)]
+    mc_coal_list = [50 + i for i in range(num_coal)]
     # Create the data
     powerplant_units_data = {
-        "name": ["Wind", "Oil", "Gas", "Coal"],
-        "technology": ["wind", "oil", "natural gas", "lignite"],
-        "node": ["north", "north", "south", "south"],
+        "name": [f"Wind {i}" for i in range(num_wind)] + [f"Diesel {i}" for i in range(num_diesel)] + [f"Gas {i}" for i in range(num_gas)] + [f"Coal {i}" for i in range(num_coal)],
+        "technology": ["wind"]*num_wind + ["diesel"]*num_diesel + ["natural gas"]*num_gas + ["lignite"]*num_coal,
+        "node": ["north"]*num_wind + ["north"]*num_diesel + ["north"]*num_gas + ["south"]*num_coal,
         "bidding_EOM": eom_bidding_list,
         "bidding_redispatch": redispatch_bidding_list,
-        "fuel_type": ["renewable", "oil", "natural gas", "lignite"],
-        "max_power": [15000.0, 2000.0, 3000.0, 3000.0],
-        "min_power": [0, 0, 0, 0],
-        "additional_cost": [0, 120, 80, 50],
-        "unit_operator": ["wind operator", "oil operator", "gas operator", "coal operator"],
-        "emission_factor": [0, 0, 0, 0],
-        "efficiency": [1, 0.3, 0.4, 0.5],
+        "fuel_type": ["renewable"]*num_wind + ["diesel"]*num_diesel + ["natural gas"]*num_gas + ["lignite"]*num_coal,
+        "max_power": [25000.0]*num_wind + [1000.0]*(num_all-num_wind),
+        "min_power": [0]*num_all,
+        "additional_cost": mc_wind_list + mc_diesel_list + mc_gas_list + mc_coal_list,
+        "unit_operator": ["wind operator"]*num_wind + ["diesel operator"]*num_diesel + ["gas operator"]*num_gas + ["coal operator"]*num_coal,
+        "emission_factor": [0]*num_all,
+        "efficiency": [1]*num_wind + [0.3]*num_diesel + [0.4]*num_gas + [0.5]*num_coal,
     }
     #
     # Convert to DataFrame and save as CSV
@@ -94,14 +99,14 @@ for study_case in ["learning_coal"]:# ["base_case", "learning_oil", "learning_ga
     powerplant_units_df.to_csv(f"{input_path}/{scenario}/powerplant_units.csv", index=False)
 
     demand_units_data = {
-        "name": ["demand_north", "demand_south"],
+        "name": ["demand_south", "demand_north"],
         "technology": ["inflex_demand", "inflex_demand"],
         "bidding_EOM": ["naive_eom", "naive_eom"],
         "bidding_redispatch": ["naive_redispatch", "naive_redispatch"],
-        "node": ["north", "south"],
+        "node": ["south", "north"],
         "max_power": [100000, 100000],
         "min_power": [0, 0],
-        "unit_operator": ["demand operator north", "demand operator south"],
+        "unit_operator": ["demand operator south", "demand operator north"],
     }
 
     # Convert to DataFrame and save as CSV
@@ -110,12 +115,15 @@ for study_case in ["learning_coal"]:# ["base_case", "learning_oil", "learning_ga
 
     # read demand data for germany and split into two regions
     german_demand_data = pd.read_csv(f"{input_path}/example_01f/demand_df.csv", index_col='datetime')
-    demand_data = pd.DataFrame(
-        {
-            "demand_north": german_demand_data.loc["2019-01-01 00:00":"2019-02-01 23:45", "demand_EOM"] / 20,
-            "demand_south": german_demand_data.loc["2019-01-01 00:00":"2019-02-01 23:45", "demand_EOM"] / 20,
-        }
-    )
+    #demand_data = pd.DataFrame(
+        #{
+            #"demand_north": german_demand_data.loc["2019-01-01 00:00":"2019-02-01 23:45", "demand_EOM"] / 20,
+            #"demand_south": german_demand_data.loc["2019-01-01 00:00":"2019-02-01 23:45", "demand_EOM"] / 10,
+        #}
+    #)
+    demand_data = pd.DataFrame(index=german_demand_data.loc["2019-01-01 00:00":"2019-02-01 23:45"].index)
+    demand_data['demand_north'] = [0]*len(demand_data)
+    demand_data['demand_south'] = [50000]*len(demand_data)
     demand_data.index = pd.to_datetime(demand_data.index)
     demand_data.to_csv(f"{input_path}/{scenario}/demand_df.csv", index=True)
 
