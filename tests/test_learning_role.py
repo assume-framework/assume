@@ -35,13 +35,17 @@ def test_learning_init():
         "learning_mode": False,
         "perform_evaluation": False,
         "training_episodes": 3,
+        "episodes_collecting_initial_experience": 1,
         "continue_learning": False,
         "trained_policies_save_path": None,
         "early_stopping_steps": 10,
         "early_stopping_threshold": 0.05,
     }
     # test init
-    learn = Learning(learning_config)
+    learn = Learning(
+        learning_config, 
+        episodes_collecting_initial_experience=learning_config["episodes_collecting_initial_experience"]
+    )
     assert len(learn.rl_strats) == 0
 
     # we need to add learning strategies first
