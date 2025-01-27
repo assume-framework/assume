@@ -100,6 +100,7 @@ class CriticTD3(nn.Module):
 
         for layer in self.q1_layers[:-1]:  # All hidden layers
             x = F.relu(layer(x))
+
         x = self.q1_layers[-1](x)  # Output layer (no activation)
 
         return x

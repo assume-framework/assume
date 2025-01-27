@@ -16,7 +16,7 @@ base:
     algorithm: matd3
     learning_rate: 0.001
     learning_rate_schedule: linear
-    training_episodes: 30
+    training_episodes: 100
     episodes_collecting_initial_experience: 3
     train_freq: 10h
     gradient_steps: 1

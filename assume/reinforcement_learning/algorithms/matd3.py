@@ -378,7 +378,10 @@ class TD3(RLAlgorithm):
 
         logger.debug("Updating Policy")
 
-        n_rl_agents = len(self.learning_role.rl_strats)
+        # Stack strategies for easier access
+        strategies = list(self.learning_role.rl_strats.values())
+
+        n_rl_agents = len(strategies)
 
         # update noise decay and learning rate
         updated_noise_decay = self.learning_role.calc_noise_from_progress(
@@ -390,7 +393,7 @@ class TD3(RLAlgorithm):
         )
 
         # loop over all units to avoid update call for every gradient step, as it will be ambiguous
-        for strategy in self.learning_role.rl_strats.values():
+        for strategy in strategies:
             self.update_learning_rate(
                 [
                     strategy.critics.optimizer,
@@ -413,18 +416,16 @@ class TD3(RLAlgorithm):
 
             with th.no_grad():
                 # Select action according to policy and add clipped noise
-                # Select action according to policy and add clipped noise
                 noise = th.randn_like(actions) * self.target_policy_noise
                 noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
 
+                # Select next actions for all agents
                 next_actions = th.stack(
                     [
                         (
                             strategy.actor_target(next_states[:, i, :]) + noise[:, i, :]
                         ).clamp(-1, 1)
-                        for i, strategy in enumerate(
-                            self.learning_role.rl_strats.values()
-                        )
+                        for i, strategy in enumerate(strategies)
                     ]
                 )
 
@@ -442,7 +443,7 @@ class TD3(RLAlgorithm):
             ].reshape(self.batch_size, n_rl_agents, -1)
 
             # Loop over all agents and update their actor and critic networks
-            for i, strategy in enumerate(self.learning_role.rl_strats.values()):
+            for i, strategy in enumerate(strategies):
                 actor = strategy.actor
                 critic = strategy.critics
                 critic_target = strategy.target_critics
@@ -511,7 +512,7 @@ class TD3(RLAlgorithm):
                     all_actions_clone = actions.clone().detach()
                     all_actions_clone[:, i, :] = action_i
 
-                    # calculate actor loss
+                    # Calculate actor loss
                     actor_loss = -critic.q1_forward(
                         all_states, all_actions_clone.view(self.batch_size, -1)
                     ).mean()
@@ -530,7 +531,7 @@ class TD3(RLAlgorithm):
                 all_actor_params = []
                 all_target_actor_params = []
 
-                for strategy in self.learning_role.rl_strats.values():
+                for strategy in strategies:
                     all_critic_params.extend(strategy.critics.parameters())
                     all_target_critic_params.extend(
                         strategy.target_critics.parameters()
