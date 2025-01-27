@@ -149,3 +149,6 @@ examples/notebooks/outputs
 *.pb
 *.jar
 fameSetup.yaml
+
+examples/inputs/example_2030
+examples/inputs/example_2035
