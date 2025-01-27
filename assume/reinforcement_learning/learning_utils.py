@@ -2,14 +2,14 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import logging
-
 from collections.abc import Callable
 from datetime import datetime
 from typing import TypedDict
 
 import numpy as np
 import torch as th
+
+
 class ObsActRew(TypedDict):
     observation: list[th.Tensor]
     action: list[th.Tensor]

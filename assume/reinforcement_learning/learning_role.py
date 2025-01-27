@@ -7,8 +7,8 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-import torch as th
 import pandas as pd
+import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
@@ -397,7 +397,7 @@ class Learning(Role):
         db_addr = self.context.data.get("output_agent_addr")
 
         # Initialize datetime the first time the function is called
-        if self.datetime == None:
+        if self.datetime is None:
             self.datetime = pd.to_datetime(self.context.data.get("train_start"))
 
         freq_timedelta = pd.Timedelta(self.context.data.get("freq"))

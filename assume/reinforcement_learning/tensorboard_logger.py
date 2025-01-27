@@ -5,16 +5,16 @@
 import logging
 import os
 
+import pandas as pd
+from sqlalchemy import create_engine
+from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
+from torch.utils.tensorboard import SummaryWriter
+
 # Turn off TF onednn optimizations to avoid memory leaks
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
-from torch.utils.tensorboard import SummaryWriter
-from sqlalchemy import create_engine
-from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
-
 logger = logging.getLogger(__name__)
 
-import pandas as pd
 
 tensorboard_intro = """
 # TensorBoard Guide: Parameter Visualization and Interpretation
@@ -135,11 +135,11 @@ class TensorBoardLogger:
         if self.db.dialect.name == 'sqlite':
             # To aggregate by hour instead of day, replace '%Y-%m-%d' with '%Y-%m-%d %H'
             # To aggregate by month instead of day, replace '%Y-%m-%d' with '%Y-%m'
-            date_func = f"strftime('%Y-%m-%d', datetime)"
+            date_func = "strftime('%Y-%m-%d', datetime)"
         elif self.db.dialect.name == 'postgresql':
             # To aggregate by hour instead of day, replace 'YYYY-MM-DD' with 'YYYY-MM-DD HH24'
             # To aggregate by month instead of day, replace 'YYYY-MM-DD' with 'YYYY-MM'
-            date_func = f"TO_CHAR(datetime, 'YYYY-MM-DD')"
+            date_func = "TO_CHAR(datetime, 'YYYY-MM-DD')"
 
         query = f"""
             SELECT 

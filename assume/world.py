@@ -243,7 +243,6 @@ class World:
             # self.clock_agent.stopped.add_done_callback(stop)
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
-            #TODO: which ID should be used here?
             self.setup_learning(simulation_id)
 
             self.setup_output_agent(simulation_id, save_frequency_hours)
@@ -252,7 +251,7 @@ class World:
             )
             self.container.register(self.clock_manager)
 
-    def setup_learning(self, id : str) -> None:
+    def setup_learning(self, simulation_id: str) -> None:
         """
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
@@ -264,7 +263,9 @@ class World:
         if self.learning_mode or self.perform_evaluation:
             # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
-            from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
+            from assume.reinforcement_learning.tensorboard_logger import (
+                TensorBoardLogger,
+            )
 
             self.learning_role = Learning(
                 self.learning_config, 
@@ -281,7 +282,9 @@ class World:
                 suggested_aid=self.learning_agent_addr.aid,
             )
             rl_agent.suspendable_tasks = False
-            
+
+            id = "Learning_1"
+            # add Learning_1 to the list of learning operators if not already existing
             if self.learning_operators.get(id):
                 raise ValueError(f"LearningOperator {id} already exists")
             
@@ -303,9 +306,9 @@ class World:
             self.learning_operators[id] = learning_role_agent
 
             self.tensor_board_logger = TensorBoardLogger(
-                simulation_id = id,
+                simulation_id = simulation_id,
                 db_uri = self.db_uri,
-                tensorboard_path = f"{self.learning_config.get("trained_policies_save_path", "logs")}/TB",
+                tensorboard_path = f"{self.learning_config.get('trained_policies_save_path', 'logs')}/TB",
                 learning_mode = self.learning_mode,
                 episodes_collecting_initial_experience = self.episodes_collecting_initial_experience,
                 perform_evaluation = self.perform_evaluation,

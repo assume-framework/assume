@@ -4,7 +4,6 @@
 
 import logging
 import shutil
-
 from collections import defaultdict
 from datetime import datetime
 from multiprocessing import Lock
