@@ -416,9 +416,6 @@ class TD3(RLAlgorithm):
             )
             unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
 
-        # set the policy in training mode to enable dropout and batch normalization
-        self.set_training_mode(True)
-
         for _ in range(self.gradient_steps):
             self.n_updates += 1
 
@@ -508,9 +505,9 @@ class TD3(RLAlgorithm):
                 current_Q_values = critic(all_states, all_actions)
 
                 # Compute critic loss
-                critic_q_values = th.cat(current_Q_values, dim=1)  # Concatenate once
-                critic_loss = F.mse_loss(
-                    critic_q_values, target_Q_values.expand_as(critic_q_values)
+                critic_loss = sum(
+                    F.mse_loss(current_q, target_Q_values)
+                    for current_q in current_Q_values
                 )
 
                 # Optimize the critics
@@ -526,10 +523,8 @@ class TD3(RLAlgorithm):
                     state_i = states[:, i, :]
                     action_i = actor(state_i)
 
-                    all_actions_clone = actions.detach().clone()
-                    all_actions_clone[:, i, :].copy_(
-                        action_i
-                    )  # Efficient in-place copy
+                    all_actions_clone = actions.clone().detach()
+                    all_actions_clone[:, i, :] = action_i
 
                     # calculate actor loss
                     actor_loss = -critic.q1_forward(
@@ -574,16 +569,3 @@ class TD3(RLAlgorithm):
                 # Perform batch-wise Polyak update (NO LOOPS)
                 polyak_update(all_critic_params, all_target_critic_params, self.tau)
                 polyak_update(all_actor_params, all_target_actor_params, self.tau)
-
-        self.set_training_mode(False)
-
-    def set_training_mode(self, mode: bool) -> None:
-        """
-        Put the policy in either training or evaluation mode.
-
-        This affects certain modules, such as batch normalisation and dropout.
-
-        :param mode: if true, set to training mode, else set to evaluation mode
-        """
-        for u_id in self.learning_role.rl_strats.keys():
-            self.learning_role.rl_strats[u_id].actor.train(mode)
