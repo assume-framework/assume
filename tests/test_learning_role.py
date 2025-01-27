@@ -43,8 +43,10 @@ def test_learning_init():
     }
     # test init
     learn = Learning(
-        learning_config, 
-        episodes_collecting_initial_experience=learning_config["episodes_collecting_initial_experience"]
+        learning_config,
+        episodes_collecting_initial_experience=learning_config[
+            "episodes_collecting_initial_experience"
+        ],
     )
     assert len(learn.rl_strats) == 0
 

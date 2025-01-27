@@ -106,8 +106,10 @@ class Learning(Role):
         else:
             self.calc_noise_from_progress = lambda x: noise_dt
 
-        self.episodes_collecting_initial_experience = episodes_collecting_initial_experience
-        
+        self.episodes_collecting_initial_experience = (
+            episodes_collecting_initial_experience
+        )
+
         self.datetime = None
         self.train_freq = learning_config.get("train_freq", "24h")
 
@@ -377,8 +379,10 @@ class Learning(Role):
 
                         return True
             return False
-   
-    def write_rl_critic_params_to_output(self, learning_rate : float, critic_losses_list : list[dict]) -> None:
+
+    def write_rl_critic_params_to_output(
+        self, learning_rate: float, critic_losses_list: list[dict]
+    ) -> None:
         """
         Writes learning parameters and critic losses to output at specified time intervals.
 
@@ -402,20 +406,23 @@ class Learning(Role):
 
         freq_timedelta = pd.Timedelta(self.context.data.get("freq"))
         # This is for padding the output list when the gradient steps are not identical to the train frequency
-        time_steps = int(pd.Timedelta(self.train_freq) / (freq_timedelta * self.gradient_steps))
-        
+        time_steps = int(
+            pd.Timedelta(self.train_freq) / (freq_timedelta * self.gradient_steps)
+        )
+
         output_list = [
             {
                 "unit": u_id,
                 "critic_loss": loss,
                 "learning_rate": learning_rate,
-                "datetime": self.datetime + ((time_step * self.gradient_steps + gradient_step) * freq_timedelta)
+                "datetime": self.datetime
+                + ((time_step * self.gradient_steps + gradient_step) * freq_timedelta),
             }
             for time_step in range(time_steps)
             for gradient_step in range(self.gradient_steps)
             for u_id, loss in critic_losses_list[gradient_step].items()
         ]
-            
+
         if db_addr:
             self.context.schedule_instant_message(
                 receiver_addr=db_addr,

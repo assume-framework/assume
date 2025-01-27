@@ -15,6 +15,7 @@ class ObsActRew(TypedDict):
     action: list[th.Tensor]
     reward: list[th.Tensor]
 
+
 observation_dict = dict[list[datetime], ObsActRew]
 
 # A schedule takes the remaining progress as input

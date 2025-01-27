@@ -707,7 +707,6 @@ class WriteOutput(Role):
             with self.db.begin() as db:
                 df.to_sql("kpis", db, if_exists="append", index=None)
 
-
     def get_sum_reward(self):
         """
         Retrieves the total reward for each learning unit.

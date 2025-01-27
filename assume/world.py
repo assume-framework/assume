@@ -268,10 +268,10 @@ class World:
             )
 
             self.learning_role = Learning(
-                self.learning_config, 
+                self.learning_config,
                 self.episodes_collecting_initial_experience,
-                start=self.start, 
-                end=self.end
+                start=self.start,
+                end=self.end,
             )
 
             # separate process does not support buffer and learning
@@ -287,7 +287,7 @@ class World:
             # add Learning_1 to the list of learning operators if not already existing
             if self.learning_operators.get(id):
                 raise ValueError(f"LearningOperator {id} already exists")
-            
+
             learning_role_agent = RoleAgent()
             learning_role_agent.add_role(self.learning_role)
             self.container.register(learning_role_agent, suggested_aid=id)
@@ -296,25 +296,23 @@ class World:
             # after creation of an agent - we set additional context params
             learning_role_agent._role_context.data.update(
                 {
-                "output_agent_addr": self.output_agent_addr,
-                "train_start": self.start,
-                "train_end": self.end,
-                "freq" : self.forecaster.index.freq
+                    "output_agent_addr": self.output_agent_addr,
+                    "train_start": self.start,
+                    "train_end": self.end,
+                    "freq": self.forecaster.index.freq,
                 }
             )
-        
+
             self.learning_operators[id] = learning_role_agent
 
             self.tensor_board_logger = TensorBoardLogger(
-                simulation_id = simulation_id,
-                db_uri = self.db_uri,
-                tensorboard_path = f"{self.learning_config.get('trained_policies_save_path', 'logs')}/TB",
-                learning_mode = self.learning_mode,
-                episodes_collecting_initial_experience = self.episodes_collecting_initial_experience,
-                perform_evaluation = self.perform_evaluation,
+                simulation_id=simulation_id,
+                db_uri=self.db_uri,
+                tensorboard_path=f"{self.learning_config.get('trained_policies_save_path', 'logs')}/TB",
+                learning_mode=self.learning_mode,
+                episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
+                perform_evaluation=self.perform_evaluation,
             )
-
-
 
     def setup_output_agent(self, simulation_id: str, save_frequency_hours: int) -> None:
         """
@@ -340,7 +338,7 @@ class World:
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
-            episodes_collecting_initial_experience = self.episodes_collecting_initial_experience,
+            episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
             perform_evaluation=self.perform_evaluation,
             additional_kpis=self.additional_kpis,
         )
