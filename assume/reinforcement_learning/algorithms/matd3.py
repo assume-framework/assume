@@ -9,7 +9,6 @@ import torch as th
 from torch.nn import functional as F
 from torch.optim import AdamW
 
-from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.learning_utils import polyak_update
 from assume.reinforcement_learning.neural_network_architecture import CriticTD3
@@ -81,13 +80,11 @@ class TD3(RLAlgorithm):
             directory (str): The base directory for saving the parameters.
         """
         os.makedirs(directory, exist_ok=True)
-        for u_id in self.learning_role.rl_strats.keys():
+        for u_id, strategy in self.learning_role.rl_strats.items():
             obj = {
-                "critic": self.learning_role.critics[u_id].state_dict(),
-                "critic_target": self.learning_role.target_critics[u_id].state_dict(),
-                "critic_optimizer": self.learning_role.critics[
-                    u_id
-                ].optimizer.state_dict(),
+                "critic": strategy.critics.state_dict(),
+                "critic_target": strategy.target_critics.state_dict(),
+                "critic_optimizer": strategy.critics.optimizer.state_dict(),
             }
             path = f"{directory}/critic_{u_id}.pt"
             th.save(obj, path)
@@ -104,15 +101,11 @@ class TD3(RLAlgorithm):
             directory (str): The base directory for saving the parameters.
         """
         os.makedirs(directory, exist_ok=True)
-        for u_id in self.learning_role.rl_strats.keys():
+        for u_id, strategy in self.learning_role.rl_strats.items():
             obj = {
-                "actor": self.learning_role.rl_strats[u_id].actor.state_dict(),
-                "actor_target": self.learning_role.rl_strats[
-                    u_id
-                ].actor_target.state_dict(),
-                "actor_optimizer": self.learning_role.rl_strats[
-                    u_id
-                ].actor.optimizer.state_dict(),
+                "actor": strategy.actor.state_dict(),
+                "actor_target": strategy.actor_target.state_dict(),
+                "actor_optimizer": strategy.actor.optimizer.state_dict(),
             }
             path = f"{directory}/actor_{u_id}.pt"
             th.save(obj, path)
@@ -149,18 +142,14 @@ class TD3(RLAlgorithm):
             )
             return
 
-        for u_id in self.learning_role.rl_strats.keys():
+        for u_id, strategy in self.learning_role.rl_strats.items():
             try:
                 critic_params = self.load_obj(
                     directory=f"{directory}/critics/critic_{str(u_id)}.pt"
                 )
-                self.learning_role.critics[u_id].load_state_dict(
-                    critic_params["critic"]
-                )
-                self.learning_role.target_critics[u_id].load_state_dict(
-                    critic_params["critic_target"]
-                )
-                self.learning_role.critics[u_id].optimizer.load_state_dict(
+                strategy.critics.load_state_dict(critic_params["critic"])
+                strategy.target_critics.load_state_dict(critic_params["critic_target"])
+                strategy.critics.optimizer.load_state_dict(
                     critic_params["critic_optimizer"]
                 )
             except Exception:
@@ -184,18 +173,14 @@ class TD3(RLAlgorithm):
             )
             return
 
-        for u_id in self.learning_role.rl_strats.keys():
+        for u_id, strategy in self.learning_role.rl_strats.items():
             try:
                 actor_params = self.load_obj(
                     directory=f"{directory}/actors/actor_{str(u_id)}.pt"
                 )
-                self.learning_role.rl_strats[u_id].actor.load_state_dict(
-                    actor_params["actor"]
-                )
-                self.learning_role.rl_strats[u_id].actor_target.load_state_dict(
-                    actor_params["actor_target"]
-                )
-                self.learning_role.rl_strats[u_id].actor.optimizer.load_state_dict(
+                strategy.actor.load_state_dict(actor_params["actor"])
+                strategy.actor_target.load_state_dict(actor_params["actor_target"])
+                strategy.actor.optimizer.load_state_dict(
                     actor_params["actor_optimizer"]
                 )
             except Exception:
@@ -217,11 +202,12 @@ class TD3(RLAlgorithm):
             self.create_critics()
 
         else:
-            self.learning_role.critics = actors_and_critics["critics"]
-            self.learning_role.target_critics = actors_and_critics["target_critics"]
-            for u_id, unit_strategy in self.learning_role.rl_strats.items():
-                unit_strategy.actor = actors_and_critics["actors"][u_id]
-                unit_strategy.actor_target = actors_and_critics["actor_targets"][u_id]
+            for u_id, strategy in self.learning_role.rl_strats.items():
+                strategy.actor = actors_and_critics["actors"][u_id]
+                strategy.actor_target = actors_and_critics["actor_targets"][u_id]
+
+                strategy.critics = actors_and_critics["critics"][u_id]
+                strategy.target_critics = actors_and_critics["target_critics"][u_id]
 
             self.obs_dim = actors_and_critics["obs_dim"]
             self.act_dim = actors_and_critics["act_dim"]
@@ -245,30 +231,31 @@ class TD3(RLAlgorithm):
         obs_dim_list = []
         act_dim_list = []
 
-        for _, unit_strategy in self.learning_role.rl_strats.items():
-            unit_strategy.actor = self.actor_architecture_class(
-                obs_dim=unit_strategy.obs_dim,
-                act_dim=unit_strategy.act_dim,
+        for strategy in self.learning_role.rl_strats.values():
+            strategy.actor = self.actor_architecture_class(
+                obs_dim=strategy.obs_dim,
+                act_dim=strategy.act_dim,
                 float_type=self.float_type,
             ).to(self.device)
 
-            unit_strategy.actor_target = self.actor_architecture_class(
-                obs_dim=unit_strategy.obs_dim,
-                act_dim=unit_strategy.act_dim,
+            strategy.actor_target = self.actor_architecture_class(
+                obs_dim=strategy.obs_dim,
+                act_dim=strategy.act_dim,
                 float_type=self.float_type,
             ).to(self.device)
-            unit_strategy.actor_target.load_state_dict(unit_strategy.actor.state_dict())
-            unit_strategy.actor_target.train(mode=False)
 
-            unit_strategy.actor.optimizer = AdamW(
-                unit_strategy.actor.parameters(),
+            strategy.actor_target.load_state_dict(strategy.actor.state_dict())
+            strategy.actor_target.train(mode=False)
+
+            strategy.actor.optimizer = AdamW(
+                strategy.actor.parameters(),
                 lr=self.learning_role.calc_lr_from_progress(
                     1
                 ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
             )
 
-            obs_dim_list.append(unit_strategy.obs_dim)
-            act_dim_list.append(unit_strategy.act_dim)
+            obs_dim_list.append(strategy.obs_dim)
+            act_dim_list.append(strategy.act_dim)
 
         if len(set(obs_dim_list)) > 1:
             raise ValueError(
@@ -293,43 +280,34 @@ class TD3(RLAlgorithm):
             If you have units with different observation dimensions. They need to have different critics and hence learning roles.
         """
         n_agents = len(self.learning_role.rl_strats)
-        strategy: LearningStrategy
         unique_obs_dim_list = []
 
-        for u_id, strategy in self.learning_role.rl_strats.items():
-            self.learning_role.critics[u_id] = CriticTD3(
+        for strategy in self.learning_role.rl_strats.values():
+            strategy.critics = CriticTD3(
                 n_agents=n_agents,
                 obs_dim=strategy.obs_dim,
                 act_dim=strategy.act_dim,
                 unique_obs_dim=strategy.unique_obs_dim,
                 float_type=self.float_type,
-            )
-            self.learning_role.target_critics[u_id] = CriticTD3(
-                n_agents=n_agents,
-                obs_dim=strategy.obs_dim,
-                act_dim=strategy.act_dim,
-                unique_obs_dim=strategy.unique_obs_dim,
-                float_type=self.float_type,
-            )
+            ).to(self.device)
 
-            self.learning_role.critics[u_id].optimizer = AdamW(
-                self.learning_role.critics[u_id].parameters(),
+            strategy.target_critics = CriticTD3(
+                n_agents=n_agents,
+                obs_dim=strategy.obs_dim,
+                act_dim=strategy.act_dim,
+                unique_obs_dim=strategy.unique_obs_dim,
+                float_type=self.float_type,
+            ).to(self.device)
+
+            strategy.target_critics.load_state_dict(strategy.critics.state_dict())
+            strategy.target_critics.train(mode=False)
+
+            strategy.critics.optimizer = AdamW(
+                strategy.critics.parameters(),
                 lr=self.learning_role.calc_lr_from_progress(
                     1
                 ),  # 1 = 100% of simulation remaining, uses learning_rate from config as starting point
             )
-
-            self.learning_role.target_critics[u_id].load_state_dict(
-                self.learning_role.critics[u_id].state_dict()
-            )
-            self.learning_role.target_critics[u_id].train(mode=False)
-
-            self.learning_role.critics[u_id] = self.learning_role.critics[u_id].to(
-                self.device
-            )
-            self.learning_role.target_critics[u_id] = self.learning_role.target_critics[
-                u_id
-            ].to(self.device)
 
             unique_obs_dim_list.append(strategy.unique_obs_dim)
 
@@ -356,15 +334,21 @@ class TD3(RLAlgorithm):
         actors = {}
         actor_targets = {}
 
-        for u_id, unit_strategy in self.learning_role.rl_strats.items():
-            actors[u_id] = unit_strategy.actor
-            actor_targets[u_id] = unit_strategy.actor_target
+        critics = {}
+        target_critics = {}
+
+        for u_id, strategy in self.learning_role.rl_strats.items():
+            actors[u_id] = strategy.actor
+            actor_targets[u_id] = strategy.actor_target
+
+            critics[u_id] = strategy.critics
+            target_critics[u_id] = strategy.target_critics
 
         actors_and_critics = {
             "actors": actors,
             "actor_targets": actor_targets,
-            "critics": self.learning_role.critics,
-            "target_critics": self.learning_role.target_critics,
+            "critics": critics,
+            "target_critics": target_critics,
             "obs_dim": self.obs_dim,
             "act_dim": self.act_dim,
             "unique_obs_dim": self.unique_obs_dim,
@@ -394,7 +378,7 @@ class TD3(RLAlgorithm):
 
         logger.debug("Updating Policy")
 
-        n_rl_agents = len(self.learning_role.rl_strats.keys())
+        n_rl_agents = len(self.learning_role.rl_strats)
 
         # update noise decay and learning rate
         updated_noise_decay = self.learning_role.calc_noise_from_progress(
@@ -405,16 +389,16 @@ class TD3(RLAlgorithm):
             self.learning_role.get_progress_remaining()
         )
 
-        # loop again over all units to avoid update call for every gradient step, as it will be ambiguous
-        for u_id, unit_strategy in self.learning_role.rl_strats.items():
+        # loop over all units to avoid update call for every gradient step, as it will be ambiguous
+        for strategy in self.learning_role.rl_strats.values():
             self.update_learning_rate(
                 [
-                    self.learning_role.critics[u_id].optimizer,
-                    self.learning_role.rl_strats[u_id].actor.optimizer,
+                    strategy.critics.optimizer,
+                    strategy.actor.optimizer,
                 ],
                 learning_rate=learning_rate,
             )
-            unit_strategy.action_noise.update_noise_decay(updated_noise_decay)
+            strategy.action_noise.update_noise_decay(updated_noise_decay)
 
         for _ in range(self.gradient_steps):
             self.n_updates += 1
@@ -457,10 +441,11 @@ class TD3(RLAlgorithm):
                 :, :, self.obs_dim - self.unique_obs_dim :
             ].reshape(self.batch_size, n_rl_agents, -1)
 
-            for i, u_id in enumerate(self.learning_role.rl_strats.keys()):
-                critic_target = self.learning_role.target_critics[u_id]
-                critic = self.learning_role.critics[u_id]
-                actor = self.learning_role.rl_strats[u_id].actor
+            # Loop over all agents and update their actor and critic networks
+            for i, strategy in enumerate(self.learning_role.rl_strats.values()):
+                actor = strategy.actor
+                critic = strategy.critics
+                critic_target = strategy.target_critics
 
                 # Efficiently extract unique observations from all other agents
                 other_unique_obs = th.cat(
@@ -539,32 +524,20 @@ class TD3(RLAlgorithm):
 
             # Perform batch-wise Polyak update at the end (instead of inside the loop)
             if self.n_updates % self.policy_delay == 0:
-                # Collect all parameters in a single call to polyak_update
-                rl_keys = list(self.learning_role.rl_strats.keys())
+                all_critic_params = []
+                all_target_critic_params = []
 
-                all_critic_params = [
-                    p
-                    for u_id in rl_keys
-                    for p in self.learning_role.critics[u_id].parameters()
-                ]
-                all_target_critic_params = [
-                    p
-                    for u_id in rl_keys
-                    for p in self.learning_role.target_critics[u_id].parameters()
-                ]
+                all_actor_params = []
+                all_target_actor_params = []
 
-                all_actor_params = [
-                    p
-                    for u_id in rl_keys
-                    for p in self.learning_role.rl_strats[u_id].actor.parameters()
-                ]
-                all_target_actor_params = [
-                    p
-                    for u_id in rl_keys
-                    for p in self.learning_role.rl_strats[
-                        u_id
-                    ].actor_target.parameters()
-                ]
+                for strategy in self.learning_role.rl_strats.values():
+                    all_critic_params.extend(strategy.critics.parameters())
+                    all_target_critic_params.extend(
+                        strategy.target_critics.parameters()
+                    )
+
+                    all_actor_params.extend(strategy.actor.parameters())
+                    all_target_actor_params.extend(strategy.actor_target.parameters())
 
                 # Perform batch-wise Polyak update (NO LOOPS)
                 polyak_update(all_critic_params, all_target_critic_params, self.tau)

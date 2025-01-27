@@ -748,6 +748,9 @@ def setup_world(
             for unit in op_units:
                 world.add_unit(**unit)
 
+    if world.learning_mode or world.perform_evaluation:
+        world.add_learning_strategies_to_learning_role()
+
     if (
         world.learning_mode
         and world.learning_role is not None
