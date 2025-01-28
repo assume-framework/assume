@@ -370,7 +370,7 @@ class TD3(RLAlgorithm):
             3. Compute the target Q-values based on the next states, rewards, and the target critic network.
             4. Compute the critic loss as the mean squared error between current Q-values and target Q-values.
             5. Optimize the critic network by performing a gradient descent step.
-            6. Optionally, update the actor network if the specified policy delay is reached.
+            6. Update the actor network if the specified policy delay is reached.
             7. Apply Polyak averaging to update target networks.
 
             This function implements the TD3 algorithm's key step for policy improvement and exploration.
@@ -380,7 +380,6 @@ class TD3(RLAlgorithm):
 
         # Stack strategies for easier access
         strategies = list(self.learning_role.rl_strats.values())
-
         n_rl_agents = len(strategies)
 
         # update noise decay and learning rate
@@ -428,7 +427,6 @@ class TD3(RLAlgorithm):
                         for i, strategy in enumerate(strategies)
                     ]
                 )
-
                 next_actions = next_actions.transpose(0, 1).contiguous()
                 next_actions = next_actions.view(-1, n_rl_agents * self.act_dim)
 
@@ -442,7 +440,17 @@ class TD3(RLAlgorithm):
                 :, :, self.obs_dim - self.unique_obs_dim :
             ].reshape(self.batch_size, n_rl_agents, -1)
 
-            # Loop over all agents and update their actor and critic networks
+            #####################################################################
+            # CRITIC UPDATE: Accumulate losses for all agents, then backprop once
+            #####################################################################
+
+            # Zero-grad for all critics before accumulation
+            for strategy in strategies:
+                strategy.critics.optimizer.zero_grad(set_to_none=True)
+
+            total_critic_loss = 0.0
+
+            # Loop over all agents and accumulate critic loss
             for i, strategy in enumerate(strategies):
                 actor = strategy.actor
                 critic = strategy.critics
@@ -477,8 +485,8 @@ class TD3(RLAlgorithm):
                     dim=1,
                 )
 
+                # Compute the next Q-values: min over all critics targets
                 with th.no_grad():
-                    # Compute the next Q-values: min over all critics targets
                     next_q_values = th.cat(
                         critic_target(all_next_states, next_actions), dim=1
                     )
@@ -490,41 +498,82 @@ class TD3(RLAlgorithm):
                 # Get current Q-values estimates for each critic network
                 current_Q_values = critic(all_states, all_actions)
 
-                # Compute critic loss
+                # Accumulate critic loss for this agent
                 critic_loss = sum(
                     F.mse_loss(current_q, target_Q_values)
                     for current_q in current_Q_values
                 )
+                total_critic_loss += critic_loss
 
-                # Optimize the critics
-                critic.optimizer.zero_grad(set_to_none=True)
-                critic_loss.backward()
-                # Clip the gradients to avoid exploding gradients and stabilize training
-                th.nn.utils.clip_grad_norm_(critic.parameters(), max_norm=1.0)
-                critic.optimizer.step()
+            # Single backward pass for all agents' critics
+            total_critic_loss.backward()
 
-                # Delayed policy updates
-                if self.n_updates % self.policy_delay == 0:
-                    # Compute actor loss
+            # Clip the gradients and step each critic optimizer
+            for strategy in strategies:
+                th.nn.utils.clip_grad_norm_(strategy.critics.parameters(), max_norm=1.0)
+                strategy.critics.optimizer.step()
+
+            ######################################################################
+            # ACTOR UPDATE (DELAYED): Accumulate losses for all agents in one pass
+            ######################################################################
+            if self.n_updates % self.policy_delay == 0:
+                # Zero-grad for all actors first
+                for strategy in strategies:
+                    strategy.actor.optimizer.zero_grad(set_to_none=True)
+
+                total_actor_loss = 0.0
+
+                # We'll compute each agent's actor loss, accumulate, then do one backprop
+                for i, strategy in enumerate(strategies):
+                    actor = strategy.actor
+                    critic = strategy.critics
+
+                    # Build local state for actor i
                     state_i = states[:, i, :]
                     action_i = actor(state_i)
 
+                    # Construct final state representation for agent i
+                    other_unique_obs = th.cat(
+                        (
+                            unique_obs_from_others[:, :i],
+                            unique_obs_from_others[:, i + 1 :],
+                        ),
+                        dim=1,
+                    )
+                    all_states_i = th.cat(
+                        (
+                            state_i.reshape(self.batch_size, -1),
+                            other_unique_obs.reshape(self.batch_size, -1),
+                        ),
+                        dim=1,
+                    )
+
+                    # Replace the i-th agent's action in the batch
                     all_actions_clone = actions.clone().detach()
                     all_actions_clone[:, i, :] = action_i
 
-                    # Calculate actor loss
+                    # Flatten again for the critic
+                    all_actions_clone = all_actions_clone.view(self.batch_size, -1)
+
+                    # Calculate actor loss (negative Q1 of the updated action)
                     actor_loss = -critic.q1_forward(
-                        all_states, all_actions_clone.view(self.batch_size, -1)
+                        all_states_i, all_actions_clone
                     ).mean()
 
-                    actor.optimizer.zero_grad(set_to_none=True)
-                    actor_loss.backward()
-                    # Clip the gradients to avoid exploding gradients and stabilize training
-                    th.nn.utils.clip_grad_norm_(actor.parameters(), max_norm=1.0)
-                    actor.optimizer.step()
+                    # Accumulate actor losses
+                    total_actor_loss += actor_loss
 
-            # Perform batch-wise Polyak update at the end (instead of inside the loop)
-            if self.n_updates % self.policy_delay == 0:
+                # Single backward pass for all actors
+                total_actor_loss.backward()
+
+                # Clip and step each actor optimizer
+                for strategy in strategies:
+                    th.nn.utils.clip_grad_norm_(
+                        strategy.actor.parameters(), max_norm=1.0
+                    )
+                    strategy.actor.optimizer.step()
+
+                # Perform batch-wise Polyak update at the end (instead of inside the loop)
                 all_critic_params = []
                 all_target_critic_params = []
 
