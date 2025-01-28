@@ -270,7 +270,7 @@ class MarketRole(MarketMechanism, Role):
 
         # schedule the next opening too
         next_opening = self.marketconfig.opening_hours.after(market_open)
-        if next_opening <= self.last_market_opening:
+        if next_opening is not None and next_opening <= self.last_market_opening:
             next_opening_ts = datetime2timestamp(next_opening)
             self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
             logger.debug(
