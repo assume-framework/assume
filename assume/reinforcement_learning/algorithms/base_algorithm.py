@@ -115,7 +115,7 @@ class RLAlgorithm:
         Returns:
             object: The loaded object.
         """
-        return th.load(directory, map_location=self.device)
+        return th.load(directory, map_location=self.device, weights_only=True)
 
     def load_params(self, directory: str) -> None:
         """

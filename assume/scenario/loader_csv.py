@@ -895,7 +895,7 @@ def run_learning(
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
 
-    if Path(save_path).is_dir():
+    if Path(save_path).is_dir() and not world.learning_config["continue_learning"]:
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
             f"{save_path=} exists - should we overwrite current learnings? (y/N) "

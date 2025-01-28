@@ -110,6 +110,9 @@ class Learning(Role):
         self.episodes_collecting_initial_experience = max(
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
+        # if we continue learning we do not need to collect initial experience
+        if self.continue_learning:
+            self.episodes_collecting_initial_experience = 0
 
         self.train_freq = learning_config.get("train_freq", "100h")
         self.gradient_steps = learning_config.get("gradient_steps", 100)
