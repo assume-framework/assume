@@ -148,7 +148,7 @@ class Learning(Role):
 
         # if enough initial experience was collected according to specifications in learning config
         # turn off initial exploration and go into full learning mode
-        if self.episodes_done > self.episodes_collecting_initial_experience:
+        if self.episodes_done >= self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
