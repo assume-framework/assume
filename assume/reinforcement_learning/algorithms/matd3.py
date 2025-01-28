@@ -36,7 +36,7 @@ class TD3(RLAlgorithm):
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
-        gradient_steps=-1,
+        gradient_steps=100,
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,

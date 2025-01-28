@@ -22,7 +22,7 @@ class RLAlgorithm:
         batch_size (int): Minibatch size for each gradient update
         tau (float): the soft update coefficient ("Polyak update", between 0 and 1)
         gamma (float): the discount factor
-        gradient_steps (int): how many gradient steps to do after each rollout (if -1, no gradient step is done)
+        gradient_steps (int): how many gradient steps to do after each rollout
         policy_delay (int): Policy and target networks will only be updated once every policy_delay steps per training steps. The Q values will be updated policy_delay more often (update every training step)
         target_policy_noise (float): Standard deviation of Gaussian noise added to target policy (smoothing noise)
         target_noise_clip (float): Limit for absolute value of target policy smoothing noise
@@ -38,7 +38,7 @@ class RLAlgorithm:
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
-        gradient_steps=-1,
+        gradient_steps=100,
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,

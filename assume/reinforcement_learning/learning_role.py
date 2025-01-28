@@ -111,12 +111,9 @@ class Learning(Role):
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
 
-        self.train_freq = learning_config.get("train_freq", "1h")
-        self.gradient_steps = (
-            int(self.train_freq[:-1])
-            if learning_config.get("gradient_steps", -1) == -1
-            else learning_config["gradient_steps"]
-        )
+        self.train_freq = learning_config.get("train_freq", "100h")
+        self.gradient_steps = learning_config.get("gradient_steps", 100)
+
         self.batch_size = learning_config.get("batch_size", 128)
         self.gamma = learning_config.get("gamma", 0.99)
 
