@@ -34,7 +34,7 @@ class RLAlgorithm:
         # init learning_role as object of Learning class
         learning_role,
         learning_rate=1e-4,
-        episodes_collecting_initial_experience=100,
+        episodes_collecting_initial_experience=10,
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
