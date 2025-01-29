@@ -145,7 +145,7 @@ class RLStrategy(AbstractLearningStrategy):
 
     def __init__(self, *args, **kwargs):
         # check if kwargs contains arguments on obs_dim, act_dim, unique_obs_dim
-        obs_dim = kwargs.pop("obs_dim", 50)
+        obs_dim = kwargs.pop("obs_dim", 38)
         act_dim = kwargs.pop("act_dim", 2)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
 
@@ -384,6 +384,10 @@ class RLStrategy(AbstractLearningStrategy):
 
             # noise is an tensor with zeros, because we are not in learning mode
             noise = th.zeros_like(curr_action, dtype=self.float_type)
+
+        # Ensure the tensors remain tensors but without unnecessary dimensions
+        curr_action = curr_action.squeeze()
+        noise = noise.squeeze()
 
         return curr_action, noise
 
@@ -1137,7 +1141,7 @@ class RedispatchRLStrategy(RLStrategy):
                     "start_time": product[0],
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": price.item(),
+                    "price": price,
                     "volume": current_power,
                     "max_power": max_power,
                     "min_power": min_power,
@@ -1156,6 +1160,7 @@ class RedispatchRLStrategy(RLStrategy):
     ) -> Orderbook:
         start = product_tuples[0][0]
         end = product_tuples[0][1]
+
         # get technical bounds for the unit output from the unit
         min_power, max_power = unit.calculate_min_max_power(start, end)
         min_power = min_power[0]
@@ -1168,7 +1173,6 @@ class RedispatchRLStrategy(RLStrategy):
             unit=unit,
             market_id=market_config.market_id,
             start=start,
-            end=end,
         )
 
         # =============================================================================

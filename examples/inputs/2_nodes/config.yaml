@@ -1,10 +1,14 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 base_case:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-06 00:00
   time_step: 1h
   learning_mode: False
   save_frequency_hours: False
-  
+
   markets_config:
     EOM:
       operator: EOM_operator
@@ -81,7 +85,7 @@ learning_coal:
     trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
     training_episodes: 100
     validation_episodes_interval: 5
-  
+
   markets_config:
     EOM:
       operator: EOM_operator
@@ -157,7 +161,7 @@ learning_gas:
     trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
     training_episodes: 100
     validation_episodes_interval: 5
-  
+
   markets_config:
     EOM:
       operator: EOM_operator
@@ -233,7 +237,7 @@ learning_diesel:
     trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
     training_episodes: 100
     validation_episodes_interval: 5
-  
+
   markets_config:
     EOM:
       operator: EOM_operator
@@ -303,7 +307,7 @@ learning_all3:
     trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
     training_episodes: 100
     validation_episodes_interval: 5
-  
+
   markets_config:
     EOM:
       operator: EOM_operator
