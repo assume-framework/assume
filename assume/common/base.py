@@ -314,8 +314,8 @@ class SupportsMinMax(BaseUnit):
 
     min_power: float
     max_power: float
-    ramp_down: float
-    ramp_up: float
+    ramp_down: float = None
+    ramp_up: float = None
     efficiency: float
     emission_factor: float
     min_operating_time: int = 0
@@ -355,6 +355,9 @@ class SupportsMinMax(BaseUnit):
         Returns:
             float: The corrected possible power to offer according to ramping restrictions.
         """
+        if self.ramp_down is None and self.ramp_up is None:
+            return power
+
         # was off before, but should be on now and min_down_time is not reached
         if power > 0 and op_time < 0 and op_time > -self.min_down_time:
             power = 0
@@ -366,20 +369,23 @@ class SupportsMinMax(BaseUnit):
             # if less than min_power is required, we run min_power
             # we could also split at self.min_power/2
             return power
+
         # ramp up constraint
         # max_power + current_power < previous_power + unit.ramp_up
-        power = min(
-            power,
-            previous_power + self.ramp_up - current_power,
-            self.max_power - current_power,
-        )
+        if self.ramp_up is not None:
+            power = min(
+                power,
+                previous_power + self.ramp_up - current_power,
+                self.max_power - current_power,
+            )
         # ramp down constraint
         # min_power + current_power > previous_power - unit.ramp_down
-        power = max(
-            power,
-            previous_power - self.ramp_down - current_power,
-            self.min_power - current_power,
-        )
+        if self.ramp_down is not None:
+            power = max(
+                power,
+                previous_power - self.ramp_down - current_power,
+                self.min_power - current_power,
+            )
         return power
 
     def get_operation_time(self, start: datetime) -> int:

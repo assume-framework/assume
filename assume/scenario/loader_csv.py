@@ -100,6 +100,10 @@ def load_file(
                 return None
 
             if df.index.freq < index.freq:
+                logger.warning(
+                    f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
+                    "Resampling using mean(). Make sure this is what you want and your data is in units of power."
+                )
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")
 
@@ -457,6 +461,7 @@ def load_config_and_create_forecaster(
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
+    exchange_units = load_file(path=path, config=config, file_name="exchange_units")
 
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
@@ -478,8 +483,9 @@ def load_config_and_create_forecaster(
     demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
     if demand_df is None:
         raise ValueError("No demand time series was provided!")
-    cross_border_flows_df = load_file(
-        path=path, config=config, file_name="cross_border_flows", index=index
+
+    exchanges_df = load_file(
+        path=path, config=config, file_name="exchanges_df", index=index
     )
     availability = load_file(
         path=path, config=config, file_name="availability_df", index=index
@@ -513,7 +519,7 @@ def load_config_and_create_forecaster(
 
     forecaster.set_forecast(forecasts_df)
     forecaster.set_forecast(demand_df)
-    forecaster.set_forecast(cross_border_flows_df)
+    forecaster.set_forecast(exchanges_df)
     forecaster.set_forecast(availability, prefix="availability_")
     forecaster.set_forecast(fuel_prices_df, prefix="fuel_price_")
     forecaster.calc_forecast_if_needed()
@@ -529,6 +535,7 @@ def load_config_and_create_forecaster(
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
+        "exchange_units": exchange_units,
         "dsm_units": dsm_units,
         "forecaster": forecaster,
     }
@@ -571,6 +578,7 @@ def setup_world(
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
+    exchange_units = scenario_data["exchange_units"]
     dsm_units = scenario_data["dsm_units"]
     forecaster = scenario_data["forecaster"]
 
@@ -670,7 +678,7 @@ def setup_world(
     logger.info("Read units from file")
 
     units = defaultdict(list)
-    pwp_plants = read_units(
+    powerplant_units = read_units(
         units_df=powerplant_units,
         unit_type="power_plant",
         forecaster=forecaster,
@@ -678,7 +686,7 @@ def setup_world(
         learning_mode=learning_config["learning_mode"],
     )
 
-    str_plants = read_units(
+    storage_units = read_units(
         units_df=storage_units,
         unit_type="storage",
         forecaster=forecaster,
@@ -686,12 +694,19 @@ def setup_world(
         learning_mode=learning_config["learning_mode"],
     )
 
-    dem_plants = read_units(
+    demand_units = read_units(
         units_df=demand_units,
         unit_type="demand",
         forecaster=forecaster,
         world_bidding_strategies=world.bidding_strategies,
         learning_mode=learning_config["learning_mode"],
+    )
+
+    exchange_units = read_units(
+        units_df=exchange_units,
+        unit_type="exchange",
+        forecaster=forecaster,
+        world_bidding_strategies=world.bidding_strategies,
     )
 
     if dsm_units is not None:
@@ -706,11 +721,13 @@ def setup_world(
         for op, op_units in dsm_units.items():
             units[op].extend(op_units)
 
-    for op, op_units in pwp_plants.items():
+    for op, op_units in powerplant_units.items():
         units[op].extend(op_units)
-    for op, op_units in str_plants.items():
+    for op, op_units in storage_units.items():
         units[op].extend(op_units)
-    for op, op_units in dem_plants.items():
+    for op, op_units in demand_units.items():
+        units[op].extend(op_units)
+    for op, op_units in exchange_units.items():
         units[op].extend(op_units)
 
     # if distributed_role is true - there is a manager available
