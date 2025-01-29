@@ -285,8 +285,8 @@ class Learning(Role):
                 logger.info(f"Loading pretrained policies from {directory}!")
                 self.rl_algorithm.load_params(directory)
             else:
-                logger.warning(
-                    f"Folder with pretrained policies {directory} does not exist"
+                raise FileNotFoundError(
+                    f"Directory {directory} does not exist! Cannot load pretrained policies!"
                 )
 
     def update_policy(self) -> None:
