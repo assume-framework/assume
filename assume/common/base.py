@@ -162,6 +162,16 @@ class BaseUnit:
             else:
                 added_volume = order["accepted_volume"]
             self.outputs[product_type].loc[start:end_excl] += added_volume
+
+            # Get the accepted price and store it in the outputs
+            if isinstance(order["accepted_price"], dict):
+                accepted_price = list(order["accepted_price"].values())
+            else:
+                accepted_price = order["accepted_price"]
+            self.outputs[f"{product_type}_accepted_price"].loc[start:end_excl] = (
+                accepted_price
+            )
+
         self.calculate_cashflow(product_type, orderbook)
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(

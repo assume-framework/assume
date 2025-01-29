@@ -20,7 +20,7 @@ tiny:
     validation_episodes_interval: 2
     episodes_collecting_initial_experience: 1
     train_freq: 24h
-    gradient_steps: -1
+    gradient_steps: 24
     batch_size: 64
     gamma: 0.99
     device: cpu
@@ -63,7 +63,7 @@ base:
     training_episodes: 200
     episodes_collecting_initial_experience: 5
     train_freq: 1000h
-    gradient_steps: -1
+    gradient_steps: 1000
     batch_size: 256
     gamma: 0.999
     device: cpu

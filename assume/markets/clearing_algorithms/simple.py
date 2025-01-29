@@ -168,6 +168,11 @@ class PayAsClearRole(MarketRole):
                 order["accepted_price"] = clear_price
             accepted_orders.extend(accepted_product_orders)
 
+            # set accepted volume to 0 and price to clear price for rejected orders
+            for order in rejected_orders:
+                order["accepted_volume"] = 0
+                order["accepted_price"] = clear_price
+
             meta.append(
                 calculate_meta(
                     accepted_supply_orders,

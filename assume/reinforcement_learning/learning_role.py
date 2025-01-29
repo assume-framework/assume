@@ -89,6 +89,8 @@ class Learning(Role):
             self.start = datetime2timestamp(start)
         if end is not None:
             self.end = datetime2timestamp(end)
+            
+        self.datetime = None
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
         self.learning_rate_schedule = learning_config.get(
@@ -109,15 +111,19 @@ class Learning(Role):
         self.episodes_collecting_initial_experience = (
             episodes_collecting_initial_experience
         )
+        # if we continue learning we do not need to collect initial experience
+        if self.continue_learning:
+            self.episodes_collecting_initial_experience = 0
 
-        self.datetime = None
-        self.train_freq = learning_config.get("train_freq", "24h")
+        self.train_freq = learning_config.get("train_freq", "100h")
+        self.gradient_steps = learning_config.get("gradient_steps", 100)
 
-        self.gradient_steps = (
-            int(self.train_freq[:-1])
-            if learning_config.get("gradient_steps", -1) == -1
-            else learning_config["gradient_steps"]
-        )
+        # check that gradient_steps is positive
+        if self.gradient_steps <= 0:
+            raise ValueError(
+                f"gradient_steps need to be positive, got {self.gradient_steps}"
+            )
+
         self.batch_size = learning_config.get("batch_size", 128)
         self.gamma = learning_config.get("gamma", 0.99)
 
@@ -286,8 +292,8 @@ class Learning(Role):
                 logger.info(f"Loading pretrained policies from {directory}!")
                 self.rl_algorithm.load_params(directory)
             else:
-                logger.warning(
-                    f"Folder with pretrained policies {directory} does not exist"
+                raise FileNotFoundError(
+                    f"Directory {directory} does not exist! Cannot load pretrained policies!"
                 )
 
     def update_policy(self) -> None:
@@ -348,6 +354,10 @@ class Learning(Role):
                     logger.info(
                         f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
                     )
+            else:
+                logger.info(
+                    f"Current policy not better than best policy, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+                )
 
             # if we do not see any improvement in the last x evaluation runs we stop the training
             if len(self.rl_eval[metric]) >= self.early_stopping_steps:

@@ -591,40 +591,40 @@ def rename_study_case(path: str, old_key: str, new_key: str):
         yaml.safe_dump(data, file, sort_keys=False)
 
 
-def check_for_tensors(data):
+def convert_tensors(data):
     """
-    Checks if the data contains tensors and converts them to native Python types.
+    Recursively checks if the data contains PyTorch tensors and converts them to
+    native Python types (floats, ints, lists).
 
-    Supports both pandas.Series and list of dictionaries.
+    Supports:
+    - pandas.Series (vectorized for efficiency)
+    - Lists of dictionaries (including nested structures)
+    - Any nested list/dict structure
 
     Args:
-        data (pandas.Series or list of dicts): The data to be checked.
+        data (pandas.Series, list, dict, or other Python data types)
 
     Returns:
-        The data with tensors converted to native Python types.
+        The data with all tensors converted to Python-native types.
     """
     try:
         import torch as th
 
         if isinstance(data, pd.Series):
-            # Vectorized check for tensors
-            tensor_mask = data.apply(lambda x: isinstance(x, th.Tensor))
-            if tensor_mask.any():
-                # Convert tensors to their scalar values
-                data[tensor_mask] = data[tensor_mask].apply(lambda x: x.item())
+            # Vectorized conversion
+            return data.map(lambda x: x.tolist() if isinstance(x, th.Tensor) else x)
+
+        elif isinstance(data, dict):
+            # Recursively convert tensors in a dictionary
+            return {k: convert_tensors(v) for k, v in data.items()}
 
         elif isinstance(data, list):
-            # Check if it's a list of dictionaries
-            if all(isinstance(item, dict) for item in data):
-                for d in data:
-                    for key, value in d.items():
-                        if isinstance(value, th.Tensor):
-                            d[key] = value.item()
+            # Recursively convert tensors in a list
+            return [convert_tensors(item) for item in data]
 
-        else:
-            # If data is a single value, check its type directly
-            if isinstance(data, th.Tensor):
-                data = data.item()
+        elif isinstance(data, th.Tensor):
+            # Handles both scalars and multi-dimensional tensors
+            return data.tolist()  # Converts to Python-native lists/ints/floats
 
     except ImportError:
         # If torch is not installed, return the data unchanged

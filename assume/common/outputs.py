@@ -22,7 +22,7 @@ from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
     calculate_content_size,
-    check_for_tensors,
+    convert_tensors,
     separate_orders,
 )
 
@@ -515,7 +515,11 @@ class WriteOutput(Role):
             if df.empty:
                 continue
 
-            df = df.apply(check_for_tensors)
+            # check for tensors and convert them to floats
+            df = df.apply(convert_tensors)
+
+            # check for any float64 columns and convert them to floats
+            df = df.map(lambda x: float(x) if isinstance(x, np.float64) else x)
 
             if self.export_csv_path:
                 data_path = self.export_csv_path / f"{table}.csv"
