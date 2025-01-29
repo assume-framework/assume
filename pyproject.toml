@@ -50,7 +50,7 @@ learning = [
     "torch >=2.0.1",
 ]
 network = [
-    "pypsa <=0.30.3",
+    "pypsa >=0.32.0",
 ]
 oeds = [
     "demandlib >=0.1.9",
