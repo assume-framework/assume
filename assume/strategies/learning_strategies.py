@@ -193,8 +193,12 @@ class RLStrategy(AbstractLearningStrategy):
         # float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float
 
-        # for definition of observation space
-        self.foresight = kwargs.get("foresight", 24)
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations. This value is fixed for each strategy, as the
+        # neural network architecture is predefined, and the size of the observations must remain consistent.
+        # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
+        # as the observation dimension depends on the foresight value.
+        self.foresight = 24
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -270,7 +274,6 @@ class RLStrategy(AbstractLearningStrategy):
             unit=unit,
             market_id=market_config.market_id,
             start=start,
-            end=end,
         )
 
         # =============================================================================
@@ -394,7 +397,6 @@ class RLStrategy(AbstractLearningStrategy):
         unit: SupportsMinMax,
         market_id: str,
         start: datetime,
-        end: datetime,
     ):
         """
         Constructs a scaled observation tensor based on the unit's forecast data and internal state.
@@ -428,9 +430,6 @@ class RLStrategy(AbstractLearningStrategy):
         ):
             self.prepare_observations(unit, market_id)
 
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - unit.index.freq
-
         # get the forecast length depending on the tme unit considered in the modelled unit
         forecast_len = (self.foresight - 1) * unit.index.freq
 
@@ -440,7 +439,7 @@ class RLStrategy(AbstractLearningStrategy):
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
-        if end_excl + forecast_len > self.scaled_res_load_obs.index[-1]:
+        if start + forecast_len > self.scaled_res_load_obs.index[-1]:
             scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
 
             scaled_res_load_forecast = np.concatenate(
@@ -454,10 +453,10 @@ class RLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_res_load_forecast = self.scaled_res_load_obs.loc[
-                start : end_excl + forecast_len
+                start : start + forecast_len
             ]
 
-        if end_excl + forecast_len > self.scaled_prices_obs.index[-1]:
+        if start + forecast_len > self.scaled_prices_obs.index[-1]:
             scaled_price_forecast = self.scaled_prices_obs.loc[start:]
             scaled_price_forecast = np.concatenate(
                 [
@@ -470,7 +469,7 @@ class RLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_price_forecast = self.scaled_prices_obs.loc[
-                start : end_excl + forecast_len
+                start : start + forecast_len
             ]
 
         # get last accepted bid volume and the current marginal costs of the unit
@@ -709,8 +708,12 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float
 
-        # for definition of observation space
-        self.foresight = kwargs.get("foresight", 24)
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations. This value is fixed for each strategy, as the
+        # neural network architecture is predefined, and the size of the observations must remain consistent.
+        # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
+        # as the observation dimension depends on the foresight value.
+        self.foresight = 24
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -773,7 +776,6 @@ class StorageRLStrategy(AbstractLearningStrategy):
             unit=unit,
             market_id=market_config.market_id,
             start=start,
-            end=end_all,
         )
         # =============================================================================
         # Get the Actions, based on the observations
@@ -989,7 +991,6 @@ class StorageRLStrategy(AbstractLearningStrategy):
         unit: SupportsMinMaxCharge,
         market_id: str,
         start: datetime,
-        end: datetime,
     ):
         """
         Creates a scaled observation tensor from the storage unit's state and forecast data.
@@ -1022,9 +1023,6 @@ class StorageRLStrategy(AbstractLearningStrategy):
         ):
             self.prepare_observations(unit, market_id)
 
-        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        end_excl = end - unit.index.freq
-
         # get the forecast length depending on the tme unit considered in the modelled unit
         forecast_len = (self.foresight - 1) * unit.index.freq
 
@@ -1034,7 +1032,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
         # checks if we are at end of simulation horizon, since we need to change the forecast then
         # for residual load and price forecast and scale them
-        if end_excl + forecast_len > self.scaled_res_load_obs.index[-1]:
+        if start + forecast_len > self.scaled_res_load_obs.index[-1]:
             scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
 
             scaled_res_load_forecast = np.concatenate(
@@ -1048,10 +1046,10 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_res_load_forecast = self.scaled_res_load_obs.loc[
-                start : end_excl + forecast_len
+                start : start + forecast_len
             ]
 
-        if end_excl + forecast_len > self.scaled_prices_obs.index[-1]:
+        if start + forecast_len > self.scaled_prices_obs.index[-1]:
             scaled_price_forecast = self.scaled_prices_obs.loc[start:]
             scaled_price_forecast = np.concatenate(
                 [
@@ -1064,7 +1062,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
         else:
             scaled_price_forecast = self.scaled_prices_obs.loc[
-                start : end_excl + forecast_len
+                start : start + forecast_len
             ]
 
         # get the current soc value
