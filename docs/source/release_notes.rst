@@ -19,6 +19,8 @@ Upcoming Release
 
 **Improvements:**
 
+- **Multi-agent DRL fix**: Addressed a critical bug affecting action sampling, ensuring correct multi-agent learning.
+- **Performance boost**: Optimized training efficiency, achieving **2x overall speedup** and up to **5x on CUDA devices**.
 - **Learning Observation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
   This allows for a more robust scaling of the observation space for future analysis.
 - **Allow Multi-Market Bidding Strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,

@@ -110,13 +110,19 @@ class Learning(Role):
         self.episodes_collecting_initial_experience = max(
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
+        # if we continue learning we do not need to collect initial experience
+        if self.continue_learning:
+            self.episodes_collecting_initial_experience = 0
 
-        self.train_freq = learning_config.get("train_freq", "1h")
-        self.gradient_steps = (
-            int(self.train_freq[:-1])
-            if learning_config.get("gradient_steps", -1) == -1
-            else learning_config["gradient_steps"]
-        )
+        self.train_freq = learning_config.get("train_freq", "100h")
+        self.gradient_steps = learning_config.get("gradient_steps", 100)
+
+        # check that gradient_steps is positive
+        if self.gradient_steps <= 0:
+            raise ValueError(
+                f"gradient_steps need to be positive, got {self.gradient_steps}"
+            )
+
         self.batch_size = learning_config.get("batch_size", 128)
         self.gamma = learning_config.get("gamma", 0.99)
 
@@ -148,7 +154,7 @@ class Learning(Role):
 
         # if enough initial experience was collected according to specifications in learning config
         # turn off initial exploration and go into full learning mode
-        if self.episodes_done > self.episodes_collecting_initial_experience:
+        if self.episodes_done >= self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
@@ -285,8 +291,8 @@ class Learning(Role):
                 logger.info(f"Loading pretrained policies from {directory}!")
                 self.rl_algorithm.load_params(directory)
             else:
-                logger.warning(
-                    f"Folder with pretrained policies {directory} does not exist"
+                raise FileNotFoundError(
+                    f"Directory {directory} does not exist! Cannot load pretrained policies!"
                 )
 
     def update_policy(self) -> None:
@@ -300,7 +306,7 @@ class Learning(Role):
         Notes:
             This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
-        if self.episodes_done > self.episodes_collecting_initial_experience:
+        if self.episodes_done >= self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
@@ -346,6 +352,10 @@ class Learning(Role):
                     logger.info(
                         f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
                     )
+            else:
+                logger.info(
+                    f"Current policy not better than best policy, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+                )
 
             # if we do not see any improvement in the last x evaluation runs we stop the training
             if len(self.rl_eval[metric]) >= self.early_stopping_steps:
