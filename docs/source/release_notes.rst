@@ -12,6 +12,9 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+
+v0.5.1 - (31th January 2025)
+===========================================
 **New Features:**
 
 - **Exchange Unit**: A new unit type for modeling **energy trading** between market participants. It supports **buying (importing) and selling (exporting) energy**, with user-defined prices.
