@@ -463,9 +463,6 @@ class World:
         # if we have learning strategy we need to assign the powerplant to one unit_operator handling all learning units
         unit_params["bidding_strategies"] = bidding_strategies
 
-        if self.learning_mode:
-            self._add_bidding_strategies_to_learning_role(id, bidding_strategies)
-
         # create unit within the unit operator its associated with
         return unit_class(
             id=id,
@@ -474,7 +471,7 @@ class World:
             **unit_params,
         )
 
-    def _add_bidding_strategies_to_learning_role(self, unit_id, bidding_strategies):
+    def add_learning_strategies_to_learning_role(self):
         """
         Add bidding strategies to the learning role for the specified unit.
 
@@ -482,10 +479,11 @@ class World:
             unit_id (str): The identifier for the unit.
             bidding_strategies (dict[str, BaseStrategy]): The bidding strategies for the unit.
         """
-
-        for strategy in bidding_strategies.values():
-            if isinstance(strategy, LearningStrategy):
-                self.learning_role.rl_strats[unit_id] = strategy
+        for unit in self.unit_operators["Operator-RL"].rl_units:
+            for strategy in unit.bidding_strategies.values():
+                if isinstance(strategy, LearningStrategy):
+                    self.learning_role.rl_strats[unit.id] = strategy
+                    break
 
     def _prepare_bidding_strategies(self, unit_params, unit_id):
         """

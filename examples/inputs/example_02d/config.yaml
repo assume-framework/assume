@@ -19,7 +19,7 @@ dam:
     training_episodes: 30
     episodes_collecting_initial_experience: 5
     train_freq: 24h
-    gradient_steps: -1
+    gradient_steps: 24
     batch_size: 128
     gamma: 0.99
     device: cuda:0
@@ -72,7 +72,7 @@ tiny:
     training_episodes: 3
     episodes_collecting_initial_experience: 1
     train_freq: 24h
-    gradient_steps: -1
+    gradient_steps: 24
     batch_size: 128
     gamma: 0.99
     device: cpu
