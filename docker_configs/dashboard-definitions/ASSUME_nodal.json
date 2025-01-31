@@ -987,8 +987,8 @@
     "list": [
       {
         "current": {
-          "text": "example_01d_nodal_case",
-          "value": "example_01d_nodal_case"
+          "text": "example_01d",
+          "value": "example_01d"
         },
         "datasource": {
           "type": "postgres",

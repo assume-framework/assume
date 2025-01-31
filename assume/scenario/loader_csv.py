@@ -1003,10 +1003,10 @@ def run_learning(
 
         world.reset()
 
-    # save the last policies at the end of the training
-    world.learning_role.rl_algorithm.save_params(
-        directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
-    )
+        # save the policies after each episode in case the simulation is stopped or crashes
+        world.learning_role.rl_algorithm.save_params(
+            directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
+        )
 
     # container shutdown implicitly with new initialisation
     logger.info("################")
