@@ -169,6 +169,7 @@ class UnitsOperator(Role):
                 self.context.addr,
                 acl_metadata={
                     "reply_with": market.market_id,
+                    "performative": Performatives.propose,
                 },
             ),
             receiver_addr=market.addr,
@@ -268,6 +269,7 @@ class UnitsOperator(Role):
                 sender_addr=self.context.addr,
                 acl_metadata={
                     "in_reply_to": meta.get("reply_with"),
+                    "performative": Performatives.inform,
                 },
             ),
             receiver_addr=sender_addr(meta),
@@ -327,6 +329,7 @@ class UnitsOperator(Role):
                 "cashflow",
                 "marginal_costs",
                 "total_costs",
+                "heat",
             ]
 
             for key in unit.outputs.keys():
