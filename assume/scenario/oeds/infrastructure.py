@@ -246,6 +246,7 @@ class InfrastructureInterface:
             COALESCE(ev."Laengengrad", {longitude}) as "lon",
             COALESCE(ev."Breitengrad", {latitude}) as "lat",
             COALESCE(ev."Inbetriebnahmedatum", '2010-01-01') as "startDate",
+            COALESCE(ev."DatumEndgueltigeStilllegung", '2050-01-01') as "endDate",
             ev."Nettonennleistung" as "maxPower",
             COALESCE(ev."Technologie", 839) as "turbineTyp",
             ev."GenMastrNummer" as "generatorID"
@@ -470,7 +471,8 @@ class InfrastructureInterface:
             f'"ClusterNordsee" as "nordicSea", '
             f'"ClusterOstsee" as "balticSea", '
             f'"GenMastrNummer" as "generatorID", '
-            f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate" '
+            f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
+            f'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
             f'FROM "EinheitenWind" '
             f'WHERE "EinheitBetriebsstatus" >= 35 '
             f'AND "Lage" = {self.mastr_wind_type[wind_type]} '
@@ -541,6 +543,7 @@ class InfrastructureInterface:
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
+            f'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
             f'"Nettonennleistung" as "maxPower", '
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
@@ -581,6 +584,7 @@ class InfrastructureInterface:
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
+            'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
             f'"Nettonennleistung" as "maxPower", '
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
@@ -822,7 +826,7 @@ class InfrastructureInterface:
         start: datetime,
         end: datetime,
     ):
-        """returns price of CO2 equivalents per ton from EU ETS trading"""
+        """returns coal price from instat_pl converted to €/kWh"""
         query = f"SELECT date as time, price_eur_per_kwh*1000 as price_eur_per_mwh FROM coal_price WHERE date BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'"
         with self.databases["instrat_pl"].connect() as connection:
             return pd.read_sql_query(query, connection, index_col="time")[
@@ -834,7 +838,7 @@ class InfrastructureInterface:
         start: datetime,
         end: datetime,
     ):
-        """returns price of CO2 equivalents per ton from EU ETS trading"""
+        """returns gas price from instrat_pl converted to €/MWh"""
         query = f"SELECT date as time, price_eur_per_kwh*1000 as price_eur_per_mwh FROM gas_price WHERE date BETWEEN '{start.isoformat()}' AND '{end.isoformat()}'"
         with self.databases["instrat_pl"].connect() as connection:
             return pd.read_sql_query(query, connection, index_col="time")[
@@ -873,6 +877,7 @@ class InfrastructureInterface:
 
     def get_offshore_wind_series(self, start: datetime, end: datetime):
         area = "DEF02"
+        # TODO get specific weather of each plant
         latitude, longitude = self.get_lat_lon_area(area)
         weather_df = self.get_weather_param(
             WEATHER_PARAMS_ECMWF,

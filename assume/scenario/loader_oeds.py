@@ -13,6 +13,7 @@ import pandas as pd
 from dateutil import rrule as rr
 
 from assume import World
+from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
@@ -31,6 +32,7 @@ def load_oeds(
     bidding_strategies: dict[str, str],
     nuts_config: list[str] = [],
     random=True,
+    entsoe_demand=True,
 ):
     """
     This initializes a scenario using the open-energy-data-server
@@ -79,13 +81,15 @@ def load_oeds(
         world.add_market(mo_id, market_config)
 
     fuel_prices = {  # €/MWh
-        "hard coal": infra_interface.get_coal_price(start, end),  # 8.6
-        "lignite": 1.8,
+        # prices taken from
+        # https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/studies/DE2024_ISE_Studie_Stromgestehungskosten_Erneuerbare_Energien.pdf
+        "hard coal": infra_interface.get_coal_price(start, end),  # 11.6
+        "lignite": 2.3,
         "oil": infra_interface.get_oil_price(start, end),  # 22
         "gas": infra_interface.get_gas_price(start, end),  # 26
         "biomass": 20,
-        "nuclear": 1,
-        "co2": infra_interface.get_co2_price(start, end),  # 1€/tCO2
+        "nuclear": 8,
+        "co2": infra_interface.get_co2_price(start, end),  # 20€/tCO2eq
     }
     for name in fuel_prices.keys():
         if not isinstance(fuel_prices[name], float | int):
@@ -116,9 +120,11 @@ def load_oeds(
                 co2_price=0,
             ),
         )
+
     # total german demand if area is not set
-    demand = infra_interface.get_country_demand(start, end, "DE")
-    demand = demand.resample("h").mean() / len(nuts_config)
+    if entsoe_demand:
+        demand = infra_interface.get_country_demand(start, end, "DE")
+        demand = demand.resample("h").mean() / len(nuts_config)
 
     for area in nuts_config:
         logger.info(f"loading config {area} for {year}")
@@ -127,13 +133,14 @@ def load_oeds(
             logger.info("query database time series")
             if area == "DE":
                 # for each area - add demand and generation
-                demand = infra_interface.get_country_demand(start, end, "DE")
+                demand_save = infra_interface.get_country_demand(start, end, "DE")
                 renewables = infra_interface.get_country_renewables(start, end, "DE")
                 solar = renewables["solar"].resample("1h").mean()
                 wind = renewables["wind_onshore"].resample("1h").mean()
             else:
                 # demand from OEP is less accurate but extrapolates better
-                demand = infra_interface.get_demand_series_in_area(area, year)
+                if not entsoe_demand:
+                    demand_save = infra_interface.get_demand_series_in_area(area, year)
                 # TODO add battery_power as storage
                 solar, wind, battery_power = (
                     infra_interface.get_renewables_series_in_area(
@@ -143,11 +150,14 @@ def load_oeds(
                     )
                 )
 
-            demand = demand.resample("h").mean()
+            demand_save = demand.resample("h").mean()
             # demand in MW
+            if not entsoe_demand:
+                demand = demand_save
+            
             try:
                 config_path.mkdir(parents=True, exist_ok=True)
-                demand.to_csv(config_path / "demand.csv")
+                demand_save.to_csv(config_path / "demand.csv")
                 solar.to_csv(config_path / "solar.csv")
                 if isinstance(wind, float):
                     logger.info(wind, area, year)
@@ -157,9 +167,10 @@ def load_oeds(
         else:
             logger.info("use existing local time series")
             # demand from OEP is less accurate but extrapolates better
-            demand = pd.read_csv(
-                config_path / "demand.csv", index_col=0, parse_dates=True
-            ).squeeze()
+            if not entsoe_demand:
+                demand = pd.read_csv(
+                    config_path / "demand.csv", index_col=0, parse_dates=True
+                ).squeeze()
             solar = pd.read_csv(
                 config_path / "solar.csv", index_col=0, parse_dates=True
             ).squeeze()
@@ -232,7 +243,7 @@ def load_oeds(
         biomass["maxPower"] /= 2
 
         if random:
-            randomness = np.random.uniform(-5, 5)
+            randomness = np.random.uniform(-20, 20)
         else:
             randomness = 0
 
@@ -315,6 +326,12 @@ def load_oeds(
                     randomness = np.random.uniform(-5, 5)
                 else:
                     randomness = 0
+
+                availability = 1
+                if plant["endDate"] < end:
+                    availability = FastSeries(index, 1)
+                    availability[availability.index > end] = 0
+
                 world.add_unit(
                     f"conventional{area}_{fuel_type}_{i}",
                     "power_plant",
@@ -335,7 +352,7 @@ def load_oeds(
                     },
                     NaiveForecast(
                         index,
-                        availability=1,  # TODO mid-year availability for created and removed power plants
+                        availability=availability,
                         fuel_price=fuel_prices[fuel_type] + randomness,
                         co2_price=fuel_prices["co2"],
                     ),
