@@ -110,6 +110,7 @@ class SupportStrategy(NaiveSingleBidStrategy):
         self.contract_amount_fraction = contract_amount_fraction
         self.contract_value = contract_value
         self.evaluation_frequency = evaluation_frequency
+        self.eligible_lambda = is_co2emissionless
 
     def calculate_bids(
         self,
@@ -161,7 +162,7 @@ class SupportStrategy(NaiveSingleBidStrategy):
                         "sender_id": unit.id,
                         "contract": contract_type,
                         # by default only bid on co2 emissionless contracts
-                        "eligible_lambda": is_co2emissionless,
+                        "eligible_lambda": self.eligible_lambda,
                         # lambda u: u.technology in ["nuclear"],
                         "evaluation_frequency": self.evaluation_frequency,
                         "node": unit.node,
