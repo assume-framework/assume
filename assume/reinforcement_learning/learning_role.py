@@ -108,8 +108,11 @@ class Learning(Role):
         else:
             self.calc_noise_from_progress = lambda x: noise_dt
 
-        self.episodes_collecting_initial_experience = (
-            episodes_collecting_initial_experience
+        # if we do not have initial experience collected we will get an error as no samples are available on the
+        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
+
+        self.episodes_collecting_initial_experience = max(
+            learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
         # if we continue learning we do not need to collect initial experience
         if self.continue_learning:

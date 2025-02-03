@@ -171,7 +171,7 @@ if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)
     scenario = "world_pypsa"
-    study_case = "ac_dc_meshed"
+    study_case = "scigrid_de"
     # "pay_as_clear", "redispatch" or "nodal"
     market_mechanism = "complex_clearing"
 
@@ -200,6 +200,7 @@ if __name__ == "__main__":
             additional_fields=["node", "max_power", "min_power", "bid_type"],
             maximum_bid_volume=1e9,
             maximum_bid_price=1e9,
+            param_dict={"log_flows": True},
         )
     ]
     if market_mechanism == "redispatch":

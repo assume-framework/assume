@@ -5249,8 +5249,8 @@
     ]
   },
   "time": {
-    "from": "2022-12-30T10:00:00.000Z",
-    "to": "2023-01-06T14:00:00.000Z"
+    "from": "2019-01-01T10:00:00.000Z",
+    "to": "2019-01-06T14:00:00.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -5264,7 +5264,7 @@
   },
   "timezone": "utc",
   "title": "ASSUME: Main overview",
-  "uid": "ee6wyk2qb0ruoe",
-  "version": 19,
+  "uid": "mQ3Lvkr4k",
+  "version": 2,
   "weekStart": ""
 }
