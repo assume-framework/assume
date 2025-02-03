@@ -69,23 +69,22 @@ It then makes sense to reschedule the market clearing all 4 hours, but it would 
 
 .. mermaid::
 
-   gantt
-      title Market Schedule Simple count 4
-      dateFormat  YYY-MM-DD HH:mm
-      axisFormat %H:%M
-      section First
-      Bidding00 EOM          :a1, 2019-01-01 12:00, 1h
-      Delivery01 EOM         :2019-01-01 14:00, 1h
-      Delivery02 EOM         :2019-01-01 15:00, 1h
-      Delivery03 EOM         :2019-01-01 16:00, 1h
-      Delivery04 EOM         :2019-01-01 17:00, 1h
-      section Second
-      Bidding10 EOM          :a2, 2019-01-01 13:00, 1h
-      Delivery11 EOM         :2019-01-01 15:00, 1h
-      Delivery12 EOM         :2019-01-01 16:00, 1h
-      Delivery13 EOM         :2019-01-01 17:00, 1h
-      Delivery14 EOM         :2019-01-01 18:00, 1h
-
+  gantt
+    title Market Schedule Simple count 4
+    dateFormat  YYY-MM-DD HH:mm
+    axisFormat %H:%M
+    section First
+    Bidding00 EOM          :a1, 2019-01-01 12:00, 1h
+    Delivery01 EOM         :2019-01-01 14:00, 1h
+    Delivery02 EOM         :2019-01-01 15:00, 1h
+    Delivery03 EOM         :2019-01-01 16:00, 1h
+    Delivery04 EOM         :2019-01-01 17:00, 1h
+    section Second
+    Bidding10 EOM          :a2, 2019-01-01 13:00, 1h
+    Delivery11 EOM         :2019-01-01 15:00, 1h
+    Delivery12 EOM         :2019-01-01 16:00, 1h
+    Delivery13 EOM         :2019-01-01 17:00, 1h
+    Delivery14 EOM         :2019-01-01 18:00, 1h
 
 Please note, Trade Convention
 -----------------------------
@@ -144,21 +143,21 @@ Due to the configuration of the market opening frequency and duration, the timet
 
 .. mermaid::
 
-   gantt
-      title Market Schedule
-      dateFormat  YYY-MM-DD HH:mm
-      axisFormat %H:%M
-      section EOM
-      Bidding01 EOM          :a1, 2019-01-01 01:00, 1h
-      Delivery01 EOM         :2019-01-01 01:00, 1h
-      Bidding02 EOM          :a2, 2019-01-01 02:00, 1h
-      Delivery02 EOM         :2019-01-01 02:00, 1h
-      Bidding03 EOM          :a3, 2019-01-01 03:00, 1h
-      Delivery03 EOM         :2019-01-01 03:00, 1h
-      Bidding04 EOM          :a4, 2019-01-01 04:00, 1h
-      Delivery04 EOM         :2019-01-01 04:00, 1h
-      section CRM
-      Bidding CRM            :crm01, 2019-01-01 00:00, 30m
-      Delivery CRM           :crm02, 2019-01-01 01:00, 4h
-      Bidding CRM            :crm03, 2019-01-01 04:00, 30m
-      Delivery CRM           :crm04, 2019-01-01 05:00, 4h
+  gantt
+    title Market Schedule
+    dateFormat  YYY-MM-DD HH:mm
+    axisFormat %H:%M
+    section EOM
+    Bidding01 EOM          :a1, 2019-01-01 01:00, 1h
+    Delivery01 EOM         :2019-01-01 01:00, 1h
+    Bidding02 EOM          :a2, 2019-01-01 02:00, 1h
+    Delivery02 EOM         :2019-01-01 02:00, 1h
+    Bidding03 EOM          :a3, 2019-01-01 03:00, 1h
+    Delivery03 EOM         :2019-01-01 03:00, 1h
+    Bidding04 EOM          :a4, 2019-01-01 04:00, 1h
+    Delivery04 EOM         :2019-01-01 04:00, 1h
+    section CRM
+    Bidding CRM            :crm01, 2019-01-01 00:00, 30m
+    Delivery CRM           :crm02, 2019-01-01 01:00, 4h
+    Bidding CRM            :crm03, 2019-01-01 04:00, 30m
+    Delivery CRM           :crm04, 2019-01-01 05:00, 4h
