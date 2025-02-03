@@ -2,24 +2,26 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-version: "3.9"
 services:
   assume_db:
-    image: timescaledev/timescaledb-ha:pg15-oss
+    image: timescaledev/timescaledb-ha:pg17-oss
     # smaller without postgis support:
-    # image: timescale/timescaledb:latest-pg15
+    # image: timescale/timescaledb:latest-pg17
     container_name: assume_db
     restart: always
+    # running as 0 removes the need to create the volume bind-mount beforehand
+    user: "0:0"
     environment:
       - POSTGRES_USER=assume
       - POSTGRES_PASSWORD=assume
       - POSTGRES_DB=assume
       - TS_TUNE_MAX_CONNS=500
+      # pgdata is /home/postgres/pgdata otherwise
+      # https://github.com/timescale/timescaledb-docker-ha/blob/345ceabef65c808ec6aaaa61a8b6ca568ccad7d3/Dockerfile#L460
+      - PGDATA=/var/lib/postgresql/data
     volumes:
       # needed for normal image
-      #- ./assume-db:/var/lib/postgresql/data
-      # /home/postgres/data is path for timescaledev image
-      - ./assume-db:/home/postgres/pgdata
+      - ./assume-db:/var/lib/postgresql/data
     ports:
       - 5432:5432
     deploy:
