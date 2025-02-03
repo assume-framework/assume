@@ -372,7 +372,7 @@ class Learning(Role):
 
                     if avg_change < self.early_stopping_threshold:
                         logger.info(
-                            f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
+                            f"Stopping training as no improvement above {self.early_stopping_threshold*100}% in last {self.early_stopping_steps} evaluations for {metric}"
                         )
                         if (
                             self.learning_rate_schedule or self.action_noise_schedule

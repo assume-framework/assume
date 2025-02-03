@@ -269,8 +269,7 @@ class RLStrategy(AbstractLearningStrategy):
         # 2. Get the Actions, based on the observations
         # =============================================================================
         actions, noise = self.get_actions(next_observation)
-        # if not self.learning_mode and not self.perform_evaluation:
-        #     actions = th.clamp(actions, next_observation[-1], None)
+
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
@@ -557,11 +556,14 @@ class RLStrategy(AbstractLearningStrategy):
         operational_cost = 0.0
 
         accepted_volume_total = 0
+        offered_volume_total = 0
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
             accepted_volume = order.get("accepted_volume", 0)
             accepted_volume_total += accepted_volume
+
+            offered_volume_total += order["volume"]
 
             # calculate profit as income - running_cost from this event
             order_income = market_clearing_price * accepted_volume * duration
@@ -590,17 +592,17 @@ class RLStrategy(AbstractLearningStrategy):
         # as the loss of income we have because we are not running at full power
         opportunity_cost = (
             (market_clearing_price - marginal_cost)
-            * (unit.max_power - accepted_volume_total)
+            * (offered_volume_total - accepted_volume_total)
             * duration
         )
 
         # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
         opportunity_cost = max(opportunity_cost, 0)
 
-        # set regret_scale as 0.2 if partially dispatched, 0.5 if not dispatched at all
-        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 1
+        # set regret_scale as 0.1 if dispatched above min. power, 0.5 if not dispatched at all
+        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 1.0
 
-        # ---------------------------
+        # --------------------
         # 4.1 Calculate Reward
         # The straight forward implementation would be reward = profit, yet we would like to give the agent more guidance
         # in the learning process, so we add a regret term to the reward, which is the opportunity cost
