@@ -167,6 +167,7 @@ def load_dsm_units(
         "unit_type",
         "node",
         "flexibility_measure",
+        "is_prosumer",
         "congestion_threshold",
         "peak_load_cap",
     ]
