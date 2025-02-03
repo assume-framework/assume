@@ -41,7 +41,7 @@ class ComplexDmasClearingRole(MarketRole):
             logger.setLevel(logging.WARNING)
 
     def clear(
-        self, orderbook: Orderbook, market_products: list[MarketProduct]
+        self, accepted: Orderbook, market_products: list[MarketProduct]
     ) -> (Orderbook, Orderbook, list[dict]):
         """
         This performs the process of "market clearing" for a given market agent and its orders.
@@ -65,6 +65,12 @@ class ComplexDmasClearingRole(MarketRole):
         # assumes same duration for all given products
         start = market_products[0][0]
         duration = market_products[0][1] - start
+        s = start
+        for market_product in market_products[1:]:
+            if market_product[0] != s + duration:
+                raise ValueError("Market products of one clearing must align")
+            s = market_product[0]
+
         T = len(market_products)
         t_range = np.arange(T)
         # Orders have (block, hour, name) as key and (price, volume, link) as values
@@ -85,7 +91,7 @@ class ComplexDmasClearingRole(MarketRole):
         agent_addrs = {}
         unit_ids = {}
 
-        for order in orderbook:
+        for order in accepted:
             order_type = None
             if order["exclusive_id"] is not None:
                 if order["block_id"] is None and order["link"] is None:
@@ -198,7 +204,7 @@ class ComplexDmasClearingRole(MarketRole):
                     parent_hours = orders_local[(parent_id, agent)]
                     model.enable_child_block.add(
                         quicksum(model.use_linked_order[block, h, agent] for h in hours)
-                        <= 2
+                        <= 100  # this factor is arbitrary and means that if we took at least 0.01 from the linked block, we can use our full block
                         * quicksum(
                             model.use_linked_order[parent_id, h, agent]
                             for h in parent_hours
@@ -378,9 +384,8 @@ class ComplexDmasClearingRole(MarketRole):
         logger.info(f"Got {sum_magic_source:.2f} kWh from Magic source")
         # -> determine used ask orders
 
-        used_orders = {type_: {} for type_ in model_vars.keys()}
-
-        orderbook = []
+        accepted = []
+        rejected = []
         for t in t_range:
             t = int(t)
             bstart = start + duration * t
@@ -389,63 +394,65 @@ class ComplexDmasClearingRole(MarketRole):
             for type_ in model_vars.keys():
                 for block, name in index_orders[type_][t]:
                     if type_ in ["single_ask", "linked_ask"]:
-                        if model_vars[type_][block, t, name].value:
-                            f = model_vars[type_][block, t, name].value
-                            link = None
-                            if "linked" in type_:
-                                prc, vol, link = orders[type_][block, t, name]
-                                accepted_volume = vol * f
-                                p = (prc, accepted_volume, link)
-                            else:
-                                prc, vol = orders[type_][block, t, name]
-                                accepted_volume = vol * f
-                                p = (prc, accepted_volume)
-                            used_orders[type_][(block, t, name)] = p
-                            o: Order = {
-                                "start_time": bstart,
-                                "end_time": end,
-                                "only_hours": None,
-                                "price": prc,
-                                "volume": vol,
-                                "accepted_price": clear_price,
-                                "accepted_volume": accepted_volume,
-                                "block_id": block,
-                                "link": link,
-                                "exclusive_id": None,
-                                "agent_addr": agent_addrs[name],
-                                "bid_id": bid_ids[name],
-                                "unit_id": unit_ids[name],
-                            }
-                            orderbook.append(o)
+                        # usage from 0 to 1
+                        usage = model_vars[type_][block, t, name].value or 0
+                        link = None
+                        if "linked" in type_:
+                            prc, vol, link = orders[type_][block, t, name]
+                        else:
+                            prc, vol = orders[type_][block, t, name]
+                        o: Order = {
+                            "start_time": bstart,
+                            "end_time": end,
+                            "only_hours": None,
+                            "price": prc,
+                            "volume": vol,
+                            "accepted_price": clear_price,
+                            "accepted_volume": vol * usage,
+                            "block_id": block,
+                            "link": link,
+                            "exclusive_id": None,
+                            "agent_addr": agent_addrs[name],
+                            "bid_id": bid_ids[name],
+                            "unit_id": unit_ids[name],
+                        }
+                        if usage > 0:
+                            accepted.append(o)
+                        else:
+                            rejected.append(o)
 
                     elif type_ == "exclusive_ask":
-                        if model_vars[type_][block, name].value:
-                            prc, vol = orders[type_][block, t, name]
-                            used_orders[type_][(block, t, name)] = (prc, vol)
-                            o: Order = {
-                                "start_time": bstart,
-                                "end_time": end,
-                                "only_hours": None,
-                                "price": prc,
-                                "volume": vol,
-                                "accepted_price": prc,
-                                "accepted_volume": vol,
-                                "block_id": None,
-                                "link": None,
-                                "exclusive_id": block,
-                                "agent_addr": agent_addrs[name],
-                                "bid_id": bid_ids[name],
-                                "unit_id": unit_ids[name],
-                            }
-                            orderbook.append(o)
+                        # usage from 0 to 1
+                        usage = model_vars[type_][block, t, name].value or 0
+
+                        prc, vol = orders[type_][block, t, name]
+                        o: Order = {
+                            "start_time": bstart,
+                            "end_time": end,
+                            "only_hours": None,
+                            "price": prc,
+                            "volume": vol,
+                            "accepted_price": prc,
+                            "accepted_volume": vol * usage,
+                            "block_id": None,
+                            "link": None,
+                            "exclusive_id": block,
+                            "agent_addr": agent_addrs[name],
+                            "bid_id": bid_ids[name],
+                            "unit_id": unit_ids[name],
+                        }
+                        if usage > 0:
+                            accepted.append(o)
+                        else:
+                            rejected.append(o)
 
         for key, val in orders["single_bid"].items():
             block, hour, name = key
             _, vol = val
             prc = prices["price"][hour]
-            bstart = start + duration * t
-            end = start + duration * (t + 1)
-            orderbook.append(
+            bstart = start + duration * hour
+            end = start + duration * (hour + 1)
+            accepted.append(
                 {
                     "start_time": bstart,
                     "end_time": end,
@@ -463,43 +470,9 @@ class ComplexDmasClearingRole(MarketRole):
                 }
             )
 
-        # -> build dataframe
-        for type_ in model_vars.keys():
-            orders_df = pd.DataFrame.from_dict(used_orders[type_], orient="index")
-            orders_df.index = pd.MultiIndex.from_tuples(
-                orders_df.index, names=["block_id", "hour", "name"]
-            )
-
-            if "linked" in type_:
-                if orders_df.empty:
-                    orders_df["price"] = []
-                    orders_df["volume"] = []
-                    orders_df["link"] = []
-                else:
-                    orders_df.columns = ["price", "volume", "link"]
-            else:
-                if orders_df.empty:
-                    orders_df["price"] = []
-                    orders_df["volume"] = []
-                else:
-                    orders_df.columns = ["price", "volume"]
-
-            used_orders[type_] = orders_df.copy()
-        # -> return all bid orders
-        used_bid_orders = pd.DataFrame.from_dict(orders["single_bid"], orient="index")
-        used_bid_orders.index = pd.MultiIndex.from_tuples(
-            used_bid_orders.index, names=["block_id", "hour", "name"]
-        )
-        if used_bid_orders.empty:
-            used_bid_orders["price"] = []
-            used_bid_orders["volume"] = []
-        else:
-            used_bid_orders.columns = ["price", "volume"]
-
         prices["volume"] = volumes
         prices["magic_source"] = [get_real_number(m) for m in magic_source]
 
-        rejected = []
         meta = []
         for t in t_range:
             t = int(t)
@@ -526,4 +499,4 @@ class ComplexDmasClearingRole(MarketRole):
         # write network flows here if applicable
         flows = []
 
-        return orderbook, rejected, meta, flows
+        return accepted, rejected, meta, flows

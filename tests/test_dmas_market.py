@@ -610,3 +610,116 @@ def test_clearing():
     # mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
     # accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
     # assert meta[0]["price"] == 65
+
+
+def test_clearing_multi_hours():
+    start = datetime(2018, 1, 1, 1)
+    end = datetime(2018, 1, 1, 2)
+    start2 = datetime(2018, 1, 1, 2)
+    end2 = datetime(2018, 1, 1, 3)
+    products = [(start, end, None), (start2, end2, None)]
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": 0.2,
+            "volume": 4900,
+            "node": "DE1",
+            "block_id": None,
+            "link": None,
+            "exclusive_id": None,
+            "agent_addr": ("world", "renewablesDE1"),
+            "bid_id": "renewablesDE1_wind_1",
+            "unit_id": "renewablesDE1_wind",
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": 65,  # .000505,
+            "volume": 81.0,
+            "node": "DE1",
+            "block_id": None,
+            "link": None,
+            "exclusive_id": None,
+            "agent_addr": ("world", "conventionalDE1"),
+            "bid_id": "conventionalDE1_gas_34_1",
+            "unit_id": "conventionalDE1_gas_34",
+        },
+        {
+            "start_time": start,
+            "end_time": end,
+            "only_hours": None,
+            "price": 1000.0,
+            "volume": -4832,
+            "node": "DE1",
+            "block_id": None,
+            "link": None,
+            "exclusive_id": None,
+            "agent_addr": ("world", "demandDE1"),
+            "bid_id": "demandDE11_1",
+            "unit_id": "demandDE11",
+        },
+        {
+            "start_time": start2,
+            "end_time": end2,
+            "only_hours": None,
+            "price": 0.2,
+            "volume": 4800,
+            "node": "DE1",
+            "block_id": None,
+            "link": None,
+            "exclusive_id": None,
+            "agent_addr": ("world", "renewablesDE1"),
+            "bid_id": "renewablesDE1_wind_2",
+            "unit_id": "renewablesDE1_wind",
+        },
+        {
+            "start_time": start2,
+            "end_time": end2,
+            "only_hours": None,
+            "price": 65,  # .000505,
+            "volume": 81.0,
+            "node": "DE1",
+            "block_id": None,
+            "link": None,
+            "exclusive_id": None,
+            "agent_addr": ("world", "conventionalDE1"),
+            "bid_id": "conventionalDE1_gas_34_2",
+            "unit_id": "conventionalDE1_gas_34",
+        },
+        {
+            "start_time": start2,
+            "end_time": end2,
+            "only_hours": None,
+            "price": 1000.0,
+            "volume": -4832,
+            "node": "DE1",
+            "block_id": None,
+            "link": None,
+            "exclusive_id": None,
+            "agent_addr": ("world", "demandDE1"),
+            "bid_id": "demandDE11_2",
+            "unit_id": "demandDE11",
+        },
+    ]
+
+    simple_dayahead_auction_config.maximum_bid_price = 1e9
+    mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
+    assert meta[0]["price"] == 0.2
+    assert meta[1]["price"] == 65
+    assert meta[0]["demand_volume"] == 4832
+    assert meta[1]["demand_volume"] == 4832
+
+    """
+    the following shows a flaw in the usage of GLPK.
+    it does not occur for highs or CBC
+    maximum_bid_price should not be too high.. Some floating point issue in pyomo..?
+    I don't know why this happens with GLPK
+    """
+    # simple_dayahead_auction_config.maximum_bid_price = 1e12
+    # mr = ComplexDmasClearingRole(simple_dayahead_auction_config)
+    # accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
+    # assert meta[0]["price"] == 65

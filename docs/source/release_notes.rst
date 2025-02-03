@@ -70,6 +70,8 @@ v0.5.0 - (10th December 2024)
   if the total duration of the market products plus first delivery time fits before the simulation end.
 - **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
 
+**Full Changelog**: `v0.4.3...v0.5.0 <https://github.com/assume-framework/assume/compare/v0.4.2...v0.5.0>`_
+
 v0.4.3 - (11th November 2024)
 ===========================================
 
@@ -81,7 +83,7 @@ v0.4.3 - (11th November 2024)
 
 - **Simulation**: Delete simulation results for same simulation prior to run (as before v0.4.2)
 
-**Full Changelog**: [v0.4.2...v0.4.3](https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3)
+**Full Changelog**: `v0.4.2...v0.4.3 <https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3>`_
 
 v0.4.2 - (5th November 2024)
 ===========================================
@@ -115,7 +117,7 @@ v0.4.2 - (5th November 2024)
 
 - @HafnerMichael made their first contribution with improvements to cashflow calculations and development of residential DST components.
 
-**Full Changelog**: [v0.4.1...v0.4.2](https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2)
+**Full Changelog**: `v0.4.1...v0.4.2 <https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2>`_
 
 
 v0.4.1 (8th October 2024)
@@ -139,6 +141,8 @@ v0.4.1 (8th October 2024)
 - add compatibility with pyyaml-include (#421)
 - make complex clearing compatible to RL (#430)
 - pin PyPSA to remove DeprecationWarnings for now (#431)
+
+**Full Changelog**: `v0.4.0...v0.4.1 <https://github.com/assume-framework/assume/compare/v0.4.0...v0.4.1>`_
 
 v0.4.0 (8th August 2024)
 =========================================
@@ -206,6 +210,8 @@ v0.4.0 (8th August 2024)
 
 - Added closing word and final dashboard link to interoperability tutorial
 
+
+**Full Changelog**: `v0.3.7...v0.4.0 <https://github.com/assume-framework/assume/compare/v0.3.7...v0.4.0>`_
 
 v0.3.7 (21st March 2024)
 =========================
