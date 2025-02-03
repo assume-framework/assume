@@ -89,7 +89,7 @@ class Learning(Role):
             self.start = datetime2timestamp(start)
         if end is not None:
             self.end = datetime2timestamp(end)
-            
+
         self.datetime = None
 
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
@@ -308,8 +308,8 @@ class Learning(Role):
             This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
         if self.episodes_done >= self.episodes_collecting_initial_experience:
-            learning_rate, critic_losses = self.rl_algorithm.update_policy()
-            self.write_rl_critic_params_to_output(learning_rate, critic_losses)
+            learning_rate, unit_params = self.rl_algorithm.update_policy()
+            self.write_rl_critic_params_to_output(learning_rate, unit_params)
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """
@@ -391,7 +391,7 @@ class Learning(Role):
             return False
 
     def write_rl_critic_params_to_output(
-        self, learning_rate: float, critic_losses_list: list[dict]
+        self, learning_rate: float, unit_params_list: list[dict]
     ) -> None:
         """
         Writes learning parameters and critic losses to output at specified time intervals.
@@ -404,7 +404,7 @@ class Learning(Role):
         ----------
         learning_rate : float
             The current learning rate used in training.
-        critic_losses_list : list[dict]
+        unit_params_list : list[dict]
             A list of dictionaries containing critic losses for each time step.
             Each dictionary maps critic names to their corresponding loss values.
         """
@@ -423,14 +423,16 @@ class Learning(Role):
         output_list = [
             {
                 "unit": u_id,
-                "critic_loss": loss,
+                "critic_loss": params["loss"],
+                "total_grad_norm": params["total_grad_norm"],
+                "max_grad_norm": params["max_grad_norm"],
                 "learning_rate": learning_rate,
                 "datetime": self.datetime
                 + ((time_step * self.gradient_steps + gradient_step) * freq_timedelta),
             }
             for time_step in range(time_steps)
             for gradient_step in range(self.gradient_steps)
-            for u_id, loss in critic_losses_list[gradient_step].items()
+            for u_id, params in unit_params_list[gradient_step].items()
         ]
 
         if db_addr:

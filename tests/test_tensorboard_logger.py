@@ -45,6 +45,8 @@ def sample_df():
             "reward": [0.5, 0.7],
             "regret": [0.1, 0.2],
             "loss": [0.01, 0.02],
+            "total_grad_norm": [3, 5],
+            "max_grad_norm": [5, 7],
             "lr": [0.001, 0.001],
             "noise_0": [0.1, 0.1],
             "noise_1": [0.2, 0.2],
@@ -104,8 +106,11 @@ def test_update_tensorboard_training_mode(
         "train/b) profit",
         "train/c) regret",
         "train/d) loss",
-        "train/e) learning rate",
-        "train/f) noise",
+        "train/e) total_grad_norm",
+        "train/f) max_grad_norm",
+        "train/g) learning_rate",
+        "train/h) noise",
     ]
-    print(calls)
+    print(metrics_logged)
+    print(expected_metrics)
     assert all(metric in metrics_logged for metric in expected_metrics)

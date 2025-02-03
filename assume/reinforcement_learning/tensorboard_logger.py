@@ -129,6 +129,8 @@ class TensorBoardLogger:
         train_columns = """,
             AVG(regret) AS regret,
             AVG(critic_loss) AS loss,
+            AVG(total_grad_norm) AS total_grad_norm,
+            MAX(max_grad_norm) AS max_grad_norm,
             AVG(learning_rate) AS lr,
             AVG(exploration_noise_0) AS noise_0,
             AVG(exploration_noise_1) AS noise_1
@@ -181,7 +183,9 @@ class TensorBoardLogger:
 
                 # Build metrics dictionary
                 unit_metrics = ["reward", "profit"] + (
-                    ["regret", "loss"] if mode == "train" else []
+                    ["regret", "loss", "total_grad_norm", "max_grad_norm"]
+                    if mode == "train"
+                    else []
                 )
                 metric_dicts = {
                     metric: {
@@ -193,11 +197,11 @@ class TensorBoardLogger:
 
                 # Add training-specific metrics
                 if mode == "train":
-                    metric_dicts["learning rate"] = {"": time_df["lr"].iloc[0]}
+                    metric_dicts["learning_rate"] = {"": time_df["lr"].iloc[0]}
                     metric_dicts["noise"] = {
                         f"{i}": time_df[f"noise_{i}"].abs().mean() for i in range(2)
                     }
-                plot_order = ["a)", "b)", "c)", "d)", "e)", "f)"]
+                plot_order = ["a)", "b)", "c)", "d)", "e)", "f)", "g)", "h)"]
                 # Write to tensorboard
                 for order, (metric, values) in enumerate(metric_dicts.items()):
                     self.writer.add_scalars(

@@ -283,10 +283,15 @@ class WriteOutput(Role):
         else:
             df["initial_exploration"] = False
         # Add missing rl_critic_params columns in case of initial_exploration
-        if "critic_loss" not in df.columns:
-            df["critic_loss"] = np.nan
-        if "learning_rate" not in df.columns:
-            df["learning_rate"] = np.nan
+        required_columns = [
+            "critic_loss",
+            "total_grad_norm",
+            "max_grad_norm",
+            "learning_rate",
+        ]
+        for col in required_columns:
+            if col not in df.columns:
+                df[col] = np.nan
 
         return df
 
