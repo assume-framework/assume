@@ -316,7 +316,11 @@ class WriteOutput(Role):
             df["evaluation_frequency"] = df["evaluation_frequency"].astype(str)
 
         # Remove unnecessary columns (use a list to minimize deletion calls)
-        df.drop(columns=["only_hours", "agent_addr"], inplace=True, errors=False)
+        df.drop(
+            columns=["only_hours", "agent_addr", "contractor_addr"],
+            inplace=True,
+            errors="ignore",
+        )
 
         # Add missing columns with defaults
         for col in ["bid_type", "node"]:
