@@ -749,6 +749,9 @@ def setup_world(
             for unit in op_units:
                 world.add_unit(**unit)
 
+    if world.learning_mode or world.perform_evaluation:
+        world.add_learning_strategies_to_learning_role()
+
     if (
         world.learning_mode
         and world.learning_role is not None
@@ -893,7 +896,7 @@ def run_learning(
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
 
-    if Path(save_path).is_dir():
+    if Path(save_path).is_dir() and not world.learning_config["continue_learning"]:
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
             f"{save_path=} exists - should we overwrite current learnings? (y/N) "
@@ -1001,10 +1004,10 @@ def run_learning(
 
         world.reset()
 
-    # save the last policies at the end of the training
-    world.learning_role.rl_algorithm.save_params(
-        directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
-    )
+        # save the policies after each episode in case the simulation is stopped or crashes
+        world.learning_role.rl_algorithm.save_params(
+            directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
+        )
 
     # container shutdown implicitly with new initialisation
     logger.info("################")

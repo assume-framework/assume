@@ -25,7 +25,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 1,
   "links": [],
   "panels": [
     {
@@ -158,10 +158,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -209,7 +205,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  episode,\n  avg(reward) as profit\nFROM rl_params\nwhere simulation ~ '^${simulation}_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
+          "rawSql": "WITH unit_episode_rewards AS (\n    SELECT\n        episode,\n        unit,\n        learning_mode,\n        SUM(reward) AS total_reward\n    FROM rl_params\n    WHERE simulation ~ '^${simulation}_[1-9]+'\n      AND learning_mode IS NOT NULL  -- Ensure learning mode is considered\n    GROUP BY episode, unit, learning_mode\n),\nepisode_unit_counts AS (\n    SELECT \n        episode, \n        learning_mode,\n        COUNT(DISTINCT unit) AS unit_count\n    FROM unit_episode_rewards\n    GROUP BY episode, learning_mode\n)\nSELECT \n    u.episode,\n    u.learning_mode,\n    SUM(u.total_reward) / e.unit_count AS avg_profit\nFROM unit_episode_rewards u\nJOIN episode_unit_counts e \n    ON u.episode = e.episode \n    AND u.learning_mode = e.learning_mode\nGROUP BY u.episode, u.learning_mode, e.unit_count\nORDER BY u.episode, u.learning_mode;\n",
           "refId": "A",
           "select": [
             [
@@ -326,10 +322,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           }
@@ -377,7 +369,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT\n  episode,\n  avg(reward) as reward\nFROM rl_params\nwhere simulation ~ '^${simulation}_eval_[1-9]+' AND\n      unit = '$rl_unit' AND learning_mode is true\ngroup by episode\norder by episode",
+          "rawSql": "WITH unit_episode_rewards AS (\n    SELECT\n        episode,\n        unit,\n        SUM(reward) AS total_reward\n    FROM rl_params\n    WHERE simulation ~ '^${simulation}_eval_[1-9]+'\n      AND learning_mode IS TRUE\n    GROUP BY episode, unit\n),\nepisode_unit_counts AS (\n    SELECT \n        episode, \n        COUNT(DISTINCT unit) AS unit_count\n    FROM unit_episode_rewards\n    GROUP BY episode\n)\nSELECT \n    u.episode,\n    SUM(u.total_reward) / e.unit_count AS avg_reward\nFROM unit_episode_rewards u\nJOIN episode_unit_counts e ON u.episode = e.episode\nGROUP BY u.episode, e.unit_count\nORDER BY u.episode;\n",
           "refId": "A",
           "select": [
             [
@@ -453,54 +445,6 @@
         }
       ],
       "title": "Average EVALUATION REWARD of all learning units",
-      "transformations": [
-        {
-          "id": "calculateField",
-          "options": {
-            "binary": {
-              "left": "index",
-              "reducer": "sum",
-              "right": "episode"
-            },
-            "mode": "binary",
-            "reduce": {
-              "reducer": "sum"
-            }
-          }
-        },
-        {
-          "id": "groupBy",
-          "options": {
-            "fields": {
-              "episode": {
-                "aggregations": [],
-                "operation": "groupby"
-              },
-              "index  episode": {
-                "aggregations": [],
-                "operation": "aggregate"
-              },
-              "reward": {
-                "aggregations": [
-                  "mean"
-                ],
-                "operation": "aggregate"
-              }
-            }
-          }
-        },
-        {
-          "id": "sortBy",
-          "options": {
-            "fields": {},
-            "sort": [
-              {
-                "field": "episode"
-              }
-            ]
-          }
-        }
-      ],
       "type": "barchart"
     },
     {
@@ -552,8 +496,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -729,8 +672,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -846,8 +788,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1028,7 +969,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -1062,8 +1003,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1211,7 +1151,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -1245,8 +1185,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1428,8 +1367,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1616,7 +1554,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -1650,8 +1588,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1799,7 +1736,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -1845,8 +1782,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -1960,7 +1896,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -2006,8 +1942,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2168,8 +2103,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2286,8 +2220,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2403,8 +2336,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2541,8 +2473,8 @@
     ]
   },
   "time": {
-    "from": "2019-02-28T23:00:00.000Z",
-    "to": "2019-03-01T22:59:59.000Z"
+    "from": "2019-03-01T00:00:00.000Z",
+    "to": "2019-03-30T23:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [

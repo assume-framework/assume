@@ -56,12 +56,22 @@ A class representing an electrolyser component for hydrogen production.
    :members:
    :undoc-members:
 
-Hydrogen Storage
-^^^^^^^^^^^^^^^^
+
+Hydrogen Buffer Storage
+^^^^^^^^^^^^^^^^^^^^^^^
 
 A class representing a hydrogen storage unit.
 
 .. autoclass:: assume.units.dst_components.HydrogenBufferStorage
+   :members:
+   :undoc-members:
+
+Seasonal Hydrogen Storage
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A class representing a seasonal hydrogen storage unit.
+
+.. autoclass:: assume.units.dst_components.SeasonalHydrogenStorage
    :members:
    :undoc-members:
 

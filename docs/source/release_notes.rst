@@ -34,6 +34,8 @@ Upcoming Release
 
 **Improvements:**
 
+- **Multi-agent DRL fix**: Addressed a critical bug affecting action sampling, ensuring correct multi-agent learning.
+- **Performance boost**: Optimized training efficiency, achieving **2x overall speedup** and up to **5x on CUDA devices**.
 - **Learning Observation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
   This allows for a more robust scaling of the observation space for future analysis.
 - **Allow Multi-Market Bidding Strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
@@ -83,6 +85,8 @@ v0.5.0 - (10th December 2024)
   if the total duration of the market products plus first delivery time fits before the simulation end.
 - **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
 
+**Full Changelog**: `v0.4.3...v0.5.0 <https://github.com/assume-framework/assume/compare/v0.4.2...v0.5.0>`_
+
 v0.4.3 - (11th November 2024)
 ===========================================
 
@@ -94,7 +98,7 @@ v0.4.3 - (11th November 2024)
 
 - **Simulation**: Delete simulation results for same simulation prior to run (as before v0.4.2)
 
-**Full Changelog**: [v0.4.2...v0.4.3](https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3)
+**Full Changelog**: `v0.4.2...v0.4.3 <https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3>`_
 
 v0.4.2 - (5th November 2024)
 ===========================================
@@ -128,7 +132,7 @@ v0.4.2 - (5th November 2024)
 
 - @HafnerMichael made their first contribution with improvements to cashflow calculations and development of residential DST components.
 
-**Full Changelog**: [v0.4.1...v0.4.2](https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2)
+**Full Changelog**: `v0.4.1...v0.4.2 <https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2>`_
 
 
 v0.4.1 (8th October 2024)
@@ -152,6 +156,8 @@ v0.4.1 (8th October 2024)
 - add compatibility with pyyaml-include (#421)
 - make complex clearing compatible to RL (#430)
 - pin PyPSA to remove DeprecationWarnings for now (#431)
+
+**Full Changelog**: `v0.4.0...v0.4.1 <https://github.com/assume-framework/assume/compare/v0.4.0...v0.4.1>`_
 
 v0.4.0 (8th August 2024)
 =========================================
@@ -219,6 +225,8 @@ v0.4.0 (8th August 2024)
 
 - Added closing word and final dashboard link to interoperability tutorial
 
+
+**Full Changelog**: `v0.3.7...v0.4.0 <https://github.com/assume-framework/assume/compare/v0.3.7...v0.4.0>`_
 
 v0.3.7 (21st March 2024)
 =========================
