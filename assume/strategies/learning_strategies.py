@@ -269,7 +269,8 @@ class RLStrategy(AbstractLearningStrategy):
         # 2. Get the Actions, based on the observations
         # =============================================================================
         actions, noise = self.get_actions(next_observation)
-
+        # if not self.learning_mode and not self.perform_evaluation:
+        #     actions = th.clamp(actions, next_observation[-1], None)
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
@@ -539,61 +540,65 @@ class RLStrategy(AbstractLearningStrategy):
 
         product_type = marketconfig.product_type
 
-        profit = 0
-        reward = 0
-        opportunity_cost = 0
-        costs = 0
+        start = orderbook[0]["start_time"]
+        end = orderbook[0]["end_time"]
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+        end_excl = end - unit.index.freq
+
+        # depending on way the unit calculates marginal costs we take costs
+        marginal_cost = unit.calculate_marginal_cost(
+            start, unit.outputs[product_type].at[start]
+        )
+        market_clearing_price = orderbook[0]["accepted_price"]
+
+        duration = (end - start) / timedelta(hours=1)
+
+        income = 0.0
+        operational_cost = 0.0
+
+        accepted_volume_total = 0
 
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-            end_excl = end - unit.index.freq
-
-            # depending on way the unit calculates marginal costs we take costs
-            marginal_cost = unit.calculate_marginal_cost(
-                start, unit.outputs[product_type].at[start]
-            )
-
-            duration = (end - start) / timedelta(hours=1)
-
             accepted_volume = order.get("accepted_volume", 0)
-            accepted_price = order.get("accepted_price", 0)
+            accepted_volume_total += accepted_volume
 
             # calculate profit as income - running_cost from this event
-            order_profit = accepted_price * accepted_volume * duration
+            order_income = market_clearing_price * accepted_volume * duration
             order_cost = marginal_cost * accepted_volume * duration
 
             # collect profit and opportunity cost for all orders
-            profit += order_profit
-            costs += order_cost
+            income += order_income
+            operational_cost += order_cost
+
+        # consideration of start-up costs, which are evenly divided between the
+        # upward and downward regulation events
+        if (
+            unit.outputs[product_type].at[start] != 0
+            and unit.outputs[product_type].at[start - unit.index.freq] == 0
+        ):
+            operational_cost += unit.hot_start_cost / 2
+        elif (
+            unit.outputs[product_type].at[start] == 0
+            and unit.outputs[product_type].at[start - unit.index.freq] != 0
+        ):
+            operational_cost += unit.hot_start_cost / 2
+
+        profit = income - operational_cost
 
         # calculate opportunity cost
         # as the loss of income we have because we are not running at full power
         opportunity_cost = (
-            (accepted_price - marginal_cost)
-            * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
+            (market_clearing_price - marginal_cost)
+            * (unit.max_power - accepted_volume_total)
             * duration
         )
 
         # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
         opportunity_cost = max(opportunity_cost, 0)
 
-        # consideration of start-up costs, which are evenly divided between the
-        # upward and downward regulation events
-        if (
-            unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].loc[start - unit.index.freq] == 0
-        ):
-            costs += unit.hot_start_cost / 2
-        elif (
-            unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].loc[start - unit.index.freq] != 0
-        ):
-            costs += unit.hot_start_cost / 2
-
-        profit = profit - costs
+        # set regret_scale as 0.2 if partially dispatched, 0.5 if not dispatched at all
+        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 1
 
         # ---------------------------
         # 4.1 Calculate Reward
@@ -602,14 +607,13 @@ class RLStrategy(AbstractLearningStrategy):
         # define the reward and scale it
 
         scaling = 0.1 / unit.max_power
-        regret_scale = 0.2
         reward = float(profit - regret_scale * opportunity_cost) * scaling
 
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[start:end_excl] += profit
         unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
-        unit.outputs["total_costs"].loc[start:end_excl] = costs
+        unit.outputs["total_costs"].loc[start:end_excl] = operational_cost
 
         unit.outputs["rl_rewards"].append(reward)
 
