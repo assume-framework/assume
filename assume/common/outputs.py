@@ -316,7 +316,11 @@ class WriteOutput(Role):
             df["evaluation_frequency"] = df["evaluation_frequency"].astype(str)
 
         # Remove unnecessary columns (use a list to minimize deletion calls)
-        df.drop(columns=["only_hours", "agent_addr"], inplace=True, errors=False)
+        df.drop(
+            columns=["only_hours", "agent_addr", "contractor_addr"],
+            inplace=True,
+            errors="ignore",
+        )
 
         # Add missing columns with defaults
         for col in ["bid_type", "node"]:
@@ -478,10 +482,7 @@ class WriteOutput(Role):
                 data_list.clear()
             # concat all dataframes
             # use join='outer' to keep all columns and fill missing values with NaN
-            if df is None:
-                continue
-
-            if df.empty:
+            if df is None or df.empty:
                 continue
 
             # check for tensors and convert them to floats

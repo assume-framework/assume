@@ -11,6 +11,8 @@ from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
+# define the path where the simulation results in form of CSV files will be stored, for example: "examples/outputs"
+# "" means no CSV files will be stored
 csv_path = ""
 
 os.makedirs("./examples/local_db", exist_ok=True)

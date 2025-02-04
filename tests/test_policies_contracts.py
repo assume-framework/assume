@@ -38,9 +38,10 @@ def test_contract_functions():
         "bid_id": "nuclear1_1",
         "unit_id": "nuclear1",
         "accepted_volume": 1000,
-        "accepted_price": 4.5,
+        "accepted_price": 0,
+        "contract_price": 4.5,
         "contractor_unit_id": "demand1",
-        "contractor_id": ("world", "brd"),
+        "contractor_addr": addr("world", "brd"),
         "market_id": "Support",
     }
 
