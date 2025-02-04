@@ -48,10 +48,6 @@ available_examples = {
         "scenario": "example_01d",
         "study_case": "base",
     },
-    "small_with_nodal_clearing": {
-        "scenario": "example_01d",
-        "study_case": "nodal_case",
-    },
     "small_with_zonal_clearing": {
         "scenario": "example_01d",
         "study_case": "zonal_case",

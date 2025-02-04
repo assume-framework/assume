@@ -236,12 +236,16 @@ class TD3(RLAlgorithm):
                 obs_dim=strategy.obs_dim,
                 act_dim=strategy.act_dim,
                 float_type=self.float_type,
+                unique_obs_dim=strategy.unique_obs_dim,
+                num_timeseries_obs_dim=strategy.num_timeseries_obs_dim,
             ).to(self.device)
 
             strategy.actor_target = self.actor_architecture_class(
                 obs_dim=strategy.obs_dim,
                 act_dim=strategy.act_dim,
                 float_type=self.float_type,
+                unique_obs_dim=strategy.unique_obs_dim,
+                num_timeseries_obs_dim=strategy.num_timeseries_obs_dim,
             ).to(self.device)
 
             strategy.actor_target.load_state_dict(strategy.actor.state_dict())

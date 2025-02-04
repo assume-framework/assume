@@ -34,6 +34,8 @@ class AbstractLearningStrategy(LearningStrategy):
             obs_dim=self.obs_dim,
             act_dim=self.act_dim,
             float_type=self.float_type,
+            unique_obs_dim=self.unique_obs_dim,
+            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
         ).to(self.device)
         self.actor.load_state_dict(params["actor"])
 
@@ -42,6 +44,8 @@ class AbstractLearningStrategy(LearningStrategy):
                 obs_dim=self.obs_dim,
                 act_dim=self.act_dim,
                 float_type=self.float_type,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
             ).to(self.device)
             self.actor_target.load_state_dict(params["actor_target"])
             self.actor_target.eval()

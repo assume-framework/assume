@@ -117,6 +117,12 @@ class Learning(Role):
         self.train_freq = learning_config.get("train_freq", "100h")
         self.gradient_steps = learning_config.get("gradient_steps", 100)
 
+        # check that gradient_steps is positive
+        if self.gradient_steps <= 0:
+            raise ValueError(
+                f"gradient_steps need to be positive, got {self.gradient_steps}"
+            )
+
         self.batch_size = learning_config.get("batch_size", 128)
         self.gamma = learning_config.get("gamma", 0.99)
 
@@ -285,8 +291,8 @@ class Learning(Role):
                 logger.info(f"Loading pretrained policies from {directory}!")
                 self.rl_algorithm.load_params(directory)
             else:
-                logger.warning(
-                    f"Folder with pretrained policies {directory} does not exist"
+                raise FileNotFoundError(
+                    f"Directory {directory} does not exist! Cannot load pretrained policies!"
                 )
 
     def update_policy(self) -> None:
