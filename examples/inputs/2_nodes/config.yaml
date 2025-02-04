@@ -521,7 +521,7 @@ learning_single_diesel:
     batch_size: 64
     continue_learning: false
     device: cpu
-    episodes_collecting_initial_experience: 20
+    episodes_collecting_initial_experience: 40
     gamma: 0.99
     gradient_steps: 1
     learning_rate: 0.001

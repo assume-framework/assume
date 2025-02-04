@@ -218,7 +218,7 @@ for study_case in [
 
     # create world instance
     world = World(database_uri=db_uri, export_csv_path=csv_path)
-    world.bidding_strategies["pp_learning"] = RLStrategy
+    #world.bidding_strategies["pp_learning"] = RLStrategy
     # load scenario by providing the world instance
     # the path to the inputs folder and the scenario name (subfolder in inputs)
     # and the study case name (which config to use for the simulation)
