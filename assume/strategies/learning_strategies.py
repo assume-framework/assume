@@ -588,6 +588,10 @@ class RLStrategy(AbstractLearningStrategy):
 
         profit = income - operational_cost
 
+        # account for only 10% of the profit if it is positive to not overstimulate the egant
+        # to manipulate the market
+        profit = min(profit, 0.1 * abs(profit))
+
         # calculate opportunity cost
         # as the loss of income we have because we are not running at full power
         opportunity_cost = (
@@ -600,7 +604,7 @@ class RLStrategy(AbstractLearningStrategy):
         opportunity_cost = max(opportunity_cost, 0)
 
         # set regret_scale as 0.1 if dispatched above min. power, 0.5 if not dispatched at all
-        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 1.0
+        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 0.5
 
         # --------------------
         # 4.1 Calculate Reward
