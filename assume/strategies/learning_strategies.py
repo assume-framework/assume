@@ -1301,8 +1301,6 @@ class RedispatchRLStrategy(RLStrategy):
         costs = 0
         profit = 0
 
-        opportunity_cost = 0
-
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
             start = order["start_time"]
@@ -1329,17 +1327,6 @@ class RedispatchRLStrategy(RLStrategy):
             revenue += order_revenue
             costs += order_cost
 
-        # calculate opportunity cost
-        # as the loss of income we have because we are not running at full power
-        opportunity_cost = (
-            (accepted_price - marginal_cost)
-            * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
-            * duration
-        )
-
-        # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-        opportunity_cost = max(opportunity_cost, 0)
-
         # consideration of start-up costs, which are evenly divided between the
         # upward and downward regulation events
         if (
@@ -1357,5 +1344,4 @@ class RedispatchRLStrategy(RLStrategy):
 
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["opportunity_cost"].loc[start:end_excl] = opportunity_cost
         unit.outputs["total_costs"].loc[start:end_excl] = costs

@@ -357,3 +357,231 @@ learning_all3:
         solver: highs
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
+
+learning_single_gas:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-02 00:00
+  time_step: 1h
+  learning_mode: true
+  save_frequency_hours: null
+  learning_config:
+    algorithm: matd3
+    batch_size: 64
+    continue_learning: false
+    device: cpu
+    episodes_collecting_initial_experience: 20
+    gamma: 0.99
+    gradient_steps: 1
+    learning_rate: 0.001
+    learning_rate_schedule: linear
+    max_bid_price: 100
+    action_noise_schedule: linear
+    noise_dt: 1
+    noise_scale: 1
+    noise_sigma: 0.1
+    train_freq: 24h
+    trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
+    training_episodes: 100
+    validation_episodes_interval: 5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      #additional_fields:
+      #  - node
+      #  - bid_type
+      #param_dict:
+      #  network_path: .
+      #  zones_identifier: zone_id
+
+    redispatch:
+      operator: network_operator
+      product_type: energy
+      start_date: 2019-01-01 02:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+       - node
+       - min_power
+       - max_power
+      param_dict:
+        network_path: .
+        solver: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+
+learning_single_coal:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-02 00:00
+  time_step: 1h
+  learning_mode: true
+  save_frequency_hours: null
+  learning_config:
+    algorithm: matd3
+    batch_size: 64
+    continue_learning: false
+    device: cpu
+    episodes_collecting_initial_experience: 20
+    gamma: 0.99
+    gradient_steps: 1
+    learning_rate: 0.001
+    learning_rate_schedule: linear
+    max_bid_price: 100
+    action_noise_schedule: linear
+    noise_dt: 1
+    noise_scale: 1
+    noise_sigma: 0.1
+    train_freq: 24h
+    trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
+    training_episodes: 100
+    validation_episodes_interval: 5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      #additional_fields:
+      #  - node
+      #  - bid_type
+      #param_dict:
+      #  network_path: .
+      #  zones_identifier: zone_id
+
+    redispatch:
+      operator: network_operator
+      product_type: energy
+      start_date: 2019-01-01 02:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+       - node
+       - min_power
+       - max_power
+      param_dict:
+        network_path: .
+        solver: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+
+learning_single_diesel:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-02 00:00
+  time_step: 1h
+  learning_mode: true
+  save_frequency_hours: null
+  learning_config:
+    algorithm: matd3
+    batch_size: 64
+    continue_learning: false
+    device: cpu
+    episodes_collecting_initial_experience: 20
+    gamma: 0.99
+    gradient_steps: 1
+    learning_rate: 0.001
+    learning_rate_schedule: linear
+    max_bid_price: 100
+    action_noise_schedule: linear
+    noise_dt: 1
+    noise_scale: 1
+    noise_sigma: 0.1
+    train_freq: 24h
+    trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
+    training_episodes: 100
+    validation_episodes_interval: 5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      #additional_fields:
+      #  - node
+      #  - bid_type
+      #param_dict:
+      #  network_path: .
+      #  zones_identifier: zone_id
+
+    redispatch:
+      operator: network_operator
+      product_type: energy
+      start_date: 2019-01-01 02:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+       - node
+       - min_power
+       - max_power
+      param_dict:
+        network_path: .
+        solver: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000

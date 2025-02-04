@@ -44,11 +44,14 @@ num_coal = 20
 num_all = num_wind + num_diesel + num_gas + num_coal
 
 for study_case in [
-    "base_case",
-    "learning_diesel",
-    "learning_gas",
-    "learning_coal",
-    "learning_all3",
+    #"base_case",
+    #"learning_gas",
+    #"learning_diesel",
+    #"learning_coal",
+    #"learning_all3",
+    #"learning_single_gas",
+    #"learning_single_coal",
+    "learning_single_diesel",
 ]:
     # study_case="base_case"
     # study_case = "learning_coal"
@@ -96,32 +99,67 @@ for study_case in [
         redispatch_bidding_list = ["naive_redispatch"] * num_wind + [
             "redispatch_learning"
         ] * (num_all - num_wind)
+    elif study_case == "learning_single_gas":
+        eom_bidding_list = (
+            ["naive_eom"] * num_all
+        )
+        redispatch_bidding_list = (
+            ["naive_redispatch"] * num_all
+        )
+        # change bidding behaviour for one gas unit (e.g. the fifth unit (unit 4) with MC=44 €)
+        # unit 4 does not lern anything, profit = 0. when sigma=0.1 und initial experience = 20 bietet es immer -100€ und bekommt 49€ von EOM
+        eom_bidding_list[num_wind + num_diesel + 4] = "redispatch_learning"
+        redispatch_bidding_list[num_wind + num_diesel + 4] = "redispatch_learning"
+    elif study_case == "learning_single_coal":
+        eom_bidding_list = (
+            ["naive_eom"] * num_all
+        )
+        redispatch_bidding_list = (
+            ["naive_redispatch"] * num_all
+        )
+        # change bidding behaviour for one coal unit (e.g. the fifteenth unit (unit 14) with MC=34 €)
+        # unit 14 does not leran overbidding in current setup. it always bids -100€ and gets payment of 49 from EOM...
+        # try with unit that is more on the edge: unit 19 with mc=39
+        eom_bidding_list[num_wind + num_diesel + num_gas + 14] = "redispatch_learning"
+        redispatch_bidding_list[num_wind + num_diesel + num_gas + 14] = "redispatch_learning"
+    
+    
+    elif study_case == "learning_single_diesel":
+        eom_bidding_list = (
+            ["naive_eom"] * num_all
+        )
+        redispatch_bidding_list = (
+            ["naive_redispatch"] * num_all
+        )
+        # change bidding behaviour for one diesel unit (e.g. the 2nd unit (unit 1) with MC=66 €)
+        eom_bidding_list[num_wind + 1] = "redispatch_learning"
+        redispatch_bidding_list[num_wind + 1] = "redispatch_learning"
 
     mc_wind_list = [0 for i in range(num_wind)]
-    mc_diesel_list = [120 + i for i in range(num_diesel)]
-    mc_gas_list = [80 + i for i in range(num_gas)]
-    mc_coal_list = [50 + i for i in range(num_coal)]
+    mc_diesel_list = [65 + i for i in range(num_diesel)]
+    mc_gas_list = [40 + i for i in range(num_gas)]
+    mc_coal_list = [20 + i for i in range(num_coal)]
     # Create the data
     powerplant_units_data = {
         "name": [f"Wind {i}" for i in range(num_wind)]
         + [f"Diesel {i}" for i in range(num_diesel)]
         + [f"Gas {i}" for i in range(num_gas)]
         + [f"Coal {i}" for i in range(num_coal)],
-        "technology": ["wind"] * num_wind
+        "technology": ["lignite"] * num_wind # hier vorübergehend technology lignite gemacht um 20 gw 0 marginal cost zu haben und keine Schwankungen durch Wind generation
         + ["diesel"] * num_diesel
         + ["natural gas"] * num_gas
         + ["lignite"] * num_coal,
         "node": ["north"] * num_wind
         + ["north"] * num_diesel
-        + ["north"] * num_gas
-        + ["south"] * num_coal,
+        + ["south"] * num_gas
+        + ["north"] * num_coal,
         "bidding_EOM": eom_bidding_list,
         "bidding_redispatch": redispatch_bidding_list,
         "fuel_type": ["renewable"] * num_wind
         + ["diesel"] * num_diesel
         + ["natural gas"] * num_gas
         + ["lignite"] * num_coal,
-        "max_power": [25000.0] * num_wind + [1000.0] * (num_all - num_wind),
+        "max_power": [20000.0] * num_wind + [1000.0] * (num_all - num_wind),
         "min_power": [0] * num_all,
         "additional_cost": mc_wind_list + mc_diesel_list + mc_gas_list + mc_coal_list,
         "unit_operator": ["wind operator"] * num_wind
@@ -194,7 +232,7 @@ for study_case in [
     if world.learning_config.get("learning_mode", False):
         run_learning(
             world,
-            inputs_path="inputs",
+            inputs_path=input_path,
             scenario=scenario,
             study_case=study_case,
         )
