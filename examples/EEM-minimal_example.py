@@ -32,8 +32,8 @@ log = logging.getLogger(__name__)
 # Define paths for input and output data
 # csv_path = r"C:\Users\Gunter\Code\EEM_paper\outputs"
 # input_path = r"C:\Users\Gunter\Code\EEM_paper\inputs"
-csv_path = "outputs"
-input_path = "inputs"
+csv_path = "examples/outputs"
+input_path = "examples/inputs"
 scenario = "2_nodes"
 
 # powerplant units according to example in Hirth and Schlecht (2024)
