@@ -555,7 +555,6 @@ def load_config_and_create_forecaster(
 def setup_world(
     world: World,
     scenario_data: dict[str, object],
-    study_case: str,
     perform_evaluation: bool = False,
     terminate_learning: bool = False,
     episode: int = 1,
@@ -633,9 +632,9 @@ def setup_world(
 
     if not learning_config.get("trained_policies_save_path"):
         if learning_config["learning_mode"]:
-            path = f"learned_strategies/{study_case}"
+            path = f"learned_strategies/{sim_id}"
         else:
-            path = f"learned_strategies/{study_case}/last_policies"
+            path = f"learned_strategies/{sim_id}/last_policies"
 
         learning_config["trained_policies_save_path"] = path
 
@@ -804,7 +803,6 @@ def load_scenario_folder(
     setup_world(
         world=world,
         scenario_data=scenario_data,
-        study_case=study_case,
     )
 
 
@@ -910,7 +908,7 @@ def run_learning(
     if Path(save_path).is_dir() and not world.learning_config["continue_learning"]:
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
-            f"{save_path=} exists - should we overwrite current learnings? (y/N) "
+            f"{save_path=} exists - should we overwrite current learned strategies? (y/N) "
         )
         if accept.lower().startswith("y"):
             # remove existing tensorboard log directory
@@ -918,7 +916,9 @@ def run_learning(
                 shutil.rmtree(save_path, ignore_errors=True)
         else:
             # stop here - do not start learning or save anything
-            raise AssumeException("don't overwrite existing strategies")
+            raise AssumeException(
+                "Simulation aborted by user not to overwrite existing learned strategies. You can use 'simulation_id' parameter in the config to start a new simulation."
+            )
 
     # -----------------------------------------
     # Load scenario data to reuse across episodes
@@ -959,7 +959,6 @@ def run_learning(
         setup_world(
             world=world,
             scenario_data=scenario_data,
-            study_case=study_case,
             episode=episode,
         )
 
@@ -989,7 +988,6 @@ def run_learning(
             setup_world(
                 world=world,
                 scenario_data=scenario_data,
-                study_case=study_case,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
             )
@@ -1039,7 +1037,6 @@ def run_learning(
     setup_world(
         world=world,
         scenario_data=scenario_data,
-        study_case=study_case,
         terminate_learning=True,
     )
 

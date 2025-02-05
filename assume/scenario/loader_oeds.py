@@ -154,7 +154,7 @@ def load_oeds(
             # demand in MW
             if not entsoe_demand:
                 demand = demand_save
-            
+
             try:
                 config_path.mkdir(parents=True, exist_ok=True)
                 demand_save.to_csv(config_path / "demand.csv")
