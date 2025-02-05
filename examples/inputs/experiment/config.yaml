@@ -4,7 +4,7 @@
 
 cement_plant_case:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-07 23:00
+  end_date: 2019-01-10 23:00
   time_step: 1h
   save_frequency_hours: 24
 
@@ -12,33 +12,16 @@ cement_plant_case:
     crm_foresight: 4h
 
   markets_config:
-    EOM:
-      start_date: 2019-01-01 00:00
-      operator: EOM_operator
-      product_type: energy
-      products:
-      - duration: 1h
-        count: 24
-        first_delivery: 24h
-      opening_frequency: 24h
-      opening_duration: 20h
-      volume_unit: MWh
-      maximum_bid_volume: 100000
-      maximum_bid_price: 3000
-      minimum_bid_price: -500
-      price_unit: EUR/MWh
-      market_mechanism: pay_as_clear
-
     # Long Term Market - 7d contracts
     LTM_OTC:
       operator: LTM_operator
       product_type: energy
       start_date: 2019-01-01 00:00
       products:
-        - duration: 7d
+        - duration: 24h
           count: 1
-          first_delivery: 2h
-      opening_frequency: 7d
+          first_delivery: 24h
+      opening_frequency: 24h
       opening_duration: 1h
       volume_unit: MW
       maximum_volume: 1000000
@@ -48,11 +31,11 @@ cement_plant_case:
     CRM_pos:
       operator: CRM_operator
       product_type: capacity_pos
-      start_date: 2019-01-01 00:00
+      start_date: 2019-01-01 03:00
       products:
         - duration: 4h
           count: 1
-          first_delivery: 1h
+          first_delivery: 22h
       opening_frequency: 4h
       opening_duration: 1h
       volume_unit: MW
@@ -65,11 +48,11 @@ cement_plant_case:
     CRM_neg:
       operator: CRM_operator
       product_type: capacity_neg
-      start_date: 2019-01-01 00:00
+      start_date: 2019-01-01 03:00
       products:
         - duration: 4h
           count: 1
-          first_delivery: 1h
+          first_delivery: 22h
       opening_frequency: 4h
       opening_duration: 1h
       volume_unit: MW
@@ -78,3 +61,23 @@ cement_plant_case:
       minimum_bid_price: -9999
       price_unit: EUR/MW
       market_mechanism: pay_as_bid
+
+    EOM:
+      start_date: 2019-01-01 05:00
+      operator: EOM_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 19h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+
+

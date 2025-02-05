@@ -19,6 +19,8 @@ from assume.strategies.naive_strategies import (
     NaiveSingleBidStrategy,
     NaiveExchangeStrategy,
     OTC_DSM_Strategy,
+    DSM_NegCRM_Strategy,
+    DSM_PosCRM_Strategy,
 )
 from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
@@ -47,6 +49,8 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "dmas_powerplant": DmasPowerplantStrategy,
     "dmas_storage": DmasStorageStrategy,
     "otc_dsm_strategy": OTC_DSM_Strategy,
+    "dsm_neg_crm": DSM_NegCRM_Strategy,
+    "dsm_pos_crm": DSM_PosCRM_Strategy,
 }
 
 try:

@@ -146,8 +146,8 @@ class NaiveProfileStrategy(BaseStrategy):
 
 class NaiveDADSMStrategy(BaseStrategy):
     """
-    A naive strategy of a Demand Side Management (DSM) unit. The bid volume is the optimal power requirement of
-    the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
+    A naive strategy of a Demand Side Management (DSM) unit for the Day-Ahead Market.
+    The bid volume is the optimal power requirement above the baseline threshold.
     """
 
     def calculate_bids(
@@ -157,10 +157,22 @@ class NaiveDADSMStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        # calculate the optimal operation of the unit
-        # unit.determine_optimal_operation_without_flex()
-        unit.determine_optimal_operation_with_flex()
-        self.plot_power_requirements(unit)
+        """
+        Formulate bids for the Day-Ahead Market.
+
+        Args:
+            unit: The demand-side agent (e.g., cement plant) for which bids are being formulated.
+            market_config: Market configuration containing product details and constraints.
+            product_tuples: List of products for the Day-Ahead Market (duration and time steps).
+            **kwargs: Additional arguments for bid calculation.
+
+        Returns:
+            Orderbook: Contains bids for the Day-Ahead Market.
+        """
+
+        # Calculate the baseline threshold (80% of maximum power requirement)
+        max_power = max(unit.opt_power_requirement)
+        baseline_threshold = 0.7 * max_power
 
         bids = []
         for product in product_tuples:
@@ -169,16 +181,29 @@ class NaiveDADSMStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
+            end = product[1]
 
-            volume = unit.opt_power_requirement.at[start]
-            marginal_price = unit.calculate_marginal_cost(start=start, power=volume)
+            # Calculate bid volume (energy above the threshold)
+            opt_power = unit.opt_power_requirement.at[start]
+            if opt_power > baseline_threshold:
+                bid_volume = opt_power - baseline_threshold
+            else:
+                bid_volume = 0
+
+            # Skip if bid volume is 0
+            if bid_volume <= 0:
+                continue
+
+            # Calculate the marginal cost for the bid volume
+            marginal_price = unit.calculate_marginal_cost(start=start, power=bid_volume)
+
             bids.append(
                 {
                     "start_time": start,
-                    "end_time": product[1],
+                    "end_time": end,
                     "only_hours": product[2],
-                    "price": marginal_price,
-                    "volume": -volume,
+                    "price": 3000,
+                    "volume": -bid_volume,
                 }
             )
 
@@ -244,14 +269,14 @@ class OTC_DSM_Strategy(BaseStrategy):
         Returns:
             Orderbook: Contains bids for the LTM market.
         """
-        # Determine the optimal operation of the unit
-        unit.determine_optimal_operation_without_flex()
+        if unit.optimisation_counter == 0:
+            unit.determine_optimal_operation_with_flex()
+            self.plot_power_requirements(unit)
+            unit.optimisation_counter = 1
 
-        # Calculate the baseline power threshold (80% of max optimal power requirement)
+        # Calculate the baseline threshold (70% of maximum power requirement)
         max_power = max(unit.opt_power_requirement)
-        print(max_power)
-        baseline_threshold = 0.8 * max_power
-        # print(baseline_threshold)
+        baseline_threshold = 0.7 * max_power
 
         bids = []
 
@@ -259,13 +284,187 @@ class OTC_DSM_Strategy(BaseStrategy):
             start = product[0]
             end = product[1]
 
-            # Calculate bid volume as the minimum of the baseline threshold and the optimal power at this time step
-            opt_power = unit.opt_power_requirement.at[start]
-            bid_volume = min(baseline_threshold, opt_power)
-            # print(bid_volume)
+            # Calculate total energy below the threshold
+            current_time = start
+            energy_below_threshold = 0
 
-            # Calculate the marginal cost for the bid volume
-            marginal_price = unit.calculate_marginal_cost(start=start, power=bid_volume)
+            while current_time < end:
+                opt_power = unit.opt_power_requirement.at[current_time]
+                power_below_threshold = min(opt_power, baseline_threshold)
+                energy_below_threshold += power_below_threshold
+                current_time += unit.index.freq
+
+            # Skip if no valid energy for the product
+            if energy_below_threshold <= 0:
+                continue
+
+            # Calculate the marginal cost for the bid volume (total energy below threshold)
+            marginal_price = unit.calculate_marginal_cost(
+                start=start, power=energy_below_threshold
+            )
+
+            # Add the bid to the list
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": 3000,
+                    "volume": -energy_below_threshold,
+                    "node": unit.node,
+                }
+            )
+
+        # Clean up empty bids
+        bids = self.remove_empty_bids(bids)
+
+        return bids
+
+    def plot_power_requirements(self, unit: SupportsMinMax):
+        """
+        Plots the optimal power requirement and flexibility power requirement for comparison.
+
+        Args:
+            unit (SupportsMinMax): The unit containing power requirements.
+        """
+        # Retrieve power requirements data
+        opt_power_requirement = unit.opt_power_requirement
+        flex_power_requirement = unit.flex_power_requirement
+
+        # Plotting
+        plt.figure(figsize=(10, 6))
+        plt.plot(
+            opt_power_requirement.index,
+            opt_power_requirement,
+            label="Optimal Power Requirement",
+            color="blue",
+        )
+        plt.plot(
+            flex_power_requirement.index,
+            flex_power_requirement,
+            label="Flex Power Requirement",
+            color="orange",
+            linestyle="--",
+        )
+
+        # Labels and title
+        plt.xlabel("Time")
+        plt.ylabel("Power Requirement (kW)")
+        plt.title("Comparison of Optimal and Flexible Power Requirements")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+
+class DSM_NegCRM_Strategy(BaseStrategy):
+    """
+    Strategy for Negative CRM Reserve (Demand Side).
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Calculate bids for the Negative CRM market for each 4-hour block.
+        """
+        start = product_tuples[0][0]
+        end = product_tuples[-1][1]
+
+        bids = []
+        for product in product_tuples:
+            start, end, only_hours = product
+
+            # Find the maximum flex_downward in the 4-hour block
+            max_flex_downward = 0
+            current_time = start
+            while current_time < end:
+                flex_downward = max(
+                    0,
+                    unit.flex_power_requirement.at[current_time]
+                    - unit.opt_power_requirement.at[current_time],
+                )
+                max_flex_downward = max(max_flex_downward, flex_downward)
+                current_time += unit.index.freq  # Increment time by 1 hour
+
+            # Skip the block if no downward flexibility is available
+            if max_flex_downward <= 0:
+                continue
+
+            # Calculate the capacity price
+            capacity_price = unit.calculate_marginal_cost(
+                start=start, power=max_flex_downward
+            )
+
+            # Add the bid to the list
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": 0,
+                    "volume": max_flex_downward,  # Negative for CRM_Neg
+                    "node": unit.node,
+                }
+            )
+
+        # Clean up empty bids
+        bids = self.remove_empty_bids(bids)
+
+        return bids
+
+
+class DSM_PosCRM_Strategy(BaseStrategy):
+    """
+    Strategy for Positive CRM Reserve (Demand Side).
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Calculate bids for the Positive CRM market for each 4-hour block.
+        """
+        # Determine the optimal operation of the unit
+        unit.determine_optimal_operation_with_flex()
+
+        # Calculate the baseline power threshold (80% of max optimal power requirement)
+        max_power = max(unit.opt_power_requirement)
+        baseline_threshold = 0.8 * max_power
+
+        bids = []
+
+        for product in product_tuples:
+            start = product[0]
+            end = product[1]
+
+            # Find the maximum flex_upward in the 4-hour block
+            max_flex_upward = 0
+            current_time = start
+            while current_time < end:
+                flex_upward = max(
+                    0,
+                    unit.opt_power_requirement.at[current_time]
+                    - unit.flex_power_requirement.at[current_time],
+                )
+                max_flex_upward = max(max_flex_upward, flex_upward)
+                current_time += unit.index.freq  # Increment time by 1 hour
+
+            # Skip the block if no upward flexibility is available
+            if max_flex_upward <= 0:
+                continue
+
+            # Calculate the capacity price
+            capacity_price = unit.calculate_marginal_cost(
+                start=start, power=max_flex_upward
+            )
 
             # Add the bid to the list
             bids.append(
@@ -273,8 +472,8 @@ class OTC_DSM_Strategy(BaseStrategy):
                     "start_time": start,
                     "end_time": end,
                     "only_hours": product[2],
-                    "price": marginal_price,
-                    "volume": bid_volume,
+                    "price": 0,
+                    "volume": max_flex_upward,
                     "node": unit.node,
                 }
             )

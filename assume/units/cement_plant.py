@@ -95,6 +95,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 )
 
         self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
+        self.target_profile = self.forecaster["target_profile"]
         self.hydrogen_price = self.forecaster["price_hydrogen"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.electricity_price_flex = self.forecaster["price_EOM_flex"]
@@ -123,6 +124,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.has_clinker_inventory = "clinker_inventory" in self.components.keys()
         self.has_cement_inventory = "cement_inventory" in self.components.keys()
 
+        self.optimisation_counter = 0
         self.opt_power_requirement = None
         self.flex_power_requirement = None
 
@@ -154,6 +156,10 @@ class CementPlant(DSMFlex, SupportsMinMax):
         )
 
     def define_parameters(self):
+        self.model.target_profile = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.target_profile)},
+        )
         self.model.electricity_price = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
@@ -196,6 +202,8 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.model.variable_cost = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
+        self.model.deviation = pyo.Var(self.model.time_steps, within=pyo.Reals)
+        self.model.max_deviation = pyo.Var(within=pyo.NonNegativeReals)
 
     def initialize_process_sequence(self):
         """
@@ -784,6 +792,34 @@ class CementPlant(DSMFlex, SupportsMinMax):
 
                 return total_variable_cost
 
+        if self.objective == "min_deviation":
+
+            @self.model.Objective(sense=pyo.minimize)
+            def obj_rule_opt(m):
+                """
+                Minimizes deviation + Minimise cost
+                """
+                # Max deviation is the highest value in the target profile parameter
+                max_deviation = max(m.target_profile[t] for t in m.time_steps)
+
+                # Max cost is the total variable cost across all time steps
+                max_cost = sum(m.variable_cost[t] for t in m.time_steps)
+
+                # Normalized deviation across all time steps
+                normalized_deviation = sum(
+                    ((m.total_power_input[t] - m.target_profile[t]) / max_deviation)
+                    * 1000
+                    for t in m.time_steps
+                )
+
+                # Normalized cost across all time steps
+                normalized_cost = sum(
+                    m.variable_cost[t] / max_cost for t in m.time_steps
+                )
+
+                # Weighted sum of both objectives (adjust weights as needed)
+                return 0.5 * normalized_deviation + 0.5 * normalized_cost
+
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
 
@@ -813,14 +849,28 @@ class CementPlant(DSMFlex, SupportsMinMax):
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule_flex(m):
                 """
-                Maximizes the load shift over all time steps.
+                Minimizes deviation + Minimise cost
                 """
+                # Max deviation is the highest value in the target profile parameter
+                max_deviation = max(m.target_profile[t] for t in m.time_steps)
 
-                total_variable_cost = sum(
-                    self.model.variable_cost[t] for t in self.model.time_steps
+                # Max cost is the total variable cost across all time steps
+                max_cost = sum(m.variable_cost[t] for t in m.time_steps)
+
+                # Normalized deviation across all time steps
+                normalized_deviation = sum(
+                    ((m.total_power_input[t] - m.target_profile[t]) / max_deviation)
+                    * 10000
+                    for t in m.time_steps
                 )
 
-                return total_variable_cost
+                # Normalized cost across all time steps
+                normalized_cost = sum(
+                    m.variable_cost[t] / max_cost for t in m.time_steps
+                )
+
+                # Weighted sum of both objectives (adjust weights as needed)
+                return 0.7 * normalized_deviation + 0.3 * normalized_cost
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """

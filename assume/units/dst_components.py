@@ -922,8 +922,14 @@ class Electrolyser:
         model_block.min_power = pyo.Param(initialize=self.min_power)
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
-        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
-        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.min_operating_steps = pyo.Param(
+            initialize=int(self.min_operating_steps),
+            within=pyo.NonNegativeIntegers,
+        )
+        model_block.min_down_steps = pyo.Param(
+            initialize=int(self.min_down_steps),
+            within=pyo.NonNegativeIntegers,
+        )
         model_block.initial_operational_status = pyo.Param(
             initialize=self.initial_operational_status
         )

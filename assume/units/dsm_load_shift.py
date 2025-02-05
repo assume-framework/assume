@@ -166,20 +166,22 @@ class DSMFlex:
                     )
             elif self.technology == "cement_plant":
                 power_input = 0
-            if self.has_raw_mill:
-                power_input += self.model.dsm_blocks["raw_material_mill"].power_in[t]
-            if self.has_cement_mill:
-                power_input += self.model.dsm_blocks["cement_mill"].power_in[t]
-            if self.has_clinker_system:
-                power_input += self.model.dsm_blocks["clinker_system"].power_in[t]
-            if self.has_ccs_system:
-                power_input += self.model.dsm_blocks["ccs_system"].power_in[t]
-            if self.has_electrolyser:
-                power_input += self.model.dsm_blocks["electrolyser"].power_in[t]
-            return (
-                m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                == power_input
-            )
+                if self.has_raw_mill:
+                    power_input += self.model.dsm_blocks["raw_material_mill"].power_in[
+                        t
+                    ]
+                if self.has_cement_mill:
+                    power_input += self.model.dsm_blocks["cement_mill"].power_in[t]
+                if self.has_clinker_system:
+                    power_input += self.model.dsm_blocks["clinker_system"].power_in[t]
+                if self.has_ccs_system:
+                    power_input += self.model.dsm_blocks["ccs_system"].power_in[t]
+                if self.has_electrolyser:
+                    power_input += self.model.dsm_blocks["electrolyser"].power_in[t]
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == power_input
+                )
 
     def electricity_price_signal_based_flexibility(self, model):
         """
@@ -726,10 +728,13 @@ class DSMFlex:
         data = {
             "Time Step": time_steps,
             "opt_power": self.opt_power_requirement,
-            "flex_power": flex_power_requirement,
+            "flex_power": self.flex_power_requirement,
         }
         df = pd.DataFrame(data)
-        df.to_excel("./examples/outputs/opt_power_requirement.xlsx", index=False)
+        df.to_excel(
+            "./examples/inputs/experiment/output/opt_power_requirement.xlsx",
+            index=False,
+        )
         logger.debug(
             f"Time series data saved to {"./examples/outputs/opt_power_requirement.xlsx"}"
         )
