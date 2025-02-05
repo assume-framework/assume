@@ -43,23 +43,26 @@ To install the core package:
 pip install assume-framework
 ```
 
-To install with reinforcement learning capabilities:
+**To install with reinforcement learning capabilities:**
 
 ```bash
 pip install 'assume-framework[learning]'
 ```
 
-We also include network-based market clearing algorithms such as for the re-dispatch or nodal market clearing, which requires the PyPSA library. To install the package with these capabilities, use:
+Please keep in mind, that the above installation method will install pytorch package without CUDA support. If you want to make use of your GPU with CUDA cores, please install pytorch with GPU support separately as described [here](https://pytorch.org/get-started/locally/).
+
+We also include **network-based market clearing algorithms** such as for the re-dispatch or nodal market clearing, which requires the PyPSA library. To install the package with these capabilities, use:
 
 ```bash
 pip install 'assume-framework[network]'
 ```
 
-To install with testing capabilities:
+To install with all capabilities:
 
 ```bash
-pip install 'assume-framework[test]'
+pip install 'assume-framework[all]'
 ```
+
 
 ### Timescale Database and Grafana Dashboards
 
@@ -81,11 +84,6 @@ docker-compose up -d
 ```
 
 This will launch a container for TimescaleDB and Grafana with preconfigured dashboards for analysis. You can access the Grafana dashboards at `http://localhost:3000`.
-
-### Using Learning Capabilities
-
-If you intend to use the reinforcement learning capabilities of ASSUME and train your agents, make sure to install Torch. Detailed installation instructions can be found [here](https://pytorch.org/get-started/locally/).
-
 ### Using TensorBoard to display Learning Metrics
 
 When running an example with learning capabilities, you can start TensorBoard to observe the learning process. Use the following shell command to start TensorBoard:
@@ -154,8 +152,20 @@ For additional CLI options, run `assume -h`.
 ## Development
 
 If you're contributing to the development of ASSUME, follow these steps:
+1. Clone the repository and navigate to its directory:
 
-1. Install pre-commit:
+```bash
+git clone https://github.com/assume-framework/assume.git
+cd assume
+```
+
+2. Install the package in editable mode:
+
+```bash
+pip install -e ".[all]"
+```
+
+3. Install pre-commit:
 
 ```bash
 pip install pre-commit
@@ -166,6 +176,12 @@ To run pre-commit checks directly, use:
 
 ```bash
 pre-commit run --all-files
+```
+
+4. Install also testing capabilities:
+
+```bash
+pip install -e ".[testing]"
 ```
 
 ### Release
@@ -209,6 +225,6 @@ ASSUME is funded by the Federal Ministry for Economic Affairs and Climate Action
 
 ## License
 
-Copyright 2022-2024 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
+Copyright 2022-2025 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
 
 ASSUME is licensed under the [GNU Affero General Public License v3.0](./LICENSES/AGPL-3.0-or-later.txt). This license is a strong copyleft license that requires that any derivative work be licensed under the same terms as the original work. It is approved by the [Open Source Initiative](https://opensource.org/licenses/AGPL-3.0).

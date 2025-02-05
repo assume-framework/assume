@@ -115,6 +115,16 @@ def load_file(
 
             df = df.loc[index]
 
+        else:
+            # Check if duplicate unit names exist and raise an error
+            duplicates = df.index[df.index.duplicated()].unique()
+
+            if len(duplicates) > 0:
+                duplicate_names = ", ".join(duplicates)
+                raise ValueError(
+                    f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
+                )
+
         return df
 
     except FileNotFoundError:
