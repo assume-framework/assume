@@ -543,7 +543,6 @@ def load_config_and_create_forecaster(
 def setup_world(
     world: World,
     scenario_data: dict[str, object],
-    study_case: str,
     perform_evaluation: bool = False,
     terminate_learning: bool = False,
     episode: int = 1,
@@ -557,7 +556,6 @@ def setup_world(
     Args:
         world (World): An instance of the World class representing the simulation environment.
         scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
-        study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 1.
@@ -621,9 +619,9 @@ def setup_world(
 
     if not learning_config.get("trained_policies_save_path"):
         if learning_config["learning_mode"]:
-            path = f"learned_strategies/{study_case}"
+            path = f"learned_strategies/{sim_id}"
         else:
-            path = f"learned_strategies/{study_case}/last_policies"
+            path = f"learned_strategies/{sim_id}/last_policies"
 
         learning_config["trained_policies_save_path"] = path
 
@@ -792,7 +790,6 @@ def load_scenario_folder(
     setup_world(
         world=world,
         scenario_data=scenario_data,
-        study_case=study_case,
     )
 
 
@@ -943,7 +940,6 @@ def run_learning(
         setup_world(
             world=world,
             scenario_data=scenario_data,
-            study_case=study_case,
             episode=episode,
         )
 
@@ -971,7 +967,6 @@ def run_learning(
             setup_world(
                 world=world,
                 scenario_data=scenario_data,
-                study_case=study_case,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
             )
@@ -1019,7 +1014,6 @@ def run_learning(
     setup_world(
         world=world,
         scenario_data=scenario_data,
-        study_case=study_case,
         terminate_learning=True,
     )
 

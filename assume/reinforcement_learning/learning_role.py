@@ -110,9 +110,6 @@ class Learning(Role):
         self.episodes_collecting_initial_experience = max(
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
-        # if we continue learning we do not need to collect initial experience
-        if self.continue_learning:
-            self.episodes_collecting_initial_experience = 0
 
         self.train_freq = learning_config.get("train_freq", "100h")
         self.gradient_steps = learning_config.get("gradient_steps", 100)
@@ -154,7 +151,11 @@ class Learning(Role):
 
         # if enough initial experience was collected according to specifications in learning config
         # turn off initial exploration and go into full learning mode
-        if self.episodes_done >= self.episodes_collecting_initial_experience:
+        # or if we are in continue_learning mode we also turn off initial exploration
+        if (
+            self.episodes_done >= self.episodes_collecting_initial_experience
+            or self.continue_learning
+        ):
             self.turn_off_initial_exploration()
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
@@ -222,8 +223,8 @@ class Learning(Role):
             exploration is often used to collect initial experience before training begins. Disabling it can be useful when the agent
             has collected sufficient initial data and is ready to focus on training.
         """
-        for _, unit in self.rl_strats.items():
-            unit.collect_initial_experience_mode = False
+        for strategy in self.rl_strats.values():
+            strategy.collect_initial_experience_mode = False
 
     def get_progress_remaining(self) -> float:
         """
@@ -265,7 +266,6 @@ class Learning(Role):
             self.rl_algorithm = TD3(
                 learning_role=self,
                 learning_rate=self.learning_rate,
-                episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,

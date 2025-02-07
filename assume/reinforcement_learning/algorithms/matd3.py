@@ -33,7 +33,6 @@ class TD3(RLAlgorithm):
         self,
         learning_role,
         learning_rate=1e-4,
-        episodes_collecting_initial_experience=10,
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
@@ -46,7 +45,6 @@ class TD3(RLAlgorithm):
         super().__init__(
             learning_role,
             learning_rate,
-            episodes_collecting_initial_experience,
             batch_size,
             tau,
             gamma,
