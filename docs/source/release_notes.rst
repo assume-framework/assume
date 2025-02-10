@@ -12,24 +12,35 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+
+v0.5.1 - (3rd February 2025)
+===========================================
 **New Features:**
 
 - **Exchange Unit**: A new unit type for modeling **energy trading** between market participants. It supports **buying (importing) and selling (exporting) energy**, with user-defined prices.
   Check **example_01a**, **example_03**, and the files **"exchange_units.csv"** and **"exchanges_df.csv"** for usage examples.
+- **Market Contracts and Support Policies**: it is now possible to simulate the auctioning of support policies, like feed-in tariff, PPA, CfD or a market premium.
+  The contracts are auctioned and then have a regular contract execution, to compensate according to the contracts dynamic, based on the historic market price and unit dispatch (#542).
+- **Merit Order Plot** on the default Grafana Dashboard - showing a deeper view into the bidding behavior of the market actors.
+  Additionally, a graph showing the market result per generation technology has been added (#531).
 
 **Improvements:**
 
 - **Multi-agent DRL fix**: Addressed a critical bug affecting action sampling, ensuring correct multi-agent learning.
 - **Performance boost**: Optimized training efficiency, achieving **2x overall speedup** and up to **5x on CUDA devices**.
-- **Learning Observation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
-  This allows for a more robust scaling of the observation space for future analysis.
+- **Learning Observation Space Scaling:** Instead of the formerly used max scaling of the observation space, we added a min-max scaling to the observation space.
+  This allows for a more robust scaling of the observation space for future analysis (#508).
 - **Allow Multi-Market Bidding Strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
   the strategy is only created once and the same instance is used for all of these markets.
 - **Improve Storage Behavior**: Storages were using the current unmodified SoC instead of the final SoC of last hour, leading to always using the initial value to calculate discharge possibility.(#524)
+- **OEDS Loader**: when using the OEDS as a database, the queries have been adjusted to the latest update of the MarktStammDatenRegister. Time-sensitive fuel costs for gas, coal and oil are available from the OEDS as well.
+  This also includes various fixes to the behavior of the DMAS market and complex powerplant strategies (#532).
 
 **Bug Fixes:**
 
 - **Update PyPSA Version:** Fixes example "small_with_redispatch"; adjustments to tutorials 10 and 11 to remove DeprecationWarnings.
+- **Fixes to the documentation** documentation and example notebooks were updated to be compatible with the latest changes to the framework (#530, #537, #543)
+- **postgresql17** - using the docker container in the default compose.yml requires to backup or delete the existing assume-db folder. Afterwards, no permission changes should be required anymore when setting up the DB (#541)
 
 v0.5.0 - (10th December 2024)
 ===========================================
