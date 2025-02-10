@@ -460,7 +460,7 @@ class WriteOutput(Role):
         if not self.db and not self.export_csv_path:
             return
 
-        # Merge rl_critic_params to rl_params before uploading to db
+        # If both rl_critic_params and rl_params exist, merge them before uploading to db
         if (
             "rl_params" in self.write_buffers
             and "rl_critic_params" in self.write_buffers
@@ -471,7 +471,7 @@ class WriteOutput(Role):
             merged_list = merged_df.to_dict("records")
             self.write_buffers["rl_params"] = merged_list
             del self.write_buffers["rl_critic_params"]
-        # if only rl_critic_params are present, rename them to rl_params
+        # elif only rl_critic_params exist, rename them to rl_params
         elif "rl_critic_params" in self.write_buffers:
             self.write_buffers["rl_params"] = self.write_buffers["rl_critic_params"]
             del self.write_buffers["rl_critic_params"]
