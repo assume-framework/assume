@@ -35,7 +35,6 @@ class Learning(Role):
     def __init__(
         self,
         learning_config: LearningConfig,
-        episodes_collecting_initial_experience: int,
         start: datetime = None,
         end: datetime = None,
     ):
@@ -311,8 +310,7 @@ class Learning(Role):
             This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
         if self.episodes_done >= self.episodes_collecting_initial_experience:
-            learning_rate, unit_params = self.rl_algorithm.update_policy()
-            self.write_rl_critic_params_to_output(learning_rate, unit_params)
+            self.rl_algorithm.update_policy()
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """

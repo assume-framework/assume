@@ -269,7 +269,6 @@ class World:
 
             self.learning_role = Learning(
                 self.learning_config,
-                self.episodes_collecting_initial_experience,
                 start=self.start,
                 end=self.end,
             )

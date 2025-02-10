@@ -622,4 +622,4 @@ class TD3(RLAlgorithm):
                 polyak_update(all_critic_params, all_target_critic_params, self.tau)
                 polyak_update(all_actor_params, all_target_actor_params, self.tau)
 
-        return learning_rate, unit_params
+        self.learning_role.write_rl_critic_params_to_output(learning_rate, unit_params)
