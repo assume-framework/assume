@@ -205,8 +205,8 @@ class RLStrategy(AbstractLearningStrategy):
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
-        elif Path(kwargs["trained_policies_save_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
+        elif Path(kwargs["trained_policies_load_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
         else:
             raise FileNotFoundError(
                 f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
@@ -747,8 +747,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
-        elif Path(kwargs["trained_policies_save_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_save_path"])
+        elif Path(kwargs["trained_policies_load_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
         else:
             raise FileNotFoundError(
                 f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
