@@ -386,7 +386,10 @@ class TD3(RLAlgorithm):
         n_rl_agents = len(strategies)
 
         # Randomly select a subset of strategies to update
-        selected_strategies = random.sample(strategies, k=int(n_rl_agents / 3))
+        if n_rl_agents > 3:
+            selected_strategies = random.sample(strategies, k=int(n_rl_agents / 3))
+        else:
+            selected_strategies = strategies
 
         # update noise decay and learning rate
         updated_noise_decay = self.learning_role.calc_noise_from_progress(
