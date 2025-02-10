@@ -968,7 +968,7 @@ def run_learning(
 
         world.run()
 
-        world.tensor_board_logger.update_tensorboard()
+        world.learning_role.tensor_board_logger.update_tensorboard()
 
         # -----------------------------------------
         # Store updated information across episodes
@@ -996,7 +996,7 @@ def run_learning(
 
             world.run()
 
-            world.tensor_board_logger.update_tensorboard()
+            world.learning_role.tensor_board_logger.update_tensorboard()
 
             total_rewards = world.output_role.get_sum_reward()
 

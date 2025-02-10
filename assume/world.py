@@ -66,13 +66,11 @@ class World:
         market_operators (dict[str, mango.RoleAgent]): The market operators for the world instance.
         markets (dict[str, MarketConfig]): The markets for the world instance.
         unit_operators (dict[str, UnitsOperator]): The unit operators for the world instance.
-        learning_operators (dict[str, RoleAgent]): The learning operators for the world instance.
         unit_types (dict[str, BaseUnit]): The unit types for the world instance.
         bidding_strategies (dict[str, type[BaseStrategy]]): The bidding strategies for the world instance.
         clearing_mechanisms (dict[str, MarketRole]): The clearing mechanisms for the world instance.
         addresses (list[str]): The addresses for the world instance.
         loop (asyncio.AbstractEventLoop): The event loop for the world instance.
-        tensor_board_logger (TensorBoardLogger): The tensor board logger for the world instance.
         clock (ExternalClock): The external clock for the world instance.
         start (datetime.datetime): The start datetime for the simulation.
         end (datetime.datetime): The end datetime for the simulation.
@@ -134,7 +132,6 @@ class World:
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
-        self.learning_operators: dict[str, RoleAgent] = {}
         self.unit_types = unit_types
         self.dst_components = demand_side_technologies
 
@@ -154,8 +151,6 @@ class World:
         nest_asyncio.apply()
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-
-        self.tensor_board_logger = None
 
     def setup(
         self,
@@ -263,14 +258,9 @@ class World:
         if self.learning_mode or self.perform_evaluation:
             # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
-            from assume.reinforcement_learning.tensorboard_logger import (
-                TensorBoardLogger,
-            )
 
             self.learning_role = Learning(
-                self.learning_config,
-                start=self.start,
-                end=self.end,
+                self.learning_config, start=self.start, end=self.end
             )
 
             # separate process does not support buffer and learning
@@ -282,36 +272,18 @@ class World:
             )
             rl_agent.suspendable_tasks = False
 
-            id = "Learning_1"
-            # add Learning_1 to the list of learning operators if not already existing
-            if self.learning_operators.get(id):
-                raise ValueError(f"LearningOperator {id} already exists")
-
-            learning_role_agent = RoleAgent()
-            learning_role_agent.add_role(self.learning_role)
-            self.container.register(learning_role_agent, suggested_aid=id)
-            learning_role_agent.suspendable_tasks = False
-
-            # after creation of an agent - we set additional context params
-            learning_role_agent._role_context.data.update(
+            rl_agent._role_context.data.update(
                 {
                     "output_agent_addr": self.output_agent_addr,
+                    "simulation_id": simulation_id,
+                    "db_uri": self.db_uri,
                     "train_start": self.start,
                     "train_end": self.end,
                     "freq": self.forecaster.index.freq,
                 }
             )
 
-            self.learning_operators[id] = learning_role_agent
-
-            self.tensor_board_logger = TensorBoardLogger(
-                simulation_id=simulation_id,
-                db_uri=self.db_uri,
-                tensorboard_path=f"{self.learning_config.get('trained_policies_save_path', 'logs')}/TB",
-                learning_mode=self.learning_mode,
-                episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
-                perform_evaluation=self.perform_evaluation,
-            )
+            self.learning_role.init_logging()
 
     def setup_output_agent(self, simulation_id: str, save_frequency_hours: int) -> None:
         """
@@ -731,7 +703,6 @@ class World:
         self.market_operators = {}
         self.markets = {}
         self.unit_operators = {}
-        self.learning_operators = {}
         self.forecast_providers = {}
 
     def add_unit(
