@@ -106,7 +106,8 @@ class TensorBoardLogger:
             episodes_collecting_initial_experience
         )
 
-        self.writer = SummaryWriter(tensorboard_path)
+        self.tensorboard_path = tensorboard_path
+        self.writer = None  # Delay creation of SummaryWriter
         self.db_uri = db_uri
         if self.db_uri:
             self.db = create_engine(self.db_uri)
@@ -122,6 +123,11 @@ class TensorBoardLogger:
         """Store episodic evaluation data in tensorboard"""
         if not (self.episode and self.learning_mode):
             return
+
+        if self.writer is None:
+            self.writer = SummaryWriter(
+                self.tensorboard_path
+            )  # Create SummaryWriter here
 
         mode = "train" if not self.perform_evaluation else "eval"
 
@@ -218,6 +224,6 @@ class TensorBoardLogger:
         """
         Deletes the WriteOutput instance.
         """
-        if hasattr(self, "writer"):
+        if hasattr(self, "writer") and self.writer is not None:
             self.writer.flush()
             self.writer.close()
