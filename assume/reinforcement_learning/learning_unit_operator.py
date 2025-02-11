@@ -126,6 +126,7 @@ class RLUnitsOperator(UnitsOperator):
                 output_dict = {
                     "datetime": start,
                     "unit": unit.id,
+                    "initial_exploration": strategy.collect_initial_experience_mode,
                 }
 
                 if isinstance(strategy, RLAdvancedOrderStrategy):

@@ -193,8 +193,8 @@ class RLStrategy(AbstractLearningStrategy):
         self.order_types = kwargs.get("order_types", ["SB"])
 
         if self.learning_mode or self.perform_evaluation:
-            self.collect_initial_experience_mode = kwargs.get(
-                "episodes_collecting_initial_experience", True
+            self.collect_initial_experience_mode = bool(
+                kwargs.get("episodes_collecting_initial_experience", True)
             )
 
             self.action_noise = NormalActionNoise(
@@ -725,8 +725,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
         self.order_types = kwargs.get("order_types", ["SB"])
 
         if self.learning_mode or self.perform_evaluation:
-            self.collect_initial_experience_mode = kwargs.get(
-                "episodes_collecting_initial_experience", True
+            self.collect_initial_experience_mode = bool(
+                kwargs.get("episodes_collecting_initial_experience", True)
             )
 
             self.action_noise = NormalActionNoise(

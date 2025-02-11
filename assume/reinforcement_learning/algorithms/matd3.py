@@ -377,7 +377,6 @@ class TD3(RLAlgorithm):
             6. Update the actor network if the specified policy delay is reached.
             7. Apply Polyak averaging to update target networks.
 
-            This function implements the TD3 algorithm's key step for policy improvement and exploration.
         """
 
         logger.debug("Updating Policy")
@@ -385,6 +384,13 @@ class TD3(RLAlgorithm):
         # Stack strategies for easier access
         strategies = list(self.learning_role.rl_strats.values())
         n_rl_agents = len(strategies)
+        unit_params = [
+            {
+                u_id: {"loss": None, "total_grad_norm": None, "max_grad_norm": None}
+                for u_id in self.learning_role.rl_strats.keys()
+            }
+            for _ in range(self.gradient_steps)
+        ]
 
         # update noise decay and learning rate
         updated_noise_decay = self.learning_role.calc_noise_from_progress(
@@ -406,7 +412,7 @@ class TD3(RLAlgorithm):
             )
             strategy.action_noise.update_noise_decay(updated_noise_decay)
 
-        for _ in range(self.gradient_steps):
+        for step in range(self.gradient_steps):
             self.n_updates += 1
 
             transitions = self.learning_role.buffer.sample(self.batch_size)
@@ -507,6 +513,9 @@ class TD3(RLAlgorithm):
                     F.mse_loss(current_q, target_Q_values)
                     for current_q in current_Q_values
                 )
+
+                # Store the critic loss for this unit ID
+                unit_params[step][strategy.unit_id]["loss"] = critic_loss.item()
                 total_critic_loss += critic_loss
 
             # Single backward pass for all agents' critics
@@ -514,8 +523,18 @@ class TD3(RLAlgorithm):
 
             # Clip the gradients and step each critic optimizer
             for strategy in strategies:
-                th.nn.utils.clip_grad_norm_(strategy.critics.parameters(), max_norm=1.0)
+                parameters = list(strategy.critics.parameters())
+
+                # Determine clipping statistics
+                max_grad_norm = max(p.grad.norm() for p in parameters)
+
+                # Perform clipping
+                total_norm = th.nn.utils.clip_grad_norm_(parameters, max_norm=1.0)
                 strategy.critics.optimizer.step()
+
+                # Store clipping statistics
+                unit_params[step][strategy.unit_id]["total_grad_norm"] = total_norm
+                unit_params[step][strategy.unit_id]["max_grad_norm"] = max_grad_norm
 
             ######################################################################
             # ACTOR UPDATE (DELAYED): Accumulate losses for all agents in one pass
@@ -596,3 +615,5 @@ class TD3(RLAlgorithm):
                 # Perform batch-wise Polyak update (NO LOOPS)
                 polyak_update(all_critic_params, all_target_critic_params, self.tau)
                 polyak_update(all_actor_params, all_target_actor_params, self.tau)
+
+        self.learning_role.write_rl_critic_params_to_output(learning_rate, unit_params)
