@@ -130,51 +130,92 @@ class TensorBoardLogger:
 
         mode = "train" if not self.perform_evaluation else "eval"
 
-        # columns specific to the training mode.
-        train_columns = """,
-            AVG(regret) AS regret,
-            AVG(critic_loss) AS loss,
+        # Dynamically detect noise columns in database
+        query_columns = (
+            "PRAGMA table_info(rl_params)"
+            if self.db.dialect.name == "sqlite"
+            else """
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'rl_params'
+        """
+        )
+        columns_df = pd.read_sql(query_columns, self.db)
+
+        column_names = (
+            columns_df["name"].tolist()
+            if self.db.dialect.name == "sqlite"
+            else columns_df["column_name"].tolist()
+        )
+        noise_columns = [
+            col for col in column_names if col.startswith("exploration_noise_")
+        ]
+        noise_sql = (
+            ", ".join([f"AVG({col}) AS {col}" for col in noise_columns])
+            if noise_columns
+            else ""
+        )
+
+        # Define the SQL query dynamically
+        critic_columns = (
+            """AVG(critic_loss) AS loss,
             AVG(total_grad_norm) AS total_grad_norm,
             MAX(max_grad_norm) AS max_grad_norm,
-            AVG(learning_rate) AS lr,
-            AVG(exploration_noise_0) AS noise_0,
-            AVG(exploration_noise_1) AS noise_1
-            """
+            AVG(learning_rate) AS lr
+        """
+            if mode == "train"
+            and self.episode > self.episodes_collecting_initial_experience
+            else ""
+        )
 
-        # Use appropriate date function and parameter style based on database type
-        if self.db.dialect.name == "sqlite":
-            # To aggregate by hour instead of day, replace '%Y-%m-%d' with '%Y-%m-%d %H'
-            # To aggregate by month instead of day, replace '%Y-%m-%d' with '%Y-%m'
-            date_func = "strftime('%Y-%m-%d', datetime)"
-        elif self.db.dialect.name == "postgresql":
-            # To aggregate by hour instead of day, replace 'YYYY-MM-DD' with 'YYYY-MM-DD HH24'
-            # To aggregate by month instead of day, replace 'YYYY-MM-DD' with 'YYYY-MM'
-            date_func = "TO_CHAR(datetime, 'YYYY-MM-DD')"
+        date_func = (
+            "strftime('%Y-%m-%d', datetime)"
+            if self.db.dialect.name == "sqlite"
+            else "TO_CHAR(datetime, 'YYYY-MM-DD')"
+        )
 
+        # Dynamically build the SQL query, ensuring proper commas
+        query_parts = [
+            f"{date_func} AS dt",
+            "unit",
+            "SUM(profit) AS profit",
+            "SUM(reward) AS reward",
+        ]
+
+        # Add regret column if it exists
+        if "regret" in column_names:
+            query_parts.append("SUM(regret) AS regret")
+
+        # Add critic-related columns (if any)
+        if critic_columns:
+            query_parts.append(critic_columns)
+
+        # Add noise columns (if any)
+        if noise_sql:
+            query_parts.append(noise_sql)
+
+        # Build the final SQL query
         query = f"""
             SELECT
-                {date_func} AS dt,
-                unit,
-                AVG(profit) AS profit,
-                AVG(reward) AS reward
-                {train_columns if mode == 'train' else ''}
+                {", ".join(query_parts)}
             FROM rl_params
             WHERE episode = '{self.episode}'
             AND simulation = '{self.simulation_id}'
             AND perform_evaluation = {self.perform_evaluation}
-            {'AND initial_exploration = False' if mode == 'train' else ''}
             GROUP BY dt, unit
             ORDER BY dt
         """
+
         try:
-            # Add intro text for first episode
+            # Add TensorBoard introduction text only in the first training episode
             if self.episode == 1 and mode == "train":
                 self.writer.add_text("TensorBoard Introduction", tensorboard_intro)
 
-            # Process dataframe
+            # Load query results into a DataFrame
             df = pd.read_sql(query, self.db)
             df["dt"] = pd.to_datetime(df["dt"])
-            df = df.fillna(0.0)
+
+            # Fill missing numeric values
+            df.fillna(0.0, inplace=True)
 
             # Calculate x_index
             datetimes = df["dt"].unique()
@@ -182,42 +223,39 @@ class TensorBoardLogger:
             if mode == "train":
                 x_index -= self.episodes_collecting_initial_experience * len(datetimes)
 
-            # Define the order of metrics explicitly with prefixes
+            # Define metric order explicitly
             metric_order = {
-                "01_reward": "reward",
-                "02_profit": "profit",
-                "03_regret": "regret",
-                "04_learning_rate": "learning_rate",
-                "05_loss": "loss",
-                "06_total_grad_norm": "total_grad_norm",
-                "07_max_grad_norm": "max_grad_norm",
-                "08_noise": "noise",
+                "02_reward": "reward",
+                "03_profit": "profit",
+                "04_regret": "regret",
+                "05_learning_rate": "learning_rate",
+                "06_loss": "loss",
+                "07_total_grad_norm": "total_grad_norm",
+                "08_max_grad_norm": "max_grad_norm",
+                "09_noise": "noise",
             }
 
-            # Process metrics for each timestamp
-            for i, time in enumerate(datetimes):
-                time_df = df[df["dt"] == time]
+            # Group data upfront instead of filtering repeatedly
+            grouped_data = df.groupby("dt")
 
-                # Define and compute metrics
+            # Process metrics for each timestamp
+            for i, (_, time_df) in enumerate(grouped_data):
                 metric_dicts = {
                     "reward": {"avg": time_df["reward"].mean()},
                     "profit": {"avg": time_df["profit"].mean()},
                 }
 
                 if mode == "train":
-                    # Dynamically detect noise columns
-                    noise_columns = [
-                        col for col in time_df.columns if col.startswith("noise_")
-                    ]
+                    # Compute noise dynamically
+                    noise_values = [time_df[col].abs().mean() for col in noise_columns]
                     noise_avg = (
-                        sum(time_df[col].abs().mean() for col in noise_columns)
-                        / len(noise_columns)
-                        if noise_columns
-                        else 0.0
+                        sum(noise_values) / len(noise_values) if noise_values else 0.0
                     )
 
+                    # Update training-specific metrics
                     metric_dicts.update(
                         {
+                            "noise": {"avg": noise_avg},
                             "regret": {"avg": time_df["regret"].mean()}
                             if "regret" in time_df
                             else {"avg": 0.0},
@@ -235,27 +273,29 @@ class TensorBoardLogger:
                             "max_grad_norm": {"avg": time_df["max_grad_norm"].mean()}
                             if "max_grad_norm" in time_df
                             else {"avg": 0.0},
-                            "noise": {
-                                "avg": noise_avg
-                            },  # Dynamically computed noise average
                         }
                     )
 
                 # Log metrics in the specified order using prefixed names
                 for prefixed_name, metric in metric_order.items():
-                    if (
-                        metric in metric_dicts
-                    ):  # Ensure the metric exists before logging
+                    if metric in metric_dicts:
                         self.writer.add_scalar(
                             f"{mode}/{prefixed_name}",
                             metric_dicts[metric]["avg"],
                             x_index + i,
                         )
 
-        except (ProgrammingError, OperationalError, DataError):
+            # Log episode-level reward
+            episode_reward_avg = df.groupby("unit")["reward"].sum().mean()
+            self.writer.add_scalar(
+                f"{mode}/01_episode_reward", episode_reward_avg, self.episode
+            )
+
+        except (ProgrammingError, OperationalError, DataError) as db_error:
+            logger.error(f"Database error while reading query: {db_error}")
             return
         except Exception as e:
-            logger.error("could not read query: %s", e)
+            logger.error(f"Unexpected error in update_tensorboard: {e}")
             return
 
     def __del__(self):

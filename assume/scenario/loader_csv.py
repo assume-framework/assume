@@ -919,16 +919,16 @@ def run_learning(
             if os.path.exists(save_path):
                 shutil.rmtree(save_path, ignore_errors=True)
 
-            # also remove tensorboard logs
-            tensorboard_path = f"tensorboard/{scenario_data['sim_id']}"
-            if os.path.exists(tensorboard_path):
-                shutil.rmtree(tensorboard_path, ignore_errors=True)
-
         else:
             # stop here - do not start learning or save anything
             raise AssumeException(
                 "Simulation aborted by user not to overwrite existing learned strategies. You can use 'simulation_id' parameter in the config to start a new simulation."
             )
+
+    # also remove tensorboard logs
+    tensorboard_path = f"tensorboard/{scenario_data['sim_id']}"
+    if os.path.exists(tensorboard_path):
+        shutil.rmtree(tensorboard_path, ignore_errors=True)
 
     # -----------------------------------------
     # Information that needs to be stored across episodes, aka one simulation run
