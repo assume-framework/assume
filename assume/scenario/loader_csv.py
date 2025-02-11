@@ -902,6 +902,10 @@ def run_learning(
     actors_and_critics = None
     world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
 
+    # -----------------------------------------
+    # Load scenario data to reuse across episodes
+    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
+
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
 
@@ -911,18 +915,20 @@ def run_learning(
             f"{save_path=} exists - should we overwrite current learned strategies? (y/N) "
         )
         if accept.lower().startswith("y"):
-            # remove existing tensorboard log directory
+            # remove existing policies
             if os.path.exists(save_path):
                 shutil.rmtree(save_path, ignore_errors=True)
+
+            # also remove tensorboard logs
+            tensorboard_path = f"tensorboard/{scenario_data['sim_id']}"
+            if os.path.exists(tensorboard_path):
+                shutil.rmtree(tensorboard_path, ignore_errors=True)
+
         else:
             # stop here - do not start learning or save anything
             raise AssumeException(
                 "Simulation aborted by user not to overwrite existing learned strategies. You can use 'simulation_id' parameter in the config to start a new simulation."
             )
-
-    # -----------------------------------------
-    # Load scenario data to reuse across episodes
-    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
 
     # -----------------------------------------
     # Information that needs to be stored across episodes, aka one simulation run
@@ -1022,9 +1028,14 @@ def run_learning(
         world.reset()
 
         # save the policies after each episode in case the simulation is stopped or crashes
-        world.learning_role.rl_algorithm.save_params(
-            directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
-        )
+        if (
+            episode
+            >= world.learning_role.episodes_collecting_initial_experience
+            + validation_interval
+        ):
+            world.learning_role.rl_algorithm.save_params(
+                directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
+            )
 
     # container shutdown implicitly with new initialisation
     logger.info("################")

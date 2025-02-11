@@ -125,9 +125,8 @@ class TensorBoardLogger:
             return
 
         if self.writer is None:
-            self.writer = SummaryWriter(
-                self.tensorboard_path
-            )  # Create SummaryWriter here
+            sim_id = self.simulation_id.replace("_eval", "").rsplit("_", 1)[0]
+            self.writer = SummaryWriter(log_dir=os.path.join("tensorboard", sim_id))
 
         mode = "train" if not self.perform_evaluation else "eval"
 
@@ -183,36 +182,75 @@ class TensorBoardLogger:
             if mode == "train":
                 x_index -= self.episodes_collecting_initial_experience * len(datetimes)
 
+            # Define the order of metrics explicitly with prefixes
+            metric_order = {
+                "01_reward": "reward",
+                "02_profit": "profit",
+                "03_regret": "regret",
+                "04_learning_rate": "learning_rate",
+                "05_loss": "loss",
+                "06_total_grad_norm": "total_grad_norm",
+                "07_max_grad_norm": "max_grad_norm",
+                "08_noise": "noise",
+            }
+
             # Process metrics for each timestamp
             for i, time in enumerate(datetimes):
                 time_df = df[df["dt"] == time]
 
-                # Build metrics dictionary
-                unit_metrics = ["reward", "profit"] + (
-                    ["regret", "loss", "total_grad_norm", "max_grad_norm"]
-                    if mode == "train"
-                    else []
-                )
+                # Define and compute metrics
                 metric_dicts = {
-                    metric: {
-                        **time_df.set_index("unit")[metric].to_dict(),
-                        "avg": time_df[metric].mean(),
-                    }
-                    for metric in unit_metrics
+                    "reward": {"avg": time_df["reward"].mean()},
+                    "profit": {"avg": time_df["profit"].mean()},
                 }
 
-                # Add training-specific metrics
                 if mode == "train":
-                    metric_dicts["learning_rate"] = {"": time_df["lr"].iloc[0]}
-                    metric_dicts["noise"] = {
-                        f"{i}": time_df[f"noise_{i}"].abs().mean() for i in range(2)
-                    }
-                plot_order = ["a)", "b)", "c)", "d)", "e)", "f)", "g)", "h)"]
-                # Write to tensorboard
-                for order, (metric, values) in enumerate(metric_dicts.items()):
-                    self.writer.add_scalars(
-                        f"{mode}/{plot_order[order]} {metric}", values, x_index + i
+                    # Dynamically detect noise columns
+                    noise_columns = [
+                        col for col in time_df.columns if col.startswith("noise_")
+                    ]
+                    noise_avg = (
+                        sum(time_df[col].abs().mean() for col in noise_columns)
+                        / len(noise_columns)
+                        if noise_columns
+                        else 0.0
                     )
+
+                    metric_dicts.update(
+                        {
+                            "regret": {"avg": time_df["regret"].mean()}
+                            if "regret" in time_df
+                            else {"avg": 0.0},
+                            "learning_rate": {"avg": time_df["lr"].iat[0]}
+                            if "lr" in time_df
+                            else {"avg": 0.0},
+                            "loss": {"avg": time_df["loss"].mean()}
+                            if "loss" in time_df
+                            else {"avg": 0.0},
+                            "total_grad_norm": {
+                                "avg": time_df["total_grad_norm"].mean()
+                            }
+                            if "total_grad_norm" in time_df
+                            else {"avg": 0.0},
+                            "max_grad_norm": {"avg": time_df["max_grad_norm"].mean()}
+                            if "max_grad_norm" in time_df
+                            else {"avg": 0.0},
+                            "noise": {
+                                "avg": noise_avg
+                            },  # Dynamically computed noise average
+                        }
+                    )
+
+                # Log metrics in the specified order using prefixed names
+                for prefixed_name, metric in metric_order.items():
+                    if (
+                        metric in metric_dicts
+                    ):  # Ensure the metric exists before logging
+                        self.writer.add_scalar(
+                            f"{mode}/{prefixed_name}",
+                            metric_dicts[metric]["avg"],
+                            x_index + i,
+                        )
 
         except (ProgrammingError, OperationalError, DataError):
             return
