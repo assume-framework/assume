@@ -403,20 +403,31 @@ class Learning(Role):
                         return True
             return False
 
-    def init_logging(self):
+    def init_logging(
+        self,
+        simulation_id: str,
+        db_uri: str,
+        output_agent_addr: str,
+        train_start: str,
+        freq: str,
+    ):
         """
         Initialize the logging for the reinforcement learning agent.
 
         This method initializes the tensor board logger for the reinforcement learning agent.
         It also initializes the parameters required for sending data to the output role.
 
-        Notes:
-            This method is typically called at the beginning of the training process to enable logging.
+        Args:
+            simulation_id (str): The unique identifier for the simulation.
+            db_uri (str): URI for connecting to the database.
+            output_agent_addr (str): The address of the output agent.
+            train_start (str): The start time of simulation.
+            freq (str): The frequency of simulation.
         """
 
         self.tensor_board_logger = TensorBoardLogger(
-            simulation_id=self.context.data.get("simulation_id"),
-            db_uri=self.context.data.get("db_uri"),
+            simulation_id=simulation_id,
+            db_uri=db_uri,
             tensorboard_path=self.tensor_board_path,
             learning_mode=self.learning_mode,
             episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
@@ -424,11 +435,11 @@ class Learning(Role):
         )
 
         # Parameters required for sending data to the output role
-        self.db_addr = self.context.data.get("output_agent_addr")
+        self.db_addr = output_agent_addr
 
-        self.datetime = pd.to_datetime(self.context.data.get("train_start"))
+        self.datetime = pd.to_datetime(train_start)
 
-        self.freq_timedelta = pd.Timedelta(self.context.data.get("freq"))
+        self.freq_timedelta = pd.Timedelta(freq)
         # This is for padding the output list when the gradient steps are not identical to the train frequency
         self.time_steps = int(
             pd.Timedelta(self.train_freq) / (self.freq_timedelta * self.gradient_steps)

@@ -377,12 +377,6 @@ class TD3(RLAlgorithm):
             6. Update the actor network if the specified policy delay is reached.
             7. Apply Polyak averaging to update target networks.
 
-            This function implements the TD3 algorithm's key step for policy improvement and exploration.
-
-        Returns:
-            tuple: (learning_rate, unit_params) where:
-                - learning_rate (float): The current learning rate
-                - unit_params (list[dict]): Critic losses for each agent in each gradient step
         """
 
         logger.debug("Updating Policy")
