@@ -61,6 +61,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         components: dict[str, dict] = None,
         objective: str = None,
         flexibility_measure: str = "",
+        peak_load_cap: float = 0,
         demand: float = 0,
         cost_tolerance: float = 10,
         **kwargs,
@@ -99,6 +100,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.hydrogen_price = self.forecaster["price_hydrogen"]
         self.electricity_price = self.forecaster["price_EOM"]
         self.electricity_price_flex = self.forecaster["price_EOM_flex"]
+        self.opt_power = self.forecaster["opt_power"]
         self.grinder_availability_profile = self.forecaster[
             "grinder_availability_profile"
         ]
@@ -111,6 +113,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
+        self.peak_load_cap = peak_load_cap
 
         # Initialize component flags
         self.has_raw_mill = "raw_material_mill" in self.components.keys()
@@ -194,6 +197,10 @@ class CementPlant(DSMFlex, SupportsMinMax):
             },
         )
         self.model.cement_demand = pyo.Param(initialize=self.cement_demand)
+        # self.model.opt_power = pyo.Param(
+        #     self.model.time_steps,
+        #     initialize={t: value for t, value in enumerate(self.opt_power)},
+        # )
 
     def define_variables(self):
         self.model.total_power_input = pyo.Var(
@@ -818,7 +825,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 )
 
                 # Weighted sum of both objectives (adjust weights as needed)
-                return 0.5 * normalized_deviation + 0.5 * normalized_cost
+                return 0.6 * normalized_deviation + 0.4 * normalized_cost
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
@@ -870,7 +877,20 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 )
 
                 # Weighted sum of both objectives (adjust weights as needed)
-                return 0.7 * normalized_deviation + 0.3 * normalized_cost
+                return 0.6 * normalized_deviation + 0.4 * normalized_cost
+            
+        if self.flexibility_measure == "peak_load_shifting":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_flex(m):
+                """
+                Maximizes the load shift over all time steps.
+                """
+                maximise_load_shift = pyo.quicksum(
+                    m.load_shift_neg[t] * m.peak_indicator[t] for t in m.time_steps
+                )
+
+                return maximise_load_shift
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """

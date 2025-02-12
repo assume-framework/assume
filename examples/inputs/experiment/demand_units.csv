@@ -1,5 +1,0 @@
-name,technology,bidding_EOM,bidding_LTM_OTC,max_power,min_power,node,unit_operator,bidding_redispatch,bidding_CRM_pos,bidding_CRM_neg
-demand_EOM1,inflex_demand,naive_eom,otc_strategy,500,0,north,eom_de1,naive_redispatch,,
-demand_EOM2,inflex_demand,naive_eom,otc_strategy,650,0,south,eom_de1,naive_redispatch,,
-demand_CRM_pos,reserve_capacity,,,50,0,north,crm_de,,naive_pos_reserve,
-demand_CRM_neg,reserve_capacity,,,50,0,south,crm_de,,,naive_neg_reserve

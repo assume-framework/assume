@@ -172,7 +172,7 @@ class NaiveDADSMStrategy(BaseStrategy):
 
         # Calculate the baseline threshold (80% of maximum power requirement)
         max_power = max(unit.opt_power_requirement)
-        baseline_threshold = 0.7 * max_power
+        baseline_threshold = 0.5 * max_power
 
         bids = []
         for product in product_tuples:
@@ -271,7 +271,7 @@ class OTC_DSM_Strategy(BaseStrategy):
         """
         if unit.optimisation_counter == 0:
             unit.determine_optimal_operation_with_flex()
-            self.plot_power_requirements(unit)
+            # self.plot_power_requirements(unit)
             unit.optimisation_counter = 1
 
         # Calculate the baseline threshold (70% of maximum power requirement)

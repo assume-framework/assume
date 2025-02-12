@@ -1,6 +1,0 @@
-name,unit_type,technology,node,bidding_EOM,bidding_LTM_OTC,bidding_CRM_neg,bidding_CRM_pos,unit_operator,objective,flexibility_measure,cost_tolerance,demand,fuel_type,max_power,min_power,ramp_up,ramp_down,min_operating_steps,min_down_steps,efficiency,specific_thermal_consumption,specific_electricity_consumption,clinker_to_cement_ratio,limestone_to_clinker_ratio,calcination_emission_factor,start_price,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_operating_hours,availability_profile,max_processing_rate
-A360,cement_plant,clinker_system,south,naive_da_dsm,otc_dsm_strategy,dsm_neg_crm,dsm_pos_crm,dsm_operator,min_deviation,cost_based_load_shift,0,2700,hydrogen,10.5,0,1.03,1.03,168,168,,0.97,0.025,0.5,1.5,0.507,,,,,,,,,,24,no,
-A360,cement_plant,cement_mill,,,,,,,,,,,,0.55,0,0.055,0.055,0,0,1,,0.026,,,,,,,,,,,,,20,no,
-A360,cement_plant,electrolyser,,,,,,,,,,,,11,0,11,11,0,0,0.8,,,,,,,,,,,,,,,,,
-A360,cement_plant,ccs_system,,,,,,,,,,,,20,0,20,20,0,0,1,,0.1,,,,,20,,,,,,,,24,,4.6
-A360,cement_plant,clinker_inventory,,,,,,,,,,,,1000,0,1000,1000,,,,,,,,,,1000,0,1000,1000,0,0,1,1,,,

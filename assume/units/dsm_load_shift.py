@@ -270,7 +270,7 @@ class DSMFlex:
             model (pyomo.ConcreteModel): The Pyomo model being optimized.
         """
 
-        max_load = max(self.opt_power_requirement)
+        max_load = max(self.opt_power)
 
         peak_load_cap_value = max_load * (
             self.peak_load_cap / 100
@@ -279,7 +279,7 @@ class DSMFlex:
         model.peak_load_cap_value = pyo.Param(initialize=peak_load_cap_value)
 
         # Parameters
-        model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
+        # model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
         model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
         # Variables for load shifting
@@ -314,18 +314,37 @@ class DSMFlex:
         # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_peak_shift(m, t):
-            if self.has_electrolyser:
+            if self.technology == "steel_plant":
+                if self.has_electrolyser:
+                    return (
+                        m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                        == m.dsm_blocks["electrolyser"].power_in[t]
+                        + m.dsm_blocks["eaf"].power_in[t]
+                        + m.dsm_blocks["dri_plant"].power_in[t]
+                    )
+                else:
+                    return (
+                        m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                        == m.dsm_blocks["eaf"].power_in[t]
+                        + m.dsm_blocks["dri_plant"].power_in[t]
+                    )
+            if self.technology == "cement_plant":
+                power_input = 0
+                if self.has_raw_mill:
+                    power_input += self.model.dsm_blocks["raw_material_mill"].power_in[
+                        t
+                    ]
+                if self.has_cement_mill:
+                    power_input += self.model.dsm_blocks["cement_mill"].power_in[t]
+                if self.has_clinker_system:
+                    power_input += self.model.dsm_blocks["clinker_system"].power_in[t]
+                if self.has_ccs_system:
+                    power_input += self.model.dsm_blocks["ccs_system"].power_in[t]
+                if self.has_electrolyser:
+                    power_input += self.model.dsm_blocks["electrolyser"].power_in[t]
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                )
-            else:
-                return (
-                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    == power_input
                 )
 
         @model.Constraint(model.time_steps)
@@ -333,18 +352,37 @@ class DSMFlex:
             """
             Ensures that the power input during peak periods does not exceed the peak threshold value.
             """
-            if self.has_electrolyser:
+            if self.technology == "steel_plant":
+                if self.has_electrolyser:
+                    return (
+                        m.dsm_blocks["electrolyser"].power_in[t]
+                        + m.dsm_blocks["eaf"].power_in[t]
+                        + m.dsm_blocks["dri_plant"].power_in[t]
+                        <= peak_load_cap_value
+                    )
+                else:
+                    return (
+                        m.dsm_blocks["eaf"].power_in[t]
+                        + m.dsm_blocks["dri_plant"].power_in[t]
+                        <= peak_load_cap_value
+                    )
+            
+            if self.technology == "cement_plant":
+                power_input = 0
+                if self.has_raw_mill:
+                    power_input += self.model.dsm_blocks["raw_material_mill"].power_in[
+                        t
+                    ]
+                if self.has_cement_mill:
+                    power_input += self.model.dsm_blocks["cement_mill"].power_in[t]
+                if self.has_clinker_system:
+                    power_input += self.model.dsm_blocks["clinker_system"].power_in[t]
+                if self.has_ccs_system:
+                    power_input += self.model.dsm_blocks["ccs_system"].power_in[t]
+                if self.has_electrolyser:
+                    power_input += self.model.dsm_blocks["electrolyser"].power_in[t]
                 return (
-                    m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_load_cap_value
-                )
-            else:
-                return (
-                    m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_load_cap_value
+                     power_input <= peak_load_cap_value
                 )
 
     def renewable_utilisation(self, model):
@@ -423,6 +461,7 @@ class DSMFlex:
         if switch_flex_off:
             instance = self.switch_to_opt(instance)
         # solve the instance
+        self.solver_options["mipgap"] = 0.1  # Allows up to 10% deviation from optimal
         results = self.solver.solve(instance, options=self.solver_options)
 
         # Check solver status and termination condition
@@ -657,6 +696,8 @@ class DSMFlex:
         instance = self.model.create_instance()
         # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
         instance = self.switch_to_flex(instance)
+
+        self.solver_options["mipgap"] = 0.1  # Allows up to 10% deviation from optimal
         # solve the instance
         results = self.solver.solve(instance, options=self.solver_options)
 
@@ -727,16 +768,16 @@ class DSMFlex:
         time_steps = list(instance.time_steps)
         data = {
             "Time Step": time_steps,
-            "opt_power": self.opt_power_requirement,
+            "opt_power": self.opt_power,
             "flex_power": self.flex_power_requirement,
         }
         df = pd.DataFrame(data)
         df.to_excel(
-            "./examples/inputs/experiment/output/opt_power_requirement.xlsx",
+            "./examples/inputs/paper/output/opt_power_requirement.xlsx",
             index=False,
         )
         logger.debug(
-            f"Time series data saved to {"./examples/outputs/opt_power_requirement.xlsx"}"
+            f"Time series data saved to {"./examples/inputs/paper/output/opt_power_requirement.xlsx"}"
         )
 
     def switch_to_opt(self, instance):

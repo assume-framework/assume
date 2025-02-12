@@ -1,7 +1,0 @@
-name,unit_type,technology,node,bidding_EOM,unit_operator,objective,flexibility_measure,cost_tolerance,demand,fuel_type,max_power,min_power,ramp_up,ramp_down,min_operating_steps,min_down_steps,efficiency,specific_thermal_consumption,specific_electricity_consumption,clinker_to_cement_ratio,limestone_to_clinker_ratio,calcination_emission_factor,start_price,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_operating_hours,availability_profile,max_processing_rate
-A360,cement_plant,clinker_system,south,naive_da_dsm,dsm_operator,min_variable_cost,electricity_price_signal_based_flexibility,0,180800,hydrogen,10.5,0,1.03,1.03,0,0,,0.97,0.025,0.5,1.5,0.507,,,,,,,,,,24,no,
-A360,cement_plant,cement_mill,,,,,,,,,0.55,0,0.055,0.055,0,0,1,,0.026,,,,,,,,,,,,,20,no,
-A360,cement_plant,electrolyser,,,,,,,,,15.7,0,15.7,15.7,0,0,0.8,,,,,,,,,,,,,,,,,
-A360,cement_plant,ccs_system,,,,,,,,,20,0,20,20,0,0,1,,0.1,,,,,20,,,,,,,,24,,4.6
-A360,cement_plant,hydrogen_buffer_storage,,,,,,,,,480,0,480,480,,,,,,,,,,480,0,480,480,0,0,1,1,,,
-A360,cement_plant,clinker_inventory,,,,,,,,,1500,0,1500,1500,,,,,,,,,,1500,0,1500,1500,0,0,1,1,,,
