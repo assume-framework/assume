@@ -635,6 +635,10 @@ def setup_world(
 
         learning_config["trained_policies_save_path"] = path
 
+    learning_config["trained_policies_load_path"] = learning_config.get(
+        "trained_policies_load_path", learning_config["trained_policies_save_path"]
+    )
+
     config = replace_paths(config, scenario_data["path"])
 
     if learning_config.get("learning_mode", False) and not learning_config.get(
