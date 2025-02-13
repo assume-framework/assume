@@ -18,7 +18,6 @@ class RLAlgorithm:
     Args:
         learning_role (Learning Role object): Learning object
         learning_rate (float): learning rate for adam optimizer
-        episodes_collecting_initial_experience (int): how many steps of the model to collect transitions for before learning starts
         batch_size (int): Minibatch size for each gradient update
         tau (float): the soft update coefficient ("Polyak update", between 0 and 1)
         gamma (float): the discount factor
@@ -34,7 +33,6 @@ class RLAlgorithm:
         # init learning_role as object of Learning class
         learning_role,
         learning_rate=1e-4,
-        episodes_collecting_initial_experience=10,
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
@@ -48,9 +46,6 @@ class RLAlgorithm:
 
         self.learning_role = learning_role
         self.learning_rate = learning_rate
-        self.episodes_collecting_initial_experience = (
-            episodes_collecting_initial_experience
-        )
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau
