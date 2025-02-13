@@ -96,6 +96,12 @@ class CsvForecaster(Forecaster):
     Methods are included to retrieve forecasts for specific columns, availability of units,
     and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
+    Notes:
+    - Some built-in forecasts are calculated at the beginning of the simulation, such as price forecast and residual load forecast.
+    - Price forecast is calculated for energy-only markets using a merit order approach.
+    - Residual load forecast is calculated by subtracting the total available power from variable renewable energy power
+      plants from the overall demand forecast. Only power plants containing 'wind' or 'solar' in their technology column are considered VRE power plants.
+
     Args:
         index (pd.Series): The index of the forecasts.
         powerplants_units (pd.DataFrame): A DataFrame containing information about power plants.
