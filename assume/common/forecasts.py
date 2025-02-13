@@ -412,12 +412,12 @@ class CsvForecaster(Forecaster):
 
             # Find the first unit where the cumulative available power meets or exceeds demand.
             matching_units = cumsum_power[cumsum_power >= demand_t]
-            if not matching_units.empty:
-                # The marginal cost of the first unit that meets demand becomes the price.
-                price = sorted_mc.loc[matching_units.index[0]]
-            else:
+            if matching_units.empty:
                 # If available capacity is insufficient, set the price to 1000.
                 price = 1000.0
+            else:
+                # The marginal cost of the first unit that meets demand becomes the price.
+                price = sorted_mc.loc[matching_units.index[0]]
 
             price_forecast.loc[t] = price
 
