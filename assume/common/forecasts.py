@@ -393,7 +393,7 @@ class CsvForecaster(Forecaster):
         sum_demand = self.forecasts[demand_units.index].sum(axis=1)
 
         # 6. Initialize the price forecast series.
-        price_forecast = pd.Series(index=self.index, data=np.nan)
+        price_forecast = pd.Series(index=self.index, data=0.0)
 
         # 7. Loop over each time step
         for t in self.index:
