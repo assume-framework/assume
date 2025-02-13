@@ -461,7 +461,7 @@ class DSMFlex:
         if switch_flex_off:
             instance = self.switch_to_opt(instance)
         # solve the instance
-        self.solver_options["mipgap"] = 0.1  # Allows up to 10% deviation from optimal
+        # self.solver_options["mipgap"] = 0.1
         results = self.solver.solve(instance, options=self.solver_options)
 
         # Check solver status and termination condition
