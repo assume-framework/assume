@@ -554,7 +554,6 @@ def load_config_and_create_forecaster(
 
 def setup_world(
     world: World,
-    scenario_data: dict[str, object],
     perform_evaluation: bool = False,
     terminate_learning: bool = False,
     episode: int = 1,
@@ -578,7 +577,7 @@ def setup_world(
 
     """
     # make a deep copy of the scenario data to avoid changing the original data
-    scenario_data = copy.deepcopy(scenario_data)
+    scenario_data = copy.deepcopy(world.scenario_data)
 
     sim_id = scenario_data["sim_id"]
     config = scenario_data["config"]
@@ -797,12 +796,11 @@ def load_scenario_folder(
     """
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
-    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
-
-    setup_world(
-        world=world,
-        scenario_data=scenario_data,
+    world.scenario_data = load_config_and_create_forecaster(
+        inputs_path, scenario, study_case
     )
+
+    setup_world(world=world)
 
 
 def load_custom_units(
@@ -898,8 +896,7 @@ def run_learning(
     world.export_csv_path = ""
 
     # initialize policies already here to set the obs_dim and act_dim in the learning role
-    actors_and_critics = None
-    world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
+    world.learning_role.rl_algorithm.initialize_policy()
 
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
@@ -912,10 +909,6 @@ def run_learning(
         if not accept.lower().startswith("y"):
             # stop here - do not start learning or save anything
             raise AssumeException("don't overwrite existing strategies")
-
-    # -----------------------------------------
-    # Load scenario data to reuse across episodes
-    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
 
     # -----------------------------------------
     # Information that needs to be stored across episodes, aka one simulation run
@@ -947,9 +940,10 @@ def run_learning(
 
     # TODO: delete before release
     # delete old tensorboard logs
-    if Path(f"tensorboard/{scenario_data['sim_id']}").is_dir():
-        shutil.rmtree(f"tensorboard/{scenario_data['sim_id']}")
-    writer = SummaryWriter(log_dir=f"tensorboard/{scenario_data["sim_id"]}")
+    scenario_id = world.scenario_data["sim_id"]
+    if Path(f"tensorboard/{scenario_id}").is_dir():
+        shutil.rmtree(f"tensorboard/{scenario_id}")
+    writer = SummaryWriter(log_dir=f"tensorboard/{scenario_id}")
 
     for episode in tqdm(
         range(1, world.learning_role.training_episodes + 1),
@@ -957,7 +951,6 @@ def run_learning(
     ):
         setup_world(
             world=world,
-            scenario_data=scenario_data,
             episode=episode,
         )
 
@@ -993,7 +986,6 @@ def run_learning(
             # load evaluation run
             setup_world(
                 world=world,
-                scenario_data=scenario_data,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
             )
@@ -1049,7 +1041,6 @@ def run_learning(
     # load scenario for evaluation
     setup_world(
         world=world,
-        scenario_data=scenario_data,
         terminate_learning=True,
     )
 

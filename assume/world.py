@@ -128,6 +128,7 @@ class World:
                         logger.error("%s", e)
                     time.sleep(2)
 
+        self.scenario_data = {}
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
