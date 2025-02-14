@@ -863,9 +863,6 @@ def load_custom_units(
 
 def run_learning(
     world: World,
-    inputs_path: str,
-    scenario: str,
-    study_case: str,
     verbose: bool = False,
 ) -> None:
     """
@@ -929,6 +926,8 @@ def run_learning(
         "eval_episodes_done": 0,
     }
 
+    world.learning_role.load_inter_episodic_data(inter_episodic_data)
+
     # -----------------------------------------
 
     validation_interval = min(
@@ -949,14 +948,14 @@ def run_learning(
         range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
     ):
-        setup_world(
-            world=world,
-            episode=episode,
-        )
-
         # -----------------------------------------
         # Give the newly initialized learning role the needed information across episodes
-        world.learning_role.load_inter_episodic_data(inter_episodic_data)
+        if episode != 1:
+            setup_world(
+                world=world,
+                episode=episode,
+            )
+            world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
         world.run()
 
