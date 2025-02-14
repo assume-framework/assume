@@ -4,6 +4,7 @@
 
 import copy
 import logging
+import shutil
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,7 @@ import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
 import yaml
+from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from assume.common.base import LearningConfig
@@ -628,16 +630,12 @@ def setup_world(
         learning_config["perform_evaluation"] = False
 
     if not learning_config.get("trained_policies_save_path"):
-        if learning_config["learning_mode"]:
-            path = f"learned_strategies/{sim_id}"
-        else:
-            path = f"learned_strategies/{sim_id}/last_policies"
+        learning_config["trained_policies_save_path"] = f"learned_strategies/{sim_id}"
 
-        learning_config["trained_policies_save_path"] = path
-
-    learning_config["trained_policies_load_path"] = learning_config.get(
-        "trained_policies_load_path", learning_config["trained_policies_save_path"]
-    )
+    if not learning_config.get("trained_policies_load_path"):
+        learning_config["trained_policies_load_path"] = (
+            f"learned_strategies/{sim_id}/last_policies"
+        )
 
     config = replace_paths(config, scenario_data["path"])
 
@@ -947,6 +945,12 @@ def run_learning(
 
     eval_episode = 1
 
+    # TODO: delete before release
+    # delete old tensorboard logs
+    if Path(f"tensorboard/{scenario_data['sim_id']}").is_dir():
+        shutil.rmtree(f"tensorboard/{scenario_data['sim_id']}")
+    writer = SummaryWriter(log_dir=f"tensorboard/{scenario_data["sim_id"]}")
+
     for episode in tqdm(
         range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
@@ -962,6 +966,15 @@ def run_learning(
         world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
         world.run()
+
+        total_rewards = world.output_role.get_sum_reward()
+
+        if len(total_rewards) == 0:
+            raise AssumeException("No rewards were collected during evaluation run")
+
+        avg_reward = np.mean(total_rewards)
+
+        writer.add_scalar("Train/AvgReward", avg_reward, episode)
 
         # -----------------------------------------
         # Store updated information across episodes
@@ -996,6 +1009,8 @@ def run_learning(
 
             avg_reward = np.mean(total_rewards)
 
+            writer.add_scalar("Eval/AvgReward", avg_reward, eval_episode)
+
             # check reward improvement in evaluation run
             # and store best run in eval folder
             terminate = world.learning_role.compare_and_save_policies(
@@ -1026,6 +1041,8 @@ def run_learning(
     logger.info("################")
     logger.info("Training finished, Start evaluation run")
     world.export_csv_path = temp_csv_path
+
+    writer.close()
 
     world.reset()
 

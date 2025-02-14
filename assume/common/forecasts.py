@@ -321,7 +321,7 @@ class CsvForecaster(Forecaster):
 
         vre_powerplants_units = self.powerplants_units[
             self.powerplants_units["technology"].str.contains(
-                r"\b(wind|solar)\b", case=False, na=False
+                r"\b(?:wind|solar)\b", case=False, na=False
             )
         ].copy()
 
