@@ -58,7 +58,7 @@ class OUNoise:
 
 class NormalActionNoise:
     """
-    A gaussian action noise
+    A Gaussian action noise that supports direct tensor creation on a given device.
     """
 
     def __init__(self, action_dimension, mu=0.0, sigma=0.1, scale=1.0, dt=0.9998):
@@ -68,13 +68,28 @@ class NormalActionNoise:
         self.scale = scale
         self.dt = dt
 
-    def noise(self):
-        noise = (
+    def noise(self, device=None, dtype=th.float):
+        """
+        Generates noise using torch.normal(), ensuring efficient execution on GPU if needed.
+
+        Args:
+        - device (torch.device, optional): Target device (e.g., 'cuda' or 'cpu').
+        - dtype (torch.dtype, optional): Data type of the tensor (default: torch.float32).
+
+        Returns:
+        - torch.Tensor: Noise tensor on the specified device.
+        """
+        return (
             self.dt
             * self.scale
-            * np.random.normal(self.mu, self.sigma, self.act_dimension)
+            * th.normal(
+                mean=self.mu,
+                std=self.sigma,
+                size=(self.act_dimension,),
+                dtype=dtype,
+                device=device,
+            )
         )
-        return noise
 
     def update_noise_decay(self, updated_decay: float):
         self.dt = updated_decay
@@ -98,10 +113,8 @@ def polyak_update(params, target_params, tau: float):
         tau: the soft update coefficient ("Polyak update", between 0 and 1)
     """
     with th.no_grad():
-        # zip does not raise an exception if length of parameters does not match.
         for param, target_param in zip(params, target_params):
-            target_param.data.mul_(1 - tau)
-            th.add(target_param.data, param.data, alpha=tau, out=target_param.data)
+            target_param.lerp_(param, tau)  # More efficient in-place operation
 
 
 def linear_schedule_func(

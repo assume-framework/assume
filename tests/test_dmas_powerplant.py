@@ -143,6 +143,38 @@ def test_dmas_day(power_plant_day):
     assert unknown == [], "found unknown link orders"
 
 
+def test_dmas_ramp_day(power_plant_day):
+    """
+    Test that ramping constraints are respected in the bidding behavior
+    """
+    power_plant_day.ramp_down = power_plant_day.max_power / 2
+    power_plant_day.ramp_up = power_plant_day.max_power / 2
+    strategy = DmasPowerplantStrategy()
+    hour_count = len(power_plant_day.index) // 2
+    assert hour_count == 24
+
+    mc = MarketConfig(
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[
+            MarketProduct(timedelta(hours=1), hour_count, timedelta(hours=0))
+        ],
+        additional_fields=["link", "block_id"],
+    )
+    start = power_plant_day.index[0]
+    products = get_available_products(mc.market_products, start)
+    orderbook = strategy.calculate_bids(
+        power_plant_day, market_config=mc, product_tuples=products
+    )
+    assert orderbook
+    block_ids = {o["block_id"] for o in orderbook} | {-1}
+    # all links should match existing block ids
+    unknown = [o["link"] for o in orderbook if o["link"] not in block_ids]
+    assert unknown == [], "found unknown link orders"
+
+
 def test_dmas_prevent_start(power_plant_day):
     """
     This test makes sure, that the powerplants still bids positive marginal cost, with block bids.

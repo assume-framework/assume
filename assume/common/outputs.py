@@ -22,7 +22,7 @@ from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
     calculate_content_size,
-    check_for_tensors,
+    convert_tensors,
     separate_orders,
 )
 
@@ -331,7 +331,11 @@ class WriteOutput(Role):
             df["evaluation_frequency"] = df["evaluation_frequency"].astype(str)
 
         # Remove unnecessary columns (use a list to minimize deletion calls)
-        df.drop(columns=["only_hours", "agent_addr"], inplace=True, errors=False)
+        df.drop(
+            columns=["only_hours", "agent_addr", "contractor_addr"],
+            inplace=True,
+            errors="ignore",
+        )
 
         # Add missing columns with defaults
         for col in ["bid_type", "node"]:
@@ -509,13 +513,14 @@ class WriteOutput(Role):
                 data_list.clear()
             # concat all dataframes
             # use join='outer' to keep all columns and fill missing values with NaN
-            if df is None:
+            if df is None or df.empty:
                 continue
 
-            if df.empty:
-                continue
+            # check for tensors and convert them to floats
+            df = df.apply(convert_tensors)
 
-            df = df.apply(check_for_tensors)
+            # check for any float64 columns and convert them to floats
+            df = df.map(lambda x: float(x) if isinstance(x, np.float64) else x)
 
             if self.export_csv_path:
                 data_path = self.export_csv_path / f"{table}.csv"

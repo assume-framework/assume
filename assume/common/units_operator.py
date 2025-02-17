@@ -75,7 +75,6 @@ class UnitsOperator(Role):
 
     def setup(self):
         super().setup()
-        self.id = self.context.aid
         self.context.subscribe_message(
             self,
             self.handle_opening,
@@ -102,6 +101,7 @@ class UnitsOperator(Role):
 
     def on_ready(self):
         super().on_ready()
+        self.id = self.context.aid
 
         for market in self.available_markets:
             if self.participate(market):
@@ -169,6 +169,7 @@ class UnitsOperator(Role):
                 self.context.addr,
                 acl_metadata={
                     "reply_with": market.market_id,
+                    "performative": Performatives.propose,
                 },
             ),
             receiver_addr=market.addr,
@@ -268,6 +269,7 @@ class UnitsOperator(Role):
                 sender_addr=self.context.addr,
                 acl_metadata={
                     "in_reply_to": meta.get("reply_with"),
+                    "performative": Performatives.inform,
                 },
             ),
             receiver_addr=sender_addr(meta),
@@ -327,6 +329,7 @@ class UnitsOperator(Role):
                 "cashflow",
                 "marginal_costs",
                 "total_costs",
+                "heat",
             ]
 
             for key in unit.outputs.keys():

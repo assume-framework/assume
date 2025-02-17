@@ -10,19 +10,19 @@ base:
   learning_mode: True
 
   learning_config:
-    continue_learning: False
+    continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
-    actor_architecture: mlp
     learning_rate: 0.001
     training_episodes: 10
     episodes_collecting_initial_experience: 3
     train_freq: 24h
-    gradient_steps: 1
+    gradient_steps: 24
     batch_size: 256
     gamma: 0.99
     device: cpu
+    action_noise_schedule: linear
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
