@@ -30,16 +30,20 @@ To view the training and evaluation results, navigate to the "SCALARS" page in T
 The following parameters are being tracked and displayed:
 
 ### Training Metrics:
-a) Reward
-b) Profit
-c) Regret
-d) Loss
-e) Learning Rate
-f) Noise Parameters
+01_episode_reward: The sum of the rewards per episode averaged over all units
+02_reward: The sum of the rewards per day averaged over all units
+03_profit: The sum of the profits per day averaged over all units
+04_regret: The sum of the regrets per day averaged over all units
+05_learning_rate: The daily learning rate
+06_loss: The average of the losses of all units per day
+07_total_grad_norm: The average of the total gradient norm per day
+08_max_grad_norm: The maximum gradient norm per day
+09_noise": The average of the noises of all units per day
 
 ### Evaluation Metrics:
-a) Reward
-b) Profit
+01_episode_reward: The sum of the rewards per episode averaged over all units
+02_reward: The sum of the rewards per day averaged over all units
+03_profit: The sum of the profits per day averaged over all units
 
 ## Visualization Settings
 
@@ -220,8 +224,6 @@ class TensorBoardLogger:
             # Calculate x_index
             datetimes = df["dt"].unique()
             x_index = (self.episode - 1) * len(datetimes)
-            if mode == "train":
-                x_index -= self.episodes_collecting_initial_experience * len(datetimes)
 
             # Define metric order explicitly
             metric_order = {
