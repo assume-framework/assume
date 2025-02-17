@@ -40,6 +40,9 @@ The following parameters are being tracked and displayed:
 08_max_grad_norm: The maximum gradient norm per day
 09_noise": The average of the noises of all units per day
 
+For the training metrics, the episode indices are displayed as negative values during the initial exploration phase,
+as the results are random due to the explorative nature of the RL algorithm.
+
 ### Evaluation Metrics:
 01_episode_reward: The sum of the rewards per episode averaged over all units
 02_reward: The sum of the rewards per day averaged over all units
@@ -53,11 +56,6 @@ For optimal visualization of the training progress:
 - For the learning rate visualization, set smoothing to 0.0 to see the exact values
 - The x-axis represents time in hours, displayed as consecutive integers over the episodes
 - Data display begins after the initial exploration phase, as early results are random due to the exploration nature of the RL algorithm
-
-## Using Regex Filters
-
-To focus on specific metrics or units, use the regex filter option ion the left of the SCALARS page. This allows you to display only the data you're interested in, making it easier to analyze the results.
-You can filter by unit name, display only averaged values or filter different study cases.
 
 ## Interactive Features
 
@@ -224,6 +222,8 @@ class TensorBoardLogger:
             # Calculate x_index
             datetimes = df["dt"].unique()
             x_index = (self.episode - 1) * len(datetimes)
+            if mode == "train":
+                x_index -= self.episodes_collecting_initial_experience * len(datetimes)
 
             # Define metric order explicitly
             metric_order = {
@@ -290,7 +290,9 @@ class TensorBoardLogger:
             # Log episode-level reward
             episode_reward_avg = df.groupby("unit")["reward"].sum().mean()
             self.writer.add_scalar(
-                f"{mode}/01_episode_reward", episode_reward_avg, self.episode
+                f"{mode}/01_episode_reward",
+                episode_reward_avg,
+                self.episode - self.episodes_collecting_initial_experience,
             )
 
         except (ProgrammingError, OperationalError, DataError) as db_error:
