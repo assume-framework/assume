@@ -1,0 +1,19 @@
+name: opt
+channels:
+  - https://conda.anaconda.org/gurobi
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - ipython
+  - pandas
+  - jupyter
+  - matplotlib
+  - numpy
+  - tqdm
+  - gurobi
+  - black
+  - pyomo
+  - plotly
+  - isort
+prefix: /opt/anaconda3/envs/opt

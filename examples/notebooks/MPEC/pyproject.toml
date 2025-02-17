@@ -1,0 +1,4 @@
+# FILEPATH: /Users/nick/GitHub/bilevel_opt/pyproject.toml
+
+[tool.isort]
+profile = "black"
