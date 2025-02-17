@@ -80,7 +80,10 @@ def test_update_tensorboard_training_mode(
 ):
     """Test update_tensorboard method in training mode"""
     # Setup
-    mock_read_sql.return_value = sample_df
+    mock_read_sql.side_effect = [
+        pd.DataFrame({"name": sample_df.columns.tolist()}),
+        sample_df,
+    ]
 
     logger = TensorBoardLogger(
         db_uri="sqlite:///:memory:",
@@ -97,20 +100,19 @@ def test_update_tensorboard_training_mode(
     logger.update_tensorboard()
 
     # Verify
-    assert mock_writer.add_scalars.called
+    assert mock_writer.add_scalar.called
     # Verify specific metrics were logged
-    calls = mock_writer.add_scalars.call_args_list
-    metrics_logged = [call[0][0] for call in calls]  # Get the metric names
+    calls = mock_writer.add_scalar.call_args_list
+    metrics_logged = [call[0][0] for call in calls]
     expected_metrics = [
-        "train/a) reward",
-        "train/b) profit",
-        "train/c) regret",
-        "train/d) loss",
-        "train/e) total_grad_norm",
-        "train/f) max_grad_norm",
-        "train/g) learning_rate",
-        "train/h) noise",
+        "train/01_episode_reward",
+        "train/02_reward",
+        "train/03_profit",
+        "train/04_regret",
+        "train/05_learning_rate",
+        "train/06_loss",
+        "train/07_total_grad_norm",
+        "train/08_max_grad_norm",
+        "train/09_noise",
     ]
-    print(metrics_logged)
-    print(expected_metrics)
     assert all(metric in metrics_logged for metric in expected_metrics)
