@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import shutil
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -60,11 +59,8 @@ def test_initialization():
     logger = TensorBoardLogger(
         db_uri="sqlite:///:memory:",
         simulation_id="sim_1",
-        tensorboard_path="tests/logs",
         learning_mode=True,
     )
-    # Remove logging folder after creation
-    shutil.rmtree("tests/logs", ignore_errors=True)
 
     assert logger.simulation_id == "sim_1"
     assert logger.learning_mode is True
@@ -88,11 +84,8 @@ def test_update_tensorboard_training_mode(
     logger = TensorBoardLogger(
         db_uri="sqlite:///:memory:",
         simulation_id="sim_1",
-        tensorboard_path="tests/logs",
         learning_mode=True,
     )
-    # Remove logging folder after creation
-    shutil.rmtree("tests/logs", ignore_errors=True)
     logger.db = mock_db
     logger.writer = mock_writer
 
