@@ -1015,6 +1015,13 @@ def run_learning(
 
     world.reset()
 
+    # Set 'trained_policies_load_path' to None in order to load the most recent policies,
+    # especially if previous strategies were loaded from an external source.
+    # This is useful when continuing from a previous learning session.
+    world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
+        None
+    )
+
     # load scenario for evaluation
     setup_world(
         world=world,
