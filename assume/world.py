@@ -116,17 +116,31 @@ class World:
             self.db_uri = make_url(database_uri)
             db = create_engine(self.db_uri)
             connected = False
-            while not connected:
+            attempts = 0
+            max_attempts = 5
+
+            while not connected and attempts < max_attempts:
                 try:
                     with db.connect():
                         connected = True
-                        logger.info("connected to db")
+                        logger.info("Connected to the database")
                 except OperationalError as e:
-                    logger.error("could not connect to %s, trying again", database_uri)
+                    attempts += 1
+                    logger.error(
+                        "Could not connect to %s, trying again (%d/%d)",
+                        database_uri,
+                        attempts,
+                        max_attempts,
+                    )
                     # log error if not connection refused
                     if not e.code == "e3q8":
                         logger.error("%s", e)
                     time.sleep(2)
+
+            if not connected:
+                raise RuntimeError(
+                    f"Failed to connect to the database after {max_attempts} attempts"
+                )
 
         self.scenario_data = {}
         self.market_operators: dict[str, RoleAgent] = {}
