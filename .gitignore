@@ -142,7 +142,6 @@ assume-db
 learned_strategies
 examples/outputs
 assume-repo
-tensorboard
 
 examples/notebooks/inputs
 examples/notebooks/outputs
