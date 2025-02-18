@@ -233,7 +233,7 @@ class World:
             # self.clock_agent.stopped.add_done_callback(stop)
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
-            self.setup_learning()
+            self.setup_learning(simulation_id)
 
             self.setup_output_agent(simulation_id, save_frequency_hours)
             self.clock_manager = DistributedClockManager(
@@ -241,7 +241,7 @@ class World:
             )
             self.container.register(self.clock_manager)
 
-    def setup_learning(self) -> None:
+    def setup_learning(self, simulation_id: str) -> None:
         """
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
@@ -266,6 +266,14 @@ class World:
                 suggested_aid=self.learning_agent_addr.aid,
             )
             rl_agent.suspendable_tasks = False
+
+            self.learning_role.init_logging(
+                simulation_id=simulation_id,
+                db_uri=self.db_uri,
+                output_agent_addr=self.output_agent_addr,
+                train_start=self.start,
+                freq=self.forecaster.index.freq,
+            )
 
     def setup_output_agent(self, simulation_id: str, save_frequency_hours: int) -> None:
         """
