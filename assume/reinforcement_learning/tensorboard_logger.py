@@ -96,7 +96,6 @@ class TensorBoardLogger:
         self,
         db_uri: str,
         simulation_id: str,
-        tensorboard_path: str = "logs/tensorboard",
         learning_mode: bool = False,
         episodes_collecting_initial_experience: int = 0,
         perform_evaluation: bool = False,
@@ -108,7 +107,6 @@ class TensorBoardLogger:
             episodes_collecting_initial_experience
         )
 
-        self.tensorboard_path = tensorboard_path
         self.writer = None  # Delay creation of SummaryWriter
         self.db_uri = db_uri
         if self.db_uri:
@@ -287,12 +285,17 @@ class TensorBoardLogger:
                             x_index + i,
                         )
 
+            episode_index = (
+                self.episode - self.episodes_collecting_initial_experience
+                if mode == "train"
+                else self.episode
+            )
             # Log episode-level reward
             episode_reward_avg = df.groupby("unit")["reward"].sum().mean()
             self.writer.add_scalar(
                 f"{mode}/01_episode_reward",
                 episode_reward_avg,
-                self.episode - self.episodes_collecting_initial_experience,
+                episode_index,
             )
 
         except (ProgrammingError, OperationalError, DataError) as db_error:

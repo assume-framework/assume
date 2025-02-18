@@ -141,10 +141,6 @@ class Learning(Role):
         # list of avg_changes
         self.avg_rewards = []
 
-        # tensor board logging
-        self.tensor_board_path = (
-            f"{learning_config.get('trained_policies_save_path', 'logs')}/TB"
-        )
         self.tensor_board_logger = None
 
         #
@@ -428,7 +424,6 @@ class Learning(Role):
         self.tensor_board_logger = TensorBoardLogger(
             simulation_id=simulation_id,
             db_uri=db_uri,
-            tensorboard_path=self.tensor_board_path,
             learning_mode=self.learning_mode,
             episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
             perform_evaluation=self.perform_evaluation,
