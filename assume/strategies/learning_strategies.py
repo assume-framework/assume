@@ -597,7 +597,7 @@ class RLStrategy(AbstractLearningStrategy):
         # Opportunity cost: The income lost due to not operating at full capacity.
         opportunity_cost = (
             (market_clearing_price - marginal_cost)
-            * (offered_volume_total - accepted_volume_total)
+            * (unit.max_power - accepted_volume_total)
             * duration
         )
 
