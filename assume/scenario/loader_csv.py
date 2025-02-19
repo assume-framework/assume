@@ -519,6 +519,30 @@ def load_config_and_create_forecaster(
     buses = load_file(path=path, config=config, file_name="buses")
     lines = load_file(path=path, config=config, file_name="lines")
 
+    learning_config: LearningConfig = config.get("learning_config", {})
+
+    # Check if simulation length is divisible by train_freq in learning config and adjust if not
+    if (train_freq_str := learning_config.get("train_freq")) is not None:
+        train_freq = pd.Timedelta(train_freq_str)
+        total_length = end - start
+
+        # Compute remainder and determine the required intervals
+        quotient, remainder = divmod(total_length, train_freq)
+
+        if remainder != pd.Timedelta(0):
+            # Adjust train_freq so that it evenly divides total_length
+            n_intervals = quotient + 1
+            new_train_freq = (total_length / n_intervals).total_seconds() / 3600
+            new_train_freq_str = f"{int(new_train_freq)}h"  # Directly accessing hours
+
+            # Update the configuration
+            learning_config["train_freq"] = new_train_freq_str
+
+            logger.warning(
+                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
+                f"Adjusting train_freq to {new_train_freq_str}. Consider modifying simulation length or train_freq in the config to avoid this adjustment."
+            )
+
     forecaster = CsvForecaster(
         index=index,
         powerplants_units=powerplant_units,

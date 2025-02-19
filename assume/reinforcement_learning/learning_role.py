@@ -436,8 +436,10 @@ class Learning(Role):
 
         self.freq_timedelta = pd.Timedelta(freq)
         # This is for padding the output list when the gradient steps are not identical to the train frequency
-        self.time_steps = int(
-            pd.Timedelta(self.train_freq) / (self.freq_timedelta * self.gradient_steps)
+        self.time_steps = max(
+            1,
+            pd.Timedelta(self.train_freq)
+            // (self.freq_timedelta * self.gradient_steps),
         )
 
     def write_rl_critic_params_to_output(

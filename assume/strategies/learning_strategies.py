@@ -681,7 +681,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=38, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
         # defines bounds of actions space
@@ -719,7 +719,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # neural network architecture is predefined, and the size of the observations must remain consistent.
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
-        self.foresight = 24
+        self.foresight = 12
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -1070,6 +1070,25 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 start : start + forecast_len
             ]
 
+        # collect historical past market clearing prices
+        actual_price = unit.outputs["energy_accepted_price"]
+        if start - forecast_len < actual_price.index[0]:
+            # Not enough historical data, use available actual prices and prepend forecasted values for missing past data
+            actual_price_history = actual_price.loc[:start] / self.max_bid_price
+            missing_values = self.foresight - len(actual_price_history)
+
+            if missing_values > 0:
+                forecasted_prices = self.scaled_prices_obs.iloc[:missing_values]
+                actual_price_history = np.concatenate(
+                    [forecasted_prices, actual_price_history]
+                )
+
+        else:
+            # Sufficient historical data exists, collect past actual prices
+            actual_price_history = (
+                actual_price.loc[start - forecast_len : start] / self.max_bid_price
+            )
+
         # get the current soc value
         soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
         energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
@@ -1079,6 +1098,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
             [
                 scaled_res_load_forecast,
                 scaled_price_forecast,
+                actual_price_history,
                 np.array([soc_scaled, energy_cost_scaled]),
             ]
         )
