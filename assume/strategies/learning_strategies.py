@@ -945,15 +945,17 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
         # Iterate over all orders in the orderbook to calculate order-specific profit
         for order in orderbook:
-            start_time = order["start_time"]
-            next_time = start_time + unit.index.freq
-            end_time = order["end_time"]
-            end_exclusive = end_time - unit.index.freq
-            duration_hours = (end_time - start_time) / timedelta(hours=1)
+            start = order["start_time"]
+            end = order["end_time"]
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+            end_excl = end - unit.index.freq
+
+            next_time = start + unit.index.freq
+            duration_hours = (end - start) / timedelta(hours=1)
 
             # Calculate marginal and starting costs
             marginal_cost = unit.calculate_marginal_cost(
-                start_time, unit.outputs[product_type].at[start_time]
+                start, unit.outputs[product_type].at[start]
             )
             marginal_cost += unit.get_starting_costs(int(duration_hours))
 
@@ -966,28 +968,27 @@ class StorageRLStrategy(AbstractLearningStrategy):
             order_profit = accepted_price * accepted_volume * duration_hours
             order_cost = abs(marginal_cost * accepted_volume * duration_hours)
 
-            current_soc = unit.outputs["soc"].at[start_time]
+            current_soc = unit.outputs["soc"].at[start]
             next_soc = unit.outputs["soc"].at[next_time]
 
             # Calculate and clip the energy cost for the start time
-            unit.outputs["energy_cost"].at[next_time] = np.clip(
-                (
-                    unit.outputs["energy_cost"].at[start_time] * current_soc
-                    - order_profit
+            if current_soc < 1:
+                unit.outputs["energy_cost"].at[next_time] = 0
+            else:
+                unit.outputs["energy_cost"].at[next_time] = np.clip(
+                    (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
+                    / next_soc,
+                    0,
+                    self.max_bid_price,
                 )
-                / next_soc,
-                0,
-                self.max_bid_price,
-            )
 
-            reward += (order_profit - order_cost) * scaling_factor
+            profit = order_profit - order_cost
+            reward += profit * scaling_factor
 
             # Store results in unit outputs
-            unit.outputs["profit"].loc[start_time:end_exclusive] += (
-                order_profit - order_cost
-            )
-            unit.outputs["reward"].loc[start_time:end_exclusive] = reward
-            unit.outputs["total_costs"].loc[start_time:end_exclusive] = order_cost
+            unit.outputs["profit"].loc[start:end_excl] += profit
+            unit.outputs["reward"].loc[start:end_excl] = reward
+            unit.outputs["total_costs"].loc[start:end_excl] = order_cost
             unit.outputs["rl_rewards"].append(reward)
 
     def create_observation(

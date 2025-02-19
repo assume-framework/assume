@@ -175,7 +175,7 @@ class Storage(SupportsMinMaxCharge):
         """
         time_delta = self.index.freq / timedelta(hours=1)
 
-        for t in self.index[start : end - self.index.freq]:
+        for t in self.index[start:end]:
             delta_soc = 0
             soc = self.outputs["soc"].at[t]
 
@@ -478,6 +478,8 @@ class Storage(SupportsMinMaxCharge):
         unit_dict = super().as_dict()
         unit_dict.update(
             {
+                "max_soc": self.max_soc,
+                "min_soc": self.min_soc,
                 "max_power_charge": self.max_power_charge,
                 "max_power_discharge": self.max_power_discharge,
                 "min_power_charge": self.min_power_charge,

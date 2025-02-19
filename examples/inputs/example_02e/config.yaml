@@ -2,6 +2,52 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+base:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-30 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  learning_mode: True
+
+  learning_config:
+    continue_learning: false
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    actor_architecture: mlp
+    learning_rate: 0.001
+    learning_rate_schedule: linear
+    training_episodes: 200
+    episodes_collecting_initial_experience: 5
+    train_freq: 1000h
+    gradient_steps: 1000
+    batch_size: 256
+    gamma: 0.999
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+
 tiny:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-05 00:00
@@ -27,52 +73,6 @@ tiny:
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
-
-  markets_config:
-    EOM:
-      operator: EOM_operator
-      product_type: energy
-      products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
-      opening_frequency: 1h
-      opening_duration: 1h
-      volume_unit: MWh
-      maximum_bid_volume: 100000
-      maximum_bid_price: 3000
-      minimum_bid_price: -500
-      price_unit: EUR/MWh
-      market_mechanism: pay_as_clear
-
-
-base:
-  start_date: 2019-03-01 00:00
-  end_date: 2019-04-30 00:00
-  time_step: 1h
-  save_frequency_hours: null
-  learning_mode: True
-
-  learning_config:
-    continue_learning: False
-    trained_policies_save_path: null
-    max_bid_price: 100
-    algorithm: matd3
-    actor_architecture: mlp
-    learning_rate: 0.0001
-    training_episodes: 200
-    episodes_collecting_initial_experience: 5
-    train_freq: 1000h
-    gradient_steps: 1000
-    batch_size: 256
-    gamma: 0.999
-    device: cpu
-    noise_sigma: 0.1
-    noise_scale: 1
-    noise_dt: 1
-    validation_episodes_interval: 5
-    early_stopping_steps: 10
-    early_stopping_threshold: 0.05
 
   markets_config:
     EOM:
