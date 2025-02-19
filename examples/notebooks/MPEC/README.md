@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: ASSUME Developers
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # ASSUME-MPEC
 # Bilevel Optimization for Electricity Market Dynamics
 
@@ -7,9 +13,9 @@ This repository contains the files and codes used in the paper titled **"How Sat
 
 ## Abstract
 
-Various factors make electricity markets increasingly complex, making their analysis challenging. This complexity demands advanced analytical tools to manage and understand market dynamics. This paper explores the application of deep reinforcement learning (DRL) and bi-level optimization models to analyze and simulate electricity markets. We introduce a bi-level optimization framework incorporating realistic market constraints, such as non-convex operational characteristics and binary decision variables, to establish an upper-bound benchmark for evaluating the performance of DRL algorithms. 
+Various factors make electricity markets increasingly complex, making their analysis challenging. This complexity demands advanced analytical tools to manage and understand market dynamics. This paper explores the application of deep reinforcement learning (DRL) and bi-level optimization models to analyze and simulate electricity markets. We introduce a bi-level optimization framework incorporating realistic market constraints, such as non-convex operational characteristics and binary decision variables, to establish an upper-bound benchmark for evaluating the performance of DRL algorithms.
 
-The results confirm that DRL methods do not reach the theoretical upper bounds set by the bi-level models, thereby confirming the effectiveness of the proposed model in providing a clear performance target for DRL. This benchmarking approach demonstrates DRL's current capabilities and limitations in complex market environments but also aids in developing more effective DRL strategies by providing clear, quantifiable targets for improvement. 
+The results confirm that DRL methods do not reach the theoretical upper bounds set by the bi-level models, thereby confirming the effectiveness of the proposed model in providing a clear performance target for DRL. This benchmarking approach demonstrates DRL's current capabilities and limitations in complex market environments but also aids in developing more effective DRL strategies by providing clear, quantifiable targets for improvement.
 
 The proposed method can also identify the information gap cost since DRL methods operate under more realistic conditions than optimization techniques, given that they don't need to assume complete knowledge about the system. This study thus provides a foundation for future research to enhance market understanding and possibly its efficiency in the face of increasing complexity in the electricity market. Our methodology's effectiveness is further validated through a large-scale case study involving 150 power plants, demonstrating its scalability and applicability to real-world scenarios.
 

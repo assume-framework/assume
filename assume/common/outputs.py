@@ -47,7 +47,6 @@ class WriteOutput(Role):
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
-        episodes_collecting_initial_experience: Number of episodes collecting initial experience. Defaults to 0.
         perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
         max_dfs_size_mb (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
@@ -62,7 +61,6 @@ class WriteOutput(Role):
         export_csv_path: str = "",
         save_frequency_hours: int = None,
         learning_mode: bool = False,
-        episodes_collecting_initial_experience: int = 0,
         perform_evaluation: bool = False,
         additional_kpis: dict[str, OutputDef] = {},
         max_dfs_size_mb: int = 300,
@@ -87,9 +85,6 @@ class WriteOutput(Role):
 
         self.learning_mode = learning_mode
         self.perform_evaluation = perform_evaluation
-        self.episodes_collecting_initial_experience = (
-            episodes_collecting_initial_experience
-        )
 
         # get episode number if in learning or evaluation mode
         self.episode = None
@@ -278,15 +273,16 @@ class WriteOutput(Role):
         df["learning_mode"] = self.learning_mode
         df["perform_evaluation"] = self.perform_evaluation
         df["episode"] = self.episode
-        if self.episode <= self.episodes_collecting_initial_experience:
-            df["initial_exploration"] = True
-        else:
-            df["initial_exploration"] = False
         # Add missing rl_critic_params columns in case of initial_exploration
-        if "critic_loss" not in df.columns:
-            df["critic_loss"] = np.nan
-        if "learning_rate" not in df.columns:
-            df["learning_rate"] = np.nan
+        required_columns = [
+            "critic_loss",
+            "total_grad_norm",
+            "max_grad_norm",
+            "learning_rate",
+        ]
+        for col in required_columns:
+            if col not in df.columns:
+                df[col] = np.nan
 
         return df
 
@@ -455,7 +451,7 @@ class WriteOutput(Role):
         if not self.db and not self.export_csv_path:
             return
 
-        # Merge rl_critic_params to rl_params before uploading to db
+        # If both rl_critic_params and rl_params exist, merge them before uploading to db
         if (
             "rl_params" in self.write_buffers
             and "rl_critic_params" in self.write_buffers
@@ -466,7 +462,7 @@ class WriteOutput(Role):
             merged_list = merged_df.to_dict("records")
             self.write_buffers["rl_params"] = merged_list
             del self.write_buffers["rl_critic_params"]
-        # if only rl_critic_params are present, rename them to rl_params
+        # elif only rl_critic_params exist, rename them to rl_params
         elif "rl_critic_params" in self.write_buffers:
             self.write_buffers["rl_params"] = self.write_buffers["rl_critic_params"]
             del self.write_buffers["rl_critic_params"]

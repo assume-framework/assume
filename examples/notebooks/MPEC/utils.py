@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
@@ -6,11 +10,11 @@ from pyomo.opt import SolverFactory
 def calculate_profits(main_df, gens_df, price_column="mcp", supp_df=None):
     profits = pd.DataFrame(index=main_df.index, columns=gens_df.index)
     for gen in gens_df.index:
-        profits[gen] = (
-            main_df[f"gen_{gen}"] * (main_df[price_column] - gens_df.at[gen, "mc"])
+        profits[gen] = main_df[f"gen_{gen}"] * (
+            main_df[price_column] - gens_df.at[gen, "mc"]
         )
         if supp_df is not None:
-            profits[gen] -= (supp_df[f"start_up_{gen}"] + supp_df[f"shut_down_{gen}"])
+            profits[gen] -= supp_df[f"start_up_{gen}"] + supp_df[f"shut_down_{gen}"]
 
     return profits
 

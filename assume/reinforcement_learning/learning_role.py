@@ -17,6 +17,7 @@ from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import linear_schedule_func
+from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,6 @@ class Learning(Role):
     def __init__(
         self,
         learning_config: LearningConfig,
-        episodes_collecting_initial_experience: int,
         start: datetime = None,
         end: datetime = None,
     ):
@@ -90,6 +90,8 @@ class Learning(Role):
         if end is not None:
             self.end = datetime2timestamp(end)
 
+        self.datetime = None
+
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
         self.learning_rate_schedule = learning_config.get(
             "learning_rate_schedule", None
@@ -106,8 +108,11 @@ class Learning(Role):
         else:
             self.calc_noise_from_progress = lambda x: noise_dt
 
-        self.episodes_collecting_initial_experience = (
-            episodes_collecting_initial_experience
+        # if we do not have initial experience collected we will get an error as no samples are available on the
+        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
+
+        self.episodes_collecting_initial_experience = max(
+            learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
         # if we continue learning we do not need to collect initial experience
         if self.continue_learning:
@@ -135,6 +140,13 @@ class Learning(Role):
         self.rl_eval = defaultdict(list)
         # list of avg_changes
         self.avg_rewards = []
+
+        self.tensor_board_logger = None
+
+        #
+        self.db_addr = None
+        self.freq_timedelta = None
+        self.time_steps = None
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -387,8 +399,49 @@ class Learning(Role):
                         return True
             return False
 
+    def init_logging(
+        self,
+        simulation_id: str,
+        db_uri: str,
+        output_agent_addr: str,
+        train_start: str,
+        freq: str,
+    ):
+        """
+        Initialize the logging for the reinforcement learning agent.
+
+        This method initializes the tensor board logger for the reinforcement learning agent.
+        It also initializes the parameters required for sending data to the output role.
+
+        Args:
+            simulation_id (str): The unique identifier for the simulation.
+            db_uri (str): URI for connecting to the database.
+            output_agent_addr (str): The address of the output agent.
+            train_start (str): The start time of simulation.
+            freq (str): The frequency of simulation.
+        """
+
+        self.tensor_board_logger = TensorBoardLogger(
+            simulation_id=simulation_id,
+            db_uri=db_uri,
+            learning_mode=self.learning_mode,
+            episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
+            perform_evaluation=self.perform_evaluation,
+        )
+
+        # Parameters required for sending data to the output role
+        self.db_addr = output_agent_addr
+
+        self.datetime = pd.to_datetime(train_start)
+
+        self.freq_timedelta = pd.Timedelta(freq)
+        # This is for padding the output list when the gradient steps are not identical to the train frequency
+        self.time_steps = int(
+            pd.Timedelta(self.train_freq) / (self.freq_timedelta * self.gradient_steps)
+        )
+
     def write_rl_critic_params_to_output(
-        self, learning_rate: float, critic_losses_list: list[dict]
+        self, learning_rate: float, unit_params_list: list[dict]
     ) -> None:
         """
         Writes learning parameters and critic losses to output at specified time intervals.
@@ -401,38 +454,32 @@ class Learning(Role):
         ----------
         learning_rate : float
             The current learning rate used in training.
-        critic_losses_list : list[dict]
+        unit_params_list : list[dict]
             A list of dictionaries containing critic losses for each time step.
             Each dictionary maps critic names to their corresponding loss values.
         """
-        db_addr = self.context.data.get("output_agent_addr")
-
-        # Initialize datetime the first time the function is called
-        if self.datetime is None:
-            self.datetime = pd.to_datetime(self.context.data.get("train_start"))
-
-        freq_timedelta = pd.Timedelta(self.context.data.get("freq"))
-        # This is for padding the output list when the gradient steps are not identical to the train frequency
-        time_steps = int(
-            pd.Timedelta(self.train_freq) / (freq_timedelta * self.gradient_steps)
-        )
 
         output_list = [
             {
                 "unit": u_id,
-                "critic_loss": loss,
+                "critic_loss": params["loss"],
+                "total_grad_norm": params["total_grad_norm"],
+                "max_grad_norm": params["max_grad_norm"],
                 "learning_rate": learning_rate,
                 "datetime": self.datetime
-                + ((time_step * self.gradient_steps + gradient_step) * freq_timedelta),
+                + (
+                    (time_step * self.gradient_steps + gradient_step)
+                    * self.freq_timedelta
+                ),
             }
-            for time_step in range(time_steps)
+            for time_step in range(self.time_steps)
             for gradient_step in range(self.gradient_steps)
-            for u_id, loss in critic_losses_list[gradient_step].items()
+            for u_id, params in unit_params_list[gradient_step].items()
         ]
 
-        if db_addr:
+        if self.db_addr:
             self.context.schedule_instant_message(
-                receiver_addr=db_addr,
+                receiver_addr=self.db_addr,
                 content={
                     "context": "write_results",
                     "type": "rl_critic_params",

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 """
 
 Created by: Nick Harder (nick.harder94@gmail.com)
@@ -22,11 +26,21 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
     model.gens = pyo.Set(initialize=gens_df.index)
 
     # primary problem variables
-    model.g = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals) # Power output of producer 𝑖 at period 𝑡 (MW)
-    model.d = pyo.Var(model.time, within=pyo.NonNegativeReals) # satisfied demand at period 𝑡 (MW)
-    model.c_up = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals) # Start-up cost of producer 𝑖 at period 𝑡 (€)
-    model.c_down = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals) # Shut-down cost of producer 𝑖 at period 𝑡 (€)
-    model.u = pyo.Var(model.gens, model.time, within=pyo.Binary) # Binary UC status of producer 𝑖 at period 𝑡 (𝑢 = 1 if it is on, 𝑢 = 0 if it is off)
+    model.g = pyo.Var(
+        model.gens, model.time, within=pyo.NonNegativeReals
+    )  # Power output of producer 𝑖 at period 𝑡 (MW)
+    model.d = pyo.Var(
+        model.time, within=pyo.NonNegativeReals
+    )  # satisfied demand at period 𝑡 (MW)
+    model.c_up = pyo.Var(
+        model.gens, model.time, within=pyo.NonNegativeReals
+    )  # Start-up cost of producer 𝑖 at period 𝑡 (€)
+    model.c_down = pyo.Var(
+        model.gens, model.time, within=pyo.NonNegativeReals
+    )  # Shut-down cost of producer 𝑖 at period 𝑡 (€)
+    model.u = pyo.Var(
+        model.gens, model.time, within=pyo.Binary
+    )  # Binary UC status of producer 𝑖 at period 𝑡 (𝑢 = 1 if it is on, 𝑢 = 0 if it is off)
 
     # primary problem objective
     def objective_rule(model):
@@ -59,7 +73,7 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
     model.g_max = pyo.Constraint(model.gens, model.time, rule=g_max_rule)
 
     # max demand constraint
-    # TODO: Wieso erlauben wir hier demand kleiner als der input demand? 
+    # TODO: Wieso erlauben wir hier demand kleiner als der input demand?
     def d_max_rule(model, t):
         return model.d[t] <= demand_df.at[t, "volume"]
 

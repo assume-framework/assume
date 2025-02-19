@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # %%
 import pandas as pd
 import pyomo.environ as pyo
@@ -23,13 +27,27 @@ def find_optimal_dispatch(
     model.gens = pyo.Set(initialize=gens_df.index)
 
     # primary variables
-    model.g = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals) # Power output of producer 𝑖 at period 𝑡 (MW)
-    model.d = pyo.Var(model.time, within=pyo.NonNegativeReals) # satisfied demand at period 𝑡 (MW)
-    model.c_up = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)  # Start-up cost of producer 𝑖 at period 𝑡 (€)
-    model.c_down = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals) # Shut-down cost of producer 𝑖 at period 𝑡 (€)
-    model.k = pyo.Var(model.time, bounds=(1, k_max), within=pyo.NonNegativeReals) # Bidding decision at timestep t as a multiplier of the marginal costs
-    model.lambda_ = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 200)) # TODO: Check what this is
-    model.u = pyo.Var(model.gens, model.time, within=pyo.Binary) # Binary UC status of producer 𝑖 at period 𝑡 (𝑢 = 1 if it is on, 𝑢 = 0 if it is off)
+    model.g = pyo.Var(
+        model.gens, model.time, within=pyo.NonNegativeReals
+    )  # Power output of producer 𝑖 at period 𝑡 (MW)
+    model.d = pyo.Var(
+        model.time, within=pyo.NonNegativeReals
+    )  # satisfied demand at period 𝑡 (MW)
+    model.c_up = pyo.Var(
+        model.gens, model.time, within=pyo.NonNegativeReals
+    )  # Start-up cost of producer 𝑖 at period 𝑡 (€)
+    model.c_down = pyo.Var(
+        model.gens, model.time, within=pyo.NonNegativeReals
+    )  # Shut-down cost of producer 𝑖 at period 𝑡 (€)
+    model.k = pyo.Var(
+        model.time, bounds=(1, k_max), within=pyo.NonNegativeReals
+    )  # Bidding decision at timestep t as a multiplier of the marginal costs
+    model.lambda_ = pyo.Var(
+        model.time, within=pyo.Reals, bounds=(-500, 200)
+    )  # TODO: Check what this is
+    model.u = pyo.Var(
+        model.gens, model.time, within=pyo.Binary
+    )  # Binary UC status of producer 𝑖 at period 𝑡 (𝑢 = 1 if it is on, 𝑢 = 0 if it is off)
 
     # secondary variables
     model.mu_max = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
@@ -532,6 +550,3 @@ def find_optimal_dispatch(
         k_values.at[t, "k"] = instance.k[t].value
 
     return main_df, supp_df, k_values
-
-
-

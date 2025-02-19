@@ -42,12 +42,7 @@ def test_learning_init():
         "early_stopping_threshold": 0.05,
     }
     # test init
-    learn = Learning(
-        learning_config,
-        episodes_collecting_initial_experience=learning_config[
-            "episodes_collecting_initial_experience"
-        ],
-    )
+    learn = Learning(learning_config)
     assert len(learn.rl_strats) == 0
 
     # we need to add learning strategies first

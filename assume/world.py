@@ -66,13 +66,11 @@ class World:
         market_operators (dict[str, mango.RoleAgent]): The market operators for the world instance.
         markets (dict[str, MarketConfig]): The markets for the world instance.
         unit_operators (dict[str, UnitsOperator]): The unit operators for the world instance.
-        learning_operators (dict[str, RoleAgent]): The learning operators for the world instance.
         unit_types (dict[str, BaseUnit]): The unit types for the world instance.
         bidding_strategies (dict[str, type[BaseStrategy]]): The bidding strategies for the world instance.
         clearing_mechanisms (dict[str, MarketRole]): The clearing mechanisms for the world instance.
         addresses (list[str]): The addresses for the world instance.
         loop (asyncio.AbstractEventLoop): The event loop for the world instance.
-        tensor_board_logger (TensorBoardLogger): The tensor board logger for the world instance.
         clock (ExternalClock): The external clock for the world instance.
         start (datetime.datetime): The start datetime for the simulation.
         end (datetime.datetime): The end datetime for the simulation.
@@ -80,7 +78,6 @@ class World:
         perform_evaluation (bool): A boolean indicating whether the evaluation mode is enabled.
         forecaster (Forecaster, optional): The forecaster used for custom unit types.
         learning_mode (bool): A boolean indicating whether the learning mode is enabled.
-        episodes_collecting_initial_experience (int): The number of episodes for collecting initial experience.
         output_agent_addr (tuple[str, str]): The address of the output agent.
         bidding_params (dict): Parameters for bidding.
         index (pandas.Series): The index for the simulation.
@@ -134,7 +131,6 @@ class World:
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
-        self.learning_operators: dict[str, RoleAgent] = {}
         self.unit_types = unit_types
         self.dst_components = demand_side_technologies
 
@@ -154,8 +150,6 @@ class World:
         nest_asyncio.apply()
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
-
-        self.tensor_board_logger = None
 
     def setup(
         self,
@@ -223,11 +217,7 @@ class World:
             **container_kwargs,
         )
         self.learning_mode = self.learning_config.get("learning_mode", False)
-        # if we do not have initial experience collected we will get an error as no samples are available on the
-        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
-        self.episodes_collecting_initial_experience = max(
-            learning_config.get("episodes_collecting_initial_experience", 5), 1
-        )
+
         if not self.db_uri and not self.export_csv_path:
             self.output_agent_addr = None
         else:
@@ -263,15 +253,9 @@ class World:
         if self.learning_mode or self.perform_evaluation:
             # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
-            from assume.reinforcement_learning.tensorboard_logger import (
-                TensorBoardLogger,
-            )
 
             self.learning_role = Learning(
-                self.learning_config,
-                self.episodes_collecting_initial_experience,
-                start=self.start,
-                end=self.end,
+                self.learning_config, start=self.start, end=self.end
             )
 
             # separate process does not support buffer and learning
@@ -283,35 +267,12 @@ class World:
             )
             rl_agent.suspendable_tasks = False
 
-            id = "Learning_1"
-            # add Learning_1 to the list of learning operators if not already existing
-            if self.learning_operators.get(id):
-                raise ValueError(f"LearningOperator {id} already exists")
-
-            learning_role_agent = RoleAgent()
-            learning_role_agent.add_role(self.learning_role)
-            self.container.register(learning_role_agent, suggested_aid=id)
-            learning_role_agent.suspendable_tasks = False
-
-            # after creation of an agent - we set additional context params
-            learning_role_agent._role_context.data.update(
-                {
-                    "output_agent_addr": self.output_agent_addr,
-                    "train_start": self.start,
-                    "train_end": self.end,
-                    "freq": self.forecaster.index.freq,
-                }
-            )
-
-            self.learning_operators[id] = learning_role_agent
-
-            self.tensor_board_logger = TensorBoardLogger(
+            self.learning_role.init_logging(
                 simulation_id=simulation_id,
                 db_uri=self.db_uri,
-                tensorboard_path=f"{self.learning_config.get('trained_policies_save_path', 'logs')}/TB",
-                learning_mode=self.learning_mode,
-                episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
-                perform_evaluation=self.perform_evaluation,
+                output_agent_addr=self.output_agent_addr,
+                train_start=self.start,
+                freq=self.forecaster.index.freq,
             )
 
     def setup_output_agent(self, simulation_id: str, save_frequency_hours: int) -> None:
@@ -338,7 +299,6 @@ class World:
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
-            episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
             perform_evaluation=self.perform_evaluation,
             additional_kpis=self.additional_kpis,
         )
@@ -732,7 +692,6 @@ class World:
         self.market_operators = {}
         self.markets = {}
         self.unit_operators = {}
-        self.learning_operators = {}
         self.forecast_providers = {}
 
     def add_unit(
