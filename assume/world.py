@@ -567,7 +567,7 @@ class World:
         if self.unit_operators[unit_operator_id].units.get(id):
             raise ValueError(f"Unit {id} already exists")
 
-    def add_market_operator(self, id: str) -> None:
+    def add_market_operator(self, id: str) -> RoleAgent:
         """
         Add a market operator to the simulation by creating a new role agent for the market operator
         and setting additional context parameters. If not in learning mode and not in evaluation mode,
@@ -590,6 +590,7 @@ class World:
                 {"output_agent_addr": self.output_agent_addr}
             )
         self.market_operators[id] = market_operator_agent
+        return market_operator_agent
 
     def add_market(self, market_operator_id: str, market_config: MarketConfig) -> None:
         """
