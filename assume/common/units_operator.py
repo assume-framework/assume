@@ -175,7 +175,7 @@ class UnitsOperator(Role):
         await self.context.send_message(
             create_acl(
                 {
-                    "context": "registration",
+                    "context": "registration_reply",
                     "market_id": market.market_id,
                     "information": [u.as_dict() for u in self.units.values()],
                 },
