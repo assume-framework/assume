@@ -135,7 +135,7 @@ class World:
                     # log error if not connection refused
                     if not e.code == "e3q8":
                         logger.error("%s", e)
-                    time.sleep(2)
+                    time.sleep(2**attempts)
 
             if not connected:
                 raise RuntimeError(
