@@ -97,8 +97,7 @@ class MarketRole(MarketMechanism, Role):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
         self.registered_agents = {}
-        self.open_auctions = set()
-        self.all_orders = []
+        self.open_auctions: set[MarketProduct] = set()
         self.results = []
         if marketconfig.price_tick:
             if marketconfig.maximum_bid_price % marketconfig.price_tick != 0:
@@ -136,6 +135,7 @@ class MarketRole(MarketMechanism, Role):
         """
 
         super().setup()
+        self.context.data["all_orders"] = []
         self.marketconfig.addr = self.context.addr
 
         market_id = getattr(self.marketconfig, "market_id", "Unknown Market ID")
@@ -173,7 +173,7 @@ class MarketRole(MarketMechanism, Role):
         def accept_registration(content: RegistrationMessage, meta: MetaDict):
             if (
                 not isinstance(content, dict)
-                or content.get("context") != "registration"
+                or content.get("context") != "registration_reply"
             ):
                 return False
             if isinstance(meta["sender_addr"], list):
@@ -505,7 +505,7 @@ class MarketRole(MarketMechanism, Role):
 
             # Add each validated order to 'all_orders'
             for order in orderbook:
-                self.all_orders.append(order)
+                self.context.data["all_orders"].append(order)
 
         except Exception as e:
             # Log the error with agent details for better traceability
@@ -599,9 +599,11 @@ class MarketRole(MarketMechanism, Role):
                         and o.get("only_hours") == order.get("only_hours")
                     )
 
-                available_orders = list(filter(order_matches_req, self.all_orders))
+                available_orders = list(
+                    filter(order_matches_req, self.context.data["all_orders"])
+                )
             else:
-                available_orders = self.all_orders
+                available_orders = self.context.data["all_orders"]
 
             self.context.schedule_instant_message(
                 content={
@@ -623,21 +625,30 @@ class MarketRole(MarketMechanism, Role):
         Args:
             market_products (list[MarketProduct]): The products to be traded.
         """
-        if not self.all_orders:
+        if not self.context.data["all_orders"]:
             logger.warning(
                 f"[{self.context.current_timestamp}] The order book for market {self.marketconfig.market_id} with products {market_products} is empty. No orders were found."
             )
-            return
+            accepted_orderbook = []
+            rejected_orderbook = []
+            market_meta = []
+            flows = []
+        else:
+            orders = self.context.data["all_orders"]
 
-        try:
-            (accepted_orderbook, rejected_orderbook, market_meta, flows) = self.clear(
-                self.all_orders, market_products
-            )
-        except Exception as e:
-            logger.error("clearing failed: %s", e)
-            raise e
+            # this makes the market role idempotent to clear the same bids multiple times
+            for order in orders:
+                order.pop("accepted_volume", None)
+                order.pop("accepted_price", None)
+            try:
+                (accepted_orderbook, rejected_orderbook, market_meta, flows) = (
+                    self.clear(orders, market_products)
+                )
+            except Exception as e:
+                logger.error("clearing failed: %s", e)
+                raise e
 
-        self.all_orders = []
+        self.context.data["all_orders"] = []
 
         for order in rejected_orderbook:
             if "accepted_volume" not in order and "accepted_price" not in order:
@@ -653,7 +664,7 @@ class MarketRole(MarketMechanism, Role):
                     order["accepted_volume"] = 0.0
                     order["accepted_price"] = market_meta[0]["price"]
 
-        self.open_auctions - set(market_products)
+        self.open_auctions -= set(market_products)
 
         accepted_orderbook = sorted(
             accepted_orderbook, key=lambda x: str(x["agent_addr"])

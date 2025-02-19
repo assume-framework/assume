@@ -548,9 +548,6 @@ class ComplexClearingRole(MarketRole):
             pricing_mechanism=self.pricing_mechanism,
             log_flows=self.log_flows,
         )
-
-        self.all_orders = []
-
         return accepted_orders, rejected_orders, meta, flows
 
 

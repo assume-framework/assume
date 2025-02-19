@@ -5,7 +5,7 @@
 import time
 from multiprocessing import Process, set_start_method
 
-from mango import addr
+from mango import AgentAddress, addr
 
 from assume import World
 
@@ -28,13 +28,13 @@ from .world_manager import create_worker as create_manager
 set_start_method("spawn", force=True)
 
 
-def manager():
+def manager(additional_addresses: list[AgentAddress]):
     world = World(
         database_uri=db_uri, addr=manager_protocol_addr, distributed_role=True
     )
 
     if world.distributed_role:
-        world.addresses.extend(agent_addresses)
+        world.addresses.extend(additional_addresses)
     world.loop.run_until_complete(worker(world, marketdesign, create_manager))
 
 
