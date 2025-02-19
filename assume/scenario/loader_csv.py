@@ -631,7 +631,7 @@ def setup_world(
 
     if not learning_config.get("trained_policies_load_path"):
         learning_config["trained_policies_load_path"] = (
-            f"learned_strategies/{sim_id}/last_policies"
+            f"learned_strategies/{sim_id}/avg_reward_eval_policies"
         )
 
     config = replace_paths(config, scenario_data["path"])
@@ -1019,7 +1019,7 @@ def run_learning(
     # especially if previous strategies were loaded from an external source.
     # This is useful when continuing from a previous learning session.
     world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
-        None
+        f"{world.learning_role.trained_policies_save_path}/avg_reward_eval_policies"
     )
 
     # load scenario for evaluation
