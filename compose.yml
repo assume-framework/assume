@@ -47,6 +47,7 @@ services:
       GF_RENDERING_SERVER_URL: http://renderer:8081/render
       GF_RENDERING_CALLBACK_URL: http://grafana:3000/
       GF_LOG_FILTERS: rendering:debug
+      GF_USERS_DEFAULT_THEME: light
     volumes:
       - ./docker_configs/grafana.ini:/etc/grafana/grafana.ini
       - ./docker_configs/datasources:/etc/grafana/provisioning/datasources

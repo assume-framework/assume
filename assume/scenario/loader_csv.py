@@ -4,6 +4,8 @@
 
 import copy
 import logging
+import os
+import shutil
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -899,11 +901,23 @@ def run_learning(
     if Path(save_path).is_dir() and not world.learning_config["continue_learning"]:
         # we are in learning mode and about to train new policies, which might overwrite existing ones
         accept = input(
-            f"{save_path=} exists - should we overwrite current learnings? (y/N) "
+            f"{save_path=} exists - should we overwrite current learned strategies? (y/N) "
         )
-        if not accept.lower().startswith("y"):
+        if accept.lower().startswith("y"):
+            # remove existing policies
+            if os.path.exists(save_path):
+                shutil.rmtree(save_path, ignore_errors=True)
+
+        else:
             # stop here - do not start learning or save anything
-            raise AssumeException("don't overwrite existing strategies")
+            raise AssumeException(
+                "Simulation aborted by user not to overwrite existing learned strategies. You can use 'simulation_id' parameter in the config to start a new simulation."
+            )
+
+    # also remove tensorboard logs
+    tensorboard_path = f"tensorboard/{world.scenario_data['sim_id']}"
+    if os.path.exists(tensorboard_path):
+        shutil.rmtree(tensorboard_path, ignore_errors=True)
 
     # -----------------------------------------
     # Information that needs to be stored across episodes, aka one simulation run
@@ -950,6 +964,8 @@ def run_learning(
 
         world.run()
 
+        world.learning_role.tensor_board_logger.update_tensorboard()
+
         # -----------------------------------------
         # Store updated information across episodes
         inter_episodic_data = world.learning_role.get_inter_episodic_data()
@@ -974,6 +990,8 @@ def run_learning(
             world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
             world.run()
+
+            world.learning_role.tensor_board_logger.update_tensorboard()
 
             total_rewards = world.output_role.get_sum_reward()
 

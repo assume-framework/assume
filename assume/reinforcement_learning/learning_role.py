@@ -7,6 +7,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
 import torch as th
 from mango import Role
 
@@ -16,6 +17,7 @@ from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import linear_schedule_func
+from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,8 @@ class Learning(Role):
         if end is not None:
             self.end = datetime2timestamp(end)
 
+        self.datetime = None
+
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
         self.learning_rate_schedule = learning_config.get(
             "learning_rate_schedule", None
@@ -133,6 +137,11 @@ class Learning(Role):
         self.rl_eval = defaultdict(list)
         # list of avg_changes
         self.avg_rewards = []
+
+        self.tensor_board_logger = None
+        self.db_addr = None
+        self.freq_timedelta = None
+        self.time_steps = None
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -186,8 +195,8 @@ class Learning(Role):
             This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
             for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
-        # subscribe to messages for handling the training process
 
+        # subscribe to messages for handling the training process
         if not self.perform_evaluation:
             self.context.subscribe_message(
                 self,
@@ -387,3 +396,93 @@ class Learning(Role):
 
                         return True
             return False
+
+    def init_logging(
+        self,
+        simulation_id: str,
+        db_uri: str,
+        output_agent_addr: str,
+        train_start: str,
+        freq: str,
+    ):
+        """
+        Initialize the logging for the reinforcement learning agent.
+
+        This method initializes the tensor board logger for the reinforcement learning agent.
+        It also initializes the parameters required for sending data to the output role.
+
+        Args:
+            simulation_id (str): The unique identifier for the simulation.
+            db_uri (str): URI for connecting to the database.
+            output_agent_addr (str): The address of the output agent.
+            train_start (str): The start time of simulation.
+            freq (str): The frequency of simulation.
+        """
+
+        self.tensor_board_logger = TensorBoardLogger(
+            simulation_id=simulation_id,
+            db_uri=db_uri,
+            learning_mode=self.learning_mode,
+            episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
+            perform_evaluation=self.perform_evaluation,
+        )
+
+        # Parameters required for sending data to the output role
+        self.db_addr = output_agent_addr
+
+        self.datetime = pd.to_datetime(train_start)
+
+        self.freq_timedelta = pd.Timedelta(freq)
+        # This is for padding the output list when the gradient steps are not identical to the train frequency
+        self.time_steps = int(
+            pd.Timedelta(self.train_freq) / (self.freq_timedelta * self.gradient_steps)
+        )
+
+    def write_rl_critic_params_to_output(
+        self, learning_rate: float, unit_params_list: list[dict]
+    ) -> None:
+        """
+        Writes learning parameters and critic losses to output at specified time intervals.
+
+        This function processes training metrics for each critic over multiple time steps and
+        sends them to a database for storage. It tracks the learning rate and critic losses
+        across training iterations, associating each record with a timestamp.
+
+        Parameters
+        ----------
+        learning_rate : float
+            The current learning rate used in training.
+        unit_params_list : list[dict]
+            A list of dictionaries containing critic losses for each time step.
+            Each dictionary maps critic names to their corresponding loss values.
+        """
+
+        output_list = [
+            {
+                "unit": u_id,
+                "critic_loss": params["loss"],
+                "total_grad_norm": params["total_grad_norm"],
+                "max_grad_norm": params["max_grad_norm"],
+                "learning_rate": learning_rate,
+                "datetime": self.datetime
+                + (
+                    (time_step * self.gradient_steps + gradient_step)
+                    * self.freq_timedelta
+                ),
+            }
+            for time_step in range(self.time_steps)
+            for gradient_step in range(self.gradient_steps)
+            for u_id, params in unit_params_list[gradient_step].items()
+        ]
+
+        if self.db_addr:
+            self.context.schedule_instant_message(
+                receiver_addr=self.db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "rl_critic_params",
+                    "data": output_list,
+                },
+            )
+
+        self.datetime = self.datetime + pd.Timedelta(self.train_freq)

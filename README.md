@@ -84,7 +84,16 @@ docker-compose up -d
 ```
 
 This will launch a container for TimescaleDB and Grafana with preconfigured dashboards for analysis. You can access the Grafana dashboards at `http://localhost:3000`.
+### Using TensorBoard to display Learning Metrics
 
+When running an example with learning capabilities, you can start TensorBoard to observe the learning process. Use the following shell command to start TensorBoard:
+```shell
+tensorboard --logdir tensorboard
+```
+
+You can then head to `http://localhost:6006/` to view and evaluate the training progress.
+
+Please note that TensorBoard should ideally be shut down via `Ctrl + C` every time you want to start a new simulation run in the same folder structure and want to overwrite existing results, as failing to do so may lead to conflicts deleting old logs.
 
 ## Trying out ASSUME and the provided Examples
 
