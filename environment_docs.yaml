@@ -19,7 +19,7 @@ dependencies:
 
 - pip:
   - .[all]
-  - sphinx<9
+  - sphinx<8.2
   - sphinx-book-theme
   - nbsphinx
   - nbsphinx-link
