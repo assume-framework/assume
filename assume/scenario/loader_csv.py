@@ -522,7 +522,7 @@ def load_config_and_create_forecaster(
     learning_config: LearningConfig = config.get("learning_config", {})
 
     # Check if simulation length is divisible by train_freq in learning config and adjust if not
-    if learning_config.get("learning_mode"):
+    if config.get("learning_mode"):
         train_freq_str = learning_config.get("train_freq", "24h")
         train_freq = pd.Timedelta(train_freq_str)
         total_length = end - start
