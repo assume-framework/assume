@@ -11,6 +11,8 @@ from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
+# define the path where the simulation results in form of CSV files will be stored, for example: "examples/outputs"
+# "" means no CSV files will be stored
 csv_path = ""
 
 os.makedirs("./examples/local_db", exist_ok=True)
@@ -151,11 +153,6 @@ if __name__ == "__main__":
 
     if world.learning_config.get("learning_mode", False):
         # run learning if learning mode is enabled
-        run_learning(
-            world,
-            inputs_path="examples/inputs",
-            scenario=available_examples[example]["scenario"],
-            study_case=available_examples[example]["study_case"],
-        )
+        run_learning(world)
 
     world.run()

@@ -35,6 +35,7 @@ def test_learning_init():
         "learning_mode": False,
         "perform_evaluation": False,
         "training_episodes": 3,
+        "episodes_collecting_initial_experience": 1,
         "continue_learning": False,
         "trained_policies_save_path": None,
         "early_stopping_steps": 10,

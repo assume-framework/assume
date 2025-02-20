@@ -14,37 +14,38 @@ Upcoming Release
 
 **New Features:**
 
+- **Tensorboard Integration:** To enable better monitoring of the learning prograss and comparison between different runs, we added the possibility to use Tensorboard for logging the learning progress.
+  To use this feature, please follow the instructions in the README.
+
+
+v0.5.1 - (3rd February 2025)
+===========================================
+**New Features:**
+
 - **Exchange Unit**: A new unit type for modeling **energy trading** between market participants. It supports **buying (importing) and selling (exporting) energy**, with user-defined prices.
   Check **example_01a**, **example_03**, and the files **"exchange_units.csv"** and **"exchanges_df.csv"** for usage examples.
-- **Building Demand Side Unit**: Added a demand side agent, "building demand side unit" to the framework, enabling users to model a residential/building unit with building components. This feature allows
-  for more detailed modeling of a building type and its technology configuration and market interactions.  This feature allows users to model a building type and integrate building-specific components such as:
-    - Generic storage
-    - Heat pump
-    - Boilers
-    - Thermal storage
-    - Electric vehicle
-    - Photovoltaic system
-  The agent type can be optimized to minimize costs or to maximize the load shift, depending on the user's requirements. This agent also has an attribute to be a Prosumer or a Consumer.
-  A tutorial and detailed documentation on how to use this feature are coming soon.
-- **Flexibility module**: The latest release introduces Flexibility Measures designed for the Demand Side Agents The measures in the module allow the Demand Side Agents for planning flexibility bids while interacting dynamically with energy markets.
-    - *Congestion Management:* Maximising load shift during periods of high congestion in the grid to alleviate stress on the power network.  A node-specific forecast provided by the grid operator that indicates the level of congestion in different areas of the grid.
-    - *Peak Load Shifting:* Shifting peak load according to defined peak load limits, thereby reducing strain on the grid and avoiding high peak demand.
-    - *Renewable Utilization:* Increase the utilization of renewable energy by synchronizing operations with periods of high renewable energy availability of a given node/location.
-    - *Cost-Based Load Shifting:* Shifting the operations by adhering to a predefined cost tolerance, ensuring that operational costs remain within acceptable limits while meeting production goals.
+- **Market Contracts and Support Policies**: it is now possible to simulate the auctioning of support policies, like feed-in tariff, PPA, CfD or a market premium.
+  The contracts are auctioned and then have a regular contract execution, to compensate according to the contracts dynamic, based on the historic market price and unit dispatch (#542).
+- **Merit Order Plot** on the default Grafana Dashboard - showing a deeper view into the bidding behavior of the market actors.
+  Additionally, a graph showing the market result per generation technology has been added (#531).
 
 **Improvements:**
 
 - **Multi-agent DRL fix**: Addressed a critical bug affecting action sampling, ensuring correct multi-agent learning.
 - **Performance boost**: Optimized training efficiency, achieving **2x overall speedup** and up to **5x on CUDA devices**.
-- **Learning Observation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
-  This allows for a more robust scaling of the observation space for future analysis.
+- **Learning Observation Space Scaling:** Instead of the formerly used max scaling of the observation space, we added a min-max scaling to the observation space.
+  This allows for a more robust scaling of the observation space for future analysis (#508).
 - **Allow Multi-Market Bidding Strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
   the strategy is only created once and the same instance is used for all of these markets.
 - **Improve Storage Behavior**: Storages were using the current unmodified SoC instead of the final SoC of last hour, leading to always using the initial value to calculate discharge possibility.(#524)
+- **OEDS Loader**: when using the OEDS as a database, the queries have been adjusted to the latest update of the MarktStammDatenRegister. Time-sensitive fuel costs for gas, coal and oil are available from the OEDS as well.
+  This also includes various fixes to the behavior of the DMAS market and complex powerplant strategies (#532).
 
 **Bug Fixes:**
 
 - **Update PyPSA Version:** Fixes example "small_with_redispatch"; adjustments to tutorials 10 and 11 to remove DeprecationWarnings.
+- **Fixes to the documentation** documentation and example notebooks were updated to be compatible with the latest changes to the framework (#530, #537, #543)
+- **postgresql17** - using the docker container in the default compose.yml requires to backup or delete the existing assume-db folder. Afterwards, no permission changes should be required anymore when setting up the DB (#541)
 
 v0.5.0 - (10th December 2024)
 ===========================================

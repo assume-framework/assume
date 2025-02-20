@@ -247,8 +247,8 @@ class PowerPlant(SupportsMinMax):
         self, start: datetime, end: datetime, product_type="energy"
     ) -> tuple[np.array, np.array]:
         """
-        Calculates the minimum and maximum power output of the unit and returns it.
-
+        Calculates the minimum and maximum power output of the unit and returns it,
+        while considering heat demand and positive capacity reserve power.
         Args:
             start (pandas.Timestamp): The start time of the dispatch.
             end (pandas.Timestamp): The end time of the dispatch.
