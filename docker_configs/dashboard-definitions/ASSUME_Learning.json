@@ -1370,7 +1370,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "profit"
+              "options": "reward"
             },
             "properties": [
               {
@@ -2138,6 +2138,84 @@
         "name": "timeRange",
         "options": [],
         "query": "SELECT MIN(datetime), MAX(datetime) FROM rl_params",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "1",
+          "value": "1"
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "SELECT DISTINCT episode\nFROM rl_params\nWHERE simulation ~ '^${simulation}_[1-9]+' \nAND learning_mode IS True\nORDER BY episode;",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Episode",
+        "multi": false,
+        "name": "episode",
+        "options": [],
+        "query": "SELECT DISTINCT episode\nFROM rl_params\nWHERE simulation ~ '^${simulation}_[1-9]+' \nAND learning_mode IS True\nORDER BY episode;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "1",
+          "value": "1"
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "P7B13B9DF907EC40C"
+        },
+        "definition": "SELECT DISTINCT episode\nFROM rl_params\nWHERE simulation ~ '^${simulation}_eval_[1-9]+'\n  AND learning_mode IS TRUE\nORDER BY episode;\n",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Eval. episode",
+        "multi": false,
+        "name": "eval_episode",
+        "options": [],
+        "query": "SELECT DISTINCT episode\nFROM rl_params\nWHERE simulation ~ '^${simulation}_eval_[1-9]+'\n  AND learning_mode IS TRUE\nORDER BY episode;\n",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "1",
+          "value": "1"
+        },
+        "definition": "SELECT DISTINCT episode\nFROM rl_params\nWHERE simulation ~ '^${simulation}_[1-9]+' \nAND learning_mode IS True\nORDER BY episode;",
+        "label": "Episode",
+        "name": "episode",
+        "options": [],
+        "query": "SELECT DISTINCT episode\nFROM rl_params\nWHERE simulation ~ '^${simulation}_[1-9]+' \nAND learning_mode IS True\nORDER BY episode;",
+        "refresh": 1,
+        "regex": "",
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "1",
+          "value": "1"
+        },
+        "definition": "SELECT DISTINCT episode\nFROM rl_params\nWHERE simulation ~ '^${simulation}_eval_[1-9]+'\n  AND learning_mode IS TRUE\nORDER BY episode;\n",
+        "label": "Eval. episode",
+        "name": "eval_episode",
+        "options": [],
+        "query": "SELECT DISTINCT episode\nFROM rl_params\nWHERE simulation ~ '^${simulation}_eval_[1-9]+'\n  AND learning_mode IS TRUE\nORDER BY episode;\n",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,

@@ -99,8 +99,7 @@ class CsvForecaster(Forecaster):
     Notes:
     - Some built-in forecasts are calculated at the beginning of the simulation, such as price forecast and residual load forecast.
     - Price forecast is calculated for energy-only markets using a merit order approach.
-    - Residual load forecast is calculated by subtracting the total available power from variable renewable energy power
-      plants from the overall demand forecast. Only power plants containing 'wind' or 'solar' in their technology column are considered VRE power plants.
+    - Residual load forecast is calculated by subtracting the total available power from variable renewable energy power plants from the overall demand forecast. Only power plants containing 'wind' or 'solar' in their technology column are considered VRE power plants.
 
     Args:
         index (pd.Series): The index of the forecasts.
@@ -317,6 +316,7 @@ class CsvForecaster(Forecaster):
             2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
             3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
             4. Calculates the residual demand by subtracting the total VRE power feed-in from the overall demand forecast.
+
         """
 
         vre_powerplants_units = self.powerplants_units[
