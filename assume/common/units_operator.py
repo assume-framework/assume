@@ -214,6 +214,15 @@ class UnitsOperator(Role):
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_actual_dispatch(marketconfig.product_type)
 
+        # now once we have the market results and the dispatch has been set
+        # we can calculate the cashflow and reward for the units
+        self.calculate_unit_cashflow_and_reward(orderbook, marketconfig)
+
+        # if unit operator is a subclass of learning unit operator
+        # we need to write the learning data to the output agent
+        if hasattr(self, "write_learning_to_output"):
+            self.write_learning_to_output(orderbook, marketconfig.market_id)
+
     def handle_registration_feedback(
         self, content: RegistrationMessage, meta: MetaDict
     ) -> None:
@@ -289,6 +298,24 @@ class UnitsOperator(Role):
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
             orderbook = list(orders)
             self.units[unit_id].set_dispatch_plan(
+                marketconfig=marketconfig,
+                orderbook=orderbook,
+            )
+
+    def calculate_unit_cashflow_and_reward(
+        self, orderbook: Orderbook, marketconfig: MarketConfig
+    ) -> None:
+        """
+        Feeds the current market result back to the units.
+
+        Args:
+            orderbook (Orderbook): The orderbook of the market.
+            marketconfig (MarketConfig): The market configuration.
+        """
+        orderbook.sort(key=itemgetter("unit_id"))
+        for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
+            orderbook = list(orders)
+            self.units[unit_id].calculate_cashflow_and_reward(
                 marketconfig=marketconfig,
                 orderbook=orderbook,
             )

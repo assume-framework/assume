@@ -109,6 +109,7 @@ def test_calculate_bids(base_unit, mock_market_config):
     base_unit.calculate_marginal_cost = lambda *x: 10
     base_unit.set_dispatch_plan(mock_market_config, orderbook)
     base_unit.calculate_generation_cost(index[0], index[1], "energy")
+    base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
 
     # we apply the dispatch plan of 10 MW
     assert base_unit.outputs["energy"][start] == 10
@@ -119,6 +120,7 @@ def test_calculate_bids(base_unit, mock_market_config):
     # we somehow sold an additional 10 MW
     base_unit.set_dispatch_plan(mock_market_config, orderbook)
     base_unit.calculate_generation_cost(index[0], index[1], "energy")
+    base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
 
     # the final output should be 10+10
     assert base_unit.outputs["energy"][start] == 20
@@ -155,6 +157,7 @@ def test_calculate_multi_bids(base_unit, mock_market_config):
     base_unit.calculate_marginal_cost = lambda *x: 10
     base_unit.set_dispatch_plan(mock_market_config, orderbook)
     base_unit.calculate_generation_cost(index[0], index[1], "energy")
+    base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
 
     assert base_unit.outputs["energy"][index[0]] == 10
     assert base_unit.outputs["energy_marginal_costs"][index[0]] == 100
@@ -165,6 +168,7 @@ def test_calculate_multi_bids(base_unit, mock_market_config):
 
     base_unit.set_dispatch_plan(mock_market_config, orderbook)
     base_unit.calculate_generation_cost(index[0], index[1], "energy")
+    base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
 
     # should be correctly applied for the sum, even if different hours are applied
     assert base_unit.outputs["energy"][index[0]] == 20

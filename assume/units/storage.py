@@ -173,50 +173,49 @@ class Storage(SupportsMinMaxCharge):
         Returns:
             np.array: The volume of the unit within the given time range.
         """
+        start = max(start, self.index[0])
         time_delta = self.index.freq / timedelta(hours=1)
 
-        for t in self.index[start : end - self.index.freq]:
+        for t in self.index[start:end]:
+            current_power = self.outputs["energy"].at[t]
+
+            # adjust power to constraints of the unit
+            if current_power > self.max_power_discharge:
+                current_power = self.max_power_discharge
+            elif current_power < self.max_power_charge:
+                current_power = self.max_power_charge
+            elif (
+                current_power < self.min_power_discharge
+                and current_power > self.min_power_charge
+                and current_power != 0
+            ):
+                current_power = 0
+
+            # calculate the change in state of charge
             delta_soc = 0
             soc = self.outputs["soc"].at[t]
 
-            if self.outputs["energy"].at[t] > self.max_power_discharge:
-                self.outputs["energy"].at[t] = self.max_power_discharge
-            elif self.outputs["energy"].at[t] < self.max_power_charge:
-                self.outputs["energy"].at[t] = self.max_power_charge
-            elif (
-                self.outputs["energy"].at[t] < self.min_power_discharge
-                and self.outputs["energy"].at[t] > self.min_power_charge
-                and self.outputs["energy"].at[t] != 0
-            ):
-                self.outputs["energy"].at[t] = 0
-
             # discharging
-            if self.outputs["energy"].at[t] > 0:
+            if current_power > 0:
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
 
-                if self.outputs["energy"].at[t] > max_soc_discharge:
-                    self.outputs["energy"].at[t] = max_soc_discharge
+                if current_power > max_soc_discharge:
+                    current_power = max_soc_discharge
 
-                time_delta = self.index.freq / timedelta(hours=1)
-                delta_soc = (
-                    -self.outputs["energy"].at[t]
-                    * time_delta
-                    / self.efficiency_discharge
-                )
+                delta_soc = -current_power * time_delta / self.efficiency_discharge
 
             # charging
-            elif self.outputs["energy"].at[t] < 0:
+            elif current_power < 0:
                 max_soc_charge = self.calculate_soc_max_charge(soc)
 
-                if self.outputs["energy"].at[t] < max_soc_charge:
-                    self.outputs["energy"].at[t] = max_soc_charge
+                if current_power < max_soc_charge:
+                    current_power = max_soc_charge
 
-                time_delta = self.index.freq / timedelta(hours=1)
-                delta_soc = (
-                    -self.outputs["energy"].at[t] * time_delta * self.efficiency_charge
-                )
+                delta_soc = -current_power * time_delta * self.efficiency_charge
 
+            # update the values of the state of charge and the energy
             self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
+            self.outputs["energy"].at[t] = current_power
 
         return self.outputs["energy"].loc[start:end]
 
@@ -368,11 +367,10 @@ class Storage(SupportsMinMaxCharge):
             min_power_discharge < max_power_discharge, min_power_discharge, 0
         )
 
-        if soc is None:
-            soc = self.get_soc_before(start)
-
         # restrict according to min_soc
-        max_soc_discharge = self.calculate_soc_max_discharge(soc)
+        max_soc_discharge = self.calculate_soc_max_discharge(
+            self.outputs["soc"].at[start]
+        )
         max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge
@@ -478,6 +476,8 @@ class Storage(SupportsMinMaxCharge):
         unit_dict = super().as_dict()
         unit_dict.update(
             {
+                "max_soc": self.max_soc,
+                "min_soc": self.min_soc,
                 "max_power_charge": self.max_power_charge,
                 "max_power_discharge": self.max_power_discharge,
                 "min_power_charge": self.min_power_charge,
