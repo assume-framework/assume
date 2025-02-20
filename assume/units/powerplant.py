@@ -68,6 +68,7 @@ class PowerPlant(SupportsMinMax):
         cold_start_cost: float = 0,
         min_operating_time: float = 0,
         min_down_time: float = 0,
+        dynamic_cost = False,
         downtime_hot_start: int = 0,  # hours
         downtime_warm_start: int = 0,  # hours
         heat_extraction: bool = False,
@@ -112,8 +113,11 @@ class PowerPlant(SupportsMinMax):
         self.downtime_warm_start = downtime_warm_start / (
             self.index.freq / timedelta(hours=1)
         )
-
-        self.init_marginal_cost()
+        
+        if dynamic_cost:
+            self.marginal_cost = None
+        else:
+            self.init_marginal_cost()
 
     def init_marginal_cost(self):
         """
