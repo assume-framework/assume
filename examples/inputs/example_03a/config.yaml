@@ -7,29 +7,29 @@ base_case_2019:
   end_date: 2019-03-31 00:00
   time_step: 1h
   learning_mode: true
-  save_frequency_hours: Null
+  save_frequency_hours: null
 
   learning_config:
     continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
-    learning_rate: 0.001
-    learning_rate_schedule: linear
+    learning_rate: 0.0001
+    # learning_rate_schedule: linear
     training_episodes: 100
-    episodes_collecting_initial_experience: 3
+    episodes_collecting_initial_experience: 5
     train_freq: 10h
     gradient_steps: 1
-    batch_size: 256
+    batch_size: 128
     gamma: 0.99
-    device: cpu
-    action_noise_schedule: linear
+    device: cuda:0
+    # action_noise_schedule: linear
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
-    early_stopping_steps: 10
-    early_stopping_threshold: 0.05
+    # early_stopping_steps: 10
+    # early_stopping_threshold: 0.05
 
   markets_config:
     EOM:
