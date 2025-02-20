@@ -541,7 +541,7 @@ def load_config_and_create_forecaster(
             learning_config["train_freq"] = new_train_freq_str
 
             logger.warning(
-                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
+                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). This will lead to a loss of training experience."
                 f"Adjusting train_freq to {new_train_freq_str}. Consider modifying simulation length or train_freq in the config to avoid this adjustment."
             )
 
