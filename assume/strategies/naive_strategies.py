@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
@@ -144,10 +145,341 @@ class NaiveProfileStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDADSMStrategy(BaseStrategy):
+# class NaiveDADSMStrategy(BaseStrategy):
+#     """
+#     A naive strategy of a Demand Side Management (DSM) unit for the Day-Ahead Market.
+#     The bid volume is the optimal power requirement above the baseline threshold.
+#     """
+
+#     def calculate_bids(
+#         self,
+#         unit: SupportsMinMax,
+#         market_config: MarketConfig,
+#         product_tuples: list[Product],
+#         **kwargs,
+#     ) -> Orderbook:
+#         """
+#         Formulate bids for the Day-Ahead Market.
+
+#         Args:
+#             unit: The demand-side agent (e.g., cement plant) for which bids are being formulated.
+#             market_config: Market configuration containing product details and constraints.
+#             product_tuples: List of products for the Day-Ahead Market (duration and time steps).
+#             **kwargs: Additional arguments for bid calculation.
+
+#         Returns:
+#             Orderbook: Contains bids for the Day-Ahead Market.
+#         """
+
+#         # Calculate the baseline threshold (80% of maximum power requirement)
+#         max_power = max(unit.opt_power_requirement)
+#         baseline_threshold = 0.5 * max_power
+
+#         bids = []
+#         for product in product_tuples:
+#             """
+#             for each product, calculate the marginal cost of the unit at the start time of the product
+#             and the volume of the product. Dispatch the order to the market.
+#             """
+#             start = product[0]
+#             end = product[1]
+
+#             # Calculate bid volume (energy above the threshold)
+#             opt_power = unit.opt_power_requirement.at[start]
+#             if opt_power > baseline_threshold:
+#                 bid_volume = opt_power - baseline_threshold
+#             else:
+#                 bid_volume = 0
+
+#             # Skip if bid volume is 0
+#             if bid_volume <= 0:
+#                 continue
+
+#             # Calculate the marginal cost for the bid volume
+#             marginal_price = unit.calculate_marginal_cost(start=start, power=bid_volume)
+
+#             bids.append(
+#                 {
+#                     "start_time": start,
+#                     "end_time": end,
+#                     "only_hours": product[2],
+#                     "price": 3000,
+#                     "volume": -bid_volume,
+#                 }
+#             )
+
+#         return bids
+
+#     def plot_power_requirements(self, unit: SupportsMinMax):
+#         """
+#         Plots the optimal power requirement and flexibility power requirement for comparison.
+
+#         Args:
+#             unit (SupportsMinMax): The unit containing power requirements.
+#         """
+#         # Retrieve power requirements data
+#         opt_power_requirement = unit.opt_power_requirement
+#         flex_power_requirement = unit.flex_power_requirement
+
+#         # Plotting
+#         plt.figure(figsize=(10, 6))
+#         plt.plot(
+#             opt_power_requirement.index,
+#             opt_power_requirement,
+#             label="Optimal Power Requirement",
+#             color="blue",
+#         )
+#         plt.plot(
+#             flex_power_requirement.index,
+#             flex_power_requirement,
+#             label="Flex Power Requirement",
+#             color="orange",
+#             linestyle="--",
+#         )
+
+#         # Labels and title
+#         plt.xlabel("Time")
+#         plt.ylabel("Power Requirement (kW)")
+#         plt.title("Comparison of Optimal and Flexible Power Requirements")
+#         plt.legend()
+#         plt.grid(True)
+#         plt.show()
+
+
+# class OTC_DSM_Strategy(BaseStrategy):
+#     """
+#     Strategy for Long-Term Market (LTM) bids based on baseline power threshold.
+#     """
+
+#     def calculate_bids(
+#         self,
+#         unit: SupportsMinMax,
+#         market_config: MarketConfig,
+#         product_tuples: list[Product],
+#         **kwargs,
+#     ) -> Orderbook:
+#         """
+#         Formulate bids for the LTM market.
+
+#         Args:
+#             unit: The demand-side agent (e.g., cement plant) for which bids are being formulated.
+#             market_config: Market configuration containing product details and constraints.
+#             product_tuples: List of products for the LTM market (duration and time steps).
+#             **kwargs: Additional arguments for bid calculation.
+
+#         Returns:
+#             Orderbook: Contains bids for the LTM market.
+#         """
+#         if unit.optimisation_counter == 0:
+#             unit.determine_optimal_operation_with_flex()
+#             # self.plot_power_requirements(unit)
+#             unit.optimisation_counter = 1
+
+#         # Calculate the baseline threshold (70% of maximum power requirement)
+#         max_power = max(unit.opt_power_requirement)
+#         baseline_threshold = 0.7 * max_power
+
+#         bids = []
+
+#         for product in product_tuples:
+#             start = product[0]
+#             end = product[1]
+
+#             # Calculate total energy below the threshold
+#             current_time = start
+#             energy_below_threshold = 0
+
+#             while current_time < end:
+#                 opt_power = unit.opt_power_requirement.at[current_time]
+#                 power_below_threshold = min(opt_power, baseline_threshold)
+#                 energy_below_threshold += power_below_threshold
+#                 current_time += unit.index.freq
+
+#             # Skip if no valid energy for the product
+#             if energy_below_threshold <= 0:
+#                 continue
+
+#             # Calculate the marginal cost for the bid volume (total energy below threshold)
+#             marginal_price = unit.calculate_marginal_cost(
+#                 start=start, power=energy_below_threshold
+#             )
+
+#             # Add the bid to the list
+#             bids.append(
+#                 {
+#                     "start_time": start,
+#                     "end_time": end,
+#                     "only_hours": None,
+#                     "price": 3000,
+#                     "volume": -energy_below_threshold,
+#                     "node": unit.node,
+#                 }
+#             )
+
+#         # Clean up empty bids
+#         bids = self.remove_empty_bids(bids)
+
+#         return bids
+
+# # Flex and Inflex
+# class OTC_DSM_Strategy(BaseStrategy):
+#     """
+#     Strategy for Long-Term Market (LTM) bids based on aggregated power requirements.
+#     """
+    
+#     def calculate_bids(
+#         self,
+#         unit: SupportsMinMax,
+#         market_config: MarketConfig,
+#         product_tuples: list[Product],
+#         **kwargs,
+#     ) -> Orderbook:
+#         """
+#         Formulate bids for the LTM market using aggregated power over 24-hour periods. (Inflex & Flex)
+#         """
+#         bids = []
+        
+#         for product in product_tuples:
+#             start, end, only_hours = product
+            
+#             # Aggregate power demand for the 24-hour period
+#             total_power = unit.forecaster['flex_power'].loc[start:end].sum()
+#             # avg_price = unit.LTM_price.loc[start:end].mean()
+            
+#             # Skip bid if no power demand
+#             if total_power <= 0:
+#                 continue
+            
+#             # Add bid to the list
+#             bids.append(
+#                 {
+#                     "start_time": start,
+#                     "end_time": end,
+#                     "only_hours": None,
+#                     "price": 3000,
+#                     "volume": -total_power,
+#                     "node": unit.node,
+#                 }
+#             )
+        
+#         return self.remove_empty_bids(bids)
+    
+    # def plot_power_requirements(self, unit: SupportsMinMax):
+    #     """
+    #     Plots the optimal power requirement and flexibility power requirement for comparison.
+
+    #     Args:
+    #         unit (SupportsMinMax): The unit containing power requirements.
+    #     """
+    #     # Retrieve power requirements data
+    #     opt_power_requirement = unit.opt_power_requirement
+    #     flex_power_requirement = unit.flex_power_requirement
+
+    #     # Plotting
+    #     plt.figure(figsize=(10, 6))
+    #     plt.plot(
+    #         opt_power_requirement.index,
+    #         opt_power_requirement,
+    #         label="Optimal Power Requirement",
+    #         color="blue",
+    #     )
+    #     plt.plot(
+    #         flex_power_requirement.index,
+    #         flex_power_requirement,
+    #         label="Flex Power Requirement",
+    #         color="orange",
+    #         linestyle="--",
+    #     )
+
+    #     # Labels and title
+    #     plt.xlabel("Time")
+    #     plt.ylabel("Power Requirement (kW)")
+    #     plt.title("Comparison of Optimal and Flexible Power Requirements")
+    #     plt.legend()
+    #     plt.grid(True)
+    #     plt.show()
+
+# # LTM_50/80_EOM
+# class OTC_DSM_Strategy(BaseStrategy):
+#     """
+#     Bidding strategy for the Long-Term Market (LTM) with a 50% threshold.
+#     """
+
+#     def calculate_bids(
+#         self,
+#         unit: SupportsMinMax,
+#         market_config: MarketConfig,
+#         product_tuples: list[Product],
+#         **kwargs,
+#     ) -> Orderbook:
+
+#         max_power = max(unit.forecaster['flex_power'])
+#         baseline_threshold = 0.8 * max_power  
+
+#         bids = []
+#         for product in product_tuples:
+#             start, end, only_hours = product
+#             # Compute total energy below threshold for the 24-hour block
+#             energy_below_threshold = 0
+#             current_time = start
+#             while current_time < end:
+#                 power_value = unit.forecaster['flex_power'].at[current_time]
+#                 energy_below_threshold += min(power_value, baseline_threshold)
+#                 current_time += unit.index.freq
+
+#             if energy_below_threshold > 0:
+#                 # avg_price = unit.LTM_price.loc[start:end].mean()  # Average LTM price over the block
+#                 bids.append({
+#                     "start_time": start,
+#                     "end_time": end,
+#                     "price": 3000,
+#                     "volume": -energy_below_threshold,
+#                     "node": unit.node,
+#                 })
+#         return self.remove_empty_bids(bids)
+
+# # # LTM_50/80_EOM
+
+# class NaiveDADSMStrategy(BaseStrategy):
+#     """
+#     Bidding strategy for the Day-Ahead Market (EOM) for excess demand.
+#     """
+
+#     def calculate_bids(
+#         self,
+#         unit: SupportsMinMax,
+#         market_config: MarketConfig,
+#         product_tuples: list[Product],
+#         **kwargs,
+#     ) -> Orderbook:
+#         max_power = max(unit.forecaster['flex_power'])
+#         baseline_threshold = 0.8 * max_power  
+
+#         bids = []
+#         for product in product_tuples:
+#             start = product[0]
+#             end = product[1]
+#             current_time = start
+#             while current_time < end:
+#                 flex_power = unit.forecaster['flex_power'].at[current_time]
+#                 if flex_power > baseline_threshold:
+#                     bid_volume = flex_power - baseline_threshold
+#                     # bid_price = unit.EOM_price.at[current_time]
+#                     bids.append({
+#                         "start_time": current_time,
+#                         "end_time": current_time + unit.index.freq,
+#                         "price": 3000,
+#                         "volume": -bid_volume,
+#                     })
+#                 current_time += unit.index.freq
+
+#         return self.remove_empty_bids(bids)
+
+# Reserve LTM and EOM
+    
+class DSM_PosCRM_Strategy(BaseStrategy):
     """
-    A naive strategy of a Demand Side Management (DSM) unit for the Day-Ahead Market.
-    The bid volume is the optimal power requirement above the baseline threshold.
+    Strategy for trading positive reserve (CRM_pos) based on available reserve power.
     """
 
     def calculate_bids(
@@ -157,97 +489,48 @@ class NaiveDADSMStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        """
-        Formulate bids for the Day-Ahead Market.
-
-        Args:
-            unit: The demand-side agent (e.g., cement plant) for which bids are being formulated.
-            market_config: Market configuration containing product details and constraints.
-            product_tuples: List of products for the Day-Ahead Market (duration and time steps).
-            **kwargs: Additional arguments for bid calculation.
-
-        Returns:
-            Orderbook: Contains bids for the Day-Ahead Market.
-        """
-
-        # Calculate the baseline threshold (80% of maximum power requirement)
-        max_power = max(unit.opt_power_requirement)
-        baseline_threshold = 0.5 * max_power
-
         bids = []
         for product in product_tuples:
-            """
-            for each product, calculate the marginal cost of the unit at the start time of the product
-            and the volume of the product. Dispatch the order to the market.
-            """
             start = product[0]
             end = product[1]
+            # Initialize min reserve power for 4-hour block
+            bid_volume = float("inf")
 
-            # Calculate bid volume (energy above the threshold)
-            opt_power = unit.opt_power_requirement.at[start]
-            if opt_power > baseline_threshold:
-                bid_volume = opt_power - baseline_threshold
-            else:
-                bid_volume = 0
+            # Determine the lowest reserve power across the 4-hour block
+            current_time = start
+            while current_time < end:
+                reserve_power = (
+                    unit.forecaster["flex_power"][current_time] - unit.forecaster["reserve_power"][current_time]
+                )
+                bid_volume = min(bid_volume, reserve_power)  # Take min to ensure constant power bid
+                current_time += unit.index.freq  # Move to next hour
 
-            # Skip if bid volume is 0
-            if bid_volume <= 0:
-                continue
+            # Ensure we only bid if reserve power is available
+            if bid_volume > 0:
+                # Calculate opportunity cost as the average EOM price in the bidding period
+                price_total = 0
+                count = 0
+                current_time = start
+                while current_time < end:
+                    price_total += unit.forecaster["price_EOM_flex"][current_time]
+                    count += 1
+                    current_time += unit.index.freq
 
-            # Calculate the marginal cost for the bid volume
-            marginal_price = unit.calculate_marginal_cost(start=start, power=bid_volume)
+                bid_price = price_total / count if count > 0 else 0  # Avoid division by zero
 
-            bids.append(
-                {
+                bids.append({
                     "start_time": start,
                     "end_time": end,
-                    "only_hours": product[2],
-                    "price": 3000,
-                    "volume": -bid_volume,
-                }
-            )
+                    "price": bid_price,
+                    "volume": bid_volume,
+                    "node": unit.node,
+                })
 
-        return bids
-
-    def plot_power_requirements(self, unit: SupportsMinMax):
-        """
-        Plots the optimal power requirement and flexibility power requirement for comparison.
-
-        Args:
-            unit (SupportsMinMax): The unit containing power requirements.
-        """
-        # Retrieve power requirements data
-        opt_power_requirement = unit.opt_power_requirement
-        flex_power_requirement = unit.flex_power_requirement
-
-        # Plotting
-        plt.figure(figsize=(10, 6))
-        plt.plot(
-            opt_power_requirement.index,
-            opt_power_requirement,
-            label="Optimal Power Requirement",
-            color="blue",
-        )
-        plt.plot(
-            flex_power_requirement.index,
-            flex_power_requirement,
-            label="Flex Power Requirement",
-            color="orange",
-            linestyle="--",
-        )
-
-        # Labels and title
-        plt.xlabel("Time")
-        plt.ylabel("Power Requirement (kW)")
-        plt.title("Comparison of Optimal and Flexible Power Requirements")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-
+        return self.remove_empty_bids(bids)
 
 class OTC_DSM_Strategy(BaseStrategy):
     """
-    Strategy for Long-Term Market (LTM) bids based on baseline power threshold.
+    Strategy for trading in the Long-Term Market (LTM) with 80% allocation.
     """
 
     def calculate_bids(
@@ -257,105 +540,146 @@ class OTC_DSM_Strategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        """
-        Formulate bids for the LTM market.
-
-        Args:
-            unit: The demand-side agent (e.g., cement plant) for which bids are being formulated.
-            market_config: Market configuration containing product details and constraints.
-            product_tuples: List of products for the LTM market (duration and time steps).
-            **kwargs: Additional arguments for bid calculation.
-
-        Returns:
-            Orderbook: Contains bids for the LTM market.
-        """
-        if unit.optimisation_counter == 0:
-            unit.determine_optimal_operation_with_flex()
-            # self.plot_power_requirements(unit)
-            unit.optimisation_counter = 1
-
-        # Calculate the baseline threshold (70% of maximum power requirement)
-        max_power = max(unit.opt_power_requirement)
-        baseline_threshold = 0.7 * max_power
+        max_power = max(unit.forecaster['flex_power'])
+        baseline_threshold = 0.8 * max_power  # 80% threshold
 
         bids = []
-
         for product in product_tuples:
             start = product[0]
             end = product[1]
 
-            # Calculate total energy below the threshold
-            current_time = start
+            # Accumulate the bid volume for the 24-hour period
             energy_below_threshold = 0
-
+            current_time = start
             while current_time < end:
-                opt_power = unit.opt_power_requirement.at[current_time]
-                power_below_threshold = min(opt_power, baseline_threshold)
-                energy_below_threshold += power_below_threshold
+                flex_power = unit.forecaster["flex_power"][current_time]
+                reserve_power = unit.forecaster["reserve_power"][current_time]
+                available_power = flex_power - reserve_power  # Adjust for reserve trade
+
+                # Bid up to the baseline threshold
+                energy_below_threshold += min(available_power, baseline_threshold)
                 current_time += unit.index.freq
 
-            # Skip if no valid energy for the product
-            if energy_below_threshold <= 0:
-                continue
-
-            # Calculate the marginal cost for the bid volume (total energy below threshold)
-            marginal_price = unit.calculate_marginal_cost(
-                start=start, power=energy_below_threshold
-            )
-
-            # Add the bid to the list
-            bids.append(
-                {
+            if energy_below_threshold > 0:
+                avg_price = 3000  # Assuming static price for now
+                bids.append({
                     "start_time": start,
                     "end_time": end,
-                    "only_hours": None,
-                    "price": 3000,
+                    "price": avg_price,
                     "volume": -energy_below_threshold,
                     "node": unit.node,
-                }
-            )
+                })
 
-        # Clean up empty bids
-        bids = self.remove_empty_bids(bids)
+        return self.remove_empty_bids(bids)
+    
+class NaiveDADSMStrategy(BaseStrategy):
+    """
+    Strategy for trading in the Day-Ahead Market (EOM) with the remaining 20% power.
+    """
 
-        return bids
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        max_power = max(unit.forecaster['flex_power'])
+        baseline_threshold = 0.8 * max_power  # 80% to LTM, remaining 20% in EOM
 
-    def plot_power_requirements(self, unit: SupportsMinMax):
-        """
-        Plots the optimal power requirement and flexibility power requirement for comparison.
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            end = product[1]
+            # Accumulate EOM bid volume
+            eom_bid_volume = 0
+            current_time = start
+            while current_time < end:
+                flex_power = unit.forecaster["flex_power"][current_time]
+                reserve_power = unit.forecaster["reserve_power"][current_time]
+                available_power = flex_power - reserve_power
 
-        Args:
-            unit (SupportsMinMax): The unit containing power requirements.
-        """
-        # Retrieve power requirements data
-        opt_power_requirement = unit.opt_power_requirement
-        flex_power_requirement = unit.flex_power_requirement
+                # Allocate remaining 20% to EOM
+                eom_bid_volume += max(0, available_power - baseline_threshold)
+                current_time += unit.index.freq
 
-        # Plotting
-        plt.figure(figsize=(10, 6))
-        plt.plot(
-            opt_power_requirement.index,
-            opt_power_requirement,
-            label="Optimal Power Requirement",
-            color="blue",
-        )
-        plt.plot(
-            flex_power_requirement.index,
-            flex_power_requirement,
-            label="Flex Power Requirement",
-            color="orange",
-            linestyle="--",
-        )
+            if eom_bid_volume > 0:
+                avg_price = 3000  # Assuming static price for now
+                bids.append({
+                    "start_time": start,
+                    "end_time": end,
+                    "price": avg_price,
+                    "volume": -eom_bid_volume,
+                    "node": unit.node,
+                })
 
-        # Labels and title
-        plt.xlabel("Time")
-        plt.ylabel("Power Requirement (kW)")
-        plt.title("Comparison of Optimal and Flexible Power Requirements")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
+        return self.remove_empty_bids(bids)
 
+  ##### Optim case  
+# class DSM_PosCRM_Strategy(BaseStrategy):
+#     """
+#     Strategy for Positive CRM Reserve (Demand Side).
+#     """
 
+#     def calculate_bids(
+#         self,
+#         unit: SupportsMinMax,
+#         market_config: MarketConfig,
+#         product_tuples: list[Product],
+#         **kwargs,
+#     ) -> Orderbook:
+#         """
+#         Calculate bids for the Positive CRM market for each 4-hour block.
+#         """
+#         # Determine the optimal operation of the unit
+#         # unit.determine_optimal_operation_with_flex()
+
+#         # Calculate the baseline power threshold (80% of max optimal power requirement)
+#         max_power = max(unit.forecaster['flex_power'])
+#         baseline_threshold = 0.8 * max_power
+
+#         bids = []
+
+#         for product in product_tuples:
+#             start = product[0]
+#             end = product[1]
+
+#             # Find the maximum flex_upward in the 4-hour block
+#             max_flex_upward = 0
+#             current_time = start
+#             while current_time < end:
+#                 flex_upward = max(
+#                     0,
+#                     unit.opt_power_requirement.at[current_time]
+#                     - unit.flex_power_requirement.at[current_time],
+#                 )
+#                 max_flex_upward = max(max_flex_upward, flex_upward)
+#                 current_time += unit.index.freq  # Increment time by 1 hour
+
+#             # Skip the block if no upward flexibility is available
+#             if max_flex_upward <= 0:
+#                 continue
+
+#             # Calculate the capacity price
+#             capacity_price = unit.calculate_marginal_cost(
+#                 start=start, power=max_flex_upward
+#             )
+
+#             # Add the bid to the list
+#             bids.append(
+#                 {
+#                     "start_time": start,
+#                     "end_time": end,
+#                     "only_hours": product[2],
+#                     "price": 0,
+#                     "volume": max_flex_upward,
+#                     "node": unit.node,
+#                 }
+#             )
+#         bids = self.remove_empty_bids(bids)
+
+#         return bids
+    
 class DSM_NegCRM_Strategy(BaseStrategy):
     """
     Strategy for Negative CRM Reserve (Demand Side).
@@ -416,72 +740,6 @@ class DSM_NegCRM_Strategy(BaseStrategy):
 
         return bids
 
-
-class DSM_PosCRM_Strategy(BaseStrategy):
-    """
-    Strategy for Positive CRM Reserve (Demand Side).
-    """
-
-    def calculate_bids(
-        self,
-        unit: SupportsMinMax,
-        market_config: MarketConfig,
-        product_tuples: list[Product],
-        **kwargs,
-    ) -> Orderbook:
-        """
-        Calculate bids for the Positive CRM market for each 4-hour block.
-        """
-        # Determine the optimal operation of the unit
-        unit.determine_optimal_operation_with_flex()
-
-        # Calculate the baseline power threshold (80% of max optimal power requirement)
-        max_power = max(unit.opt_power_requirement)
-        baseline_threshold = 0.8 * max_power
-
-        bids = []
-
-        for product in product_tuples:
-            start = product[0]
-            end = product[1]
-
-            # Find the maximum flex_upward in the 4-hour block
-            max_flex_upward = 0
-            current_time = start
-            while current_time < end:
-                flex_upward = max(
-                    0,
-                    unit.opt_power_requirement.at[current_time]
-                    - unit.flex_power_requirement.at[current_time],
-                )
-                max_flex_upward = max(max_flex_upward, flex_upward)
-                current_time += unit.index.freq  # Increment time by 1 hour
-
-            # Skip the block if no upward flexibility is available
-            if max_flex_upward <= 0:
-                continue
-
-            # Calculate the capacity price
-            capacity_price = unit.calculate_marginal_cost(
-                start=start, power=max_flex_upward
-            )
-
-            # Add the bid to the list
-            bids.append(
-                {
-                    "start_time": start,
-                    "end_time": end,
-                    "only_hours": product[2],
-                    "price": 0,
-                    "volume": max_flex_upward,
-                    "node": unit.node,
-                }
-            )
-        bids = self.remove_empty_bids(bids)
-
-        return bids
-
-
 class NaiveRedispatchDSMStrategy(BaseStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of the unit on the redispatch market.
@@ -496,7 +754,7 @@ class NaiveRedispatchDSMStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit according to the objective function
-        unit.determine_optimal_operation_with_flex()
+        # unit.determine_optimal_operation_with_flex()
 
         bids = []
         for product in product_tuples:

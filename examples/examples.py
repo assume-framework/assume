@@ -11,7 +11,7 @@ from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
-csv_path = "" #./examples/inputs/paper/output
+csv_path = "./examples/inputs/paper/output" #./examples/inputs/paper/output
 
 os.makedirs("./examples/local_db", exist_ok=True)
 

@@ -1,6 +1,6 @@
-name,unit_type,technology,node,bidding_EOM,bidding_LTM_OTC,bidding_CRM_neg,bidding_CRM_pos,unit_operator,objective,flexibility_measure,peak_load_cap,cost_tolerance,demand,fuel_type,max_power,min_power,ramp_up,ramp_down,min_operating_steps,min_down_steps,efficiency,specific_thermal_consumption,specific_electricity_consumption,clinker_to_cement_ratio,limestone_to_clinker_ratio,calcination_emission_factor,start_price,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_operating_hours,availability_profile,max_processing_rate
-A360,cement_plant,clinker_system,south,naive_da_dsm,otc_dsm_strategy,dsm_neg_crm,dsm_pos_crm,dsm_operator,min_deviation,electricity_price_signal_based_flexibility,86.7,0,10000,hydrogen,0.2,0,0.02,0.02,168,168,,0.97,0.025,0.5,1.5,0.507,,,,,,,,,,24,no,
-A360,cement_plant,cement_mill,,,,,,,,,,,,,0.27,0,0.026,0.026,0,0,1,,0.026,,,,,,,,,,,,,20,no,
-A360,cement_plant,electrolyser,,,,,,,,,,,,,6.5,0,6.5,6.5,0,0,0.8,,,,,,,,,,,,,,,,,
-A360,cement_plant,ccs_system,,,,,,,,,,,,,40,0,40,40,0,0,1,,0.1,,,,,40,,,,,,,,24,,4.6
-A360,cement_plant,clinker_inventory,,,,,,,,,,,,,875,0,875,875,,,,,,,,,,1000,0,1000,1000,0,0,1,1,,,
+name,unit_type,technology,node,bidding_EOM,bidding_LTM_OTC,bidding_CRM_pos,unit_operator,objective,flexibility_measure,peak_load_cap,cost_tolerance,demand,fuel_type,max_power,min_power,ramp_up,ramp_down,min_operating_steps,min_down_steps,efficiency,specific_thermal_consumption,specific_electricity_consumption,clinker_to_cement_ratio,limestone_to_clinker_ratio,calcination_emission_factor,start_price,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_operating_hours,availability_profile,max_processing_rate
+A360,cement_plant,clinker_system,south,naive_da_dsm,otc_dsm_strategy,dsm_pos_crm,dsm_operator,min_deviation,electricity_price_signal_based_flexibility,86.7,0,10000,hydrogen,0.2,0,0.02,0.02,168,168,,0.97,0.025,0.5,1.5,0.507,,,,,,,,,,24,no,
+A360,cement_plant,cement_mill,,,,,,,,,,,,0.27,0,0.026,0.026,0,0,1,,0.026,,,,,,,,,,,,,20,no,
+A360,cement_plant,electrolyser,,,,,,,,,,,,6.5,0,6.5,6.5,0,0,0.8,,,,,,,,,,,,,,,,,
+A360,cement_plant,ccs_system,,,,,,,,,,,,40,0,40,40,0,0,1,,0.1,,,,,40,,,,,,,,24,,4.6
+A360,cement_plant,clinker_inventory,,,,,,,,,,,,875,0,875,875,,,,,,,,,,1000,0,1000,1000,0,0,1,1,,,

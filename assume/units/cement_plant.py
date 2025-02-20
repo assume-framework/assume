@@ -101,6 +101,8 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.electricity_price = self.forecaster["price_EOM"]
         self.electricity_price_flex = self.forecaster["price_EOM_flex"]
         self.opt_power = self.forecaster["opt_power"]
+        self.flex_power = self.forecaster["flex_power"]
+        self.reserve_power = self.forecaster["reserve_power"]
         self.grinder_availability_profile = self.forecaster[
             "grinder_availability_profile"
         ]
@@ -143,7 +145,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.define_constraints()
         self.define_objective_opt()
 
-        self.determine_optimal_operation_without_flex(switch_flex_off=False)
+        # self.determine_optimal_operation_without_flex(switch_flex_off=False)
 
         # Apply the flexibility function based on flexibility measure
         if self.flexibility_measure in DSMFlex.flexibility_map:
@@ -197,10 +199,18 @@ class CementPlant(DSMFlex, SupportsMinMax):
             },
         )
         self.model.cement_demand = pyo.Param(initialize=self.cement_demand)
-        # self.model.opt_power = pyo.Param(
-        #     self.model.time_steps,
-        #     initialize={t: value for t, value in enumerate(self.opt_power)},
-        # )
+        self.model.opt_power = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.opt_power)},
+        )
+        self.model.flex_power = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.flex_power)},
+        )
+        self.model.reserve_power = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.reserve_power)},
+        )
 
     def define_variables(self):
         self.model.total_power_input = pyo.Var(
@@ -892,27 +902,27 @@ class CementPlant(DSMFlex, SupportsMinMax):
 
                 return maximise_load_shift
 
-    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
-        """
-        Calculate the marginal cost of the unit based on the provided time and power.
+    # def calculate_marginal_cost(self, start: datetime, power: float) -> float:
+    #     """
+    #     Calculate the marginal cost of the unit based on the provided time and power.
 
-        Args:
-            start (datetime.datetime): The start time of the dispatch.
-            power (float): The power output of the unit.
+    #     Args:
+    #         start (datetime.datetime): The start time of the dispatch.
+    #         power (float): The power output of the unit.
 
-        Returns:
-            float: the marginal cost of the unit for the given power.
-        """
-        # Initialize marginal cost
-        marginal_cost = 0
+    #     Returns:
+    #         float: the marginal cost of the unit for the given power.
+    #     """
+    #     # Initialize marginal cost
+    #     marginal_cost = 0
 
-        if self.opt_power_requirement.at[start] > 0:
-            marginal_cost = (
-                self.variable_cost_series.at[start]
-                / self.opt_power_requirement.at[start]
-            )
+    #     if self.opt_power_requirement.at[start] > 0:
+    #         marginal_cost = (
+    #             self.variable_cost_series.at[start]
+    #             / self.opt_power_requirement.at[start]
+    #         )
 
-        return marginal_cost
+    #     return marginal_cost
 
     def as_dict(self) -> dict:
         """
