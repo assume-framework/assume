@@ -972,7 +972,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
             next_soc = unit.outputs["soc"].at[next_time]
 
             # Calculate and clip the energy cost for the start time
-            if current_soc < 1:
+            if next_soc < 1:
                 unit.outputs["energy_cost"].at[next_time] = 0
             else:
                 unit.outputs["energy_cost"].at[next_time] = np.clip(

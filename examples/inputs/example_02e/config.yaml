@@ -7,7 +7,7 @@ base:
   end_date: 2019-05-30 00:00
   time_step: 1h
   save_frequency_hours: null
-  learning_mode: True
+  learning_mode: true
 
   learning_config:
     continue_learning: false
