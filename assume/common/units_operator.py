@@ -146,7 +146,10 @@ class UnitsOperator(Role):
         Returns:
             bool: True if participate, False otherwise.
         """
-        return True
+        for u in self.units.values():
+            if market.market_id in u.bidding_strategies.keys():
+                return True
+        return False
 
     async def register_market(self, market: MarketConfig) -> None:
         """
