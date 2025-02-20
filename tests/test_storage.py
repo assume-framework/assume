@@ -138,9 +138,7 @@ def test_soc_constraint(storage_unit):
         start, end
     )
     assert min_power_discharge[0] == 40
-    assert math.isclose(
-        max_power_discharge[0], (50 * storage_unit.efficiency_discharge)
-    )
+    assert max_power_discharge[0] == 60
 
     storage_unit.outputs["soc"][start] = 0.95 * storage_unit.max_soc
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(

@@ -211,7 +211,7 @@ class Storage(SupportsMinMaxCharge):
                 if current_power < max_soc_charge:
                     current_power = max_soc_charge
 
-                delta_soc = - current_power * time_delta * self.efficiency_charge
+                delta_soc = -current_power * time_delta * self.efficiency_charge
 
             # update the values of the state of charge and the energy
             self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
@@ -367,11 +367,10 @@ class Storage(SupportsMinMaxCharge):
             min_power_discharge < max_power_discharge, min_power_discharge, 0
         )
 
-        if soc is None:
-            soc = self.get_soc_before(start)
-
         # restrict according to min_soc
-        max_soc_discharge = self.calculate_soc_max_discharge(soc)
+        max_soc_discharge = self.calculate_soc_max_discharge(
+            self.outputs["soc"].at[start]
+        )
         max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge

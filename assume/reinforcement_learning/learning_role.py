@@ -115,7 +115,7 @@ class Learning(Role):
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
 
-        self.train_freq = learning_config.get("train_freq", "100h")
+        self.train_freq = learning_config.get("train_freq", "24h")
         self.gradient_steps = learning_config.get("gradient_steps", 100)
 
         # check that gradient_steps is positive
