@@ -621,6 +621,36 @@ def test_set_list():
     assert res_fds < res_pd
 
 
+def test_slicing_fastseries_even():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+    b = start + timedelta(hours=1)
+    e = start + timedelta(hours=4)
+    result = fs[b:e]
+
+    datelist = fs.index.get_date_list(b, e)
+    series = pd.Series(0, index=pd.date_range(start, end, freq="h"))
+    assert list(series[b:e].index) == datelist
+    assert len(series[b:e]) == len(fs[b:e])
+
+
+def test_slicing_fastseries_uneven():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+    b = start + timedelta(seconds=1)
+    e = start + timedelta(hours=4, seconds=1)
+    result = fs[b:e]
+
+    datelist = fs.index.get_date_list(b, e)
+    series = pd.Series(0, index=pd.date_range(start, end, freq="h"))
+    assert list(series[b:e].index) == datelist
+    assert len(series[b:e]) == len(fs[b:e])
+
+
 def test_parse_duration():
     assert parse_duration("24h") == timedelta(days=1)
     assert parse_duration("1d") == timedelta(days=1)
