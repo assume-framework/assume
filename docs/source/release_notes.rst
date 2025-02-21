@@ -19,6 +19,8 @@ Upcoming Release
 
 **Improvements:**
 
+- **Multi-market participation configuration**: Respect the `eligible_obligations_lambda` set in the `MarketConfig` to only bid on markets where the UnitsOperator fulfills the requirements.
+  Changes the behavior to not participate on markets when no unit has a matching bidding strategy for this market.
 - **Learning Performance:** The learning performance for large multi-agent learning setups has been significantly improved by introducing several learning stabilization techniques.
   This leads to a more stable learning process and faster convergence. It also allows for running simulations on historical data with a larger number of agents, achieving very good quality results.
   For example, running example_03a for the year 2019, one can achieve an RMSE of 10.22 EUR/MWh and MAE of 6.52 EUR/MWh for hourly market prices, and an RMSE of 6.8 EUR/MWh and MAE of 4.6 EUR/MWh when

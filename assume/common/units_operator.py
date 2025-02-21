@@ -19,6 +19,7 @@ from assume.common.market_objects import (
     OpeningMessage,
     Orderbook,
     RegistrationMessage,
+    lambda_functions,
 )
 from assume.common.utils import (
     aggregate_step_amount,
@@ -146,7 +147,20 @@ class UnitsOperator(Role):
         Returns:
             bool: True if participate, False otherwise.
         """
-        return True
+        if callable(market.eligible_obligations_lambda):
+            requirement = market.eligible_obligations_lambda
+        else:
+            requirement = lambda_functions.get(
+                market.eligible_obligations_lambda, lambda u: True
+            )
+
+        for u in self.units.values():
+            if market.market_id in u.bidding_strategies.keys() and requirement(
+                u.as_dict()
+            ):
+                return True
+
+        return False
 
     async def register_market(self, market: MarketConfig) -> None:
         """
