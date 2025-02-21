@@ -4,6 +4,7 @@
 
 from assume.common.market_objects import Orderbook
 from assume.markets.base_market import MarketRole
+from assume.markets.clearing_algorithms.intermediate import PayAsClearIntermediateRole
 
 from .contracts import PayAsBidContractRole
 from .simple import PayAsBidRole, PayAsClearRole
@@ -16,6 +17,7 @@ clearing_mechanisms: dict[str, MarketRole] = {
     "pay_as_bid_contract": PayAsBidContractRole,
     "complex_clearing": ComplexClearingRole,
     "pay_as_clear_complex_dmas": ComplexDmasClearingRole,
+    "intermediate": PayAsClearIntermediateRole,
 }
 
 # try importing pypsa if it is installed
