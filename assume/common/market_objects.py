@@ -279,3 +279,39 @@ class MetaDict(TypedDict):
 
 contract_type = Callable[[Agent, Agent], None]
 market_contract_type = Callable[[Agent, Agent, list], None]
+
+
+def only_renewables(unit):
+    """check that technology is renewable"""
+    return unit["technology"] in [
+        "demand",
+        "wind",
+        "wind_onshore",
+        "wind_offshore",
+        "solar",
+        "biomass",
+    ]
+
+
+def only_co2emissionless(unit):
+    """same as only_renewables plus nuclear"""
+    return unit["technology"] in [
+        "demand",
+        "nuclear",
+        "wind",
+        "wind_onshore",
+        "wind_offshore",
+        "solar",
+        "biomass",
+    ]
+
+
+def power_plant_not_negative(unit):
+    return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 0
+
+
+lambda_functions = {
+    "only_renewables": only_renewables,
+    "only_co2emissionless": only_co2emissionless,
+    "power_plant_not_negative": power_plant_not_negative,
+}
