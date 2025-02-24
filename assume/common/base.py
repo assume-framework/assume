@@ -221,7 +221,6 @@ class BaseUnit:
         self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
             generation_costs
         )
-        self.outputs[f"{product_type}_marginal_costs"].loc[start:end] = marginal_costs
 
     def execute_current_dispatch(
         self,
