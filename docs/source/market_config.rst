@@ -185,3 +185,9 @@ For example, because only agents with a given minimum or maximum power are allow
       eligible_obligations_lambda: only_renewables
 
 When configuring the market as a Python object, it is also possible to configure a customized lambda function for the market object to reflect to special conditions.
+
+The built-in lambda functions are:
+
+- :py:meth:`assume.common.market_objects.only_renewables`
+- :py:meth:`assume.common.market_objects.only_co2emissionless`
+- :py:meth:`assume.common.market_objects.power_plant_not_negative`
