@@ -220,8 +220,8 @@ class BaseUnit:
             self.calculate_marginal_cost(t, product_data[idx])
             for idx, t in enumerate(self.index[start:end])
         ]
-        new_values = np.abs(marginal_costs * product_data)
-        self.outputs[product_type_mc].loc[start:end] = new_values
+        #new_values = np.abs(marginal_costs * product_data)
+        self.outputs[product_type_mc].loc[start:end] = marginal_costs
 
     def execute_current_dispatch(
         self,
