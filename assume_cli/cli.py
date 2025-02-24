@@ -160,12 +160,8 @@ def cli(args=None):
         logging.info(f"loaded {args.scenario} - {args.case_study}")
 
         if world.learning_config.get("learning_mode", False):
-            run_learning(
-                world,
-                inputs_path=args.input_path,
-                scenario=args.scenario,
-                study_case=args.case_study,
-            )
+            run_learning(world)
+
         world.run()
 
     except KeyboardInterrupt:

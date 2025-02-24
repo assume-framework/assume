@@ -244,10 +244,8 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
     # THEN resulting unit dispatch dataframe contains one row
     # which is for the current time - as we must know our current dispatch
-    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
-    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
-    # only 1 start and stop contained
-    assert len(unit_dfs[0]["time"]) == 2
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
 
     # WHEN another hour passes
@@ -256,16 +254,14 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
 
     # THEN resulting unit dispatch dataframe contains only one row with current dispatch
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
-    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
-    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
-    assert len(unit_dfs[0]["time"]) == 2
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
 
     last = clock.time
     clock.set_time(clock.time + 3600)
 
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
-    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
-    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
-    assert len(unit_dfs[0]["time"]) == 2
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0

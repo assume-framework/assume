@@ -519,6 +519,31 @@ def load_config_and_create_forecaster(
     buses = load_file(path=path, config=config, file_name="buses")
     lines = load_file(path=path, config=config, file_name="lines")
 
+    learning_config: LearningConfig = config.get("learning_config", {})
+
+    # Check if simulation length is divisible by train_freq in learning config and adjust if not
+    if config.get("learning_mode"):
+        train_freq_str = learning_config.get("train_freq", "24h")
+        train_freq = pd.Timedelta(train_freq_str)
+        total_length = end - start
+
+        # Compute remainder and determine the required intervals
+        quotient, remainder = divmod(total_length, train_freq)
+
+        if remainder != pd.Timedelta(0):
+            # Adjust train_freq so that it evenly divides total_length
+            n_intervals = quotient + 1
+            new_train_freq = (total_length / n_intervals).total_seconds() / 3600
+            new_train_freq_str = f"{int(new_train_freq)}h"  # Directly accessing hours
+
+            # Update the configuration
+            learning_config["train_freq"] = new_train_freq_str
+
+            logger.warning(
+                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). This will lead to a loss of training experience."
+                f"Adjusting train_freq to {new_train_freq_str}. Consider modifying simulation length or train_freq in the config to avoid this adjustment."
+            )
+
     forecaster = CsvForecaster(
         index=index,
         powerplants_units=powerplant_units,
@@ -554,7 +579,6 @@ def load_config_and_create_forecaster(
 
 def setup_world(
     world: World,
-    scenario_data: dict[str, object],
     perform_evaluation: bool = False,
     terminate_learning: bool = False,
     episode: int = 1,
@@ -568,7 +592,6 @@ def setup_world(
     Args:
         world (World): An instance of the World class representing the simulation environment.
         scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
-        study_case (str): The specific study case within the scenario to be loaded.
         perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 1.
@@ -579,7 +602,7 @@ def setup_world(
 
     """
     # make a deep copy of the scenario data to avoid changing the original data
-    scenario_data = copy.deepcopy(scenario_data)
+    scenario_data = copy.deepcopy(world.scenario_data)
 
     sim_id = scenario_data["sim_id"]
     config = scenario_data["config"]
@@ -631,12 +654,12 @@ def setup_world(
         learning_config["perform_evaluation"] = False
 
     if not learning_config.get("trained_policies_save_path"):
-        if learning_config["learning_mode"]:
-            path = f"learned_strategies/{sim_id}"
-        else:
-            path = f"learned_strategies/{sim_id}/last_policies"
+        learning_config["trained_policies_save_path"] = f"learned_strategies/{sim_id}"
 
-        learning_config["trained_policies_save_path"] = path
+    if not learning_config.get("trained_policies_load_path"):
+        learning_config["trained_policies_load_path"] = (
+            f"learned_strategies/{sim_id}/avg_reward_eval_policies"
+        )
 
     config = replace_paths(config, scenario_data["path"])
 
@@ -798,12 +821,11 @@ def load_scenario_folder(
     """
     logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
 
-    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
-
-    setup_world(
-        world=world,
-        scenario_data=scenario_data,
+    world.scenario_data = load_config_and_create_forecaster(
+        inputs_path, scenario, study_case
     )
+
+    setup_world(world=world)
 
 
 def load_custom_units(
@@ -866,9 +888,6 @@ def load_custom_units(
 
 def run_learning(
     world: World,
-    inputs_path: str,
-    scenario: str,
-    study_case: str,
     verbose: bool = False,
 ) -> None:
     """
@@ -899,12 +918,7 @@ def run_learning(
     world.export_csv_path = ""
 
     # initialize policies already here to set the obs_dim and act_dim in the learning role
-    actors_and_critics = None
-    world.learning_role.initialize_policy(actors_and_critics=actors_and_critics)
-
-    # -----------------------------------------
-    # Load scenario data to reuse across episodes
-    scenario_data = load_config_and_create_forecaster(inputs_path, scenario, study_case)
+    world.learning_role.rl_algorithm.initialize_policy()
 
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
@@ -926,7 +940,7 @@ def run_learning(
             )
 
     # also remove tensorboard logs
-    tensorboard_path = f"tensorboard/{scenario_data['sim_id']}"
+    tensorboard_path = f"tensorboard/{world.scenario_data['sim_id']}"
     if os.path.exists(tensorboard_path):
         shutil.rmtree(tensorboard_path, ignore_errors=True)
 
@@ -949,6 +963,8 @@ def run_learning(
         "eval_episodes_done": 0,
     }
 
+    world.learning_role.load_inter_episodic_data(inter_episodic_data)
+
     # -----------------------------------------
 
     validation_interval = min(
@@ -962,15 +978,14 @@ def run_learning(
         range(1, world.learning_role.training_episodes + 1),
         desc="Training Episodes",
     ):
-        setup_world(
-            world=world,
-            scenario_data=scenario_data,
-            episode=episode,
-        )
-
         # -----------------------------------------
         # Give the newly initialized learning role the needed information across episodes
-        world.learning_role.load_inter_episodic_data(inter_episodic_data)
+        if episode != 1:
+            setup_world(
+                world=world,
+                episode=episode,
+            )
+            world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
         world.run()
 
@@ -993,7 +1008,6 @@ def run_learning(
             # load evaluation run
             setup_world(
                 world=world,
-                scenario_data=scenario_data,
                 perform_evaluation=True,
                 eval_episode=eval_episode,
             )
@@ -1044,10 +1058,16 @@ def run_learning(
 
     world.reset()
 
+    # Set 'trained_policies_load_path' to None in order to load the most recent policies,
+    # especially if previous strategies were loaded from an external source.
+    # This is useful when continuing from a previous learning session.
+    world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
+        f"{world.learning_role.trained_policies_save_path}/avg_reward_eval_policies"
+    )
+
     # load scenario for evaluation
     setup_world(
         world=world,
-        scenario_data=scenario_data,
         terminate_learning=True,
     )
 

@@ -172,6 +172,20 @@ class BaseUnit:
                 accepted_price
             )
 
+    def calculate_cashflow_and_reward(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ) -> None:
+        """
+        Calculates the cashflow and the reward for the given unit.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+
+        product_type = marketconfig.product_type
         self.calculate_cashflow(product_type, orderbook)
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
@@ -783,5 +797,6 @@ class LearningConfig(TypedDict):
     noise_dt: int
     action_noise_schedule: str
     trained_policies_save_path: str
+    trained_policies_load_path: str
     early_stopping_steps: int
     early_stopping_threshold: float
