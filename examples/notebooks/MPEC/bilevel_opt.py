@@ -79,6 +79,8 @@ def find_optimal_dispatch(
     model.M = pyo.Param(initialize=max(gens_df["mc"]) * k_max)
     delta = [gens_df.at[gen, "g_max"] / (pow(2, K) - 1) for gen in gens_df.index]
 
+    
+    # ---------------------------------------------------------------------------
     # binary expansion constraints
     def g_binary_rule(model, t):
         return model.g[opt_gen, t] <= delta[opt_gen] * sum(
@@ -127,6 +129,8 @@ def find_optimal_dispatch(
         model.time, range(K), rule=binary_expansion_2_constr_2_rule
     )
 
+
+    # ---------------------------------------------------------------------------
     # objective rules
     def primary_objective_rule(model):
         return sum(
@@ -200,6 +204,7 @@ def find_optimal_dispatch(
 
     model.objective = pyo.Objective(expr=final_objective_rule, sense=pyo.maximize)
 
+    # ---------------------------------------------------------------------------
     # constraints
     # energy balance constraint
     def balance_rule(model, t):
