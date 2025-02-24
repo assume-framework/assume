@@ -88,7 +88,7 @@ class TensorBoardLogger:
     tensorboard_path (str, optional): Path for storing tensorboard logs.
     learning_mode (bool, optional): Whether the simulation is in learning mode. Defaults to False.
     episodes_collecting_initial_experience (int, optional): Number of episodes for initial experience collection. Defaults to 0.
-    perform_evaluation (bool, optional): Whether the simulation is in evaluation mode. Defaults to False.
+    evaluation_mode (bool, optional): Whether the simulation is in evaluation mode. Defaults to False.
 
     """
 
@@ -97,12 +97,14 @@ class TensorBoardLogger:
         db_uri: str,
         simulation_id: str,
         learning_mode: bool = False,
+        evaluation_mode: bool = False,
+        episode: int = 1,
+        eval_episode: int = 1,
         episodes_collecting_initial_experience: int = 0,
-        perform_evaluation: bool = False,
     ):
         self.simulation_id = simulation_id
         self.learning_mode = learning_mode
-        self.perform_evaluation = perform_evaluation
+        self.evaluation_mode = evaluation_mode
         self.episodes_collecting_initial_experience = (
             episodes_collecting_initial_experience
         )
@@ -113,22 +115,19 @@ class TensorBoardLogger:
             self.db = create_engine(self.db_uri)
 
         # get episode number if in learning or evaluation mode
-        self.episode = None
-        if self.learning_mode or self.perform_evaluation:
-            episode = self.simulation_id.split("_")[-1]
-            if episode.isdigit():
-                self.episode = int(episode)
+        self.episode = episode if not evaluation_mode else eval_episode
 
     def update_tensorboard(self):
         """Store episodic evaluation data in tensorboard"""
-        if not (self.episode and self.learning_mode):
+        if not self.learning_mode:
             return
 
         if self.writer is None:
-            sim_id = self.simulation_id.replace("_eval", "").rsplit("_", 1)[0]
-            self.writer = SummaryWriter(log_dir=os.path.join("tensorboard", sim_id))
+            self.writer = SummaryWriter(
+                log_dir=os.path.join("tensorboard", self.simulation_id)
+            )
 
-        mode = "train" if not self.perform_evaluation else "eval"
+        mode = "train" if not self.evaluation_mode else "eval"
 
         # Dynamically detect noise columns in database
         query_columns = (
@@ -200,7 +199,7 @@ class TensorBoardLogger:
             FROM rl_params
             WHERE episode = '{self.episode}'
             AND simulation = '{self.simulation_id}'
-            AND perform_evaluation = {self.perform_evaluation}
+            AND evaluation_mode = {self.evaluation_mode}
             GROUP BY dt, unit
             ORDER BY dt
         """

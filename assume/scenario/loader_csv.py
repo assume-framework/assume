@@ -104,7 +104,7 @@ def load_file(
             if df.index.freq < index.freq:
                 logger.warning(
                     f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
-                    "Resampling using mean(). Make sure this is what you want and your data is in units of power."
+                    "Resampling using mean(). Make sure this is what you want!"
                 )
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")
@@ -458,7 +458,7 @@ def load_config_and_create_forecaster(
         study_case = list(config.keys())[0]
     config = config[study_case]
 
-    sim_id = config.get("simulation_id", f"{scenario}_{study_case}")
+    simulation_id = config.get("simulation_id", f"{scenario}_{study_case}")
 
     start = pd.Timestamp(config["start_date"])
     end = pd.Timestamp(config["end_date"])
@@ -564,7 +564,7 @@ def load_config_and_create_forecaster(
 
     return {
         "config": config,
-        "sim_id": sim_id,
+        "simulation_id": simulation_id,
         "path": path,
         "start": start,
         "end": end,
@@ -579,7 +579,7 @@ def load_config_and_create_forecaster(
 
 def setup_world(
     world: World,
-    perform_evaluation: bool = False,
+    evaluation_mode: bool = False,
     terminate_learning: bool = False,
     episode: int = 1,
     eval_episode: int = 1,
@@ -592,7 +592,7 @@ def setup_world(
     Args:
         world (World): An instance of the World class representing the simulation environment.
         scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
-        perform_evaluation (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
+        evaluation_mode (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 1.
         eval_episode (int, optional): The episode number for evaluation. Defaults to 1.
@@ -604,7 +604,7 @@ def setup_world(
     # make a deep copy of the scenario data to avoid changing the original data
     scenario_data = copy.deepcopy(world.scenario_data)
 
-    sim_id = scenario_data["sim_id"]
+    simulation_id = scenario_data["simulation_id"]
     config = scenario_data["config"]
     start = scenario_data["start"]
     end = scenario_data["end"]
@@ -647,31 +647,23 @@ def setup_world(
     bidding_strategy_params = config.get("bidding_strategy_params", {})
 
     learning_config["learning_mode"] = config.get("learning_mode", False)
-    learning_config["perform_evaluation"] = perform_evaluation
+    learning_config["evaluation_mode"] = evaluation_mode
 
     if terminate_learning:
         learning_config["learning_mode"] = False
-        learning_config["perform_evaluation"] = False
+        learning_config["evaluation_mode"] = False
 
     if not learning_config.get("trained_policies_save_path"):
-        learning_config["trained_policies_save_path"] = f"learned_strategies/{sim_id}"
+        learning_config["trained_policies_save_path"] = (
+            f"learned_strategies/{simulation_id}"
+        )
 
     if not learning_config.get("trained_policies_load_path"):
         learning_config["trained_policies_load_path"] = (
-            f"learned_strategies/{sim_id}/avg_reward_eval_policies"
+            f"learned_strategies/{simulation_id}/avg_reward_eval_policies"
         )
 
     config = replace_paths(config, scenario_data["path"])
-
-    if learning_config.get("learning_mode", False) and not learning_config.get(
-        "perform_evaluation", False
-    ):
-        sim_id = f"{sim_id}_{episode}"
-
-    elif learning_config.get("learning_mode", False) and learning_config.get(
-        "perform_evaluation", False
-    ):
-        sim_id = f"{sim_id}_eval_{eval_episode}"
 
     world.reset()
 
@@ -679,8 +671,10 @@ def setup_world(
         start=start,
         end=end,
         save_frequency_hours=save_frequency_hours,
-        simulation_id=sim_id,
+        simulation_id=simulation_id,
         learning_config=learning_config,
+        episode=episode,
+        eval_episode=eval_episode,
         bidding_params=bidding_strategy_params,
         forecaster=forecaster,
     )
@@ -782,7 +776,7 @@ def setup_world(
             for unit in op_units:
                 world.add_unit(**unit)
 
-    if world.learning_mode or world.perform_evaluation:
+    if world.learning_mode or world.evaluation_mode:
         world.add_learning_strategies_to_learning_role()
 
     if (
@@ -940,7 +934,7 @@ def run_learning(
             )
 
     # also remove tensorboard logs
-    tensorboard_path = f"tensorboard/{world.scenario_data['sim_id']}"
+    tensorboard_path = f"tensorboard/{world.scenario_data['simulation_id']}"
     if os.path.exists(tensorboard_path):
         shutil.rmtree(tensorboard_path, ignore_errors=True)
 
@@ -1008,7 +1002,8 @@ def run_learning(
             # load evaluation run
             setup_world(
                 world=world,
-                perform_evaluation=True,
+                evaluation_mode=True,
+                episode=episode,
                 eval_episode=eval_episode,
             )
 
@@ -1018,7 +1013,7 @@ def run_learning(
 
             world.learning_role.tensor_board_logger.update_tensorboard()
 
-            total_rewards = world.output_role.get_sum_reward()
+            total_rewards = world.output_role.get_sum_reward(episode=eval_episode)
 
             if len(total_rewards) == 0:
                 raise AssumeException("No rewards were collected during evaluation run")

@@ -20,13 +20,13 @@ def init(world, n=1):
     end = datetime(2019, 3, 1)
 
     index = FastIndex(start, end, freq="h")
-    sim_id = "world_script_simulation"
+    simulation_id = "world_script_simulation"
 
     world.setup(
         start=start,
         end=end,
         save_frequency_hours=48,
-        simulation_id=sim_id,
+        simulation_id=simulation_id,
     )
 
     marketdesign = [
