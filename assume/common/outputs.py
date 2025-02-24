@@ -137,8 +137,13 @@ class WriteOutput(Role):
         table_names = inspect(self.db).get_table_names()
         # Iterate through each table
         for table_name in table_names:
-            # ignore spatial_ref_sys and rl_params tables
-            if table_name in ["spatial_ref_sys", "rl_params"]:
+            # ignore spatial_ref_sys table
+            if table_name == "spatial_ref_sys":
+                continue
+            # only delete rl_params during the first episode of learning
+            if table_name == "rl_params" and not (
+                self.learning_mode and self.episode == 1
+            ):
                 continue
             try:
                 with self.db.begin() as db:
@@ -160,23 +165,6 @@ class WriteOutput(Role):
                     f"could not clear old scenarios from table {table_name} - {e}"
                 )
 
-    def delete_rl_params(self):
-        """
-        Deletes all similar runs from the database based on the simulation ID. This ensures that we overwrite simulations results when restarting one. Please note that a simulation which you also want to keep need to be assigned anew ID.
-        """
-        if self.db_uri is None:
-            return
-        query = text("select simulation from rl_params")
-
-        try:
-            with self.db.begin() as db:
-                simulations = db.execute(query).fetchall()
-        except Exception:
-            simulations = []
-
-        if self.simulation_id in simulations:
-            self.delete_db_scenario(self.simulation_id)
-
     def setup(self):
         """
         Sets up the WriteOutput instance by subscribing to messages and scheduling recurrent tasks of storing the data.
@@ -194,10 +182,6 @@ class WriteOutput(Role):
             self.db = create_engine(self.db_uri)
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
-
-            # check if episode equals 1 and delete all similar runs
-            if self.learning_mode and self.episode == 1:
-                self.delete_rl_params()
 
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
