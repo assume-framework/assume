@@ -191,7 +191,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "average_reward"
+              "options": "avg_reward"
             },
             "properties": [
               {
@@ -389,7 +389,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "average_reward"
+              "options": "avg_reward"
             },
             "properties": [
               {
@@ -600,7 +600,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "average_reward"
+              "options": "total_reward"
             },
             "properties": [
               {
@@ -734,7 +734,7 @@
           ]
         }
       ],
-      "title": "Average training REWARD",
+      "title": "Total training REWARD",
       "transformations": [
         {
           "id": "partitionByValues",
@@ -798,7 +798,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "average_reward"
+              "options": "total_reward"
             },
             "properties": [
               {
@@ -932,7 +932,7 @@
           ]
         }
       ],
-      "title": "Average evaluation REWARD",
+      "title": "Total evaluation REWARD",
       "transformations": [
         {
           "id": "partitionByValues",
@@ -996,7 +996,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "avg_profit_k"
+              "options": "total_profit_k"
             },
             "properties": [
               {
@@ -1194,7 +1194,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "avg_profit_k"
+              "options": "total_profit_k"
             },
             "properties": [
               {
@@ -1806,7 +1806,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "reward"
+              "options": "profit"
             },
             "properties": [
               {
@@ -2516,13 +2516,13 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT simulation\nFROM rl_params",
+        "definition": "SELECT DISTINCT simulation\nFROM rl_params",
         "description": "Can choose which simulation we want to show ",
         "includeAll": false,
         "label": "Simulation ID",
         "name": "simulation",
         "options": [],
-        "query": "SELECT simulation\nFROM rl_params",
+        "query": "SELECT DISTINCT simulation\nFROM rl_params",
         "refresh": 2,
         "regex": "",
         "sort": 1,
@@ -2579,14 +2579,14 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT unit \nFROM rl_params\nWHERE simulation = '$simulation';",
+        "definition": "SELECT DISTINCT unit \nFROM rl_params\nWHERE simulation = '$simulation';",
         "description": "All units that have an reinforcment learning strategy and hence have the Rl specific parameteres logged",
         "includeAll": true,
         "label": "Unit",
         "multi": true,
         "name": "rl_unit",
         "options": [],
-        "query": "SELECT unit \nFROM rl_params\nWHERE simulation = '$simulation';",
+        "query": "SELECT DISTINCT unit \nFROM rl_params\nWHERE simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
         "type": "query"
@@ -2611,6 +2611,6 @@
   "timezone": "",
   "title": "ASSUME: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 16,
+  "version": 20,
   "weekStart": ""
 }
