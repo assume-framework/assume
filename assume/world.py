@@ -687,7 +687,7 @@ class World:
         async with activate(self.container) as c:
             await tasks_complete_or_sleeping(c)
             logger.debug("all agents up - starting simulation")
-            pbar = tqdm(total=end_ts - start_ts, desc="Simulation Progress")
+            pbar = tqdm(total=end_ts - start_ts)
 
             # allow registration before first opening
             self.clock.set_time(start_ts - 1)
