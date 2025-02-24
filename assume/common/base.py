@@ -210,18 +210,18 @@ class BaseUnit:
         if start not in self.index:
             start = self.index[0]
 
-        product_type_mc = product_type + "_marginal_costs"
         # Adjusted code for accessing product data and mapping over the index
-        product_data = self.outputs[product_type].loc[
-            start:end
-        ]  # Slicing directly without `.loc`
+        product_data = self.outputs[product_type].loc[start:end]
 
         marginal_costs = [
             self.calculate_marginal_cost(t, product_data[idx])
             for idx, t in enumerate(self.index[start:end])
         ]
-        #new_values = np.abs(marginal_costs * product_data)
-        self.outputs[product_type_mc].loc[start:end] = marginal_costs
+        generation_costs = np.abs(marginal_costs * product_data)
+        self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
+            generation_costs
+        )
+        self.outputs[f"{product_type}_marginal_costs"].loc[start:end] = marginal_costs
 
     def execute_current_dispatch(
         self,
