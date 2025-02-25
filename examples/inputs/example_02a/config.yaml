@@ -20,7 +20,7 @@ base:
     training_episodes: 200
     episodes_collecting_initial_experience: 20
     train_freq: 24h
-    gradient_steps: -1
+    gradient_steps: 24
     batch_size: 256
     gamma: 0.99
     device: cpu
@@ -65,7 +65,7 @@ base_lstm:
     training_episodes: 1000
     episodes_collecting_initial_experience: 50
     train_freq: 24h
-    gradient_steps: -1
+    gradient_steps: 24
     batch_size: 256
     gamma: 0.99
     device: cpu
@@ -156,7 +156,7 @@ tiny:
     training_episodes: 10
     episodes_collecting_initial_experience: 3
     train_freq: 24h
-    gradient_steps: -1
+    gradient_steps: 24
     batch_size: 64
     gamma: 0.99
     device: cpu

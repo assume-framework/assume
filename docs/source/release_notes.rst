@@ -14,20 +14,53 @@ Upcoming Release
 
 **New Features:**
 
-- **Exchange Unit**: A new unit type for modeling **energy trading** between market participants. It supports **buying (importing) and selling (exporting) energy**, with user-defined prices.
-  Check **example_01a**, **example_03**, and the files **"exchange_units.csv"** and **"exchanges_df.csv"** for usage examples.
+- **TensorBoard Integration:** To enable better monitoring of the learning progress and comparison between different runs, we have added the possibility to use TensorBoard for logging the learning progress.
+  To use this feature, please follow the instructions in the README.
 
 **Improvements:**
 
-- **Learning Observation Space Scaling:** Instead of the formerly used max sclaing of the observation space, we added a min-max scaling to the observation space.
-  This allows for a more robust scaling of the observation space for future analysis.
+- **Multi-market participation configuration**: Respect the `eligible_obligations_lambda` set in the `MarketConfig` to only bid on markets where the UnitsOperator fulfills the requirements.
+  Changes the behavior to not participate on markets when no unit has a matching bidding strategy for this market.
+- **Learning Performance:** The learning performance for large multi-agent learning setups has been significantly improved by introducing several learning stabilization techniques.
+  This leads to a more stable learning process and faster convergence. It also allows for running simulations on historical data with a larger number of agents, achieving very good quality results.
+  For example, running example_03a for the year 2019, one can achieve an RMSE of 10.22 EUR/MWh and MAE of 6.52 EUR/MWh for hourly market prices, and an RMSE of 6.8 EUR/MWh and MAE of 4.6 EUR/MWh when
+  using daily average prices. This is a significant improvement compared to the previous version of the framework.
+
+**Bug Fixes:**
+
+- **Storage Learning Strategy:** Fixed a bug in the storage learning strategy that caused the learning process to fail or perform poorly. The bug was related to the way the storage was updating the state of charge.
+  This has been fixed, and the learning process for storage units is now stable and performs well. It also improved the performance of non-learning bidding strategies for storage units.
+- **Wrong train_freq Handling:** Fixed a bug where, if the simulation length was not a multiple of the train_freq, the remaining simulation steps were not used for training, causing the training to fail.
+  This has been fixed, and now the train_freq is adjusted dynamically to fit the simulation length. The user is also informed about the adjusted train_freq in the logs.
+
+v0.5.1 - (3rd February 2025)
+===========================================
+**New Features:**
+
+- **Exchange Unit**: A new unit type for modeling **energy trading** between market participants. It supports **buying (importing) and selling (exporting) energy**, with user-defined prices.
+  Check **example_01a**, **example_03**, and the files **"exchange_units.csv"** and **"exchanges_df.csv"** for usage examples.
+- **Market Contracts and Support Policies**: it is now possible to simulate the auctioning of support policies, like feed-in tariff, PPA, CfD or a market premium.
+  The contracts are auctioned and then have a regular contract execution, to compensate according to the contracts dynamic, based on the historic market price and unit dispatch (#542).
+- **Merit Order Plot** on the default Grafana Dashboard - showing a deeper view into the bidding behavior of the market actors.
+  Additionally, a graph showing the market result per generation technology has been added (#531).
+
+**Improvements:**
+
+- **Multi-agent DRL fix**: Addressed a critical bug affecting action sampling, ensuring correct multi-agent learning.
+- **Performance boost**: Optimized training efficiency, achieving **2x overall speedup** and up to **5x on CUDA devices**.
+- **Learning Observation Space Scaling:** Instead of the formerly used max scaling of the observation space, we added a min-max scaling to the observation space.
+  This allows for a more robust scaling of the observation space for future analysis (#508).
 - **Allow Multi-Market Bidding Strategies**: Added the possibility to define a bidding strategy for multiple markets. Now when the same bidding strategy is used for two or more markets,
   the strategy is only created once and the same instance is used for all of these markets.
 - **Improve Storage Behavior**: Storages were using the current unmodified SoC instead of the final SoC of last hour, leading to always using the initial value to calculate discharge possibility.(#524)
+- **OEDS Loader**: when using the OEDS as a database, the queries have been adjusted to the latest update of the MarktStammDatenRegister. Time-sensitive fuel costs for gas, coal and oil are available from the OEDS as well.
+  This also includes various fixes to the behavior of the DMAS market and complex powerplant strategies (#532).
 
 **Bug Fixes:**
 
 - **Update PyPSA Version:** Fixes example "small_with_redispatch"; adjustments to tutorials 10 and 11 to remove DeprecationWarnings.
+- **Fixes to the documentation** documentation and example notebooks were updated to be compatible with the latest changes to the framework (#530, #537, #543)
+- **postgresql17** - using the docker container in the default compose.yml requires to backup or delete the existing assume-db folder. Afterwards, no permission changes should be required anymore when setting up the DB (#541)
 
 v0.5.0 - (10th December 2024)
 ===========================================
@@ -68,6 +101,8 @@ v0.5.0 - (10th December 2024)
   if the total duration of the market products plus first delivery time fits before the simulation end.
 - **Loader fixes**: Fixes for PyPSA, OEDS and AMIRIS loaders
 
+**Full Changelog**: `v0.4.3...v0.5.0 <https://github.com/assume-framework/assume/compare/v0.4.2...v0.5.0>`_
+
 v0.4.3 - (11th November 2024)
 ===========================================
 
@@ -79,7 +114,7 @@ v0.4.3 - (11th November 2024)
 
 - **Simulation**: Delete simulation results for same simulation prior to run (as before v0.4.2)
 
-**Full Changelog**: [v0.4.2...v0.4.3](https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3)
+**Full Changelog**: `v0.4.2...v0.4.3 <https://github.com/assume-framework/assume/compare/v0.4.2...v0.4.3>`_
 
 v0.4.2 - (5th November 2024)
 ===========================================
@@ -113,7 +148,7 @@ v0.4.2 - (5th November 2024)
 
 - @HafnerMichael made their first contribution with improvements to cashflow calculations and development of residential DST components.
 
-**Full Changelog**: [v0.4.1...v0.4.2](https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2)
+**Full Changelog**: `v0.4.1...v0.4.2 <https://github.com/assume-framework/assume/compare/v0.4.1...v0.4.2>`_
 
 
 v0.4.1 (8th October 2024)
@@ -137,6 +172,8 @@ v0.4.1 (8th October 2024)
 - add compatibility with pyyaml-include (#421)
 - make complex clearing compatible to RL (#430)
 - pin PyPSA to remove DeprecationWarnings for now (#431)
+
+**Full Changelog**: `v0.4.0...v0.4.1 <https://github.com/assume-framework/assume/compare/v0.4.0...v0.4.1>`_
 
 v0.4.0 (8th August 2024)
 =========================================
@@ -204,6 +241,8 @@ v0.4.0 (8th August 2024)
 
 - Added closing word and final dashboard link to interoperability tutorial
 
+
+**Full Changelog**: `v0.3.7...v0.4.0 <https://github.com/assume-framework/assume/compare/v0.3.7...v0.4.0>`_
 
 v0.3.7 (21st March 2024)
 =========================

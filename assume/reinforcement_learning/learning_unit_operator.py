@@ -9,12 +9,10 @@ import torch as th
 
 from assume.common import UnitsOperator
 from assume.common.market_objects import (
-    ClearingMessage,
     MarketConfig,
-    MetaDict,
     Orderbook,
 )
-from assume.common.utils import create_rrule, get_products_index
+from assume.common.utils import convert_tensors, create_rrule, get_products_index
 from assume.strategies import BaseStrategy, LearningStrategy, RLAdvancedOrderStrategy
 from assume.units import BaseUnit
 
@@ -77,28 +75,6 @@ class RLUnitsOperator(UnitsOperator):
 
                 self.rl_units.append(unit)
                 break
-
-    def handle_market_feedback(self, content: ClearingMessage, meta: MetaDict) -> None:
-        """
-        Handles the feedback which is received from a market we did bid at.
-
-        Args:
-            content (ClearingMessage): The content of the clearing message.
-            meta (MetaDict): The meta data of the market.
-        """
-        logger.debug("%s got market result: %s", self.id, content)
-        accepted_orders: Orderbook = content["accepted_orders"]
-        rejected_orders: Orderbook = content["rejected_orders"]
-        orderbook = accepted_orders + rejected_orders
-
-        for order in orderbook:
-            order["market_id"] = content["market_id"]
-
-        marketconfig = self.registered_markets[content["market_id"]]
-        self.valid_orders[marketconfig.product_type].extend(orderbook)
-        self.set_unit_dispatch(orderbook, marketconfig)
-        self.write_learning_to_output(orderbook, marketconfig.market_id)
-        self.write_actual_dispatch(marketconfig.product_type)
 
     def write_learning_to_output(self, orderbook: Orderbook, market_id: str) -> None:
         """
@@ -278,4 +254,5 @@ class RLUnitsOperator(UnitsOperator):
                 order["unit_id"] = unit_id
                 orderbook.append(order)
 
-        return orderbook
+        # Convert all CUDA tensors to CPU in one pass
+        return convert_tensors(orderbook)

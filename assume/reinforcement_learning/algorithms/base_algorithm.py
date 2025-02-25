@@ -18,11 +18,10 @@ class RLAlgorithm:
     Args:
         learning_role (Learning Role object): Learning object
         learning_rate (float): learning rate for adam optimizer
-        episodes_collecting_initial_experience (int): how many steps of the model to collect transitions for before learning starts
         batch_size (int): Minibatch size for each gradient update
         tau (float): the soft update coefficient ("Polyak update", between 0 and 1)
         gamma (float): the discount factor
-        gradient_steps (int): how many gradient steps to do after each rollout (if -1, no gradient step is done)
+        gradient_steps (int): how many gradient steps to do after each rollout
         policy_delay (int): Policy and target networks will only be updated once every policy_delay steps per training steps. The Q values will be updated policy_delay more often (update every training step)
         target_policy_noise (float): Standard deviation of Gaussian noise added to target policy (smoothing noise)
         target_noise_clip (float): Limit for absolute value of target policy smoothing noise
@@ -34,11 +33,10 @@ class RLAlgorithm:
         # init learning_role as object of Learning class
         learning_role,
         learning_rate=1e-4,
-        episodes_collecting_initial_experience=100,
         batch_size=1024,
         tau=0.005,
         gamma=0.99,
-        gradient_steps=-1,
+        gradient_steps=100,
         policy_delay=2,
         target_policy_noise=0.2,
         target_noise_clip=0.5,
@@ -48,9 +46,6 @@ class RLAlgorithm:
 
         self.learning_role = learning_role
         self.learning_rate = learning_rate
-        self.episodes_collecting_initial_experience = (
-            episodes_collecting_initial_experience
-        )
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau
@@ -115,7 +110,7 @@ class RLAlgorithm:
         Returns:
             object: The loaded object.
         """
-        return th.load(directory, map_location=self.device)
+        return th.load(directory, map_location=self.device, weights_only=True)
 
     def load_params(self, directory: str) -> None:
         """

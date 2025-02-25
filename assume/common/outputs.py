@@ -22,7 +22,7 @@ from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
     calculate_content_size,
-    check_for_tensors,
+    convert_tensors,
     separate_orders,
 )
 
@@ -238,6 +238,7 @@ class WriteOutput(Role):
             "market_dispatch",
             "unit_dispatch",
             "rl_params",
+            "rl_critic_params",
         ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
@@ -272,6 +273,16 @@ class WriteOutput(Role):
         df["learning_mode"] = self.learning_mode
         df["perform_evaluation"] = self.perform_evaluation
         df["episode"] = self.episode
+        # Add missing rl_critic_params columns in case of initial_exploration
+        required_columns = [
+            "critic_loss",
+            "total_grad_norm",
+            "max_grad_norm",
+            "learning_rate",
+        ]
+        for col in required_columns:
+            if col not in df.columns:
+                df[col] = np.nan
 
         return df
 
@@ -316,7 +327,11 @@ class WriteOutput(Role):
             df["evaluation_frequency"] = df["evaluation_frequency"].astype(str)
 
         # Remove unnecessary columns (use a list to minimize deletion calls)
-        df.drop(columns=["only_hours", "agent_addr"], inplace=True, errors=False)
+        df.drop(
+            columns=["only_hours", "agent_addr", "contractor_addr"],
+            inplace=True,
+            errors="ignore",
+        )
 
         # Add missing columns with defaults
         for col in ["bid_type", "node"]:
@@ -436,6 +451,22 @@ class WriteOutput(Role):
         if not self.db and not self.export_csv_path:
             return
 
+        # If both rl_critic_params and rl_params exist, merge them before uploading to db
+        if (
+            "rl_params" in self.write_buffers
+            and "rl_critic_params" in self.write_buffers
+        ):
+            df1 = pd.DataFrame(self.write_buffers["rl_params"])
+            df2 = pd.DataFrame(self.write_buffers["rl_critic_params"])
+            merged_df = pd.merge(df1, df2, how="outer")
+            merged_list = merged_df.to_dict("records")
+            self.write_buffers["rl_params"] = merged_list
+            del self.write_buffers["rl_critic_params"]
+        # elif only rl_critic_params exist, rename them to rl_params
+        elif "rl_critic_params" in self.write_buffers:
+            self.write_buffers["rl_params"] = self.write_buffers["rl_critic_params"]
+            del self.write_buffers["rl_critic_params"]
+
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:
                 continue
@@ -478,13 +509,14 @@ class WriteOutput(Role):
                 data_list.clear()
             # concat all dataframes
             # use join='outer' to keep all columns and fill missing values with NaN
-            if df is None:
+            if df is None or df.empty:
                 continue
 
-            if df.empty:
-                continue
+            # check for tensors and convert them to floats
+            df = df.apply(convert_tensors)
 
-            df = df.apply(check_for_tensors)
+            # check for any float64 columns and convert them to floats
+            df = df.map(lambda x: float(x) if isinstance(x, np.float64) else x)
 
             if self.export_csv_path:
                 data_path = self.export_csv_path / f"{table}.csv"

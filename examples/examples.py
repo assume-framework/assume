@@ -11,6 +11,8 @@ from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
 log = logging.getLogger(__name__)
 
+# define the path where the simulation results in form of CSV files will be stored, for example: "examples/outputs"
+# "" means no CSV files will be stored
 csv_path = ""
 
 os.makedirs("./examples/local_db", exist_ok=True)
@@ -44,10 +46,6 @@ available_examples = {
         "scenario": "example_01d",
         "study_case": "base",
     },
-    "small_with_nodal_clearing": {
-        "scenario": "example_01d",
-        "study_case": "nodal_case",
-    },
     "small_with_zonal_clearing": {
         "scenario": "example_01d",
         "study_case": "zonal_case",
@@ -70,7 +68,10 @@ available_examples = {
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     # DRL cases with lstm instead of mlp as actor neural network architecture
     "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
-    "small_learning_1_lstm_original": {"scenario": "example_02a", "study_case": "base_lstm_original"},
+    "small_learning_1_lstm_original": {
+        "scenario": "example_02a",
+        "study_case": "base_lstm_original",
+    },
     "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
     "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "dam"},
@@ -108,7 +109,11 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    examples = ["small_learning_1", "small_learning_1_lstm", "small_learning_1_lstm_original"]
+    examples = [
+        "small_learning_1",
+        "small_learning_1_lstm",
+        "small_learning_1_lstm_original",
+    ]
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

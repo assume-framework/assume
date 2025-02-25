@@ -4,7 +4,7 @@
 
 base_case_2019:
   start_date: 2019-01-01 00:00
-  end_date: 2019-02-01 00:00
+  end_date: 2019-12-31 00:00
   time_step: 1h
   industrial_dsm_units: null
   save_frequency_hours: 720
@@ -60,7 +60,7 @@ dam_case_2019:
 
 eom_crm_case_2019:
   start_date: 2019-01-01 00:00
-  end_date: 2019-02-01 00:00
+  end_date: 2019-12-31 00:00
   time_step: 1h
   industrial_dsm_units: null
   save_frequency_hours: 720
@@ -72,11 +72,11 @@ eom_crm_case_2019:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 1:00
+      start_date: 2019-01-01 2:00
       products:
         - duration: 1h
           count: 1
-          first_delivery: 1h
+          first_delivery: 2h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -93,7 +93,7 @@ eom_crm_case_2019:
       products:
         - duration: 4h
           count: 1
-          first_delivery: 1h
+          first_delivery: 4h
       opening_frequency: 4h
       opening_duration: 1h
       volume_unit: MW
@@ -110,7 +110,7 @@ eom_crm_case_2019:
       products:
         - duration: 4h
           count: 1
-          first_delivery: 1h
+          first_delivery: 4h
       opening_frequency: 4h
       opening_duration: 1h
       volume_unit: MW

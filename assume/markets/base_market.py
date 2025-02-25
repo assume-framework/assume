@@ -7,7 +7,7 @@ import math
 from itertools import groupby
 from operator import itemgetter
 
-from mango import AgentAddress, Role, create_acl, sender_addr
+from mango import AgentAddress, Performatives, Role, create_acl, sender_addr
 
 from assume.common.market_objects import (
     ClearingMessage,
@@ -20,6 +20,7 @@ from assume.common.market_objects import (
     OrderBookMessage,
     RegistrationMessage,
     RegistrationReplyMessage,
+    lambda_functions,
 )
 from assume.common.utils import (
     datetime2timestamp,
@@ -29,6 +30,8 @@ from assume.common.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+process_time = 0
 
 
 class MarketMechanism:
@@ -259,6 +262,7 @@ class MarketRole(MarketMechanism, Role):
                     sender_addr=self.context.addr,
                     acl_metadata={
                         "reply_with": f"{self.marketconfig.market_id}_{market_open}",
+                        "performative": Performatives.call_for_proposal,
                     },
                 ),
                 receiver_addr=agent,
@@ -296,12 +300,14 @@ class MarketRole(MarketMechanism, Role):
         Returns:
             bool: True if the registration is valid, False otherwise.
         """
+        if callable(self.marketconfig.eligible_obligations_lambda):
+            requirement = self.marketconfig.eligible_obligations_lambda
+        else:
+            requirement = lambda_functions.get(
+                self.marketconfig.eligible_obligations_lambda, lambda u: True
+            )
 
-        # simple check that 1 MW can be bid at least by  powerplants
-        def requirement(unit: dict):
-            return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 0
-
-        return all([requirement(info) for info in content["information"]])
+        return all([requirement(unit_info) for unit_info in content["information"]])
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
@@ -453,6 +459,10 @@ class MarketRole(MarketMechanism, Role):
             "accepted": accepted,
         }
 
+        performative = (
+            Performatives.accept_proposal if accepted else Performatives.reject_proposal
+        )
+
         self.context.schedule_instant_message(
             create_acl(
                 content=msg,
@@ -460,6 +470,7 @@ class MarketRole(MarketMechanism, Role):
                 sender_addr=self.context.addr,
                 acl_metadata={
                     "in_reply_to": meta.get("reply_with"),
+                    "performative": performative,
                 },
             ),
             receiver_addr=agent_addr,
@@ -516,6 +527,7 @@ class MarketRole(MarketMechanism, Role):
                     sender_addr=self.context.addr,
                     acl_metadata={
                         "in_reply_to": meta.get("reply_with", 1),
+                        "performative": Performatives.refuse,
                     },
                 ),
                 receiver_addr=agent_addr,
@@ -557,6 +569,7 @@ class MarketRole(MarketMechanism, Role):
                 sender_addr=self.context.addr,
                 acl_metadata={
                     "in_reply_to": meta.get("reply_with"),
+                    "performative": Performatives.inform,
                 },
             ),
             receiver_addr=sender_addr(meta),
@@ -666,7 +679,11 @@ class MarketRole(MarketMechanism, Role):
         }
 
         for agent in self.registered_agents.keys():
-            meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
+            meta = {
+                "sender_addr": self.context.addr,
+                "sender_id": self.context.aid,
+                "performative": Performatives.accept_proposal,
+            }
             closing: ClearingMessage = {
                 "context": "clearing",
                 "market_id": self.marketconfig.market_id,
