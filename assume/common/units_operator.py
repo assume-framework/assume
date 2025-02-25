@@ -368,7 +368,7 @@ class UnitsOperator(Role):
             valid_outputs = [
                 "soc",
                 "cashflow",
-                "marginal_costs",
+                "generation_costs",
                 "total_costs",
                 "heat",
             ]
