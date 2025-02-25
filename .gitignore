@@ -142,6 +142,7 @@ assume-db
 learned_strategies
 examples/outputs
 assume-repo
+tensorboard
 
 examples/notebooks/inputs
 examples/notebooks/outputs
@@ -150,5 +151,8 @@ examples/notebooks/outputs
 *.jar
 fameSetup.yaml
 
-examples/inputs/example_2030
+examples/inputs/example_2030/*/*.csv
+examples/inputs/example_2030/*/*.license
+*.png
+*.gif
 examples/inputs/example_2035
