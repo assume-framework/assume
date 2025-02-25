@@ -270,7 +270,7 @@ def retrieve_best_episode_actions(inputs_dir, scenario, study_case, db):
         f"Best episode: {best_episode} found with an average reward of {reward_df.at[best_episode, 'avg_reward']:.3f}"
     )
 
-    query = f"SELECT datetime as dt, unit, actions_0, actions_1 FROM rl_params where simulation = '{simulation}_{episode}'"
+    query = f"SELECT datetime as dt, unit, actions_0, actions_1 FROM rl_params where simulation = '{simulation}_{best_episode}'"
     actions_df = pd.read_sql(query, db)
     actions_df.index = pd.to_datetime(actions_df["dt"])
     actions_df.drop(columns=["dt"], inplace=True)
@@ -418,7 +418,9 @@ def plot_sample_distribution(sample_df, rest_df):
 
 def plot_profit_comparison(df_rl, df_mpec, bound=-10):
     # Calculate percentage deviation
-    percent_deviation = ((df_rl - df_mpec) / df_mpec) * 100
+    percent_deviation = ((df_rl - df_mpec) / df_rl) * 100
+    
+
 
     # Create figure
     fig, ax = plt.subplots(figsize=(12, 6))
