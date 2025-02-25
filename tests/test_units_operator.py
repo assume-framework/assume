@@ -314,6 +314,7 @@ def test_participate():
 
     assert units_role.participate(marketconfig)
 
+
 def test_participate_lambda():
     """
     Tests that one of the selected lambda functions works correctly in the participation
