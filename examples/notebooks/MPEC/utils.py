@@ -343,17 +343,22 @@ def run_MPEC(opt_gen, index, gens_df, demand_df, k_values_df, k_max, big_w):
     Returns:
         tuple: The profits before and after the optimization.
     """
-    print("We now optimize the decison for unit ", gens_df.index[opt_gen])
-    demand_df = demand_df.copy(deep=True).loc[index]
+    print("We now optimize the decison for unit index", gens_df.index[opt_gen])
+    demand_df['date']=demand_df.index.date
+    demand_df = demand_df.copy(deep=True).loc[demand_df['date'].isin(index)]
+    demand_df.drop(columns=['date'],inplace=True)
     # reset index to start at 0
     demand_df = demand_df.reset_index(drop=True)
-    demand_df
+   
 
-    k_values_df = k_values_df.copy(deep=True).loc[index]
+    # filter k_values_df to only include the selected index
+    k_values_df['date']=k_values_df.index.date
+    k_values_df = k_values_df.copy(deep=True).loc[k_values_df['date'].isin(index)]
+    k_values_df.drop(columns=['date'],inplace=True)
     # rename columns to match index of gens_df
     k_values_df.columns = gens_df.index
     k_values_df.reset_index(inplace=True)
-    k_values_df
+    
 
     gens_df = gens_df.copy(deep=True)
 
