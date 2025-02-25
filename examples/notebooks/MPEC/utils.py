@@ -2,9 +2,16 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import os
+
 import pandas as pd
 import pyomo.environ as pyo
+import yaml
+from matplotlib import pyplot as plt
 from pyomo.opt import SolverFactory
+
+from examples.notebooks.MPEC.bilevel_opt import find_optimal_dispatch
+from examples.notebooks.MPEC.uc_problem import solve_uc_problem
 
 
 def calculate_profits(main_df, gens_df, price_column="mcp", supp_df=None):
@@ -182,3 +189,303 @@ def calculate_mc(powerplant, fuel_prices):
     mc = fuel_cost + co2_cost + variable_cost
 
     return mc
+
+
+def load_config(inputs_dir, scenario, study_case=""):
+    """
+
+    Load the config file from the given directory.
+
+    Args:
+        inputs_dir (str): The directory containing the config file.
+        scenario (str): The scenario name.
+        study_case (str): The study case name. If left empty, the entire config file is loaded.
+
+    Returns:
+        dict: The loaded config file.
+    """
+    config_path = os.path.join(inputs_dir, scenario, "config.yaml")
+    with open(config_path) as file:
+        config = yaml.safe_load(file)
+    if study_case != "":
+        config = config[study_case]
+    return config
+
+
+def store_config(config, inputs_dir, scenario):
+    """
+    Store the config file in the given directory.
+
+    Args:
+        config (dict): The config file to store.
+        scenario (str): The scenario name.
+        inputs_dir (str): The directory to store the config file.
+    """
+
+    class NoAliasDumper(yaml.SafeDumper):
+        def ignore_aliases(self, _):
+            return True
+
+    # Store the config file in the given directory
+    config_path = os.path.join(inputs_dir, scenario, "config.yaml")
+    with open(config_path, "w") as file:
+        yaml.dump(
+            config,
+            file,
+            Dumper=NoAliasDumper,
+            default_flow_style=False,
+            sort_keys=False,
+        )
+
+
+def get_no_of_val_episodes(inputs_dir, scenario, study_case):
+    # Read and calculate the number of validation episodes from the config file
+    config = load_config(inputs_dir, scenario, study_case)
+    learning_config = config["learning_config"]
+    no_of_val_episodes = (
+        learning_config["training_episodes"]
+        - learning_config["episodes_collecting_initial_experience"]
+    ) // learning_config.get("validation_episodes_interval", 5)
+    return no_of_val_episodes
+
+
+def retrieve_best_episode_actions(inputs_dir, scenario, study_case, db):
+    """
+    Retrieve the actions of the best episode based on the average reward of each episode.
+    """
+    simulation = f"{scenario}_{study_case}_eval"
+    # Get the number of validation episodes
+    no_of_val_episodes = get_no_of_val_episodes(inputs_dir, scenario, study_case)
+    # Get the average reward for each episode in order to determine the best episode.
+    reward_df = pd.DataFrame(
+        columns=["avg_reward"], index=range(1, no_of_val_episodes + 1)
+    )
+    for episode in range(1, no_of_val_episodes + 1):
+        query = f"SELECT AVG(reward) as avg_reward FROM rl_params where simulation = '{simulation}_{episode}'"
+        reward_df.at[episode, "avg_reward"] = pd.read_sql(query, db).values[0][0]
+
+    # Use the episode with the best reward to get the respective actions
+    best_episode = reward_df["avg_reward"].idxmax()
+    print(
+        f"Best episode: {best_episode} found with an average reward of {reward_df.at[best_episode, 'avg_reward']:.3f}"
+    )
+
+    query = f"SELECT datetime as dt, unit, actions_0, actions_1 FROM rl_params where simulation = '{simulation}_{episode}'"
+    actions_df = pd.read_sql(query, db)
+    actions_df.index = pd.to_datetime(actions_df["dt"])
+    actions_df.drop(columns=["dt"], inplace=True)
+
+    return actions_df
+
+
+def sample_seasonal_weeks(datetime_index):
+    """
+    Sample one random complete week from each season.
+
+    Args:
+        datetime_index (pd.DatetimeIndex): DatetimeIndex of the DataFrame
+
+    Returns:
+        pd.DatetimeIndex: Combined index of four sampled weeks (one per season)
+    """
+    import random
+
+    # Define seasons by month numbers
+    seasons = {
+        "Spring": [3, 4, 5],
+        "Summer": [6, 7, 8],
+        "Fall": [9, 10, 11],
+        "Winter": [12, 1, 2],
+    }
+
+    sampled_dates = []
+
+    for season, months in seasons.items():
+        # Get seasonal data indices
+        seasonal_idx = datetime_index[datetime_index.month.isin(months)]
+
+        # Find complete weeks within season
+        complete_weeks = []
+        for week in seasonal_idx.isocalendar().week.unique():
+            week_idx = datetime_index[datetime_index.isocalendar().week == week]
+            # Check if week is complete (168 hours) and fully within season
+            if len(week_idx) == 168 and all(
+                month in months for month in week_idx.month.unique()
+            ):
+                complete_weeks.append(week)
+
+        if complete_weeks:
+            # Set a seed for reproducibility
+            random.seed(42)
+
+            random_week = random.choice(complete_weeks)
+            week_idx = datetime_index[datetime_index.isocalendar().week == random_week]
+            sampled_dates.extend([d.date() for d in week_idx])
+
+        print(f"{season} complete weeks: {complete_weeks}")
+
+    return sorted(list(set(sampled_dates)))
+
+
+def run_MPEC(opt_gen, index, gens_df, demand_df, k_values_df, k_max, big_w):
+    """
+    Run the MPEC optimization for the given unit and return the profits before and after the optimization.
+
+    Args:
+        opt_gen (str): The unit to optimize.
+        index (pd.Index): The index of the time series data.
+        gens_df (pd.DataFrame): The generator data.
+        demand_df (pd.DataFrame): The demand data.
+        k_values_df (pd.DataFrame): The k-values data.
+        k_max (float): The maximum k-value.
+        big_w (float): The big W value.
+
+    Returns:
+        tuple: The profits before and after the optimization.
+    """
+    print("We now optimize the decison for unit ", gens_df.index[opt_gen])
+    demand_df = demand_df.copy(deep=True).loc[index]
+    # reset index to start at 0
+    demand_df = demand_df.reset_index(drop=True)
+    demand_df
+
+    k_values_df = k_values_df.copy(deep=True).loc[index]
+    # rename columns to match index of gens_df
+    k_values_df.columns = gens_df.index
+    k_values_df.reset_index(inplace=True)
+    k_values_df
+
+    gens_df = gens_df.copy(deep=True)
+
+    main_df, supp_df, k_values = find_optimal_dispatch(
+        gens_df=gens_df,
+        k_values_df=k_values_df,
+        demand_df=demand_df,
+        k_max=k_max,
+        opt_gen=opt_gen,
+        big_w=big_w,
+        time_limit=3600,
+        print_results=True,
+        K=5,
+        big_M=10e6,
+    )
+
+    # calculate actual market clearing prices
+    k_values_df_2 = k_values_df.copy()
+    k_values_df_2[opt_gen] = k_values
+
+    updated_main_df_2, updated_supp_df_2 = solve_uc_problem(
+        gens_df, demand_df, k_values_df_2
+    )
+
+    # Calculate profits
+    profits_1 = calculate_profits(main_df=main_df, supp_df=supp_df, gens_df=gens_df)
+    profits_2 = calculate_profits(
+        main_df=updated_main_df_2, supp_df=updated_supp_df_2, gens_df=gens_df
+    )
+
+    return profits_1, profits_2
+
+
+def plot_sample_distribution(sample_df, rest_df):
+    colors = list(["green"] * len(rest_df)) + list(["blue"] * len(sample_df))
+
+    # Scatter matrix
+    fig = pd.plotting.scatter_matrix(
+        pd.concat([rest_df, sample_df], sort=False),
+        c=colors,
+        figsize=(7, 7),
+        range_padding=0.2,
+        hist_kwds={"bins": 20},  # Generic histogram configuration
+        s=30,
+        alpha=0.5,
+    )
+
+    # Customize histogram colors for each diagonal
+    hist_colors = ["green", "blue"]
+    for i, ax in enumerate(fig.diagonal()):
+        ax.hist(
+            [rest_df.iloc[:, i], sample_df.iloc[:, i]],
+            bins=20,
+            color=hist_colors,
+            stacked=True,
+            alpha=0.7,
+        )
+
+    # Show plot
+    plt.show()
+
+
+def plot_profit_comparison(df_rl, df_mpec, bound=-10):
+    # Calculate percentage deviation
+    percent_deviation = ((df_rl - df_mpec) / df_mpec) * 100
+
+    # Create figure
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Create violin plot
+    parts = ax.violinplot(
+        [percent_deviation[col].values for col in percent_deviation.columns],
+        showmeans=False,
+        showmedians=False,
+        showextrema=False,
+    )
+
+    # Customize violin plot colors
+    for pc in parts["bodies"]:
+        pc.set_facecolor("lightblue")
+        pc.set_alpha(0.7)
+
+    # Add box plot inside violin plot
+    ax.boxplot(
+        [percent_deviation[col].values for col in percent_deviation.columns],
+        positions=range(1, len(percent_deviation.columns) + 1),
+        widths=0.2,
+        showfliers=True,
+        notch=True,
+    )
+
+    # Add horizontal lines and colored regions
+    ax.axhline(y=0, color="black", linestyle="--", alpha=0.7, linewidth=1.5)
+    ax.axhline(y=bound, color="black", linestyle="--", alpha=0.7, linewidth=1.5)
+
+    # Create background colors for different regions
+    plt.axhspan(
+        0,
+        max(percent_deviation.max()) + 10,
+        color="lightgreen",
+        alpha=0.3,
+        label="RL profit > MPEC profit",
+    )
+    plt.axhspan(
+        bound,
+        0,
+        color="yellow",
+        alpha=0.3,
+        label="RL profit < MPEC profit but in bounds",
+    )
+    plt.axhspan(
+        min(percent_deviation.min()) - 5,
+        bound,
+        color="lightcoral",
+        alpha=0.3,
+        label="RL profit < MPEC profit outside bounds",
+    )
+
+    # Customize plot
+    ax.set_xlabel("Power Plant Units")
+    ax.set_ylabel("Deviation (%)\n(RL - MPEC) / MPEC")
+    ax.set_title("Profit Deviation Distribution (Combined Violin and Box Plot)")
+    ax.grid(True, alpha=0.3)
+
+    # Set x-ticks
+    ax.set_xticks(range(1, len(percent_deviation.columns) + 1))
+    ax.set_xticklabels(percent_deviation.columns)
+
+    handles, labels = plt.gca().get_legend_handles_labels()
+    plt.legend(handles, labels, loc="upper right")
+
+    # Adjust layout
+    plt.tight_layout()
+
+    return fig
