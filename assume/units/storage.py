@@ -286,7 +286,7 @@ class Storage(SupportsMinMaxCharge):
         return power
 
     def calculate_min_max_charge(
-        self, start: datetime, end: datetime, product_type="energy"
+        self, start: datetime, end: datetime, soc: float = None
     ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max charging power for the given time period.
@@ -320,17 +320,21 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict charging according to max_soc
-        max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"].at[start])
+        if soc is None:
+            soc = self.outputs["soc"].at[start]
+        max_soc_charge = self.calculate_soc_max_charge(soc)
         max_power_charge = max_power_charge.clip(min=max_soc_charge)
+
+        # convert to single values if only one value is left
+        if len(min_power_charge) == 1:
+            min_power_charge = min_power_charge[0]
+        if len(max_power_charge) == 1:
+            max_power_charge = max_power_charge[0]
 
         return min_power_charge, max_power_charge
 
     def calculate_min_max_discharge(
-        self,
-        start: datetime,
-        end: datetime,
-        product_type: str = "energy",
-        soc: float = None,
+        self, start: datetime, end: datetime, soc: float = None
     ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max discharging power for the given time period.
@@ -368,10 +372,16 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict according to min_soc
-        max_soc_discharge = self.calculate_soc_max_discharge(
-            self.outputs["soc"].at[start]
-        )
+        if soc is None:
+            soc = self.outputs["soc"].at[start]
+        max_soc_discharge = self.calculate_soc_max_discharge(soc)
         max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
+
+        # convert to single values if only one value is left
+        if len(min_power_discharge) == 1:
+            min_power_discharge = min_power_discharge[0]
+        if len(max_power_discharge) == 1:
+            max_power_discharge = max_power_discharge[0]
 
         return min_power_discharge, max_power_discharge
 
