@@ -65,6 +65,10 @@ available_examples = {
     },
     # example_01f is used in the tutorial notebook #5: Market configuration comparison example
     # example_01g is used in the tutorial notebook #6: Advanced order types example
+    "small_household": {
+        "scenario": "example_01h",
+        "study_case": "eom",
+    },
     #
     # DRL references case for learning advancement testing
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
