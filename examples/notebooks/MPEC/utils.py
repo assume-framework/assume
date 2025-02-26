@@ -327,7 +327,7 @@ def sample_seasonal_weeks(datetime_index):
     return sorted(list(set(sampled_dates)))
 
 
-def run_MPEC(opt_gen, index, gens_df, demand_df, k_values_df, k_max, big_w):
+def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w):
     """
     Run the MPEC optimization for the given unit and return the profits before and after the optimization.
 
@@ -344,17 +344,12 @@ def run_MPEC(opt_gen, index, gens_df, demand_df, k_values_df, k_max, big_w):
         tuple: The profits before and after the optimization.
     """
     print("We now optimize the decison for unit index", gens_df.index[opt_gen])
-    demand_df['date']=demand_df.index.date
-    demand_df = demand_df.copy(deep=True).loc[demand_df['date'].isin(index)]
-    demand_df.drop(columns=['date'],inplace=True)
+
+    demand_df = demand_df.copy(deep=True)
     # reset index to start at 0
     demand_df = demand_df.reset_index(drop=True)
    
-
-    # filter k_values_df to only include the selected index
-    k_values_df['date']=k_values_df.index.date
-    k_values_df = k_values_df.copy(deep=True).loc[k_values_df['date'].isin(index)]
-    k_values_df.drop(columns=['date'],inplace=True)
+    k_values_df = k_values_df.copy(deep=True)
     # rename columns to match index of gens_df
     k_values_df.columns = gens_df.index
     k_values_df.reset_index(inplace=True)
