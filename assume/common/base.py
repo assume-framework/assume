@@ -175,7 +175,7 @@ class BaseUnit:
         # also update the SOC if the unit is a storage unit
         if isinstance(self, SupportsMinMaxCharge):
             start = orderbook[0]["start_time"]
-            end = orderbook[-1]["end_time"]
+            end = orderbook[-1]["start_time"]
             time_delta = self.index.freq / timedelta(hours=1)
 
             for t in self.index[start:end]:
