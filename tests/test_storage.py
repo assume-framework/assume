@@ -85,6 +85,10 @@ def test_calculate_operational_window(storage_unit):
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
+    min_power_discharge, max_power_discharge = (
+        min_power_discharge[0],
+        max_power_discharge[0],
+    )
     cost_discharge = storage_unit.calculate_marginal_cost(start, max_power_discharge)
 
     assert min_power_discharge == 0
@@ -94,6 +98,8 @@ def test_calculate_operational_window(storage_unit):
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
+    min_power_charge, max_power_charge = min_power_charge[0], max_power_charge[0]
+
     cost_charge = storage_unit.calculate_marginal_cost(start, max_power_charge)
 
     assert min_power_charge == 0
@@ -109,11 +115,16 @@ def test_calculate_operational_window(storage_unit):
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
+    min_power_charge, max_power_charge = min_power_charge[0], max_power_charge[0]
     assert min_power_charge == -40
     assert max_power_charge == -60
 
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
+    )
+    min_power_discharge, max_power_discharge = (
+        min_power_discharge[0],
+        max_power_discharge[0],
     )
     assert min_power_discharge == 40
     assert max_power_discharge == 60
@@ -155,10 +166,16 @@ def test_storage_feedback(storage_unit, mock_market_config):
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
+    min_power_charge, max_power_charge = min_power_charge[0], max_power_charge[0]
 
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
+    min_power_discharge, max_power_discharge = (
+        min_power_discharge[0],
+        max_power_discharge[0],
+    )
+
     cost_discharge = storage_unit.calculate_marginal_cost(start, max_power_discharge)
 
     assert min_power_charge == 0
@@ -186,6 +203,10 @@ def test_storage_feedback(storage_unit, mock_market_config):
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
+    min_power_discharge, max_power_discharge = (
+        min_power_discharge[0],
+        max_power_discharge[0],
+    )
 
     # we do not need additional min_power, as our runtime requirement is fulfilled
     assert min_power_discharge == 0
@@ -198,6 +219,10 @@ def test_storage_feedback(storage_unit, mock_market_config):
     end = datetime(2022, 1, 1, 2)
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
+    )
+    min_power_discharge, max_power_discharge = (
+        min_power_discharge[0],
+        max_power_discharge[0],
     )
 
     # now we can bid max_power and need min_power again

@@ -81,6 +81,15 @@ class flexableEOMStorage(BaseStrategy):
                 start, end, soc=theoretic_SOC
             )
 
+            min_power_charge, max_power_charge = (
+                min_power_charge[0],
+                max_power_charge[0],
+            )
+            min_power_discharge, max_power_discharge = (
+                min_power_discharge[0],
+                max_power_discharge[0],
+            )
+
             # Calculate ramping constraints using helper function
             max_power_discharge = unit.calculate_ramp_discharge(
                 theoretic_SOC,
