@@ -4,6 +4,7 @@
 
 import os
 
+import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 import yaml
@@ -327,6 +328,61 @@ def sample_seasonal_weeks(datetime_index):
     return sorted(list(set(sampled_dates)))
 
 
+def create_gens_df(pp_units, dispatch_df):
+    gens_df = pp_units.copy()
+
+    # Transform gen_df into the format that is expected by the optimization problem
+    # g_max	mc	u_0	g_0	r_up	r_down	k_up	k_down
+    gens_df = gens_df.reset_index()
+    gens_df = gens_df.rename(columns={"max_power": "g_max", "min_power": "u_0"})
+    gens_df["r_up"] = gens_df["g_max"]  # ramping up constraints
+    gens_df["r_down"] = gens_df["g_max"]  # ramping down constraints
+    gens_df["k_up"] = 0  # start up costs
+    gens_df["k_down"] = 0  # shut down costs
+    gens_df["g_0"] = 0  # start with no power output
+
+    # get average mc from dispatch_df per unit name
+    mc = dispatch_df.groupby("unit")["energy_marginal_costs"].mean()
+
+    # based on name and unit column join mc into gens_df
+    gens_df = gens_df.merge(mc, left_on="name", right_on="unit", how="left")
+    gens_df = gens_df.rename(columns={"energy_marginal_costs": "mc"})
+    return gens_df
+
+
+def join_demand_market_orders(demand_df, market_orders_df):
+    # join demand df and market orders where unit id is demand_EOM based on index
+    demand_df = demand_df.copy()
+    demand_df["price"] = market_orders_df[market_orders_df["unit_id"] == "demand_EOM"][
+        "price"
+    ]
+    demand_df = demand_df.drop(columns=["date"])
+    demand_df.index.name = "datetime"
+    demand_df.columns = ["volume", "price"]
+    demand_df.index = pd.to_datetime(demand_df.index)
+    demand_df["date"] = demand_df.index.date
+    return demand_df
+
+
+def obtain_k_values(k_df, gens_df):
+    mc_mapping = dict(zip(gens_df["name"], gens_df["mc"]))
+    k_df["gens_df_mc"] = k_df["unit_id"].map(mc_mapping)
+
+    # transformed actions into k_values, one per generator
+    k_df["k"] = k_df["price"] / k_df["gens_df_mc"]
+
+    # replace inf with 0
+    k_df["k"] = k_df["k"].replace(np.inf, 0)
+
+    k_values_df = k_df.pivot(index="time", columns="unit_id", values="k")
+    # k_values_df.reset_index(inplace=True)
+
+    # sort columns to match the order of the columns in the gens_df
+    k_values_df = k_values_df[gens_df["name"].values]
+    k_values_df["date"] = k_values_df.index.date
+    return k_values_df
+
+
 def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w):
     """
     Run the MPEC optimization for the given unit and return the profits before and after the optimization.
@@ -348,12 +404,11 @@ def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w):
     demand_df = demand_df.copy(deep=True)
     # reset index to start at 0
     demand_df = demand_df.reset_index(drop=True)
-   
+
     k_values_df = k_values_df.copy(deep=True)
     # rename columns to match index of gens_df
     k_values_df.columns = gens_df.index
     k_values_df.reset_index(inplace=True)
-    
 
     gens_df = gens_df.copy(deep=True)
 
@@ -417,26 +472,30 @@ def plot_sample_distribution(sample_df, rest_df):
 
 
 def plot_profit_comparison(df_rl, df_mpec, bound=-10):
-    # Calculate percentage deviation
-    percent_deviation = ((df_rl - df_mpec) / df_rl) * 100
-    
+    # Filter out zero value columns
+    df_rl = df_rl.loc[:, (df_rl != 0).any(axis=0)]
+    df_mpec = df_mpec.loc[:, (df_mpec != 0).any(axis=0)]
 
+    df_rl_mean = df_rl.mean(axis=0)
+    # Calculate percentage deviation
+    percent_deviation = ((df_rl - df_mpec) / df_rl_mean) * 100
 
     # Create figure
     fig, ax = plt.subplots(figsize=(12, 6))
 
+    # TODO: comment in when values fixed and kernel approximation works, currently too many zero and similar values exist.
     # Create violin plot
-    parts = ax.violinplot(
-        [percent_deviation[col].values for col in percent_deviation.columns],
-        showmeans=False,
-        showmedians=False,
-        showextrema=False,
-    )
+    # parts = ax.violinplot(
+    #     [percent_deviation[col].values for col in percent_deviation.columns],
+    #     showmeans=False,
+    #     showmedians=False,
+    #     showextrema=False,
+    # )
 
     # Customize violin plot colors
-    for pc in parts["bodies"]:
-        pc.set_facecolor("lightblue")
-        pc.set_alpha(0.7)
+    # for pc in parts["bodies"]:
+    #     pc.set_facecolor("lightblue")
+    #     pc.set_alpha(0.7)
 
     # Add box plot inside violin plot
     ax.boxplot(
@@ -476,7 +535,7 @@ def plot_profit_comparison(df_rl, df_mpec, bound=-10):
 
     # Customize plot
     ax.set_xlabel("Power Plant Units")
-    ax.set_ylabel("Deviation (%)\n(RL - MPEC) / MPEC")
+    ax.set_ylabel("Deviation (%)\n(RL - MPEC) / mean(RL)")
     ax.set_title("Profit Deviation Distribution (Combined Violin and Box Plot)")
     ax.grid(True, alpha=0.3)
 
