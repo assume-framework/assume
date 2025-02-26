@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base:
-  start_date: 2019-02-28 22:00
+  start_date: 2019-02-28 23:00
   end_date: 2019-03-31 02:00
   time_step: 1h
   learning_mode: true
@@ -25,7 +25,7 @@ base:
     gamma: 0.99
     device: cpu
     action_noise_schedule: linear
-    noise_sigma: 0.3
+    noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
@@ -34,7 +34,7 @@ base:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-02-28 22:00
+      start_date: 2019-02-28 23:00
       products:
         - duration: 1h
           count: 1
@@ -49,7 +49,7 @@ base:
       market_mechanism: pay_as_clear
 
 base_lstm:
-  start_date: 2019-02-28 22:00
+  start_date: 2019-02-28 23:00
   end_date: 2019-03-31 02:00
   time_step: 1h
   learning_mode: true
@@ -62,15 +62,15 @@ base_lstm:
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 1000
-    episodes_collecting_initial_experience: 50
+    training_episodes: 200
+    episodes_collecting_initial_experience: 20
     train_freq: 24h
     gradient_steps: 24
     batch_size: 256
     gamma: 0.99
     device: cpu
-    action_noise_schedule: linear
-    noise_sigma: 0.3
+    #action_noise_schedule: linear
+    noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
@@ -80,7 +80,7 @@ base_lstm:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-02-28 22:00
+      start_date: 2019-02-28 23:00
       products:
         - duration: 1h
           count: 24
@@ -95,27 +95,27 @@ base_lstm:
       market_mechanism: pay_as_clear
 
 base_lstm_original:
-  start_date: 2019-02-28 22:00
+  start_date: 2019-02-28 23:00
   end_date: 2019-03-31 02:00
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
 
   learning_config:
-    action_dimension: 48
+    action_dimension: 24
     continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 1000
-    episodes_collecting_initial_experience: 50
+    training_episodes: 200
+    episodes_collecting_initial_experience: 20
     train_freq: 24h
-    gradient_steps: -1
+    gradient_steps: 24
     batch_size: 256
     gamma: 0.99
     device: cpu
-    noise_sigma: 0.3
+    noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
@@ -126,7 +126,7 @@ base_lstm_original:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-02-28 22:00
+      start_date: 2019-02-28 23:00
       products:
         - duration: 1h
           count: 24

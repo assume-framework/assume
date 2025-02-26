@@ -288,7 +288,10 @@ class RLStrategy(AbstractLearningStrategy):
         bid_prices = actions * self.max_bid_price
 
         # reshape for multi-step bidding with flex and inflex
-        bid_prices = bid_prices.reshape(-1, 2)
+        if self.original_implementation:
+            bid_prices = bid_prices.reshape(-1, 1)
+        else:
+            bid_prices = bid_prices.reshape(-1, 2)
 
         # 3.1 formulate the bids for Pmin
         # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
@@ -432,11 +435,8 @@ class RLStrategy(AbstractLearningStrategy):
                     noise = th.zeros(self.act_dim, dtype=self.float_type)
                 else:
                     curr_action = self.actor(next_observation).detach()
-                    noise = th.tensor(
-                        self.action_noise.noise(),
-                        device=self.device,
-                        dtype=self.float_type,
-                    )
+                    noise = self.action_noise.noise().clone().detach()
+
                     curr_action += noise
 
         else:
@@ -686,12 +686,12 @@ class RLStrategy(AbstractLearningStrategy):
         # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
         # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
         # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
-        profit = min(profit, 0.1 * abs(profit))
+        profit = np.minimum(profit, 0.1 * abs(profit))
 
         # Dynamic regret scaling:
         # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
         # - If no dispatch happens, apply higher regret (0.5) to discourage idle behavior, if it could have been profitable.
-        regret_scale = 0.1 if (accepted_volume_total > unit.min_power).any() else 0.5
+        regret_scale = 0.1 if (accepted_volume_total > unit.min_power).all() else 0.5
 
         # --------------------
         # 4.1 Calculate Reward
@@ -699,7 +699,7 @@ class RLStrategy(AbstractLearningStrategy):
         # This guides the agent toward strategies that maximize accepted bids while minimizing lost opportunities.
 
         scaling = 0.1 / unit.max_power
-        reward = float(profit - regret_scale * opportunity_cost) * scaling
+        reward = (profit - regret_scale * opportunity_cost) * scaling
 
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[products_index] = profit
