@@ -113,7 +113,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small"
+    example = "small_with_vre_and_storage"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

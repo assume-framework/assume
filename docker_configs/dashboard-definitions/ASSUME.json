@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 2,
   "links": [],
   "panels": [
     {
@@ -2454,7 +2454,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2533,7 +2534,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2626,7 +2627,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2701,7 +2703,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2806,7 +2808,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -2960,7 +2963,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3101,7 +3105,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3263,7 +3268,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3277,7 +3283,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "energy_marginal_costs demand_EOM"
+              "options": "energy_generation_costs demand_EOM"
             },
             "properties": [
               {
@@ -3445,7 +3451,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3580,7 +3587,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3688,7 +3696,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3829,7 +3838,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -3843,7 +3853,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "energy_marginal_costs demand_EOM"
+              "options": "energy_generation_costs demand_EOM"
             },
             "properties": [
               {
@@ -3894,7 +3904,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -energy_cashflow AS \"Cashflow:\",\r\n  -energy_marginal_costs AS \"Production costs:\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -energy_cashflow AS \"Cashflow:\",\r\n  -energy_generation_costs AS \"Production costs:\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3999,7 +4009,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4153,7 +4164,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4173,7 +4185,7 @@
       "id": 47,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\nUnit Operator: {{unit_operator}}\n\n### Technical Specifications\nMaximum Capacity: {{max_soc}} MWh <br>\nMinimum Capacity: {{min_soc}} MWh <br>\n\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} % <br>  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -4276,7 +4288,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4417,7 +4430,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4631,7 +4645,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4818,7 +4833,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -4897,7 +4913,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -4990,7 +5006,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "red",
@@ -5065,7 +5082,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -5118,8 +5135,8 @@
     "list": [
       {
         "current": {
-          "text": "world_mastr_nuts0_random_2023",
-          "value": "world_mastr_nuts0_random_2023"
+          "text": "example_01c_eom_only",
+          "value": "example_01c_eom_only"
         },
         "datasource": {
           "type": "postgres",
@@ -5159,10 +5176,10 @@
       {
         "current": {
           "text": [
-            "conventionalDE_gas_1"
+            "Biomass"
           ],
           "value": [
-            "conventionalDE_gas_1"
+            "Biomass"
           ]
         },
         "datasource": {
@@ -5184,10 +5201,10 @@
       {
         "current": {
           "text": [
-            "demand_DE1"
+            "demand_CRM_neg"
           ],
           "value": [
-            "demand_DE1"
+            "demand_CRM_neg"
           ]
         },
         "datasource": {
@@ -5209,10 +5226,10 @@
       {
         "current": {
           "text": [
-            "storageDE_SSE900014446378"
+            "Storage 1"
           ],
           "value": [
-            "storageDE_SSE900014446378"
+            "Storage 1"
           ]
         },
         "datasource": {
@@ -5233,8 +5250,8 @@
       },
       {
         "current": {
-          "text": "2023-01-01 01:00:00",
-          "value": "2023-01-01 01:00:00"
+          "text": "2019-01-01 10:00:00",
+          "value": "2019-01-01 10:00:00"
         },
         "definition": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
         "description": "The minimum time we have in the time range.\nUsed for the merit order plot title",
@@ -5249,8 +5266,8 @@
     ]
   },
   "time": {
-    "from": "2019-01-01T10:00:00.000Z",
-    "to": "2019-01-06T14:00:00.000Z"
+    "from": "2019-01-01T00:00:00.000Z",
+    "to": "2019-01-31T23:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -5265,6 +5282,6 @@
   "timezone": "utc",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 2,
+  "version": 6,
   "weekStart": ""
 }

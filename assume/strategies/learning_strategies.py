@@ -693,7 +693,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=50, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=38, act_dim=2, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
         # defines bounds of actions space
@@ -731,7 +731,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # neural network architecture is predefined, and the size of the observations must remain consistent.
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
-        self.foresight = 24
+        self.foresight = 12
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -957,15 +957,17 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
         # Iterate over all orders in the orderbook to calculate order-specific profit
         for order in orderbook:
-            start_time = order["start_time"]
-            next_time = start_time + unit.index.freq
-            end_time = order["end_time"]
-            end_exclusive = end_time - unit.index.freq
-            duration_hours = (end_time - start_time) / timedelta(hours=1)
+            start = order["start_time"]
+            end = order["end_time"]
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+            end_excl = end - unit.index.freq
+
+            next_time = start + unit.index.freq
+            duration_hours = (end - start) / timedelta(hours=1)
 
             # Calculate marginal and starting costs
             marginal_cost = unit.calculate_marginal_cost(
-                start_time, unit.outputs[product_type].at[start_time]
+                start, unit.outputs[product_type].at[start]
             )
             marginal_cost += unit.get_starting_costs(int(duration_hours))
 
@@ -978,28 +980,27 @@ class StorageRLStrategy(AbstractLearningStrategy):
             order_profit = accepted_price * accepted_volume * duration_hours
             order_cost = abs(marginal_cost * accepted_volume * duration_hours)
 
-            current_soc = unit.outputs["soc"].at[start_time]
+            current_soc = unit.outputs["soc"].at[start]
             next_soc = unit.outputs["soc"].at[next_time]
 
             # Calculate and clip the energy cost for the start time
-            unit.outputs["energy_cost"].at[next_time] = np.clip(
-                (
-                    unit.outputs["energy_cost"].at[start_time] * current_soc
-                    - order_profit
+            if next_soc < 1:
+                unit.outputs["energy_cost"].at[next_time] = 0
+            else:
+                unit.outputs["energy_cost"].at[next_time] = np.clip(
+                    (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
+                    / next_soc,
+                    0,
+                    self.max_bid_price,
                 )
-                / next_soc,
-                0,
-                self.max_bid_price,
-            )
 
-            reward += (order_profit - order_cost) * scaling_factor
+            profit = order_profit - order_cost
+            reward += profit * scaling_factor
 
             # Store results in unit outputs
-            unit.outputs["profit"].loc[start_time:end_exclusive] += (
-                order_profit - order_cost
-            )
-            unit.outputs["reward"].loc[start_time:end_exclusive] = reward
-            unit.outputs["total_costs"].loc[start_time:end_exclusive] = order_cost
+            unit.outputs["profit"].loc[start:end_excl] += profit
+            unit.outputs["reward"].loc[start:end_excl] = reward
+            unit.outputs["total_costs"].loc[start:end_excl] = order_cost
             unit.outputs["rl_rewards"].append(reward)
 
     def create_observation(
@@ -1081,6 +1082,25 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 start : start + forecast_len
             ]
 
+        # collect historical past market clearing prices
+        actual_price = unit.outputs["energy_accepted_price"]
+        if start - forecast_len < actual_price.index[0]:
+            # Not enough historical data, use available actual prices and prepend forecasted values for missing past data
+            actual_price_history = actual_price.loc[:start] / self.max_bid_price
+            missing_values = self.foresight - len(actual_price_history)
+
+            if missing_values > 0:
+                forecasted_prices = self.scaled_prices_obs.iloc[:missing_values]
+                actual_price_history = np.concatenate(
+                    [forecasted_prices, actual_price_history]
+                )
+
+        else:
+            # Sufficient historical data exists, collect past actual prices
+            actual_price_history = (
+                actual_price.loc[start - forecast_len : start] / self.max_bid_price
+            )
+
         # get the current soc value
         soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
         energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
@@ -1090,6 +1110,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
             [
                 scaled_res_load_forecast,
                 scaled_price_forecast,
+                actual_price_history,
                 np.array([soc_scaled, energy_cost_scaled]),
             ]
         )

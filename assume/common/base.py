@@ -172,6 +172,20 @@ class BaseUnit:
                 accepted_price
             )
 
+    def calculate_cashflow_and_reward(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ) -> None:
+        """
+        Calculates the cashflow and the reward for the given unit.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+
+        product_type = marketconfig.product_type
         self.calculate_cashflow(product_type, orderbook)
 
         self.bidding_strategies[marketconfig.market_id].calculate_reward(
@@ -196,18 +210,17 @@ class BaseUnit:
         if start not in self.index:
             start = self.index[0]
 
-        product_type_mc = product_type + "_marginal_costs"
         # Adjusted code for accessing product data and mapping over the index
-        product_data = self.outputs[product_type].loc[
-            start:end
-        ]  # Slicing directly without `.loc`
+        product_data = self.outputs[product_type].loc[start:end]
 
         marginal_costs = [
             self.calculate_marginal_cost(t, product_data[idx])
             for idx, t in enumerate(self.index[start:end])
         ]
-        new_values = np.abs(marginal_costs * product_data)
-        self.outputs[product_type_mc].loc[start:end] = new_values
+        generation_costs = np.abs(marginal_costs * product_data)
+        self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
+            generation_costs
+        )
 
     def execute_current_dispatch(
         self,

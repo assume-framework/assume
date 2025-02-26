@@ -244,10 +244,8 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
     # THEN resulting unit dispatch dataframe contains one row
     # which is for the current time - as we must know our current dispatch
-    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
-    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
-    # only 1 start and stop contained
-    assert len(unit_dfs[0]["time"]) == 2
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
 
     # WHEN another hour passes
@@ -256,16 +254,150 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
 
     # THEN resulting unit dispatch dataframe contains only one row with current dispatch
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
-    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
-    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
-    assert len(unit_dfs[0]["time"]) == 2
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
 
     last = clock.time
     clock.set_time(clock.time + 3600)
 
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
-    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
-    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
-    assert len(unit_dfs[0]["time"]) == 2
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
+
+
+def test_participate():
+    """
+    Tests that an operator without units does not participate.
+    And an operator with units for the wrong market does not participate.
+    A correct units operator participates correctly.
+    """
+    market_id = "EOM"
+    marketconfig = MarketConfig(
+        market_id=market_id,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
+    )
+    clock = ExternalClock(0)
+    units_role = UnitsOperator(available_markets=[marketconfig])
+
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"wrong_market": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = Demand("testdemand", **params_dict)
+    units_role.add_unit(unit)
+
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = Demand("testdemand", **params_dict)
+    units_role.add_unit(unit)
+
+    assert units_role.participate(marketconfig)
+
+
+def test_participate_lambda():
+    """
+    Tests that one of the selected lambda functions works correctly in the participation
+    """
+    market_id = "EOM"
+    marketconfig = MarketConfig(
+        market_id=market_id,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
+        eligible_obligations_lambda="only_renewables",
+    )
+    units_role = UnitsOperator(available_markets=[marketconfig])
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 10,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = PowerPlant("testdemand", **params_dict)
+    units_role.add_unit(unit)
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "wind offshore",
+        "unit_operator": "x",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = PowerPlant("testdemand", **params_dict)
+    units_role.add_unit(unit)
+
+    assert units_role.participate(marketconfig)
+
+
+def test_participate_custom_lambda():
+    """
+    Tests that the custom lambda function is respected in the participation
+    """
+    market_id = "EOM"
+    marketconfig = MarketConfig(
+        market_id=market_id,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
+        eligible_obligations_lambda=lambda u: abs(u.get("max_power", 0)) > 100,
+    )
+    units_role = UnitsOperator(available_markets=[marketconfig])
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 10,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = PowerPlant("testdemand", **params_dict)
+    units_role.add_unit(unit)
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = PowerPlant("testdemand", **params_dict)
+    units_role.add_unit(unit)
+
+    assert units_role.participate(marketconfig)

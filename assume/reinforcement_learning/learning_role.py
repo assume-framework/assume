@@ -115,7 +115,7 @@ class Learning(Role):
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
 
-        self.train_freq = learning_config.get("train_freq", "100h")
+        self.train_freq = learning_config.get("train_freq", "24h")
         self.gradient_steps = learning_config.get("gradient_steps", 100)
 
         # check that gradient_steps is positive
@@ -434,8 +434,10 @@ class Learning(Role):
 
         self.freq_timedelta = pd.Timedelta(freq)
         # This is for padding the output list when the gradient steps are not identical to the train frequency
-        self.time_steps = int(
-            pd.Timedelta(self.train_freq) / (self.freq_timedelta * self.gradient_steps)
+        self.time_steps = max(
+            1,
+            pd.Timedelta(self.train_freq)
+            // (self.freq_timedelta * self.gradient_steps),
         )
 
     def write_rl_critic_params_to_output(

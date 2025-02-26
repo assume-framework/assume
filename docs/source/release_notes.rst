@@ -14,9 +14,24 @@ Upcoming Release
 
 **New Features:**
 
-- **Tensorboard Integration:** To enable better monitoring of the learning prograss and comparison between different runs, we added the possibility to use Tensorboard for logging the learning progress.
+- **TensorBoard Integration:** To enable better monitoring of the learning progress and comparison between different runs, we have added the possibility to use TensorBoard for logging the learning progress.
   To use this feature, please follow the instructions in the README.
 
+**Improvements:**
+
+- **Multi-market participation configuration**: Respect the `eligible_obligations_lambda` set in the `MarketConfig` to only bid on markets where the UnitsOperator fulfills the requirements.
+  Changes the behavior to not participate on markets when no unit has a matching bidding strategy for this market.
+- **Learning Performance:** The learning performance for large multi-agent learning setups has been significantly improved by introducing several learning stabilization techniques.
+  This leads to a more stable learning process and faster convergence. It also allows for running simulations on historical data with a larger number of agents, achieving very good quality results.
+  For example, running example_03a for the year 2019, one can achieve an RMSE of 10.22 EUR/MWh and MAE of 6.52 EUR/MWh for hourly market prices, and an RMSE of 6.8 EUR/MWh and MAE of 4.6 EUR/MWh when
+  using daily average prices. This is a significant improvement compared to the previous version of the framework.
+
+**Bug Fixes:**
+
+- **Storage Learning Strategy:** Fixed a bug in the storage learning strategy that caused the learning process to fail or perform poorly. The bug was related to the way the storage was updating the state of charge.
+  This has been fixed, and the learning process for storage units is now stable and performs well. It also improved the performance of non-learning bidding strategies for storage units.
+- **Wrong train_freq Handling:** Fixed a bug where, if the simulation length was not a multiple of the train_freq, the remaining simulation steps were not used for training, causing the training to fail.
+  This has been fixed, and now the train_freq is adjusted dynamically to fit the simulation length. The user is also informed about the adjusted train_freq in the logs.
 
 v0.5.1 - (3rd February 2025)
 ===========================================
