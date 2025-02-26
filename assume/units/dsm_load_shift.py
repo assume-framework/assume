@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -546,6 +547,115 @@ class DSMFlex:
             pyo.value(instance.variable_cost[t]) for t in instance.time_steps
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
+
+        # Extract time series data for variable cost and total power input
+        time_steps = list(instance.time_steps)
+        variable_cost_series = [
+            pyo.value(instance.variable_cost[t]) for t in time_steps
+        ]
+        total_power_input_series = [
+            pyo.value(instance.total_power_input[t]) for t in time_steps
+        ]
+
+        # Save time series data to attributes
+        self.opt_power_requirement = FastSeries(
+            index=self.index, value=total_power_input_series
+        )
+        self.variable_cost_series = FastSeries(
+            index=self.index, value=variable_cost_series
+        )
+        ##############EXTRACT RESULT######################
+
+        # Calculate total cost
+        self.total_cost = sum(variable_cost_series)
+
+        # Extract power input for raw material mill, clinker system, and cement mill
+
+        heat_pump_power_in = (
+            [
+                pyo.value(instance.dsm_blocks["heat_pump"].power_in[t])
+                for t in instance.time_steps
+            ]
+            if "heat_pump" in instance.dsm_blocks
+            else None
+        )
+
+        # storage_charge = (
+        #     [
+        #         pyo.value(instance.dsm_blocks["generic_storage"].charge[t])
+        #         for t in instance.time_steps
+        #     ]
+        #     if "generic_storage" in instance.dsm_blocks
+        #     else None
+        # )
+
+        # storage_discharge = (
+        #     [
+        #         -pyo.value(instance.dsm_blocks["generic_storage"].discharge[t])
+        #         for t in instance.time_steps
+        #     ]
+        #     if "generic_storage" in instance.dsm_blocks
+        #     else None
+        # )
+
+        # storage_soc = (
+        #     [
+        #         pyo.value(instance.dsm_blocks["generic_storage"].soc[t])
+        #         for t in instance.time_steps
+        #     ]
+        #     if "generic_storage" in instance.dsm_blocks
+        #     else None
+        # )
+
+        # Plot the power input
+        time_steps = range(len(instance.time_steps))
+        plt.figure(figsize=(10, 20))
+
+        if heat_pump_power_in:
+            # Middle subplot: Clinker System
+            plt.subplot(1, 1, 1)
+            plt.plot(
+                time_steps,
+                heat_pump_power_in,
+                label="heat pump Power input",
+                color="green",
+            )
+            plt.title("heat pump power input")
+            plt.xlabel("Time Steps")
+            plt.ylabel("Power (MW)")
+            plt.legend()
+
+        # if storage_charge and storage_discharge and storage_soc:
+        #     # Subplot 4: battery Storage
+        #     plt.subplot(2, 1, 2)
+        #     plt.plot(
+        #         time_steps,
+        #         storage_charge,
+        #         label="Charge",
+        #         color="green",
+        #         linestyle="solid",
+        #     )
+        #     plt.plot(
+        #         time_steps,
+        #         [-x for x in storage_discharge],  # Invert discharge for clarity
+        #         label="Discharge",
+        #         color="red",
+        #         linestyle="solid",
+        #     )
+        #     plt.fill_between(
+        #         time_steps,
+        #         storage_soc,
+        #         alpha=0.3,
+        #         label="State of Charge (SOC)",
+        #         color="blue",
+        #     )
+        #     plt.title("Clinker Buffer Storage")
+        #     plt.xlabel("Time Steps")
+        #     plt.ylabel("Clinker buffer (units)")
+        #     plt.legend()
+
+        plt.tight_layout()
+        plt.show()
 
     def determine_optimal_operation_with_flex(self):
         """
