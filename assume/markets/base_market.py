@@ -20,6 +20,7 @@ from assume.common.market_objects import (
     OrderBookMessage,
     RegistrationMessage,
     RegistrationReplyMessage,
+    lambda_functions,
 )
 from assume.common.utils import (
     datetime2timestamp,
@@ -299,12 +300,14 @@ class MarketRole(MarketMechanism, Role):
         Returns:
             bool: True if the registration is valid, False otherwise.
         """
+        if callable(self.marketconfig.eligible_obligations_lambda):
+            requirement = self.marketconfig.eligible_obligations_lambda
+        else:
+            requirement = lambda_functions.get(
+                self.marketconfig.eligible_obligations_lambda, lambda u: True
+            )
 
-        # simple check that 1 MW can be bid at least by  powerplants
-        def requirement(unit: dict):
-            return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 0
-
-        return all([requirement(info) for info in content["information"]])
+        return all([requirement(unit_info) for unit_info in content["information"]])
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress

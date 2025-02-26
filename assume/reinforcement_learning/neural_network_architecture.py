@@ -30,7 +30,7 @@ class CriticTD3(nn.Module):
         self.act_dim = act_dim * n_agents
 
         # Select proper architecture based on `n_agents`
-        if n_agents <= 10:
+        if n_agents <= 20:
             hidden_sizes = [256, 128]  # Shallow network for small `n_agents`
         elif n_agents <= 50:
             hidden_sizes = [512, 256, 128]  # Medium network

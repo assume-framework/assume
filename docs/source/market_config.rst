@@ -45,6 +45,7 @@ The `price_tick` and `volume_tick` is the step increment of volume, which ensure
 The `price_unit` and `volume_unit` are strings for visualization of price.
 The `supports_get_unmatched` is a boolean which defines if the market supports the handle_get_unmatched method, which allows agents to look into the current market orderbook, as it is the case, mostly on continuous markets.
 The `maximum_gradient` is the maximum allowed change between bids from one hour to the next one - only relevant if the count of market products is greater than 1.
+The `eligible_obligations_lambda` allows to configure additional requirements for agents operating on the market. It can be a string representing one of the preconfigured functions by name (`only_renewables` and `only_co2emissionless`) - or a lambda function checking on the units information.
 
 Most important, the `market_products` are a list of MarketProduct objects.
 
@@ -86,8 +87,8 @@ It then makes sense to reschedule the market clearing all 4 hours, but it would 
     Delivery13 EOM         :2019-01-01 17:00, 1h
     Delivery14 EOM         :2019-01-01 18:00, 1h
 
-Please note, Trade Convention
------------------------------
+Please note the following Trade Convention
+------------------------------------------
 
 In our market trading system, we follow this convention for representing the volume and price of trades in any market:
 
@@ -161,3 +162,32 @@ Due to the configuration of the market opening frequency and duration, the timet
     Delivery CRM           :crm02, 2019-01-01 01:00, 4h
     Bidding CRM            :crm03, 2019-01-01 04:00, 30m
     Delivery CRM           :crm04, 2019-01-01 05:00, 4h
+
+
+Example Configuration - Eligible Obligations Lambda
+---------------------------------------------------
+
+If not all agents are allowed to bid on a market, one can configure this in the market as well.
+For example, because only agents with a given minimum or maximum power are allowed or only agents with renewable generation:
+
+   markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 01:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      market_mechanism: pay_as_clear
+      eligible_obligations_lambda: only_renewables
+
+When configuring the market as a Python object, it is also possible to configure a customized lambda function for the market object to reflect to special conditions.
+
+The built-in lambda functions are:
+
+- :py:meth:`assume.common.market_objects.only_renewables`
+- :py:meth:`assume.common.market_objects.only_co2emissionless`
+- :py:meth:`assume.common.market_objects.power_plant_not_negative`

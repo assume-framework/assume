@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "assume-framework"
-version = "0.5.0"
+version = "0.5.1"
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = [{ name = "ASSUME Developers", email = "contact@assume-project.de"}]
 license = {text = "AGPL-3.0-or-later"}
@@ -48,6 +48,7 @@ dependencies = [
 [project.optional-dependencies]
 learning = [
     "torch >=2.0.1",
+    "tensorboard >=2.7.0",
 ]
 network = [
     "pypsa >=0.32.0",

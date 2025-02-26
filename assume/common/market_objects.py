@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -279,3 +280,29 @@ class MetaDict(TypedDict):
 
 contract_type = Callable[[Agent, Agent], None]
 market_contract_type = Callable[[Agent, Agent, list], None]
+
+
+def only_renewables(unit):
+    """
+    check that technology is renewable.
+    This allows all names containing wind, solar, bio or demand
+    """
+    return re.search(
+        r"\b(?:wind|solar|bio|demand)\b", unit["technology"], flags=re.IGNORECASE
+    )
+
+
+def only_co2emissionless(unit):
+    """same as only_renewables plus nuclear"""
+    return only_renewables(unit) or unit["technology"] == "nuclear"
+
+
+def power_plant_not_negative(unit):
+    return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 0
+
+
+lambda_functions = {
+    "only_renewables": only_renewables,
+    "only_co2emissionless": only_co2emissionless,
+    "power_plant_not_negative": power_plant_not_negative,
+}

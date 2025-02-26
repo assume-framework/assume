@@ -51,8 +51,6 @@ class PayAsBidContractRole(MarketRole):
 
     Args:
         marketconfig (MarketConfig): The market configuration.
-        limitation (str): a string for limitations - either being "only_co2emissionless" or "only_renewables"
-
     """
 
     required_fields = [
@@ -65,10 +63,8 @@ class PayAsBidContractRole(MarketRole):
     def __init__(
         self,
         marketconfig: MarketConfig,
-        limitation: str = "only_co2emissionless",
     ):
         super().__init__(marketconfig)
-        self.limitation = limitation
         self.futures = {}
 
     def setup(self):
@@ -106,38 +102,6 @@ class PayAsBidContractRole(MarketRole):
                 if order["contract"] not in allowed_contracts:
                     contract = order["contract"]
                     raise ValueError(f"{contract} is not in {allowed_contracts}")
-
-    def validate_registration(self, content: dict, meta: MetaDict) -> bool:
-        """
-        validation function called by handle_registration
-        Makes it possible to allow only a subset of agents to bid on this market
-        by using self.limitation of the clearing mechanism.
-
-        Args:
-            content (dict): message content with registration message and agent information
-            meta (MetaDict): message meta
-
-        Returns:
-            bool: True if agent fulfills requirements
-        """
-        if self.limitation:
-            if self.limitation == "only_co2emissionless":
-                requirement = lambda x: x in [
-                    "demand",
-                    "nuclear",
-                    "wind",
-                    "solar",
-                    "biomass",
-                ]
-            elif self.limitation == "only_renewables":
-                requirement = lambda x: x in ["demand", "wind", "solar", "biomass"]
-            else:
-                logger.error(f"unknown limitation {self.limitation}")
-            return all(
-                [requirement(info["technology"]) for info in content["information"]]
-            )
-        else:
-            return True
 
     def check_working(self, supply_order: Order, demand_order: Order) -> bool:
         """

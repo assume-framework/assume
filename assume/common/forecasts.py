@@ -96,6 +96,11 @@ class CsvForecaster(Forecaster):
     Methods are included to retrieve forecasts for specific columns, availability of units,
     and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
+    Notes:
+    - Some built-in forecasts are calculated at the beginning of the simulation, such as price forecast and residual load forecast.
+    - Price forecast is calculated for energy-only markets using a merit order approach.
+    - Residual load forecast is calculated by subtracting the total available power from variable renewable energy power plants from the overall demand forecast. Only power plants containing 'wind' or 'solar' in their technology column are considered VRE power plants.
+
     Args:
         index (pd.Series): The index of the forecasts.
         powerplants_units (pd.DataFrame): A DataFrame containing information about power plants.
@@ -307,15 +312,16 @@ class CsvForecaster(Forecaster):
             pd.Series: The residual demand forecast.
 
         Notes:
-            1. Selects VRE power plants (wind_onshore, wind_offshore, solar) from the powerplants_units data.
+            1. Selects VRE power plants from the powerplants_units DataFrame based on the technology column (wind or solar).
             2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
             3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
             4. Calculates the residual demand by subtracting the total VRE power feed-in from the overall demand forecast.
+
         """
 
         vre_powerplants_units = self.powerplants_units[
-            self.powerplants_units["technology"].isin(
-                ["wind_onshore", "wind_offshore", "solar"]
+            self.powerplants_units["technology"].str.contains(
+                r"\b(?:wind|solar)\b", case=False, na=False
             )
         ].copy()
 
@@ -359,39 +365,61 @@ class CsvForecaster(Forecaster):
         # calculate infeed of renewables and residual demand
         # check if max_power is a series or a float
 
-        # select only those power plant units, which have a bidding strategy for the specific market_id
+        # 1. Filter power plant units with a bidding strategy for the given market_id
         powerplants_units = self.powerplants_units[
             self.powerplants_units[f"bidding_{market_id}"].notnull()
         ]
 
+        # 2. Calculate marginal costs for each unit and time step.
+        #    The resulting DataFrame has rows = time steps and columns = units.
         marginal_costs = powerplants_units.apply(self.calculate_marginal_cost, axis=1).T
-        sorted_columns = marginal_costs.loc[self.index[0]].sort_values().index
+
+        # 3. Get forecast availabilities and reformat the column names to match unit identifiers.
         col_availabilities = self.forecasts.columns[
             self.forecasts.columns.str.startswith("availability")
         ]
-        availabilities = self.forecasts[col_availabilities]
+        availabilities = self.forecasts[col_availabilities].copy()
         availabilities.columns = col_availabilities.str.replace("availability_", "")
 
+        # 4. Compute available power for each unit at each time step.
+        #    Since max_power is a float, this multiplication broadcasts over each column.
         power = self.powerplants_units.max_power * availabilities
-        cumsum_power = power[sorted_columns].cumsum(axis=1)
 
+        # 5. Process the demand.
+        #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
         demand_units = self.demand_units[
             self.demand_units[f"bidding_{market_id}"].notnull()
         ]
         sum_demand = self.forecasts[demand_units.index].sum(axis=1)
 
-        # initialize empty price_forecast
+        # 6. Initialize the price forecast series.
         price_forecast = pd.Series(index=self.index, data=0.0)
 
-        # start with most expensive type (highest cumulative power)
-        for col in sorted_columns[::-1]:
-            # find times which can still be provided with this technology
-            # and cheaper once
-            cheaper = cumsum_power[col] > sum_demand
-            # set the price of this technology as the forecast price
-            # for these times
-            price_forecast.loc[cheaper] = marginal_costs[col].loc[cheaper]
-            # repeat with the next cheaper technology
+        # 7. Loop over each time step
+        for t in self.index:
+            # Get marginal costs and available power for time t (both are Series indexed by unit)
+            mc_t = marginal_costs.loc[t]
+            power_t = power.loc[t]
+            demand_t = sum_demand.loc[t]
+
+            # Sort units by their marginal cost in ascending order for time t.
+            sorted_units = mc_t.sort_values().index
+            sorted_mc = mc_t.loc[sorted_units]
+            sorted_power = power_t.loc[sorted_units]
+
+            # Compute the cumulative sum of available power in the sorted order.
+            cumsum_power = sorted_power.cumsum()
+
+            # Find the first unit where the cumulative available power meets or exceeds demand.
+            matching_units = cumsum_power[cumsum_power >= demand_t]
+            if matching_units.empty:
+                # If available capacity is insufficient, set the price to 1000.
+                price = 1000.0
+            else:
+                # The marginal cost of the first unit that meets demand becomes the price.
+                price = sorted_mc.loc[matching_units.index[0]]
+
+            price_forecast.loc[t] = price
 
         return price_forecast
 

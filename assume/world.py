@@ -116,18 +116,33 @@ class World:
             self.db_uri = make_url(database_uri)
             db = create_engine(self.db_uri)
             connected = False
-            while not connected:
+            attempts = 0
+            max_attempts = 5
+
+            while not connected and attempts < max_attempts:
                 try:
                     with db.connect():
                         connected = True
-                        logger.info("connected to db")
+                        logger.info("Connected to the database")
                 except OperationalError as e:
-                    logger.error("could not connect to %s, trying again", database_uri)
+                    attempts += 1
+                    logger.error(
+                        "Could not connect to %s, trying again (%d/%d)",
+                        database_uri,
+                        attempts,
+                        max_attempts,
+                    )
                     # log error if not connection refused
                     if not e.code == "e3q8":
                         logger.error("%s", e)
-                    time.sleep(2)
+                    time.sleep(2**attempts)
 
+            if not connected:
+                raise RuntimeError(
+                    f"Failed to connect to the database after {max_attempts} attempts"
+                )
+
+        self.scenario_data = {}
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
@@ -233,7 +248,7 @@ class World:
             # self.clock_agent.stopped.add_done_callback(stop)
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
-            self.setup_learning()
+            self.setup_learning(simulation_id)
 
             self.setup_output_agent(simulation_id, save_frequency_hours)
             self.clock_manager = DistributedClockManager(
@@ -241,7 +256,7 @@ class World:
             )
             self.container.register(self.clock_manager)
 
-    def setup_learning(self) -> None:
+    def setup_learning(self, simulation_id: str) -> None:
         """
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
@@ -266,6 +281,14 @@ class World:
                 suggested_aid=self.learning_agent_addr.aid,
             )
             rl_agent.suspendable_tasks = False
+
+            self.learning_role.init_logging(
+                simulation_id=simulation_id,
+                db_uri=self.db_uri,
+                output_agent_addr=self.output_agent_addr,
+                train_start=self.start,
+                freq=self.forecaster.index.freq,
+            )
 
     def setup_output_agent(self, simulation_id: str, save_frequency_hours: int) -> None:
         """

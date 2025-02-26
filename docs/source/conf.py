@@ -56,8 +56,8 @@ intersphinx_disabled_domains = ["std"]
 
 templates_path = ["_templates"]
 
-source_suffix = ".rst"
-master_doc = "index"
+source_suffix = {".rst": "restructuredtext"}
+root_doc = "index"
 
 # -- Options for HTML output ----------------------------------------------
 html_theme = "sphinx_book_theme"

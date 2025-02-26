@@ -18,8 +18,8 @@ dependencies:
 - pypsa
 
 - pip:
-  - .[oeds]
-  - sphinx<9
+  - .[all]
+  - sphinx<8.2
   - sphinx-book-theme
   - nbsphinx
   - nbsphinx-link

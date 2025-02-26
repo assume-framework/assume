@@ -16,7 +16,7 @@ from assume.units import Storage
 
 @pytest.fixture
 def storage_unit() -> Storage:
-    index = pd.date_range("2022-01-01", periods=4, freq="h")
+    index = pd.date_range("2022-01-01", periods=5, freq="h")
     forecaster = NaiveForecast(index, availability=1, price_forecast=50)
     return Storage(
         id="Test_Storage",
@@ -59,23 +59,23 @@ def test_reset_function(storage_unit):
     # check if total_power_output is reset
     assert (
         storage_unit.outputs["energy"]
-        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
+        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=5, freq="h"))
     ).all()
 
     # the same for pos and neg capacity reserve
     assert (
         storage_unit.outputs["pos_capacity"]
-        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
+        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=5, freq="h"))
     ).all()
     assert (
         storage_unit.outputs["neg_capacity"]
-        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
+        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=5, freq="h"))
     ).all()
 
     # check if state of charge (soc) is reset correctly
     assert (
         storage_unit.outputs["soc"]
-        == pd.Series(500.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
+        == pd.Series(500.0, index=pd.date_range("2022-01-01", periods=5, freq="h"))
     ).all()
 
 
@@ -138,9 +138,7 @@ def test_soc_constraint(storage_unit):
         start, end
     )
     assert min_power_discharge[0] == 40
-    assert math.isclose(
-        max_power_discharge[0], (50 * storage_unit.efficiency_discharge)
-    )
+    assert max_power_discharge[0] == 60
 
     storage_unit.outputs["soc"][start] = 0.95 * storage_unit.max_soc
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
