@@ -374,10 +374,16 @@ class Learning(Role):
                 )
 
                 if len(self.avg_rewards) >= self.early_stopping_steps:
-                    avg_change = (
-                        max(self.avg_rewards[-self.early_stopping_steps :])
-                        - min(self.avg_rewards[-self.early_stopping_steps :])
-                    ) / min(self.avg_rewards[-self.early_stopping_steps :])
+                    recent_rewards = self.avg_rewards[-self.early_stopping_steps :]
+                    min_reward = min(recent_rewards)
+                    max_reward = max(recent_rewards)
+
+                    # Avoid division by zero or unexpected behavior with negative values
+                    denominator = max(
+                        abs(min_reward), 1e-8
+                    )  # Use small value to avoid zero-division
+
+                    avg_change = (max_reward - min_reward) / denominator
 
                     if avg_change < self.early_stopping_threshold:
                         logger.info(
