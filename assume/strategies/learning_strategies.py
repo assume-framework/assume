@@ -592,7 +592,7 @@ class RLStrategy(AbstractLearningStrategy):
         # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
         # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
         # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
-        profit = min(profit, 0.1 * abs(profit))
+        # profit = min(profit, 0.1 * abs(profit))
 
         # Opportunity cost: The income lost due to not operating at full capacity.
         opportunity_cost = (
@@ -607,20 +607,23 @@ class RLStrategy(AbstractLearningStrategy):
         # Dynamic regret scaling:
         # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
         # - If no dispatch happens, apply higher regret (0.5) to discourage idle behavior, if it could have been profitable.
-        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 0.5
+        # regret_scale = 0.1 if accepted_volume_total > unit.min_power else 0.5
 
         # --------------------
         # 4.1 Calculate Reward
         # Instead of directly setting reward = profit, we incorporate a regret term (opportunity cost penalty).
         # This guides the agent toward strategies that maximize accepted bids while minimizing lost opportunities.
+        max_price_difference = self.max_bid_price - min(unit.marginal_cost)
+        scaling = 1 / (max_price_difference * unit.max_power)
 
-        scaling = 0.1 / unit.max_power
-        reward = float(profit - regret_scale * opportunity_cost) * scaling
+        reward = (profit - opportunity_cost) * scaling
+
+        # reward = float(profit - regret_scale * opportunity_cost) * scaling
 
         # Store results in unit outputs, which are later written to the database by the unit operator.
         unit.outputs["profit"].loc[start:end_excl] += profit
         unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
+        unit.outputs["regret"].loc[start:end_excl] = opportunity_cost
         unit.outputs["total_costs"].loc[start:end_excl] = operational_cost
 
         unit.outputs["rl_rewards"].append(reward)

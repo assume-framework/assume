@@ -113,14 +113,6 @@ class PowerPlant(SupportsMinMax):
             self.index.freq / timedelta(hours=1)
         )
 
-        self.init_marginal_cost()
-
-    def init_marginal_cost(self):
-        """
-        Initializes the marginal cost of the unit using calc_cimple_marginal_cost().
-
-        Args:
-        """
         self.marginal_cost = self.calc_simple_marginal_cost()
 
     def execute_current_dispatch(
