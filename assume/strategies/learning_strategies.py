@@ -953,7 +953,10 @@ class StorageRLStrategy(AbstractLearningStrategy):
         Rewards are based on profit and include fixed costs for charging and discharging.
         """
 
-        scaling_factor = 0.1 / unit.max_power_discharge
+        scaling_factor_discharge = 1 / (
+            self.max_bid_price * abs(unit.max_power_discharge)
+        )
+        scaling_factor_charge = 1 / (self.max_bid_price * abs(unit.max_power_charge))
 
         product_type = marketconfig.product_type
         reward = 0
@@ -998,7 +1001,10 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 )
 
             profit = order_profit - order_cost
-            reward += profit * scaling_factor
+            if accepted_volume < 0:
+                reward += profit * scaling_factor_charge
+            elif accepted_volume > 0:
+                reward += profit * scaling_factor_discharge
 
             # Store results in unit outputs
             unit.outputs["profit"].loc[start:end_excl] += profit
