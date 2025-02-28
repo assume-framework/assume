@@ -141,7 +141,7 @@ class BaseUnit:
     ) -> None:
         """
         Iterates through the orderbook, adding the accepted volumes to the corresponding time slots
-        in the dispatch plan. It then calculates the cashflow and the reward for the bidding strategies.
+        in the dispatch plan. Updates the SOC for storage units.
 
         Args:
             marketconfig (MarketConfig): The market configuration.
@@ -174,11 +174,13 @@ class BaseUnit:
 
         # also update the SOC if the unit is a storage unit
         if isinstance(self, SupportsMinMaxCharge):
-            start = orderbook[0]["start_time"]
-            end = orderbook[-1]["start_time"]
+            start = min(order["start_time"] for order in orderbook)
+            end = max(order["end_time"] for order in orderbook)
+            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+            end_excl = end - self.index.freq
             time_delta = self.index.freq / timedelta(hours=1)
 
-            for t in self.index[start:end]:
+            for t in self.index[start:end_excl]:
                 next_t = t + self.index.freq
                 # continue if it is the last time step
                 if next_t not in self.index:
@@ -209,6 +211,7 @@ class BaseUnit:
 
                 # update the values of the state of charge and the energy
                 self.outputs["soc"].at[next_t] = soc + delta_soc
+                self.outputs["energy"].at[t] = current_power
 
     def calculate_cashflow_and_reward(
         self,
@@ -556,14 +559,14 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             start (datetime.datetime): The start time of the dispatch.
             end (datetime.datetime): The end time of the dispatch.
-            product_type (str, optional): The product type of the unit. Defaults to "energy".
+            soc (float, optional): The current state-of-charge. Defaults to None.
 
         Returns:
             tuple[np.array, np.array]: The min and max charging power for the given time period.
         """
 
     def calculate_min_max_discharge(
-        self, start: datetime, end: datetime, product_type="energy"
+        self, start: datetime, end: datetime, soc: float = None
     ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max discharging power for the given time period.
@@ -571,7 +574,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             start (datetime.datetime): The start time of the dispatch.
             end (datetime.datetime): The end time of the dispatch.
-            product_type (str, optional): The product type of the unit. Defaults to "energy".
+            soc (float, optional): The current state-of-charge. Defaults to None.
 
         Returns:
             tuple[np.array, np.array]: The min and max discharging power for the given time period.

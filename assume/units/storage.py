@@ -296,7 +296,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             start (datetime.datetime): The start of the current dispatch.
             end (datetime.datetime): The end of the current dispatch.
-            product_type (str): The product type of the storage unit.
+            soc (float): The current state-of-charge. Defaults to None, then using soc at given start time.
 
         Returns:
             tuple[np.array, np.array]: The minimum and maximum charge power levels of the storage unit in MW.
@@ -338,7 +338,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             start (datetime.datetime): The start of the current dispatch.
             end (datetime.datetime): The end of the current dispatch.
-            product_type (str): The product type of the storage unit.
+            soc (float): The current state-of-charge. Defaults to None, then using soc at given start time.
 
         Returns:
             tuple[np.array, np.array]: The minimum and maximum discharge power levels of the storage unit in MW.
