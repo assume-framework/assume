@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-version: "3.9"
 services:
   assume_db:
     image: timescaledev/timescaledb-ha:pg15-oss
@@ -17,9 +16,9 @@ services:
       - TS_TUNE_MAX_CONNS=500
     volumes:
       # needed for normal image
-      #- ./assume-db:/var/lib/postgresql/data
+      - ./assume-db:/var/lib/postgresql/data
       # /home/postgres/data is path for timescaledev image
-      - ./assume-db:/home/postgres/pgdata
+      #- ./assume-db:/home/postgres/pgdata
     ports:
       - 5432:5432
     deploy:
