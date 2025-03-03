@@ -452,6 +452,9 @@ def load_config_and_create_forecaster(
     """
 
     path = f"{inputs_path}/{scenario}"
+    logger.info(f"Input files path: {path}")
+    logger.info(f"Study case: {study_case}")
+
     with open(f"{path}/config.yaml") as f:
         config = yaml.safe_load(f)
     if not study_case:
@@ -822,9 +825,6 @@ def load_scenario_folder(
         - After calling this function, the world environment is prepared for further simulation and analysis.
 
     """
-    logger.info(
-        f"Loading config and input files from {inputs_path}/{scenario}/{study_case}"
-    )
 
     world.scenario_data = load_config_and_create_forecaster(
         inputs_path, scenario, study_case
