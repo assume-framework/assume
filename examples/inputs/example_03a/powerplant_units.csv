@@ -10,7 +10,6 @@ KKW PHILIPPSBURG 2,nuclear,pp_learning,uranium,0,1468,590,0.33,880,880,10.3,140,
 KKW GROHNDE,nuclear,pp_learning,uranium,0,1430,570,0.33,860,860,10.3,140,140,140,RL_operator
 KKW EMSLAND,nuclear,pp_learning,uranium,0,1406,560,0.33,840,840,10.3,140,140,140,RL_operator
 KKW NECKARWESTHEIM,nuclear,pp_learning,uranium,0,1400,560,0.33,840,840,10.3,140,140,140,RL_operator
-KKW GUNDREMMINGEN B,nuclear,pp_learning,uranium,0,1344,540,0.33,810,810,10.3,140,140,140,RL_operator
 KKW GUNDREMMINGEN C,nuclear,pp_learning,uranium,0,1344,540,0.33,810,810,10.3,140,140,140,RL_operator
 NEURATH F,lignite,pp_learning,lignite,0.406,1120,560,0.434,590,590,1.65,30.4,47.5,69.3,RL_operator
 NEURATH G,lignite,pp_learning,lignite,0.406,1120,560,0.434,590,590,1.65,30.4,47.5,69.3,RL_operator
