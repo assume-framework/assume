@@ -120,6 +120,7 @@ class CsvForecaster(Forecaster):
         powerplants_units: pd.DataFrame,
         demand_units: pd.DataFrame,
         market_configs: dict[str, dict],
+        exchange_units: pd.DataFrame | None = None,
         buses: pd.DataFrame | None = None,
         lines: pd.DataFrame | None = None,
         save_path: str = "",
@@ -131,6 +132,7 @@ class CsvForecaster(Forecaster):
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
         self.market_configs = market_configs
+        self.exchange_units = exchange_units
         self.buses = buses
         self.lines = lines
 
@@ -316,6 +318,7 @@ class CsvForecaster(Forecaster):
             2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
             3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
             4. Calculates the residual demand by subtracting the total VRE power feed-in from the overall demand forecast.
+            5. If exchange units are available, imports and exports are subtracted and added to the demand forecast, respectively.
 
         """
 
@@ -337,33 +340,54 @@ class CsvForecaster(Forecaster):
         ]
         sum_demand = self.forecasts[demand_units.index].sum(axis=1)
 
+        # get exchanges if exchange_units are available
+        if self.exchange_units is not None:
+            exchange_units = self.exchange_units[
+                self.exchange_units[f"bidding_{market_id}"].notnull()
+            ]
+            # get sum of imports as name of exchange_unit_import
+            import_units = [f"{unit}_import" for unit in exchange_units.index]
+            sum_imports = self.forecasts[import_units].sum(axis=1)
+            # get sum of exports as name of exchange_unit_export
+            export_units = [f"{unit}_export" for unit in exchange_units.index]
+            sum_exports = self.forecasts[export_units].sum(axis=1)
+            # add imports and exports to the sum_demand
+            sum_demand += sum_imports - sum_exports
+
         res_demand_df = sum_demand - vre_feed_in_df.sum(axis=1)
 
         return res_demand_df
 
     def calculate_market_price_forecast(self, market_id):
         """
-        Calculates the merit order price forecast for the entire time horizon at once.
+        Computes the merit order price forecast for the entire time horizon.
 
-        The method considers the infeed of renewables, residual demand, and the marginal costs of power plants to derive the price forecast.
+        This method estimates electricity prices by considering renewable energy infeed, residual demand,
+        and marginal costs of power plants. It follows a merit-order approach to determine the price at
+        each time step.
+
+        Args:
+            market_id (str): The market identifier for which the price forecast is calculated.
 
         Returns:
-            pd.Series: The merit order price forecast.
+            pd.Series: A time-indexed series representing the merit order price forecast.
+
+        Methodology:
+            1. Filters power plant units that participate in the specified market.
+            2. Calculates the marginal costs for each unit based on fuel costs, efficiencies, emissions, and fixed costs.
+            3. Retrieves forecasted unit availabilities and computes available power for each time step.
+            4. Aggregates demand forecasts, including imports and exports if applicable.
+            5. Iterates over each time step:
+                - Sorts power plants by marginal cost.
+                - Computes cumulative available power.
+                - Sets the price based on the marginal cost of the unit that meets demand.
+                - Assigns a default price of 1000 if supply is insufficient.
 
         Notes:
-            1. Calculates the marginal costs for each power plant based on fuel costs, efficiencies, emissions, and fixed costs.
-            2. Sorts the power plants based on their marginal costs and availability.
-            3. Computes the cumulative power of available power plants.
-            4. Determines the price forecast by iterating through the sorted power plants, setting the price for times that can still be provided with a specific technology and cheaper ones.
-
-        TODO:
-            Extend price forecasts for all markets, not just specified for the DAM.
-            Consider the inclusion of storages in the price forecast calculation.
+            - Extending the price forecast to additional markets beyond the DAM is planned.
+            - Future enhancements may include storage integration in the price forecast.
 
         """
-
-        # calculate infeed of renewables and residual demand
-        # check if max_power is a series or a float
 
         # 1. Filter power plant units with a bidding strategy for the given market_id
         powerplants_units = self.powerplants_units[
@@ -391,6 +415,20 @@ class CsvForecaster(Forecaster):
             self.demand_units[f"bidding_{market_id}"].notnull()
         ]
         sum_demand = self.forecasts[demand_units.index].sum(axis=1)
+
+        # get exchanges if exchange_units are available
+        if self.exchange_units is not None:
+            exchange_units = self.exchange_units[
+                self.exchange_units[f"bidding_{market_id}"].notnull()
+            ]
+            # get sum of imports as name of exchange_unit_import
+            import_units = [f"{unit}_import" for unit in exchange_units.index]
+            sum_imports = self.forecasts[import_units].sum(axis=1)
+            # get sum of exports as name of exchange_unit_export
+            export_units = [f"{unit}_export" for unit in exchange_units.index]
+            sum_exports = self.forecasts[export_units].sum(axis=1)
+            # add imports and exports to the sum_demand
+            sum_demand += sum_imports - sum_exports
 
         # 6. Initialize the price forecast series.
         price_forecast = pd.Series(index=self.index, data=0.0)

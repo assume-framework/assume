@@ -104,7 +104,7 @@ def load_file(
             if df.index.freq < index.freq:
                 logger.warning(
                     f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
-                    "Resampling using mean(). Make sure this is what you want and your data is in units of power."
+                    "Resampling using mean(). Make sure this is what you want."
                 )
                 df = df.resample(index.freq).mean()
                 logger.info(f"Downsampling {file_name} successful.")
@@ -460,6 +460,8 @@ def load_config_and_create_forecaster(
 
     sim_id = config.get("simulation_id", f"{scenario}_{study_case}")
 
+    logger.info(f"Simulation ID: {sim_id}")
+
     start = pd.Timestamp(config["start_date"])
     end = pd.Timestamp(config["end_date"])
 
@@ -548,6 +550,7 @@ def load_config_and_create_forecaster(
         index=index,
         powerplants_units=powerplant_units,
         demand_units=demand_units,
+        exchange_units=exchange_units,
         market_configs=config["markets_config"],
         buses=buses,
         lines=lines,
@@ -819,7 +822,9 @@ def load_scenario_folder(
         - After calling this function, the world environment is prepared for further simulation and analysis.
 
     """
-    logger.info(f"Starting Scenario {scenario}/{study_case} from {inputs_path}")
+    logger.info(
+        f"Loading config and input files from {inputs_path}/{scenario}/{study_case}"
+    )
 
     world.scenario_data = load_config_and_create_forecaster(
         inputs_path, scenario, study_case
