@@ -119,7 +119,7 @@ class TensorBoardLogger:
 
     def update_tensorboard(self):
         """Store episodic evaluation data in tensorboard"""
-        if not self.learning_mode:
+        if not self.learning_mode or not self.db_uri:
             return
 
         if self.writer is None:
