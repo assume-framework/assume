@@ -53,9 +53,9 @@ def load_oeds(
         end=end,
         freq="h",
     )
-    sim_id = f"{scenario}_{study_case}"
+    simulation_id = f"{scenario}_{study_case}"
     year = start.year
-    logger.info(f"loading scenario {sim_id} with {nuts_config}")
+    logger.info(f"loading scenario {simulation_id} with {nuts_config}")
     infra_interface = InfrastructureInterface("test", infra_uri)
 
     if not nuts_config or nuts_config == "nuts3":
@@ -71,7 +71,7 @@ def load_oeds(
         start=start,
         end=end,
         save_frequency_hours=48,
-        simulation_id=sim_id,
+        simulation_id=simulation_id,
     )
     # setup eom market
 
