@@ -816,11 +816,8 @@ class StorageRLStrategy(AbstractLearningStrategy):
         else:
             bid_direction = "ignore"
 
-        _, max_discharge = unit.calculate_min_max_discharge(start, end_all)
-        _, max_charge = unit.calculate_min_max_charge(start, end_all)
-
-        bid_quantity_supply = max_discharge[0]
-        bid_quantity_demand = max_charge[0]
+        _, bid_quantity_supply = unit.calculate_min_max_discharge(start, end_all)
+        _, bid_quantity_demand = unit.calculate_min_max_charge(start, end_all)
 
         bids = []
 
