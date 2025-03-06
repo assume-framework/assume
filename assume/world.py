@@ -51,46 +51,53 @@ logger = logging.getLogger(__name__)
 
 class World:
     """
-    World instance with the provided address, database URI, export CSV path, log level, and distributed role settings.
+    Represents a simulation environment with a specified address, database connection, CSV export path,
+    log level, and optional distributed role settings.
 
-    If a database URI is provided, it establishes a database connection. Additionally, it sets up various dictionaries and attributes for market operators,
-    markets, unit operators, unit types, bidding strategies, and clearing mechanisms. If available, it imports learning strategies and handles any potential import errors.
-    Finally, it sets up the event loop for asynchronous operations.
+    If a database URI is provided, the World instance attempts to establish a database connection.
+    It initializes key attributes for market operators, markets, unit operators, bidding strategies,
+    and clearing mechanisms. Additionally, it checks for learning strategy availability and sets up an event loop.
 
     Attributes:
-        addr (Union[tuple[str, int], str]): The address of the world, represented as a tuple of string and int or a string.
+        addr (tuple[str, int] | str, optional): The address of the world, represented as a tuple (host, port) or a string.
+        distributed_role (bool, optional): Defines the world’s role in distributed execution:
+            - `True`: Acts as a manager world that schedules events.
+            - `False`: Acts as a client world receiving schedules from a manager.
+            - `None` (default): Runs independently without subprocesses.
+        export_csv_path (str, optional): Path for exporting CSV data.
+        log_level (str, optional): The logging level for the world instance.
+        db_uri (sqlalchemy.engine.URL, optional): The processed database URI.
+        db (sqlalchemy.engine.base.Engine, optional): The database connection engine.
         container (mango.Container, optional): The container for the world instance.
-        distributed_role (bool, optional): A boolean indicating whether distributed roles are enabled.
-        export_csv_path (str): The path for exporting CSV data.
-        db (sqlalchemy.engine.base.Engine, optional): The database connection.
-        market_operators (dict[str, mango.RoleAgent]): The market operators for the world instance.
-        markets (dict[str, MarketConfig]): The markets for the world instance.
-        unit_operators (dict[str, UnitsOperator]): The unit operators for the world instance.
-        unit_types (dict[str, BaseUnit]): The unit types for the world instance.
-        bidding_strategies (dict[str, type[BaseStrategy]]): The bidding strategies for the world instance.
-        clearing_mechanisms (dict[str, MarketRole]): The clearing mechanisms for the world instance.
-        addresses (list[str]): The addresses for the world instance.
-        loop (asyncio.AbstractEventLoop): The event loop for the world instance.
-        clock (ExternalClock): The external clock for the world instance.
-        start (datetime.datetime): The start datetime for the simulation.
-        end (datetime.datetime): The end datetime for the simulation.
-        learning_config (LearningConfig): The configuration for the learning process.
-        perform_evaluation (bool): A boolean indicating whether the evaluation mode is enabled.
+        loop (asyncio.AbstractEventLoop, optional): The event loop for asynchronous operations.
+        clock (ExternalClock, optional): External clock instance.
+        start (datetime.datetime, optional): Start datetime for the simulation.
+        end (datetime.datetime, optional): End datetime for the simulation.
+        market_operators (dict[str, mango.RoleAgent], optional): Market operators in the world instance.
+        markets (dict[str, MarketConfig], optional): Market configurations.
+        unit_operators (dict[str, UnitsOperator], optional): Unit operators.
+        unit_types (dict[str, BaseUnit], optional): Available unit types.
+        dst_components (dict[str, DemandSideTechnology], optional): Demand-side technologies.
+        bidding_strategies (dict[str, type[BaseStrategy]], optional): Bidding strategies for the world instance.
+            - If `"pp_learning"` is unavailable, learning strategies may be missing due to missing dependencies (e.g., `torch`).
+        clearing_mechanisms (dict[str, MarketRole], optional): Market clearing mechanisms.
+        additional_kpis (dict[str, OutputDef], optional): Additional performance indicators.
+        scenario_data (dict, optional): Dictionary for scenario-specific data.
+        addresses (list[str], optional): Addresses for the world instance.
+        output_agent_addr (tuple[str, str], optional): Address of the output agent.
+        bidding_params (dict, optional): Parameters for bidding.
+        index (pandas.Series, optional): The index for simulation tracking.
+        learning_config (LearningConfig, optional): Configuration for learning-based components.
+        learning_mode (bool, optional): Whether learning mode is enabled.
+        evaluation_mode (bool, optional): Whether evaluation mode is enabled.
         forecaster (Forecaster, optional): The forecaster used for custom unit types.
-        learning_mode (bool): A boolean indicating whether the learning mode is enabled.
-        output_agent_addr (tuple[str, str]): The address of the output agent.
-        bidding_params (dict): Parameters for bidding.
-        index (pandas.Series): The index for the simulation.
 
     Args:
-        addr: The address of the world, represented as a tuple of string and int or a string.
-        database_uri: The URI for the database connection.
-        export_csv_path: The path for exporting CSV data.
-        log_level: The logging level for the world instance.
-        distributed_role: A boolean indicating whether distributed roles are enabled.
-            If True - this world is a manager world which schedules events itself.
-            If False - this world is a client world which receives schedules from a manager through the DistributedClock mechanism.
-            If None (default) - this world is not distributed and does not use subprocesses
+        addr (tuple[str, int] | str, optional): The world’s address as a (host, port) tuple or a string. Defaults to `"world"`.
+        database_uri (str, optional): Database URI for establishing a connection. Defaults to `""` (no database).
+        export_csv_path (str, optional): Path for exporting CSV data. Defaults to `""`.
+        log_level (str, optional): Logging level. Defaults to `"INFO"`.
+        distributed_role (bool, optional): Defines the world’s role in distributed execution. Defaults to `None`.
     """
 
     def __init__(
@@ -174,6 +181,8 @@ class World:
         save_frequency_hours: int = 24,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
+        episode: int = 1,
+        eval_episode: int = 1,
         forecaster: Forecaster | None = None,
         manager_address=None,
         **kwargs: dict,
@@ -198,11 +207,24 @@ class World:
         """
 
         self.clock = ExternalClock(0)
+        self.simulation_id = simulation_id
         self.start = start
         self.end = end
         self.learning_config = learning_config
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        self.perform_evaluation = self.learning_config.get("perform_evaluation", False)
+        self.learning_mode = self.learning_config.get("learning_mode", False)
+        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
+
+        # make a descriptor for the tqdm progress bar
+        # use simulation_id of not in learning mode; use Episode ID if in learning mode
+        # and use Evaluation Episode ID if in evaluation mode
+        self.simulation_desc = (
+            simulation_id
+            if not self.learning_mode
+            else f"Training Episode {episode}"
+            if not self.evaluation_mode
+            else f"Evaluation Episode {eval_episode}"
+        )
 
         # forecaster is used only when loading custom unit types
         self.forecaster = forecaster
@@ -231,7 +253,6 @@ class World:
             clock=self.clock,
             **container_kwargs,
         )
-        self.learning_mode = self.learning_config.get("learning_mode", False)
 
         if not self.db_uri and not self.export_csv_path:
             self.output_agent_addr = None
@@ -248,15 +269,19 @@ class World:
             # self.clock_agent.stopped.add_done_callback(stop)
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
-            self.setup_learning(simulation_id)
+            self.setup_learning(episode=episode, eval_episode=eval_episode)
 
-            self.setup_output_agent(simulation_id, save_frequency_hours)
+            self.setup_output_agent(
+                save_frequency_hours=save_frequency_hours,
+                episode=episode,
+                eval_episode=eval_episode,
+            )
             self.clock_manager = DistributedClockManager(
                 receiver_clock_addresses=self.addresses
             )
             self.container.register(self.clock_manager)
 
-    def setup_learning(self, simulation_id: str) -> None:
+    def setup_learning(self, episode: int, eval_episode: int) -> None:
         """
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
@@ -265,7 +290,7 @@ class World:
 
         self.bidding_params.update(self.learning_config)
 
-        if self.learning_mode or self.perform_evaluation:
+        if self.learning_mode or self.evaluation_mode:
             # if so, we initiate the rl learning role with parameters
             from assume.reinforcement_learning.learning_role import Learning
 
@@ -283,21 +308,27 @@ class World:
             rl_agent.suspendable_tasks = False
 
             self.learning_role.init_logging(
-                simulation_id=simulation_id,
+                simulation_id=self.simulation_id,
+                episode=episode,
+                eval_episode=eval_episode,
                 db_uri=self.db_uri,
                 output_agent_addr=self.output_agent_addr,
                 train_start=self.start,
                 freq=self.forecaster.index.freq,
             )
 
-    def setup_output_agent(self, simulation_id: str, save_frequency_hours: int) -> None:
+    def setup_output_agent(
+        self,
+        save_frequency_hours: int,
+        episode: int,
+        eval_episode: int,
+    ) -> None:
         """
         Set up the output agent for the simulation, creating an output role responsible for writing simulation output,
         including data storage and export settings. Depending on the platform (currently supported only on Linux),
         it adds the output agent to the container's processes, or directly adds the output role to the output agent.
 
         Args:
-            simulation_id (str): The unique identifier for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
         """
 
@@ -307,14 +338,16 @@ class World:
             self.export_csv_path,
         )
         self.output_role = WriteOutput(
-            simulation_id=simulation_id,
+            simulation_id=self.simulation_id,
             start=self.start,
             end=self.end,
             db_uri=self.db_uri,
             export_csv_path=self.export_csv_path,
             save_frequency_hours=save_frequency_hours,
             learning_mode=self.learning_mode,
-            perform_evaluation=self.perform_evaluation,
+            evaluation_mode=self.evaluation_mode,
+            episode=episode,
+            eval_episode=eval_episode,
             additional_kpis=self.additional_kpis,
         )
         if not self.output_agent_addr:
@@ -585,7 +618,7 @@ class World:
         market_operator_agent.markets = []
 
         # after creation of an agent - we set additional context params
-        if not self.learning_mode and not self.perform_evaluation:
+        if not self.learning_mode and not self.evaluation_mode:
             market_operator_agent._role_context.data.update(
                 {"output_agent_addr": self.output_agent_addr}
             )
@@ -667,7 +700,7 @@ class World:
                 if delta or prev_delta:
                     pbar.update(delta)
                     pbar.set_description(
-                        f"{self.output_role.simulation_id} {timestamp2datetime(self.clock.time)}",
+                        f"{self.simulation_desc} {timestamp2datetime(self.clock.time)}",
                         refresh=False,
                     )
                 else:

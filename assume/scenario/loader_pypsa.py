@@ -41,14 +41,14 @@ def load_pypsa(
     index.freq = index.inferred_freq
     start = index[0]
     end = index[-1]
-    sim_id = f"{scenario}_{study_case}"
-    logger.info(f"loading scenario {sim_id}")
+    simulation_id = f"{scenario}_{study_case}"
+    logger.info(f"loading scenario {simulation_id}")
 
     world.setup(
         start=start,
         end=end,
         save_frequency_hours=save_frequency_hours,
-        simulation_id=sim_id,
+        simulation_id=simulation_id,
     )
     # setup eom market
 
