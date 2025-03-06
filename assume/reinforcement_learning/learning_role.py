@@ -51,8 +51,8 @@ class Learning(Role):
         # define whether we train model or evaluate it
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
+        self.evaluation_mode = learning_config["evaluation_mode"]
         self.continue_learning = learning_config["continue_learning"]
-        self.perform_evaluation = learning_config["perform_evaluation"]
         self.trained_policies_save_path = learning_config["trained_policies_save_path"]
         self.trained_policies_load_path = learning_config.get(
             "trained_policies_load_path", self.trained_policies_save_path
@@ -197,7 +197,7 @@ class Learning(Role):
         """
 
         # subscribe to messages for handling the training process
-        if not self.perform_evaluation:
+        if not self.evaluation_mode:
             self.context.subscribe_message(
                 self,
                 self.save_buffer_and_update,
@@ -374,10 +374,16 @@ class Learning(Role):
                 )
 
                 if len(self.avg_rewards) >= self.early_stopping_steps:
-                    avg_change = (
-                        max(self.avg_rewards[-self.early_stopping_steps :])
-                        - min(self.avg_rewards[-self.early_stopping_steps :])
-                    ) / min(self.avg_rewards[-self.early_stopping_steps :])
+                    recent_rewards = self.avg_rewards[-self.early_stopping_steps :]
+                    min_reward = min(recent_rewards)
+                    max_reward = max(recent_rewards)
+
+                    # Avoid division by zero or unexpected behavior with negative values
+                    denominator = max(
+                        abs(min_reward), 1e-8
+                    )  # Use small value to avoid zero-division
+
+                    avg_change = (max_reward - min_reward) / denominator
 
                     if avg_change < self.early_stopping_threshold:
                         logger.info(
@@ -400,6 +406,8 @@ class Learning(Role):
     def init_logging(
         self,
         simulation_id: str,
+        episode: int,
+        eval_episode: int,
         db_uri: str,
         output_agent_addr: str,
         train_start: str,
@@ -423,8 +431,10 @@ class Learning(Role):
             simulation_id=simulation_id,
             db_uri=db_uri,
             learning_mode=self.learning_mode,
+            evaluation_mode=self.evaluation_mode,
+            episode=episode,
+            eval_episode=eval_episode,
             episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
-            perform_evaluation=self.perform_evaluation,
         )
 
         # Parameters required for sending data to the output role

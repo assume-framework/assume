@@ -32,6 +32,8 @@ Upcoming Release
   This has been fixed, and the learning process for storage units is now stable and performs well. It also improved the performance of non-learning bidding strategies for storage units.
 - **Wrong train_freq Handling:** Fixed a bug where, if the simulation length was not a multiple of the train_freq, the remaining simulation steps were not used for training, causing the training to fail.
   This has been fixed, and now the train_freq is adjusted dynamically to fit the simulation length. The user is also informed about the adjusted train_freq in the logs.
+- **Logging of Learning Parameters:** Fixed the way learning parameters were logged, which previously used a different simulation_id for each episode, leading to very slow performance of the learning Grafana dashboard.
+  Now, the learning parameters are logged using the same simulation_id for each episode, which significantly improves the performance of the learning Grafana dashboard.
 
 v0.5.1 - (3rd February 2025)
 ===========================================

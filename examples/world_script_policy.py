@@ -28,7 +28,7 @@ def init(world: World):
         end=end + timedelta(hours=24),
         freq="h",
     )
-    sim_id = "world_script_policy"
+    simulation_id = "world_script_policy"
 
     world.clearing_mechanisms["pay_as_bid_contract"] = PayAsBidContractRole
     from assume.strategies.extended import SupportStrategy
@@ -39,7 +39,7 @@ def init(world: World):
         start=start,
         end=end,
         save_frequency_hours=48,
-        simulation_id=sim_id,
+        simulation_id=simulation_id,
     )
     contract_types = ["MPFIX"]
 

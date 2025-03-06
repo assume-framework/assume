@@ -55,6 +55,7 @@ class TD3(RLAlgorithm):
             actor_architecture,
         )
         self.n_updates = 0
+        self.grad_clip_norm = 1.0
 
     def save_params(self, directory):
         """
@@ -538,7 +539,9 @@ class TD3(RLAlgorithm):
                 max_grad_norm = max(p.grad.norm() for p in parameters)
 
                 # Perform clipping
-                total_norm = th.nn.utils.clip_grad_norm_(parameters, max_norm=1.0)
+                total_norm = th.nn.utils.clip_grad_norm_(
+                    parameters, max_norm=self.grad_clip_norm
+                )
                 strategy.critics.optimizer.step()
 
                 # Store clipping statistics
@@ -604,7 +607,7 @@ class TD3(RLAlgorithm):
                 # Clip and step each actor optimizer
                 for strategy in selected_strategies:
                     th.nn.utils.clip_grad_norm_(
-                        strategy.actor.parameters(), max_norm=1.0
+                        strategy.actor.parameters(), max_norm=self.grad_clip_norm
                     )
                     strategy.actor.optimizer.step()
 
