@@ -6,14 +6,14 @@
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import parse_duration
-from assume.strategies.flexable import (
+from assume.strategies.standard_powerplant import (
+    EOMPowerplant,
     calculate_EOM_price_if_off,
     calculate_EOM_price_if_on,
-    flexableEOM,
 )
 
 
-class flexableEOMBlock(flexableEOM):
+class EOMBlockPowerplant(EOMPowerplant):
     """
     A strategy that bids on the EOM-market with block bids.
 
@@ -188,7 +188,7 @@ class flexableEOMBlock(flexableEOM):
         return bids
 
 
-class flexableEOMLinked(flexableEOM):
+class EOMLinkedPowerplant(EOMPowerplant):
     """
     A strategy that bids on the EOM-market with block and linked bids.
     """

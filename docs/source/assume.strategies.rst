@@ -2,19 +2,11 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-Bidding strategies
+Bidding Strategies
 ===================
 
 Submodules
 ----------
-
-assume.strategies.advanced\_orders module
------------------------------------------
-
-.. automodule:: assume.strategies.advanced_orders
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 assume.strategies.dmas\_powerplant module
 -----------------------------------------
@@ -40,22 +32,6 @@ assume.strategies.extended module
    :undoc-members:
    :show-inheritance:
 
-assume.strategies.flexable module
----------------------------------
-
-.. automodule:: assume.strategies.flexable
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-assume.strategies.flexable\_storage module
-------------------------------------------
-
-.. automodule:: assume.strategies.flexable_storage
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 assume.strategies.learning\_advanced\_orders module
 ---------------------------------------------------
 
@@ -76,6 +52,38 @@ assume.strategies.naive\_strategies module
 ------------------------------------------
 
 .. automodule:: assume.strategies.naive_strategies
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.strategies.manual\_strategies module
+------------------------------------------
+
+.. automodule:: assume.strategies.manual_strategies
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.strategies.standard\_advanced\_orders module
+---------------------------------
+
+.. automodule:: assume.strategies.standard_advanced_orders
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.strategies.standard\_powerplant module
+---------------------------------
+
+.. automodule:: assume.strategies.standard_powerplant
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.strategies.standard\_storage module
+---------------------------------
+
+.. automodule:: assume.strategies.standard_storage
    :members:
    :undoc-members:
    :show-inheritance:

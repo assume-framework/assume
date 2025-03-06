@@ -132,7 +132,7 @@ def init(world: World):
             "min_power": 200,
             "max_power": 1000,
             "bidding_strategies": {
-                "EOM": "naive_eom",
+                "EOM": "naive_eom_powerplant",
                 "Support": "support",
                 "SupportEnergy": "support",
             },

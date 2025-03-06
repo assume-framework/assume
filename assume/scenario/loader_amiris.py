@@ -149,9 +149,9 @@ def add_agent_to_world(
         base_path (str): base path to load profile csv files from
         markups (dict, optional): markups read from former agents. Defaults to {}.
     """
-    strategies = {m: "flexable_eom" for m in list(world.markets.keys())}
-    storage_strategies = {m: "flexable_eom_storage" for m in list(world.markets.keys())}
-    demand_strategies = {m: "naive_eom" for m in list(world.markets.keys())}
+    strategies = {m: "eom_powerplant" for m in list(world.markets.keys())}
+    storage_strategies = {m: "eom_storage" for m in list(world.markets.keys())}
+    demand_strategies = {m: "naive_eom_demand" for m in list(world.markets.keys())}
     match agent["Type"]:
         case "SupportPolicy":
             support_data = agent["Attributes"]["SetSupportData"]

@@ -12,7 +12,7 @@ This can be done to test a specific behavior, challenge yourself or create a gam
 Single Manual Terminal Client
 -----------------------------
 
-You can test this by opening the `example_01a/powerplant_units.csv` and change the bidding_strategy of a single powerplant from `naive_eom` to `manual_strategy`.
+You can test this by opening the `example_01a/powerplant_units.csv` and change the bidding_strategy of a single powerplant from `naive_eom_powerplant` to `manual_strategy`.
 
 Now run `assume -c tiny` in your terminal to have a small local simulation with assume, which prompts you for the bids of this single agent.
 
@@ -21,7 +21,7 @@ Distributed Game
 
 As shown in :doc:`distributed_simulation` - one can also run a distributed simulation where each participant manages a single unit operator and is asked for the bids of a unit.
 
-To now use the manual strategy in a distributed simulation, you can edit the `world_agent.py` and replace `naive_eom` with `manual_strategy`.
+To now use the manual strategy in a distributed simulation, you can edit the `world_agent.py` and replace `naive_eom_powerplant` with `manual_strategy`.
 Then you can first start a terminal for the agent:
 
     python -m distributed_simulation.world_agent

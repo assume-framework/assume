@@ -41,7 +41,7 @@ async def create_worker(
         {
             "min_power": 0,
             "max_power": 1000,
-            "bidding_strategies": {market_config.market_id: "naive_eom"},
+            "bidding_strategies": {market_config.market_id: "naive_eom_demand"},
             "technology": "demand",
         },
         NaiveForecast(index, demand=1000),

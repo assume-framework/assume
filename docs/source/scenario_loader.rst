@@ -55,7 +55,7 @@ The AMIRIS loader can be used to run examples configured for usage with the ener
     # Create a simulation world
     world = World(database_uri=db_uri)
 
-    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+    default_strategy = {mc.market_id: "naive_eom_powerplant" for mc in marketdesign}
 
     bidding_strategies = {
         "hard coal": default_strategy,
@@ -126,7 +126,7 @@ An example configuration of how this can be used is shown here:
         )
     ]
 
-    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+    default_strategy = {mc.market_id: "naive_eom_powerplant" for mc in marketdesign}
 
     bidding_strategies = {
         "hard coal": default_strategy,
