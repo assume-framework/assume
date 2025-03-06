@@ -41,11 +41,11 @@ Naive
  ================================================= ================================================ =============================================================
   Bidding Strategy Type                             Bidding Strategy ID                              Description
  ================================================= ================================================ =============================================================
-  Naive Energy Only Market Power Plant Bid          naive_eom_powerplant                             This bid is the generic formulation of a bid in a merit order
+  Naive Energy-Only Market Power Plant Bid          naive_eom_powerplant                             This bid is the generic formulation of a bid in a merit order
                                                                                                      market configuration at any one timepoint (hour) for the EOM,
                                                                                                      where it uses marginal cost for its bid price, and max. power
                                                                                                      output (given ramping constraints) as its volume.
-  Naive Energy Only Market Demand Bid               naive_eom_demand                                 The demand bid uses the same strategy as :code:`naive_eom_powerplant`, it is
+  Naive Energy-Only Market Demand Bid               naive_eom_demand                                 The demand bid uses the same strategy as :code:`naive_eom_powerplant`, it is
                                                                                                      realised as a price-inelastic demand bid by setting
                                                                                                      the bid price very high, and the volume is negative as it is consuming rather than producing power.
   Naive Day-Ahead Market Bid                        naive_eom_block_powerplant                       Similar to :code:`naive_eom_powerplant`, however it is a block bid for 24 hours to
@@ -79,24 +79,24 @@ Standard
  ================================================= ========================== =============================================================
   Bidding Strategy Type                             Bidding Strategy ID        Description
  ================================================= ========================== =============================================================
-  Energy Only Market Power Plant Bid                eom_powerplant             A more refined approach to bidding on the EOM compared to :code:`naive_eom_powerplant`.
+  Energy-Only Market Power Plant Bid                eom_powerplant             A more refined approach to bidding on the EOM compared to :code:`naive_eom_powerplant`.
                                                                                A unit submits both inflexible and flexible bids per hour.
                                                                                The inflexible bid represents the minimum power output, priced at marginal cost plus startup costs,
                                                                                while the flexible bid covers additional power up to the maximum capacity at marginal cost.
                                                                                It incorporates price forecasting and accounts for ramping constraints, operational history,
                                                                                and power loss due to heat production.
-  Energy Only Market Power Plant Block Bid          eom_block_powerplant       Formulated similarly to :code:`eom_powerplant`, however it is a block bid for multiple hours.
+  Energy-Only Market Power Plant Block Bid          eom_block_powerplant       Formulated similarly to :code:`eom_powerplant`, however it is a block bid for multiple hours.
                                                                                A minimum acceptance ratio (MAR) defines how to handle the possibility of rejected bids
                                                                                within individual hours of the block.
                                                                                It set to 1, meaning that all bids within the block must be accepted otherwise the whole block bid is rejected.
                                                                                See the (`Advanced Orders tutorial <https://assume.readthedocs.io/en/latest/examples/06_advanced_orders_example.html#1.-Basics>`_)
                                                                                for a more detailed description.
-  Energy Only Market Linked Bid                     eom_linked_powerplant      Similar to :code:`eom_block_powerplant`, however the MAR for children (flexible) bids can be less than that of the parent (inflexible) bids.
+  Energy-Only Market Linked Bid                     eom_linked_powerplant      Similar to :code:`eom_block_powerplant`, however the MAR for children (flexible) bids can be less than that of the parent (inflexible) bids.
   Negative Control Reserve Market Bid               ncrm_powerplant            A bid on the negative Capacity or Energy CRM, volume is determined by calculating how much it can reduce power. The capacity price is
                                                                                found by comparing the revenue it could receive if it bid this volume on the EOM, the energy price is the negative of marginal cost.
   Positive Control Reserve Market Bid               pcrm_powerplant            A bid on the positive Capacity or Energy CRM, volume is determined by calculating how much it can increase power. The capacity price is
                                                                                found by comparing the revenue it could receive if it bid this volume on the EOM, the energy price is the marginal cost.
-  Energy Only Market Storage Bid                    eom_storage                Determines strategy of Storage unit bidding on the EOM. The unit acts as generator or load based on average price forecast.
+  Energy-Only Market Storage Bid                    eom_storage                Determines strategy of Storage unit bidding on the EOM. The unit acts as generator or load based on average price forecast.
                                                                                If the current price forecast is greater than the average price, the Storage unit will bid to discharge at a price
                                                                                equal to the average price divided by the discharge efficiency. Otherwise, it will bid to charge at the average price
                                                                                multiplied by the charge efficiency. Calculates ramping constraints for charging and discharging based on theoretical state of charge (SOC),
@@ -150,7 +150,7 @@ Learning
 Learning method descriptions:
 
 - :meth:`assume.strategies.learning_strategies.RLStrategy`
-- :meth:`assume.strategies.learning_advanced_orders.StorageRLStrategy`
+- :meth:`assume.strategies.learning_strategies.StorageRLStrategy`
 
 Other
 -------------
