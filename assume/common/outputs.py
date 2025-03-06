@@ -47,7 +47,7 @@ class WriteOutput(Role):
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
         save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
-        perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
+        evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
         max_dfs_size_mb (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
     """
@@ -61,7 +61,9 @@ class WriteOutput(Role):
         export_csv_path: str = "",
         save_frequency_hours: int = None,
         learning_mode: bool = False,
-        perform_evaluation: bool = False,
+        evaluation_mode: bool = False,
+        episode: int = None,
+        eval_episode: int = None,
         additional_kpis: dict[str, OutputDef] = {},
         max_dfs_size_mb: int = 300,
     ):
@@ -84,14 +86,11 @@ class WriteOutput(Role):
         self.db_uri = db_uri
 
         self.learning_mode = learning_mode
-        self.perform_evaluation = perform_evaluation
+        self.evaluation_mode = evaluation_mode
 
         # get episode number if in learning or evaluation mode
-        self.episode = None
-        if self.learning_mode or self.perform_evaluation:
-            episode = self.simulation_id.split("_")[-1]
-            if episode.isdigit():
-                self.episode = int(episode)
+        self.episode = episode
+        self.eval_episode = eval_episode
 
         # construct all timeframe under which hourly values are written to excel and db
         self.start = start
@@ -138,8 +137,13 @@ class WriteOutput(Role):
         table_names = inspect(self.db).get_table_names()
         # Iterate through each table
         for table_name in table_names:
-            # ignore postgis table
-            if "spatial_ref_sys" == table_name:
+            # ignore spatial_ref_sys table
+            if table_name == "spatial_ref_sys":
+                continue
+            # only delete rl_params during the first episode of learning
+            if table_name == "rl_params" and not (
+                self.learning_mode and self.episode == 1
+            ):
                 continue
             try:
                 with self.db.begin() as db:
@@ -161,26 +165,6 @@ class WriteOutput(Role):
                     f"could not clear old scenarios from table {table_name} - {e}"
                 )
 
-    def delete_similar_runs(self):
-        """
-        Deletes all similar runs from the database based on the simulation ID. This ensures that we overwrite simulations results when restarting one. Please note that a simulation which you also want to keep need to be assigned anew ID.
-        """
-        if self.db_uri is None:
-            return
-        query = text("select distinct simulation from rl_params")
-
-        try:
-            with self.db.begin() as db:
-                simulations = db.execute(query).fetchall()
-        except Exception:
-            simulations = []
-        simulations = [s[0] for s in simulations]
-
-        for simulation_id in simulations:
-            # delete all simulation_id which are similar to my simulation_id
-            if simulation_id.startswith(self.simulation_id[:-1]):
-                self.delete_db_scenario(simulation_id)
-
     def setup(self):
         """
         Sets up the WriteOutput instance by subscribing to messages and scheduling recurrent tasks of storing the data.
@@ -198,10 +182,6 @@ class WriteOutput(Role):
             self.db = create_engine(self.db_uri)
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
-
-            # check if episode equals 1 and delete all similar runs
-            if self.episode == 1:
-                self.delete_similar_runs()
 
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
@@ -270,9 +250,8 @@ class WriteOutput(Role):
 
         df = pd.DataFrame.from_records(rl_params, index="datetime")
         df["simulation"] = self.simulation_id
-        df["learning_mode"] = self.learning_mode
-        df["perform_evaluation"] = self.perform_evaluation
-        df["episode"] = self.episode
+        df["evaluation_mode"] = self.evaluation_mode
+        df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
         # Add missing rl_critic_params columns in case of initial_exploration
         required_columns = [
             "critic_loss",
@@ -708,7 +687,7 @@ class WriteOutput(Role):
             with self.db.begin() as db:
                 df.to_sql("kpis", db, if_exists="append", index=None)
 
-    def get_sum_reward(self):
+    def get_sum_reward(self, episode: int, evaluation_mode=True):
         """
         Retrieves the total reward for each learning unit.
 
@@ -716,7 +695,11 @@ class WriteOutput(Role):
             np.array: The total reward for each learning unit.
         """
         query = text(
-            f"select unit, SUM(reward) FROM rl_params where simulation='{self.simulation_id}' GROUP BY unit"
+            f"SELECT unit, SUM(reward) FROM rl_params "
+            f"WHERE simulation='{self.simulation_id}' "
+            f"AND evaluation_mode={evaluation_mode} "
+            f"AND episode={episode} "
+            f"GROUP BY unit"
         )
         if self.db is None:
             return []

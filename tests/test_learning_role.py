@@ -33,7 +33,7 @@ def test_learning_init():
         "algorithm": "matd3",
         "actor_architecture": "mlp",
         "learning_mode": False,
-        "perform_evaluation": False,
+        "evaluation_mode": False,
         "training_episodes": 3,
         "episodes_collecting_initial_experience": 1,
         "continue_learning": False,

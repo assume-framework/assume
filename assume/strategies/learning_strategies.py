@@ -157,7 +157,7 @@ class RLStrategy(AbstractLearningStrategy):
 
         # tells us whether we are training the agents or just executing per-learning strategies
         self.learning_mode = kwargs.get("learning_mode", False)
-        self.perform_evaluation = kwargs.get("perform_evaluation", False)
+        self.evaluation_mode = kwargs.get("evaluation_mode", False)
 
         # based on learning config
         self.algorithm = kwargs.get("algorithm", "matd3")
@@ -192,7 +192,7 @@ class RLStrategy(AbstractLearningStrategy):
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
-        if self.learning_mode or self.perform_evaluation:
+        if self.learning_mode or self.evaluation_mode:
             self.collect_initial_experience_mode = bool(
                 kwargs.get("episodes_collecting_initial_experience", True)
             )
@@ -339,7 +339,7 @@ class RLStrategy(AbstractLearningStrategy):
         """
 
         # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.perform_evaluation:
+        if self.learning_mode and not self.evaluation_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
@@ -701,7 +701,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
         # tells us whether we are training the agents or just executing per-learnind strategies
         self.learning_mode = kwargs.get("learning_mode", False)
-        self.perform_evaluation = kwargs.get("perform_evaluation", False)
+        self.evaluation_mode = kwargs.get("evaluation_mode", False)
 
         # based on learning config
         self.algorithm = kwargs.get("algorithm", "matd3")
@@ -736,7 +736,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
-        if self.learning_mode or self.perform_evaluation:
+        if self.learning_mode or self.evaluation_mode:
             self.collect_initial_experience_mode = bool(
                 kwargs.get("episodes_collecting_initial_experience", True)
             )
@@ -889,7 +889,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         """
 
         # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.perform_evaluation:
+        if self.learning_mode and not self.evaluation_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
