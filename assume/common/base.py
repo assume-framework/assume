@@ -551,7 +551,7 @@ class SupportsMinMaxCharge(BaseUnit):
     efficiency_discharge: float
 
     def calculate_min_max_charge(
-        self, start: datetime, end: datetime, product_type="energy"
+        self, start: datetime, end: datetime, soc: float = None
     ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max charging power for the given time period.
