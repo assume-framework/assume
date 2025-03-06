@@ -9,7 +9,7 @@ import pytest
 
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
-    from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
+    from assume.strategies.learning_advanced_orders import LearningProfileEOMPowerplant
 except ImportError:
     pass
 
@@ -42,7 +42,7 @@ def power_plant() -> PowerPlant:
         min_power=200,
         efficiency=0.5,
         additional_cost=10,
-        bidding_strategies={"EOM": RLAdvancedOrderStrategy(**learning_config)},
+        bidding_strategies={"EOM": LearningProfileEOMPowerplant(**learning_config)},
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,

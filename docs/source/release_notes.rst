@@ -126,7 +126,7 @@ v0.4.2 - (5th November 2024)
 - **Residential Components**: Added new residential DST components including PV, EV, Heat Pump, and Boiler, now with enhanced docstrings for better usability.
 - **Modular DST Components**: DST components have been converted from functions to classes, improving modularity and reusability.
 - **Generic Storage Class**: Introduced a `GenericStorage` class for storage components. Specific classes, such as EV and Hydrogen Storage, now inherit from it.
-- **Storage Learning Strategy**: Added a new DRL-based learning strategy for storage units. To use it, set `storage_learning` in the `bidding_EOM` column of `storage_units.csv`. Refer to the `StorageRLStrategy` documentation for more details.
+- **Storage Learning Strategy**: Added a new DRL-based learning strategy for storage units. To use it, set `storage_learning` in the `bidding_EOM` column of `storage_units.csv`. Refer to the `LearningEOMStorage` documentation for more details.
 - **Mango 2.x Update**: Upgraded to mango 2.x, enabling synchronous world creation. To upgrade an existing environment, run:
   ```
   pip uninstall -y mango-agents mango-agents-assume && pip install assume-framework --upgrade

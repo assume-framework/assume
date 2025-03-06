@@ -151,7 +151,7 @@ def add_agent_to_world(
     """
     strategies = {m: "eom_powerplant" for m in list(world.markets.keys())}
     storage_strategies = {m: "eom_storage" for m in list(world.markets.keys())}
-    demand_strategies = {m: "naive_eom_demand" for m in list(world.markets.keys())}
+    demand_strategies = {m: "naive" for m in list(world.markets.keys())}
     match agent["Type"]:
         case "SupportPolicy":
             support_data = agent["Attributes"]["SetSupportData"]

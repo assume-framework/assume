@@ -75,7 +75,7 @@ class AbstractLearningStrategy(LearningStrategy):
         )
 
 
-class RLStrategy(AbstractLearningStrategy):
+class LearningEOMPowerplant(AbstractLearningStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -626,7 +626,7 @@ class RLStrategy(AbstractLearningStrategy):
         unit.outputs["rl_rewards"].append(reward)
 
 
-class StorageRLStrategy(AbstractLearningStrategy):
+class LearningEOMStorage(AbstractLearningStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.

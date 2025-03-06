@@ -41,20 +41,20 @@ Naive
  ================================================= ================================================ =============================================================
   Bidding Strategy Type                             Bidding Strategy ID                              Description
  ================================================= ================================================ =============================================================
-  Naive Energy-Only Market Power Plant Bid          naive_eom_powerplant                             This bid is the generic formulation of a bid in a merit order
+  Naive Energy-Only Market Power Plant Bid          naive                             This bid is the generic formulation of a bid in a merit order
                                                                                                      market configuration at any one timepoint (hour) for the EOM,
                                                                                                      where it uses marginal cost for its bid price, and max. power
                                                                                                      output (given ramping constraints) as its volume.
-  Naive Energy-Only Market Demand Bid               naive_eom_demand                                 The demand bid uses the same strategy as :code:`naive_eom_powerplant`, it is
+  Naive Energy-Only Market Demand Bid               naive                                 The demand bid uses the same strategy as :code:`naive`, it is
                                                                                                      realised as a price-inelastic demand bid by setting
                                                                                                      the bid price very high, and the volume is negative as it is consuming rather than producing power.
-  Naive Day-Ahead Market Bid                        naive_eom_block_powerplant                       Similar to :code:`naive_eom_powerplant`, however it is a block bid for 24 hours to
+  Naive Day-Ahead Market Bid                        naive_eom_block_powerplant                       Similar to :code:`naive`, however it is a block bid for 24 hours to
                                                                                                      simulate a bid for the Day-Ahead market.
-  Naive Positive Control Reserve Market Bid         naive_pcrm                                       This bid uses the same strategy as :code:`naive_eom_powerplant`,
+  Naive Positive Control Reserve Market Bid         naive_pcrm                                       This bid uses the same strategy as :code:`naive`,
                                                                                                      however the bid is placed in the positive CRM.
-  Naive Negative Control Reserve Market Bid         naive_ncrm                                       This bid uses the same strategy as :code:`naive_eom_powerplant`,
+  Naive Negative Control Reserve Market Bid         naive_ncrm                                       This bid uses the same strategy as :code:`naive`,
                                                                                                      however the bid is placed in the negative CRM.
-  Naive Redispatch Market Bid                       naive_redispatch                                 This bid uses the same strategy as :code:`naive_eom_powerplant`,
+  Naive Redispatch Market Bid                       naive_redispatch                                 This bid uses the same strategy as :code:`naive`,
                                                                                                      however the bid is placed in the Redispatch market.
   Naive Day-Ahead DSM Market Bid                    naive_eom_block_dsm                              Demand Side Management (DSM) unit bid, for 24-hour period on the EOM,
                                                                                                      where the bid volume is the unit's optimal power requirement
@@ -79,7 +79,7 @@ Standard
  ================================================= ========================== =============================================================
   Bidding Strategy Type                             Bidding Strategy ID        Description
  ================================================= ========================== =============================================================
-  Energy-Only Market Power Plant Bid                eom_powerplant             A more refined approach to bidding on the EOM compared to :code:`naive_eom_powerplant`.
+  Energy-Only Market Power Plant Bid                eom_powerplant             A more refined approach to bidding on the EOM compared to :code:`naive`.
                                                                                A unit submits both inflexible and flexible bids per hour.
                                                                                The inflexible bid represents the minimum power output, priced at marginal cost plus startup costs,
                                                                                while the flexible bid covers additional power up to the maximum capacity at marginal cost.
@@ -107,14 +107,14 @@ Standard
 
 Standard method descriptions:
 
-- :meth:`assume.strategies.standard_powerplant.EOMPowerplant`
+- :meth:`assume.strategies.standard_powerplant.StandardEOMPowerplant`
 - :meth:`assume.strategies.standard_advanced_orders.EOMBlockPowerplant`
-- :meth:`assume.strategies.standard_advanced_orders.EOMLinkedPowerplant`
-- :meth:`assume.strategies.standard_powerplant.NCRMPowerplant`
-- :meth:`assume.strategies.standard_powerplant.PCRMPowerplant`
-- :meth:`assume.strategies.standard_storage.EOMStorage`
-- :meth:`assume.strategies.standard_storage.NCRMStorage`
-- :meth:`assume.strategies.standard_storage.PCRMStorage`
+- :meth:`assume.strategies.standard_advanced_orders.StandardProfileEOMPowerplant`
+- :meth:`assume.strategies.standard_powerplant.StandardNCRMPowerplant`
+- :meth:`assume.strategies.standard_powerplant.StandardPCRMPowerplant`
+- :meth:`assume.strategies.standard_storage.StandardEOMStorage`
+- :meth:`assume.strategies.standard_storage.StandardNCRMStorage`
+- :meth:`assume.strategies.standard_storage.StandardPCRMStorage`
 
 DMAS
 -------------
@@ -137,20 +137,20 @@ Learning
  ================================================= ========================== =============================================================
   Bidding Strategy Type                             Bidding Strategy ID        Description
  ================================================= ========================== =============================================================
-  Reinforcement Learning Powerplant Bid             learning_powerplant        A reinforcement learning (RL) approach designed to optimize bidding strategies for an Energy-Only Market. The agent's actions are
+  Reinforcement Learning Powerplant Bid             learning_eom_powerplant        A reinforcement learning (RL) approach designed to optimize bidding strategies for an Energy-Only Market. The agent's actions are
                                                                                two bid prices: one for the inflexible component (P_min) and another for the flexible component (P_max - P_min) of a unit's capacity.
                                                                                The bids are informed by 50 observations, which include forecasted residual load, forecasted price, total capacity, and marginal cost,
                                                                                all contributing to decision-making. Noise can be added to the action to encourage exploration and novelty.
 
                                                                                The reward system includes profits from accepted bids, operational costs, opportunity costs (penalizing underutilized capacity),
                                                                                and a regret term to minimize missed revenue opportunities. This approach encourages full utilization of the unit's capacity.
-  Reinforcement Learning Storage Bid                learning_storage           Similar to `learning_powerplant`, taking into account parameters of a Storage unit such as State-of-Charge (SOC).
+  Reinforcement Learning Storage Bid                learning_eom_storage           Similar to `learning_eom_powerplant`, taking into account parameters of a Storage unit such as State-of-Charge (SOC).
  ================================================= ========================== =============================================================
 
 Learning method descriptions:
 
-- :meth:`assume.strategies.learning_strategies.RLStrategy`
-- :meth:`assume.strategies.learning_strategies.StorageRLStrategy`
+- :meth:`assume.strategies.learning_strategies.LearningEOMPowerplant`
+- :meth:`assume.strategies.learning_strategies.LearningEOMStorage`
 
 Other
 -------------
@@ -164,8 +164,8 @@ Other
                                                                              (with bidding price close to maximum to virtually guarantee acceptance) on the market.
                                                                              Import bids have positive volumes and are treated as supply
                                                                              (with bidding price close to minimum to virtually guarantee acceptance) on the market.
-  Over the Counter Market Bid                       otc_strategy             Similar to `naive_eom_powerplant`, however it is bid on the OTC market, representing bilateral trades.
-  Manual Bid                                        manual_strategy          The bidding volume and price is manually entered.
+  Over the Counter Market Bid                       misc_otc             Similar to `naive`, however it is bid on the OTC market, representing bilateral trades.
+  Manual Bid                                        misc_manual          The bidding volume and price is manually entered.
  ================================================= ======================== =============================================================
 
 Other method descriptions:

@@ -14,7 +14,7 @@ try:
     import torch as th
 
     from assume.reinforcement_learning.learning_role import LearningConfig
-    from assume.strategies.learning_strategies import StorageRLStrategy
+    from assume.strategies.learning_strategies import LearningEOMStorage
 except ImportError:
     th = None
 
@@ -28,7 +28,7 @@ def storage_unit() -> Storage:
     """
     Fixture to create a Storage unit instance with example parameters.
     """
-    # Define the learning configuration for the StorageRLStrategy
+    # Define the learning configuration for the LearningEOMStorage
     learning_config: LearningConfig = {
         "observation_dimension": 50,
         "action_dimension": 2,
@@ -46,7 +46,7 @@ def storage_unit() -> Storage:
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
-        bidding_strategies={"EOM": StorageRLStrategy(**learning_config)},
+        bidding_strategies={"EOM": LearningEOMStorage(**learning_config)},
         max_power_charge=500,  # Negative for charging
         max_power_discharge=500,
         max_soc=1000,
@@ -74,7 +74,7 @@ def mock_market_config():
 @pytest.mark.require_learning
 def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
     """
-    Test the StorageRLStrategy for a 'sell' bid action.
+    Test the LearningEOMStorage for a 'sell' bid action.
     """
 
     # Define the product index and tuples
@@ -92,7 +92,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
     # Mock the get_actions method to return the sell action
     with patch.object(
-        StorageRLStrategy,
+        LearningEOMStorage,
         "get_actions",
         return_value=(th.tensor(sell_action), th.tensor(0.0)),
     ):
@@ -170,7 +170,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 @pytest.mark.require_learning
 def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
     """
-    Test the StorageRLStrategy for a 'buy' bid action.
+    Test the LearningEOMStorage for a 'buy' bid action.
     """
     # Define the product index and tuples
     product_index = pd.date_range("2023-07-01", periods=1, freq="h")
@@ -179,7 +179,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
 
-    # Instantiate the StorageRLStrategy
+    # Instantiate the LearningEOMStorage
     strategy = storage_unit.bidding_strategies["EOM"]
 
     # Define the 'buy' action: [0.3, -0.5] -> price=30, direction='buy'
@@ -187,7 +187,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
     # Mock the get_actions method to return the buy action
     with patch.object(
-        StorageRLStrategy,
+        LearningEOMStorage,
         "get_actions",
         return_value=(th.tensor(buy_action), th.tensor(0.0)),
     ):
@@ -262,7 +262,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 @pytest.mark.require_learning
 def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
     """
-    Test the StorageRLStrategy for an 'ignore' bid action.
+    Test the LearningEOMStorage for an 'ignore' bid action.
     """
 
     # Define the product index and tuples
@@ -272,7 +272,7 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
 
-    # Instantiate the StorageRLStrategy
+    # Instantiate the LearningEOMStorage
     strategy = storage_unit.bidding_strategies["EOM"]
 
     # Define the 'ignore' action: [0.0, 0.0] -> price=0, direction='ignore'
@@ -280,7 +280,7 @@ def test_storage_rl_strategy_ignore_bid(mock_market_config, storage_unit):
 
     # Mock the get_actions method to return the ignore action
     with patch.object(
-        StorageRLStrategy,
+        LearningEOMStorage,
         "get_actions",
         return_value=(th.tensor(ignore_action), th.tensor(0.0)),
     ):

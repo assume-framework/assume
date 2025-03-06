@@ -396,10 +396,8 @@ if __name__ == "__main__":
         )
     ]
 
-    default_strategy = {mc.market_id: "naive_eom_powerplant" for mc in marketdesign}
-    default_naive_strategy = {
-        mc.market_id: "naive_eom_powerplant" for mc in marketdesign
-    }
+    default_strategy = {mc.market_id: "naive" for mc in marketdesign}
+    default_naive_strategy = {mc.market_id: "naive" for mc in marketdesign}
 
     bidding_strategies = {
         "hard coal": default_strategy,

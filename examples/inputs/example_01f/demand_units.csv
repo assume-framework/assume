@@ -1,2 +1,2 @@
 name,technology,bidding_EOM,bidding_LTM_OTC,max_power,min_power,unit_operator
-demand_EOM,inflex_demand,naive_eom_demand,otc_strategy,1000000.0,0.0,eom_de
+demand_EOM,inflex_demand,naive,misc_otc,1000000.0,0.0,eom_de
