@@ -693,7 +693,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=38, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=74, act_dim=1, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
         # defines bounds of actions space
@@ -731,7 +731,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # neural network architecture is predefined, and the size of the observations must remain consistent.
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
-        self.foresight = 12
+        self.foresight = 24
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -804,17 +804,15 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # 3. Transform Actions into bids
         # =============================================================================
         # the first action is the bid price
-        bid_price = actions[0] * self.max_bid_price
+        bid_price = abs(actions[0]) * self.max_bid_price
 
         # the second action is the bid direction
         # the interval [-0.1, 0.1] for the 'ignore' action is based on the learning
         # process observation and should be adjusted in the future to improve performance
-        if actions[1] <= -0.1:
+        if actions[0] <= 0:
             bid_direction = "buy"
-        elif actions[1] >= 0.1:
+        elif actions[0] > 0:
             bid_direction = "sell"
-        else:
-            bid_direction = "ignore"
 
         _, max_discharge = unit.calculate_min_max_discharge(start, end_all)
         _, max_charge = unit.calculate_min_max_charge(start, end_all)
@@ -846,18 +844,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
                     "end_time": end_all,
                     "only_hours": None,
                     "price": bid_price,
-                    "volume": bid_quantity_demand + 1e-6,  # negative value for demand
-                    "node": unit.node,
-                }
-            )
-        elif bid_direction == "ignore":
-            bids.append(
-                {
-                    "start_time": start,
-                    "end_time": end_all,
-                    "only_hours": None,
-                    "price": 0,
-                    "volume": 1e-6,  # negative value for demand
+                    "volume": bid_quantity_demand - 1e-6,  # negative value for demand
                     "node": unit.node,
                 }
             )
@@ -950,7 +937,9 @@ class StorageRLStrategy(AbstractLearningStrategy):
         Rewards are based on profit and include fixed costs for charging and discharging.
         """
 
-        scaling_factor = 0.1 / unit.max_power_discharge
+        # scaling_factor = 0.1 / unit.max_power_discharge
+
+        scaling_factor = 1 / (self.max_bid_price * unit.max_power_discharge)
 
         product_type = marketconfig.product_type
         reward = 0
@@ -990,7 +979,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 unit.outputs["energy_cost"].at[next_time] = np.clip(
                     (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
                     / next_soc,
-                    0,
+                    -self.max_bid_price,
                     self.max_bid_price,
                 )
 

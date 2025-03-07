@@ -127,12 +127,8 @@ class RLUnitsOperator(UnitsOperator):
                 action_dim = action_tuple.numel()
 
                 for i in range(action_dim):
-                    output_dict[f"exploration_noise_{i}"] = (
-                        noise_tuple[i] if action_dim > 1 else noise_tuple
-                    )
-                    output_dict[f"actions_{i}"] = (
-                        action_tuple[i] if action_dim > 1 else action_tuple
-                    )
+                    output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+                    output_dict[f"actions_{i}"] = action_tuple[i]
 
                 output_agent_list.append(output_dict)
 
