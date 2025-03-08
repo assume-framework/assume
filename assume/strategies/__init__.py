@@ -4,18 +4,18 @@
 
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.strategies.standard_advanced_orders import (
-    StandardProfileEOMPowerplant,
+    StandardProfileEOMPowerplantStrategy,
 )
 from assume.strategies.extended import OTCStrategy
 from assume.strategies.standard_powerplant import (
-    StandardEOMPowerplant,
-    StandardNCRMPowerplant,
-    StandardPCRMPowerplant,
+    StandardEOMPowerplantStrategy,
+    StandardNegCRMPowerplantStrategy,
+    StandardPosCRMPowerplantStrategy,
 )
 from assume.strategies.standard_storage import (
-    StandardEOMStorage,
-    StandardNCRMStorage,
-    StandardPCRMStorage,
+    StandardEOMStorageStrategy,
+    StandardNegCRMStorageStrategy,
+    StandardPosCRMStorageStrategy,
 )
 from assume.strategies.naive_strategies import (
     NaiveDADSMStrategy,
@@ -37,13 +37,13 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "naive_exchange": NaiveExchangeStrategy,
     "naive_redispatch": NaiveRedispatchStrategy,
     "naive_redispatch_dsm": NaiveRedispatchDSMStrategy,
-    "standard_eom_powerplant": StandardEOMPowerplant,
-    "standard_profile_eom_powerplant": StandardProfileEOMPowerplant,
-    "standard_pcrm_powerplant": StandardPCRMPowerplant,
-    "standard_ncrm_powerplant": StandardNCRMPowerplant,
-    "standard_eom_storage": StandardEOMStorage,
-    "standard_pcrm_storage": StandardPCRMStorage,
-    "standard_ncrm_storage": StandardNCRMStorage,
+    "standard_eom_powerplant": StandardEOMPowerplantStrategy,
+    "standard_profile_eom_powerplant": StandardProfileEOMPowerplantStrategy,
+    "standard_pos_crm_powerplant": StandardPosCRMPowerplantStrategy,
+    "standard_neg_crm_powerplant": StandardNegCRMPowerplantStrategy,
+    "standard_eom_storage": StandardEOMStorageStrategy,
+    "standard_pos_crm_storage": StandardPosCRMStorageStrategy,
+    "standard_neg_crm_storage": StandardNegCRMStorageStrategy,
     "dmas_powerplant": DmasPowerplantStrategy,
     "dmas_storage": DmasStorageStrategy,
     "misc_otc": OTCStrategy,
@@ -52,16 +52,18 @@ bidding_strategies: dict[str, BaseStrategy] = {
 
 try:
     from assume.strategies.learning_advanced_orders import (
-        LearningProfileEOMPowerplant,
+        LearningProfileEOMPowerplantStrategy,
     )
     from assume.strategies.learning_strategies import (
-        LearningEOMPowerplant,
-        LearningEOMStorage,
+        LearningEOMPowerplantStrategy,
+        LearningEOMStorageStrategy,
     )
 
-    bidding_strategies["learning_eom_powerplant"] = LearningEOMPowerplant
-    bidding_strategies["learning_eom_storage"] = LearningEOMStorage
-    bidding_strategies["learning_profile_eom_powerplant"] = LearningProfileEOMPowerplant
+    bidding_strategies["learning_eom_powerplant"] = LearningEOMPowerplantStrategy
+    bidding_strategies["learning_eom_storage"] = LearningEOMStorageStrategy
+    bidding_strategies["learning_profile_eom_powerplant"] = (
+        LearningProfileEOMPowerplantStrategy
+    )
 
 except ImportError:
     pass

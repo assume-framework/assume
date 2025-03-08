@@ -10,7 +10,7 @@ import pytest
 
 from assume.common.forecasts import NaiveForecast
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
-from assume.strategies.standard_storage import StandardEOMStorage
+from assume.strategies.standard_storage import StandardEOMStorageStrategy
 from assume.units import Storage
 
 
@@ -322,7 +322,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
 
     mc = mock_market_config
 
-    strategy = StandardEOMStorage()
+    strategy = StandardEOMStorageStrategy()
     product_tuples = [(start, end, None)]
 
     storage_unit.outputs["energy"][start] = 100

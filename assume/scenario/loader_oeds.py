@@ -410,7 +410,7 @@ if __name__ == "__main__":
         "wind": default_naive_strategy,
         "solar": default_naive_strategy,
         "demand": default_naive_strategy,
-        "storage": {mc.market_id: "eom_storage" for mc in marketdesign},
+        "storage": {mc.market_id: "standard_eom_storage" for mc in marketdesign},
     }
     load_oeds(
         world,

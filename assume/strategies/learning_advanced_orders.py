@@ -10,10 +10,10 @@ import torch as th
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
-from assume.strategies.learning_strategies import LearningEOMPowerplant
+from assume.strategies.learning_strategies import LearningEOMPowerplantStrategy
 
 
-class LearningProfileEOMPowerplant(LearningEOMPowerplant):
+class LearningProfileEOMPowerplantStrategy(LearningEOMPowerplantStrategy):
     """
     Reinforcement Learning Strategy for an Energy-Only-Market with simple hourly, block and linked orders.
 

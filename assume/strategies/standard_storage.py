@@ -11,7 +11,7 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import parse_duration
 
 
-class StandardEOMStorage(BaseStrategy):
+class StandardEOMStorageStrategy(BaseStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.
 
@@ -219,7 +219,7 @@ class StandardEOMStorage(BaseStrategy):
             unit.outputs["total_costs"].loc[start:end_excl] = costs
 
 
-class StandardPCRMStorage(BaseStrategy):
+class StandardPosCRMStorageStrategy(BaseStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.
 
@@ -357,7 +357,7 @@ class StandardPCRMStorage(BaseStrategy):
         return bids
 
 
-class StandardNCRMStorage(BaseStrategy):
+class StandardNegCRMStorageStrategy(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 

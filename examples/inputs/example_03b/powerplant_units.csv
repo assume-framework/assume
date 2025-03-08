@@ -1,9 +1,9 @@
 name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_costs,hot_start_costs,warm_start_costs,cold_start_costs,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator
-Wind Onshore,wind_onshore,eom_powerplant,renewable,0,53190,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
-Wind Offshore,wind_offshore,eom_powerplant,renewable,0,7560,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
-Solar,solar,eom_powerplant,renewable,0,48860,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
-Hydro,hydro,eom_powerplant,renewable,0,4940,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
-Biomass,biomass,eom_powerplant,renewable,0,8340,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
+Wind Onshore,wind_onshore,standard_eom_powerplant,renewable,0,53190,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
+Wind Offshore,wind_offshore,standard_eom_powerplant,renewable,0,7560,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
+Solar,solar,standard_eom_powerplant,renewable,0,48860,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
+Hydro,hydro,standard_eom_powerplant,renewable,0,4940,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
+Biomass,biomass,standard_eom_powerplant,renewable,0,8340,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
 KKW ISAR 2,nuclear,learning_eom_powerplant,uranium,0,1485.0,590.0,0.33,890.0,890.0,10.3,140.0,140.0,140.0,72.0,10.0,no,0.0,RL_operator
 KKW BROKDORF,nuclear,learning_eom_powerplant,uranium,0,1480.0,590.0,0.33,890.0,890.0,10.3,140.0,140.0,140.0,72.0,10.0,no,0.0,RL_operator
 KKW GROHNDE,nuclear,learning_eom_powerplant,uranium,0,1430.0,570.0,0.33,860.0,860.0,10.3,140.0,140.0,140.0,72.0,10.0,no,0.0,RL_operator

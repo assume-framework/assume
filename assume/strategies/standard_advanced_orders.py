@@ -7,13 +7,13 @@ from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import parse_duration
 from assume.strategies.standard_powerplant import (
-    StandardEOMPowerplant,
+    StandardEOMPowerplantStrategy,
     calculate_EOM_price_if_off,
     calculate_EOM_price_if_on,
 )
 
 
-class StandardProfileEOMPowerplant(StandardEOMPowerplant):
+class StandardProfileEOMPowerplantStrategy(StandardEOMPowerplantStrategy):
     """
     A strategy that bids on the EOM-market with block and linked bids.
     """

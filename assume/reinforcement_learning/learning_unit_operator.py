@@ -15,7 +15,7 @@ from assume.common.market_objects import (
 from assume.common.utils import convert_tensors, create_rrule, get_products_index
 from assume.strategies import (
     BaseStrategy,
-    LearningProfileEOMPowerplant,
+    LearningProfileEOMPowerplantStrategy,
     LearningStrategy,
 )
 from assume.units import BaseUnit
@@ -108,7 +108,7 @@ class RLUnitsOperator(UnitsOperator):
                     "unit": unit.id,
                 }
 
-                if isinstance(strategy, LearningProfileEOMPowerplant):
+                if isinstance(strategy, LearningProfileEOMPowerplantStrategy):
                     output_dict.update(
                         {
                             "profit": unit.outputs["profit"].loc[products_index].sum(),

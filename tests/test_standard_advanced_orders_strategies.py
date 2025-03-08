@@ -9,7 +9,7 @@ import pytest
 
 from assume.common.forecasts import NaiveForecast
 from assume.strategies import (
-    StandardProfileEOMPowerplant,
+    StandardProfileEOMPowerplantStrategy,
 )
 from assume.units import PowerPlant
 
@@ -40,7 +40,7 @@ def power_plant() -> PowerPlant:
 def test_eom_with_links(mock_market_config, power_plant):
     power_plant.ramp_up = 400
     product_index = pd.date_range("2023-07-01", periods=24, freq="h")
-    strategy = StandardProfileEOMPowerplant()
+    strategy = StandardProfileEOMPowerplantStrategy()
     mc = mock_market_config
     mc.product_type = "energy_eom"
     product_tuples = [

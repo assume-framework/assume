@@ -11,7 +11,7 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index, parse_duration
 
 
-class StandardEOMPowerplant(BaseStrategy):
+class StandardEOMPowerplantStrategy(BaseStrategy):
     """
     A strategy that bids on the EOM-market.
 
@@ -242,7 +242,7 @@ class StandardEOMPowerplant(BaseStrategy):
         update_avg_op_time(unit, product_type, products_index[0], products_index[-1])
 
 
-class StandardPCRMPowerplant(BaseStrategy):
+class StandardPosCRMPowerplantStrategy(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
 
@@ -357,7 +357,7 @@ class StandardPCRMPowerplant(BaseStrategy):
         return bids
 
 
-class StandardNCRMPowerplant(BaseStrategy):
+class StandardNegCRMPowerplantStrategy(BaseStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 

@@ -163,8 +163,10 @@ async def test_formulate_bids(units_operator: UnitsOperator):
 
 @pytest.mark.require_learning
 async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
-    from assume.strategies.learning_advanced_orders import LearningProfileEOMPowerplant
-    from assume.strategies.learning_strategies import LearningEOMPowerplant
+    from assume.strategies.learning_advanced_orders import (
+        LearningProfileEOMPowerplantStrategy,
+    )
+    from assume.strategies.learning_strategies import LearningEOMPowerplantStrategy
 
     marketconfig = rl_units_operator.available_markets[0]
     start = datetime(2020, 1, 1)
@@ -173,7 +175,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     params_dict = {
         "bidding_strategies": {
-            "EOM": LearningProfileEOMPowerplant(
+            "EOM": LearningProfileEOMPowerplantStrategy(
                 unit_id="testplant",
                 learning_mode=True,
             )
@@ -212,7 +214,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     rl_units_operator.units["testplant"].bidding_strategies[
         "EOM"
-    ].bidding_strategies = LearningEOMPowerplant(
+    ].bidding_strategies = LearningEOMPowerplantStrategy(
         unit_id="testplant",
         learning_mode=True,
         observation_dimension=50,

@@ -11,9 +11,9 @@ import pytest
 
 from assume.common.forecasts import NaiveForecast
 from assume.strategies import (
-    StandardEOMStorage,
-    StandardNCRMStorage,
-    StandardPCRMStorage,
+    StandardEOMStorageStrategy,
+    StandardNegCRMStorageStrategy,
+    StandardPosCRMStorageStrategy,
 )
 from assume.units import Storage
 
@@ -45,11 +45,11 @@ def storage() -> Storage:
     )
 
 
-def test_eom_storage(mock_market_config, storage):
+def test_standard_eom_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 1)
-    strategy = StandardEOMStorage()
+    strategy = StandardEOMStorageStrategy()
     mc = mock_market_config
     product_tuples = [(start, end, None)]
 
@@ -157,11 +157,11 @@ def test_eom_storage(mock_market_config, storage):
     assert bids[20]["volume"] == -60
 
 
-def test_pcrm_storage(mock_market_config, storage):
+def test_standard_pos_crm_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 4, 0, 0)
-    strategy = StandardPCRMStorage()
+    strategy = StandardPosCRMStorageStrategy()
     mc = mock_market_config
     mc.product_type = "energy_pos"
     product_tuples = [(start, end, None)]
@@ -198,11 +198,11 @@ def test_pcrm_storage(mock_market_config, storage):
     assert len(bids) == 1
 
 
-def test_ncrm_storage(mock_market_config, storage):
+def test_standard_neg_crm_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 4, 0, 0)
-    strategy = StandardNCRMStorage()
+    strategy = StandardNegCRMStorageStrategy()
     mc = mock_market_config
     # Calculations for negative energy
     mc.product_type = "energy_neg"
