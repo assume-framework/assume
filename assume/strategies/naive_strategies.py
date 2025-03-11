@@ -181,14 +181,13 @@ class NaiveDADSMStrategy(BaseStrategy):
             start = product[0]
 
             volume = unit.opt_power_requirement.at[start]
-            marginal_price = unit.calculate_marginal_cost(start, volume)
 
             bids.append(
                 {
                     "start_time": start,
                     "end_time": product[1],
                     "only_hours": product[2],
-                    "price": marginal_price,
+                    "price": 3000,
                     "volume": -volume,
                 }
             )
