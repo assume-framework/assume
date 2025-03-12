@@ -184,22 +184,36 @@ DMAS method API references:
 Learning
 -------------
 
- ========================== =============================================================
-  bidding_strategy_id        Description
- ========================== =============================================================
-  learning_eom_powerplant    A reinforcement learning (RL) approach to formulating bids for a Power Plant in an Energy-Only Market. The agent's actions are
-                             two bid prices: one for the inflexible component (P_min) and another for the flexible component (P_max - P_min) of a unit's capacity.
-                             The bids are informed by 50 observations, which include forecasted residual load, forecasted price, total capacity, and marginal cost,
-                             all contributing to decision-making. Noise is added to the action, especially towards the beginning of the learning, to encourage exploration and novelty.
+ ================================= =============================================================
+  bidding_strategy_id               Description
+ ================================= =============================================================
+  learning_eom_powerplant           A (`reinforcement learning <https://assume.readthedocs.io/en/latest/learning_algorithm.html#td3-twin-delayed-ddpg>`_) (RL) approach to formulating bids for a
+                                    Power Plant in an Energy-Only Market. The agent's actions are
+                                    two bid prices: one for the inflexible component (P_min) and another for the flexible component (P_max - P_min) of a unit's capacity.
+                                    The bids are informed by 50 observations, which include forecasted residual load, forecasted price, total capacity, and marginal cost,
+                                    all contributing to decision-making. Noise is added to the action, especially towards the beginning of the learning, to encourage exploration and novelty.
 
-                             The reward is calculated based on profits from executed bids, operational costs, opportunity costs (penalizing underutilized capacity),
-                             and a regret term to minimize missed revenue opportunities. This approach encourages full utilization of the unit's capacity.
-  learning_eom_storage       Similar RL approach as :code:`learning_eom_powerplant`, for a Storage unit. The make-up of the observations is similar to those for
-                             :code:`learning_eom_powerplant`, with an additional observation being the State-of-Charge (SOC) of the storage unit. The agent has 2 actions -
-                             a bid price, and a bid direction (to buy, sell or do nothing). The bid volume is subject to the charge/discharge capacity of the unit.
+                                    The reward is calculated based on profits from executed bids, operational costs, opportunity costs (penalizing underutilized capacity),
+                                    and a regret term to minimize missed revenue opportunities. This approach encourages full utilization of the unit's capacity.
+  learning_eom_storage              Similar RL approach as :code:`learning_eom_powerplant`, for a Storage unit. The make-up of the observations is similar to those for
+                                    :code:`learning_eom_powerplant`, with an additional observation being the State-of-Charge (SOC) of the storage unit. The agent has 2 actions -
+                                    a bid price, and a bid direction (to buy, sell or do nothing). The bid volume is subject to the charge/discharge capacity of the unit.
 
-                             The reward is calculated based on profits from executed bids, with fixed costs for charging/discharging incorporated.
- ========================== =============================================================
+                                    The reward is calculated based on profits from executed bids, with fixed costs for charging/discharging incorporated.
+  learning_profile_eom_powerplant   An RL strategy for bidding in an Energy-Only Market (EOM) using different order types (simple hourly, block, and linked orders).
+                                    Based on :code:`standard_profile_eom_powerplant`, however uses the trained actor network (as with the other RL bidding strategies)
+                                    to determine bid prices instead of relying on marginal costs. Once again there are two bid prices, a lower price for inflexible component,
+                                    and a higher price for flexible compoenent.
+
+                                    Order types are set implicitly, not by the RL agent itself, and the bid structure
+                                    based on allowed order types (SB - Simple Hourly Bid, BB - Block Bid, LB - Linked Bid):
+
+                                    - SB only: Both power types use SB.
+                                    - SB & LB: Inflexible uses SB, flexible uses LB.
+                                    - SB & BB: Inflexible uses BB, flexible uses SB.
+                                    - SB, BB & LB: Inflexible uses BB, flexible uses LB (or SB if inflexible power is 0, like VREs).
+
+ ================================= =============================================================
 
 Learning method API references:
 

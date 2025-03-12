@@ -35,8 +35,8 @@ class LearningProfileEOMPowerplantStrategy(LearningEOMPowerplantStrategy):
         **kwargs: Arbitrary keyword arguments.
 
     Note:
-        This strategy is based on the strategy in flexable.py, but uses the actor network to determine the prices
-        instead of using the marginal costs as in flexable.py.
+        This strategy is based on the strategy in standard_advanced_orders.py, but uses the actor network to determine the prices
+        instead of using the marginal costs as in standard_advanced_orders.py.
         The two prices for flexible and inflexible power are determined by the actor network,
         which is trained with the MATD3 algorithm.
         The maximum of those two prices is used for the flexible bid and the minimum for the inflexible bid.
