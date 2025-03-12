@@ -187,7 +187,7 @@ Learning
  ================================= =============================================================
   bidding_strategy_id               Description
  ================================= =============================================================
-  learning_eom_powerplant           A (`reinforcement learning <https://assume.readthedocs.io/en/latest/learning_algorithm.html#td3-twin-delayed-ddpg>`_) (RL) approach to formulating bids for a
+  learning_eom_powerplant           A `reinforcement learning <https://assume.readthedocs.io/en/latest/learning_algorithm.html#td3-twin-delayed-ddpg>`_ (RL) approach to formulating bids for a
                                     Power Plant in an Energy-Only Market. The agent's actions are
                                     two bid prices: one for the inflexible component (P_min) and another for the flexible component (P_max - P_min) of a unit's capacity.
                                     The bids are informed by 50 observations, which include forecasted residual load, forecasted price, total capacity, and marginal cost,
@@ -200,7 +200,7 @@ Learning
                                     a bid price, and a bid direction (to buy, sell or do nothing). The bid volume is subject to the charge/discharge capacity of the unit.
 
                                     The reward is calculated based on profits from executed bids, with fixed costs for charging/discharging incorporated.
-  learning_profile_eom_powerplant   An RL strategy for bidding in an Energy-Only Market (EOM) using different order types (simple hourly, block, and linked orders).
+  learning_profile_eom_powerplant   An RL strategy for bidding in an EOM using different order types (simple hourly, block, and linked orders).
                                     Based on :code:`standard_profile_eom_powerplant`, however uses the trained actor network (as with the other RL bidding strategies)
                                     to determine bid prices instead of relying on marginal costs. Once again there are two bid prices, a lower price for inflexible component,
                                     and a higher price for flexible compoenent.
