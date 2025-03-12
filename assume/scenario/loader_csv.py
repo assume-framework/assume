@@ -36,6 +36,7 @@ def load_file(
     config: dict,
     file_name: str,
     index: pd.DatetimeIndex | None = None,
+    check_duplicates: bool = True,
 ) -> pd.DataFrame:
     """
     Loads a csv file from the given path and returns a dataframe.
@@ -50,6 +51,7 @@ def load_file(
         config (dict): The config file containing file mappings.
         file_name (str): The name of the csv file.
         index (pd.DatetimeIndex, optional): The index of the dataframe. Defaults to None.
+        check_duplicates (bool, optional): Whether to check for duplicate unit names. Defaults to True.
 
     Returns:
         pandas.DataFrame: The dataframe containing the loaded data.
@@ -115,7 +117,7 @@ def load_file(
 
             df = df.loc[index]
 
-        else:
+        elif check_duplicates:
             # Check if duplicate unit names exist and raise an error
             duplicates = df.index[df.index.duplicated()].unique()
 
@@ -161,10 +163,12 @@ def load_dsm_units(
     """
 
     # Load the DSM units file
+    # Note: check_duplicates is set to False to avoid raising an error for duplicate unit names
     dsm_units = load_file(
         path=path,
         config=config,
         file_name=file_name,
+        check_duplicates=False,
     )
 
     if dsm_units is None:
