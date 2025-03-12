@@ -396,8 +396,8 @@ if __name__ == "__main__":
         )
     ]
 
-    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
-    default_naive_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+    default_strategy = {mc.market_id: "naive" for mc in marketdesign}
+    default_naive_strategy = {mc.market_id: "naive" for mc in marketdesign}
 
     bidding_strategies = {
         "hard coal": default_strategy,
@@ -410,7 +410,7 @@ if __name__ == "__main__":
         "wind": default_naive_strategy,
         "solar": default_naive_strategy,
         "demand": default_naive_strategy,
-        "storage": {mc.market_id: "flexable_eom_storage" for mc in marketdesign},
+        "storage": {mc.market_id: "standard_eom_storage" for mc in marketdesign},
     }
     load_oeds(
         world,

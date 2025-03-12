@@ -10,10 +10,10 @@ import torch as th
 from assume.common.base import SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index
-from assume.strategies.learning_strategies import RLStrategy
+from assume.strategies.learning_strategies import LearningEOMPowerplantStrategy
 
 
-class RLAdvancedOrderStrategy(RLStrategy):
+class LearningProfileEOMPowerplantStrategy(LearningEOMPowerplantStrategy):
     """
     Reinforcement Learning Strategy for an Energy-Only-Market with simple hourly, block and linked orders.
 
@@ -35,8 +35,8 @@ class RLAdvancedOrderStrategy(RLStrategy):
         **kwargs: Arbitrary keyword arguments.
 
     Note:
-        This strategy is based on the strategy in flexable.py, but uses the actor network to determine the prices
-        instead of using the marginal costs as in flexable.py.
+        This strategy is based on the strategy in standard_advanced_orders.py, but uses the actor network to determine the prices
+        instead of using the marginal costs as in standard_advanced_orders.py.
         The two prices for flexible and inflexible power are determined by the actor network,
         which is trained with the MATD3 algorithm.
         The maximum of those two prices is used for the flexible bid and the minimum for the inflexible bid.
