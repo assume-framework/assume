@@ -36,9 +36,9 @@ as well as the type of unit making the bid.
 
 Accordingly, each Bidding Strategy has an associated ID which takes the form "methodology_market_unit". The "market" and/or "unit" components are omitted if
 the strategy is applicable across multiple markets and/or unit types, e.g. :code:`"naive"`.
-Each Bidding Strategy and associated ID for each methodology is defined and described further below.
+This "bidding_strategy_id" needs to be entered when defining a unit's bidding strategy. Each Bidding Strategy and associated ID for each methodology is defined and described further below.
 
-When explicitly adding a unit, its bidding strategies are defined by inputting the relevant "Bidding Strategy ID" as values
+When explicitly adding a unit, its bidding strategies are defined by inputting the relevant "bidding_strategy_id" as values
 in the :code:`"bidding_strategies"` dictionary, where the associated key is the Market Type
 for which the strategy is formulating a bid. In the following example, a Demand unit uses the :code:`"naive"` bidding strategy on the EOM.
 The key(s) (market name(s)) in :code:`"bidding_strategies"` need to match the names of the market(s) given in the :code:`markets_config` part of the config file::
@@ -56,8 +56,10 @@ The key(s) (market name(s)) in :code:`"bidding_strategies"` need to match the na
     forecaster=demand_forecast,
   )
 
-When constructing a units CSV file, the bidding strategies are set using :code:`"bidding_"` parameters, where the market type
-follows the underscore, again the market names need to match with those in the config file::
+When constructing a units CSV file, the bidding strategies are set using :code:`"bidding_"` keys (which become columns in the CSV), where the market type
+follows the underscore (the market names need to match with those in the config file). The value for each :code:`"bidding_"` key is a list of "bidding_strategy_id" entries,
+each corresponding to its associated unit in the CSV (e.g. the :code:`"naive"` :code:`bidding_EOM` strategy is used by the :code:`"Naive-Bidding Unit"`,
+and the :code:`"standard_eom_powerplant"` :code:`bidding_EOM` strategy is used by the :code:`"Standard-Bidding Unit"`)::
 
   powerplant_units_data = {
     "name": ["Naive-Bidding Unit", "Standard-Bidding Unit"],
@@ -74,13 +76,13 @@ follows the underscore, again the market names need to match with those in the c
     "unit_operator": ["Operator 1", "Operator 2"],
   }
 
-We'll now take a look at the different Bidding Strategy types within each methodology.
+We'll now take a look at the different Bidding Strategy types within each methodology, and their associated "bidding_strategy_id".
 
 Naive
 -------------
 
  ================================================ =============================================================
-  Bidding Strategy ID                              Description
+  bidding_strategy_id                              Description
  ================================================ =============================================================
   naive                                            The basic bidding strategy formulated for participating in a merit order
                                                    market configuration, at any one timepoint (hour). Can be used for placing bids on the EOM, negative CRM or
@@ -125,7 +127,7 @@ Standard
 -------------
 
  ================================= =============================================================
-  Bidding Strategy ID               Description
+  bidding_strategy_id               Description
  ================================= =============================================================
   standard_eom_powerplant           A more refined approach to bidding on the EOM compared to :code:`naive`.
                                     A unit submits both inflexible and flexible bids per hour.
@@ -168,7 +170,7 @@ DMAS
 -------------
 
  ==================================== =============================================================
-  Bidding Strategy ID                  Description
+  bidding_strategy_id                  Description
  ==================================== =============================================================
   dmas_powerplant                      TODO
   dmas_storage                         TODO
@@ -183,7 +185,7 @@ Learning
 -------------
 
  ========================== =============================================================
-  Bidding Strategy ID        Description
+  bidding_strategy_id        Description
  ========================== =============================================================
   learning_eom_powerplant    A reinforcement learning (RL) approach to formulating bids for a Power Plant in an Energy-Only Market. The agent's actions are
                              two bid prices: one for the inflexible component (P_min) and another for the flexible component (P_max - P_min) of a unit's capacity.
@@ -208,7 +210,7 @@ Other
 -------------
 
  ======================== =============================================================
-  Bidding Strategy ID      Description
+  bidding_strategy_id      Description
  ======================== =============================================================
   misc_otc                 Similar to `naive`, however it is bid on the OTC market, representing bilateral trades.
   misc_manual              The bidding volume and price is manually entered.
