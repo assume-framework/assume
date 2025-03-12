@@ -3,24 +3,25 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base:
+  simulation_id: example_02c_old_scaling
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
   save_frequency_hours: null
-  learning_mode: true
+  learning_mode: false
 
   learning_config:
     continue_learning: false
     trained_policies_save_path: null
+    trained_policies_load_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.0003
-    learning_rate_schedule: linear
     training_episodes: 100
-    episodes_collecting_initial_experience: 10
+    episodes_collecting_initial_experience: 5
     train_freq: 100h
     gradient_steps: 10
-    batch_size: 64
+    batch_size: 128
     gamma: 0.99
     device: cpu
     action_noise_schedule: linear
@@ -28,8 +29,6 @@ base:
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
-    early_stopping_steps: 10
-    early_stopping_threshold: 0.05
 
   markets_config:
     EOM:
