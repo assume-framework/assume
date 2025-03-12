@@ -693,7 +693,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=74, act_dim=1, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=38, act_dim=1, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
         # defines bounds of actions space
@@ -731,7 +731,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # neural network architecture is predefined, and the size of the observations must remain consistent.
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
-        self.foresight = 24
+        self.foresight = 12
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -936,8 +936,6 @@ class StorageRLStrategy(AbstractLearningStrategy):
         -----
         Rewards are based on profit and include fixed costs for charging and discharging.
         """
-
-        # scaling_factor = 0.1 / unit.max_power_discharge
 
         scaling_factor = 1 / (self.max_bid_price * unit.max_power_discharge)
 
