@@ -51,7 +51,7 @@ class DSMFlex:
         # raise an error if no solver is available
         if not solvers:
             raise ValueError(
-                "None of ['appsi_highs', 'gurobi', 'glpk', 'cbc', 'cplex'] are available"
+                f"None of {SOLVERS} are available. Install one of them to proceed."
             )
 
         solver = solver if solver in solvers else solvers[0]

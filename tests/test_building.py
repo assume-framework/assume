@@ -14,9 +14,8 @@ from assume.strategies.naive_strategies import NaiveDADSMStrategy
 from assume.units.building import Building
 from assume.units.dsm_load_shift import SOLVERS, check_available_solvers
 
+
 # Fixtures for Component Configurations
-
-
 @pytest.fixture
 def generic_storage_config():
     return {
@@ -287,7 +286,9 @@ def test_building_initialization_invalid_component(
 
 def test_solver_availability():
     available_solvers = check_available_solvers(*SOLVERS)
-    assert len(available_solvers) > 0, f"None of the solvers {SOLVERS} are available."
+    assert (
+        len(available_solvers) > 0
+    ), f"None of {SOLVERS} are available. Install one of them to proceed."
 
 
 def test_building_optimization_heatpump(
@@ -476,9 +477,8 @@ def test_building_no_available_solvers(
             components=building_components_heatpump,
             forecaster=forecaster,  # Passed via **kwargs
         )
-    assert (
-        "None of ['appsi_highs', 'gurobi', 'glpk', 'cbc', 'cplex'] are available"
-        in str(exc_info.value)
+    assert f"None of {SOLVERS} are available. Install one of them to proceed." in str(
+        exc_info.value
     )
 
 
