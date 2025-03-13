@@ -956,53 +956,59 @@ class StorageRLStrategy(AbstractLearningStrategy):
         product_type = marketconfig.product_type
         reward = 0
 
-        # Iterate over all orders in the orderbook to calculate order-specific profit
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-            end_excl = end - unit.index.freq
-
-            next_time = start + unit.index.freq
-            duration_hours = (end - start) / timedelta(hours=1)
-
-            # Calculate marginal and starting costs
-            marginal_cost = unit.calculate_marginal_cost(
-                start, unit.outputs[product_type].at[start]
+        # check if orderbook contains only one order and raise an error if not and notify the user
+        # that the strategy is not designed for multiple orders and the market configuration should be adjusted
+        if len(orderbook) > 1:
+            raise ValueError(
+                "StorageRLStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
             )
-            marginal_cost += unit.get_starting_costs(int(duration_hours))
 
-            accepted_volume = order.get("accepted_volume", 0)
-            # ignore very small volumes due to calculations
-            accepted_volume = accepted_volume if abs(accepted_volume) > 1 else 0
-            accepted_price = order.get("accepted_price", 0)
+        order = orderbook[0]
+        start = order["start_time"]
+        end = order["end_time"]
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+        end_excl = end - unit.index.freq
 
-            # Calculate profit and cost for the order
-            order_profit = accepted_price * accepted_volume * duration_hours
-            order_cost = abs(marginal_cost * accepted_volume * duration_hours)
+        next_time = start + unit.index.freq
+        duration_hours = (end - start) / timedelta(hours=1)
 
-            current_soc = unit.outputs["soc"].at[start]
-            next_soc = unit.outputs["soc"].at[next_time]
+        # Calculate marginal and starting costs
+        marginal_cost = unit.calculate_marginal_cost(
+            start, unit.outputs[product_type].at[start]
+        )
+        marginal_cost += unit.get_starting_costs(int(duration_hours))
 
-            # Calculate and clip the energy cost for the start time
-            if next_soc < 1:
-                unit.outputs["energy_cost"].at[next_time] = 0
-            else:
-                unit.outputs["energy_cost"].at[next_time] = np.clip(
-                    (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
-                    / next_soc,
-                    -self.max_bid_price,
-                    self.max_bid_price,
-                )
+        accepted_volume = order.get("accepted_volume", 0)
+        # ignore very small volumes due to calculations
+        accepted_volume = accepted_volume if abs(accepted_volume) > 1 else 0
+        accepted_price = order.get("accepted_price", 0)
 
-            profit = order_profit - order_cost
-            reward += profit * scaling_factor
+        # Calculate profit and cost for the order
+        order_profit = accepted_price * accepted_volume * duration_hours
+        order_cost = abs(marginal_cost * accepted_volume * duration_hours)
 
-            # Store results in unit outputs
-            unit.outputs["profit"].loc[start:end_excl] += profit
-            unit.outputs["reward"].loc[start:end_excl] = reward
-            unit.outputs["total_costs"].loc[start:end_excl] = order_cost
-            unit.outputs["rl_rewards"].append(reward)
+        current_soc = unit.outputs["soc"].at[start]
+        next_soc = unit.outputs["soc"].at[next_time]
+
+        # Calculate and clip the energy cost for the start time
+        if next_soc < 1:
+            unit.outputs["energy_cost"].at[next_time] = 0
+        else:
+            unit.outputs["energy_cost"].at[next_time] = np.clip(
+                (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
+                / next_soc,
+                -self.max_bid_price,
+                self.max_bid_price,
+            )
+
+        profit = order_profit - order_cost
+        reward += profit * scaling_factor
+
+        # Store results in unit outputs
+        unit.outputs["profit"].loc[start:end_excl] += profit
+        unit.outputs["reward"].loc[start:end_excl] = reward
+        unit.outputs["total_costs"].loc[start:end_excl] = order_cost
+        unit.outputs["rl_rewards"].append(reward)
 
     def create_observation(
         self,
