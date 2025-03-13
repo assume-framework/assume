@@ -1,0 +1,2 @@
+name,technology,bidding_EOM,bidding_LTM_OTC,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator
+NEURATH F,lignite,naive_eom,otc_strategy,lignite,0.406,1120,560,0.434,590,590,1.65,30.4,47.5,69.3,10,7,no,0,RWE POWER AG

@@ -625,13 +625,9 @@ class PVPlant:
 
         # Predefined power profile constraint
         if self.power_profile is not None:
-            if not isinstance(self.power_profile, pd.Series):
-                raise TypeError(
-                    "Residential PV `power_profile` must be a pandas Series."
-                )
-            if not all(t in self.power_profile.index for t in self.time_steps):
+            if len(self.time_steps) != len(self.power_profile.index):
                 raise ValueError(
-                    "All `time_steps` must be present in residential PV `power_profile` index."
+                    "The length of the `time_steps` list must match the length of the `power_profile` index."
                 )
 
             @model_block.Constraint(self.time_steps)
@@ -639,17 +635,13 @@ class PVPlant:
                 """
                 Ensures the PV follows the predefined power profile.
                 """
-                return b.power[t] == self.power_profile[t]
+                return b.power[t] == self.power_profile.iat[t]
 
         # Availability profile constraints
         if self.availability_profile is not None:
-            if not isinstance(self.availability_profile, pd.Series):
-                raise TypeError(
-                    "Residential PV `availability_profile` must be a pandas Series."
-                )
-            if not all(t in self.availability_profile.index for t in self.time_steps):
+            if len(self.time_steps) != len(self.availability_profile.index):
                 raise ValueError(
-                    "All `time_steps` must be present in residential PV `availability_profile` index."
+                    "The length of the `time_steps` list must match the length of the `availability_profile` index."
                 )
 
             @model_block.Constraint(self.time_steps)
@@ -657,7 +649,7 @@ class PVPlant:
                 """
                 Ensures the PV operates only during available periods.
                 """
-                return b.power[t] <= self.availability_profile[t] * b.max_power
+                return b.power[t] <= self.availability_profile.iat[t] * b.max_power
 
         # Maximum power constraint (redundant due to variable bounds, included for clarity)
         @model_block.Constraint(self.time_steps)
@@ -1364,35 +1356,31 @@ class ElectricVehicle(GenericStorage):
 
         # Apply availability profile constraints if provided
         if self.availability_profile is not None:
-            if not isinstance(self.availability_profile, pd.Series):
-                raise TypeError("`availability_profile` must be a pandas Series.")
-            if not all(t in self.availability_profile.index for t in self.time_steps):
+            if len(self.availability_profile) != len(self.time_steps):
                 raise ValueError(
-                    "All `time_steps` must be present in `availability_profile` index."
+                    "Length of `availability_profile` must match the number of `time_steps`."
                 )
 
             @model_block.Constraint(self.time_steps)
             def discharge_availability_constraint(b, t):
-                availability = self.availability_profile[t]
+                availability = self.availability_profile.iat[t]
                 return b.discharge[t] <= availability * b.max_power_discharge
 
             @model_block.Constraint(self.time_steps)
             def charge_availability_constraint(b, t):
-                availability = self.availability_profile[t]
+                availability = self.availability_profile.iat[t]
                 return b.charge[t] <= availability * b.max_power_charge
 
         # Apply predefined charging profile constraints if provided
         if self.charging_profile is not None:
-            if not isinstance(self.charging_profile, pd.Series):
-                raise TypeError("`charging_profile` must be a pandas Series.")
-            if not all(t in self.charging_profile.index for t in self.time_steps):
+            if len(self.charging_profile) != len(self.time_steps):
                 raise ValueError(
-                    "All `time_steps` must be present in `charging_profile` index."
+                    "Length of `charging_profile` must match the number of `time_steps`."
                 )
 
             @model_block.Constraint(self.time_steps)
             def charging_profile_constraint(b, t):
-                return b.charge[t] == self.charging_profile[t]
+                return b.charge[t] == self.charging_profile.iat[t]
 
         return model_block
 
@@ -1670,6 +1658,7 @@ demand_side_technologies: dict = {
     "electric_vehicle": ElectricVehicle,
     "generic_storage": GenericStorage,
     "pv_plant": PVPlant,
+    "thermal_storage": GenericStorage,
 }
 
 
