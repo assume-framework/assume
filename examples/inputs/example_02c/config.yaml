@@ -3,12 +3,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base:
-  simulation_id: example_02c_old_scaling
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
   save_frequency_hours: null
-  learning_mode: false
+  learning_mode: true
 
   learning_config:
     continue_learning: false
