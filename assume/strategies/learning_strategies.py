@@ -809,10 +809,12 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # the second action is the bid direction
         # the interval [-0.1, 0.1] for the 'ignore' action is based on the learning
         # process observation and should be adjusted in the future to improve performance
-        if actions[0] <= 0:
+        if actions[0] < 0:
             bid_direction = "buy"
         elif actions[0] > 0:
             bid_direction = "sell"
+        else:
+            bid_direction = "ignore"
 
         _, max_discharge = unit.calculate_min_max_discharge(start, end_all)
         _, max_charge = unit.calculate_min_max_charge(start, end_all)
@@ -845,6 +847,18 @@ class StorageRLStrategy(AbstractLearningStrategy):
                     "only_hours": None,
                     "price": bid_price,
                     "volume": bid_quantity_demand - 1e-6,  # negative value for demand
+                    "node": unit.node,
+                }
+            )
+
+        elif bid_direction == "ignore":
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end_all,
+                    "only_hours": None,
+                    "price": 0,
+                    "volume": 1e-6,
                     "node": unit.node,
                 }
             )
