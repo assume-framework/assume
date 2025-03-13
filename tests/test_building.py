@@ -579,9 +579,6 @@ def test_building_solver_infeasibility_logging(
     # Call the method to ensure the log messages are triggered
     building.determine_optimal_operation_without_flex()
 
-    # Assert no exceptions occur
-    assert True
-
 
 def test_building_bidding_strategy_execution(
     forecaster,
