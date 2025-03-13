@@ -614,8 +614,10 @@ class RLStrategy(AbstractLearningStrategy):
         # Instead of directly setting reward = profit, we incorporate a regret term (opportunity cost penalty).
         # This guides the agent toward strategies that maximize accepted bids while minimizing lost opportunities.
 
-        scaling = 0.1 / unit.max_power
-        reward = float(profit - regret_scale * opportunity_cost) * scaling
+        # scaling factor to normalize the reward to the range [-1,1]
+        scaling = 1 / (self.max_bid_price * unit.max_power)
+
+        reward = scaling * (profit - regret_scale * opportunity_cost)
 
         # Store results in unit outputs, which are later written to the database by the unit operator.
         unit.outputs["profit"].loc[start:end_excl] += profit
@@ -951,8 +953,6 @@ class StorageRLStrategy(AbstractLearningStrategy):
         Rewards are based on profit and include fixed costs for charging and discharging.
         """
 
-        scaling_factor = 1 / (self.max_bid_price * unit.max_power_discharge)
-
         product_type = marketconfig.product_type
         reward = 0
 
@@ -1002,7 +1002,11 @@ class StorageRLStrategy(AbstractLearningStrategy):
             )
 
         profit = order_profit - order_cost
-        reward += profit * scaling_factor
+
+        # scaling factor to normalize the reward to the range [-1,1]
+        scaling_factor = 1 / (self.max_bid_price * unit.max_power_discharge)
+
+        reward += scaling_factor * profit
 
         # Store results in unit outputs
         unit.outputs["profit"].loc[start:end_excl] += profit
