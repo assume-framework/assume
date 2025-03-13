@@ -15,7 +15,7 @@ base:
     trained_policies_load_path: null
     max_bid_price: 100
     algorithm: matd3
-    learning_rate: 0.0003
+    learning_rate: 0.001
     training_episodes: 100
     episodes_collecting_initial_experience: 5
     train_freq: 100h
