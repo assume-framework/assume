@@ -14,18 +14,38 @@ Upcoming Release
 
 **New Features:**
 
-- **Building class:** Introduced a new Building class to represent residential and tertiary buildings within the framework. This new framework allows users to define a building type and its associated technology components, enabling a more detailed investigation of energy consumption and flexibility potential.
-- **Prosume/Consumer:** dded the is_prosumer attribute, enabling users to specify whether a building operates as a consumer or prosumer.
-- **Prosumer:** Represents a building that actively participates in electricity trading, allowing the operator/resident to sell excess energy to the grid.
-- **Consumer:** Represents a traditional energy consumer, focusing solely on energy consumption without trading capabilities. This attribute enhances flexibility in modeling building behavior within energy markets.
+- **TensorBoard Integration:** To enable better monitoring of the learning progress and comparison between different runs, we have added the possibility to use TensorBoard for logging
+  the learning progress. To use this feature, please follow the instructions in the README.
+- **Building Class:** Introduced a new ``Building`` class to represent residential and tertiary buildings. This enhancement allows users to define a building type along with
+  associated technology components, facilitating a more detailed investigation of energy consumption and flexibility potential. The building can also be defined as a prosumer or consumer.
+  When a building is defined as prosumer, it actively participates in electricity trading, allowing the operator/resident to sell excess energy to the grid. In contrast,
+  a consumer represents a traditional energy consumer focusing solely on energy consumption without trading capabilities.
 
 **Improvements:**
 
-- Refactor function and move common functions to DSMFlex -add tests for the building class
-- Refactoring variable names
-- Restructuring the process sequence
+- **Multi-market participation configuration**: Respect the `eligible_obligations_lambda` set in the `MarketConfig` to only bid on markets where the UnitsOperator fulfills the requirements.
+  Changes the behavior to not participate on markets when no unit has a matching bidding strategy for this market.
+- **Learning Performance:** The learning performance for large multi-agent learning setups has been significantly improved by introducing several learning stabilization techniques.
+  This leads to a more stable learning process and faster convergence. It also allows for running simulations on historical data with a larger number of agents, achieving very good quality results.
+  For example, running example_03a for the year 2019, one can achieve an RMSE of 10.22 EUR/MWh and MAE of 6.52 EUR/MWh for hourly market prices, and an RMSE of 6.8 EUR/MWh and MAE of 4.6 EUR/MWh when
+  using daily average prices. This is a significant improvement compared to the previous version of the framework.
 
 **Bug Fixes:**
+
+- **Storage Learning Strategy:** Fixed a bug in the storage learning strategy that caused the learning process to fail or perform poorly. The bug was related to the way the storage was updating the state of charge.
+  This has been fixed, and the learning process for storage units is now stable and performs well. It also improved the performance of non-learning bidding strategies for storage units.
+- **Wrong train_freq Handling:** Fixed a bug where, if the simulation length was not a multiple of the train_freq, the remaining simulation steps were not used for training, causing the training to fail.
+  This has been fixed, and now the train_freq is adjusted dynamically to fit the simulation length. The user is also informed about the adjusted train_freq in the logs.
+- **Logging of Learning Parameters:** Fixed the way learning parameters were logged, which previously used a different simulation_id for each episode, leading to very slow performance of the learning Grafana dashboard.
+  Now, the learning parameters are logged using the same simulation_id for each episode, which significantly improves the performance of the learning Grafana dashboard.
+
+**Code Refactoring**
+
+  - Moved common functions to DSMFlex.
+  - Added tests for the ``Building`` class.
+  - Refactored variable names for better readability and consistency.
+  - Restructured the process sequence for improved efficiency.
+
 
 v0.5.1 - (3rd February 2025)
 ===========================================
