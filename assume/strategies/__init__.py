@@ -53,10 +53,12 @@ try:
     )
     from assume.strategies.learning_strategies import (
         RLStrategy,
+        RLStrategySingleBid,
         StorageRLStrategy,
     )
 
     bidding_strategies["pp_learning"] = RLStrategy
+    bidding_strategies["single_bid_learning"] = RLStrategySingleBid
     bidding_strategies["storage_learning"] = StorageRLStrategy
     bidding_strategies["learning_advanced_orders"] = RLAdvancedOrderStrategy
 

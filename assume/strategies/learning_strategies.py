@@ -148,7 +148,16 @@ class RLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=38, act_dim=2, unique_obs_dim=2, *args, **kwargs)
+        obd_dim = kwargs.pop("obs_dim", 38)
+        act_dim = kwargs.pop("act_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            obs_dim=obd_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         self.unit_id = kwargs["unit_id"]
 
@@ -626,6 +635,97 @@ class RLStrategy(AbstractLearningStrategy):
         unit.outputs["total_costs"].loc[start:end_excl] = operational_cost
 
         unit.outputs["rl_rewards"].append(reward)
+
+
+class RLStrategySingleBid(RLStrategy):
+    def __init__(self, *args, **kwargs):
+        super().__init__(obs_dim=74, act_dim=1, unique_obs_dim=2, *args, **kwargs)
+
+        # we select 24 to be in line with the storage strategies
+        self.foresight = 24
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Calculates bids based on the current observations and actions derived from the actor network.
+
+        Args
+        ----
+        unit : SupportsMinMax
+            The unit for which to calculate bids, with details on capacity constraints.
+        market_config : MarketConfig
+            The configuration settings of the energy market.
+        product_tuples : list[Product]
+            List of products with start and end times for bidding.
+        **kwargs : Additional keyword arguments.
+
+        Returns
+        -------
+        Orderbook
+            Contains bid entries for each product, including start time, end time, price, and volume.
+
+        Notes
+        -----
+        This method structures bids in two parts:
+        - **Inflexible Bid** (P_min): A bid for the minimum operational capacity.
+        - **Flexible Bid** (P_max - P_min): A bid for the flexible capacity available after P_min.
+        The actions are scaled to reflect real bid prices and volumes, which are then converted into
+        orderbook entries.
+        """
+
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        # get technical bounds for the unit output from the unit
+        _, max_power = unit.calculate_min_max_power(start, end)
+        max_power = max_power[0]
+
+        # =============================================================================
+        # 1. Get the Observations, which are the basis of the action decision
+        # =============================================================================
+        next_observation = self.create_observation(
+            unit=unit,
+            market_id=market_config.market_id,
+            start=start,
+        )
+
+        # =============================================================================
+        # 2. Get the Actions, based on the observations
+        # =============================================================================
+        actions, noise = self.get_actions(next_observation)
+
+        # =============================================================================
+        # 3. Transform Actions into bids
+        # =============================================================================
+        # actions are in the range [-1,1], we need to transform them into actual bids
+        # we can use our domain knowledge to guide the bid formulation
+        bid_price = actions[0] * self.max_bid_price
+
+        # actually formulate bids in orderbook format
+        bids = [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price,
+                "volume": max_power,
+                "node": unit.node,
+            },
+        ]
+
+        # store results in unit outputs as lists to be written to the buffer for learning
+        unit.outputs["rl_observations"].append(next_observation)
+        unit.outputs["rl_actions"].append(actions)
+
+        # store results in unit outputs as series to be written to the database by the unit operator
+        unit.outputs["actions"].at[start] = actions
+        unit.outputs["exploration_noise"].at[start] = noise
+
+        return bids
 
 
 class StorageRLStrategy(AbstractLearningStrategy):
