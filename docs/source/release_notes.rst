@@ -14,8 +14,12 @@ Upcoming Release
 
 **New Features:**
 
-- **TensorBoard Integration:** To enable better monitoring of the learning progress and comparison between different runs, we have added the possibility to use TensorBoard for logging the learning progress.
-  To use this feature, please follow the instructions in the README.
+- **TensorBoard Integration:** To enable better monitoring of the learning progress and comparison between different runs, we have added the possibility to use TensorBoard for logging
+  the learning progress. To use this feature, please follow the instructions in the README.
+- **Building Class:** Introduced a new ``Building`` class to represent residential and tertiary buildings. This enhancement allows users to define a building type along with
+  associated technology components, facilitating a more detailed investigation of energy consumption and flexibility potential. The building can also be defined as a prosumer or consumer.
+  When a building is defined as prosumer, it actively participates in electricity trading, allowing the operator/resident to sell excess energy to the grid. In contrast,
+  a consumer represents a traditional energy consumer focusing solely on energy consumption without trading capabilities.
 
 **Improvements:**
 
@@ -34,6 +38,14 @@ Upcoming Release
   This has been fixed, and now the train_freq is adjusted dynamically to fit the simulation length. The user is also informed about the adjusted train_freq in the logs.
 - **Logging of Learning Parameters:** Fixed the way learning parameters were logged, which previously used a different simulation_id for each episode, leading to very slow performance of the learning Grafana dashboard.
   Now, the learning parameters are logged using the same simulation_id for each episode, which significantly improves the performance of the learning Grafana dashboard.
+
+**Code Refactoring**
+
+  - Moved common functions to DSMFlex.
+  - Added tests for the ``Building`` class.
+  - Refactored variable names for better readability and consistency.
+  - Restructured the process sequence for improved efficiency.
+
 
 v0.5.1 - (3rd February 2025)
 ===========================================

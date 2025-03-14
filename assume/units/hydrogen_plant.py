@@ -4,7 +4,6 @@
 
 import logging
 
-import pandas as pd
 import pyomo.environ as pyo
 
 from assume.common.base import SupportsMinMax
@@ -31,7 +30,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         technology (str, optional): The technology used by the plant. Default is "hydrogen_plant".
         components (dict, optional): A dictionary describing the components of the plant, such as electrolyser and hydrogen seasonal storage. Default is an empty dictionary.
         objective (str, optional): The objective function of the plant, typically to minimize variable costs. Default is "min_variable_cost".
-        flexibility_measure (str, optional): The flexibility measure used for the plant, such as "max_load_shift". Default is "max_load_shift".
+        flexibility_measure (str, optional): The flexibility measure used for the plant, such as "cost_based_load_shift". Default is "cost_based_load_shift".
         demand (float, optional): The hydrogen production demand, representing how much hydrogen needs to be produced. Default is 0.
         cost_tolerance (float, optional): The maximum allowable increase in cost when shifting load. Default is 10.
         node (str, optional): The node location where the plant is connected within the energy network. Default is "node0".
@@ -56,7 +55,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         components: dict[str, dict] = None,
         technology: str = "hydrogen_plant",
         objective: str = "min_variable_cost",
-        flexibility_measure: str = "max_load_shift",
+        flexibility_measure: str = "cost_based_load_shift",
         demand: float = 0,
         cost_tolerance: float = 10,
         node: str = "node0",
@@ -129,9 +128,22 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
 
     def initialize_process_sequence(self):
         """
-        Initializes the process sequence and constraints for the hydrogen plant.
-        Distributes hydrogen produced by the electrolyser between hydrogen demand
-        and optional hydrogen storage.
+        Establishes the process sequence and key constraints for the hydrogen plant, ensuring
+        that hydrogen production, storage, and demand are properly managed.
+
+        This function defines the **hydrogen production distribution constraint**, which regulates
+        the flow of hydrogen from the electrolyser to meet demand and/or be stored:
+
+        - **With seasonal storage**:
+        - Hydrogen can be supplied directly to demand.
+        - Excess hydrogen can be stored in hydrogen seasonal storage.
+        - Stored hydrogen can be discharged to supplement demand when required.
+
+        - **Without storage**:
+        - The electrolyser must meet all hydrogen demand directly, as no storage buffer is available.
+
+        This constraint ensures an efficient balance between hydrogen supply, demand, and storage,
+        optimizing the usage of available hydrogen resources.
         """
 
         @self.model.Constraint(self.model.time_steps)
@@ -144,27 +156,47 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
 
             if self.has_h2seasonal_storage:
                 # With storage: demand can be fulfilled by electrolyser, storage discharge, or both
-                storage_discharge = self.model.dsm_blocks[
-                    "hydrogen_seasonal_storage"
-                ].discharge[t]
-                storage_charge = self.model.dsm_blocks[
-                    "hydrogen_seasonal_storage"
-                ].charge[t]
+                storage_discharge = m.dsm_blocks["hydrogen_seasonal_storage"].discharge[
+                    t
+                ]
+                storage_charge = m.dsm_blocks["hydrogen_seasonal_storage"].charge[t]
 
                 # Hydrogen can be supplied to demand and/or storage, and storage can also discharge to meet demand
                 return (
                     electrolyser_output + storage_discharge
-                    == self.model.hydrogen_demand[t] + storage_charge
+                    == m.hydrogen_demand[t] + storage_charge
                 )
             else:
                 # Without storage: demand is met solely by electrolyser output
-                return electrolyser_output == self.model.hydrogen_demand[t]
+                return electrolyser_output == m.hydrogen_demand[t]
 
     def define_constraints(self):
         """
-        Defines the constraints for the hydrogen plant model, ensuring that the total hydrogen output
-        over all time steps meets the absolute hydrogen demand. Hydrogen can be sourced from the
-        electrolyser alone or combined with storage discharge if storage is available.
+        Defines key constraints for the hydrogen plant, ensuring that hydrogen production,
+        storage, and energy costs are accurately modeled.
+
+        This function includes the following constraints:
+
+        1. **Total Hydrogen Demand Constraint**:
+        - Ensures that the total hydrogen output over all time steps satisfies the
+            absolute hydrogen demand.
+        - If seasonal storage is available, the total demand can be met by both
+            electrolyser production and storage discharge.
+        - If no storage is available, the electrolyser must supply the entire demand.
+
+        2. **Total Power Input Constraint**:
+        - Ensures that the power input required by the electrolyser is correctly accounted for
+            at each time step.
+        - This constraint ensures that energy demand is properly modeled for optimization
+            purposes.
+
+        3. **Variable Cost per Time Step Constraint**:
+        - Calculates the operating cost per time step, ensuring that total variable
+            costs reflect the electrolyser's energy consumption.
+        - This constraint is essential for cost-based optimization of hydrogen production.
+
+        These constraints collectively ensure that hydrogen production aligns with energy
+        availability, demand fulfillment, and cost efficiency.
         """
 
         @self.model.Constraint()
@@ -177,23 +209,21 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             if self.has_h2seasonal_storage:
                 # With storage: sum of electrolyser output and storage discharge must meet the total hydrogen demand
                 return (
-                    sum(
-                        self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        + self.model.dsm_blocks["hydrogen_seasonal_storage"].discharge[
-                            t
-                        ]
-                        for t in self.model.time_steps
+                    pyo.quicksum(
+                        m.dsm_blocks["electrolyser"].hydrogen_out[t]
+                        + m.dsm_blocks["hydrogen_seasonal_storage"].discharge[t]
+                        for t in m.time_steps
                     )
-                    == self.model.absolute_hydrogen_demand
+                    == m.absolute_hydrogen_demand
                 )
             else:
                 # Without storage: sum of electrolyser output alone must meet the total hydrogen demand
                 return (
-                    sum(
-                        self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        for t in self.model.time_steps
+                    pyo.quicksum(
+                        m.dsm_blocks["electrolyser"].hydrogen_out[t]
+                        for t in m.time_steps
                     )
-                    == self.model.absolute_hydrogen_demand
+                    == m.absolute_hydrogen_demand
                 )
 
         # Constraint for total power input
@@ -202,10 +232,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             """
             Ensures the total power input is the sum of power inputs of all components.
             """
-            return (
-                m.total_power_input[t]
-                == self.model.dsm_blocks["electrolyser"].power_in[t]
-            )
+            return m.total_power_input[t] == m.dsm_blocks["electrolyser"].power_in[t]
 
         # Constraint for variable cost per time step
         @self.model.Constraint(self.model.time_steps)
@@ -214,29 +241,4 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             Calculates the variable cost per time step.
             """
 
-            return (
-                self.model.variable_cost[t]
-                == self.model.dsm_blocks["electrolyser"].operating_cost[t]
-            )
-
-    def calculate_marginal_cost(self, start: pd.Timestamp, power: float) -> float:
-        """
-        Calculate the marginal cost of the unit based on the provided time and power.
-
-        Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            power (float): The power output of the unit.
-
-        Returns:
-            float: the marginal cost of the unit for the given power.
-        """
-        # Initialize marginal cost
-        marginal_cost = 0
-
-        if self.opt_power_requirement.at[start] > 0:
-            marginal_cost = (
-                self.variable_cost_series.at[start]
-                / self.opt_power_requirement.at[start]
-            )
-
-        return marginal_cost
+            return m.variable_cost[t] == m.dsm_blocks["electrolyser"].operating_cost[t]
