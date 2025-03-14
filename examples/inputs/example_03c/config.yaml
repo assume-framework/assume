@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base_case_2019_with_storage:
-  simulation_id: example_03c_all_storages
   start_date: 2019-03-01 00:00
   end_date: 2019-05-30 00:00
   time_step: 1h
@@ -15,7 +14,7 @@ base_case_2019_with_storage:
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
-    learning_rate: 0.0003
+    learning_rate: 0.001
     # learning_rate_schedule: linear
     training_episodes: 100
     episodes_collecting_initial_experience: 5
@@ -23,9 +22,9 @@ base_case_2019_with_storage:
     gradient_steps: 720
     batch_size: 256
     gamma: 0.999
-    device: cuda:0
-    # action_noise_schedule: linear
-    noise_sigma: 0.1
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.2
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
