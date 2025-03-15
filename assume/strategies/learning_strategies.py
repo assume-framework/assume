@@ -805,18 +805,13 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
-        # the first action is the bid price
+        # the absolute value of the action determines the bid price
         bid_price = abs(actions[0]) * self.max_bid_price
-
-        # the second action is the bid direction
-        # the interval [-0.1, 0.1] for the 'ignore' action is based on the learning
-        # process observation and should be adjusted in the future to improve performance
+        # the sign of the action determines the bid direction
         if actions[0] < 0:
             bid_direction = "buy"
-        elif actions[0] > 0:
+        elif actions[0] >= 0:
             bid_direction = "sell"
-        else:
-            bid_direction = "ignore"
 
         _, max_discharge = unit.calculate_min_max_discharge(start, end_all)
         _, max_charge = unit.calculate_min_max_charge(start, end_all)
@@ -836,7 +831,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
                     # zero bids are ignored by the market clearing and orders are deleted,
                     # but we need the orderbook for the DRL to function,
                     # therefore we add a small amount
-                    "volume": bid_quantity_supply + 1e-6,
+                    "volume": bid_quantity_supply,
                     "node": unit.node,
                 }
             )
@@ -848,19 +843,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
                     "end_time": end_all,
                     "only_hours": None,
                     "price": bid_price,
-                    "volume": bid_quantity_demand - 1e-6,  # negative value for demand
-                    "node": unit.node,
-                }
-            )
-
-        elif bid_direction == "ignore":
-            bids.append(
-                {
-                    "start_time": start,
-                    "end_time": end_all,
-                    "only_hours": None,
-                    "price": 0,
-                    "volume": 1e-6,
+                    "volume": bid_quantity_demand,  # negative value for demand
                     "node": unit.node,
                 }
             )

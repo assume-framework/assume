@@ -145,12 +145,7 @@ class PayAsClearRole(MarketRole):
 
             # if demand is fulfilled, we do have some additional supply orders
             # these will be rejected
-            for order in supply_orders:
-                # if the order was not accepted partially, it is rejected
-                if not order.get("accepted_volume"):
-                    rejected_orders.append(order)
-
-            for order in demand_orders:
+            for order in product_orders:
                 # if the order was not accepted partially, it is rejected
                 if not order.get("accepted_volume"):
                     rejected_orders.append(order)
@@ -287,12 +282,7 @@ class PayAsBidRole(MarketRole):
 
             # if demand is fulfilled, we do have some additional supply orders
             # these will be rejected
-            for order in supply_orders:
-                # if the order was not accepted partially, it is rejected
-                if not order.get("accepted_volume"):
-                    rejected_orders.append(order)
-
-            for order in demand_orders:
+            for order in product_orders:
                 # if the order was not accepted partially, it is rejected
                 if not order.get("accepted_volume"):
                     rejected_orders.append(order)
