@@ -1,0 +1,10 @@
+name,bidding_EOM,price_import,price_export,unit_operator
+DE_NL,naive_exchange,0,2999,Exchanges Operator
+DE_CH,naive_exchange,0,2999,Exchanges Operator
+DE_DK,naive_exchange,0,2999,Exchanges Operator
+DE_CZ,naive_exchange,0,2999,Exchanges Operator
+DE_LU,naive_exchange,0,2999,Exchanges Operator
+DE_SE,naive_exchange,0,2999,Exchanges Operator
+DE_AT,naive_exchange,0,2999,Exchanges Operator
+DE_FR,naive_exchange,0,2999,Exchanges Operator
+DE_PL,naive_exchange,0,2999,Exchanges Operator

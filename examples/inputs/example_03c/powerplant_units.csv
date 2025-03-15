@@ -1,0 +1,263 @@
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,unit_operator
+Wind Onshore,wind_onshore,flexable_eom,renewable,0,53190,0,1,,,0,0,0,0,0,0,renewables_operator
+Wind Offshore,wind_offshore,flexable_eom,renewable,0,7560,0,1,,,0,0,0,0,0,0,renewables_operator
+Solar,solar,flexable_eom,renewable,0,48860,0,1,,,0,0,0,0,0,0,renewables_operator
+Hydro,hydro,flexable_eom,renewable,0,4940,0,1,,,0,0,0,0,0,0,renewables_operator
+Biomass,biomass,flexable_eom,renewable,0,8340,0,1,,,0,0,0,0,0,0,renewables_operator
+KKW ISAR 2,nuclear,flexable_eom,uranium,0,1485,590,0.33,890,890,10.3,140,140,140,72,10,UNIPER
+KKW BROKDORF,nuclear,flexable_eom,uranium,0,1480,590,0.33,890,890,10.3,140,140,140,72,10,UNIPER
+KKW PHILIPPSBURG 2,nuclear,flexable_eom,uranium,0,1468,590,0.33,880,880,10.3,140,140,140,72,10,ENBW ENERGIE BADEN-WURTTEMBERG
+KKW GROHNDE,nuclear,flexable_eom,uranium,0,1430,570,0.33,860,860,10.3,140,140,140,72,10,UNIPER
+KKW EMSLAND,nuclear,flexable_eom,uranium,0,1406,560,0.33,840,840,10.3,140,140,140,72,10,RWE POWER AG
+KKW NECKARWESTHEIM,nuclear,flexable_eom,uranium,0,1400,560,0.33,840,840,10.3,140,140,140,72,10,ENBW ENERGIE BADEN-WURTTEMBERG
+KKW GUNDREMMINGEN C,nuclear,flexable_eom,uranium,0,1344,540,0.33,810,810,10.3,140,140,140,72,10,RWE POWER AG
+NEURATH F,lignite,flexable_eom,lignite,0.406,1120,560,0.434,590,590,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+NEURATH G,lignite,flexable_eom,lignite,0.406,1120,560,0.434,590,590,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+NIEDERAUSSEM K,lignite,flexable_eom,lignite,0.406,1012,510,0.422,540,540,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+LIPPENDORF R,lignite,flexable_eom,lignite,0.406,933,470,0.416,490,490,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+LIPPENDORF S,lignite,flexable_eom,lignite,0.406,933,470,0.415,490,490,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+BOXBERG Q,lignite,flexable_eom,lignite,0.406,907,460,0.415,480,480,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+SCHWARZE PUMPE A,lignite,flexable_eom,lignite,0.406,800,400,0.408,420,420,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+SCHWARZE PUMPE B,lignite,flexable_eom,lignite,0.406,800,400,0.407,420,420,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+BOXBERG R,lignite,flexable_eom,lignite,0.406,675,340,0.433,360,360,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+NIEDERAUSSEM G,lignite,flexable_eom,lignite,0.406,620,310,0.38,330,330,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+NIEDERAUSSEM H,lignite,flexable_eom,lignite,0.406,620,310,0.374,330,330,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+NEURATH D,lignite,flexable_eom,lignite,0.406,600,300,0.364,320,320,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+WEISWEILER H,lignite,flexable_eom,lignite,0.406,600,300,0.364,320,320,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+NEURATH E,lignite,flexable_eom,lignite,0.406,600,300,0.363,320,320,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+WEISWEILER G,lignite,flexable_eom,lignite,0.406,600,300,0.354,320,320,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+JAENSCHWALDE D,lignite,flexable_eom,lignite,0.406,500,250,0.388,270,270,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+JAENSCHWALDE E,lignite,flexable_eom,lignite,0.406,500,250,0.386,270,270,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+JAENSCHWALDE F,lignite,flexable_eom,lignite,0.406,500,250,0.386,270,270,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+JAENSCHWALDE B,lignite,flexable_eom,lignite,0.406,500,250,0.38,270,270,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+JAENSCHWALDE C,lignite,flexable_eom,lignite,0.406,500,250,0.379,270,270,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+BOXBERG P,lignite,flexable_eom,lignite,0.406,500,250,0.372,270,270,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+JAENSCHWALDE A,lignite,flexable_eom,lignite,0.406,500,250,0.37,270,270,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+BOXBERG N,lignite,flexable_eom,lignite,0.406,500,250,0.362,270,270,1.65,30.4,47.5,69.3,10,7,VATTENFALL EUROPE AG
+SCHKOPAU II A,lignite,flexable_eom,lignite,0.406,480,240,0.41,260,260,1.65,30.4,47.5,69.3,10,7,UNIPER
+SCHKOPAU II B,lignite,flexable_eom,lignite,0.406,480,240,0.41,260,260,1.65,30.4,47.5,69.3,10,7,UNIPER
+NIEDERAUSSEM C,lignite,flexable_eom,lignite,0.406,335,170,0.338,180,180,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+NIEDERAUSSEM F,lignite,flexable_eom,lignite,0.406,320,160,0.346,170,170,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+NIEDERAUSSEM E,lignite,flexable_eom,lignite,0.406,315,160,0.346,170,170,1.65,30.4,47.5,69.3,10,7,RWE POWER AG
+NEURATH A,lignite,flexable_eom,lignite,0.406,300,150,0.355,160,160,1.65,45.1,73.9,73.2,10,7,RWE POWER AG
+NEURATH B,lignite,flexable_eom,lignite,0.406,300,150,0.355,160,160,1.65,45.1,73.9,73.2,10,7,RWE POWER AG
+NEURATH C,lignite,flexable_eom,lignite,0.406,300,150,0.355,160,160,1.65,45.1,73.9,73.2,10,7,RWE POWER AG
+FRIMMERSDORF Q,lignite,flexable_eom,lignite,0.406,300,150,0.346,160,160,1.65,45.1,73.9,73.2,10,7,RWE POWER AG
+WEISWEILER E,lignite,flexable_eom,lignite,0.406,300,150,0.338,160,160,1.65,45.1,73.9,73.2,10,7,RWE POWER AG
+FRIMMERSDORF P,lignite,flexable_eom,lignite,0.406,300,150,0.337,160,160,1.65,45.1,73.9,73.2,10,7,RWE POWER AG
+NIEDERAUSSEM D,lignite,flexable_eom,lignite,0.406,300,150,0.337,160,160,1.65,45.1,73.9,73.2,10,7,RWE POWER AG
+WEISWEILER F,lignite,flexable_eom,lignite,0.406,300,150,0.337,160,160,1.65,45.1,73.9,73.2,10,7,RWE POWER AG
+FRECHEN WACHTBERG,lignite,flexable_eom,lignite,0.406,201,110,0.31,110,110,1.65,45.1,73.9,73.2,10,7,RWE POWER AG
+MERKENICH BLOCK 6,lignite,flexable_eom,lignite,0.406,82,41,0.325,44,44,1.65,45.1,73.9,73.2,10,7,RHEINENERGIE AG
+CHEMNITZ NORD II BLOCK C,lignite,flexable_eom,lignite,0.406,75,38,0.395,40,40,1.65,45.1,73.9,73.2,10,7,EINS ENERGIE IN SACHSEN GMBH
+CHEMNITZ NORD II BLOCK B,lignite,flexable_eom,lignite,0.406,67,34,0.386,36,36,1.65,45.1,73.9,73.2,10,7,EINS ENERGIE IN SACHSEN GMBH
+KLINGENBERG 5,lignite,flexable_eom,lignite,0.406,60,30,0.388,32,32,1.65,45.1,73.9,73.2,10,7,VATTENFALL EUROPE AG
+KLINGENBERG 6,lignite,flexable_eom,lignite,0.406,60,30,0.388,32,32,1.65,45.1,73.9,73.2,10,7,VATTENFALL EUROPE AG
+KLINGENBERG 4,lignite,flexable_eom,lignite,0.406,60,30,0.37,32,32,1.65,45.1,73.9,73.2,10,7,VATTENFALL EUROPE AG
+RDK (KARLSRUHE) 8,hard coal,flexable_eom,hard coal,0.335,912,370,0.452,620,620,1.3,30.4,47.5,69.3,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+GKM 9,hard coal,flexable_eom,hard coal,0.335,911,370,0.454,620,620,1.3,30.4,47.5,69.3,7,6,GROSSKRAFTWERK MANNHEIM AG
+HEYDEN 4,hard coal,flexable_eom,hard coal,0.335,911,370,0.396,620,620,1.3,30.4,47.5,69.3,7,6,UNIPER
+MOORBURG A,hard coal,flexable_eom,hard coal,0.335,865,350,0.465,590,590,1.3,30.4,47.5,69.3,7,6,VATTENFALL EUROPE AG
+MOORBURG B,hard coal,flexable_eom,hard coal,0.335,865,350,0.465,590,590,1.3,30.4,47.5,69.3,7,6,VATTENFALL EUROPE AG
+WESTFALEN E,hard coal,flexable_eom,hard coal,0.335,820,330,0.452,560,560,1.3,30.4,47.5,69.3,7,6,RWE POWER AG
+IBBENBUEREN B NO 1,hard coal,flexable_eom,hard coal,0.335,808,330,0.398,550,550,1.3,30.4,47.5,69.3,7,6,RWE POWER AG
+WILHELMSHAVEN C,hard coal,flexable_eom,hard coal,0.335,800,320,0.452,540,540,1.3,30.4,47.5,69.3,7,6,UNIPER
+WALSUM 10,hard coal,flexable_eom,hard coal,0.335,790,320,0.454,540,540,1.3,30.4,47.5,69.3,7,6,STEAG GMBH
+BERGKAMEN A,hard coal,flexable_eom,hard coal,0.335,777,320,0.38,530,530,1.3,30.4,47.5,69.3,7,6,EVONIK INDUSTRIES AG
+BEXBACH C 1,hard coal,flexable_eom,hard coal,0.335,773,310,0.389,530,530,1.3,30.4,47.5,69.3,7,6,STEAG GMBH
+WILHELMSHAVEN A,hard coal,flexable_eom,hard coal,0.335,770,310,0.373,520,520,1.3,30.4,47.5,69.3,7,6,UNIPER
+HEILBRONN 7,hard coal,flexable_eom,hard coal,0.335,760,310,0.398,520,520,1.3,30.4,47.5,69.3,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+MEHRUM,hard coal,flexable_eom,hard coal,0.335,752,310,0.382,510,510,1.3,30.4,47.5,69.3,7,6,STADTWERKE HANNOVER AG
+LUENEN 2 STUMMHAFEN,hard coal,flexable_eom,hard coal,0.335,750,300,0.459,510,510,1.3,30.4,47.5,69.3,7,6,TRIANEL GMBH
+WEIHER 3,hard coal,flexable_eom,hard coal,0.335,707,290,0.373,480,480,1.3,30.4,47.5,69.3,7,6,STEAG GMBH
+GERSTEINWERK BLOCK K,hard coal,flexable_eom,hard coal,0.335,670,270,0.42,460,460,1.3,30.4,47.5,69.3,7,6,RWE POWER AG
+ROSTOCK 1,hard coal,flexable_eom,hard coal,0.335,553,230,0.432,380,380,1.3,30.4,47.5,69.3,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+RDK (KARLSRUHE) 7,hard coal,flexable_eom,hard coal,0.335,550,220,0.398,380,380,1.3,30.4,47.5,69.3,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+STAUDINGER 5,hard coal,flexable_eom,hard coal,0.335,510,210,0.412,350,350,1.3,30.4,47.5,69.3,7,6,UNIPER
+HERNE BLOCK 4,hard coal,flexable_eom,hard coal,0.335,500,200,0.405,340,340,1.3,30.4,47.5,69.3,7,6,STEAG GMBH
+GKM 8,hard coal,flexable_eom,hard coal,0.335,480,200,0.412,330,330,1.3,30.4,47.5,69.3,7,6,GROSSKRAFTWERK MANNHEIM AG
+GKM 7,hard coal,flexable_eom,hard coal,0.335,475,190,0.39,330,330,1.3,30.4,47.5,69.3,7,6,GROSSKRAFTWERK MANNHEIM AG
+ZOLLING LEININGER 5,hard coal,flexable_eom,hard coal,0.335,474,190,0.398,320,320,1.3,30.4,47.5,69.3,7,6,GDF SUEZ ENERGIE DEUTSCHLAND
+ALTBACH DEIZISAU HKW I,hard coal,flexable_eom,hard coal,0.335,460,190,0.398,320,320,1.3,30.4,47.5,69.3,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+WALSUM BLOCK 9,hard coal,flexable_eom,hard coal,0.335,410,170,0.406,280,280,1.3,30.4,47.5,69.3,7,6,STEAG GMBH
+SCHOLVEN C,hard coal,flexable_eom,hard coal,0.335,370,150,0.356,250,250,1.3,30.4,47.5,69.3,7,6,UNIPER
+SCHOLVEN B,hard coal,flexable_eom,hard coal,0.335,370,150,0.347,250,250,1.3,30.4,47.5,69.3,7,6,UNIPER
+HKW MUENCHEN NORD 2,hard coal,flexable_eom,hard coal,0.335,365,150,0.412,250,250,1.3,30.4,47.5,69.3,7,6,STADTWERKE MUENCHEN GMBH
+KIEL A,hard coal,flexable_eom,hard coal,0.335,354,150,0.356,240,240,1.3,30.4,47.5,69.3,7,6,UNIPER
+BREMEN FARGE,hard coal,flexable_eom,hard coal,0.335,350,140,0.356,240,240,1.3,30.4,47.5,69.3,7,6,GDF SUEZ ENERGIE DEUTSCHLAND
+ALTBACH DEIZISAU HKW II,hard coal,flexable_eom,hard coal,0.335,348,140,0.428,240,240,1.3,30.4,47.5,69.3,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+BREMEN HAFEN 6,hard coal,flexable_eom,hard coal,0.335,330,140,0.452,230,230,1.3,30.4,47.5,69.3,7,6,SWB AG
+WERDOHL ELVERLINGSEN E4,hard coal,flexable_eom,hard coal,0.335,315,130,0.39,220,220,1.3,30.4,47.5,69.3,7,6,ENERVIE - SUEDWESTFALEN ENERGIE
+GKH HANNOVER,hard coal,flexable_eom,hard coal,0.335,300,120,0.405,210,210,1.3,45.1,73.9,73.2,7,6,STADTWERKE HANNOVER AG
+HKW BERLIN REUTER WEST E,hard coal,flexable_eom,hard coal,0.335,300,120,0.405,210,210,1.3,45.1,73.9,73.2,7,6,VATTENFALL EUROPE AG
+HKW BERLIN REUTER WEST D,hard coal,flexable_eom,hard coal,0.335,300,120,0.382,210,210,1.3,45.1,73.9,73.2,7,6,VATTENFALL EUROPE AG
+GKM 6,hard coal,flexable_eom,hard coal,0.335,280,120,0.44,190,190,1.3,45.1,73.9,73.2,7,6,GROSSKRAFTWERK MANNHEIM AG
+HKW FENNE C,hard coal,flexable_eom,hard coal,0.335,212,90,0.405,150,150,1.3,45.1,73.9,73.2,7,6,STEAG GMBH
+MKW FENNE B,hard coal,flexable_eom,hard coal,0.335,195,80,0.39,140,140,1.3,45.1,73.9,73.2,7,6,STEAG GMBH
+HAMBURG TIEFSTACK,hard coal,flexable_eom,hard coal,0.335,180,80,0.412,130,130,1.3,45.1,73.9,73.2,7,6,VATTENFALL EUROPE AG
+WALHEIM 2,hard coal,flexable_eom,hard coal,0.335,160,70,0.338,110,110,1.3,45.1,73.9,73.2,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+WEDEL 1,hard coal,flexable_eom,hard coal,0.335,153,70,0.329,110,110,1.3,45.1,73.9,73.2,7,6,VATTENFALL EUROPE AG
+WEDEL 2,hard coal,flexable_eom,hard coal,0.335,137,60,0.329,100,100,1.3,45.1,73.9,73.2,7,6,VATTENFALL EUROPE AG
+KW BERLIN REUTER BlOCK C,hard coal,flexable_eom,hard coal,0.335,132,60,0.347,90,90,1.3,45.1,73.9,73.2,7,6,VATTENFALL EUROPE AG
+BREMEN HASTEDT 15,hard coal,flexable_eom,hard coal,0.335,130,60,0.405,90,90,1.3,45.1,73.9,73.2,7,6,SWB AG
+HEILBRONN 6,hard coal,flexable_eom,hard coal,0.335,125,50,0.347,90,90,1.3,45.1,73.9,73.2,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+HEILBRONN 5,hard coal,flexable_eom,hard coal,0.335,125,50,0.338,90,90,1.3,45.1,73.9,73.2,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+WALHEIM 1,hard coal,flexable_eom,hard coal,0.335,103,50,0.347,70,70,1.3,45.1,73.9,73.2,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+WUPPERTAL ELBERFELD 2,hard coal,flexable_eom,hard coal,0.335,102,50,0.405,70,70,1.3,45.1,73.9,73.2,7,6,WSW - WUPPERTALER STADTWERKE AG
+BERLIN MOABIT A,hard coal,flexable_eom,hard coal,0.335,102,50,0.404,70,70,1.3,45.1,73.9,73.2,7,6,VATTENFALL EUROPE AG
+FERNWAERMEKRAFTWERK BUER,hard coal,flexable_eom,hard coal,0.335,82,33,0.398,56,56,1.3,45.1,73.9,73.2,7,6,UNIPER
+STUTTGART MUENSTER K25,hard coal,flexable_eom,hard coal,0.335,70,28,0.38,48,48,1.3,45.1,73.9,73.2,7,6,ENBW ENERGIE BADEN-WURTTEMBERG
+HKW FRANKFURT WEST 2,hard coal,flexable_eom,hard coal,0.335,69,28,0.405,47,47,1.3,45.1,73.9,73.2,7,6,MAINOVA AG
+HKW FRANKFURT WEST 3,hard coal,flexable_eom,hard coal,0.335,69,28,0.405,47,47,1.3,45.1,73.9,73.2,7,6,MAINOVA AG
+HKW OFFENBACH 1,hard coal,flexable_eom,hard coal,0.335,64,26,0.406,44,44,1.3,45.1,73.9,73.2,7,6,EVS OFFENBACH AG
+HOECHST 3,hard coal,flexable_eom,hard coal,0.335,64,26,0.36,44,44,1.3,45.1,73.9,73.2,7,6,SUWAG ENERGIE AG
+ROEMERBRUCKE 2,hard coal,flexable_eom,hard coal,0.335,56,23,0.396,38,38,1.3,45.1,73.9,73.2,7,6,GDF SUEZ ENERGIE DEUTSCHLAND
+KARLSRUHE WEST 3,hard coal,flexable_eom,hard coal,0.335,42,17,0.388,29,29,1.3,45.1,73.9,73.2,7,6,STADTWERKE KARLSRUHE GMBH
+FLENSBURG 11,hard coal,flexable_eom,hard coal,0.335,38,16,0.388,26,26,1.3,45.1,73.9,73.2,7,6,STADTWERKE FLENSBURG GMBH
+FLENSBURG 09,hard coal,flexable_eom,hard coal,0.335,36,15,0.388,25,25,1.3,45.1,73.9,73.2,7,6,STADTWERKE FLENSBURG GMBH
+FLENSBURG 10,hard coal,flexable_eom,hard coal,0.335,36,15,0.386,25,25,1.3,45.1,73.9,73.2,7,6,STADTWERKE FLENSBURG GMBH
+KASSEL SWEW 1,hard coal,flexable_eom,hard coal,0.335,36,15,0.37,25,25,1.3,45.1,73.9,73.2,7,6,KASSELER VERKEHRS- UND VERSORGUNGS GMBH
+ROMERBRUCKE 3,hard coal,flexable_eom,hard coal,0.335,35,14,0.42,24,24,1.3,45.1,73.9,73.2,7,6,GDF SUEZ ENERGIE DEUTSCHLAND
+KARLSRUHE WEST 1,hard coal,flexable_eom,hard coal,0.335,32,13,0.388,22,22,1.3,45.1,73.9,73.2,7,6,STADTWERKE KARLSRUHE GMBH
+KARLSRUHE WEST 2,hard coal,flexable_eom,hard coal,0.335,32,13,0.388,22,22,1.3,45.1,73.9,73.2,7,6,STADTWERKE KARLSRUHE GMBH
+PFORZHEIM III NO 1,hard coal,flexable_eom,hard coal,0.335,30,12,0.405,21,21,1.3,45.1,73.9,73.2,7,6,SWP - STADTWERKE PFORZHEIM GMBH
+IRSCHING 5,combined cycle gas turbine,flexable_eom,natural gas,0.201,860,350,0.597,710,710,3.5,24.1,34.2,46.7,5,3,UNIPER
+EMSLAND LINGEN D,combined cycle gas turbine,flexable_eom,natural gas,0.201,850,340,0.592,710,702,3.5,24.1,34.2,46.7,5,3,RWE POWER AG
+GUD HUERTH KNAPSACK 1,combined cycle gas turbine,flexable_eom,natural gas,0.201,800,320,0.548,660,660,3.5,24.1,34.2,46.7,5,3,STATKRAFT AS
+KW LAUSWARD BLOCK FORTUNA GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,595,240,0.6,500,500,3.5,24.1,34.2,46.7,5,3,STADTWERKE DUESSELDORF
+DORMAGEN RWE,combined cycle gas turbine,flexable_eom,natural gas,0.201,580,240,0.523,480,480,3.5,24.1,34.2,46.7,5,3,RWE POWER AG
+IRSCHING 4,combined cycle gas turbine,flexable_eom,natural gas,0.201,565,230,0.59,470,470,3.5,24.1,34.2,46.7,5,3,UNIPER
+KW BASF LUDWIGSHAFEN MITTE,combined cycle gas turbine,flexable_eom,natural gas,0.201,490,200,0.56,410,410,3.5,24.1,34.2,46.7,5,3,BASF AG
+EMSLAND LINGEN B,combined cycle gas turbine,flexable_eom,natural gas,0.201,481,200,0.46,400,400,3.5,24.1,34.2,46.7,5,3,RWE POWER AG
+EMSLAND LINGEN C,combined cycle gas turbine,flexable_eom,natural gas,0.201,481,200,0.46,400,400,3.5,24.1,34.2,46.7,5,3,RWE POWER AG
+KW BREMEN MITTELSBUEREN BLOCK 5 GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,445,180,0.58,370,370,3.5,24.1,34.2,46.7,5,3,SWB AG
+BERLIN MITTE HKW,combined cycle gas turbine,flexable_eom,natural gas,0.201,444,180,0.488,370,370,3.5,24.1,34.2,46.7,5,3,VATTENFALL EUROPE AG
+GUD HUERTH KNAPSACK 2,combined cycle gas turbine,flexable_eom,natural gas,0.201,430,180,0.59,360,360,3.5,24.1,34.2,46.7,5,3,STATKRAFT AS
+HKW MUENCHEN SUED GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,426,180,0.54,360,360,3.5,24.1,34.2,46.7,5,3,STADTWERKE MUENCHEN GMBH
+KW LAUSWARD BLOCK EMIL GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,424,170,0.363,350,350,3.5,24.1,34.2,46.7,5,3,STADTWERKE DUESSELDORF
+KW HERDECKE CUNO MARK E,combined cycle gas turbine,flexable_eom,natural gas,0.201,417,170,0.548,350,350,3.5,24.1,34.2,46.7,5,3,ENERVIE - SUEDWESTFALEN ENERGIE
+GERSTEINWERK BLOCK F,combined cycle gas turbine,flexable_eom,natural gas,0.201,410,170,0.41,340,340,3.5,24.1,34.2,46.7,5,3,RWE POWER AG
+GERSTEINWERK BLOCK G,combined cycle gas turbine,flexable_eom,natural gas,0.201,410,170,0.41,340,340,3.5,24.1,34.2,46.7,5,3,RWE POWER AG
+KOELN NIEHL 2,combined cycle gas turbine,flexable_eom,natural gas,0.201,405,170,0.54,340,340,3.5,24.1,34.2,46.7,5,3,RHEINENERGIE AG
+HAMM UENTROP BLOCK 10,combined cycle gas turbine,flexable_eom,natural gas,0.201,400,160,0.575,330,330,3.5,24.1,34.2,46.7,5,3,TRIANEL GMBH
+HAMM UENTROP BLOCK 20,combined cycle gas turbine,flexable_eom,natural gas,0.201,400,160,0.575,330,330,3.5,24.1,34.2,46.7,5,3,TRIANEL GMBH
+MAINZ III,combined cycle gas turbine,flexable_eom,natural gas,0.201,397,160,0.58,330,330,3.5,24.1,34.2,46.7,5,3,KRAFTWERK MAINZ-WIESBADEN AG
+KW BASF LUDWIGSHAFEN SUED,combined cycle gas turbine,flexable_eom,natural gas,0.201,396,160,0.51,330,330,3.5,24.1,34.2,46.7,5,3,BASF AG
+RDK (KARLSRUHE) 4RP,combined cycle gas turbine,flexable_eom,natural gas,0.201,378,160,0.497,320,320,3.5,24.1,34.2,46.7,5,3,ENBW ENERGIE BADEN-WURTTEMBERG
+HKW DRESDEN NOSSENER BRUECKE,combined cycle gas turbine,flexable_eom,natural gas,0.201,268,110,0.48,230,230,3.5,24.1,34.2,46.7,5,3,DREWAG - STADTWERKE DRESDEN GMBH
+HKW HANNOVER LINDEN,combined cycle gas turbine,flexable_eom,natural gas,0.201,242,100,0.53,200,200,3.5,24.1,34.2,46.7,5,3,STADTWERKE HANNOVER AG
+HKW DUISBURG WANHEIM IIIB,combined cycle gas turbine,flexable_eom,natural gas,0.201,230,100,0.54,190,190,3.5,24.1,34.2,46.7,5,3,STADTWERKE DUISBURG AG
+HKW HAGEN KABEL,combined cycle gas turbine,flexable_eom,natural gas,0.201,230,100,0.39,190,190,3.5,24.1,34.2,46.7,5,3,ENERVIE - SUEDWESTFALEN ENERGIE
+HKW HOECHST BUSINESS PARK,combined cycle gas turbine,flexable_eom,natural gas,0.201,200,80,0.55,170,170,3.5,24.1,34.2,46.7,5,3,RWE POWER AG
+HKW JENA SUED,combined cycle gas turbine,flexable_eom,natural gas,0.201,195,80,0.48,170,170,3.5,24.1,34.2,46.7,5,3,UNIPER
+HKW LEIPZIG NORD GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,171,70,0.49,150,150,3.5,24.1,34.2,46.7,5,3,STADTWERKE LEIPZIG GMBH
+KIRCHMOESER,combined cycle gas turbine,flexable_eom,natural gas,0.201,165,70,0.471,140,140,3.5,24.1,34.2,46.7,5,3,UNIPER
+KW KIRCHLENGERN,combined cycle gas turbine,flexable_eom,natural gas,0.201,162,70,0.4,140,140,3.5,24.1,34.2,46.7,5,3,UNIPER
+HKW MUENCHEN FREIMANN GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,160,70,0.298,140,140,3.5,24.1,34.2,46.7,5,3,STADTWERKE MUENCHEN GMBH
+HAMBURG TIEFSTACK GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,156,70,0.556,130,130,3.5,24.1,34.2,46.7,5,3,VATTENFALL EUROPE AG
+HKW SAARBRUECKEN ROEMERBRUECKE GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,132,60,0.54,110,110,3.5,24.1,34.2,46.7,5,3,GDF SUEZ ENERGIE DEUTSCHLAND
+GUD LEUNA,combined cycle gas turbine,flexable_eom,natural gas,0.201,129,60,0.57,110,110,3.5,24.1,34.2,46.7,5,3,STEAG GMBH
+HKW ERFURT OST,combined cycle gas turbine,flexable_eom,natural gas,0.201,117,50,0.506,100,100,3.5,24.1,34.2,46.7,5,3,SWE STADTWERKE ERFURT GMBH
+GUD BITTERFELD ENVIA,combined cycle gas turbine,flexable_eom,natural gas,0.201,114,50,0.505,100,100,3.5,24.1,34.2,46.7,5,3,ENVIA MITTELDEUTSCHE ENERGIE
+GUD ANLAGE RÜSSELSHEIM OPEL,combined cycle gas turbine,flexable_eom,natural gas,0.201,112,50,0.506,100,100,3.5,24.1,34.2,46.7,5,3,OPEL EUROPE
+GUD ROSTOCK MARIENEHE,combined cycle gas turbine,flexable_eom,natural gas,0.201,111,50,0.48,100,100,3.5,24.1,34.2,46.7,5,3,STADTWERKE ROSTOCK AG
+HKW KOELN MERKENICH GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,110,50,0.505,100,100,3.5,24.1,34.2,46.7,5,3,RHEINENERGIE AG
+GUD MUENSTER HAFEN,combined cycle gas turbine,flexable_eom,natural gas,0.201,100,40,0.54,90,90,3.5,24.1,34.2,46.7,5,3,STADTWERKE MUENSTER
+KW LAUSWARD BLOCK ANTON GUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,100,40,0.54,90,90,3.5,24.1,34.2,46.7,5,3,STADTWERKE DUESSELDORF
+KW PLATTLING DAIMLER AG,combined cycle gas turbine,flexable_eom,natural gas,0.201,98,40,0.522,81,81,3.5,24.1,34.2,46.7,5,3,UNIPER
+HALLE TROTHA,combined cycle gas turbine,flexable_eom,natural gas,0.201,97,39,0.525,81,81,3.5,24.1,34.2,46.7,5,3,EVH GMBH
+HKW BARMEN I WUPPERTAL,combined cycle gas turbine,flexable_eom,natural gas,0.201,88,36,0.54,73,73,3.5,24.1,34.2,46.7,5,3,WSW - WUPPERTALER STADTWERKE AG
+HKW POTSDAM SUED,combined cycle gas turbine,flexable_eom,natural gas,0.201,81,33,0.47,67,67,3.5,24.1,34.2,46.7,5,3,EWP - ENERGIE UND WASSER POTSDAM
+HKW FRANKFURT ODER AM HOHEN FELD,combined cycle gas turbine,flexable_eom,natural gas,0.201,78,32,0.4,65,65,3.5,24.1,34.2,46.7,5,3,STADTWERKE FRANKFURT (ODER)
+HKW SANDREUTH 1 NUERNBERG,combined cycle gas turbine,flexable_eom,natural gas,0.201,75,30,0.52,62,62,3.5,24.1,34.2,46.7,5,3,N-ERGIE AG
+HKW SANDREUTH 2 NUERNBERG,combined cycle gas turbine,flexable_eom,natural gas,0.201,75,30,0.52,62,62,3.5,24.1,34.2,46.7,5,3,N-ERGIE AG
+HKW GUD NEUBRANDENBURG,combined cycle gas turbine,flexable_eom,natural gas,0.201,75,30,0.489,62,62,3.5,24.1,34.2,46.7,5,3,NEUBRANDENBURGER STADTWERKE
+GUD GERA NORD,combined cycle gas turbine,flexable_eom,natural gas,0.201,74,30,0.489,62,62,3.5,24.1,34.2,46.7,5,3,GDF SUEZ ENERGIE DEUTSCHLAND
+HKW FLENSBURG 12,combined cycle gas turbine,flexable_eom,natural gas,0.201,73,30,0.51,61,61,3.5,24.1,34.2,46.7,5,3,STADTWERKE FLENSBURG GMBH
+SCHWERIN SUD,combined cycle gas turbine,flexable_eom,natural gas,0.201,70,28,0.471,58,58,3.5,24.1,34.2,46.7,5,3,STADTWERKE SCHWERIN
+FREIBURG WVK,combined cycle gas turbine,flexable_eom,natural gas,0.201,60,24,0.48,50,50,3.5,24.1,34.2,46.7,5,3,BADENOVA AG & CO KG
+PKV KRAFTWERK VAREL,combined cycle gas turbine,flexable_eom,natural gas,0.201,58,24,0.38,48,48,3.5,24.1,34.2,46.7,5,3,PAPIER- UND KARTONFABRIK VAREL
+KW BASF LUDWIGSHAFEN NORD,combined cycle gas turbine,flexable_eom,natural gas,0.201,56,23,0.38,47,47,3.5,24.1,34.2,46.7,5,3,BASF AG
+HKW ELTMANN,combined cycle gas turbine,flexable_eom,natural gas,0.201,54,22,0.41,45,45,3.5,24.1,34.2,46.7,5,3,PAPIERFABRIK PALM GMBH & CO KG
+HKW KASSEL KOMBI,combined cycle gas turbine,flexable_eom,natural gas,0.201,53,22,0.426,44,44,3.5,24.1,34.2,46.7,5,3,KASSELER VERKEHRS- UND VERSORGUNGS GMBH
+KW HALLE DIESELSTRASSE BLOCK 1,combined cycle gas turbine,flexable_eom,natural gas,0.201,47,19,0.44,39,39,3.5,24.1,34.2,46.7,5,3,EVH GMBH
+KW HALLE DIESELSTRASSE BLOCK 2,combined cycle gas turbine,flexable_eom,natural gas,0.201,47,19,0.44,39,39,3.5,24.1,34.2,46.7,5,3,EVH GMBH
+HKW FRIEDENSBRUECKE BLOCK IV,combined cycle gas turbine,flexable_eom,natural gas,0.201,45,18,0.38,38,38,3.5,24.1,34.2,46.7,5,3,WVV - WUERZBURGER VERSORGUNGS- und VERKEHRS GMBH
+HKW HILTROP BOCHUM,combined cycle gas turbine,flexable_eom,natural gas,0.201,44,18,0.43,37,37,3.5,24.1,34.2,46.7,5,3,STADTWERKE BOCHUM AG
+HKW PFORZHEIM,combined cycle gas turbine,flexable_eom,natural gas,0.201,41,17,0.326,34,34,3.5,24.1,34.2,46.7,5,3,SWP - STADTWERKE PFORZHEIM GMBH
+KW GRENZACH WYHLEN 1,combined cycle gas turbine,flexable_eom,natural gas,0.201,40,16,0.531,33,33,3.5,24.1,34.2,46.7,5,3,UNIPER
+HKW SUD SAARBRUECKEN,combined cycle gas turbine,flexable_eom,natural gas,0.201,39,16,0.59,33,33,3.5,24.1,34.2,46.7,5,3,VVS SAARBRUECKEN
+GUD BIELEFELD HILLEGOSSEN,combined cycle gas turbine,flexable_eom,natural gas,0.201,38,16,0.54,32,32,3.5,24.1,34.2,46.7,5,3,STADTWERKE BIELEFELD GMBH
+HKW UNTERBREIZBACH,combined cycle gas turbine,flexable_eom,natural gas,0.201,34,14,0.315,29,29,3.5,24.1,34.2,46.7,5,3,K+S AG
+HKW ERLANGEN,combined cycle gas turbine,flexable_eom,natural gas,0.201,30,12,0.54,25,25,3.5,24.1,34.2,46.7,5,3,ESTW - ERLANGER STADTWERKE AG
+HKW FRIEDENSBRUECKE BLOCK II,combined cycle gas turbine,flexable_eom,natural gas,0.201,30,12,0.38,25,25,3.5,24.1,34.2,46.7,5,3,WVV - WUERZBURGER VERSORGUNGS- und VERKEHRS GMBH
+KWK ANLAGE KREFELD,combined cycle gas turbine,flexable_eom,natural gas,0.201,26,11,0.42,22,22,3.5,24.1,34.2,46.7,5,3,LANXESS
+KWK ANLAGE NEUSTADT,combined cycle gas turbine,flexable_eom,natural gas,0.201,26,11,0.34,22,22,3.5,24.1,34.2,46.7,5,3,STADTWERKE NEUSTADT
+HKW SCHWERIN LANKOW,combined cycle gas turbine,flexable_eom,natural gas,0.201,24,10,0.471,20,20,3.5,24.1,34.2,46.7,5,3,STADTWERKE SCHWERIN
+KWK ANLAGE MOHN MEDIA GÜTERSLOH,combined cycle gas turbine,flexable_eom,natural gas,0.201,22,9,0.45,19,19,3.5,24.1,34.2,46.7,5,3,MOHN MEDIA
+HKW HBB RAUBLING,combined cycle gas turbine,flexable_eom,natural gas,0.201,21,9,0.46,18,18,3.5,24.1,34.2,46.7,5,3,ROMAN BAUERNFEIND PAPIERFABRIK
+KW STAUDINGER 4,open cycle gas turbine,flexable_eom,natural gas,0.201,622,160,0.317,622,622,5.5,17.1,21.8,29.6,0,0,UNIPER
+NUERNBERG FRANKEN 1,open cycle gas turbine,flexable_eom,natural gas,0.201,440,110,0.363,440,440,5.5,17.1,21.8,29.6,0,0,UNIPER
+IRSCHING 3,open cycle gas turbine,flexable_eom,natural gas,0.201,440,110,0.308,440,440,5.5,17.1,21.8,29.6,0,0,UNIPER
+KW HUNTORF CAES GT,open cycle gas turbine,flexable_eom,natural gas,0.201,321,90,0.31,321,321,5.5,17.1,21.8,29.6,0,0,UNIPER
+KW DUISBURG HUCKINGEN BLOCK A,open cycle gas turbine,flexable_eom,natural gas,0.201,303,80,0.363,303,303,5.5,17.1,21.8,29.6,0,0,STADTWERKE DUISBURG AG
+KW DUISBURG HUCKINGEN BLOCK B,open cycle gas turbine,flexable_eom,natural gas,0.201,303,80,0.363,303,303,5.5,17.1,21.8,29.6,0,0,STADTWERKE DUISBURG AG
+KW WEISWEILER VGT BLOCK G,open cycle gas turbine,flexable_eom,natural gas,0.201,272,70,0.377,272,272,5.5,17.1,21.8,29.6,0,0,RWE POWER AG
+KW WEISWEILER VGT BLOCK H,open cycle gas turbine,flexable_eom,natural gas,0.201,272,70,0.377,272,272,5.5,17.1,21.8,29.6,0,0,RWE POWER AG
+DKW BGH O1 BURGHAUSEN WACKER CHEMIE,open cycle gas turbine,flexable_eom,natural gas,0.201,178,50,0.36,178,178,5.5,17.1,21.8,29.6,0,0,WACKER-CHEMIE GMBH
+KW MITTELSBUEREN BLOCK 4,open cycle gas turbine,flexable_eom,natural gas,0.201,150,40,0.374,150,150,5.5,17.1,21.8,29.6,0,0,SWB AG
+KW BREMEN HASTEDT 14,open cycle gas turbine,flexable_eom,natural gas,0.201,150,40,0.298,150,150,5.5,17.1,21.8,29.6,0,0,SWB AG
+LICHTERFELDE 2,open cycle gas turbine,flexable_eom,natural gas,0.201,150,40,0.298,150,150,5.5,17.1,21.8,29.6,0,0,VATTENFALL EUROPE AG
+KW HANNOVER HERRENHAUSEN B,open cycle gas turbine,flexable_eom,natural gas,0.201,100,30,0.38,100,100,5.5,17.1,21.8,29.6,0,0,STADTWERKE HANNOVER AG
+HKW FRANKFURT WEST GT,open cycle gas turbine,flexable_eom,natural gas,0.201,98,25,0.352,98,98,5.5,17.1,21.8,29.6,0,0,MAINOVA AG
+KW MAINZ II GT,open cycle gas turbine,flexable_eom,natural gas,0.201,94,24,0.41,94,94,5.5,17.1,21.8,29.6,0,0,KRAFTWERK MAINZ-WIESBADEN AG
+KW MARL BLOCK 312 EVONIK,open cycle gas turbine,flexable_eom,natural gas,0.201,78,20,0.4,78,78,5.5,17.1,21.8,29.6,0,0,EVONIK INDUSTRIES AG
+CHARLOTTENBURG GT 1,open cycle gas turbine,flexable_eom,natural gas,0.201,71,18,0.308,71,71,5.5,17.1,21.8,29.6,0,0,VATTENFALL EUROPE AG
+CHARLOTTENBURG GT 2,open cycle gas turbine,flexable_eom,natural gas,0.201,71,18,0.308,71,71,5.5,17.1,21.8,29.6,0,0,VATTENFALL EUROPE AG
+HKW CHEMNITZ NORD II BLOCK A,open cycle gas turbine,flexable_eom,natural gas,0.201,67,17,0.335,67,67,5.5,17.1,21.8,29.6,0,0,EINS ENERGIE IN SACHSEN GMBH
+INDUSTRIEKRAFTWERK BERNBURG (IKB),open cycle gas turbine,flexable_eom,natural gas,0.201,66,17,0.36,66,66,5.5,17.1,21.8,29.6,0,0,SOLVAY SA
+ALTBACH II GT E,open cycle gas turbine,flexable_eom,natural gas,0.201,65,17,0.361,65,65,5.5,17.1,21.8,29.6,0,0,ENBW ENERGIE BADEN-WURTTEMBERG
+KW OBERNBURG GT1,open cycle gas turbine,flexable_eom,natural gas,0.201,64,16,0.36,64,64,5.5,17.1,21.8,29.6,0,0,AKZO NOBEL FIBERS BV
+GTKW BIELEFELD UMMELN,open cycle gas turbine,flexable_eom,natural gas,0.201,60,15,0.31,60,60,5.5,17.1,21.8,29.6,0,0,STADTWERKE BIELEFELD GMBH
+CHARLOTTENBURG GT 3,open cycle gas turbine,flexable_eom,natural gas,0.201,60,15,0.308,60,60,5.5,17.1,21.8,29.6,0,0,VATTENFALL EUROPE AG
+KW LANDESBERGEN GT,open cycle gas turbine,flexable_eom,natural gas,0.201,56,14,0.345,56,56,5.5,17.1,21.8,29.6,0,0,STATKRAFT AS
+GERSTEINWERK BLOCK I GT,open cycle gas turbine,flexable_eom,natural gas,0.201,55,14,0.308,55,55,5.5,17.1,21.8,29.6,0,0,RWE POWER AG
+KW ZIELITZ,open cycle gas turbine,flexable_eom,natural gas,0.201,52,13,0.41,52,52,5.5,17.1,21.8,29.6,0,0,K+S AG
+KW EMDEN BLOCK 4 GT,open cycle gas turbine,flexable_eom,natural gas,0.201,50,13,0.308,50,50,5.5,17.1,21.8,29.6,0,0,STATKRAFT AS
+IKW GENDORF INFRASERV,open cycle gas turbine,flexable_eom,natural gas,0.201,49,13,0.369,49,49,5.5,9.3,9.3,9.3,0,0,INFRASERV
+GTKW DARMSTADT GT 1,open cycle gas turbine,flexable_eom,natural gas,0.201,47,12,0.396,47,47,5.5,9.3,9.3,9.3,0,0,ENTEGA AG
+GTKW DARMSTADT GT 2,open cycle gas turbine,flexable_eom,natural gas,0.201,47,12,0.396,47,47,5.5,9.3,9.3,9.3,0,0,ENTEGA AG
+UPM SCHONGAU,open cycle gas turbine,flexable_eom,natural gas,0.201,45,12,0.308,45,45,5.5,9.3,9.3,9.3,0,0,UPM OYJ
+WOLFEN ENVIA,open cycle gas turbine,flexable_eom,natural gas,0.201,40,10,0.361,40,40,5.5,9.3,9.3,9.3,0,0,ENVIA MITTELDEUTSCHE ENERGIE
+HKW DUISBURG WANHEIM IIIA,open cycle gas turbine,flexable_eom,natural gas,0.201,40,10,0.36,40,40,5.5,9.3,9.3,9.3,0,0,STADTWERKE DUISBURG AG
+KW LEUNA GT 3,open cycle gas turbine,flexable_eom,natural gas,0.201,38,10,0.36,38,38,5.5,9.3,9.3,9.3,0,0,STEAG GMBH
+AHRENSFELDE GT D,open cycle gas turbine,flexable_eom,natural gas,0.201,38,10,0.353,38,38,5.5,9.3,9.3,9.3,0,0,VATTENFALL EUROPE AG
+AHRENSFELDE GT A,open cycle gas turbine,flexable_eom,natural gas,0.201,38,10,0.344,38,38,5.5,9.3,9.3,9.3,0,0,VATTENFALL EUROPE AG
+AHRENSFELDE GT B,open cycle gas turbine,flexable_eom,natural gas,0.201,38,10,0.344,38,38,5.5,9.3,9.3,9.3,0,0,VATTENFALL EUROPE AG
+THYROW GT E,open cycle gas turbine,flexable_eom,natural gas,0.201,38,10,0.344,38,38,5.5,9.3,9.3,9.3,0,0,VATTENFALL EUROPE AG
+AHRENSFELDE GT C,open cycle gas turbine,flexable_eom,natural gas,0.201,38,10,0.343,38,38,5.5,9.3,9.3,9.3,0,0,VATTENFALL EUROPE AG
+INGOLSTADT 3,oil,flexable_eom,oil,0.776,400,100,0.308,400,400,5.5,20.7,35.8,45.1,0,0,UNIPER
+INGOLSTADT 4,oil,flexable_eom,oil,0.776,400,100,0.308,400,400,5.5,20.7,35.8,45.1,0,0,UNIPER
+MARBACH 3,oil,flexable_eom,oil,0.776,275,70,0.308,275,275,5.5,20.7,35.8,45.1,0,0,ENBW ENERGIE BADEN-WURTTEMBERG
+LICHTERFELDE 1,oil,flexable_eom,oil,0.776,150,40,0.298,150,150,5.5,20.7,35.8,45.1,0,0,VATTENFALL EUROPE AG
+WALHEIM GT 1,oil,flexable_eom,oil,0.776,120,30,0.326,120,120,5.5,20.7,35.8,45.1,0,0,ENBW ENERGIE BADEN-WURTTEMBERG
+BARMEN II,oil,flexable_eom,oil,0.776,111,30,0.339,111,111,5.5,20.7,35.8,45.1,0,0,WSW - WUPPERTALER STADTWERKE AG
+WILMERSDORF GT 2,oil,flexable_eom,oil,0.776,110,30,0.307,110,110,5.5,20.7,35.8,45.1,0,0,VATTENFALL EUROPE AG
+WILMERSDORF GT 3,oil,flexable_eom,oil,0.776,110,30,0.307,110,110,5.5,20.7,35.8,45.1,0,0,VATTENFALL EUROPE AG
+WERDOHL ELVERLINGSEN 2,oil,flexable_eom,oil,0.776,107,30,0.307,107,107,5.5,20.7,35.8,45.1,0,0,ENERVIE - SUEDWESTFALEN ENERGIE
+WERDOHL ELVERLINGSEN 1,oil,flexable_eom,oil,0.776,98,25,0.308,98,98,5.5,20.7,35.8,45.1,0,0,ENERVIE - SUEDWESTFALEN ENERGIE
+ALTBACH I GT 3,oil,flexable_eom,oil,0.776,97,25,0.298,97,97,5.5,20.7,35.8,45.1,0,0,ENBW ENERGIE BADEN-WURTTEMBERG
+MITTELSBUEREN GT 3,oil,flexable_eom,oil,0.776,88,22,0.308,88,88,5.5,20.7,35.8,45.1,0,0,SWB AG
+FLINGERN GT 1,oil,flexable_eom,oil,0.776,77,20,0.298,77,77,5.5,20.7,35.8,45.1,0,0,ENBW ENERGIE BADEN-WURTTEMBERG
+ALTBACH I GT 2,oil,flexable_eom,oil,0.776,75,19,0.298,75,75,5.5,20.7,35.8,45.1,0,0,ENBW ENERGIE BADEN-WURTTEMBERG
+MARBACH 3 GT 1,oil,flexable_eom,oil,0.776,60,15,0.35,60,60,5.5,20.7,35.8,45.1,0,0,ENBW ENERGIE BADEN-WURTTEMBERG
+MARIENEHE 1,oil,flexable_eom,oil,0.776,60,15,0.35,60,60,5.5,20.7,35.8,45.1,0,0,UNIPER
+WILHELMSHAVEN GT 1,oil,flexable_eom,oil,0.776,56,14,0.308,56,56,5.5,20.7,35.8,45.1,0,0,UNIPER
+NUERNBERG FRANKEN I GT 1,oil,flexable_eom,oil,0.776,53,14,0.308,53,53,5.5,20.7,35.8,45.1,0,0,UNIPER
+WEDEL GT 1,oil,flexable_eom,oil,0.776,51,13,0.298,51,51,5.5,20.7,35.8,45.1,0,0,VATTENFALL EUROPE AG
+WEDEL GT 2,oil,flexable_eom,oil,0.776,51,13,0.298,51,51,5.5,20.7,35.8,45.1,0,0,VATTENFALL EUROPE AG
+ALTBACH I NO 5 GT 1,oil,flexable_eom,oil,0.776,50,13,0.298,50,50,5.5,20.7,35.8,45.1,0,0,ENBW ENERGIE BADEN-WURTTEMBERG
+PEISSENBERG 1,oil,flexable_eom,oil,0.776,44,11,0.326,44,44,5.5,9.3,9.3,9.3,0,0,PEISSENBERGER KRAFTWERKS GMBH
+GROSSKAYNA GT 1,oil,flexable_eom,oil,0.776,38,10,0.352,38,38,5.5,9.3,9.3,9.3,0,0,ENVIA MITTELDEUTSCHE ENERGIE
+GROSSKAYNA GT 2,oil,flexable_eom,oil,0.776,38,10,0.352,38,38,5.5,9.3,9.3,9.3,0,0,ENVIA MITTELDEUTSCHE ENERGIE
+GROSSKAYNA GT 3,oil,flexable_eom,oil,0.776,38,10,0.352,38,38,5.5,9.3,9.3,9.3,0,0,ENVIA MITTELDEUTSCHE ENERGIE

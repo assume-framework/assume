@@ -4,7 +4,6 @@
 
 import logging
 import os
-import random
 
 import torch as th
 from torch.nn import functional as F
@@ -393,12 +392,6 @@ class TD3(RLAlgorithm):
             for _ in range(self.gradient_steps)
         ]
 
-        # Randomly select a subset of strategies to update
-        if n_rl_agents > 3:
-            selected_strategies = random.sample(strategies, k=int(n_rl_agents / 3))
-        else:
-            selected_strategies = strategies
-
         # update noise decay and learning rate
         updated_noise_decay = self.learning_role.calc_noise_from_progress(
             self.learning_role.get_progress_remaining()
@@ -409,7 +402,7 @@ class TD3(RLAlgorithm):
         )
 
         # loop over all units to avoid update call for every gradient step, as it will be ambiguous
-        for strategy in selected_strategies:
+        for strategy in strategies:
             self.update_learning_rate(
                 [
                     strategy.critics.optimizer,
@@ -462,16 +455,13 @@ class TD3(RLAlgorithm):
             #####################################################################
 
             # Zero-grad for all critics before accumulation
-            for strategy in selected_strategies:
+            for strategy in strategies:
                 strategy.critics.optimizer.zero_grad(set_to_none=True)
 
             total_critic_loss = 0.0
 
             # Loop over all agents and accumulate critic loss
             for i, strategy in enumerate(strategies):
-                if strategy not in selected_strategies:
-                    continue
-
                 actor = strategy.actor
                 critic = strategy.critics
                 critic_target = strategy.target_critics
@@ -532,7 +522,7 @@ class TD3(RLAlgorithm):
             total_critic_loss.backward()
 
             # Clip the gradients and step each critic optimizer
-            for strategy in selected_strategies:
+            for strategy in strategies:
                 parameters = list(strategy.critics.parameters())
 
                 # Determine clipping statistics
@@ -553,16 +543,13 @@ class TD3(RLAlgorithm):
             ######################################################################
             if self.n_updates % self.policy_delay == 0:
                 # Zero-grad for all actors first
-                for strategy in selected_strategies:
+                for strategy in strategies:
                     strategy.actor.optimizer.zero_grad(set_to_none=True)
 
                 total_actor_loss = 0.0
 
                 # We'll compute each agent's actor loss, accumulate, then do one backprop
-                for i, strategy in enumerate(selected_strategies):
-                    if strategy not in selected_strategies:
-                        continue
-
+                for i, strategy in enumerate(strategies):
                     actor = strategy.actor
                     critic = strategy.critics
 
@@ -605,7 +592,7 @@ class TD3(RLAlgorithm):
                 total_actor_loss.backward()
 
                 # Clip and step each actor optimizer
-                for strategy in selected_strategies:
+                for strategy in strategies:
                     th.nn.utils.clip_grad_norm_(
                         strategy.actor.parameters(), max_norm=self.grad_clip_norm
                     )
@@ -618,7 +605,7 @@ class TD3(RLAlgorithm):
                 all_actor_params = []
                 all_target_actor_params = []
 
-                for strategy in selected_strategies:
+                for strategy in strategies:
                     all_critic_params.extend(strategy.critics.parameters())
                     all_target_critic_params.extend(
                         strategy.target_critics.parameters()
