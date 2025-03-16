@@ -214,7 +214,9 @@ class Storage(SupportsMinMaxCharge):
                 delta_soc = -current_power * time_delta * self.efficiency_charge
 
             # update the values of the state of charge and the energy
-            self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
+            next_freq = t + self.index.freq
+            if next_freq in self.index:
+                self.outputs["soc"].at[next_freq] = soc + delta_soc
             self.outputs["energy"].at[t] = current_power
 
         return self.outputs["energy"].loc[start:end]
