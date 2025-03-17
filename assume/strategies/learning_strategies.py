@@ -827,9 +827,6 @@ class StorageRLStrategy(AbstractLearningStrategy):
                     "end_time": end_all,
                     "only_hours": None,
                     "price": bid_price,
-                    # zero bids are ignored by the market clearing and orders are deleted,
-                    # but we need the orderbook for the DRL to function,
-                    # therefore we add a small amount
                     "volume": bid_quantity_supply,
                     "node": unit.node,
                 }
