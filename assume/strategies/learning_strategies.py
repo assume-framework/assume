@@ -859,7 +859,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
     def get_actions(self, next_observation):
         """
-        Determines actions based on observations and optionally applies noise for exploration.
+        Determines one action for the storage bidding based on observations and optionally applies noise for exploration.
 
         Args
         ----
