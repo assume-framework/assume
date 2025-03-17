@@ -189,8 +189,8 @@ class RLUnitsOperator(UnitsOperator):
         )
         all_rewards = []
 
-        # Iterate through each RL unit and collect all of their observations, actions, and rewards besides the very last one
-        # leaving out the latest tuple nesures that data is not stored away for which the reward was notcalculated yet 
+        # Iterate through each RL unit and collect all of their observations, actions, and rewards 
+        # making it dependent on values_len ensures that data is not stored away for which the reward was not calculated yet
         for i, unit in enumerate(self.rl_units):
             # Convert pandas Series to torch Tensor
             obs_tensor = th.stack(unit.outputs["rl_observations"][:values_len], dim=0)
@@ -199,7 +199,6 @@ class RLUnitsOperator(UnitsOperator):
             all_observations[:, i, :] = obs_tensor
             all_actions[:, i, :] = actions_tensor
             all_rewards.append(unit.outputs["rl_rewards"])
-        
 
             # reset the outputs
             unit.reset_saved_rl_data()
