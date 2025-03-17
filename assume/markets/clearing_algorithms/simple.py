@@ -147,7 +147,7 @@ class PayAsClearRole(MarketRole):
             # these will be rejected
             for order in product_orders:
                 # if the order was not accepted partially, it is rejected
-                if not order.get("accepted_volume"):
+                if not order.get("accepted_volume") and order not in rejected_orders:
                     rejected_orders.append(order)
 
             # set clearing price - merit order - uniform pricing
@@ -284,7 +284,7 @@ class PayAsBidRole(MarketRole):
             # these will be rejected
             for order in product_orders:
                 # if the order was not accepted partially, it is rejected
-                if not order.get("accepted_volume"):
+                if not order.get("accepted_volume") and order not in rejected_orders:
                     rejected_orders.append(order)
 
             accepted_product_orders = accepted_demand_orders + accepted_supply_orders
