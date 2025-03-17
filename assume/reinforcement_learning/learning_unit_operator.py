@@ -127,12 +127,8 @@ class RLUnitsOperator(UnitsOperator):
                 action_dim = action_tuple.numel()
 
                 for i in range(action_dim):
-                    output_dict[f"exploration_noise_{i}"] = (
-                        noise_tuple[i] if action_dim > 1 else noise_tuple
-                    )
-                    output_dict[f"actions_{i}"] = (
-                        action_tuple[i] if action_dim > 1 else action_tuple
-                    )
+                    output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+                    output_dict[f"actions_{i}"] = action_tuple[i]
 
                 output_agent_list.append(output_dict)
 
@@ -161,9 +157,26 @@ class RLUnitsOperator(UnitsOperator):
         obs_dim = self.learning_strategies["obs_dim"]
         act_dim = self.learning_strategies["act_dim"]
         device = self.learning_strategies["device"]
+
         learning_unit_count = len(self.rl_units)
 
-        values_len = len(self.rl_units[0].outputs["rl_rewards"])
+        # Collect the number of reward values for each unit.
+        # This represents how many complete transitions we have for each unit.
+        # Using a set ensures we capture only unique lengths across all units.
+        values_len_set = {len(unit.outputs["rl_rewards"]) for unit in self.rl_units}
+
+        # Check if all units have the same number of reward values.
+        # If the set contains more than one unique length, it means at least one unit
+        # has a different number of rewards, indicating an inconsistency.
+        # This is considered an error condition, so we raise an exception.
+        if len(values_len_set) > 1:
+            raise ValueError(
+                "Mismatch in reward value lengths: All units must have the same number of rewards."
+            )
+
+        # Since all units have the same length, extract the common length
+        values_len = values_len_set.pop()
+
         # return if no data is available
         if values_len == 0:
             return
@@ -176,12 +189,12 @@ class RLUnitsOperator(UnitsOperator):
         )
         all_rewards = []
 
+        # Iterate through each RL unit and collect all of their observations, actions, and rewards 
+        # making it dependent on values_len ensures that data is not stored away for which the reward was not calculated yet
         for i, unit in enumerate(self.rl_units):
             # Convert pandas Series to torch Tensor
             obs_tensor = th.stack(unit.outputs["rl_observations"][:values_len], dim=0)
-            actions_tensor = th.stack(
-                unit.outputs["rl_actions"][:values_len], dim=0
-            ).reshape(-1, act_dim)
+            actions_tensor = th.stack(unit.outputs["rl_actions"][:values_len], dim=0)
 
             all_observations[:, i, :] = obs_tensor
             all_actions[:, i, :] = actions_tensor
@@ -190,20 +203,11 @@ class RLUnitsOperator(UnitsOperator):
             # reset the outputs
             unit.reset_saved_rl_data()
 
-        # convert all_actions list of tensor to numpy 2D array
-        all_observations = (
-            all_observations.squeeze()
-            .cpu()
-            .numpy()
-            .reshape(-1, learning_unit_count, obs_dim)
-        )
-        all_actions = (
-            all_actions.squeeze()
-            .cpu()
-            .numpy()
-            .reshape(-1, learning_unit_count, act_dim)
-        )
-        all_rewards = np.array(all_rewards).reshape(-1, learning_unit_count)
+        all_observations = all_observations.numpy(force=True)
+        all_actions = all_actions.numpy(force=True)
+
+        all_rewards = np.array(all_rewards).T
+
         rl_agent_data = (all_observations, all_actions, all_rewards)
 
         learning_role_addr = self.context.data.get("learning_agent_addr")

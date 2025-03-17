@@ -320,7 +320,7 @@ class BaseUnit:
 
     def reset_saved_rl_data(self):
         """
-        Resets the saved RL data.
+        Resets the saved RL data. This delets all data besides the observation and action where we do not yet have calculated reward values.
         """
         values_len = len(self.outputs["rl_rewards"])
 
