@@ -3,27 +3,29 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base_case_2019:
+  simulation_id: example_03a_with_storage_2
   start_date: 2019-03-01 00:00
-  end_date: 2019-03-31 00:00
+  end_date: 2019-05-30 00:00
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
 
   learning_config:
-    continue_learning: false
+    continue_learning: true
     trained_policies_save_path: null
+    trained_policies_load_path: learned_strategies\example_03a_with_storage\avg_reward_eval_policies
     max_bid_price: 100
     algorithm: matd3
-    learning_rate: 0.0001
-    # learning_rate_schedule: linear
+    learning_rate: 0.001
+    learning_rate_schedule: linear
     training_episodes: 100
     episodes_collecting_initial_experience: 5
-    train_freq: 10h
-    gradient_steps: 1
-    batch_size: 128
-    gamma: 0.99
+    train_freq: 720h
+    gradient_steps: 720
+    batch_size: 256
+    gamma: 0.999
     device: cuda:0
-    # action_noise_schedule: linear
+    action_noise_schedule: linear
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
