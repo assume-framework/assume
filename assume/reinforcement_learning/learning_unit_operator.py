@@ -189,6 +189,8 @@ class RLUnitsOperator(UnitsOperator):
         )
         all_rewards = []
 
+        # Iterate through each RL unit and collect all of their observations, actions, and rewards besides the very last one
+        # leaving out the latest tuple nesures that data is not stored away for which the reward was notcalculated yet 
         for i, unit in enumerate(self.rl_units):
             # Convert pandas Series to torch Tensor
             obs_tensor = th.stack(unit.outputs["rl_observations"][:values_len], dim=0)
@@ -197,6 +199,13 @@ class RLUnitsOperator(UnitsOperator):
             all_observations[:, i, :] = obs_tensor
             all_actions[:, i, :] = actions_tensor
             all_rewards.append(unit.outputs["rl_rewards"])
+            
+            # ensure length reward is one value smaller than observation and action othwerwise throw warning
+            if len(unit.outputs["rl_observations"]) != values_len + 1:
+                logger.warning(
+                    f" Unit {unit.id} has unexpected observation length: expected {values_len + 1}, got {len(unit.outputs['rl_observations'])}. You are risking mismatched experiences."
+                )
+   
 
             # reset the outputs
             unit.reset_saved_rl_data()

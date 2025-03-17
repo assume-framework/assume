@@ -321,6 +321,7 @@ class BaseUnit:
     def reset_saved_rl_data(self):
         """
         Resets the saved RL data. This delets all data besides the last observation and action.
+        During writing of the experience the reward of the timestep is not yet calculated. Therefore, observation and action of the last timestep are kept here.  
         """
         values_len = len(self.outputs["rl_rewards"])
 
