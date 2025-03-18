@@ -175,6 +175,7 @@ class Storage(SupportsMinMaxCharge):
         """
         start = max(start, self.index[0])
         time_delta = self.index.freq / timedelta(hours=1)
+        
 
         for t in self.index[start:end]:
             current_power = self.outputs["energy"].at[t]
@@ -293,7 +294,7 @@ class Storage(SupportsMinMaxCharge):
         """
         Calculates the min and max charging power for the given time period.
         This is relative to the already sold output on other markets for the same period.
-        It also adheres to reserved positive and negative capacities.
+        It also adheres to reserved positive and negative capacities reserved for other markets.
 
         Args:
             start (datetime.datetime): The start of the current dispatch.
