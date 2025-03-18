@@ -433,7 +433,7 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
             storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
         )
 
-        if delta_soc <= 0:
+        if delta_soc_set_dispacth <= 0:
             delta_set_dispacth = (
                 storage_unit.outputs["energy"][s] * storage_unit.efficiency_charge
             )
