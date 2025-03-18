@@ -23,7 +23,7 @@ Upcoming Release
 
 **Improvements:**
 
-- **Changed SoC Defintion**: The state of charge (SoC) for storage units is now defined as the SoC at the beginning of the repsective timestep, reflecting the entire capacity it reflects. 
+- **Changed SoC Defintion**: The state of charge (SoC) for storage units is now defined as the SoC at the beginning of the repsective timestep, reflecting the entire capacity it reflects.
   This change ensures that the SoC is consistent interpretable. Dischagring and charging action in the respective hour ar then reflected by the next SoC.
 - **Multi-market participation configuration**: Respect the `eligible_obligations_lambda` set in the `MarketConfig` to only bid on markets where the UnitsOperator fulfills the requirements.
   Changes the behavior to not participate on markets when no unit has a matching bidding strategy for this market.
@@ -35,12 +35,12 @@ Upcoming Release
 **Bug Fixes:**
 
 - **Storage Learning Strategy:** Fixed a bug in the storage learning strategy that caused the learning process to fail or perform poorly. The bug was related to the way the storage was updating the state of charge.
-  This has been fixed, and the learning process for storage units is now stable and performs well. It also improved the performance of non-learning bidding strategies for storage units. Further reduced the actions number to one which reflects discharge and charge actions. 
+  This has been fixed, and the learning process for storage units is now stable and performs well. It also improved the performance of non-learning bidding strategies for storage units. Further reduced the actions number to one which reflects discharge and charge actions.
 - **Wrong train_freq Handling:** Fixed a bug where, if the simulation length was not a multiple of the train_freq, the remaining simulation steps were not used for training, causing the training to fail.
   This has been fixed, and now the train_freq is adjusted dynamically to fit the simulation length. The user is also informed about the adjusted train_freq in the logs.
 - **Logging of Learning Parameters:** Fixed the way learning parameters were logged, which previously used a different simulation_id for each episode, leading to very slow performance of the learning Grafana dashboard.
   Now, the learning parameters are logged using the same simulation_id for each episode, which significantly improves the performance of the learning Grafana dashboard.
-- **Learning Reward Writing:** Fixed a bug where the reward iwas wrongly transformed with a reshape instead of a transpose when writing the reward to the database. This caused the reward to be written in the wrong format when working with multiple units. 
+- **Learning Reward Writing:** Fixed a bug where the reward iwas wrongly transformed with a reshape instead of a transpose when writing the reward to the database. This caused the reward to be written in the wrong format when working with multiple units.
   The bug did affect learning porcess with heterogen agents mainly. This has been fixed, and now the reward is written in the correct format.
 
 **Code Refactoring**

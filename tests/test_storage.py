@@ -424,6 +424,26 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
 
     # now dispatch full discharge
     storage_unit.set_dispatch_plan(mc, bids)
+
+    # is the dispatch plan set correctly
+    for i in range(3):
+        s = datetime(2022, 1, 1, i)
+        s_next = datetime(2022, 1, 1, i + 1)
+        delta_soc_set_dispacth = (
+            storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
+        )
+
+        if delta_soc <= 0:
+            delta_set_dispacth = (
+                storage_unit.outputs["energy"][s] * storage_unit.efficiency_charge
+            )
+        else:
+            delta_set_dispacth = (
+                storage_unit.outputs["energy"][s] / storage_unit.efficiency_discharge
+            )
+        assert math.isclose(delta_set_dispacth, delta_soc_set_dispacth)
+
+    # test if it is executed correctly, whichc should be the same with the mokc makret config only covering one market
     storage_unit.execute_current_dispatch(start, end)
 
     for i in range(3):
@@ -438,6 +458,9 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
                 storage_unit.outputs["energy"][s] / storage_unit.efficiency_discharge
             )
         assert math.isclose(delta, delta_soc)
+
+    # check that deltas are the same, which agina must be due to only one considered
+    assert math.isclose(delta_soc_set_dispacth, delta_soc)
 
 
 if __name__ == "__main__":

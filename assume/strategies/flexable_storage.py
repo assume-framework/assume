@@ -65,13 +65,13 @@ class flexableEOMStorage(BaseStrategy):
         theoretic_SOC = unit.outputs["soc"].at[start]
         previous_power = unit.get_output_before(start)
 
-        current_power = unit.outputs["energy"].at[start]
-        current_power_discharge = max(current_power, 0)
-        current_power_charge = min(current_power, 0)
-
         bids = []
         for product in product_tuples:
             start, end = product[0], product[1]
+
+            current_power = unit.outputs["energy"].at[start]
+            current_power_discharge = max(current_power, 0)
+            current_power_charge = min(current_power, 0)
 
             # calculate min and max power for charging and discharging
             min_power_charge, max_power_charge = unit.calculate_min_max_charge(

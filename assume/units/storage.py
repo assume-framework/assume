@@ -175,7 +175,6 @@ class Storage(SupportsMinMaxCharge):
         """
         start = max(start, self.index[0])
         time_delta = self.index.freq / timedelta(hours=1)
-        
 
         for t in self.index[start:end]:
             current_power = self.outputs["energy"].at[t]
