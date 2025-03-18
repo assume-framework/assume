@@ -414,21 +414,21 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     assert len(bids) == 2
     # the second and third hour have are charging 60 MW
     assert bids[0]["start_time"] == datetime(2022, 1, 1, 1)
-    assert bids[0]["volume"] == -60
-    bids[0]["accepted_volume"] = -60
+    assert bids[0]["volume"] == 100
+    bids[0]["accepted_volume"] = 100
     bids[0]["accepted_price"] = 45
     assert bids[1]["start_time"] == datetime(2022, 1, 1, 2)
-    assert bids[1]["volume"] == -60
-    bids[1]["accepted_volume"] = -60
+    assert bids[1]["volume"] == 100
+    bids[1]["accepted_volume"] = 100
     bids[1]["accepted_price"] = 45
 
     # now dispatch full discharge
     storage_unit.set_dispatch_plan(mc, bids)
 
     # is the dispatch plan set correctly
-    for i in range(3):
-        s = datetime(2022, 1, 1, i)
-        s_next = datetime(2022, 1, 1, i + 1)
+    for i in range(2):
+        s = datetime(2022, 1, 1, i + 1)
+        s_next = datetime(2022, 1, 1, i + 2)
         delta_soc_set_dispacth = (
             storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
         )
@@ -446,9 +446,9 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     # test if it is executed correctly, whichc should be the same with the mokc makret config only covering one market
     storage_unit.execute_current_dispatch(start, end)
 
-    for i in range(3):
-        s = datetime(2022, 1, 1, i)
-        s_next = datetime(2022, 1, 1, i + 1)
+    for i in range(2):
+        s = datetime(2022, 1, 1, i + 1)
+        s_next = datetime(2022, 1, 1, i + 2)
         delta_soc = storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
 
         if delta_soc <= 0:
