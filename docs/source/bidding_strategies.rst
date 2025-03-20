@@ -135,7 +135,7 @@ Standard
                                     while the flexible bid covers additional power up to the maximum capacity at marginal cost.
                                     It incorporates price forecasting and accounts for ramping constraints, operational history,
                                     and power loss due to heat production.
-  standard_profile_eom_powerplant   Formulated similarly to :code:`eom_powerplant`, however it is a block bid for multiple hours.
+  standard_profile_eom_powerplant   Formulated similarly to :code:`standard_eom_powerplant`, however it is a block bid for multiple hours.
                                     A minimum acceptance ratio (MAR) defines how to handle the possibility of rejected bids
                                     within individual hours of the block.
                                     It set to 1, meaning that all bids within the block must be accepted otherwise the whole block bid is rejected.
