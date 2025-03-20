@@ -350,7 +350,7 @@ class UnitsOperator(Role):
             tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
         """
         now = timestamp2datetime(self.context.current_timestamp)
-        # add one second to exculde the frist time stamp, because it is already executed in the last step
+        # add one second to exclude the first time stamp, because it is already executed in the last step
         start = timestamp2datetime(last + 1)
 
         market_dispatch = aggregate_step_amount(

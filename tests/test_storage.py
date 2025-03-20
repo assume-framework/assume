@@ -426,9 +426,9 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     storage_unit.set_dispatch_plan(mc, bids)
 
     # is the dispatch plan set correctly
-    for i in range(2):
-        s = datetime(2022, 1, 1, i + 1)
-        s_next = datetime(2022, 1, 1, i + 2)
+    for i in range(1, 3):
+        s = datetime(2022, 1, 1, i)
+        s_next = datetime(2022, 1, 1, i + 1)
         delta_soc_set_dispatch = (
             storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
         )
@@ -446,9 +446,9 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     # test if it is executed correctly, which should be the same with the mock market config only covering one market
     storage_unit.execute_current_dispatch(start, end)
 
-    for i in range(2):
-        s = datetime(2022, 1, 1, i + 1)
-        s_next = datetime(2022, 1, 1, i + 2)
+    for i in range(1,3):
+        s = datetime(2022, 1, 1, i)
+        s_next = datetime(2022, 1, 1, i + 1)
         delta_soc = storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
 
         if delta_soc <= 0:
