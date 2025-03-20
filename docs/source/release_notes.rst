@@ -23,21 +23,25 @@ Upcoming Release
 
 **Improvements:**
 
+- **Changed SoC Definition**: The state of charge (SoC) for storage units is now defined as the SoC at the beginning of the respective timestep, reflecting the entire available capacity before having submitted any bids.
+  This change ensures that the SoC is consistently interpretable. Discharging and charging action in the respective hour are then reflected by the next SoC.
 - **Multi-market participation configuration**: Respect the `eligible_obligations_lambda` set in the `MarketConfig` to only bid on markets where the UnitsOperator fulfills the requirements.
   Changes the behavior to not participate on markets when no unit has a matching bidding strategy for this market.
 - **Learning Performance:** The learning performance for large multi-agent learning setups has been significantly improved by introducing several learning stabilization techniques.
-  This leads to a more stable learning process and faster convergence. It also allows for running simulations on historical data with a larger number of agents, achieving very good quality results.
+  This leads to a more stable learning process and faster convergence. It also allows for running simulations with a larger number of agents that achieve comparable results to historical data.
   For example, running example_03a for the year 2019, one can achieve an RMSE of 10.22 EUR/MWh and MAE of 6.52 EUR/MWh for hourly market prices, and an RMSE of 6.8 EUR/MWh and MAE of 4.6 EUR/MWh when
   using daily average prices. This is a significant improvement compared to the previous version of the framework.
 
 **Bug Fixes:**
 
 - **Storage Learning Strategy:** Fixed a bug in the storage learning strategy that caused the learning process to fail or perform poorly. The bug was related to the way the storage was updating the state of charge.
-  This has been fixed, and the learning process for storage units is now stable and performs well. It also improved the performance of non-learning bidding strategies for storage units.
+  This has been fixed, and the learning process for storage units is now stable and performs well. It also improved the performance of non-learning bidding strategies for storage units. Further reduced the actions number to one which reflects discharge and charge actions.
 - **Wrong train_freq Handling:** Fixed a bug where, if the simulation length was not a multiple of the train_freq, the remaining simulation steps were not used for training, causing the training to fail.
   This has been fixed, and now the train_freq is adjusted dynamically to fit the simulation length. The user is also informed about the adjusted train_freq in the logs.
 - **Logging of Learning Parameters:** Fixed the way learning parameters were logged, which previously used a different simulation_id for each episode, leading to very slow performance of the learning Grafana dashboard.
   Now, the learning parameters are logged using the same simulation_id for each episode, which significantly improves the performance of the learning Grafana dashboard.
+- **Learning Reward Writing:** Fixed a bug where the reward was wrongly transformed with a reshape instead of a transpose when writing the reward to the database. This caused the reward to be written in the wrong format when working with multiple units.
+  The bug did affect learning process with heterogeneous agents mainly. This has been fixed, and now the reward is written in the correct format.
 
 **Code Refactoring**
 
