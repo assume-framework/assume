@@ -6,7 +6,7 @@
 Release Notes
 #######################
 
-Upcoming Release
+0.5.2 - 21te March 2025
 =======================
 .. warning::
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
