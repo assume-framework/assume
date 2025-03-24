@@ -160,16 +160,18 @@ class RLUnitsOperator(UnitsOperator):
 
         learning_unit_count = len(self.rl_units)
 
-        # Determine the number of reward values for each unit
-        # This tells us how many complete transitions we have
+        # Collect the number of reward values for each unit.
+        # This represents how many complete transitions we have for each unit.
+        # Using a set ensures we capture only unique lengths across all units.
         values_len_set = {len(unit.outputs["rl_rewards"]) for unit in self.rl_units}
 
-        # Ensure all units have the same number of reward values
-        # If there is more than one unique length, it means some units have a different number of rewards,
-        # which is an error condition, so we raise an exception.
+        # Check if all units have the same number of reward values.
+        # If the set contains more than one unique length, it means at least one unit
+        # has a different number of rewards, indicating an inconsistency.
+        # This is considered an error condition, so we raise an exception.
         if len(values_len_set) > 1:
             raise ValueError(
-                "The length of the reward values is not the same for all units"
+                "Mismatch in reward value lengths: All units must have the same number of rewards."
             )
 
         # Since all units have the same length, extract the common length
@@ -187,6 +189,8 @@ class RLUnitsOperator(UnitsOperator):
         )
         all_rewards = []
 
+        # Iterate through each RL unit and collect all of their observations, actions, and rewards 
+        # making it dependent on values_len ensures that data is not stored away for which the reward was not calculated yet
         for i, unit in enumerate(self.rl_units):
             # Convert pandas Series to torch Tensor
             obs_tensor = th.stack(unit.outputs["rl_observations"][:values_len], dim=0)
