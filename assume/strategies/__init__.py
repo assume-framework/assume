@@ -50,6 +50,24 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "misc_manual": SimpleManualTerminalStrategy,
 }
 
+deprecated_to_new_strategy_names: dict[str, str] = {
+    "naive_eom": "naive",
+    "naive_pos_reserve": "naive",
+    "naive_neg_reserve": "naive",
+    "naive_dam": "naive_profile",
+    "naive_da_dsm": "naive_profile_dsm",
+    "flexable_eom": "standard_eom_powerplant",
+    "flexable_eom_block": "standard_profile_eom_powerplant",
+    "flexable_eom_linked": "standard_profile_eom_powerplant",
+    "flexable_neg_crm": "standard_neg_crm_powerplant",
+    "flexable_pos_crm": "standard_pos_crm_powerplant",
+    "flexable_eom_storage": "standard_eom_storage",
+    "flexable_neg_crm_storage": "standard_neg_crm_storage",
+    "flexable_pos_crm_storage": "standard_pos_crm_storage",
+    "otc_strategy": "misc_otc",
+    "manual_strategy": "misc_manual",
+}
+
 try:
     from assume.strategies.learning_advanced_orders import (
         LearningProfileEOMPowerplantStrategy,

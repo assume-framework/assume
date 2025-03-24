@@ -38,43 +38,15 @@ Accordingly, each Bidding Strategy has an associated ID which takes the form "me
 the strategy is applicable across multiple markets and/or unit types, e.g. :code:`"naive"`.
 This "bidding_strategy_id" needs to be entered when defining a unit's bidding strategy. Each Bidding Strategy and associated ID for each methodology is defined and described further below.
 
-When explicitly adding a unit, its bidding strategies are defined by inputting the relevant "bidding_strategy_id" as values
-in the :code:`"bidding_strategies"` dictionary, where the associated key is the Market Type
-for which the strategy is formulating a bid. In the following example, a Demand unit uses the :code:`"naive"` bidding strategy on the EOM.
-The key(s) (market name(s)) in :code:`"bidding_strategies"` need to match the names of the market(s) given in the :code:`markets_config` part of the config file::
+When constructing a units CSV file, the bidding strategies are set using :code:`"bidding_"` columns, where the market type the bidding strategy is applied to
+follows the underscore (the market names need to match with those in the config file).:
 
-  world.add_unit(
-    id="demand_unit",
-    unit_type="demand",
-    unit_operator_id="demand_operator",
-    unit_params={
-        "min_power": 0,
-        "max_power": 1000,
-        "bidding_strategies": {"EOM": "naive"},
-        "technology": "demand",
-    },
-    forecaster=demand_forecast,
-  )
-
-When constructing a units CSV file, the bidding strategies are set using :code:`"bidding_"` keys (which become columns in the CSV), where the market type
-follows the underscore (the market names need to match with those in the config file). The value for each :code:`"bidding_"` key is a list of "bidding_strategy_id" entries,
-each corresponding to its associated unit in the CSV (e.g. the :code:`"naive"` :code:`bidding_EOM` strategy is used by the :code:`"Naive-Bidding Unit"`,
-and the :code:`"standard_eom_powerplant"` :code:`bidding_EOM` strategy is used by the :code:`"Standard-Bidding Unit"`)::
-
-  powerplant_units_data = {
-    "name": ["Naive-Bidding Unit", "Standard-Bidding Unit"],
-    "technology": ["nuclear", "nuclear"],
-    "bidding_EOM": ["naive", "standard_eom_powerplant"],
-    "bidding_CRM_pos": ["naive", "standard_pos_crm_powerplant"],
-    "bidding_CRM_neg": ["naive", "standard_neg_crm_powerplant"],
-    "fuel_type": ["uranium", "uranium"],
-    "emission_factor": [0.0, 0.0],
-    "max_power": [1000.0, 1000.0],
-    "min_power": [200.0, 200.0],
-    "efficiency": [0.3, 0.3],
-    "additional_cost": [10.3, 10.3],
-    "unit_operator": ["Operator 1", "Operator 2"],
-  }
+ ======================= ================== ========================= ============================= ============================= ===========
+  name                    technology        bidding_EOM                bidding_CRM_pos               bidding_CRM_neg               max_power
+ ======================= ================== ========================= ============================= ============================= ===========
+  Naive-Bidding Unit      hydro              naive                     naive                         naive                         1000
+  Standard-Bidding Unit   hydro              standard_eom_powerplant   standard_pos_crm_powerplant   standard_neg_crm_powerplant   1000
+ ======================= ================== ========================= ============================= ============================= ===========
 
 We'll now take a look at the different Bidding Strategy types within each methodology, and their associated "bidding_strategy_id".
 
@@ -135,13 +107,14 @@ Standard
                                     while the flexible bid covers additional power up to the maximum capacity at marginal cost.
                                     It incorporates price forecasting and accounts for ramping constraints, operational history,
                                     and power loss due to heat production.
-  standard_profile_eom_powerplant   Formulated similarly to :code:`eom_powerplant`, however it is a block bid for multiple hours.
+  standard_profile_eom_powerplant   Formulated similarly to :code:`eom_powerplant`, however the bid is for a block of multiple hours
+                                    instead of being for a single hour.
                                     A minimum acceptance ratio (MAR) defines how to handle the possibility of rejected bids
-                                    within individual hours of the block.
-                                    It set to 1, meaning that all bids within the block must be accepted otherwise the whole block bid is rejected.
-                                    See the (`Advanced Orders tutorial <https://assume.readthedocs.io/en/latest/examples/06_advanced_orders_example.html#1.-Basics>`_)
+                                    within individual hours of the block. For the inflexible bid, the MAR is set to 1,
+                                    meaning that all bids within the block must be accepted otherwise the whole block bid is rejected.
+                                    A separate MAR can be set for children (flexible) bids.
+                                    See the `Advanced Orders tutorial <https://assume.readthedocs.io/en/latest/examples/06_advanced_orders_example.html#1.-Basics>`_
                                     for a more detailed description.
-  eom_linked_powerplant             Similar to :code:`standard_profile_eom_powerplant`, however the MAR for children (flexible) bids can be less than that of the parent (inflexible) bids.
   standard_neg_crm_powerplant       A bid on the negative Capacity or Energy CRM, volume is determined by calculating how much it can reduce power. The capacity price is
                                     found by comparing the revenue it could receive if it bid this volume on the EOM, the energy price is the negative of marginal cost.
   standard_pos_crm_powerplant       A bid on the positive Capacity or Energy CRM, volume is determined by calculating how much it can increase power. The capacity price is

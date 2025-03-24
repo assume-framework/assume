@@ -37,7 +37,11 @@ from assume.common import (
 from assume.common.base import LearningConfig
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import LearningStrategy, bidding_strategies
+from assume.strategies import (
+    LearningStrategy,
+    bidding_strategies,
+    deprecated_to_new_strategy_names,
+)
 from assume.units import BaseUnit, demand_side_technologies, unit_types
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -563,10 +567,18 @@ class World:
                 continue
 
             if strategy not in self.bidding_strategies:
-                raise ValueError(
-                    f"""Bidding strategy {strategy} not registered. Please check the name of
-                    the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
-                )
+                if strategy not in deprecated_to_new_strategy_names:
+                    raise ValueError(
+                        f"""Bidding strategy {strategy} not registered. Please check the name of
+                        the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                    )
+                else:
+                    logger.warning(
+                        f"""FutureWarning: Bidding strategy name {strategy} is deprecated. Please check the updated
+                        names in the bidding_strategies dict and compare to old names in the
+                        deprecated_to_new_strategy_names dict in strategies.__init__.py"""
+                    )
+                    strategy = deprecated_to_new_strategy_names[strategy]
 
             if strategy not in strategy_instances:
                 # Create and cache the strategy instance if not already created
