@@ -76,6 +76,7 @@ available_examples = {
     # Further DRL example simulation showcasing learning features
     "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "dam"},
     "small_learning_with_storage": {"scenario": "example_02e", "study_case": "base"},
+    "small_learning_with_storage_and_pp": {"scenario": "example_02f", "study_case": "base"},
     #
     # full year examples to show real-world scenarios
     "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
@@ -110,10 +111,10 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_with_vre_and_storage"
+    example = "small_learning_with_storage_and_pp"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
