@@ -299,8 +299,6 @@ class ComplexClearingRole(MarketRole):
         - **Nodal Representation**: If no ``zones_identifier`` is provided, each bus is treated as a separate node, and the incidence matrix represents the connections between these nodes.
     """
 
-    required_fields = ["bid_type"]
-
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
@@ -379,7 +377,7 @@ class ComplexClearingRole(MarketRole):
 
         for order in orderbook:
             # if bid_type is None, set to default bid_type
-            if order["bid_type"] is None:
+            if order.get("bid_type") is None:
                 order["bid_type"] = "SB"
             # Validate bid_type
             elif order["bid_type"] not in ["SB", "BB", "LB"]:

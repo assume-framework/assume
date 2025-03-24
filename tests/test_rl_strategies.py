@@ -107,7 +107,7 @@ def test_learning_strategies(mock_market_config, power_plant_mcp):
     regret = power_plant_mcp.outputs["regret"].loc[product_index]
     costs = power_plant_mcp.outputs["total_costs"].loc[product_index]
 
-    assert reward[0] == 0.1
+    assert reward[0] == 0.01
     assert profit[0] == 1000.0
     assert regret[0] == 0.0
     assert costs[0] == 40000.0
@@ -139,7 +139,7 @@ def test_lstm_learning_strategies(mock_market_config, power_plant_lstm):
     regret = power_plant_lstm.outputs["regret"].loc[product_index]
     costs = power_plant_lstm.outputs["total_costs"].loc[product_index]
 
-    assert reward[0] == 0.1
+    assert reward[0] == 0.01
     assert profit[0] == 1000.0
     assert regret[0] == 0.0
     assert costs[0] == 40000.0

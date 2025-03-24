@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+base_case_2019_with_storage:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-05-30 00:00
+  time_step: 1h
+  learning_mode: true
+  save_frequency_hours: null
+
+  learning_config:
+    continue_learning: false
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    # learning_rate_schedule: linear
+    training_episodes: 100
+    episodes_collecting_initial_experience: 5
+    train_freq: 720h
+    gradient_steps: 720
+    batch_size: 256
+    gamma: 0.999
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.2
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    # early_stopping_steps: 10
+    # early_stopping_threshold: 0.05
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear

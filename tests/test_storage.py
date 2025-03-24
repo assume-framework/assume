@@ -16,7 +16,7 @@ from assume.units import Storage
 
 @pytest.fixture
 def storage_unit() -> Storage:
-    index = pd.date_range("2022-01-01", periods=5, freq="h")
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
     forecaster = NaiveForecast(index, availability=1, price_forecast=50)
     return Storage(
         id="Test_Storage",
@@ -59,23 +59,23 @@ def test_reset_function(storage_unit):
     # check if total_power_output is reset
     assert (
         storage_unit.outputs["energy"]
-        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=5, freq="h"))
+        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     ).all()
 
     # the same for pos and neg capacity reserve
     assert (
         storage_unit.outputs["pos_capacity"]
-        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=5, freq="h"))
+        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     ).all()
     assert (
         storage_unit.outputs["neg_capacity"]
-        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=5, freq="h"))
+        == pd.Series(0.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     ).all()
 
     # check if state of charge (soc) is reset correctly
     assert (
         storage_unit.outputs["soc"]
-        == pd.Series(500.0, index=pd.date_range("2022-01-01", periods=5, freq="h"))
+        == pd.Series(500.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     ).all()
 
 
@@ -83,7 +83,7 @@ def test_calculate_operational_window(storage_unit):
     start = datetime(2022, 1, 1, 0)
     end = datetime(2022, 1, 1, 1)
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
-        start, end, product_type="energy"
+        start, end
     )
     cost_discharge = storage_unit.calculate_marginal_cost(start, max_power_discharge[0])
 
@@ -92,7 +92,7 @@ def test_calculate_operational_window(storage_unit):
     assert cost_discharge == 4 / 0.95
 
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
-        start, end, product_type="energy"
+        start, end
     )
     cost_charge = storage_unit.calculate_marginal_cost(start, max_power_charge[0])
 
@@ -133,7 +133,10 @@ def test_soc_constraint(storage_unit):
     storage_unit.outputs["soc"][start - timedelta(hours=1)] = (
         0.05 * storage_unit.max_soc
     )
-    assert storage_unit.get_soc_before(start) == 0.05 * storage_unit.max_soc
+    assert (
+        storage_unit.outputs["soc"][start - storage_unit.index.freq]
+        == 0.05 * storage_unit.max_soc
+    )
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
@@ -154,11 +157,11 @@ def test_storage_feedback(storage_unit, mock_market_config):
     start = datetime(2022, 1, 1, 0)
     end = datetime(2022, 1, 1, 1)
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
-        start, end, product_type="energy"
+        start, end
     )
 
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
-        start, end, product_type="energy"
+        start, end
     )
     cost_discharge = storage_unit.calculate_marginal_cost(start, max_power_discharge[0])
 
@@ -185,7 +188,7 @@ def test_storage_feedback(storage_unit, mock_market_config):
 
     # second market request for same interval
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
-        start, end, product_type="energy"
+        start, end
     )
 
     # we do not need additional min_power, as our runtime requirement is fulfilled
@@ -198,7 +201,7 @@ def test_storage_feedback(storage_unit, mock_market_config):
     start = datetime(2022, 1, 1, 1)
     end = datetime(2022, 1, 1, 2)
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
-        start, end, product_type="energy"
+        start, end
     )
 
     # now we can bid max_power and need min_power again
@@ -211,11 +214,11 @@ def test_storage_ramping(storage_unit):
     end = datetime(2022, 1, 1, 1)
 
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
-        start, end, product_type="energy"
+        start, end
     )
 
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
-        start, end, product_type="energy"
+        start, end
     )
 
     assert min_power_charge[0] == 0
@@ -387,6 +390,77 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
     assert len(bids) == 1
+
+
+def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
+    """
+    This test checks that the dispatch of a storage does set the SoC output correctly.
+    It also makes sure to work with multiple consecutive hours
+    """
+    product_tuples = []
+    start = datetime(2022, 1, 1, 0)
+    for i in range(3):
+        s = datetime(2022, 1, 1, i)
+        end = datetime(2022, 1, 1, i + 1)
+        product_tuples.append((s, end, None))
+
+    mc = mock_market_config
+    strategy = StandardEOMStorageStrategy()
+
+    storage_unit.outputs["energy"][start] = 100
+    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
+
+    bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
+    assert len(bids) == 2
+    # continue discharging 100 MW in second and third hour
+    assert bids[0]["start_time"] == datetime(2022, 1, 1, 1)
+    assert bids[0]["volume"] == 100
+    bids[0]["accepted_volume"] = 100
+    bids[0]["accepted_price"] = 45
+    assert bids[1]["start_time"] == datetime(2022, 1, 1, 2)
+    assert bids[1]["volume"] == 100
+    bids[1]["accepted_volume"] = 100
+    bids[1]["accepted_price"] = 45
+
+    # now dispatch full discharge
+    storage_unit.set_dispatch_plan(mc, bids)
+
+    # is the dispatch plan set correctly
+    for i in range(1, 3):
+        s = datetime(2022, 1, 1, i)
+        s_next = datetime(2022, 1, 1, i + 1)
+        delta_soc_set_dispatch = (
+            storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
+        )
+
+        if delta_soc_set_dispatch <= 0:
+            delta_set_dispatch = (
+                storage_unit.outputs["energy"][s] * storage_unit.efficiency_charge
+            )
+        else:
+            delta_set_dispatch = (
+                storage_unit.outputs["energy"][s] / storage_unit.efficiency_discharge
+            )
+        assert math.isclose(delta_set_dispatch, delta_soc_set_dispatch)
+
+    # test if it is executed correctly, which should be the same with the mock market config only covering one market
+    storage_unit.execute_current_dispatch(start, end)
+
+    for i in range(1, 3):
+        s = datetime(2022, 1, 1, i)
+        s_next = datetime(2022, 1, 1, i + 1)
+        delta_soc = storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
+
+        if delta_soc <= 0:
+            delta = storage_unit.outputs["energy"][s] * storage_unit.efficiency_charge
+        else:
+            delta = (
+                storage_unit.outputs["energy"][s] / storage_unit.efficiency_discharge
+            )
+        assert math.isclose(delta, delta_soc)
+
+    # check that deltas are the same, which again must be due to only one considered market
+    assert math.isclose(delta_soc_set_dispatch, delta_soc)
 
 
 if __name__ == "__main__":
