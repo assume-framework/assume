@@ -179,7 +179,7 @@ Learning
                                     and a higher price for flexible compoenent.
 
                                     Order types are set implicitly, not by the RL agent itself, and the bid structure
-                                    based on allowed order types (SB - Simple Hourly Bid, BB - Block Bid, LB - Linked Bid):
+                                    based on allowed order types (SB - Simple (Hourly) Bid, BB - Block Bid, LB - Linked Bid):
 
                                     - SB only: Both power types use SB.
                                     - SB & LB: Inflexible uses SB, flexible uses LB.
