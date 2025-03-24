@@ -338,7 +338,7 @@ class UnitsOperator(Role):
         self, product_type: str, last: datetime
     ) -> tuple[list[tuple[datetime, float, str, str]], list[dict]]:
         """
-        Retrieves the actual dispatch and commits it in the unit.
+        Retrieves the actual dispatch since the last dispatch and commits it in the unit.
         We calculate the series of the actual market results dataframe with accepted bids.
         And the unit_dispatch for all units taken care of in the UnitsOperator.
 
@@ -350,6 +350,7 @@ class UnitsOperator(Role):
             tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
         """
         now = timestamp2datetime(self.context.current_timestamp)
+        # add one second to exclude the first time stamp, because it is already executed in the last step
         start = timestamp2datetime(last + 1)
 
         market_dispatch = aggregate_step_amount(

@@ -4,6 +4,7 @@
 
 import logging
 from collections.abc import Callable
+from datetime import datetime
 
 import pyomo.environ as pyo
 from pyomo.opt import (
@@ -46,6 +47,13 @@ class DSMFlex:
     def initialize_solver(self, solver=None):
         # Define a solver
         solvers = check_available_solvers(*SOLVERS)
+
+        # raise an error if no solver is available
+        if not solvers:
+            raise ValueError(
+                f"None of {SOLVERS} are available. Install one of them to proceed."
+            )
+
         solver = solver if solver in solvers else solvers[0]
         if solver == "gurobi":
             self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
@@ -92,7 +100,7 @@ class DSMFlex:
                     self.model, self.model.dsm_blocks[technology]
                 )
 
-    def setup_model(self):
+    def setup_model(self, presolve=True):
         # Initialize the Pyomo model
         # along with optimal and flexibility constraints
         # and the objective functions
@@ -108,7 +116,10 @@ class DSMFlex:
         self.define_constraints()
         self.define_objective_opt()
 
-        self.determine_optimal_operation_without_flex(switch_flex_off=False)
+        # Solve the model to determine the optimal operation without flexibility
+        # and store the results to be used in the flexibility mode later
+        if presolve:
+            self.determine_optimal_operation_without_flex(switch_flex_off=False)
 
         # Modify the model to include the flexibility measure constraints
         # as well as add a new objective function to the model
@@ -133,7 +144,7 @@ class DSMFlex:
         Args:
             model (pyomo.ConcreteModel): The Pyomo model.
         """
-        if self.objective == "min_variable_cost" or "recalculate":
+        if self.objective == "min_variable_cost":
 
             @self.model.Objective(sense=pyo.minimize)
             def obj_rule_opt(m):
@@ -204,6 +215,34 @@ class DSMFlex:
                         == self.model.dsm_blocks["eaf"].power_in[t]
                         + self.model.dsm_blocks["dri_plant"].power_in[t]
                     )
+
+            elif self.technology == "building":
+                total_power_input = m.inflex_demand[t]
+                # Building components (e.g., heat_pump, boiler, pv_plant, generic_storage)
+                if self.has_heatpump:
+                    total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    total_power_input += self.model.dsm_blocks["boiler"].power_in[t]
+                if self.has_ev:
+                    total_power_input += (
+                        self.model.dsm_blocks["electric_vehicle"].charge[t]
+                        - self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                    )
+                if self.has_battery_storage:
+                    total_power_input += (
+                        self.model.dsm_blocks["generic_storage"].charge[t]
+                        - self.model.dsm_blocks["generic_storage"].discharge[t]
+                    )
+                if self.has_pv:
+                    total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
+
+                # Apply flexibility adjustments
+                return (
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * model.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                    == total_power_input
+                )
 
         @self.model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):
@@ -608,6 +647,27 @@ class DSMFlex:
         instance.total_cost = self.total_cost
 
         return instance
+
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
+        """
+        Calculates the marginal cost of operating the building unit at a specific time and power level.
+
+        The marginal cost represents the additional cost incurred by increasing the power output by one unit.
+
+        Args:
+            start (datetime): The start time of the dispatch period.
+            power (float): The power output level of the unit during the dispatch.
+
+        Returns:
+            float: The marginal cost of the unit for the given power level. Returns 0 if there is no power requirement.
+        """
+        # Initialize marginal cost
+        marginal_cost = 0
+        epsilon = 1e-3
+
+        if power > epsilon:
+            marginal_cost = abs(self.variable_cost_series.at[start] / power)
+        return marginal_cost
 
     def as_dict(self) -> dict:
         """
