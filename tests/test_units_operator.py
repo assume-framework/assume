@@ -411,7 +411,7 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
     """Test that learning data from two RL units is correctly formatted and sent."""
     import torch as th
 
-    from assume.strategies.learning_strategies import RLStrategy
+    from assume.strategies.learning_strategies import LearningEOMPowerplantStrategy
 
     # Constants
     obs_dim = 2
@@ -442,7 +442,9 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
     # --- Add two RL-enabled PowerPlant units ---
     params_dict = {
         "bidding_strategies": {
-            "EOM": RLStrategy(unit_id="testplant1", learning_mode=True),
+            "EOM": LearningEOMPowerplantStrategy(
+                unit_id="testplant1", learning_mode=True
+            ),
         },
         "technology": "energy",
         "unit_operator": "test_operator",
@@ -455,7 +457,7 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
     rl_units_operator.add_unit(unit1)
 
     # Clone params_dict and update for the second unit
-    params_dict["bidding_strategies"]["EOM"] = RLStrategy(
+    params_dict["bidding_strategies"]["EOM"] = LearningEOMPowerplantStrategy(
         unit_id="testplant2", learning_mode=True
     )
     unit2 = PowerPlant("testplant2", **params_dict)
