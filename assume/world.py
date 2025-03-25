@@ -574,9 +574,10 @@ class World:
                     )
                 else:
                     logger.warning(
-                        f"""FutureWarning: Bidding strategy name {strategy} is deprecated. Please check the updated
-                        names in the bidding_strategies dict and compare to old names in the
-                        deprecated_to_new_strategy_names dict in strategies.__init__.py"""
+                        f"""FutureWarning: Bidding strategy name {strategy} is deprecated and has been
+                        renamed to {deprecated_to_new_strategy_names[strategy]}.
+                        For the full list of updated names, check the updated names in the bidding_strategies dict
+                        and compare to old names in the deprecated_to_new_strategy_names dict in strategies.__init__.py"""
                     )
                     strategy = deprecated_to_new_strategy_names[strategy]
 

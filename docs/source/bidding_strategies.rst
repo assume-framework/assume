@@ -131,7 +131,6 @@ Standard
 Standard method API references:
 
 - :meth:`assume.strategies.standard_powerplant.StandardEOMPowerplantStrategy`
-- :meth:`assume.strategies.standard_advanced_orders.EOMBlockPowerplant`
 - :meth:`assume.strategies.standard_advanced_orders.StandardProfileEOMPowerplantStrategy`
 - :meth:`assume.strategies.standard_powerplant.StandardNegCRMPowerplantStrategy`
 - :meth:`assume.strategies.standard_powerplant.StandardPosCRMPowerplantStrategy`

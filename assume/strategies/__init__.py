@@ -66,6 +66,9 @@ deprecated_to_new_strategy_names: dict[str, str] = {
     "flexable_pos_crm_storage": "standard_pos_crm_storage",
     "otc_strategy": "misc_otc",
     "manual_strategy": "misc_manual",
+    "pp_learning": "learning_eom_powerplant",
+    "storage_learning": "learning_eom_storage",
+    "learning_advanced_orders": "learning_profile_eom_powerplant",
 }
 
 try:
