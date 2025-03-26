@@ -563,6 +563,11 @@ class World:
                 continue
 
             if strategy not in self.bidding_strategies:
+                # raise a deprecated warning for learning_advanced_orders
+                if strategy == "learning_advanced_orders":
+                    logger.warning(
+                        "The bidding strategy 'learning_advanced_orders' is deprecated. Please use regular 'pp_learning' instead."
+                    )
                 raise ValueError(
                     f"""Bidding strategy {strategy} not registered. Please check the name of
                     the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""

@@ -65,9 +65,6 @@ Overview of Example Simulations
    * - small_learning_3
      - example_02c
      - 16 power plants, 10 with learning bidding strategy. Case 3 in [1]_
-   * - learning_with_complex_bids
-     - example_02d
-     - Learning strategies with complex bidding.
    * - large_2019_eom
      - example_03
      - Full-year German power market simulation (EOM only). [2]_
