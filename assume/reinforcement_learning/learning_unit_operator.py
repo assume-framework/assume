@@ -15,7 +15,6 @@ from assume.common.market_objects import (
 from assume.common.utils import convert_tensors, create_rrule, get_products_index
 from assume.strategies import (
     BaseStrategy,
-    LearningProfileEOMPowerplantStrategy,
     LearningStrategy,
 )
 from assume.units import BaseUnit
@@ -108,23 +107,13 @@ class RLUnitsOperator(UnitsOperator):
                     "unit": unit.id,
                 }
 
-                if isinstance(strategy, LearningProfileEOMPowerplantStrategy):
-                    output_dict.update(
-                        {
-                            "profit": unit.outputs["profit"].loc[products_index].sum(),
-                            "reward": unit.outputs["reward"].loc[products_index].sum()
-                            / 24,
-                            "regret": unit.outputs["regret"].loc[products_index].sum(),
-                        }
-                    )
-                else:
-                    output_dict.update(
-                        {
-                            "profit": unit.outputs["profit"].at[start],
-                            "reward": unit.outputs["reward"].at[start],
-                            "regret": unit.outputs["regret"].at[start],
-                        }
-                    )
+                output_dict.update(
+                    {
+                        "profit": unit.outputs["profit"].at[start],
+                        "reward": unit.outputs["reward"].at[start],
+                        "regret": unit.outputs["regret"].at[start],
+                    }
+                )
 
                 action_tuple = unit.outputs["actions"].at[start]
                 noise_tuple = unit.outputs["exploration_noise"].at[start]

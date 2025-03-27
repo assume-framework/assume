@@ -32,14 +32,6 @@ assume.strategies.extended module
    :undoc-members:
    :show-inheritance:
 
-assume.strategies.learning\_advanced\_orders module
----------------------------------------------------
-
-.. automodule:: assume.strategies.learning_profile_eom_powerplant
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 assume.strategies.learning\_strategies module
 ---------------------------------------------
 
