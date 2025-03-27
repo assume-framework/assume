@@ -102,7 +102,7 @@ available_examples = {
         "study_case": "base_case_2019_with_storage",
     },
     "example_bus": {
-        "scenario": "example_01h",
+        "scenario": "example_bus",
         "study_case": "eom",
     },
 }
