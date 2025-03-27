@@ -189,7 +189,7 @@ class RLUnitsOperator(UnitsOperator):
         )
         all_rewards = []
 
-        # Iterate through each RL unit and collect all of their observations, actions, and rewards 
+        # Iterate through each RL unit and collect all of their observations, actions, and rewards
         # making it dependent on values_len ensures that data is not stored away for which the reward was not calculated yet
         for i, unit in enumerate(self.rl_units):
             # Convert pandas Series to torch Tensor
