@@ -164,8 +164,7 @@ async def test_formulate_bids(units_operator: UnitsOperator):
 
 @pytest.mark.require_learning
 async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
-    from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
-    from assume.strategies.learning_strategies import RLStrategy
+    from assume.strategies.learning_strategies import LearningEOMPowerplantStrategy
 
     marketconfig = rl_units_operator.available_markets[0]
     start = datetime(2020, 1, 1)
@@ -174,7 +173,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     params_dict = {
         "bidding_strategies": {
-            "EOM": RLAdvancedOrderStrategy(
+            "EOM": LearningEOMPowerplantStrategy(
                 unit_id="testplant",
                 learning_mode=True,
             )
@@ -213,7 +212,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     rl_units_operator.units["testplant"].bidding_strategies[
         "EOM"
-    ].bidding_strategies = RLStrategy(
+    ].bidding_strategies = LearningEOMPowerplantStrategy(
         unit_id="testplant",
         learning_mode=True,
         observation_dimension=50,
@@ -409,7 +408,7 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
     """Test that learning data from two RL units is correctly formatted and sent."""
     import torch as th
 
-    from assume.strategies.learning_strategies import RLStrategy
+    from assume.strategies.learning_strategies import LearningEOMPowerplantStrategy
 
     # Constants
     obs_dim = 2
@@ -440,7 +439,9 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
     # --- Add two RL-enabled PowerPlant units ---
     params_dict = {
         "bidding_strategies": {
-            "EOM": RLStrategy(unit_id="testplant1", learning_mode=True),
+            "EOM": LearningEOMPowerplantStrategy(
+                unit_id="testplant1", learning_mode=True
+            ),
         },
         "technology": "energy",
         "unit_operator": "test_operator",
@@ -453,7 +454,7 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
     rl_units_operator.add_unit(unit1)
 
     # Clone params_dict and update for the second unit
-    params_dict["bidding_strategies"]["EOM"] = RLStrategy(
+    params_dict["bidding_strategies"]["EOM"] = LearningEOMPowerplantStrategy(
         unit_id="testplant2", learning_mode=True
     )
     unit2 = PowerPlant("testplant2", **params_dict)

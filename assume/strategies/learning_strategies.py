@@ -75,7 +75,7 @@ class AbstractLearningStrategy(LearningStrategy):
         )
 
 
-class RLStrategy(AbstractLearningStrategy):
+class LearningEOMPowerplantStrategy(AbstractLearningStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -628,7 +628,7 @@ class RLStrategy(AbstractLearningStrategy):
         unit.outputs["rl_rewards"].append(reward)
 
 
-class StorageRLStrategy(AbstractLearningStrategy):
+class LearningEOMStorageStrategy(AbstractLearningStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -648,7 +648,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
     as this can be a valid strategy in some market conditions and also improves the learning process.
 
     - **Bid Price**: The one action value determines the price at which the agent will bid.
-    - **Bid Direction**: This is implictly set base don the action:
+    - **Bid Direction**: This is implicitly set based on the action:
         - If `action < 0`: The agent submits a **buy bid**.
         - If `action >= 0`: The agent submits a **sell bid**.
 
@@ -939,7 +939,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # that the strategy is not designed for multiple orders and the market configuration should be adjusted
         if len(orderbook) > 1:
             raise ValueError(
-                "StorageRLStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
+                "LearningEOMStorageStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
             )
 
         order = orderbook[0]
