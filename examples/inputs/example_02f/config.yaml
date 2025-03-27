@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-base:
+base_longer:
   start_date: 2019-03-01 00:00
   end_date: 2019-05-30 00:00
   time_step: 1h
@@ -17,7 +17,7 @@ base:
     algorithm: matd3
     actor_architecture: mlp
     learning_rate: 0.0003
-    training_episodes: 50
+    training_episodes: 100
     episodes_collecting_initial_experience: 5
     train_freq: 720h
     gradient_steps: 720
