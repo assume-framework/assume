@@ -6,10 +6,12 @@ from torch import nn
 
 from assume.reinforcement_learning.neural_network_architecture import (
     MLPActor,
+    ContextualMLPActor,
     LSTMActor,
 )
 
 actor_architecture_aliases: dict[str, type[nn.Module]] = {
     "mlp": MLPActor,
+    "contextual_mlp": ContextualMLPActor,
     "lstm": LSTMActor,
 }

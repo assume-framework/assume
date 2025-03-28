@@ -11,7 +11,7 @@ import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import min_max_scale
+from assume.common.utils import min_max_scale, str_to_number
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
@@ -32,6 +32,7 @@ class AbstractLearningStrategy(LearningStrategy):
 
         self.actor = self.actor_architecture_class(
             obs_dim=self.obs_dim,
+            context_dim=self.context_dim,
             act_dim=self.act_dim,
             float_type=self.float_type,
             unique_obs_dim=self.unique_obs_dim,
@@ -42,6 +43,7 @@ class AbstractLearningStrategy(LearningStrategy):
         if self.learning_mode:
             self.actor_target = self.actor_architecture_class(
                 obs_dim=self.obs_dim,
+                context_dim=self.context_dim,
                 act_dim=self.act_dim,
                 float_type=self.float_type,
                 unique_obs_dim=self.unique_obs_dim,
@@ -73,6 +75,28 @@ class AbstractLearningStrategy(LearningStrategy):
             lower_scaling_factor_price,
             upper_scaling_factor_price,
         )
+
+        # prepare a context observation consisting of unit's max_power, min_power and fuel type
+        if isinstance(unit, SupportsMinMax):
+            # convert fuel type to a numerical value
+            context = [
+                unit.max_power / self.max_bid_price,
+                unit.min_power / self.max_bid_price,
+                unit.efficiency,
+                str_to_number(unit.technology),
+                str_to_number(unit.fuel_type),
+            ]
+        else:
+            context = [
+                unit.max_soc / self.max_bid_price,
+                unit.max_power_charge / self.max_bid_price,
+                unit.max_power_discharge / self.max_bid_price,
+                unit.efficiency_charge,
+                unit.efficiency_discharge,
+            ]
+
+        # convert context to tensor
+        self.context = th.as_tensor(context, dtype=self.float_type, device=self.device)
 
 
 class RLStrategy(AbstractLearningStrategy):
@@ -149,10 +173,12 @@ class RLStrategy(AbstractLearningStrategy):
 
     def __init__(self, *args, **kwargs):
         obd_dim = kwargs.pop("obs_dim", 38)
+        context_dim = kwargs.pop("context_dim", 5)
         act_dim = kwargs.pop("act_dim", 2)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
             obs_dim=obd_dim,
+            context_dim=context_dim,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
@@ -197,6 +223,9 @@ class RLStrategy(AbstractLearningStrategy):
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
         self.foresight = 12
+
+        # define standard deviation for the initial exploration noise
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -355,7 +384,7 @@ class RLStrategy(AbstractLearningStrategy):
                 # define current action as solely noise
                 noise = th.normal(
                     mean=0.0,
-                    std=0.2,
+                    std=self.exploration_noise_std,
                     size=(self.act_dim,),
                     dtype=self.float_type,
                     device=self.device,
@@ -374,7 +403,9 @@ class RLStrategy(AbstractLearningStrategy):
             else:
                 # if we are not in the initial exploration phase we choose the action with the actor neural net
                 # and add noise to the action
-                curr_action = self.actor(next_observation).detach()
+                curr_action = self.actor(
+                    obs=next_observation, context=self.context
+                ).detach()
                 noise = self.action_noise.noise(
                     device=self.device, dtype=self.float_type
                 )
@@ -382,7 +413,9 @@ class RLStrategy(AbstractLearningStrategy):
                 curr_action += noise
         else:
             # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-            curr_action = self.actor(next_observation).detach()
+            curr_action = self.actor(
+                obs=next_observation, context=self.context
+            ).detach()
 
             # noise is an tensor with zeros, because we are not in learning mode
             noise = th.zeros_like(curr_action, dtype=self.float_type)
@@ -748,7 +781,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
     as this can be a valid strategy in some market conditions and also improves the learning process.
 
     - **Bid Price**: The one action value determines the price at which the agent will bid.
-    - **Bid Direction**: This is implictly set base don the action:
+    - **Bid Direction**: This is implicitly set based on the action:
         - If `action < 0`: The agent submits a **buy bid**.
         - If `action >= 0`: The agent submits a **sell bid**.
 
@@ -794,7 +827,18 @@ class StorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=74, act_dim=1, unique_obs_dim=2, *args, **kwargs)
+        obd_dim = kwargs.pop("obs_dim", 74)
+        context_dim = kwargs.pop("context_dim", 5)
+        act_dim = kwargs.pop("act_dim", 1)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            obs_dim=obd_dim,
+            context_dim=context_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         self.unit_id = kwargs["unit_id"]
         # defines bounds of actions space
@@ -833,6 +877,9 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
         self.foresight = 24
+
+        # define standard deviation for the initial exploration noise
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.4)
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -981,7 +1028,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 # define current action as solely noise
                 noise = th.normal(
                     mean=0.0,
-                    std=0.4,
+                    std=self.exploration_noise_std,
                     size=(self.act_dim,),
                     dtype=self.float_type,
                     device=self.device,

@@ -320,7 +320,7 @@ class BaseUnit:
 
     def reset_saved_rl_data(self):
         """
-        Resets the saved RL data. This delets all data besides the observation and action where we do not yet have calculated reward values.
+        Resets the saved RL data. This deletes all data besides the observation and action where we do not yet have calculated reward values.
         """
         values_len = len(self.outputs["rl_rewards"])
 
@@ -783,6 +783,7 @@ class LearningStrategy(BaseStrategy):
         obs_dim: int,
         act_dim: int,
         unique_obs_dim: int = 0,
+        context_dim: int = 0,
         num_timeseries_obs_dim: int = 2,
         *args,
         **kwargs,
@@ -798,6 +799,9 @@ class LearningStrategy(BaseStrategy):
         # this defines the number of unique observations, which are not the same for all units
         # this is used by the centralised critic and will return an error if not matched
         self.unique_obs_dim = unique_obs_dim
+
+        # this defines the number of context observations, which are the same for all units
+        self.context_dim = context_dim
 
         # defines the number of provided timeseries, this is necessary for correctly splitting
         # them into suitable format for recurrent neural networks

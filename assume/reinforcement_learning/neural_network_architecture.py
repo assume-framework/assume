@@ -140,12 +140,64 @@ class MLPActor(Actor):
 
         self.apply(init_layer)
 
-    def forward(self, obs):
+    def forward(self, obs, *args, **kwargs):
         """Forward pass for action prediction."""
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
         x = F.softsign(self.FC3(x))
 
+        return x
+
+
+class ContextualMLPActor(Actor):
+    """
+    A modified MLP actor that incorporates additional context.
+    """
+
+    def __init__(
+        self,
+        obs_dim: int,
+        context_dim: int,
+        act_dim: int,
+        float_type,
+        hidden_sizes=(256, 128),
+        *args,
+        **kwargs,
+    ):
+        super().__init__()
+        # Process general observation
+        self.obs_fc = nn.Linear(obs_dim, 128, dtype=float_type)
+        # Process unit-specific context
+        self.context_fc = nn.Linear(context_dim, 128, dtype=float_type)
+        # Combine both processed features and further layers
+        self.fc1 = nn.Linear(128 + 128, hidden_sizes[0], dtype=float_type)
+        self.fc2 = nn.Linear(hidden_sizes[0], hidden_sizes[1], dtype=float_type)
+        self.fc3 = nn.Linear(hidden_sizes[1], act_dim, dtype=float_type)
+        self._init_weights()
+
+    def _init_weights(self):
+        # Apply Xavier initialization
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+
+    def forward(self, obs, context):
+        """
+        Forward pass takes both the general observation and unit-specific context.
+        """
+        # expand context to match batch size
+        if obs.dim() != context.dim():
+            context = context.unsqueeze(0).expand(obs.size(0), -1)
+
+        obs_emb = F.relu(self.obs_fc(obs))
+        context_emb = F.relu(self.context_fc(context))
+        # Concatenate the embeddings along the feature dimension
+        x = th.cat([obs_emb, context_emb], dim=-1)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        # Using softsign (or consider tanh if your actions need to be in [-1,1])
+        x = F.softsign(self.fc3(x))
         return x
 
 

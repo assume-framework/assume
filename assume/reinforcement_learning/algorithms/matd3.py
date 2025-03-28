@@ -197,7 +197,11 @@ class TD3(RLAlgorithm):
 
         """
         if actors_and_critics is None:
-            self.create_actors()
+            self.check_policy_dimensions()
+            if self.actor_architecture == "contextual_mlp":
+                self.create_shared_actor()
+            else:
+                self.create_individual_actors()
             self.create_critics()
 
         else:
@@ -212,7 +216,54 @@ class TD3(RLAlgorithm):
             self.act_dim = actors_and_critics["act_dim"]
             self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
 
-    def create_actors(self) -> None:
+    def check_policy_dimensions(self) -> None:
+        obs_dim_list = []
+        context_dim_list = []
+        act_dim_list = []
+        unique_obs_dim_list = []
+        num_timeseries_obs_dim_list = []
+
+        for strategy in self.learning_role.rl_strats.values():
+            obs_dim_list.append(strategy.obs_dim)
+            context_dim_list.append(strategy.context_dim)
+            act_dim_list.append(strategy.act_dim)
+            unique_obs_dim_list.append(strategy.unique_obs_dim)
+            num_timeseries_obs_dim_list.append(strategy.num_timeseries_obs_dim)
+
+        if len(set(obs_dim_list)) > 1:
+            raise ValueError(
+                "All observation dimensions must be the same for all RL agents"
+            )
+        else:
+            self.obs_dim = obs_dim_list[0]
+
+        if len(set(context_dim_list)) > 1:
+            raise ValueError(
+                "All context dimensions must be the same for all RL agents"
+            )
+        else:
+            self.context_dim = context_dim_list[0]
+
+        if len(set(act_dim_list)) > 1:
+            raise ValueError("All action dimensions must be the same for all RL agents")
+        else:
+            self.act_dim = act_dim_list[0]
+
+        if len(set(unique_obs_dim_list)) > 1:
+            raise ValueError(
+                "All unique_obs_dim values must be the same for all RL agents"
+            )
+        else:
+            self.unique_obs_dim = unique_obs_dim_list[0]
+
+        if len(set(num_timeseries_obs_dim_list)) > 1:
+            raise ValueError(
+                "All num_timeseries_obs_dim values must be the same for all RL agents"
+            )
+        else:
+            self.num_timeseries_obs_dim = num_timeseries_obs_dim_list[0]
+
+    def create_individual_actors(self) -> None:
         """
         Create actor networks for reinforcement learning for each unit strategy.
 
@@ -226,9 +277,6 @@ class TD3(RLAlgorithm):
             If you have units with different observation dimensions. They need to have different critics and hence learning roles.
 
         """
-
-        obs_dim_list = []
-        act_dim_list = []
 
         for strategy in self.learning_role.rl_strats.values():
             strategy.actor = self.actor_architecture_class(
@@ -257,20 +305,53 @@ class TD3(RLAlgorithm):
                 ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
             )
 
-            obs_dim_list.append(strategy.obs_dim)
-            act_dim_list.append(strategy.act_dim)
+    def create_shared_actor(self) -> None:
+        """
+        Create a shared actor network for reinforcement learning used by all learning strategies.
 
-        if len(set(obs_dim_list)) > 1:
-            raise ValueError(
-                "All observation dimensions must be the same for all RL agents"
-            )
-        else:
-            self.obs_dim = obs_dim_list[0]
+        This method initializes actor networks and their corresponding target networks for each unit strategy.
+        The actors are designed to map observations to action probabilities in a reinforcement learning setting.
 
-        if len(set(act_dim_list)) > 1:
-            raise ValueError("All action dimensions must be the same for all RL agents")
-        else:
-            self.act_dim = act_dim_list[0]
+        The created actor networks are associated with each unit strategy and stored as attributes.
+
+        Notes:
+            The observation dimension need to be the same, due to the centralized criic that all actors share.
+            If you have units with different observation dimensions. They need to have different critics and hence learning roles.
+
+        """
+
+        shared_actor = self.actor_architecture_class(
+            obs_dim=self.obs_dim,
+            context_dim=self.context_dim,
+            act_dim=self.act_dim,
+            float_type=self.float_type,
+            unique_obs_dim=self.unique_obs_dim,
+            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+        ).to(self.device)
+
+        shared_actor_target = self.actor_architecture_class(
+            obs_dim=self.obs_dim,
+            context_dim=self.context_dim,
+            act_dim=self.act_dim,
+            float_type=self.float_type,
+            unique_obs_dim=self.unique_obs_dim,
+            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+        ).to(self.device)
+
+        shared_actor_target.load_state_dict(shared_actor.state_dict())
+        shared_actor_target.train(mode=False)
+
+        shared_actor.optimizer = AdamW(
+            shared_actor.parameters(),
+            lr=self.learning_role.calc_lr_from_progress(
+                1
+            ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
+        )
+
+        for strategy in self.learning_role.rl_strats.values():
+            strategy.actor = shared_actor
+            strategy.actor_target = shared_actor_target
+            strategy.actor.optimizer = shared_actor.optimizer
 
     def create_critics(self) -> None:
         """
@@ -283,7 +364,6 @@ class TD3(RLAlgorithm):
             If you have units with different observation dimensions. They need to have different critics and hence learning roles.
         """
         n_agents = len(self.learning_role.rl_strats)
-        unique_obs_dim_list = []
 
         for strategy in self.learning_role.rl_strats.values():
             strategy.critics = CriticTD3(
@@ -311,17 +391,6 @@ class TD3(RLAlgorithm):
                     1
                 ),  # 1 = 100% of simulation remaining, uses learning_rate from config as starting point
             )
-
-            unique_obs_dim_list.append(strategy.unique_obs_dim)
-
-        # check if all unique_obs_dim are the same and raise an error if not
-        # if they are all the same, set the unique_obs_dim attribute
-        if len(set(unique_obs_dim_list)) > 1:
-            raise ValueError(
-                "All unique_obs_dim values must be the same for all RL agents"
-            )
-        else:
-            self.unique_obs_dim = unique_obs_dim_list[0]
 
     def extract_policy(self) -> dict:
         """
@@ -423,22 +492,8 @@ class TD3(RLAlgorithm):
                 transitions.rewards,
             )
 
-            with th.no_grad():
-                # Select action according to policy and add clipped noise
-                noise = th.randn_like(actions) * self.target_policy_noise
-                noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-
-                # Select next actions for all agents
-                next_actions = th.stack(
-                    [
-                        (
-                            strategy.actor_target(next_states[:, i, :]) + noise[:, i, :]
-                        ).clamp(-1, 1)
-                        for i, strategy in enumerate(strategies)
-                    ]
-                )
-                next_actions = next_actions.transpose(0, 1).contiguous()
-                next_actions = next_actions.view(-1, n_rl_agents * self.act_dim)
+            # Get next actions with added noise
+            next_actions = self.calculate_next_actions(actions, next_states, strategies)
 
             all_actions = actions.view(self.batch_size, -1)
 
@@ -555,7 +610,7 @@ class TD3(RLAlgorithm):
 
                     # Build local state for actor i
                     state_i = states[:, i, :]
-                    action_i = actor(state_i)
+                    action_i = actor(state_i, strategy.context)
 
                     # Construct final state representation for agent i
                     other_unique_obs = th.cat(
@@ -619,3 +674,59 @@ class TD3(RLAlgorithm):
                 polyak_update(all_actor_params, all_target_actor_params, self.tau)
 
         self.learning_role.write_rl_critic_params_to_output(learning_rate, unit_params)
+
+    def calculate_next_actions(self, actions, next_states, strategies):
+        with th.no_grad():
+            # Compute noise for the target actions (shape: [batch_size, n_rl_agents, act_dim])
+            noise = th.randn_like(actions) * self.target_policy_noise
+            noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
+            # Get batch size and number of agents from next_states
+            # (assumed shape: [batch_size, n_rl_agents, obs_dim])
+            batch_size, n_agents, obs_dim = next_states.shape
+
+            # Calculate next actions for all agents at once using batched forward pass
+            if self.actor_architecture == "contextual_mlp":
+                # Build a batched context tensor from each strategy’s fixed context.
+                # Each strategy.context is a 1D tensor of shape [context_dim]
+                context_tensor = th.stack(
+                    [strategy.context for strategy in strategies], dim=0
+                )  # [n_agents, context_dim]
+
+                # Expand the context so that each sample in the batch gets the same context for each agent.
+                context_tensor = context_tensor.unsqueeze(0).expand(
+                    batch_size, -1, -1
+                )  # [batch_size, n_agents, context_dim]
+
+                # Flatten observations and contexts so the shared target actor can process all agents at once.
+                next_states_flat = next_states.view(batch_size * n_agents, obs_dim)
+                context_flat = context_tensor.view(batch_size * n_agents, -1)
+
+                # Since the target actor is shared across agents, we can use any strategy’s actor_target.
+                shared_actor_target = strategies[0].actor_target
+
+                # Compute target actions in one batched forward pass.
+                next_actions_flat = shared_actor_target(
+                    next_states_flat, context_flat
+                )  # [batch_size*n_agents, act_dim]
+
+                # Reshape back to [batch_size, n_agents, act_dim], add noise and clamp.
+                next_actions = next_actions_flat.view(batch_size, n_agents, -1)
+                next_actions = (next_actions + noise).clamp(-1, 1)
+
+                # Flatten to shape [batch_size, n_agents * act_dim] for the critic input.
+                next_actions = next_actions.view(-1, n_agents * self.act_dim)
+
+            # Calculate next actions for each agent separately (fallback for non-contextual actor architectures)
+            else:
+                next_actions = th.stack(
+                    [
+                        (
+                            strategy.actor_target(next_states[:, i, :]) + noise[:, i, :]
+                        ).clamp(-1, 1)
+                        for i, strategy in enumerate(strategies)
+                    ]
+                )
+                next_actions = next_actions.transpose(0, 1).contiguous()
+                next_actions = next_actions.view(-1, n_agents * self.act_dim)
+
+        return next_actions

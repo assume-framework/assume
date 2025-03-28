@@ -56,6 +56,7 @@ class RLAlgorithm:
         self.target_noise_clip = target_noise_clip
         self.target_policy_noise = target_policy_noise
 
+        self.actor_architecture = actor_architecture
         if actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
                 actor_architecture
