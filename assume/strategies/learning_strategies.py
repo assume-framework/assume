@@ -992,14 +992,18 @@ class StorageRLStrategy(AbstractLearningStrategy):
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neural net
                 # and add noise to the action
-                curr_action = self.actor(next_observation).detach()
+                curr_action = self.actor(
+                    obs=next_observation, context=self.context
+                ).detach()
                 noise = self.action_noise.noise(
                     device=self.device, dtype=self.float_type
                 )
                 curr_action += noise
         else:
             # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-            curr_action = self.actor(next_observation).detach()
+            curr_action = self.actor(
+                obs=next_observation, context=self.context
+            ).detach()
             # noise is an tensor with zeros, because we are not in learning mode
             noise = th.zeros_like(curr_action, dtype=self.float_type)
 
