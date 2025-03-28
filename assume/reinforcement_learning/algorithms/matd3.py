@@ -100,14 +100,26 @@ class TD3(RLAlgorithm):
             directory (str): The base directory for saving the parameters.
         """
         os.makedirs(directory, exist_ok=True)
-        for u_id, strategy in self.learning_role.rl_strats.items():
+        # save a single shared actor for all agents
+        if self.actor_architecture == "contextual_mlp":
             obj = {
-                "actor": strategy.actor.state_dict(),
-                "actor_target": strategy.actor_target.state_dict(),
-                "actor_optimizer": strategy.actor.optimizer.state_dict(),
+                "actor": self.shared_actor.state_dict(),
+                "actor_target": self.shared_actor_target.state_dict(),
+                "actor_optimizer": self.shared_actor.optimizer.state_dict(),
             }
-            path = f"{directory}/actor_{u_id}.pt"
+            path = f"{directory}/shared_actor.pt"
             th.save(obj, path)
+
+        # else save individual actors for each agent
+        else:
+            for u_id, strategy in self.learning_role.rl_strats.items():
+                obj = {
+                    "actor": strategy.actor.state_dict(),
+                    "actor_target": strategy.actor_target.state_dict(),
+                    "actor_optimizer": strategy.actor.optimizer.state_dict(),
+                }
+                path = f"{directory}/actor_{u_id}.pt"
+                th.save(obj, path)
 
     def load_params(self, directory: str) -> None:
         """
@@ -172,18 +184,32 @@ class TD3(RLAlgorithm):
             )
             return
 
-        for u_id, strategy in self.learning_role.rl_strats.items():
+        if self.actor_architecture == "contextual_mlp":
             try:
                 actor_params = self.load_obj(
-                    directory=f"{directory}/actors/actor_{str(u_id)}.pt"
+                    directory=f"{directory}/actors/shared_actor.pt"
                 )
-                strategy.actor.load_state_dict(actor_params["actor"])
-                strategy.actor_target.load_state_dict(actor_params["actor_target"])
-                strategy.actor.optimizer.load_state_dict(
+                self.shared_actor.load_state_dict(actor_params["actor"])
+                self.shared_actor_target.load_state_dict(actor_params["actor_target"])
+                self.shared_actor.optimizer.load_state_dict(
                     actor_params["actor_optimizer"]
                 )
             except Exception:
-                logger.warning(f"No actor values loaded for agent {u_id}")
+                logger.warning("No shared actor values loaded")
+
+        else:
+            for u_id, strategy in self.learning_role.rl_strats.items():
+                try:
+                    actor_params = self.load_obj(
+                        directory=f"{directory}/actors/actor_{str(u_id)}.pt"
+                    )
+                    strategy.actor.load_state_dict(actor_params["actor"])
+                    strategy.actor_target.load_state_dict(actor_params["actor_target"])
+                    strategy.actor.optimizer.load_state_dict(
+                        actor_params["actor_optimizer"]
+                    )
+                except Exception:
+                    logger.warning(f"No actor values loaded for agent {u_id}")
 
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
@@ -205,10 +231,19 @@ class TD3(RLAlgorithm):
             self.create_critics()
 
         else:
-            for u_id, strategy in self.learning_role.rl_strats.items():
-                strategy.actor = actors_and_critics["actors"][u_id]
-                strategy.actor_target = actors_and_critics["actor_targets"][u_id]
+            if self.actor_architecture == "contextual_mlp":
+                self.shared_actor = actors_and_critics["actors"]
+                self.shared_actor_target = actors_and_critics["actor_targets"]
 
+                for u_id, strategy in self.learning_role.rl_strats.items():
+                    strategy.actor = self.shared_actor
+                    strategy.actor_target = self.shared_actor_target
+            else:
+                for u_id, strategy in self.learning_role.rl_strats.items():
+                    strategy.actor = actors_and_critics["actors"][u_id]
+                    strategy.actor_target = actors_and_critics["actor_targets"][u_id]
+
+            for u_id, strategy in self.learning_role.rl_strats.items():
                 strategy.critics = actors_and_critics["critics"][u_id]
                 strategy.target_critics = actors_and_critics["target_critics"][u_id]
 
@@ -320,7 +355,7 @@ class TD3(RLAlgorithm):
 
         """
 
-        shared_actor = self.actor_architecture_class(
+        self.shared_actor = self.actor_architecture_class(
             obs_dim=self.obs_dim,
             context_dim=self.context_dim,
             act_dim=self.act_dim,
@@ -329,7 +364,7 @@ class TD3(RLAlgorithm):
             num_timeseries_obs_dim=self.num_timeseries_obs_dim,
         ).to(self.device)
 
-        shared_actor_target = self.actor_architecture_class(
+        self.shared_actor_target = self.actor_architecture_class(
             obs_dim=self.obs_dim,
             context_dim=self.context_dim,
             act_dim=self.act_dim,
@@ -338,20 +373,20 @@ class TD3(RLAlgorithm):
             num_timeseries_obs_dim=self.num_timeseries_obs_dim,
         ).to(self.device)
 
-        shared_actor_target.load_state_dict(shared_actor.state_dict())
-        shared_actor_target.train(mode=False)
+        self.shared_actor_target.load_state_dict(self.shared_actor.state_dict())
+        self.shared_actor_target.train(mode=False)
 
-        shared_actor.optimizer = AdamW(
-            shared_actor.parameters(),
+        self.shared_actor.optimizer = AdamW(
+            self.shared_actor.parameters(),
             lr=self.learning_role.calc_lr_from_progress(
                 1
             ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
         )
 
         for strategy in self.learning_role.rl_strats.values():
-            strategy.actor = shared_actor
-            strategy.actor_target = shared_actor_target
-            strategy.actor.optimizer = shared_actor.optimizer
+            strategy.actor = self.shared_actor
+            strategy.actor_target = self.shared_actor_target
+            strategy.actor.optimizer = self.shared_actor.optimizer
 
     def create_critics(self) -> None:
         """
@@ -409,10 +444,15 @@ class TD3(RLAlgorithm):
         critics = {}
         target_critics = {}
 
-        for u_id, strategy in self.learning_role.rl_strats.items():
-            actors[u_id] = strategy.actor
-            actor_targets[u_id] = strategy.actor_target
+        if self.actor_architecture == "contextual_mlp":
+            actors = self.shared_actor
+            actor_targets = self.shared_actor_target
+        else:
+            for u_id, strategy in self.learning_role.rl_strats.items():
+                actors[u_id] = strategy.actor
+                actor_targets[u_id] = strategy.actor_target
 
+        for u_id, strategy in self.learning_role.rl_strats.items():
             critics[u_id] = strategy.critics
             target_critics[u_id] = strategy.target_critics
 
@@ -610,7 +650,10 @@ class TD3(RLAlgorithm):
 
                     # Build local state for actor i
                     state_i = states[:, i, :]
-                    action_i = actor(state_i, strategy.context)
+                    if self.actor_architecture == "contextual_mlp":
+                        action_i = self.shared_actor(state_i, strategy.context)
+                    else:
+                        action_i = actor(state_i)
 
                     # Construct final state representation for agent i
                     other_unique_obs = th.cat(
@@ -680,43 +723,39 @@ class TD3(RLAlgorithm):
             # Compute noise for the target actions (shape: [batch_size, n_rl_agents, act_dim])
             noise = th.randn_like(actions) * self.target_policy_noise
             noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
-            # Get batch size and number of agents from next_states
-            # (assumed shape: [batch_size, n_rl_agents, obs_dim])
-            batch_size, n_agents, obs_dim = next_states.shape
 
-            # Calculate next actions for all agents at once using batched forward pass
+            # Calculate next actions for all agents at once using a batched forward pass
             if self.actor_architecture == "contextual_mlp":
+                # Get batch size and number of agents from next_states (assumed shape: [batch_size, n_rl_agents, obs_dim])
+                batch_size, n_agents, obs_dim = next_states.shape
+
                 # Build a batched context tensor from each strategy’s fixed context.
                 # Each strategy.context is a 1D tensor of shape [context_dim]
                 context_tensor = th.stack(
                     [strategy.context for strategy in strategies], dim=0
                 )  # [n_agents, context_dim]
-
                 # Expand the context so that each sample in the batch gets the same context for each agent.
                 context_tensor = context_tensor.unsqueeze(0).expand(
                     batch_size, -1, -1
                 )  # [batch_size, n_agents, context_dim]
 
                 # Flatten observations and contexts so the shared target actor can process all agents at once.
-                next_states_flat = next_states.view(batch_size * n_agents, obs_dim)
-                context_flat = context_tensor.view(batch_size * n_agents, -1)
+                next_states_flat = next_states.reshape(batch_size * n_agents, obs_dim)
+                context_flat = context_tensor.reshape(batch_size * n_agents, -1)
 
-                # Since the target actor is shared across agents, we can use any strategy’s actor_target.
-                shared_actor_target = strategies[0].actor_target
-
-                # Compute target actions in one batched forward pass.
-                next_actions_flat = shared_actor_target(
+                # Compute target actions in one batched forward pass
+                next_actions_flat = self.shared_actor_target(
                     next_states_flat, context_flat
                 )  # [batch_size*n_agents, act_dim]
 
                 # Reshape back to [batch_size, n_agents, act_dim], add noise and clamp.
-                next_actions = next_actions_flat.view(batch_size, n_agents, -1)
+                next_actions = next_actions_flat.reshape(batch_size, n_agents, -1)
                 next_actions = (next_actions + noise).clamp(-1, 1)
 
-                # Flatten to shape [batch_size, n_agents * act_dim] for the critic input.
-                next_actions = next_actions.view(-1, n_agents * self.act_dim)
+                # Finally, flatten the next_actions to shape [batch_size, n_agents * act_dim] for the critic input.
+                next_actions = next_actions.reshape(batch_size, n_agents * self.act_dim)
 
-            # Calculate next actions for each agent separately (fallback for non-contextual actor architectures)
+            # Fallback for non-contextual actor architectures:
             else:
                 next_actions = th.stack(
                     [
@@ -727,6 +766,6 @@ class TD3(RLAlgorithm):
                     ]
                 )
                 next_actions = next_actions.transpose(0, 1).contiguous()
-                next_actions = next_actions.view(-1, n_agents * self.act_dim)
+                next_actions = next_actions.reshape(-1, len(strategies) * self.act_dim)
 
         return next_actions
