@@ -126,6 +126,10 @@ class Learning(Role):
 
         self.batch_size = learning_config.get("batch_size", 128)
         self.gamma = learning_config.get("gamma", 0.99)
+        self.tau = learning_config.get("tau", 0.005)
+        self.policy_delay = learning_config.get("policy_delay", 2)
+        self.target_policy_noise = learning_config.get("target_policy_noise", 0.2)
+        self.target_noise_clip = learning_config.get("target_noise_clip", 0.5)
 
         self.eval_episodes_done = 0
 
@@ -278,6 +282,10 @@ class Learning(Role):
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,
+                tau=self.tau,
+                policy_delay=self.policy_delay,
+                target_policy_noise=self.target_policy_noise,
+                target_noise_clip=self.target_noise_clip,
                 actor_architecture=self.actor_architecture,
             )
         else:
