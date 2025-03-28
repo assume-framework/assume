@@ -236,12 +236,11 @@ class DSMFlex:
                 if self.has_pv:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
 
-                # Apply flexibility adjustments
+            elif self.technology == "bus_depot":
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * model.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
-                    == total_power_input
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == self.model.dsm_blocks["electric_vehicle"].charge[t]
+                    - self.model.dsm_blocks["electric_vehicle"].discharge[t]
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -546,6 +545,15 @@ class DSMFlex:
             pyo.value(instance.variable_cost[t]) for t in instance.time_steps
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
+
+        # ✅ Print EV charge
+        ev_block = instance.dsm_blocks["electric_vehicle"]
+        charge_values = [pyo.value(ev_block.charge[t]) for t in instance.time_steps]
+        print("[DEBUG] Charge values (all):")
+        for t, val in zip(instance.time_steps, charge_values):
+            print(f"t={t} | charge={val}")
+
+        self.charge_series = FastSeries(index=self.index, value=charge_values)
 
     def determine_optimal_operation_with_flex(self):
         """

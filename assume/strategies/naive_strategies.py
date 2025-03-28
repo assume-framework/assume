@@ -169,8 +169,8 @@ class NaiveDADSMStrategy(BaseStrategy):
         """
 
         # check if unit has opt_power_requirement attribute
-        if not hasattr(unit, "opt_power_requirement"):
-            unit.determine_optimal_operation_without_flex()
+        # if not hasattr(unit, "opt_power_requirement"):
+        unit.determine_optimal_operation_without_flex()
 
         bids = []
         for product in product_tuples:

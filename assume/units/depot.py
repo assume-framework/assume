@@ -3,13 +3,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+
 import pyomo.environ as pyo
-from assume.common.utils import str_to_bool
+
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import Forecaster
+from assume.common.utils import str_to_bool
 from assume.units.dsm_load_shift import DSMFlex
 
 logger = logging.getLogger(__name__)
+
 
 class BusDepot(DSMFlex, SupportsMinMax):
     """
@@ -38,8 +41,8 @@ class BusDepot(DSMFlex, SupportsMinMax):
         optional_technologies (list): Optional technologies available.
     """
 
-    required_technologies = []
-    optional_technologies = ["charging_station", "electric_vehicle"]
+    required_technologies = ["electric_vehicle"]
+    optional_technologies = []  # "charging_station",
 
     def __init__(
         self,
@@ -52,7 +55,7 @@ class BusDepot(DSMFlex, SupportsMinMax):
         is_prosumer: str = "No",
         objective: str = "min_cost",
         flexibility_measure: str = "cost_based_load_shift",
-        max_power_capacity: float = 1000,
+        cost_tolerance: float = 10,
         node: str = "bus_node",
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
@@ -68,18 +71,61 @@ class BusDepot(DSMFlex, SupportsMinMax):
             location=location,
             **kwargs,
         )
+        # check if the required components are present in the components dictionary
+        for component in self.required_technologies:
+            if component not in components.keys():
+                raise ValueError(
+                    f"Component {component} is required for the Bus Depot  unit."
+                )
+
+        # check if the provided components are valid and do not contain any unknown components
+        for component in components.keys():
+            if (
+                component not in self.required_technologies
+                and component not in self.optional_technologies
+            ):
+                raise ValueError(
+                    f"Components {component} is not a valid component for the Bus Depot unit."
+                )
 
         self.objective = objective
         self.is_prosumer = str_to_bool(is_prosumer)
+        self.cost_tolerance = cost_tolerance
         self.flexibility_measure = flexibility_measure
-        self.max_power_capacity = max_power_capacity
-        self.electricity_price = self.forecaster["price_EOM"]
-        self.bus_availability = self.forecaster["bus_availability"]
-        self.bus_soc_profile = self.forecaster["bus_soc_profile"]
-        self.renewable_availability = self.forecaster["renewable_availability"]
+        self.is_prosumer = str_to_bool(is_prosumer)
 
+        self.electricity_price = self.forecaster["electricity_price"]
+        self.range = self.forecaster["range"]
+
+        # Check for the presence of components
+        self.has_ev = "electric_vehicle" in self.components.keys()
+        # Configure EV  power profile based on availability or charging profile
+        if self.has_ev:
+            use_charging_profile = str_to_bool(
+                self.components["electric_vehicle"].get("charging_profile", "false")
+            )
+
+            # Remove flag key to avoid accidentally passing string to the EV model
+            self.components["electric_vehicle"].pop("charging_profile", None)
+
+            profile_key_ev = (
+                f"{self.id}_ev_charging_profile"
+                if use_charging_profile
+                else "availability_profile_ev"
+            )
+
+            ev_profile = self.forecaster[profile_key_ev]
+
+            # # ✅ Add this to preview the time series you're passing into EV
+            # print(f"[DEBUG] Loaded EV profile from '{profile_key_ev}':")
+            # print(ev_profile.as_pd_series().head(10))  # ✅ If you want a timestamped view
+
+            self.components["electric_vehicle"][
+                "charging_profile" if use_charging_profile else "availability_profile"
+            ] = ev_profile
+
+        # Initialize the model
         self.setup_model(presolve=True)
-        self.initialize_process_sequence()
 
     def define_parameters(self):
         """Defines parameters including electricity price, power capacity, and bus availability."""
@@ -87,69 +133,92 @@ class BusDepot(DSMFlex, SupportsMinMax):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
-        self.model.max_power_capacity = pyo.Param(initialize=self.max_power_capacity)
-        self.model.renewable_availability = pyo.Param(
+        self.model.range = pyo.Param(
             self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.renewable_availability)},
+            initialize={t: value for t, value in enumerate(self.range)},
         )
-    
+
     def define_variables(self):
-        """Defines the charging and discharging power variables for EVs."""
-        self.model.charging_power = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power_capacity)
-        )
-        self.model.ev_discharge = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power_capacity)
-        )
-        self.model.grid_load = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
-    
+        """
+        Defines the decision variables for the Pyomo optimization model.
+
+        - `total_power_input`: Represents the total power input required at each time step.
+        - `variable_cost`: Represents the variable cost associated with power usage at each time step.
+
+        Both variables are defined over the `time_steps` set and are continuous real numbers.
+        """
+        self.model.total_power_input = pyo.Var(self.model.time_steps, within=pyo.Reals)
+        self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.Reals)
+
     def initialize_process_sequence(self):
         """Manages EV charging and discharging based on station availability and bus schedules."""
-        @self.model.Constraint(self.model.time_steps)
-        def ev_charging_balance(m, t):
-            total_ev_charge = sum(
-                m.dsm_blocks[ev].charge[t] for ev in self.electric_vehicles.keys()
-            )
-            total_ev_discharge = sum(
-                m.dsm_blocks[ev].discharge[t] for ev in self.electric_vehicles.keys()
-            )
-            return m.charging_power[t] - total_ev_discharge == total_ev_charge
 
         @self.model.Constraint(self.model.time_steps)
-        def charging_station_availability(m, t):
-            """Ensures buses connect only to available chargers."""
-            return sum(
-                m.dsm_blocks[cs].is_available[t] for cs in self.charging_stations.keys()
-            ) >= sum(
-                m.dsm_blocks[ev].is_charging[t] for ev in self.electric_vehicles.keys()
-            )
-    
+        def charge_flow_constraint(m, t):
+            # If no electrolyser, ensure DRI plant hydrogen input is as expected
+            return m.dsm_blocks["electric_vehicle"].charge[t] >= 0
+
     def define_constraints(self):
-        """Ensures charging does not exceed grid capacity and optimizes based on availability."""
-        @self.model.Constraint(self.model.time_steps)
-        def max_power_constraint(m, t):
-            return m.charging_power[t] - m.ev_discharge[t] <= m.max_power_capacity
+        """
+        Defines the optimization constraints for the Pyomo model, ensuring that the Bus Depot's
+        energy consumption, production, and cost calculations adhere to operational rules.
+
+        This function establishes the following constraints:
+
+        1. **Grid Export Constraint (for Non-Prosumers)**:
+        - Ensures that Bus Depots classified as non-prosumers cannot export power to the grid.
+        - This restriction is applied by enforcing a lower bound of zero on the total power
+            input, meaning that the Bus Depot can only draw energy from external sources,
+            but cannot inject excess energy back into the grid.
+
+        2. **Variable Cost Calculation Constraint**:
+        - Computes the variable cost incurred at each time step based on total power input
+            and electricity price.
+        - This constraint ensures that the total variable cost is directly proportional to
+            energy consumption, allowing for accurate cost minimization in the optimization model.
+
+        These constraints help enforce realistic energy system behavior while aligning with
+        market regulations and operational objectives.
+        """
+        if not self.is_prosumer:
+
+            @self.model.Constraint(self.model.time_steps)
+            def grid_export_constraint(m, t):
+                """Restricts non-prosumers from exporting to the grid."""
+                return m.total_power_input[t] >= 0
 
         @self.model.Constraint(self.model.time_steps)
-        def grid_load_constraint(m, t):
-            """Limits grid load by optimizing charging schedules."""
-            return m.grid_load[t] == m.charging_power[t] - m.ev_discharge[t]
-    
-    def define_objective(self):
-        """Defines the optimization objective based on user selection."""
-        if self.objective == "min_cost":
-            @self.model.Objective(sense=pyo.minimize)
-            def obj_rule(m):
-                return pyo.quicksum(m.grid_load[t] * m.electricity_price[t] for t in m.time_steps)
-        elif self.objective == "min_grid_load":
-            @self.model.Objective(sense=pyo.minimize)
-            def obj_rule(m):
-                return pyo.quicksum(m.grid_load[t] for t in m.time_steps)
-        elif self.objective == "max_RE_util":
-            @self.model.Objective(sense=pyo.maximize)
-            def obj_rule(m):
-                return pyo.quicksum(m.charging_power[t] * m.renewable_availability[t] for t in m.time_steps)
-        else:
-            raise ValueError(f"Unknown objective: {self.objective}")
+        def total_power_input_constraint(m, t):
+            """
+            Ensures that the total power input is the sum of all component inputs minus any self-produced
+            or stored energy at each time step.
+
+            This constraint aggregates power from buses.
+
+            Args:
+                m: Pyomo model reference.
+                t: Current time step.
+
+            Returns:
+                Equality condition balancing total power input.
+            """
+            return (
+                m.total_power_input[t] == m.dsm_blocks["electric_vehicle"].charge[t]
+            )  # - m.dsm_blocks["electric_vehicle"].discharge[t]
+
+        @self.model.Constraint(self.model.time_steps)
+        def variable_cost_constraint(m, t):
+            """
+            Calculates the variable cost associated with power usage at each time step.
+
+            This constraint multiplies the total variable power by the corresponding electricity price
+            to determine the variable cost incurred.
+
+            Args:
+                m: Pyomo model reference.
+                t: Current time step.
+
+            Returns:
+                Equality condition defining the variable cost.
+            """
+            return m.variable_cost[t] == m.total_power_input[t] * m.electricity_price[t]

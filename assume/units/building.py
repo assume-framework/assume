@@ -112,8 +112,8 @@ class Building(DSMFlex, SupportsMinMax):
         self.electricity_price = self.forecaster["price_EOM"]
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster[f"{self.id}_heat_demand"]
-        self.ev_load_profile = self.forecaster["ev_load_profile"]
-        self.ev_load_avilability = self.forecaster["ev_load_profile"]
+        self.ev_load_profile = self.forecaster[f"{self.id}_ev_charging_profile"]
+        # self.ev_load_avilability = self.forecaster["ev_load_profile"]
         self.battery_load_profile = self.forecaster["battery_load_profile"]
         self.inflex_demand = self.forecaster[f"{self.id}_load_profile"]
 
@@ -147,21 +147,31 @@ class Building(DSMFlex, SupportsMinMax):
                 else "availability_profile"
             ] = pv_profile
 
-        # Configure EV plant power profile based on availability
+        # Configure EV plant power profile based on availability or charging profile
         if self.has_ev:
-            profile_key_ev = (
-                f"{self.id}_ev_power_profile"
-                if not str_to_bool(
-                    self.components["electric_vehicle"].get("charging_profile", "false")
-                )
-                else "availability_ev"
+            use_charging_profile = str_to_bool(
+                self.components["electric_vehicle"].get("charging_profile", "false")
             )
+
+            # Remove flag key to avoid accidentally passing string to the EV model
+            self.components["electric_vehicle"].pop("charging_profile", None)
+
+            profile_key_ev = (
+                f"{self.id}_ev_charging_profile"
+                if use_charging_profile
+                else "availability_profile_ev"
+            )
+
             ev_profile = self.forecaster[profile_key_ev]
-            # Assign the aligned profile
+
+            # ✅ Add this to preview the time series you're passing into EV
+            print(f"[DEBUG] Loaded EV profile from '{profile_key_ev}':")
+            print(
+                ev_profile.as_pd_series().head(10)
+            )  # ✅ If you want a timestamped view
+
             self.components["electric_vehicle"][
-                "charging_profile"
-                if profile_key_ev.endswith("charging_profile")
-                else "availability_ev"
+                "charging_profile" if use_charging_profile else "availability_profile"
             ] = ev_profile
 
         # Initialize the model
