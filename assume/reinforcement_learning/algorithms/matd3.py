@@ -11,7 +11,10 @@ from torch.optim import AdamW
 
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.learning_utils import polyak_update
-from assume.reinforcement_learning.neural_network_architecture import CriticTD3
+from assume.reinforcement_learning.neural_network_architecture import (
+    ContextualCriticTD3,
+    CriticTD3,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,10 @@ class TD3(RLAlgorithm):
         self.n_updates = 0
         self.grad_clip_norm = 1.0
 
+        self.use_shared_actor_critic = (
+            True if actor_architecture == "contextual_mlp" else False
+        )
+
     def save_params(self, directory):
         """
         This method saves the parameters of both the actor and critic networks associated with the learning role. It organizes the
@@ -79,14 +86,26 @@ class TD3(RLAlgorithm):
             directory (str): The base directory for saving the parameters.
         """
         os.makedirs(directory, exist_ok=True)
-        for u_id, strategy in self.learning_role.rl_strats.items():
+        # save a single shared critic for all agents
+        if self.use_shared_actor_critic:
             obj = {
-                "critic": strategy.critics.state_dict(),
-                "critic_target": strategy.target_critics.state_dict(),
-                "critic_optimizer": strategy.critics.optimizer.state_dict(),
+                "critic": self.shared_critic.state_dict(),
+                "critic_target": self.shared_critic_target.state_dict(),
+                "critic_optimizer": self.shared_critic.optimizer.state_dict(),
             }
-            path = f"{directory}/critic_{u_id}.pt"
+            path = f"{directory}/shared_critic.pt"
             th.save(obj, path)
+
+        # else save individual critics for each agent
+        else:
+            for u_id, strategy in self.learning_role.rl_strats.items():
+                obj = {
+                    "critic": strategy.critics.state_dict(),
+                    "critic_target": strategy.target_critics.state_dict(),
+                    "critic_optimizer": strategy.critics.optimizer.state_dict(),
+                }
+                path = f"{directory}/critic_{u_id}.pt"
+                th.save(obj, path)
 
     def save_actor_params(self, directory):
         """
@@ -101,7 +120,7 @@ class TD3(RLAlgorithm):
         """
         os.makedirs(directory, exist_ok=True)
         # save a single shared actor for all agents
-        if self.actor_architecture == "contextual_mlp":
+        if self.use_shared_actor_critic:
             obj = {
                 "actor": self.shared_actor.state_dict(),
                 "actor_target": self.shared_actor_target.state_dict(),
@@ -153,18 +172,38 @@ class TD3(RLAlgorithm):
             )
             return
 
-        for u_id, strategy in self.learning_role.rl_strats.items():
+        if self.use_shared_actor_critic:
+            # load shared critic parameters
             try:
                 critic_params = self.load_obj(
-                    directory=f"{directory}/critics/critic_{str(u_id)}.pt"
+                    directory=f"{directory}/critics/shared_critic.pt"
                 )
-                strategy.critics.load_state_dict(critic_params["critic"])
-                strategy.target_critics.load_state_dict(critic_params["critic_target"])
-                strategy.critics.optimizer.load_state_dict(
+                self.shared_critic.load_state_dict(critic_params["critic"])
+                self.shared_critic_target.load_state_dict(
+                    critic_params["critic_target"]
+                )
+                self.shared_critic.optimizer.load_state_dict(
                     critic_params["critic_optimizer"]
                 )
-            except Exception:
-                logger.warning(f"No critic values loaded for agent {u_id}")
+            except Exception as e:
+                logger.warning(f"No shared critic values loaded: {e}")
+
+        else:
+            # load individual critic parameters
+            for u_id, strategy in self.learning_role.rl_strats.items():
+                try:
+                    critic_params = self.load_obj(
+                        directory=f"{directory}/critics/critic_{str(u_id)}.pt"
+                    )
+                    strategy.critics.load_state_dict(critic_params["critic"])
+                    strategy.target_critics.load_state_dict(
+                        critic_params["critic_target"]
+                    )
+                    strategy.critics.optimizer.load_state_dict(
+                        critic_params["critic_optimizer"]
+                    )
+                except Exception as e:
+                    logger.warning(f"No critic values loaded for agent {u_id}: {e}")
 
     def load_actor_params(self, directory: str) -> None:
         """
@@ -184,7 +223,8 @@ class TD3(RLAlgorithm):
             )
             return
 
-        if self.actor_architecture == "contextual_mlp":
+        if self.use_shared_actor_critic:
+            # load shared actor parameters
             try:
                 actor_params = self.load_obj(
                     directory=f"{directory}/actors/shared_actor.pt"
@@ -194,10 +234,11 @@ class TD3(RLAlgorithm):
                 self.shared_actor.optimizer.load_state_dict(
                     actor_params["actor_optimizer"]
                 )
-            except Exception:
-                logger.warning("No shared actor values loaded")
+            except Exception as e:
+                logger.warning(f"No shared actor values loaded: {e}")
 
         else:
+            # load individual actor parameters
             for u_id, strategy in self.learning_role.rl_strats.items():
                 try:
                     actor_params = self.load_obj(
@@ -208,8 +249,8 @@ class TD3(RLAlgorithm):
                     strategy.actor.optimizer.load_state_dict(
                         actor_params["actor_optimizer"]
                     )
-                except Exception:
-                    logger.warning(f"No actor values loaded for agent {u_id}")
+                except Exception as e:
+                    logger.warning(f"No actor values loaded for agent {u_id}: {e}")
 
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
@@ -222,30 +263,42 @@ class TD3(RLAlgorithm):
             actors_and_critics (dict): The actor and critic networks to be assigned.
 
         """
+        # If no actors and critics are provided, create new ones
         if actors_and_critics is None:
             self.check_policy_dimensions()
-            if self.actor_architecture == "contextual_mlp":
+            if self.use_shared_actor_critic:
+                # Create shared actor and critic networks
                 self.create_shared_actor()
+                self.create_shared_critics()
             else:
+                # Create individual actor and critic networks for each strategy
                 self.create_individual_actors()
-            self.create_critics()
+                self.create_individual_critics()
 
+        # If actors and critics are provided, extract and assign them
         else:
-            if self.actor_architecture == "contextual_mlp":
+            # Use shared actor and critic networks
+            if self.use_shared_actor_critic:
+                # assign the shared actor and critic to the learning role
                 self.shared_actor = actors_and_critics["actors"]
                 self.shared_actor_target = actors_and_critics["actor_targets"]
 
+                # assign the shared actor to all strategies
                 for u_id, strategy in self.learning_role.rl_strats.items():
                     strategy.actor = self.shared_actor
                     strategy.actor_target = self.shared_actor_target
+
+                self.shared_critic = actors_and_critics["critics"]
+                self.shared_critic_target = actors_and_critics["target_critics"]
+
             else:
+                # assign the individual actor and critic to the learning role
                 for u_id, strategy in self.learning_role.rl_strats.items():
                     strategy.actor = actors_and_critics["actors"][u_id]
                     strategy.actor_target = actors_and_critics["actor_targets"][u_id]
 
-            for u_id, strategy in self.learning_role.rl_strats.items():
-                strategy.critics = actors_and_critics["critics"][u_id]
-                strategy.target_critics = actors_and_critics["target_critics"][u_id]
+                    strategy.critics = actors_and_critics["critics"][u_id]
+                    strategy.target_critics = actors_and_critics["target_critics"][u_id]
 
             self.obs_dim = actors_and_critics["obs_dim"]
             self.act_dim = actors_and_critics["act_dim"]
@@ -388,7 +441,7 @@ class TD3(RLAlgorithm):
             strategy.actor_target = self.shared_actor_target
             strategy.actor.optimizer = self.shared_actor.optimizer
 
-    def create_critics(self) -> None:
+    def create_individual_critics(self) -> None:
         """
         Create critic networks for reinforcement learning.
 
@@ -427,6 +480,46 @@ class TD3(RLAlgorithm):
                 ),  # 1 = 100% of simulation remaining, uses learning_rate from config as starting point
             )
 
+    def create_shared_critics(self) -> None:
+        """
+        Create critic networks for reinforcement learning.
+
+        This method initializes critic networks for each agent in the reinforcement learning setup.
+
+        Notes:
+            The observation dimension need to be the same, due to the centralized criic that all actors share.
+            If you have units with different observation dimensions. They need to have different critics and hence learning roles.
+        """
+        n_agents = len(self.learning_role.rl_strats)
+
+        self.shared_critic = ContextualCriticTD3(
+            n_agents=n_agents,
+            obs_dim=self.obs_dim,
+            context_dim=self.context_dim,
+            act_dim=self.act_dim,
+            unique_obs_dim=self.unique_obs_dim,
+            float_type=self.float_type,
+        ).to(self.device)
+
+        self.shared_critic_target = ContextualCriticTD3(
+            n_agents=n_agents,
+            obs_dim=self.obs_dim,
+            context_dim=self.context_dim,
+            act_dim=self.act_dim,
+            unique_obs_dim=self.unique_obs_dim,
+            float_type=self.float_type,
+        ).to(self.device)
+
+        self.shared_critic_target.load_state_dict(self.shared_critic.state_dict())
+        self.shared_critic_target.train(mode=False)
+
+        self.shared_critic.optimizer = AdamW(
+            self.shared_critic.parameters(),
+            lr=self.learning_role.calc_lr_from_progress(
+                1
+            ),  # 1 = 100% of simulation remaining, uses learning_rate from config as starting point
+        )
+
     def extract_policy(self) -> dict:
         """
         Extract actor and critic networks.
@@ -444,17 +537,21 @@ class TD3(RLAlgorithm):
         critics = {}
         target_critics = {}
 
-        if self.actor_architecture == "contextual_mlp":
+        if self.use_shared_actor_critic:
+            # Use shared actor and critic networks
             actors = self.shared_actor
             actor_targets = self.shared_actor_target
+
+            critics = self.shared_critic
+            target_critics = self.shared_critic_target
         else:
+            # Use individual actor and critic networks for each strategy
             for u_id, strategy in self.learning_role.rl_strats.items():
                 actors[u_id] = strategy.actor
                 actor_targets[u_id] = strategy.actor_target
 
-        for u_id, strategy in self.learning_role.rl_strats.items():
-            critics[u_id] = strategy.critics
-            target_critics[u_id] = strategy.target_critics
+                critics[u_id] = strategy.critics
+                target_critics[u_id] = strategy.target_critics
 
         actors_and_critics = {
             "actors": actors,
@@ -510,16 +607,21 @@ class TD3(RLAlgorithm):
             self.learning_role.get_progress_remaining()
         )
 
-        # loop over all units to avoid update call for every gradient step, as it will be ambiguous
-        for strategy in strategies:
+        # Update learning rate and noise decay for all strategies
+        if self.use_shared_actor_critic:
             self.update_learning_rate(
-                [
-                    strategy.critics.optimizer,
-                    strategy.actor.optimizer,
-                ],
+                [self.shared_critic.optimizer, self.shared_actor.optimizer],
                 learning_rate=learning_rate,
             )
-            strategy.action_noise.update_noise_decay(updated_noise_decay)
+            for strategy in strategies:
+                strategy.action_noise.update_noise_decay(updated_noise_decay)
+        else:
+            for strategy in strategies:
+                self.update_learning_rate(
+                    [strategy.critics.optimizer, strategy.actor.optimizer],
+                    learning_rate=learning_rate,
+                )
+                strategy.action_noise.update_noise_decay(updated_noise_decay)
 
         for step in range(self.gradient_steps):
             self.n_updates += 1
@@ -550,16 +652,31 @@ class TD3(RLAlgorithm):
             #####################################################################
 
             # Zero-grad for all critics before accumulation
-            for strategy in strategies:
-                strategy.critics.optimizer.zero_grad(set_to_none=True)
+            if self.use_shared_actor_critic:
+                self.shared_critic.optimizer.zero_grad(set_to_none=True)
+            else:
+                for strategy in strategies:
+                    strategy.critics.optimizer.zero_grad(set_to_none=True)
 
             total_critic_loss = 0.0
 
             # Loop over all agents and accumulate critic loss
             for i, strategy in enumerate(strategies):
-                actor = strategy.actor
-                critic = strategy.critics
-                critic_target = strategy.target_critics
+                actor = (
+                    strategy.actor
+                    if not self.use_shared_actor_critic
+                    else self.shared_actor
+                )
+                critic = (
+                    strategy.critics
+                    if not self.use_shared_actor_critic
+                    else self.shared_critic
+                )
+                critic_target = (
+                    strategy.target_critics
+                    if not self.use_shared_actor_critic
+                    else self.shared_critic_target
+                )
 
                 # Efficiently extract unique observations from all other agents
                 other_unique_obs = th.cat(
@@ -593,7 +710,12 @@ class TD3(RLAlgorithm):
                 # Compute the next Q-values: min over all critics targets
                 with th.no_grad():
                     next_q_values = th.cat(
-                        critic_target(all_next_states, next_actions), dim=1
+                        critic_target(
+                            obs=all_next_states,
+                            context=strategy.context,
+                            actions=next_actions,
+                        ),
+                        dim=1,
                     )
                     next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
                     target_Q_values = (
@@ -601,7 +723,9 @@ class TD3(RLAlgorithm):
                     )
 
                 # Get current Q-values estimates for each critic network
-                current_Q_values = critic(all_states, all_actions)
+                current_Q_values = critic(
+                    obs=all_states, context=strategy.context, actions=all_actions
+                )
 
                 # Accumulate critic loss for this agent
                 critic_loss = sum(
@@ -617,43 +741,68 @@ class TD3(RLAlgorithm):
             total_critic_loss.backward()
 
             # Clip the gradients and step each critic optimizer
-            for strategy in strategies:
-                parameters = list(strategy.critics.parameters())
-
+            if self.use_shared_actor_critic:
+                parameters = list(self.shared_critic.parameters())
                 # Determine clipping statistics
                 max_grad_norm = max(p.grad.norm() for p in parameters)
-
                 # Perform clipping
                 total_norm = th.nn.utils.clip_grad_norm_(
                     parameters, max_norm=self.grad_clip_norm
                 )
-                strategy.critics.optimizer.step()
 
-                # Store clipping statistics
-                unit_params[step][strategy.unit_id]["total_grad_norm"] = total_norm
-                unit_params[step][strategy.unit_id]["max_grad_norm"] = max_grad_norm
+                self.shared_critic.optimizer.step()
+
+                for strategy in strategies:
+                    # Store clipping statistics
+                    unit_params[step][strategy.unit_id]["total_grad_norm"] = total_norm
+                    unit_params[step][strategy.unit_id]["max_grad_norm"] = max_grad_norm
+
+            else:
+                for strategy in strategies:
+                    parameters = list(strategy.critics.parameters())
+
+                    # Determine clipping statistics
+                    max_grad_norm = max(p.grad.norm() for p in parameters)
+
+                    # Perform clipping
+                    total_norm = th.nn.utils.clip_grad_norm_(
+                        parameters, max_norm=self.grad_clip_norm
+                    )
+                    strategy.critics.optimizer.step()
+
+                    # Store clipping statistics
+                    unit_params[step][strategy.unit_id]["total_grad_norm"] = total_norm
+                    unit_params[step][strategy.unit_id]["max_grad_norm"] = max_grad_norm
 
             ######################################################################
             # ACTOR UPDATE (DELAYED): Accumulate losses for all agents in one pass
             ######################################################################
             if self.n_updates % self.policy_delay == 0:
-                # Zero-grad for all actors first
-                for strategy in strategies:
-                    strategy.actor.optimizer.zero_grad(set_to_none=True)
+                # Zero grad for all actors before accumulation
+                if self.use_shared_actor_critic:
+                    self.shared_actor.optimizer.zero_grad(set_to_none=True)
+                else:
+                    for strategy in strategies:
+                        strategy.actor.optimizer.zero_grad(set_to_none=True)
 
                 total_actor_loss = 0.0
 
                 # We'll compute each agent's actor loss, accumulate, then do one backprop
                 for i, strategy in enumerate(strategies):
-                    actor = strategy.actor
-                    critic = strategy.critics
+                    actor = (
+                        strategy.actor
+                        if not self.use_shared_actor_critic
+                        else self.shared_actor
+                    )
+                    critic = (
+                        strategy.critics
+                        if not self.use_shared_actor_critic
+                        else self.shared_critic
+                    )
 
                     # Build local state for actor i
                     state_i = states[:, i, :]
-                    if self.actor_architecture == "contextual_mlp":
-                        action_i = self.shared_actor(state_i, strategy.context)
-                    else:
-                        action_i = actor(state_i)
+                    action_i = actor(state_i, strategy.context)
 
                     # Construct final state representation for agent i
                     other_unique_obs = th.cat(
@@ -680,7 +829,9 @@ class TD3(RLAlgorithm):
 
                     # Calculate actor loss (negative Q1 of the updated action)
                     actor_loss = -critic.q1_forward(
-                        all_states_i, all_actions_clone
+                        obs=all_states_i,
+                        context=strategy.context,
+                        actions=all_actions_clone,
                     ).mean()
 
                     # Accumulate actor losses
@@ -689,30 +840,48 @@ class TD3(RLAlgorithm):
                 # Single backward pass for all actors
                 total_actor_loss.backward()
 
-                # Clip and step each actor optimizer
-                for strategy in strategies:
+                # Clip and optimize actor
+                if self.use_shared_actor_critic:
+                    # Clip gradients for shared actor
                     th.nn.utils.clip_grad_norm_(
-                        strategy.actor.parameters(), max_norm=self.grad_clip_norm
+                        self.shared_actor.parameters(), max_norm=self.grad_clip_norm
                     )
-                    strategy.actor.optimizer.step()
+                    self.shared_actor.optimizer.step()
+                else:
+                    # Clip gradients and optimize each actor
+                    for strategy in strategies:
+                        th.nn.utils.clip_grad_norm_(
+                            strategy.actor.parameters(), max_norm=self.grad_clip_norm
+                        )
+                        strategy.actor.optimizer.step()
 
                 # Perform batch-wise Polyak update at the end (instead of inside the loop)
-                all_critic_params = []
-                all_target_critic_params = []
-
-                all_actor_params = []
-                all_target_actor_params = []
-
-                for strategy in strategies:
-                    all_critic_params.extend(strategy.critics.parameters())
-                    all_target_critic_params.extend(
-                        strategy.target_critics.parameters()
+                if self.use_shared_actor_critic:
+                    all_critic_params = list(self.shared_critic.parameters())
+                    all_target_critic_params = list(
+                        self.shared_critic_target.parameters()
+                    )
+                    all_actor_params = list(self.shared_actor.parameters())
+                    all_target_actor_params = list(
+                        self.shared_actor_target.parameters()
                     )
 
-                    all_actor_params.extend(strategy.actor.parameters())
-                    all_target_actor_params.extend(strategy.actor_target.parameters())
+                else:
+                    all_critic_params = []
+                    all_target_critic_params = []
+                    all_actor_params = []
+                    all_target_actor_params = []
 
-                # Perform batch-wise Polyak update (NO LOOPS)
+                    for strategy in strategies:
+                        all_critic_params.extend(strategy.critics.parameters())
+                        all_target_critic_params.extend(
+                            strategy.target_critics.parameters()
+                        )
+                        all_actor_params.extend(strategy.actor.parameters())
+                        all_target_actor_params.extend(
+                            strategy.actor_target.parameters()
+                        )
+
                 polyak_update(all_critic_params, all_target_critic_params, self.tau)
                 polyak_update(all_actor_params, all_target_actor_params, self.tau)
 
@@ -725,7 +894,7 @@ class TD3(RLAlgorithm):
             noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
 
             # Calculate next actions for all agents at once using a batched forward pass
-            if self.actor_architecture == "contextual_mlp":
+            if self.use_shared_actor_critic:
                 # Get batch size and number of agents from next_states (assumed shape: [batch_size, n_rl_agents, obs_dim])
                 batch_size, n_agents, obs_dim = next_states.shape
 

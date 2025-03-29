@@ -15,13 +15,24 @@ class Critic(nn.Module):
 
     def _build_q_network(self, input_dim, hidden_sizes, float_type):
         """
-        Build a Q-network as a sequence of linear layers.
+        Build a Q-network as a sequence of linear layers with batch normalization and ReLU.
+
+        Each hidden layer is constructed as:
+            Linear(input_dim, h) -> BatchNorm1d(h) -> ReLU
+        The final layer is a linear layer that outputs a single Q-value.
         """
         layers = nn.ModuleList()
         for h in hidden_sizes:
-            layers.append(nn.Linear(input_dim, h, dtype=float_type))
+            layers.append(
+                nn.Sequential(
+                    nn.Linear(input_dim, h, dtype=float_type),
+                    nn.BatchNorm1d(h, dtype=float_type),
+                    nn.ReLU(),
+                )
+            )
             input_dim = h
-        layers.append(nn.Linear(input_dim, 1, dtype=float_type))  # Output Q-value
+        # Final output layer without BatchNorm and activation.
+        layers.append(nn.Linear(input_dim, 1, dtype=float_type))
         return layers
 
     def _init_weights(self):
@@ -82,14 +93,14 @@ class CriticTD3(Critic):
 
         # Compute Q1
         x1 = xu
-        for layer in self.q1_layers[:-1]:  # All hidden layers
-            x1 = F.relu(layer(x1))
+        for block in self.q1_layers[:-1]:  # All hidden layers
+            x1 = block(x1)
         x1 = self.q1_layers[-1](x1)  # Output layer (no activation)
 
         # Compute Q2
         x2 = xu
-        for layer in self.q2_layers[:-1]:  # All hidden layers
-            x2 = F.relu(layer(x2))
+        for block in self.q2_layers[:-1]:  # All hidden layers
+            x2 = block(x2)
         x2 = self.q2_layers[-1](x2)  # Output layer (no activation)
 
         return x1, x2
@@ -100,8 +111,8 @@ class CriticTD3(Critic):
         """
         x = th.cat([obs, actions], dim=1)
 
-        for layer in self.q1_layers[:-1]:  # All hidden layers
-            x = F.relu(layer(x))
+        for block in self.q1_layers[:-1]:  # All hidden layers
+            x = block(x)
 
         x = self.q1_layers[-1](x)  # Output layer (no activation)
 
@@ -130,7 +141,7 @@ class ContextualCriticTD3(Critic):
         act_dim: int,
         float_type,
         unique_obs_dim: int = 0,
-        hidden_sizes=[1024, 512, 256, 128],
+        hidden_sizes=[512, 256, 128],
     ):
         super().__init__()
 
@@ -148,13 +159,11 @@ class ContextualCriticTD3(Critic):
         self.obs_fc = nn.Linear(
             self.effective_obs_dim, hidden_sizes[-1], dtype=float_type
         )
-        self.context_fc = nn.Linear(
-            self.effective_context_dim, hidden_sizes[-1], dtype=float_type
-        )
+        self.context_fc = nn.Linear(self.effective_context_dim, 64, dtype=float_type)
 
         # After processing, we concatenate the two embeddings with the actions.
         # The combined input dimension becomes: 128 (obs) + 128 (context) + effective_act_dim.
-        combined_input_dim = hidden_sizes[-1] * 2 + self.effective_act_dim
+        combined_input_dim = hidden_sizes[-1] + 64 + self.effective_act_dim
 
         # Build the two Q-networks (Q1 and Q2).
         self.q1_layers = self._build_q_network(
@@ -192,14 +201,14 @@ class ContextualCriticTD3(Critic):
 
         # Compute Q1.
         x1 = xu
-        for layer in self.q1_layers[:-1]:
-            x1 = F.relu(layer(x1))
+        for block in self.q1_layers[:-1]:
+            x1 = block(x1)
         x1 = self.q1_layers[-1](x1)
 
         # Compute Q2.
         x2 = xu
-        for layer in self.q2_layers[:-1]:
-            x2 = F.relu(layer(x2))
+        for block in self.q2_layers[:-1]:
+            x2 = block(x2)
         x2 = self.q2_layers[-1](x2)
 
         return x1, x2
@@ -215,9 +224,10 @@ class ContextualCriticTD3(Critic):
         obs_emb = F.relu(self.obs_fc(obs))
         context_emb = F.relu(self.context_fc(context))
         xu = th.cat([obs_emb, context_emb, actions], dim=1)
+
         x = xu
-        for layer in self.q1_layers[:-1]:
-            x = F.relu(layer(x))
+        for block in self.q1_layers[:-1]:
+            x = block(x)
         x = self.q1_layers[-1](x)
         return x
 
@@ -303,11 +313,11 @@ class ContextualMLPActor(Actor):
         super().__init__()
 
         # Process general observation
-        self.obs_fc = nn.Linear(obs_dim, 128, dtype=float_type)
+        self.obs_fc = nn.Linear(obs_dim, hidden_sizes[-1], dtype=float_type)
         # Process unit-specific context
-        self.context_fc = nn.Linear(context_dim, 128, dtype=float_type)
+        self.context_fc = nn.Linear(context_dim, hidden_sizes[-1], dtype=float_type)
 
-        combined_input_dim = 128 + 128
+        combined_input_dim = hidden_sizes[-1] * 2
         # Build the MLP layers that output the final action
         self.layers = self._build_mlp_layers(
             combined_input_dim, act_dim, hidden_sizes, float_type
