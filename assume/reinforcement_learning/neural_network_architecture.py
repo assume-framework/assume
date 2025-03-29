@@ -7,7 +7,34 @@ from torch import nn
 from torch.nn import functional as F
 
 
-class CriticTD3(nn.Module):
+class Critic(nn.Module):
+    """Parent class for critic networks."""
+
+    def __init__(self):
+        super().__init__()
+
+    def _build_q_network(self, input_dim, hidden_sizes, float_type):
+        """
+        Build a Q-network as a sequence of linear layers.
+        """
+        layers = nn.ModuleList()
+        for h in hidden_sizes:
+            layers.append(nn.Linear(input_dim, h, dtype=float_type))
+            input_dim = h
+        layers.append(nn.Linear(input_dim, 1, dtype=float_type))  # Output Q-value
+        return layers
+
+    def _init_weights(self):
+        """
+        Apply Xavier initialization to all linear layers.
+        """
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+
+
+class CriticTD3(Critic):
     """Initialize parameters and build model.
 
     Args:
@@ -37,42 +64,17 @@ class CriticTD3(nn.Module):
         else:
             hidden_sizes = [1024, 512, 256, 128]  # Deeper network for large `n_agents`
 
+        input_dim = self.obs_dim + self.act_dim
         # First Q-network (Q1)
-        self.q1_layers = self._build_q_network(hidden_sizes, float_type)
+        self.q1_layers = self._build_q_network(input_dim, hidden_sizes, float_type)
 
         # Second Q-network (Q2) for double Q-learning
-        self.q2_layers = self._build_q_network(hidden_sizes, float_type)
+        self.q2_layers = self._build_q_network(input_dim, hidden_sizes, float_type)
 
         # Initialize weights properly
         self._init_weights()
 
-    def _build_q_network(self, hidden_sizes, float_type):
-        """
-        Dynamically creates a Q-network given the chosen hidden layer sizes.
-        """
-        layers = nn.ModuleList()
-        input_dim = (
-            self.obs_dim + self.act_dim
-        )  # Input includes all observations and actions
-
-        for h in hidden_sizes:
-            layers.append(nn.Linear(input_dim, h, dtype=float_type))
-            input_dim = h
-        layers.append(nn.Linear(input_dim, 1, dtype=float_type))  # Output Q-value
-
-        return layers
-
-    def _init_weights(self):
-        """Apply Xavier initialization to all layers."""
-
-        def init_layer(m):
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                nn.init.zeros_(m.bias)
-
-        self.apply(init_layer)
-
-    def forward(self, obs, actions):
+    def forward(self, obs, actions, *args, **kwargs):
         """
         Forward pass through both Q-networks.
         """
@@ -92,7 +94,7 @@ class CriticTD3(nn.Module):
 
         return x1, x2
 
-    def q1_forward(self, obs, actions):
+    def q1_forward(self, obs, actions, *args, **kwargs):
         """
         Compute only Q1 (used during actor updates).
         """
@@ -106,6 +108,120 @@ class CriticTD3(nn.Module):
         return x
 
 
+class ContextualCriticTD3(Critic):
+    """
+    A centralized critic that incorporates both the global state (observation) and
+    unit-specific context in separate branches before combining them with the actions.
+
+    Args:
+        n_agents (int): Number of agents.
+        obs_dim (int): Dimension of each agent's observation.
+        context_dim (int): Dimension of each agent's extra context.
+        act_dim (int): Dimension of each agent's action.
+        float_type: The torch data type (e.g., torch.float32).
+        unique_obs_dim (int, optional): Extra observation dimensions from other agents (default=0).
+    """
+
+    def __init__(
+        self,
+        n_agents: int,
+        obs_dim: int,
+        context_dim: int,
+        act_dim: int,
+        float_type,
+        unique_obs_dim: int = 0,
+        hidden_sizes=[1024, 512, 256, 128],
+    ):
+        super().__init__()
+
+        # Effective dimensions:
+        # For the observation branch, we use the agent's own observation
+        # plus the unique observations from the other agents.
+        self.effective_obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
+        # For the actions branch, we have all agents' actions concatenated.
+        self.effective_act_dim = act_dim * n_agents
+        # For the context branch, we assume that each agent has a context vector;
+        # these are concatenated in a fixed order.
+        self.effective_context_dim = context_dim
+
+        # Build separate processing layers for observation and context.
+        self.obs_fc = nn.Linear(
+            self.effective_obs_dim, hidden_sizes[-1], dtype=float_type
+        )
+        self.context_fc = nn.Linear(
+            self.effective_context_dim, hidden_sizes[-1], dtype=float_type
+        )
+
+        # After processing, we concatenate the two embeddings with the actions.
+        # The combined input dimension becomes: 128 (obs) + 128 (context) + effective_act_dim.
+        combined_input_dim = hidden_sizes[-1] * 2 + self.effective_act_dim
+
+        # Build the two Q-networks (Q1 and Q2).
+        self.q1_layers = self._build_q_network(
+            combined_input_dim, hidden_sizes, float_type
+        )
+        self.q2_layers = self._build_q_network(
+            combined_input_dim, hidden_sizes, float_type
+        )
+
+        self._init_weights()
+
+    def forward(self, obs, context, actions):
+        """
+        Forward pass through both Q-networks.
+
+        Args:
+            obs (torch.Tensor): Global observation tensor with shape [batch, effective_obs_dim].
+            context (torch.Tensor): Concatenated context tensor with shape [batch, effective_context_dim].
+            actions (torch.Tensor): Concatenated actions with shape [batch, effective_act_dim].
+
+        Returns:
+            Tuple of Q-value estimates (Q1, Q2) each with shape [batch, 1].
+        """
+
+        # expand context to match batch size
+        if obs.dim() != context.dim():
+            context = context.unsqueeze(0).expand(obs.size(0), -1)
+
+        # Process the observation and context through their respective branches.
+        obs_emb = F.relu(self.obs_fc(obs))
+        context_emb = F.relu(self.context_fc(context))
+
+        # Concatenate the embeddings with the actions.
+        xu = th.cat([obs_emb, context_emb, actions], dim=1)
+
+        # Compute Q1.
+        x1 = xu
+        for layer in self.q1_layers[:-1]:
+            x1 = F.relu(layer(x1))
+        x1 = self.q1_layers[-1](x1)
+
+        # Compute Q2.
+        x2 = xu
+        for layer in self.q2_layers[:-1]:
+            x2 = F.relu(layer(x2))
+        x2 = self.q2_layers[-1](x2)
+
+        return x1, x2
+
+    def q1_forward(self, obs, context, actions):
+        """
+        Compute only the Q1 estimate (useful for actor updates).
+        """
+        # expand context to match batch size
+        if obs.dim() != context.dim():
+            context = context.unsqueeze(0).expand(obs.size(0), -1)
+
+        obs_emb = F.relu(self.obs_fc(obs))
+        context_emb = F.relu(self.context_fc(context))
+        xu = th.cat([obs_emb, context_emb, actions], dim=1)
+        x = xu
+        for layer in self.q1_layers[:-1]:
+            x = F.relu(layer(x))
+        x = self.q1_layers[-1](x)
+        return x
+
+
 class Actor(nn.Module):
     """
     Parent class for actor networks.
@@ -114,37 +230,57 @@ class Actor(nn.Module):
     def __init__(self):
         super().__init__()
 
+    def _build_mlp_layers(self, input_dim, act_dim, hidden_sizes, float_type):
+        """
+        Dynamically creates an MLP given the chosen hidden layer sizes.
+        """
+        layers = nn.ModuleList()
+        for h in hidden_sizes:
+            layers.append(nn.Linear(input_dim, h, dtype=float_type))
+            input_dim = h
+
+        layers.append(
+            nn.Linear(input_dim, act_dim, dtype=float_type)
+        )  # Final output layer
+
+        return layers
+
+    def _init_weights(self):
+        # Apply Xavier initialization to all linear layers.
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                nn.init.zeros_(m.bias)
+
 
 class MLPActor(Actor):
     """
     The neurnal network for the MLP actor.
     """
 
-    def __init__(self, obs_dim: int, act_dim: int, float_type, *args, **kwargs):
+    def __init__(
+        self,
+        obs_dim: int,
+        act_dim: int,
+        float_type,
+        hidden_sizes=[256, 128],
+        *args,
+        **kwargs,
+    ):
         super().__init__()
 
-        self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
-        self.FC2 = nn.Linear(256, 128, dtype=float_type)
-        self.FC3 = nn.Linear(128, act_dim, dtype=float_type)
+        self.layers = self._build_mlp_layers(obs_dim, act_dim, hidden_sizes, float_type)
 
-        # Initialize weights
         self._init_weights()
-
-    def _init_weights(self):
-        """Apply Xavier initialization to all layers."""
-
-        def init_layer(m):
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                nn.init.zeros_(m.bias)
-
-        self.apply(init_layer)
 
     def forward(self, obs, *args, **kwargs):
         """Forward pass for action prediction."""
-        x = F.relu(self.FC1(obs))
-        x = F.relu(self.FC2(x))
-        x = F.softsign(self.FC3(x))
+        x = obs
+        for layer in self.layers[:-1]:
+            x = F.relu(layer(x))
+
+        # Apply the final layer with softsign activation
+        x = F.softsign(self.layers[-1](x))
 
         return x
 
@@ -160,44 +296,44 @@ class ContextualMLPActor(Actor):
         context_dim: int,
         act_dim: int,
         float_type,
-        hidden_sizes=(256, 128),
+        hidden_sizes=[512, 256, 128],
         *args,
         **kwargs,
     ):
         super().__init__()
+
         # Process general observation
         self.obs_fc = nn.Linear(obs_dim, 128, dtype=float_type)
         # Process unit-specific context
         self.context_fc = nn.Linear(context_dim, 128, dtype=float_type)
-        # Combine both processed features and further layers
-        self.fc1 = nn.Linear(128 + 128, hidden_sizes[0], dtype=float_type)
-        self.fc2 = nn.Linear(hidden_sizes[0], hidden_sizes[1], dtype=float_type)
-        self.fc3 = nn.Linear(hidden_sizes[1], act_dim, dtype=float_type)
-        self._init_weights()
 
-    def _init_weights(self):
-        # Apply Xavier initialization
-        for m in self.modules():
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                nn.init.zeros_(m.bias)
+        combined_input_dim = 128 + 128
+        # Build the MLP layers that output the final action
+        self.layers = self._build_mlp_layers(
+            combined_input_dim, act_dim, hidden_sizes, float_type
+        )
+
+        self._init_weights()
 
     def forward(self, obs, context):
         """
         Forward pass takes both the general observation and unit-specific context.
         """
-        # expand context to match batch size
+        # Expand context to match batch size if necessary.
         if obs.dim() != context.dim():
             context = context.unsqueeze(0).expand(obs.size(0), -1)
 
         obs_emb = F.relu(self.obs_fc(obs))
         context_emb = F.relu(self.context_fc(context))
-        # Concatenate the embeddings along the feature dimension
+
+        # Concatenate the embeddings along the feature dimension.
         x = th.cat([obs_emb, context_emb], dim=-1)
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        # Using softsign (or consider tanh if your actions need to be in [-1,1])
-        x = F.softsign(self.fc3(x))
+        # Pass through the MLP hidden layers
+        for layer in self.layers[:-1]:
+            x = F.relu(layer(x))
+
+        # Apply the final layer with softsign activation.
+        x = F.softsign(self.layers[-1](x))
         return x
 
 
