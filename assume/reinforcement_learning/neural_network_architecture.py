@@ -159,11 +159,15 @@ class ContextualCriticTD3(Critic):
         self.obs_fc = nn.Linear(
             self.effective_obs_dim, hidden_sizes[-1], dtype=float_type
         )
-        self.context_fc = nn.Linear(self.effective_context_dim, 64, dtype=float_type)
+        self.context_fc = nn.Linear(
+            self.effective_context_dim, hidden_sizes[-1], dtype=float_type
+        )
 
         # After processing, we concatenate the two embeddings with the actions.
         # The combined input dimension becomes: 128 (obs) + 128 (context) + effective_act_dim.
-        combined_input_dim = hidden_sizes[-1] + 64 + self.effective_act_dim
+        combined_input_dim = (
+            hidden_sizes[-1] + hidden_sizes[-1] + self.effective_act_dim
+        )
 
         # Build the two Q-networks (Q1 and Q2).
         self.q1_layers = self._build_q_network(
@@ -306,7 +310,7 @@ class ContextualMLPActor(Actor):
         context_dim: int,
         act_dim: int,
         float_type,
-        hidden_sizes=[512, 256, 128],
+        hidden_sizes=[256, 128],
         *args,
         **kwargs,
     ):
