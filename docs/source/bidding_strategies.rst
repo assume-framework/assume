@@ -49,7 +49,7 @@ follows the underscore (the market names need to match with those in the config 
   Standard-Bidding Unit   hydro              standard_eom_powerplant   standard_pos_crm_powerplant   standard_neg_crm_powerplant   1000
  ======================= ================== ========================= ============================= ============================= ===========
 
-We'll now take a look at the different Bidding Strategy types within each methodology, and their associated "bidding_strategy_id".
+We'll now take a look at the different Bidding Strategies within each methodology, their associated "bidding_strategy_id", and for which unit and market type(s) they are valid.
 
 Naive
 -------------
