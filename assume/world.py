@@ -568,11 +568,14 @@ class World:
 
             if strategy not in self.bidding_strategies:
                 if strategy not in deprecated_to_new_strategy_names:
+                    # Invalid bidding strategy ID
                     raise ValueError(
-                        f"""Bidding strategy {strategy} not registered. Please check the name of
-                        the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                        f"""Bidding strategy {strategy} not registered. Please compare the name of
+                        the bidding strategy with the list of available strategies here https://assume.readthedocs.io/en/latest/bidding_strategies.html
+                        or register the bidding strategy in the world.bidding_strategies dict."""
                     )
                 else:
+                    # Deprecated bidding strategy ID
                     logger.warning(
                         f"""FutureWarning: Bidding strategy name {strategy} is deprecated and has been
                         renamed to {deprecated_to_new_strategy_names[strategy]}. For the full list of up-to-date strategies and names,

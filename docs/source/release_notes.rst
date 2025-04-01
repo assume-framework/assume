@@ -12,6 +12,14 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**Documentation:**
+
+- Added Bidding Strategy section with list of all available Bidding Strategies for each Bidding Strategy methodology.
+
+**Code Refactoring**
+
+- Renaming of Bidding Strategy methods to remove potentially confusing explicit references to methodology names (Flexable).
+  Bidding Strategy ID naming format has been standardised to the form "Type_Market_Unit".
 
 0.5.2 - (21th March 2025)
 =========================
