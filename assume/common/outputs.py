@@ -823,7 +823,6 @@ class DatabaseMaintenance:
             logger.info("No simulation IDs provided for deletion.")
             return
 
-        sim_list_str = ", ".join([f"'{sim}'" for sim in simulation_ids])
         inspector = inspect(self.db)
         table_names = inspector.get_table_names()
         for table in table_names:
@@ -836,10 +835,11 @@ class DatabaseMaintenance:
                             f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
                         )
                     )
+                    # Safe parameterized query
                     delete_query = text(
-                        f'DELETE FROM "{table}" WHERE simulation IN ({sim_list_str})'
+                        f'DELETE FROM "{table}" WHERE simulation = ANY(:simulations)'
                     )
-                    result = conn.execute(delete_query)
+                    result = conn.execute(delete_query, {"simulations": simulation_ids})
                     logger.debug("Deleted %s rows from %s", result.rowcount, table)
             except Exception as e:
                 logger.error(
