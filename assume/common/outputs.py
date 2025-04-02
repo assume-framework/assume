@@ -840,7 +840,6 @@ class DatabaseMaintenance:
                         f'DELETE FROM "{table}" WHERE simulation IN ({sim_list_str})'
                     )
                     result = conn.execute(delete_query)
-                    conn.commit()
                     logger.debug("Deleted %s rows from %s", result.rowcount, table)
             except Exception as e:
                 logger.error(
@@ -878,7 +877,6 @@ class DatabaseMaintenance:
                     else:
                         delete_query = text(f'DELETE FROM "{table}"')
                     result = conn.execute(delete_query)
-                    conn.commit()
                     logger.debug("Deleted %s rows from %s", result.rowcount, table)
             except Exception as e:
                 logger.error("Could not delete simulations from table %s: %s", table, e)
