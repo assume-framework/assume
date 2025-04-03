@@ -12,7 +12,7 @@ with open("../../pyproject.toml", "rb") as f:
 # -- Project information
 
 project = "ASSUME"
-copyright = "2022-2024 ASSUME Developers"
+copyright = "2022-2025 ASSUME Developers"
 author = ",".join([a["name"] for a in pyproject_toml["authors"]])
 
 version = pyproject_toml["version"]

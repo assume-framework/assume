@@ -2,9 +2,9 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-###############################
-Buffers
-###############################
+#############
+Reply Buffer
+#############
 
 This chapter gives you an insight into the general usage of buffers in reinforcement learning and how they are implemented in ASSUME.
 
