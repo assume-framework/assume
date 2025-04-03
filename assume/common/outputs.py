@@ -96,8 +96,8 @@ class WriteOutput(Role):
         self.start = start
         self.end = end
 
-        self.outputs_buffer_size_mb = outputs_buffer_size_mb * 1024 * 1024
-        self.current_dfs_size = 0
+        self.outputs_buffer_size_bytes = outputs_buffer_size_mb * 1024 * 1024
+        self.current_dfs_size_bytes = 0
 
         # initializes dfs for storing and writing asynchronous
         self.write_buffers: dict = defaultdict(list)
@@ -247,9 +247,9 @@ class WriteOutput(Role):
             self.write_buffers[content_type].append((content_data, market_id))
 
         # keep track of the memory usage of the data
-        self.current_dfs_size += calculate_content_size(content_data)
-        # if the current size is larger than self.outputs_buffer_size_mb, store the data
-        if self.current_dfs_size > self.outputs_buffer_size_mb:
+        self.current_dfs_size_bytes += calculate_content_size(content_data)
+        # if the current size is larger than self.outputs_buffer_size_bytes, store the data
+        if self.current_dfs_size_bytes > self.outputs_buffer_size_bytes:
             logger.debug("storing output data due to size limit")
             self.context.schedule_instant_task(coroutine=self.store_dfs())
 
@@ -531,7 +531,7 @@ class WriteOutput(Role):
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
 
-        self.current_dfs_size = 0
+        self.current_dfs_size_bytes = 0
 
     def store_grid(
         self,
