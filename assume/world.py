@@ -215,9 +215,9 @@ class World:
         self.learning_mode = self.learning_config.get("learning_mode", False)
         self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
-        # initialize a scenario data dict if not already present
-        if not hasattr(self, "scenario_data"):
-            self.scenario_data = {"config": {}}
+        # initialize a config dictionary for the scenario data if not already present
+        if not self.scenario_data.get("config"):
+            self.scenario_data["config"] = {}
 
         # make a descriptor for the tqdm progress bar
         # use simulation_id of not in learning mode; use Episode ID if in learning mode
