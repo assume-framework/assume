@@ -216,7 +216,7 @@ class World:
         self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
         # initialize a scenario data dict if not already present
-        if hasattr(self, "scenario_data"):
+        if not hasattr(self, "scenario_data"):
             self.scenario_data = {"config": {}}
 
         # make a descriptor for the tqdm progress bar
