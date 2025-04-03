@@ -72,9 +72,6 @@ deprecated_to_new_strategy_names: dict[str, str] = {
 }
 
 try:
-    from assume.strategies.learning_advanced_orders import (
-        LearningProfileEOMPowerplantStrategy,
-    )
     from assume.strategies.learning_strategies import (
         LearningEOMPowerplantStrategy,
         LearningEOMStorageStrategy,
@@ -82,9 +79,6 @@ try:
 
     bidding_strategies["learning_eom_powerplant"] = LearningEOMPowerplantStrategy
     bidding_strategies["learning_eom_storage"] = LearningEOMStorageStrategy
-    bidding_strategies["learning_profile_eom_powerplant"] = (
-        LearningProfileEOMPowerplantStrategy
-    )
 
 except ImportError:
     pass

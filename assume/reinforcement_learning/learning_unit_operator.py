@@ -13,10 +13,7 @@ from assume.common.market_objects import (
     Orderbook,
 )
 from assume.common.utils import convert_tensors, create_rrule, get_products_index
-from assume.strategies import (
-    BaseStrategy,
-    LearningStrategy,
-)
+from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
