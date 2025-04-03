@@ -153,7 +153,7 @@ class WriteOutput(Role):
             # ignore spatial_ref_sys table
             if table_name == "spatial_ref_sys":
                 continue
-            # only delete rl_params during the first episode of learning
+            # only delete rl_params and rl_meta during the first episode of learning
             if table_name in ["rl_params", "rl_meta"] and not (
                 self.learning_mode and self.episode == 1
             ):
