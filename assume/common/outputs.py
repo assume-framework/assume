@@ -49,7 +49,7 @@ class WriteOutput(Role):
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
-        outputs_buffer_size (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
+        outputs_buffer_size (int, optional): The maximum storage size for storing output data before saving it. Defaults to 300 MB.
     """
 
     def __init__(
