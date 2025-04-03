@@ -49,7 +49,7 @@ class WriteOutput(Role):
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
-        max_dfs_size_mb (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
+        outputs_buffer_size (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
     """
 
     def __init__(
@@ -59,13 +59,13 @@ class WriteOutput(Role):
         end: datetime,
         db_uri="",
         export_csv_path: str = "",
-        save_frequency_hours: int = None,
+        save_frequency_hours: int = 48,
         learning_mode: bool = False,
         evaluation_mode: bool = False,
         episode: int = None,
         eval_episode: int = None,
         additional_kpis: dict[str, OutputDef] = {},
-        max_dfs_size_mb: int = 300,
+        outputs_buffer_size: int = 300,
     ):
         super().__init__()
 
@@ -96,7 +96,7 @@ class WriteOutput(Role):
         self.start = start
         self.end = end
 
-        self.max_dfs_size = max_dfs_size_mb * 1024 * 1024
+        self.outputs_buffer_size = outputs_buffer_size * 1024 * 1024
         self.current_dfs_size = 0
 
         # initializes dfs for storing and writing asynchronous
@@ -248,8 +248,8 @@ class WriteOutput(Role):
 
         # keep track of the memory usage of the data
         self.current_dfs_size += calculate_content_size(content_data)
-        # if the current size is larger than self.max_dfs_size, store the data
-        if self.current_dfs_size > self.max_dfs_size:
+        # if the current size is larger than self.outputs_buffer_size, store the data
+        if self.current_dfs_size > self.outputs_buffer_size:
             logger.debug("storing output data due to size limit")
             self.context.schedule_instant_task(coroutine=self.store_dfs())
 

@@ -349,6 +349,9 @@ class World:
             episode=episode,
             eval_episode=eval_episode,
             additional_kpis=self.additional_kpis,
+            outputs_buffer_size=self.scenario_data["config"].get(
+                "outputs_buffer_size", 300
+            ),
         )
         if not self.output_agent_addr:
             return
