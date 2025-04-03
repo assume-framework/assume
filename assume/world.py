@@ -215,7 +215,7 @@ class World:
         self.learning_mode = self.learning_config.get("learning_mode", False)
         self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
-        # initialize an empty scenario config dictionary if it does not exist
+        # initialize a scenario data dict if not already present
         if hasattr(self, "scenario_data"):
             self.scenario_data = {"config": {}}
 
@@ -353,8 +353,8 @@ class World:
             episode=episode,
             eval_episode=eval_episode,
             additional_kpis=self.additional_kpis,
-            outputs_buffer_size=self.scenario_data["config"].get(
-                "outputs_buffer_size", 300
+            outputs_buffer_size_mb=self.scenario_data["config"].get(
+                "outputs_buffer_size_mb", 300
             ),
         )
         if not self.output_agent_addr:

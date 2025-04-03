@@ -20,15 +20,7 @@ The ``WriteOutput`` class is responsible for:
 - Storing data into a database and/or exporting it as CSV files.
 - Managing performance trade-offs by allowing configuration of buffer sizes and storage intervals.
 
-Constructor Parameters
-------------------------
-- **simulation_id** (*str*, required): Unique identifier for the simulation.
-- **start** (*datetime*, required): The simulation start date and time.
-- **end** (*datetime*, required): The simulation end date and time.
-- **db_uri** (*str*, optional): URI for the database engine. Defaults to an empty string.
-- **export_csv_path** (*str*, optional): Path for exporting CSV files. When provided, ``save_frequency`` is disabled.
-- **save_frequency_hours** (*int*, optional): Interval (in hours) at which the buffered data is stored. Setting to ``null`` disables time-based writes. Default: 48 hours.
-- **outputs_buffer_size** (*int*, optional): Maximum allowed size of the output buffer in MB. Default: 300 MB.
+This class is part of the :mod:`assume.common.outputs` module. For more details, refer to :py:class:`assume.common.outputs.WriteOutput`.
 
 Data Processing Workflow
 --------------------------
@@ -40,7 +32,7 @@ Data Processing Workflow
 2. **Buffer Size Management:**
 
    - The memory usage of buffered data is monitored continuously.
-   - If memory usage exceeds the ``outputs_buffer_size`` threshold, buffered data is flushed to storage.
+   - If memory usage exceeds the ``outputs_buffer_size_mb`` threshold, buffered data is flushed to storage.
 
 3. **Data Conversion:**
 
@@ -52,18 +44,13 @@ Data Processing Workflow
 
 Performance Considerations
 ---------------------------
-- **Buffering Strategy:** Increasing ``outputs_buffer_size`` can improve performance by reducing write frequency. Default: 300 MB.
+- **Buffering Strategy:** Increasing ``outputs_buffer_size_mb`` can improve performance by reducing write frequency. Default: 300 MB.
 - **Write Intervals:** Setting ``save_frequency_hours`` facilitates real-time observation with Grafana dashboards. Disabling this by setting it to ``null`` improves performance but prevents real-time monitoring.
-- **Optimal Configuration:** Increase ``outputs_buffer_size`` and disable ``save_frequency_hours`` for maximum performance. Ensure sufficient memory is available.
+- **Optimal Configuration:** Increase ``outputs_buffer_size_mb`` and disable ``save_frequency_hours`` for maximum performance. Ensure sufficient memory is available.
 
 .. note::
   When storing results as CSV files, ``save_frequency`` is automatically disabled, meaning data is only saved at the end of the simulation or if the buffer size limit is reached. This prevents real-time observation through Grafana dashboards.
 
-Key Methods
-------------
-- **handle_output_message(self, content, meta):** Processes incoming messages and buffers them.
-- **store_dfs(self):** Flushes the DataFrames to storage.
-- **on_stop(self):** Ensures all remaining buffered data is stored at the end of the simulation.
 
 Database Tables Overview
 =========================
@@ -121,15 +108,7 @@ The ``DatabaseMaintenance`` class provides utility functions for managing simula
 - Deleting specific simulations.
 - Performing bulk deletion of simulation data with optional exclusions.
 
-Constructor Parameters
------------------------
-- **db_uri** (*str*, required): The URI of the database engine used to establish a connection.
-
-Methods
---------
-- **get_unique_simulation_ids(self) -> list[str]:** Retrieves unique simulation IDs.
-- **delete_simulations(self, simulation_ids: list[str]) -> None:** Deletes records associated with the provided simulation IDs.
-- **delete_all_simulations(self, exclude: list[str] = None) -> None:** Deletes all simulation data, optionally excluding specific IDs.
+This class is part of the :mod:`assume.common.outputs` module. For more details, refer to :py:class:`assume.common.outputs.DatabaseMaintenance`.
 
 Usage Example
 ==============
@@ -142,7 +121,7 @@ Below is an example YAML configuration snippet for a simulation configuring the 
     start: 2025-01-01 00:00:00
     end: 2025-01-02 00:00:00
     save_frequency_hours: 24 # Time interval for saving data in hours
-    outputs_buffer_size: 300  # Buffer size in MB
+    outputs_buffer_size_mb: 300  # Buffer size in MB
 
 Example usage of the ``DatabaseMaintenance`` class:
 

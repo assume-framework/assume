@@ -95,7 +95,8 @@ Redispatch of Power Plants
 
 Once congestion is identified at any line or timestep, the redispatch mechanism is applied to alleviate it.
 
-### Steps for Redispatch
+Steps for Redispatch
+^^^^^^^^^^^^^^^^^^^^^
 
 1. **Fixing Dispatches from the EOM Market**
    EOM market dispatches are fixed to model redispatch from power plants with accurate cost considerations. EOM dispatches are treated as a `Load` in the network, with dispatches specified via `p_set`. Generators are assigned a positive sign, and demands are given a negative sign.

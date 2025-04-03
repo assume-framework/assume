@@ -45,11 +45,11 @@ class WriteOutput(Role):
         end (datetime.datetime): The end datetime of the simulation run.
         db_uri: The uri of the database engine. Defaults to ''.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
-        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
+        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to 48 hours.
+        outputs_buffer_size_mb (int, optional): The maximum storage size (in MB) for storing output data before saving it. Defaults to 300 MB.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
-        outputs_buffer_size (int, optional): The maximum storage size for storing output data before saving it. Defaults to 300 MB.
     """
 
     def __init__(
@@ -60,12 +60,12 @@ class WriteOutput(Role):
         db_uri="",
         export_csv_path: str = "",
         save_frequency_hours: int = 48,
+        outputs_buffer_size_mb: int = 300,
         learning_mode: bool = False,
         evaluation_mode: bool = False,
         episode: int = None,
         eval_episode: int = None,
         additional_kpis: dict[str, OutputDef] = {},
-        outputs_buffer_size: int = 300,
     ):
         super().__init__()
 
@@ -96,7 +96,7 @@ class WriteOutput(Role):
         self.start = start
         self.end = end
 
-        self.outputs_buffer_size = outputs_buffer_size * 1024 * 1024
+        self.outputs_buffer_size_mb = outputs_buffer_size_mb * 1024 * 1024
         self.current_dfs_size = 0
 
         # initializes dfs for storing and writing asynchronous
@@ -248,8 +248,8 @@ class WriteOutput(Role):
 
         # keep track of the memory usage of the data
         self.current_dfs_size += calculate_content_size(content_data)
-        # if the current size is larger than self.outputs_buffer_size, store the data
-        if self.current_dfs_size > self.outputs_buffer_size:
+        # if the current size is larger than self.outputs_buffer_size_mb, store the data
+        if self.current_dfs_size > self.outputs_buffer_size_mb:
             logger.debug("storing output data due to size limit")
             self.context.schedule_instant_task(coroutine=self.store_dfs())
 
@@ -740,30 +740,6 @@ class DatabaseMaintenance:
 
     It assumes that each table (except for system tables like "spatial_ref_sys") contains a column
     named 'simulation' that uniquely identifies the simulation.
-
-    Example:
-        from assume.common import DatabaseMaintenance
-
-        # Select to store the simulation results in a local database or in TimescaleDB.
-        # When using TimescaleDB, ensure Docker is installed and the Grafana dashboard is accessible.
-        data_format = "timescale"  # Options: "local_db" or "timescale"
-
-        if data_format == "local_db":
-            db_uri = "sqlite:///./examples/local_db/assume_db.db"
-        elif data_format == "timescale":
-            db_uri = "postgresql://assume:assume@localhost:5432/assume"
-
-        maintenance = DatabaseMaintenance(db_uri=db_uri)
-
-        # 1. Retrieve unique simulation IDs:
-        unique_ids = maintenance.get_unique_simulation_ids()
-        print("Unique simulation IDs:", unique_ids)
-
-        # 2. Delete specific simulations:
-        maintenance.delete_simulations(["example_01", "example_02"])
-
-        # 3. Delete all simulations except a few:
-        maintenance.delete_all_simulations(exclude=["example_01"])
 
     Args:
         db_uri (str): The URI of the database engine used to create a SQLAlchemy engine.
