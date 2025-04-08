@@ -4,7 +4,6 @@
 
 import calendar
 import contextlib
-import hashlib
 import inspect
 import logging
 import os
@@ -728,8 +727,3 @@ def str_to_bool(val):
         return False
     else:
         raise ValueError(f"Invalid truth value: {val!r}")
-
-
-def str_to_number(fuel: str, max_val: int = 16) -> int:
-    h = hashlib.md5(fuel.lower().encode()).hexdigest()
-    return int(h, 16) % max_val

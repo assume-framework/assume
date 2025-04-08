@@ -11,7 +11,7 @@ import torch as th
 
 from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import min_max_scale, str_to_number
+from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
@@ -138,17 +138,19 @@ class AbstractLearningStrategy(LearningStrategy):
         if isinstance(unit, SupportsMinMax):
             # convert fuel type to a numerical value
             context = [
-                unit.max_power / self.max_bid_price,
-                unit.min_power / self.max_bid_price,
+                0.0,
+                unit.max_power / unit.global_max_power,
+                unit.min_power / unit.global_max_power,
                 unit.efficiency,
-                str_to_number(unit.technology),
-                str_to_number(unit.fuel_type),
+                max(unit.marginal_cost) / unit.global_max_marginal_cost,
+                0.0,
             ]
         else:
             context = [
-                unit.max_soc / self.max_bid_price,
-                unit.max_power_charge / self.max_bid_price,
-                unit.max_power_discharge / self.max_bid_price,
+                1.0,
+                unit.max_soc / unit.global_max_soc,
+                unit.max_power_charge / unit.global_max_power,
+                unit.max_power_discharge / unit.global_max_power,
                 unit.efficiency_charge,
                 unit.efficiency_discharge,
             ]
@@ -231,7 +233,7 @@ class RLStrategy(AbstractLearningStrategy):
 
     def __init__(self, *args, **kwargs):
         obd_dim = kwargs.pop("obs_dim", 38)
-        context_dim = kwargs.pop("context_dim", 5)
+        context_dim = kwargs.pop("context_dim", 6)
         act_dim = kwargs.pop("act_dim", 2)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
@@ -831,7 +833,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
     def __init__(self, *args, **kwargs):
         obd_dim = kwargs.pop("obs_dim", 74)
-        context_dim = kwargs.pop("context_dim", 5)
+        context_dim = kwargs.pop("context_dim", 6)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(

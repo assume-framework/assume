@@ -789,6 +789,7 @@ def setup_world(
 
     if world.learning_mode or world.evaluation_mode:
         world.add_learning_strategies_to_learning_role()
+        world.define_global_normalization_values()
 
     if (
         world.learning_mode
