@@ -624,20 +624,18 @@ class TD3(RLAlgorithm):
                     next_actions = th.stack(
                         [
                             strategy.actor_target(next_states[:, i, :], contexts[i])
+                            + noise[:, i, :]
                             for i, strategy in enumerate(strategies)
                         ]
-                    )
+                    ).clamp(-1, 1)
                 else:
                     # Without context
                     next_actions = th.stack(
                         [
-                            strategy.actor_target(next_states[:, i, :])
+                            strategy.actor_target(next_states[:, i, :]) + noise[:, i, :]
                             for i, strategy in enumerate(strategies)
                         ]
-                    )
-
-                # Add noise and clamp actions
-                next_actions = (next_actions + noise).clamp(-1, 1)
+                    ).clamp(-1, 1)
 
                 # Reformat tensor as per original intention
                 next_actions = next_actions.transpose(0, 1).contiguous()
