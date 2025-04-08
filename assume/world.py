@@ -541,36 +541,6 @@ class World:
                     self.learning_role.rl_strats[unit.id] = strategy
                     break
 
-    def define_global_normalization_values(self):
-        max_power = 0
-        max_marginal_cost = 0
-        max_soc = 0
-        for unit in self.unit_operators["Operator-RL"].rl_units:
-            if hasattr(unit, "max_power"):
-                max_power = max(max_power, unit.max_power)
-                max_marginal_cost = max(max_marginal_cost, max(unit.marginal_cost))
-            if hasattr(unit, "max_soc"):
-                max_soc = max(max_soc, unit.max_soc)
-            if hasattr(unit, "max_power_charge"):
-                max_power = max(max_power, unit.max_power_charge)
-            if hasattr(unit, "max_power_discharge"):
-                max_power = max(max_power, unit.max_power_discharge)
-
-        # set the global normalization values for all units
-        for unit in self.unit_operators["Operator-RL"].rl_units:
-            if hasattr(unit, "max_power"):
-                unit.global_max_power = max_power
-                unit.global_max_marginal_cost = max_marginal_cost
-            if hasattr(unit, "max_soc"):
-                unit.global_max_soc = max_soc
-            if hasattr(unit, "max_power_charge"):
-                unit.global_max_power = max_power
-
-        for unit in self.unit_operators["Operator-RL"].rl_units:
-            for market_id, strategy in unit.bidding_strategies.items():
-                if isinstance(strategy, LearningStrategy):
-                    strategy.prepare_observations(unit, market_id)
-
     def _prepare_bidding_strategies(self, unit_params, unit_id):
         """
         Prepare bidding strategies for the unit based on the specified parameters.

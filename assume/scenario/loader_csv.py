@@ -25,7 +25,7 @@ from assume.common.utils import (
     convert_to_rrule_freq,
     normalize_availability,
 )
-from assume.strategies import BaseStrategy
+from assume.strategies import BaseStrategy, LearningStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
@@ -438,6 +438,48 @@ def read_units(
     return units_dict
 
 
+def define_global_normalization_values(world):
+    max_power = 0
+    max_marginal_cost = 0
+    max_soc = 0
+    rl_units = []
+
+    # Collect relevant RL units
+    for unit_operator in world.unit_operators.values():
+        for unit in unit_operator.units.values():
+            if any(
+                isinstance(strategy, LearningStrategy)
+                for strategy in unit.bidding_strategies.values()
+            ):
+                rl_units.append(unit)
+
+    # Calculate global maximums
+    for unit in rl_units:
+        max_power = max(
+            max_power,
+            getattr(unit, "max_power", 0),
+            getattr(unit, "max_power_charge", 0),
+            getattr(unit, "max_power_discharge", 0),
+        )
+
+        if hasattr(unit, "marginal_cost") and unit.marginal_cost:
+            max_marginal_cost = max(max_marginal_cost, max(unit.marginal_cost))
+
+        max_soc = max(max_soc, getattr(unit, "max_soc", 0))
+
+    # Set global normalization values for all units
+    for unit in rl_units:
+        unit.global_max_power = max_power
+        unit.global_max_marginal_cost = max_marginal_cost
+        unit.global_max_soc = max_soc
+
+    # Prepare observations for RL units with LearningStrategy
+    for unit in rl_units:
+        for market_id, strategy in unit.bidding_strategies.items():
+            if isinstance(strategy, LearningStrategy):
+                strategy.prepare_observations(unit, market_id)
+
+
 def load_config_and_create_forecaster(
     inputs_path: str,
     scenario: str,
@@ -789,7 +831,8 @@ def setup_world(
 
     if world.learning_mode or world.evaluation_mode:
         world.add_learning_strategies_to_learning_role()
-        world.define_global_normalization_values()
+
+    define_global_normalization_values(world)
 
     if (
         world.learning_mode
