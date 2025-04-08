@@ -44,7 +44,6 @@ class Learning(Role):
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config.get("algorithm", "matd3")
-        self.actor_architecture = learning_config.get("actor_architecture", "mlp")
         self.critics = {}
         self.target_critics = {}
 
@@ -130,6 +129,15 @@ class Learning(Role):
         self.policy_delay = learning_config.get("policy_delay", 2)
         self.target_policy_noise = learning_config.get("target_policy_noise", 0.2)
         self.target_noise_clip = learning_config.get("target_noise_clip", 0.5)
+
+        # define clustering parameters
+        self.actor_architecture = learning_config.get("actor_architecture", "mlp")
+        self.actor_clustering_method = learning_config.get(
+            "actor_clustering_method", None
+        )
+        self.clustering_method_kwargs = learning_config.get(
+            "clustering_method_kwargs", {}
+        )
 
         self.eval_episodes_done = 0
 
@@ -287,6 +295,8 @@ class Learning(Role):
                 target_policy_noise=self.target_policy_noise,
                 target_noise_clip=self.target_noise_clip,
                 actor_architecture=self.actor_architecture,
+                actor_clustering_method=self.actor_clustering_method,
+                clustering_method_kwargs=self.clustering_method_kwargs,
             )
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")

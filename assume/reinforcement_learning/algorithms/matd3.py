@@ -4,8 +4,11 @@
 
 import logging
 import os
+from collections import defaultdict
 
+import numpy as np
 import torch as th
+from sklearn.cluster import AgglomerativeClustering, KMeans
 from torch.nn import functional as F
 from torch.optim import AdamW
 
@@ -40,6 +43,8 @@ class TD3(RLAlgorithm):
         target_policy_noise=0.2,
         target_noise_clip=0.5,
         actor_architecture="mlp",
+        actor_clustering_method=None,
+        clustering_method_kwargs={},
     ):
         super().__init__(
             learning_role,
@@ -59,6 +64,13 @@ class TD3(RLAlgorithm):
         self.use_shared_actor = (
             True if actor_architecture == "contextual_mlp" else False
         )
+        if self.use_shared_actor:
+            self.actor_clustering_method = actor_clustering_method
+            self.clustering_method_kwargs = clustering_method_kwargs
+
+            self.shared_actors = {}
+            self.shared_actor_targets = {}
+            self.clusters = defaultdict(list)
 
     def save_params(self, directory):
         """
@@ -120,14 +132,18 @@ class TD3(RLAlgorithm):
 
     def save_shared_actor_params(self, directory):
         os.makedirs(directory, exist_ok=True)
-        # save a single shared actor for all agents
-        obj = {
-            "actor": self.shared_actor.state_dict(),
-            "actor_target": self.shared_actor_target.state_dict(),
-            "actor_optimizer": self.shared_actor.optimizer.state_dict(),
-        }
-        path = f"{directory}/shared_actor.pt"
-        th.save(obj, path)
+
+        # iterate over the shared_actors and save them
+        for cluster_index in self.clusters.keys():
+            obj = {
+                "actor": self.shared_actors[cluster_index].state_dict(),
+                "actor_target": self.shared_actor_targets[cluster_index].state_dict(),
+                "actor_optimizer": self.shared_actors[
+                    cluster_index
+                ].optimizer.state_dict(),
+            }
+            path = f"{directory}/shared_actor_{cluster_index}.pt"
+            th.save(obj, path)
 
     def load_params(self, directory: str) -> None:
         """
@@ -228,12 +244,18 @@ class TD3(RLAlgorithm):
             return
 
         try:
-            actor_params = self.load_obj(
-                directory=f"{directory}/actors/shared_actor.pt"
-            )
-            self.shared_actor.load_state_dict(actor_params["actor"])
-            self.shared_actor_target.load_state_dict(actor_params["actor_target"])
-            self.shared_actor.optimizer.load_state_dict(actor_params["actor_optimizer"])
+            for cluster_index in self.clusters.keys():
+                actor_params = self.load_obj(
+                    directory=f"{directory}/actors/shared_actor_{cluster_index}.pt"
+                )
+                self.shared_actors[cluster_index].load_state_dict(actor_params["actor"])
+                self.shared_actor_targets[cluster_index].load_state_dict(
+                    actor_params["actor_target"]
+                )
+                self.shared_actors[cluster_index].optimizer.load_state_dict(
+                    actor_params["actor_optimizer"]
+                )
+
         except Exception:
             logger.warning("No shared actor values loaded")
 
@@ -252,7 +274,7 @@ class TD3(RLAlgorithm):
             self.check_policy_dimensions()
 
             if self.use_shared_actor:
-                self.create_shared_actor()
+                self.create_shared_actors()
             else:
                 self.create_individual_actors()
 
@@ -260,12 +282,24 @@ class TD3(RLAlgorithm):
 
         else:
             if self.use_shared_actor:
-                self.shared_actor = actors_and_critics["actors"]
-                self.shared_actor_target = actors_and_critics["actor_targets"]
+                self.cluster_mapping = actors_and_critics["cluster_mapping"]
 
-                for u_id, strategy in self.learning_role.rl_strats.items():
-                    strategy.actor = self.shared_actor
-                    strategy.actor_target = self.shared_actor_target
+                for strategy in self.learning_role.rl_strats.values():
+                    cluster_index = self.cluster_mapping[strategy.unit_id]
+                    self.clusters[cluster_index].append(strategy)
+
+                for cluster_index, strategies in self.clusters.items():
+                    self.shared_actors[cluster_index] = actors_and_critics["actors"][
+                        cluster_index
+                    ]
+                    self.shared_actor_targets[cluster_index] = actors_and_critics[
+                        "actor_targets"
+                    ][cluster_index]
+
+                    for strategy in strategies:
+                        strategy.actor = self.shared_actors[cluster_index]
+                        strategy.actor_target = self.shared_actor_targets[cluster_index]
+
             else:
                 for u_id, strategy in self.learning_role.rl_strats.items():
                     strategy.actor = actors_and_critics["actors"][u_id]
@@ -278,6 +312,12 @@ class TD3(RLAlgorithm):
             self.obs_dim = actors_and_critics["obs_dim"]
             self.act_dim = actors_and_critics["act_dim"]
             self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
+
+            # check for consistency and raise error if not
+            if not self.verify_actor_sharing():
+                raise ValueError(
+                    "Actor sharing is not consistent across strategies in the same cluster."
+                )
 
     def check_policy_dimensions(self) -> None:
         obs_dim_list = []
@@ -368,52 +408,49 @@ class TD3(RLAlgorithm):
                 ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
             )
 
-    def create_shared_actor(self) -> None:
-        """
-        Create a shared actor network for reinforcement learning used by all learning strategies.
+    def create_shared_actors(self):
+        if self.actor_clustering_method:
+            self.clusters = self.create_clusters()
+        else:
+            # If no clustering method is specified, use a single cluster for all strategies
+            self.clusters = {0: list(self.learning_role.rl_strats.values())}
 
-        This method initializes actor networks and their corresponding target networks for each unit strategy.
-        The actors are designed to map observations to action probabilities in a reinforcement learning setting.
+        self.shared_actors = {}
+        self.shared_actor_targets = {}
 
-        The created actor networks are associated with each unit strategy and stored as attributes.
+        for cluster_index, strategies in self.clusters.items():
+            shared_actor = self.actor_architecture_class(
+                obs_dim=self.obs_dim,
+                context_dim=self.context_dim,
+                act_dim=self.act_dim,
+                float_type=self.float_type,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+            ).to(self.device)
 
-        Notes:
-            The observation dimension need to be the same, due to the centralized criic that all actors share.
-            If you have units with different observation dimensions. They need to have different critics and hence learning roles.
+            shared_actor_target = self.actor_architecture_class(
+                obs_dim=self.obs_dim,
+                context_dim=self.context_dim,
+                act_dim=self.act_dim,
+                float_type=self.float_type,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+            ).to(self.device)
 
-        """
+            shared_actor_target.load_state_dict(shared_actor.state_dict())
+            shared_actor_target.train(mode=False)
 
-        self.shared_actor = self.actor_architecture_class(
-            obs_dim=self.obs_dim,
-            context_dim=self.context_dim,
-            act_dim=self.act_dim,
-            float_type=self.float_type,
-            unique_obs_dim=self.unique_obs_dim,
-            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-        ).to(self.device)
+            shared_actor.optimizer = AdamW(
+                shared_actor.parameters(),
+                lr=self.learning_role.calc_lr_from_progress(1),
+            )
 
-        self.shared_actor_target = self.actor_architecture_class(
-            obs_dim=self.obs_dim,
-            context_dim=self.context_dim,
-            act_dim=self.act_dim,
-            float_type=self.float_type,
-            unique_obs_dim=self.unique_obs_dim,
-            num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-        ).to(self.device)
+            for strategy in strategies:
+                strategy.actor = shared_actor
+                strategy.actor_target = shared_actor_target
 
-        self.shared_actor_target.load_state_dict(self.shared_actor.state_dict())
-        self.shared_actor_target.train(mode=False)
-
-        self.shared_actor.optimizer = AdamW(
-            self.shared_actor.parameters(),
-            lr=self.learning_role.calc_lr_from_progress(
-                1
-            ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
-        )
-
-        for strategy in self.learning_role.rl_strats.values():
-            strategy.actor = self.shared_actor
-            strategy.actor_target = self.shared_actor_target
+            self.shared_actors[cluster_index] = shared_actor
+            self.shared_actor_targets[cluster_index] = shared_actor_target
 
     def create_critics(self) -> None:
         """
@@ -472,8 +509,9 @@ class TD3(RLAlgorithm):
         target_critics = {}
 
         if self.use_shared_actor:
-            actors = self.shared_actor
-            actor_targets = self.shared_actor_target
+            actors = self.shared_actors
+            actor_targets = self.shared_actor_targets
+
         else:
             for u_id, strategy in self.learning_role.rl_strats.items():
                 actors[u_id] = strategy.actor
@@ -488,6 +526,7 @@ class TD3(RLAlgorithm):
             "actor_targets": actor_targets,
             "critics": critics,
             "target_critics": target_critics,
+            "cluster_mapping": self.cluster_mapping,
             "obs_dim": self.obs_dim,
             "act_dim": self.act_dim,
             "unique_obs_dim": self.unique_obs_dim,
@@ -539,23 +578,28 @@ class TD3(RLAlgorithm):
 
         # loop over all units to avoid update call for every gradient step, as it will be ambiguous
         for strategy in strategies:
-            if self.use_shared_actor:
+            self.update_learning_rate(
+                [
+                    strategy.critics.optimizer,
+                ],
+                learning_rate=learning_rate,
+            )
+            strategy.action_noise.update_noise_decay(updated_noise_decay)
+
+        if self.use_shared_actor:
+            self.update_learning_rate(
+                [actor.optimizer for actor in self.shared_actors.values()],
+                learning_rate=learning_rate,
+            )
+
+        else:
+            for strategy in strategies:
                 self.update_learning_rate(
                     [
-                        strategy.critics.optimizer,
-                        self.shared_actor.optimizer,
-                    ],
-                    learning_rate=learning_rate,
-                )
-            else:
-                self.update_learning_rate(
-                    [
-                        strategy.critics.optimizer,
                         strategy.actor.optimizer,
                     ],
                     learning_rate=learning_rate,
                 )
-            strategy.action_noise.update_noise_decay(updated_noise_decay)
 
         for step in range(self.gradient_steps):
             self.n_updates += 1
@@ -569,14 +613,35 @@ class TD3(RLAlgorithm):
             )
 
             # Get next actions with added noise
-            if self.use_shared_actor:
-                next_actions = self.calculate_next_actions_with_shared_actor(
-                    actions, next_states, strategies
-                )
-            else:
-                next_actions = self.calculate_next_actions_with_individual_actors(
-                    actions, next_states, strategies
-                )
+            with th.no_grad():
+                # Compute noise for the target actions (shape: [batch_size, n_rl_agents, act_dim])
+                noise = th.randn_like(actions) * self.target_policy_noise
+                noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
+
+                if self.use_shared_actor:
+                    # Use context if self.use_shared_actor is True
+                    contexts = th.stack([strategy.context for strategy in strategies])
+                    next_actions = th.stack(
+                        [
+                            strategy.actor_target(next_states[:, i, :], contexts[i])
+                            for i, strategy in enumerate(strategies)
+                        ]
+                    )
+                else:
+                    # Without context
+                    next_actions = th.stack(
+                        [
+                            strategy.actor_target(next_states[:, i, :])
+                            for i, strategy in enumerate(strategies)
+                        ]
+                    )
+
+                # Add noise and clamp actions
+                next_actions = (next_actions + noise).clamp(-1, 1)
+
+                # Reformat tensor as per original intention
+                next_actions = next_actions.transpose(0, 1).contiguous()
+                next_actions = next_actions.reshape(-1, len(strategies) * self.act_dim)
 
             all_actions = actions.view(self.batch_size, -1)
 
@@ -682,7 +747,8 @@ class TD3(RLAlgorithm):
             if self.n_updates % self.policy_delay == 0:
                 # Zero-grad for all actors first
                 if self.use_shared_actor:
-                    self.shared_actor.optimizer.zero_grad(set_to_none=True)
+                    for actor in self.shared_actors.values():
+                        actor.optimizer.zero_grad(set_to_none=True)
                 else:
                     for strategy in strategies:
                         strategy.actor.optimizer.zero_grad(set_to_none=True)
@@ -697,7 +763,7 @@ class TD3(RLAlgorithm):
                     # Build local state for actor i
                     state_i = states[:, i, :]
                     if self.use_shared_actor:
-                        action_i = self.shared_actor(state_i, strategy.context)
+                        action_i = actor(state_i, strategy.context)
                     else:
                         action_i = actor(state_i)
 
@@ -737,10 +803,11 @@ class TD3(RLAlgorithm):
 
                 # Clip and step each actor optimizer
                 if self.use_shared_actor:
-                    th.nn.utils.clip_grad_norm_(
-                        self.shared_actor.parameters(), max_norm=self.grad_clip_norm
-                    )
-                    self.shared_actor.optimizer.step()
+                    for shared_actor in self.shared_actors.values():
+                        th.nn.utils.clip_grad_norm_(
+                            shared_actor.parameters(), max_norm=self.grad_clip_norm
+                        )
+                        shared_actor.optimizer.step()
                 else:
                     for strategy in strategies:
                         th.nn.utils.clip_grad_norm_(
@@ -770,10 +837,13 @@ class TD3(RLAlgorithm):
 
                 # If shared, add the shared actor params only once
                 if self.use_shared_actor:
-                    all_actor_params.extend(self.shared_actor.parameters())
-                    all_target_actor_params.extend(
-                        self.shared_actor_target.parameters()
-                    )
+                    for cluster_index in self.clusters.keys():
+                        all_actor_params.extend(
+                            self.shared_actors[cluster_index].parameters()
+                        )
+                        all_target_actor_params.extend(
+                            self.shared_actor_targets[cluster_index].parameters()
+                        )
 
                 # Perform batch-wise Polyak update (NO LOOPS)
                 polyak_update(all_critic_params, all_target_critic_params, self.tau)
@@ -781,63 +851,182 @@ class TD3(RLAlgorithm):
 
         self.learning_role.write_rl_critic_params_to_output(learning_rate, unit_params)
 
-    def calculate_next_actions_with_individual_actors(
-        self, actions, next_states, strategies
+    def cluster_strategies_fixed_k(
+        self, strategies: list, n_groups: int, random_state: int = 42
     ):
-        with th.no_grad():
-            # Compute noise for the target actions (shape: [batch_size, n_rl_agents, act_dim])
-            noise = th.randn_like(actions) * self.target_policy_noise
-            noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
+        contexts = np.array(
+            [strategy.context.detach().cpu().numpy() for strategy in strategies]
+        )
 
-            next_actions = th.stack(
-                [
-                    (
-                        strategy.actor_target(next_states[:, i, :]) + noise[:, i, :]
-                    ).clamp(-1, 1)
-                    for i, strategy in enumerate(strategies)
-                ]
+        kmeans = KMeans(n_clusters=n_groups, random_state=random_state)
+        labels = kmeans.fit_predict(contexts)
+
+        clusters = {i: [] for i in range(n_groups)}
+        for strategy, label in zip(strategies, labels):
+            clusters[label].append(strategy)
+
+        return clusters
+
+    def cluster_strategies_max_size(self, strategies: list, max_size: int):
+        contexts = np.array(
+            [strategy.context.detach().cpu().numpy() for strategy in strategies]
+        )
+
+        n_clusters = max(1, len(contexts) // max_size)
+
+        clustering = AgglomerativeClustering(n_clusters=n_clusters)
+        labels = clustering.fit_predict(contexts)
+
+        clusters = {i: [] for i in range(n_clusters)}
+        for strategy, label in zip(strategies, labels):
+            clusters[label].append(strategy)
+
+        return clusters
+
+    def create_clusters(self):
+        """
+        Create clusters of strategies based on the specified clustering method and return them.
+
+        Supports two clustering methods:
+        - 'max-size': Uses Agglomerative Clustering to create groups with a maximum number of strategies.
+        - 'fixed-k': Uses KMeans to create a predefined number of clusters.
+
+        Returns:
+            dict[int, list]: A dictionary where keys are cluster indices and values are lists of strategies.
+
+        Raises:
+            ValueError: If the required parameters are missing or if the clustering method is unknown.
+        """
+        strategies = list(self.learning_role.rl_strats.values())
+        n_strategies = len(strategies)
+
+        if not strategies:
+            raise ValueError("No strategies available for clustering.")
+
+        if self.actor_clustering_method == "max-size":
+            # Validate 'max-size' method
+            max_size = self.clustering_method_kwargs.get("max_size")
+            if not isinstance(max_size, int) or max_size <= 0:
+                raise ValueError(
+                    "'max_size' must be a positive integer when using 'max-size' clustering method."
+                )
+
+            clusters = self.cluster_strategies_max_size(
+                strategies=strategies, max_size=max_size
             )
-            next_actions = next_actions.transpose(0, 1).contiguous()
-            next_actions = next_actions.reshape(-1, len(strategies) * self.act_dim)
 
-        return next_actions
+        elif self.actor_clustering_method == "fixed-k":
+            # Validate 'fixed-k' method
+            n_clusters = self.clustering_method_kwargs.get("n_clusters")
+            if not isinstance(n_clusters, int) or n_clusters <= 0:
+                raise ValueError(
+                    "'n_clusters' must be a positive integer when using 'fixed-k' clustering method."
+                )
 
-    def calculate_next_actions_with_shared_actor(
-        self, actions, next_states, strategies
-    ):
-        with th.no_grad():
-            # Compute noise for the target actions (shape: [batch_size, n_rl_agents, act_dim])
-            noise = th.randn_like(actions) * self.target_policy_noise
-            noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
+            if n_clusters > n_strategies:
+                raise ValueError(
+                    f"'n_clusters' ({n_clusters}) cannot be greater than the number of strategies ({n_strategies})."
+                )
 
-            # Calculate next actions for all agents at once using a batched forward pass
-            # Get batch size and number of agents from next_states (assumed shape: [batch_size, n_rl_agents, obs_dim])
-            batch_size, n_agents, obs_dim = next_states.shape
+            clusters = self.cluster_strategies_fixed_k(
+                strategies=strategies,
+                n_groups=n_clusters,
+                random_state=self.clustering_method_kwargs.get("random_state", 42),
+            )
 
-            # Build a batched context tensor from each strategy’s fixed context.
-            # Each strategy.context is a 1D tensor of shape [context_dim]
-            context_tensor = th.stack(
-                [strategy.context for strategy in strategies], dim=0
-            )  # [n_agents, context_dim]
-            # Expand the context so that each sample in the batch gets the same context for each agent.
-            context_tensor = context_tensor.unsqueeze(0).expand(
-                batch_size, -1, -1
-            )  # [batch_size, n_agents, context_dim]
+        else:
+            raise ValueError(
+                f"Unknown clustering method '{self.actor_clustering_method}'. Supported methods are 'max-size' and 'fixed-k'."
+            )
 
-            # Flatten observations and contexts so the shared target actor can process all agents at once.
-            next_states_flat = next_states.reshape(batch_size * n_agents, obs_dim)
-            context_flat = context_tensor.reshape(batch_size * n_agents, -1)
+        # make a mapping from the cluster index to the unit IDs
+        self.cluster_mapping = {}
+        for cluster_index, strategies in self.clusters.items():
+            for strategy in strategies:
+                self.cluster_mapping[strategy.unit_id] = cluster_index
 
-            # Compute target actions in one batched forward pass
-            next_actions_flat = self.shared_actor_target(
-                next_states_flat, context_flat
-            )  # [batch_size*n_agents, act_dim]
+        return clusters
 
-            # Reshape back to [batch_size, n_agents, act_dim], add noise and clamp.
-            next_actions = next_actions_flat.reshape(batch_size, n_agents, -1)
-            next_actions = (next_actions + noise).clamp(-1, 1)
+    def verify_actor_sharing(self):
+        """
+        Verifies that all strategies within the same cluster point to the
+        exact same actor network instance in memory.
 
-            # Finally, flatten the next_actions to shape [batch_size, n_agents * act_dim] for the critic input.
-            next_actions = next_actions.reshape(batch_size, n_agents * self.act_dim)
+        Should be called after initialize_policy when using shared actors.
 
-        return next_actions
+        Returns:
+            bool: True if actor sharing is consistent, False otherwise.
+        """
+        if not self.use_shared_actor:
+            logger.debug("Verification skipped: Not in shared actor mode.")
+            return True  # Nothing to verify
+
+        if not hasattr(self, "clusters") or not self.clusters:
+            logger.error(
+                "Verification failed: `self.clusters` attribute not found or empty."
+            )
+            return False
+
+        logger.debug("Starting actor sharing verification...")
+        overall_consistent = True
+
+        for cluster_index, strategies_in_cluster in self.clusters.items():
+            if not strategies_in_cluster:
+                logger.debug(f"Cluster {cluster_index}: Skipping empty cluster.")
+                continue
+
+            # Get the actor instance from the first strategy as the reference
+            try:
+                reference_actor = strategies_in_cluster[0].actor
+                reference_actor_id = id(reference_actor)  # Get memory address (ID)
+                logger.debug(
+                    f"Cluster {cluster_index}: Reference actor ID is {reference_actor_id}"
+                )
+            except AttributeError:
+                logger.error(
+                    f"Cluster {cluster_index}: First strategy {strategies_in_cluster[0].unit_id} missing 'actor' attribute."
+                )
+                overall_consistent = False
+                continue  # Cannot check this cluster
+
+            # Compare all other strategies in the cluster to the reference
+            is_cluster_consistent = True
+            for i, strategy in enumerate(strategies_in_cluster):
+                try:
+                    current_actor = strategy.actor
+                    current_actor_id = id(current_actor)
+
+                    # Check if they are the *exact same object* in memory
+                    if current_actor is not reference_actor:
+                        logger.error(
+                            f"Inconsistency in Cluster {cluster_index}! "
+                            f"Strategy '{strategy.unit_id}' (index {i}) has actor ID {current_actor_id}, "
+                            f"expected {reference_actor_id}."
+                        )
+                        is_cluster_consistent = False
+                        overall_consistent = False
+                        # Optional: break here if you only care about the first mismatch per cluster
+                        # break
+                except AttributeError:
+                    logger.error(
+                        f"Cluster {cluster_index}: Strategy '{strategy.unit_id}' missing 'actor' attribute during verification."
+                    )
+                    is_cluster_consistent = False
+                    overall_consistent = False
+                    # Optional: break here
+
+            if is_cluster_consistent:
+                logger.debug(
+                    f"Cluster {cluster_index}: OK - All {len(strategies_in_cluster)} strategies share the same actor instance (ID: {reference_actor_id})."
+                )
+
+        if overall_consistent:
+            logger.debug(
+                "Actor sharing verification finished: All clusters consistent."
+            )
+        else:
+            logger.warning(
+                "Actor sharing verification finished: Inconsistencies detected!"
+            )
+
+        return overall_consistent
