@@ -414,7 +414,6 @@ class TD3(RLAlgorithm):
         for strategy in self.learning_role.rl_strats.values():
             strategy.actor = self.shared_actor
             strategy.actor_target = self.shared_actor_target
-            strategy.actor.optimizer = self.shared_actor.optimizer
 
     def create_critics(self) -> None:
         """
@@ -540,13 +539,22 @@ class TD3(RLAlgorithm):
 
         # loop over all units to avoid update call for every gradient step, as it will be ambiguous
         for strategy in strategies:
-            self.update_learning_rate(
-                [
-                    strategy.critics.optimizer,
-                    strategy.actor.optimizer,
-                ],
-                learning_rate=learning_rate,
-            )
+            if self.use_shared_actor:
+                self.update_learning_rate(
+                    [
+                        strategy.critics.optimizer,
+                        self.shared_actor.optimizer,
+                    ],
+                    learning_rate=learning_rate,
+                )
+            else:
+                self.update_learning_rate(
+                    [
+                        strategy.critics.optimizer,
+                        strategy.actor.optimizer,
+                    ],
+                    learning_rate=learning_rate,
+                )
             strategy.action_noise.update_noise_decay(updated_noise_decay)
 
         for step in range(self.gradient_steps):
@@ -673,8 +681,11 @@ class TD3(RLAlgorithm):
             ######################################################################
             if self.n_updates % self.policy_delay == 0:
                 # Zero-grad for all actors first
-                for strategy in strategies:
-                    strategy.actor.optimizer.zero_grad(set_to_none=True)
+                if self.use_shared_actor:
+                    self.shared_actor.optimizer.zero_grad(set_to_none=True)
+                else:
+                    for strategy in strategies:
+                        strategy.actor.optimizer.zero_grad(set_to_none=True)
 
                 total_actor_loss = 0.0
 
@@ -725,11 +736,17 @@ class TD3(RLAlgorithm):
                 total_actor_loss.backward()
 
                 # Clip and step each actor optimizer
-                for strategy in strategies:
+                if self.use_shared_actor:
                     th.nn.utils.clip_grad_norm_(
-                        strategy.actor.parameters(), max_norm=self.grad_clip_norm
+                        self.shared_actor.parameters(), max_norm=self.grad_clip_norm
                     )
-                    strategy.actor.optimizer.step()
+                    self.shared_actor.optimizer.step()
+                else:
+                    for strategy in strategies:
+                        th.nn.utils.clip_grad_norm_(
+                            strategy.actor.parameters(), max_norm=self.grad_clip_norm
+                        )
+                        strategy.actor.optimizer.step()
 
                 # Perform batch-wise Polyak update at the end (instead of inside the loop)
                 all_critic_params = []
@@ -744,8 +761,19 @@ class TD3(RLAlgorithm):
                         strategy.target_critics.parameters()
                     )
 
-                    all_actor_params.extend(strategy.actor.parameters())
-                    all_target_actor_params.extend(strategy.actor_target.parameters())
+                    # Only add individual actor params if not shared
+                    if not self.use_shared_actor:
+                        all_actor_params.extend(strategy.actor.parameters())
+                        all_target_actor_params.extend(
+                            strategy.actor_target.parameters()
+                        )
+
+                # If shared, add the shared actor params only once
+                if self.use_shared_actor:
+                    all_actor_params.extend(self.shared_actor.parameters())
+                    all_target_actor_params.extend(
+                        self.shared_actor_target.parameters()
+                    )
 
                 # Perform batch-wise Polyak update (NO LOOPS)
                 polyak_update(all_critic_params, all_target_critic_params, self.tau)

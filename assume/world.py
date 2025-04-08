@@ -566,6 +566,11 @@ class World:
             if hasattr(unit, "max_power_charge"):
                 unit.global_max_power = max_power
 
+        for unit in self.unit_operators["Operator-RL"].rl_units:
+            for market_id, strategy in unit.bidding_strategies.items():
+                if isinstance(strategy, LearningStrategy):
+                    strategy.prepare_observations(unit, market_id)
+
     def _prepare_bidding_strategies(self, unit_params, unit_id):
         """
         Prepare bidding strategies for the unit based on the specified parameters.

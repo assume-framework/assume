@@ -459,12 +459,6 @@ class RLStrategy(AbstractLearningStrategy):
         the total capacity and marginal cost, scaled by maximum power and bid price, respectively.
         """
 
-        # check if scaled observations are already available and if not prepare them
-        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
-            self, "scaled_prices_obs"
-        ):
-            self.prepare_observations(unit, market_id)
-
         # get the forecast length depending on the tme unit considered in the modelled unit
         forecast_len = (self.foresight - 1) * unit.index.freq
 
@@ -1125,12 +1119,6 @@ class StorageRLStrategy(AbstractLearningStrategy):
         Observations are scaled by the unit's max demand and bid price, creating input for
         the agent's action selection.
         """
-
-        # check if scaled observations are already available and if not prepare them
-        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
-            self, "scaled_prices_obs"
-        ):
-            self.prepare_observations(unit, market_id)
 
         # get the forecast length depending on the tme unit considered in the modelled unit
         forecast_len = (self.foresight - 1) * unit.index.freq
