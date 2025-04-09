@@ -9,7 +9,7 @@ from collections import defaultdict
 
 import numpy as np
 import torch as th
-from sklearn.cluster import AgglomerativeClustering, KMeans
+from sklearn.cluster import KMeans
 from torch.nn import functional as F
 from torch.optim import AdamW
 
@@ -861,8 +861,8 @@ class TD3(RLAlgorithm):
 
         self.learning_role.write_rl_critic_params_to_output(learning_rate, unit_params)
 
-    def cluster_strategies_fixed_k(
-        self, strategies: list, n_groups: int, random_state: int = 42
+    def cluster_strategies_k_means(
+        self, strategies: list, n_groups: int, random_state: int
     ):
         contexts = np.array(
             [strategy.context.detach().cpu().numpy() for strategy in strategies]
@@ -877,21 +877,48 @@ class TD3(RLAlgorithm):
 
         return clusters
 
-    def cluster_strategies_max_size(self, strategies: list, max_size: int):
-        contexts = np.array(
-            [strategy.context.detach().cpu().numpy() for strategy in strategies]
+    def cluster_strategies_max_size(
+        self, strategies: list, max_size: int, random_state: int
+    ):
+        n_clusters = max(1, len(strategies) // max_size)
+
+        # Initial clustering
+        clusters = self.cluster_strategies_k_means(
+            strategies=strategies, n_groups=n_clusters, random_state=random_state
         )
 
-        n_clusters = max(1, len(contexts) // max_size)
+        # Recursively split clusters that exceed max_size
+        def split_clusters(clusters_dict):
+            result = {}
+            cluster_id = 0
+            for cluster in clusters_dict.values():
+                if len(cluster) <= max_size:
+                    result[cluster_id] = cluster
+                    cluster_id += 1
+                else:
+                    # Recursively split the oversized cluster
+                    n_subclusters = max(2, len(cluster) // max_size)
+                    sub_clusters = self.cluster_strategies_k_means(
+                        strategies=cluster,
+                        n_groups=n_subclusters,
+                        random_state=random_state,
+                    )
+                    sub_result = split_clusters(sub_clusters)
+                    for sub_cluster in sub_result.values():
+                        result[cluster_id] = sub_cluster
+                        cluster_id += 1
+            return result
 
-        clustering = AgglomerativeClustering(n_clusters=n_clusters)
-        labels = clustering.fit_predict(contexts)
+        final_clusters = split_clusters(clusters)
 
-        clusters = {i: [] for i in range(n_clusters)}
-        for strategy, label in zip(strategies, labels):
-            clusters[label].append(strategy)
+        # Final safety check
+        for cluster in final_clusters.values():
+            if len(cluster) > max_size:
+                raise ValueError(
+                    f"Cluster size exceeds max size: {len(cluster)} > {max_size}"
+                )
 
-        return clusters
+        return final_clusters
 
     def create_clusters(self):
         """
@@ -899,7 +926,7 @@ class TD3(RLAlgorithm):
 
         Supports two clustering methods:
         - 'max-size': Uses Agglomerative Clustering to create groups with a maximum number of strategies.
-        - 'fixed-k': Uses KMeans to create a predefined number of clusters.
+        - 'k-means': Uses KMeans to create a predefined number of clusters.
 
         Returns:
             dict[int, list]: A dictionary where keys are cluster indices and values are lists of strategies.
@@ -915,22 +942,26 @@ class TD3(RLAlgorithm):
 
         if self.actor_clustering_method == "max-size":
             # Validate 'max-size' method
-            max_size = self.clustering_method_kwargs.get("max_size")
-            if not isinstance(max_size, int) or max_size <= 0:
+            max_number_of_actors = self.clustering_method_kwargs.get(
+                "max_number_of_actors"
+            )
+            if not isinstance(max_number_of_actors, int) or max_number_of_actors <= 0:
                 raise ValueError(
-                    "'max_size' must be a positive integer when using 'max-size' clustering method."
+                    "'max_number_of_actors' must be a positive integer when using 'max-size' clustering method."
                 )
 
             clusters = self.cluster_strategies_max_size(
-                strategies=strategies, max_size=max_size
+                strategies=strategies,
+                max_size=max_number_of_actors,
+                random_state=self.clustering_method_kwargs.get("random_state", 42),
             )
 
-        elif self.actor_clustering_method == "fixed-k":
-            # Validate 'fixed-k' method
+        elif self.actor_clustering_method == "k-means":
+            # Validate 'k-means' method
             n_clusters = self.clustering_method_kwargs.get("n_clusters")
             if not isinstance(n_clusters, int) or n_clusters <= 0:
                 raise ValueError(
-                    "'n_clusters' must be a positive integer when using 'fixed-k' clustering method."
+                    "'n_clusters' must be a positive integer when using 'k-means' clustering method."
                 )
 
             if n_clusters > n_strategies:
@@ -938,7 +969,7 @@ class TD3(RLAlgorithm):
                     f"'n_clusters' ({n_clusters}) cannot be greater than the number of strategies ({n_strategies})."
                 )
 
-            clusters = self.cluster_strategies_fixed_k(
+            clusters = self.cluster_strategies_k_means(
                 strategies=strategies,
                 n_groups=n_clusters,
                 random_state=self.clustering_method_kwargs.get("random_state", 42),
@@ -946,7 +977,7 @@ class TD3(RLAlgorithm):
 
         else:
             raise ValueError(
-                f"Unknown clustering method '{self.actor_clustering_method}'. Supported methods are 'max-size' and 'fixed-k'."
+                f"Unknown clustering method '{self.actor_clustering_method}'. Supported methods are 'max-size' and 'k-means'."
             )
 
         return clusters
