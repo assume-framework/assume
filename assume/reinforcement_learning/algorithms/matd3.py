@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import json
 import logging
 import os
 from collections import defaultdict
@@ -144,6 +145,11 @@ class TD3(RLAlgorithm):
             }
             path = f"{directory}/shared_actor_{cluster_index}.pt"
             th.save(obj, path)
+
+        # also store the cluster mapping
+        path = f"{directory}/cluster_mapping.json"
+        with open(path, "w") as f:
+            json.dump(self.cluster_mapping, f)
 
     def load_params(self, directory: str) -> None:
         """

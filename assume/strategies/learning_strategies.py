@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -84,7 +85,18 @@ class AbstractLearningStrategy(LearningStrategy):
         if self.actor_architecture in ["mlp", "lstm"]:
             directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
         elif self.actor_architecture == "contextual_mlp":
-            directory = f"{load_path}/actors/shared_actor.pt"
+            # first load the cluster mapping json
+            cluster_mapping_path = f"{load_path}/actors/cluster_mapping.json"
+            with open(cluster_mapping_path) as f:
+                cluster_mapping = json.load(f)
+            # get the cluster id for the unit
+            cluster_id = cluster_mapping.get(self.unit_id)
+            if cluster_id is None:
+                raise ValueError(
+                    f"Unit {self.unit_id} not found in cluster mapping file."
+                )
+            # load the actor parameters for the cluster
+            directory = f"{load_path}/actors/shared_actor_{cluster_id}.pt"
 
         params = th.load(directory, map_location=self.device, weights_only=True)
 
@@ -96,20 +108,9 @@ class AbstractLearningStrategy(LearningStrategy):
             unique_obs_dim=self.unique_obs_dim,
             num_timeseries_obs_dim=self.num_timeseries_obs_dim,
         ).to(self.device)
-        self.actor.load_state_dict(params["actor"])
 
-        if self.learning_mode:
-            self.actor_target = self.actor_architecture_class(
-                obs_dim=self.obs_dim,
-                context_dim=self.context_dim,
-                act_dim=self.act_dim,
-                float_type=self.float_type,
-                unique_obs_dim=self.unique_obs_dim,
-                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-            ).to(self.device)
-            self.actor_target.load_state_dict(params["actor_target"])
-            self.actor_target.eval()
-            self.actor.optimizer.load_state_dict(params["actor_optimizer"])
+        self.actor.load_state_dict(params["actor"])
+        self.actor.eval()  # set the actor to evaluation mode
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
@@ -145,7 +146,7 @@ class AbstractLearningStrategy(LearningStrategy):
                 max(unit.marginal_cost) / unit.global_max_marginal_cost,
                 0.0,
             ]
-        else:
+        elif isinstance(unit, SupportsMinMaxCharge):
             context = [
                 1.0,
                 unit.max_soc / unit.global_max_soc,
@@ -154,6 +155,8 @@ class AbstractLearningStrategy(LearningStrategy):
                 unit.efficiency_charge,
                 unit.efficiency_discharge,
             ]
+        else:
+            logger.warning(f"No valid context can be created for unit {unit.unit_id}.")
 
         # convert context to tensor
         self.context = th.as_tensor(context, dtype=self.float_type, device=self.device)
