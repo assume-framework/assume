@@ -421,6 +421,12 @@ class TD3(RLAlgorithm):
             # If no clustering method is specified, use a single cluster for all strategies
             self.clusters = {0: list(self.learning_role.rl_strats.values())}
 
+        # make a mapping from the cluster index to the unit IDs
+        self.cluster_mapping = {}
+        for cluster_index, strategies in self.clusters.items():
+            for strategy in strategies:
+                self.cluster_mapping[strategy.unit_id] = cluster_index
+
         self.shared_actors = {}
         self.shared_actor_targets = {}
 
@@ -942,12 +948,6 @@ class TD3(RLAlgorithm):
             raise ValueError(
                 f"Unknown clustering method '{self.actor_clustering_method}'. Supported methods are 'max-size' and 'fixed-k'."
             )
-
-        # make a mapping from the cluster index to the unit IDs
-        self.cluster_mapping = {}
-        for cluster_index, strategies in self.clusters.items():
-            for strategy in strategies:
-                self.cluster_mapping[strategy.unit_id] = cluster_index
 
         return clusters
 
