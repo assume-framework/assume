@@ -143,7 +143,7 @@ class Learning(Role):
         self.freq_timedelta = None
         self.time_steps = None
 
-    def load_inter_episodic_data(self, inter_episodic_data):
+    def load_inter_episodic_data(self, inter_episodic_data, terminate_learning=False):
         """
         Load the inter-episodic data from the dict stored across simulation runs.
 
@@ -167,7 +167,7 @@ class Learning(Role):
         ):
             self.turn_off_initial_exploration()
 
-        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+        self.initialize_policy(inter_episodic_data["actors_and_critics"], terminate_learning)
 
     def get_inter_episodic_data(self):
         """
@@ -283,7 +283,7 @@ class Learning(Role):
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")
 
-    def initialize_policy(self, actors_and_critics: dict = None) -> None:
+    def initialize_policy(self, actors_and_critics: dict = None, terminate_learning=False) -> None:
         """
         Initialize the policy of the reinforcement learning agent considering the respective algorithm.
 
@@ -293,9 +293,10 @@ class Learning(Role):
         """
 
         self.rl_algorithm.initialize_policy(actors_and_critics)
+        
+        directory = self.trained_policies_load_path
 
-        if self.continue_learning is True and actors_and_critics is None:
-            directory = self.trained_policies_load_path
+        if ((self.continue_learning is True and actors_and_critics is None)):
             if Path(directory).is_dir():
                 logger.info(f"Loading pretrained policies from {directory}!")
                 self.rl_algorithm.load_params(directory)
@@ -303,6 +304,12 @@ class Learning(Role):
                 raise FileNotFoundError(
                     f"Directory {directory} does not exist! Cannot load pretrained policies!"
                 )
+                
+        # we are in last eval run where learning_mode is false and want to use best policies if present
+        elif Path(directory).is_dir() and terminate_learning:
+            logger.info(f"Loading best policies from {directory}!")
+            self.rl_algorithm.load_params(directory)
+        #if the best_policies are not present yet we will use the polciies in the actor_critics which equal the last policies
 
     def update_policy(self) -> None:
         """
