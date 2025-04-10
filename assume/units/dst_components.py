@@ -1308,7 +1308,10 @@ class ElectricVehicle:
         self.kwargs = kwargs
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_block: pyo.Block
+        self,
+        model: pyo.ConcreteModel,
+        model_block: pyo.Block,
+        external_range: pyo.Param = None,
     ) -> pyo.Block:
         # Para
         model_block.max_capacity = pyo.Param(initialize=self.max_capacity)
@@ -1358,7 +1361,7 @@ class ElectricVehicle:
             @model_block.Constraint(self.time_steps)
             def usage_constraint(b, t):
                 return b.usage[t] == (1 - self.availability_profile.iat[t]) * (
-                    model.range[t] / b.mileage
+                    external_range[t] / b.mileage
                 )
 
             @model_block.Constraint(self.time_steps)
@@ -1696,6 +1699,22 @@ demand_side_technologies: dict = {
     "pv_plant": PVPlant,
     "thermal_storage": GenericStorage,
 }
+
+
+def get_technology_class(technology_name: str):
+    """
+    Dynamically retrieves the class for a given technology name, allowing for suffixes.
+
+    Args:
+        technology_name (str): The name of the technology (e.g., "electric_vehicle_1").
+
+    Returns:
+        class: The corresponding class for the base technology (e.g., ElectricVehicle).
+    """
+    for base_technology, technology_class in demand_side_technologies.items():
+        if technology_name.startswith(base_technology):
+            return technology_class
+    raise ValueError(f"Unknown technology: {technology_name}")
 
 
 def add_ramping_constraints(model_block, time_steps):

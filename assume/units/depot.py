@@ -71,21 +71,30 @@ class BusDepot(DSMFlex, SupportsMinMax):
             location=location,
             **kwargs,
         )
-        # check if the required components are present in the components dictionary
-        for component in self.required_technologies:
-            if component not in components.keys():
-                raise ValueError(
-                    f"Component {component} is required for the Bus Depot  unit."
-                )
-
-        # check if the provided components are valid and do not contain any unknown components
-        for component in components.keys():
-            if (
-                component not in self.required_technologies
-                and component not in self.optional_technologies
+        # Check if the required components are present in the components dictionary
+        for required_component in self.required_technologies:
+            # Check if any component matches the required base technology
+            if not any(
+                component.startswith(required_component)
+                for component in components.keys()
             ):
                 raise ValueError(
-                    f"Components {component} is not a valid component for the Bus Depot unit."
+                    f"Component {required_component} is required for the Bus Depot unit."
+                )
+
+        # Check if the provided components are valid and do not contain any unknown components
+        for component in components.keys():
+            base_component = next(
+                (
+                    req
+                    for req in self.required_technologies + self.optional_technologies
+                    if component.startswith(req)
+                ),
+                None,
+            )
+            if base_component is None:
+                raise ValueError(
+                    f"Component {component} is not a valid component for the Bus Depot unit."
                 )
 
         self.objective = objective
@@ -95,34 +104,55 @@ class BusDepot(DSMFlex, SupportsMinMax):
         self.is_prosumer = str_to_bool(is_prosumer)
 
         self.electricity_price = self.forecaster["electricity_price"]
-        self.range = self.forecaster["range"]
+        for ev_key in self.components:
+            if ev_key.startswith("electric_vehicle"):
+                ev_config = self.components[ev_key]
+                use_charging_profile = str_to_bool(
+                    ev_config.get("charging_profile", "false")
+                )
+                ev_config.pop("charging_profile", None)
 
-        # Check for the presence of components
-        self.has_ev = "electric_vehicle" in self.components.keys()
-        # Configure EV  power profile based on availability or charging profile
-        if self.has_ev:
-            use_charging_profile = str_to_bool(
-                self.components["electric_vehicle"].get("charging_profile", "false")
-            )
+                profile_key = (
+                    f"{self.id}_{ev_key}_charging_profile"
+                    if use_charging_profile
+                    else f"{self.id}_{ev_key}_availability_profile"
+                )
+                ev_profile = self.forecaster[profile_key]
+                ev_config[
+                    "charging_profile"
+                    if use_charging_profile
+                    else "availability_profile"
+                ] = ev_profile
 
-            # Remove flag key to avoid accidentally passing string to the EV model
-            self.components["electric_vehicle"].pop("charging_profile", None)
+                # ✅ Direct assignment of range series
+                ev_config["range"] = self.forecaster[f"{self.id}_{ev_key}_range"]
 
-            profile_key_ev = (
-                f"{self.id}_ev_charging_profile"
-                if use_charging_profile
-                else "availability_profile_ev"
-            )
+        # Load profiles for all EVs dynamically
+        for ev_key in self.components:
+            if ev_key.startswith("electric_vehicle"):
+                ev_config = self.components[ev_key]
+                use_charging_profile = str_to_bool(
+                    ev_config.get("charging_profile", "false")
+                )
+                ev_config.pop("charging_profile", None)
 
-            ev_profile = self.forecaster[profile_key_ev]
+                profile_key = (
+                    f"{self.id}_{ev_key}_charging_profile"
+                    if use_charging_profile
+                    else f"{self.id}_{ev_key}_availability_profile"
+                )
+
+                ev_profile = self.forecaster[profile_key]
+
+                ev_config[
+                    "charging_profile"
+                    if use_charging_profile
+                    else "availability_profile"
+                ] = ev_profile
 
             # # ✅ Add this to preview the time series you're passing into EV
             # print(f"[DEBUG] Loaded EV profile from '{profile_key_ev}':")
             # print(ev_profile.as_pd_series().head(10))  # ✅ If you want a timestamped view
-
-            self.components["electric_vehicle"][
-                "charging_profile" if use_charging_profile else "availability_profile"
-            ] = ev_profile
 
         # Initialize the model
         self.setup_model(presolve=True)
@@ -133,10 +163,16 @@ class BusDepot(DSMFlex, SupportsMinMax):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
-        self.model.range = pyo.Param(
-            self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.range)},
-        )
+        for ev_key in self.components:
+            if ev_key.startswith("electric_vehicle"):
+                ev_range = self.components[ev_key]["range"]
+                self.model.add_component(
+                    f"{ev_key}_range",
+                    pyo.Param(
+                        self.model.time_steps,
+                        initialize={t: ev_range.iloc[t] for t in range(len(ev_range))},
+                    ),
+                )
 
     def define_variables(self):
         """
@@ -151,12 +187,16 @@ class BusDepot(DSMFlex, SupportsMinMax):
         self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.Reals)
 
     def initialize_process_sequence(self):
-        """Manages EV charging and discharging based on station availability and bus schedules."""
-
-        @self.model.Constraint(self.model.time_steps)
-        def charge_flow_constraint(m, t):
-            # If no electrolyser, ensure DRI plant hydrogen input is as expected
-            return m.dsm_blocks["electric_vehicle"].charge[t] >= 0
+        for ev in self.model.dsm_blocks:
+            if ev.startswith("electric_vehicle"):
+                constraint_name = f"charge_flow_constraint_{ev}"
+                self.model.add_component(
+                    constraint_name,
+                    pyo.Constraint(
+                        self.model.time_steps,
+                        rule=lambda m, t, ev=ev: m.dsm_blocks[ev].charge[t] >= 0,
+                    ),
+                )
 
     def define_constraints(self):
         """
@@ -202,9 +242,11 @@ class BusDepot(DSMFlex, SupportsMinMax):
             Returns:
                 Equality condition balancing total power input.
             """
-            return (
-                m.total_power_input[t] == m.dsm_blocks["electric_vehicle"].charge[t]
-            )  # - m.dsm_blocks["electric_vehicle"].discharge[t]
+            return m.total_power_input[t] == sum(
+                m.dsm_blocks[ev].charge[t]  # - m.dsm_blocks[ev].discharge[t]
+                for ev in m.dsm_blocks
+                if ev.startswith("electric_vehicle")
+            )
 
         @self.model.Constraint(self.model.time_steps)
         def variable_cost_constraint(m, t):

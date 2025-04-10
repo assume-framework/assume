@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 
+import matplotlib.pyplot as plt
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -15,7 +16,7 @@ from pyomo.opt import (
 )
 
 from assume.common.fast_pandas import FastSeries
-from assume.units.dst_components import demand_side_technologies
+from assume.units.dst_components import get_technology_class
 
 SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
@@ -69,36 +70,41 @@ class DSMFlex:
 
         This method iterates over the provided components, instantiates their corresponding classes,
         and adds the respective blocks to the Pyomo model.
-
-        Args:
-            components (dict[str, dict]): A dictionary where each key is a technology name and
-                                        the value is a dictionary of parameters for the respective technology.
-                                        Each technology is mapped to a corresponding class in `demand_side_technologies`.
-
-        The method:
-        - Looks up the corresponding class for each technology in `demand_side_technologies`.
-        - Instantiates the class by passing the required parameters.
-        - Adds the resulting block to the model under the `dsm_blocks` attribute.
         """
         components = self.components.copy()
         self.model.dsm_blocks = pyo.Block(list(components.keys()))
 
         for technology, component_data in components.items():
-            if technology in demand_side_technologies:
-                # Get the class from the dictionary mapping (adjust `demand_side_technologies` to hold classes)
-                component_class = demand_side_technologies[technology]
+            try:
+                # Dynamically get the class for the technology
+                component_class = get_technology_class(technology)
 
-                # Instantiate the component with the required parameters (unpack the component_data dictionary)
+                # Instantiate the component with the required parameters
                 component_instance = component_class(
                     time_steps=self.model.time_steps, **component_data
                 )
+
                 # Add the component to the components dictionary
                 self.components[technology] = component_instance
 
-                # Add the component's block to the model
-                component_instance.add_to_model(
-                    self.model, self.model.dsm_blocks[technology]
-                )
+                # Optional external range binding
+                range_param_name = f"{technology}_range"
+                external_range = getattr(self.model, range_param_name, None)
+
+                if external_range is not None:
+                    component_instance.add_to_model(
+                        self.model,
+                        self.model.dsm_blocks[technology],
+                        external_range=external_range,
+                    )
+                else:
+                    component_instance.add_to_model(
+                        self.model, self.model.dsm_blocks[technology]
+                    )
+
+            except ValueError as e:
+                logger.error(f"Error initializing component {technology}: {e}")
+                raise
 
     def setup_model(self, presolve=True):
         # Initialize the Pyomo model
@@ -237,10 +243,13 @@ class DSMFlex:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
 
             elif self.technology == "bus_depot":
-                return (
-                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == self.model.dsm_blocks["electric_vehicle"].charge[t]
-                    - self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                return m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[
+                    t
+                ] == sum(
+                    self.model.dsm_blocks[ev].charge[t]
+                    - self.model.dsm_blocks[ev].discharge[t]
+                    for ev in self.model.dsm_blocks
+                    if ev.startswith("electric_vehicle")
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -546,14 +555,50 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
-        # ✅ Print EV charge
-        ev_block = instance.dsm_blocks["electric_vehicle"]
-        charge_values = [pyo.value(ev_block.charge[t]) for t in instance.time_steps]
-        print("[DEBUG] Charge values (all):")
-        for t, val in zip(instance.time_steps, charge_values):
-            print(f"t={t} | charge={val}")
+        # Plot
+        time_steps = list(instance.time_steps)
+        variable_cost_series = [
+            pyo.value(instance.variable_cost[t]) for t in time_steps
+        ]
+        total_power_input_series = [
+            pyo.value(instance.total_power_input[t]) for t in time_steps
+        ]
 
-        self.charge_series = FastSeries(index=self.index, value=charge_values)
+        # Save time series data to attributes
+        self.opt_power_requirement = FastSeries(
+            index=self.index, value=total_power_input_series
+        )
+        self.variable_cost_series = FastSeries(
+            index=self.index, value=variable_cost_series
+        )
+
+        # Plot for all EVs
+        plt.figure(figsize=(12, 6))
+        for ev in instance.dsm_blocks:
+            if ev.startswith("electric_vehicle"):
+                ev_charge = [
+                    pyo.value(instance.dsm_blocks[ev].charge[t]) for t in time_steps
+                ]
+                ev_discharge = [
+                    pyo.value(instance.dsm_blocks[ev].discharge[t]) for t in time_steps
+                ]
+                ev_soc = [pyo.value(instance.dsm_blocks[ev].soc[t]) for t in time_steps]
+
+                plt.plot(time_steps, ev_charge, label=f"{ev} Charge", linestyle="solid")
+                plt.plot(
+                    time_steps,
+                    [-v for v in ev_discharge],
+                    label=f"{ev} Discharge",
+                    linestyle="dashed",
+                )
+                plt.plot(time_steps, ev_soc, label=f"{ev} SOC", linestyle="dotted")
+
+        plt.title("Electric Vehicle Charging Behavior")
+        plt.xlabel("Time Steps")
+        plt.ylabel("Power / SOC")
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
 
     def determine_optimal_operation_with_flex(self):
         """
