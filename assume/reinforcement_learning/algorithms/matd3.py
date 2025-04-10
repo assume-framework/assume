@@ -671,8 +671,6 @@ class TD3(RLAlgorithm):
             for strategy in strategies:
                 strategy.critics.optimizer.zero_grad(set_to_none=True)
 
-            total_critic_loss = 0.0
-
             # Loop over all agents and accumulate critic loss
             for i, strategy in enumerate(strategies):
                 actor = strategy.actor
@@ -729,10 +727,7 @@ class TD3(RLAlgorithm):
 
                 # Store the critic loss for this unit ID
                 unit_params[step][strategy.unit_id]["loss"] = critic_loss.item()
-                total_critic_loss += critic_loss
-
-            # Single backward pass for all agents' critics
-            total_critic_loss.backward()
+                critic_loss.backward()
 
             # Clip the gradients and step each critic optimizer
             for strategy in strategies:
@@ -880,36 +875,79 @@ class TD3(RLAlgorithm):
     def cluster_strategies_max_size(
         self, strategies: list, max_size: int, random_state: int
     ):
+        """
+        Clusters strategies such that no cluster exceeds `max_size`.
+
+        Args:
+            strategies (list): List of strategy objects with `.context` attributes.
+            max_size (int): Maximum allowed number of strategies per cluster.
+            random_state (int): Seed for reproducible KMeans clustering.
+
+        Returns:
+            dict[int, list]: Dictionary of clustered strategies.
+
+        Raises:
+            ValueError: If a cluster still exceeds `max_size` after processing.
+            RecursionError: If too many recursive splits occur.
+        """
+
         n_clusters = max(1, len(strategies) // max_size)
 
-        # Initial clustering
         clusters = self.cluster_strategies_k_means(
             strategies=strategies, n_groups=n_clusters, random_state=random_state
         )
 
-        # Recursively split clusters that exceed max_size
         def split_clusters(clusters_dict):
-            result = {}
-            cluster_id = 0
+            final_clusters = {}
+            cluster_id_counter = 0
+
             for cluster in clusters_dict.values():
                 if len(cluster) <= max_size:
-                    result[cluster_id] = cluster
-                    cluster_id += 1
+                    final_clusters[cluster_id_counter] = cluster
+                    cluster_id_counter += 1
                 else:
-                    # Recursively split the oversized cluster
+                    # Check for identical contexts before attempting split
+                    sub_contexts = np.array(
+                        [s.context.detach().cpu().numpy() for s in cluster]
+                    )
+                    unique_sub_contexts = np.unique(sub_contexts, axis=0)
+
+                    if len(unique_sub_contexts) <= 1:
+                        logger.warning(
+                            f"Cannot split cluster of size {len(cluster)} further "
+                            f"as contexts are identical. Keeping oversized cluster (violates max_size)."
+                        )
+                        final_clusters[cluster_id_counter] = cluster
+                        cluster_id_counter += 1
+                        continue
+
+                    # Split cluster further
                     n_subclusters = max(2, len(cluster) // max_size)
                     sub_clusters = self.cluster_strategies_k_means(
                         strategies=cluster,
                         n_groups=n_subclusters,
-                        random_state=random_state,
+                        random_state=random_state
+                        + len(
+                            cluster
+                        ),  # add cluster size to random state for uniqueness
                     )
+
+                    # Recursively process sub-clusters
                     sub_result = split_clusters(sub_clusters)
                     for sub_cluster in sub_result.values():
-                        result[cluster_id] = sub_cluster
-                        cluster_id += 1
-            return result
+                        final_clusters[cluster_id_counter] = sub_cluster
+                        cluster_id_counter += 1
 
-        final_clusters = split_clusters(clusters)
+            return final_clusters
+
+        try:
+            final_clusters = split_clusters(clusters)
+        except RecursionError:
+            logger.error(
+                "Recursion limit reached while splitting clusters. "
+                "Consider increasing the max_number_of_actors parameter"
+            )
+            raise
 
         # Final safety check
         for cluster in final_clusters.values():
@@ -939,6 +977,13 @@ class TD3(RLAlgorithm):
 
         if not strategies:
             raise ValueError("No strategies available for clustering.")
+
+        all_contexts = np.array([s.context.detach().cpu().numpy() for s in strategies])
+        if len(np.unique(all_contexts, axis=0)) == 1:
+            logger.warning(
+                "All strategy contexts are identical — clustering is not possible."
+            )
+            return {0: strategies}  # Return a single cluster with all strategies
 
         if self.actor_clustering_method == "max-size":
             # Validate 'max-size' method

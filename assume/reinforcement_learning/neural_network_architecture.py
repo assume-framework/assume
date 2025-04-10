@@ -182,7 +182,7 @@ class ContextualMLPActor(Actor):
         context_dim: int,
         act_dim: int,
         float_type,
-        hidden_sizes=[512, 256, 128],
+        hidden_sizes=[1024, 512, 256, 128],
         *args,
         **kwargs,
     ):
