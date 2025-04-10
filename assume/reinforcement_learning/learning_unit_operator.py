@@ -13,7 +13,7 @@ from assume.common.market_objects import (
     Orderbook,
 )
 from assume.common.utils import convert_tensors, create_rrule, get_products_index
-from assume.strategies import BaseStrategy, LearningStrategy, RLAdvancedOrderStrategy
+from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -104,23 +104,13 @@ class RLUnitsOperator(UnitsOperator):
                     "unit": unit.id,
                 }
 
-                if isinstance(strategy, RLAdvancedOrderStrategy):
-                    output_dict.update(
-                        {
-                            "profit": unit.outputs["profit"].loc[products_index].sum(),
-                            "reward": unit.outputs["reward"].loc[products_index].sum()
-                            / 24,
-                            "regret": unit.outputs["regret"].loc[products_index].sum(),
-                        }
-                    )
-                else:
-                    output_dict.update(
-                        {
-                            "profit": unit.outputs["profit"].at[start],
-                            "reward": unit.outputs["reward"].at[start],
-                            "regret": unit.outputs["regret"].at[start],
-                        }
-                    )
+                output_dict.update(
+                    {
+                        "profit": unit.outputs["profit"].at[start],
+                        "reward": unit.outputs["reward"].at[start],
+                        "regret": unit.outputs["regret"].at[start],
+                    }
+                )
 
                 action_tuple = unit.outputs["actions"].at[start]
                 noise_tuple = unit.outputs["exploration_noise"].at[start]
@@ -189,7 +179,7 @@ class RLUnitsOperator(UnitsOperator):
         )
         all_rewards = []
 
-        # Iterate through each RL unit and collect all of their observations, actions, and rewards 
+        # Iterate through each RL unit and collect all of their observations, actions, and rewards
         # making it dependent on values_len ensures that data is not stored away for which the reward was not calculated yet
         for i, unit in enumerate(self.rl_units):
             # Convert pandas Series to torch Tensor

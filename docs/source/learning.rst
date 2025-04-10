@@ -2,15 +2,18 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-###############################
-Reinforcement Learning Overview
-###############################
+#######################################
+Introduction to Reinforcement Learning
+#######################################
 
 One unique characteristic of ASSUME is the usage of Reinforcement Learning (RL) for the bidding of the agents.
 To enable this the architecture of the simulation is designed in a way to accommodate the learning process. In this part of
 the documentation, we give a short introduction to reinforcement learning in general and then pinpoint you to the
-relevant parts of the code. The descriptions are mostly based on the following paper
-Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295. `10.1016/j.egyai.2023.100295 <https://doi.org/10.1016/j.egyai.2023.100295>`.
+relevant parts of the code. The descriptions are mostly based on the following paper:
+
+Harder, Nick & Qussous, Ramiz & Weidlich, Anke. (2023). Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning. Energy and AI. 14. 100295.
+
+`Fit for purpose: Modeling wholesale electricity markets realistically with multi-agent deep reinforcement learning <https://doi.org/10.1016/j.egyai.2023.100295>`_
 
 If you want a hands-on introduction check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
 
@@ -121,7 +124,7 @@ The actor policy of each agent is updated using the deterministic policy gradien
     ∇_a Q_i,θ_j(S_k, a_1,k, ..., a_N,k, π(o_i,k))|a_i,k=π(o_i,k) * ∇_θ π(o_i,k)
 
 The actor is updated similarly using only one critic network :math:`Q_{θ1}`. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the foregoing section.
-Please note that the actor and critics are updated by sampling experience from the buffer where all interactions of the agents are stored, namely the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :doc:`buffers`
+Please note that the actor and critics are updated by sampling experience from the buffer where all interactions of the agents are stored, namely the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :ref:`replay-buffer`.
 
 
 The Learning Implementation in ASSUME

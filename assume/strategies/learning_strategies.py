@@ -748,7 +748,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
     as this can be a valid strategy in some market conditions and also improves the learning process.
 
     - **Bid Price**: The one action value determines the price at which the agent will bid.
-    - **Bid Direction**: This is implictly set base don the action:
+    - **Bid Direction**: This is implicitly set based on the action:
         - If `action < 0`: The agent submits a **buy bid**.
         - If `action >= 0`: The agent submits a **sell bid**.
 
