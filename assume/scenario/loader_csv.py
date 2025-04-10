@@ -1070,13 +1070,14 @@ def run_learning(
         f"{world.learning_role.trained_policies_save_path}/avg_reward_eval_policies"
     )
 
+
     # load scenario for evaluation
     setup_world(
         world=world,
         terminate_learning=True,
     )
 
-    world.learning_role.load_inter_episodic_data(inter_episodic_data)
+    world.learning_role.load_inter_episodic_data(inter_episodic_data, terminate_learning=True)
 
 
 if __name__ == "__main__":
