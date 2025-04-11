@@ -213,6 +213,12 @@ class TensorBoardLogger:
             df = pd.read_sql(query, self.db)
             df["dt"] = pd.to_datetime(df["dt"])
 
+            # Drop all columns with only NaN values
+            df.dropna(axis=1, how="all", inplace=True)
+
+            # adjust noise columns if some were not present in the database and dropped
+            noise_columns = [col for col in noise_columns if col in df.columns]
+
             # Fill missing numeric values
             df.fillna(0.0, inplace=True)
 

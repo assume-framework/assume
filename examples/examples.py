@@ -65,6 +65,10 @@ available_examples = {
     },
     # example_01f is used in the tutorial notebook #5: Market configuration comparison example
     # example_01g is used in the tutorial notebook #6: Advanced order types example
+    "small_household": {
+        "scenario": "example_01h",
+        "study_case": "eom",
+    },
     #
     # DRL references case for learning advancement testing
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
@@ -74,7 +78,6 @@ available_examples = {
     "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
     "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
-    "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "dam"},
     "small_learning_with_storage": {"scenario": "example_02e", "study_case": "base"},
     #
     # full year examples to show real-world scenarios

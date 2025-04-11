@@ -2182,6 +2182,8 @@
             }
           },
           "mappings": [],
+          "max": 1,
+          "min": -1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -2230,7 +2232,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_0 AS noisy_action_0,\n    actions_1 AS noisy_action_1,\n    actions_1 - exploration_noise_1 AS action_1,\n    actions_0 - exploration_noise_0 AS action_0\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_0 AS noisy_action_0,\n    actions_0 - exploration_noise_0 AS action_0\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
           "refId": "A",
           "select": [
             [
@@ -2303,6 +2305,35 @@
               "type": "macro"
             }
           ]
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_1 AS noisy_action_1,  -- Handle missing actions_1\n    actions_1 - exploration_noise_1 AS action_1\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
         }
       ],
       "title": "Training ACTIONS during Episode ${episode}",
@@ -2363,6 +2394,8 @@
             }
           },
           "mappings": [],
+          "max": 1,
+          "min": -1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -2411,7 +2444,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_0,\n    actions_1\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)  -- Ensuring the query filters by the dashboard's time range\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_0\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
           "refId": "A",
           "select": [
             [
@@ -2484,9 +2517,38 @@
               "type": "macro"
             }
           ]
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_1\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
         }
       ],
-      "title": "Evaluation ACTIONS during Eval Episode ${episode}",
+      "title": "Evaluation ACTIONS during Eval Episode ${eval_episode}",
       "transformations": [
         {
           "id": "partitionByValues",
@@ -2516,13 +2578,13 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT DISTINCT simulation\nFROM rl_params",
+        "definition": "SELECT DISTINCT simulation\nFROM rl_meta",
         "description": "Can choose which simulation we want to show ",
         "includeAll": false,
         "label": "Simulation ID",
         "name": "simulation",
         "options": [],
-        "query": "SELECT DISTINCT simulation\nFROM rl_params",
+        "query": "SELECT DISTINCT simulation\nFROM rl_meta",
         "refresh": 2,
         "regex": "",
         "sort": 1,
@@ -2537,12 +2599,12 @@
           "type": "grafana-postgresql-datasource",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT episode\nFROM rl_params\nWHERE simulation = '$simulation' \nAND evaluation_mode = False\nORDER BY episode;\n",
+        "definition": "SELECT episode\nFROM rl_meta\nWHERE simulation = '$simulation' \nAND evaluation_mode = False\nORDER BY episode;",
         "includeAll": false,
         "label": "Episode",
         "name": "episode",
         "options": [],
-        "query": "SELECT episode\nFROM rl_params\nWHERE simulation = '$simulation' \nAND evaluation_mode = False\nORDER BY episode;\n",
+        "query": "SELECT episode\nFROM rl_meta\nWHERE simulation = '$simulation' \nAND evaluation_mode = False\nORDER BY episode;",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -2556,12 +2618,12 @@
           "type": "grafana-postgresql-datasource",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT episode\nFROM rl_params\nWHERE simulation = '$simulation'\nAND evaluation_mode = True\nORDER BY episode;\n",
+        "definition": "SELECT eval_episode\nFROM rl_meta\nWHERE simulation = '$simulation'\nAND evaluation_mode = True\nORDER BY eval_episode;",
         "includeAll": false,
         "label": "Eval. episode",
         "name": "eval_episode",
         "options": [],
-        "query": "SELECT episode\nFROM rl_params\nWHERE simulation = '$simulation'\nAND evaluation_mode = True\nORDER BY episode;\n",
+        "query": "SELECT eval_episode\nFROM rl_meta\nWHERE simulation = '$simulation'\nAND evaluation_mode = True\nORDER BY eval_episode;",
         "refresh": 1,
         "regex": "",
         "type": "query"
@@ -2579,14 +2641,14 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT DISTINCT unit \nFROM rl_params\nWHERE simulation = '$simulation';",
+        "definition": "SELECT DISTINCT unit \nFROM rl_params\nWHERE simulation = '$simulation'\nAND episode = 1\nAND evaluation_mode = False;",
         "description": "All units that have an reinforcment learning strategy and hence have the Rl specific parameteres logged",
         "includeAll": true,
         "label": "Unit",
         "multi": true,
         "name": "rl_unit",
         "options": [],
-        "query": "SELECT DISTINCT unit \nFROM rl_params\nWHERE simulation = '$simulation';",
+        "query": "SELECT DISTINCT unit \nFROM rl_params\nWHERE simulation = '$simulation'\nAND episode = 1\nAND evaluation_mode = False;",
         "refresh": 2,
         "regex": "",
         "type": "query"
