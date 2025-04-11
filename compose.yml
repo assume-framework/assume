@@ -4,7 +4,7 @@
 
 services:
   assume_db:
-    image: timescaledev/timescaledb-ha:pg17-oss
+    image: timescale/timescaledb-ha:pg17-oss
     # smaller without postgis support:
     # image: timescale/timescaledb:latest-pg17
     container_name: assume_db
