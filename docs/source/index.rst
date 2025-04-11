@@ -77,6 +77,7 @@ User Guide
 
 * :doc:`market_config`
 * :doc:`market_mechanism`
+* :doc:`bidding_strategies`
 * :doc:`scenario_loader`
 * :doc:`outputs`
 * :doc:`unit_operator`
@@ -96,6 +97,7 @@ User Guide
 
    market_config
    market_mechanism
+   bidding_strategies
    scenario_loader
    outputs
    unit_operator

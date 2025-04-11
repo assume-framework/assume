@@ -10,9 +10,9 @@ import pytest
 
 from assume.common.forecasts import NaiveForecast
 from assume.strategies import (
-    flexableEOM,
-    flexableNegCRM,
-    flexablePosCRM,
+    StandardEOMPowerplantStrategy,
+    StandardNegCRMPowerplantStrategy,
+    StandardPosCRMPowerplantStrategy,
 )
 from assume.units import PowerPlant
 
@@ -41,9 +41,9 @@ def power_plant() -> PowerPlant:
     )
 
 
-def test_flexable_eom(mock_market_config, power_plant):
+def test_standard_eom_powerplant(mock_market_config, power_plant):
     end = datetime(2023, 7, 1, 1)
-    strategy = flexableEOM()
+    strategy = StandardEOMPowerplantStrategy()
     mc = mock_market_config
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
@@ -72,9 +72,9 @@ def test_flexable_eom(mock_market_config, power_plant):
     assert bids[1]["volume"] == 100
 
 
-def test_flexable_pos_reserve(mock_market_config, power_plant):
+def test_standard_pos_reserve(mock_market_config, power_plant):
     end = datetime(2023, 7, 1, 4, 0, 0)
-    strategy = flexablePosCRM()
+    strategy = StandardPosCRMPowerplantStrategy()
     mc = mock_market_config
     mc.product_type = "energy_pos"
     product_tuples = [(start, end, None)]
@@ -97,9 +97,9 @@ def test_flexable_pos_reserve(mock_market_config, power_plant):
     assert bids[0]["volume"] == 1000
 
 
-def test_flexable_neg_reserve(mock_market_config, power_plant):
+def test_standard_neg_reserve(mock_market_config, power_plant):
     end = datetime(2023, 7, 1, 4, 0, 0)
-    strategy = flexableNegCRM()
+    strategy = StandardNegCRMPowerplantStrategy()
     mc = mock_market_config
     # Calculations for negative energy
     mc.product_type = "energy_neg"

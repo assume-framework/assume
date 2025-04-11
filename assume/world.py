@@ -37,7 +37,11 @@ from assume.common import (
 from assume.common.base import LearningConfig
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import LearningStrategy, bidding_strategies
+from assume.strategies import (
+    LearningStrategy,
+    bidding_strategies,
+    deprecated_to_new_strategy_names,
+)
 from assume.units import BaseUnit, demand_side_technologies, unit_types
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -157,7 +161,7 @@ class World:
         self.dst_components = demand_side_technologies
 
         self.bidding_strategies = bidding_strategies
-        if "pp_learning" not in bidding_strategies:
+        if "learning_eom_powerplant" not in bidding_strategies:
             logger.info(
                 "Learning Strategies are not available. Check that you have torch installed."
             )
@@ -575,10 +579,21 @@ class World:
                     logger.warning(
                         "The bidding strategy 'learning_advanced_orders' is deprecated. Please use regular 'pp_learning' instead."
                     )
-                raise ValueError(
-                    f"""Bidding strategy {strategy} not registered. Please check the name of
-                    the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
-                )
+                if strategy not in deprecated_to_new_strategy_names:
+                    # Invalid bidding strategy ID
+                    raise ValueError(
+                        f"""Bidding strategy {strategy} not registered. Please compare the name of
+                        the bidding strategy with the list of available strategies here https://assume.readthedocs.io/en/latest/bidding_strategies.html
+                        or register the bidding strategy in the world.bidding_strategies dict."""
+                    )
+                else:
+                    # Deprecated bidding strategy ID
+                    logger.warning(
+                        f"""FutureWarning: Bidding strategy name {strategy} is deprecated and has been
+                        renamed to {deprecated_to_new_strategy_names[strategy]}. For the full list of up-to-date strategies and names,
+                        please see the documentation https://assume.readthedocs.io/en/latest/bidding_strategies.html"""
+                    )
+                    strategy = deprecated_to_new_strategy_names[strategy]
 
             if strategy not in strategy_instances:
                 # Create and cache the strategy instance if not already created
