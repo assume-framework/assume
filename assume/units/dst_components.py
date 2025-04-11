@@ -1571,111 +1571,68 @@ class SeasonalHydrogenStorage(GenericStorage):
 
 class ThermalStorage(GenericStorage):
     """
-    Represents a flexible thermal energy storage system that can operate in either
-    short-term (daily) or long-term (seasonal) mode.
+    A flexible thermal storage class that extends GenericStorage to support short-term and long-term scheduling.
 
-    In "short-term" mode:
-        - Allows both charging and discharging with mutual exclusivity enforced using a binary status variable.
+    This class enables control over when the storage can charge or discharge, based on a binary profile.
+    It is useful in seasonal or scheduled operations like industrial heating cycles.
 
-    In "long-term" mode:
-        - Charging and discharging are restricted by a binary `availability_profile`.
-        - At time step t:
-            * 0 → Charging allowed only
-            * 1 → Discharging allowed only
+    - For 'short-term': behaves like GenericStorage without behavioral restrictions.
+    - For 'long-term': follows a storage schedule (0: charge-only, 1: discharge-only).
 
     Args:
-        max_capacity (float): Maximum energy capacity of the storage.
-        time_steps (list[int]): List of time step indices.
-        mode (str): "short-term" or "long-term".
-        availability_profile (pd.Series | None): Required if mode is "long-term".
-        min_capacity (float): Minimum allowed state of charge.
-        max_power_charge (float | None): Max charging power rate.
-        max_power_discharge (float | None): Max discharging power rate.
-        efficiency_charge (float): Charging efficiency.
-        efficiency_discharge (float): Discharging efficiency.
-        initial_soc (float): Initial SOC, as fraction of capacity.
-        ramp_up (float | None): Max charging ramp rate.
-        ramp_down (float | None): Max discharging ramp rate.
-        storage_loss_rate (float): SOC loss rate per timestep.
-        **kwargs: Additional config passed to base class.
+        storage_type (str): Type of storage behavior: 'short-term' or 'long-term'.
+        storage_schedule_profile (pd.Series, optional): Binary schedule for discharge availability (only required for 'long-term').
+        **kwargs: All other parameters are inherited from GenericStorage.
     """
 
     def __init__(
         self,
-        max_capacity: float,
-        time_steps: list[int],
         storage_type: str = "short-term",
-        availability_profile: pd.Series | None = None,
-        min_capacity: float = 0.0,
-        max_power_charge: float | None = None,
-        max_power_discharge: float | None = None,
-        efficiency_charge: float = 1.0,
-        efficiency_discharge: float = 1.0,
-        initial_soc: float = 1.0,
-        ramp_up: float | None = None,
-        ramp_down: float | None = None,
-        storage_loss_rate: float = 0.0,
+        storage_schedule_profile: pd.Series | None = None,
         **kwargs,
     ):
-        if initial_soc > 1:
-            initial_soc /= max_capacity
-            logger.warning(
-                f"Initial SOC is greater than 1.0. Setting it to {initial_soc}."
-            )
+        """
+        Initializes the thermal storage instance.
 
-        super().__init__(
-            max_capacity=max_capacity,
-            time_steps=time_steps,
-            min_capacity=min_capacity,
-            max_power_charge=max_power_charge,
-            max_power_discharge=max_power_discharge,
-            efficiency_charge=efficiency_charge,
-            efficiency_discharge=efficiency_discharge,
-            initial_soc=initial_soc,
-            ramp_up=ramp_up,
-            ramp_down=ramp_down,
-            storage_loss_rate=storage_loss_rate,
-            **kwargs,
-        )
-        self.storage_type = storage_type
-        self.storage_schedule_profile = kwargs.get("storage_schedule_profile")
+        Raises:
+            ValueError: If `storage_type` is 'long-term' and no schedule is provided.
+            ValueError: If `storage_type` is not one of ['short-term', 'long-term'].
+        """
+        super().__init__(**kwargs)
 
-        if self.storage_type == "long-term" and self.availability_profile is None:
-            raise ValueError(
-                "availability_profile must be provided in 'long-term' storage_type."
-            )
+        self.storage_type = storage_type.lower()
+        self.storage_schedule_profile = storage_schedule_profile
 
-    def add_to_model(
-        self, model: pyo.ConcreteModel, model_block: pyo.Block
-    ) -> pyo.Block:
+        if self.storage_type == "long-term" and self.storage_schedule_profile is None:
+            raise ValueError("storage_schedule_profile is required for 'long-term' storage_type.")
+
+        if self.storage_type not in ["short-term", "long-term"]:
+            raise ValueError("storage_type must be either 'short-term' or 'long-term'.")
+
+    def add_to_model(self, model: pyo.ConcreteModel, model_block: pyo.Block) -> pyo.Block:
+        """
+        Adds thermal storage constraints to the model based on storage type.
+
+        - If 'long-term', restrict charge/discharge based on the binary schedule profile.
+        - Otherwise, behaves identically to GenericStorage.
+
+        Args:
+            model (pyo.ConcreteModel): The Pyomo optimization model.
+            model_block (pyo.Block): The block to which this storage is added.
+
+        Returns:
+            pyo.Block: Updated model block with thermal storage constraints.
+        """
         model_block = super().add_to_model(model, model_block)
 
-        if self.storage_type == "short-term":
-            model_block.status = pyo.Var(self.time_steps, within=pyo.Binary)
-
-            @model_block.Constraint(self.time_steps)
-            def charge_control_constraint(b, t):
-                return b.charge[t] <= b.max_power_charge * b.status[t]
-
-            @model_block.Constraint(self.time_steps)
-            def discharge_control_constraint(b, t):
-                return b.discharge[t] <= b.max_power_discharge * (1 - b.status[t])
-
-        elif self.storage_type == "long-term":
-
+        if self.storage_type == "long-term":
             @model_block.Constraint(self.time_steps)
             def availability_charge_constraint(b, t):
-                return (
-                    b.charge[t]
-                    <= (1 - self.storage_schedule_profile.iat[t]) * b.max_power_charge
-                )
+                return b.charge[t] <= self.storage_schedule_profile.iat[t] * b.max_power_charge
 
             @model_block.Constraint(self.time_steps)
             def availability_discharge_constraint(b, t):
-                return (
-                    b.discharge[t]
-                    <= self.storage_schedule_profile.iat[t] * b.max_power_discharge
-                )
+                return b.discharge[t] <= (1 - self.storage_schedule_profile.iat[t]) * b.max_power_discharge
 
         return model_block
 

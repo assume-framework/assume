@@ -81,6 +81,10 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
                 raise ValueError(
                     f"Component {component} is not a valid component for the paper and pulp plant unit."
                 )
+        # Check for the presence of components first
+        self.has_thermal_storage = "thermal_storage" in self.components.keys()
+        self.has_boiler = "boiler" in self.components.keys()
+        self.has_heat_pump = "heat_pump" in self.components.keys()
 
         # Inject schedule into long-term thermal storage if applicable
         if "thermal_storage" in self.components:
@@ -99,11 +103,6 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
-
-        # Check for the presence of components
-        self.has_thermal_storage = "thermal_storage" in self.components.keys()
-        self.has_boiler = "boiler" in self.components.keys()
-        self.has_heat_pump = "heat_pump" in self.components.keys()
 
         # Initialize the model
         self.setup_model()
@@ -132,7 +131,7 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
         """
         Defines the decision variables for the optimization model.
         """
-        self.model.power_input = pyo.Var(
+        self.model.total_power_input = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
         self.model.heat_output = pyo.Var(
@@ -200,13 +199,13 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             if self.has_heat_pump:
                 total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
 
-            if (
-                self.has_boiler
-                and self.components["boiler"]["fuel_type"] == "electricity"
-            ):
-                total_power += self.model.dsm_blocks["boiler"].power_in[t]
+            if self.has_boiler:
+                # Access the fuel_type attribute of the Boiler instance
+                boiler = self.components["boiler"]
+                if boiler.fuel_type == "electricity":
+                    total_power += self.model.dsm_blocks["boiler"].power_in[t]
 
-            return m.power_input[t] == total_power
+            return m.total_power_input[t] == total_power
 
         # Operating cost constraint
         @self.model.Constraint(self.model.time_steps)
