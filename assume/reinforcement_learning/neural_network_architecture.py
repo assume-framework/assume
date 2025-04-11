@@ -173,7 +173,8 @@ class MLPActor(Actor):
 
 class ContextualMLPActor(Actor):
     """
-    A modified MLP actor that incorporates additional context.
+    Contextual MLP Actor where observations are processed first,
+    then merged with processed context before final layers.
     """
 
     def __init__(
@@ -182,45 +183,69 @@ class ContextualMLPActor(Actor):
         context_dim: int,
         act_dim: int,
         float_type,
-        hidden_sizes=[1024, 512, 256, 128],
+        obs_hidden_sizes=[512, 256, 128],  # Layers processing observation ONLY
+        context_embedding_dim=64,  # Size of the context embedding
+        merged_hidden_sizes=[128],  # Layers processing merged features
         *args,
         **kwargs,
     ):
         super().__init__()
+        self.float_type = float_type
+        self.obs_dim = obs_dim
+        self.context_dim = context_dim
+        self.act_dim = act_dim
 
-        # Process general observation
-        self.obs_fc = nn.Linear(obs_dim, 128, dtype=float_type)
-        # Process unit-specific context
-        self.context_fc = nn.Linear(context_dim, 128, dtype=float_type)
+        # 1. Observation Processing Layers
+        self.obs_encoder = nn.ModuleList()
+        current_dim = obs_dim
+        for h_size in obs_hidden_sizes:
+            self.obs_encoder.append(nn.Linear(current_dim, h_size, dtype=float_type))
+            current_dim = h_size
+        # Output dimension after processing observations
+        self.obs_feature_dim = current_dim
 
-        combined_input_dim = 128 + 128
-        # Build the MLP layers that output the final action
-        self.layers = self._build_mlp_layers(
-            combined_input_dim, act_dim, hidden_sizes, float_type
+        # 2. Context Processing Layer (simple embedding)
+        self.context_encoder = nn.Linear(
+            context_dim, context_embedding_dim, dtype=float_type
+        )
+        self.context_feature_dim = context_embedding_dim
+
+        # 3. Merged Processing Layers (using _build_mlp_layers helper)
+        combined_input_dim = self.obs_feature_dim + self.context_feature_dim
+        self.final_layers = self._build_mlp_layers(
+            combined_input_dim, act_dim, merged_hidden_sizes, float_type
         )
 
-        self._init_weights()
+        self._init_weights()  # Initialize all defined layers
 
     def forward(self, obs, context):
         """
-        Forward pass takes both the general observation and unit-specific context.
+        Forward pass: Process obs, process context, merge, process merged.
         """
         # Expand context to match batch size if necessary.
         if obs.dim() != context.dim():
             context = context.unsqueeze(0).expand(obs.size(0), -1)
 
-        obs_emb = F.relu(self.obs_fc(obs))
-        context_emb = F.relu(self.context_fc(context))
+        # 1. Process observation through its dedicated layers
+        obs_features = obs
+        for layer in self.obs_encoder:
+            obs_features = F.relu(layer(obs_features))
 
-        # Concatenate the embeddings along the feature dimension.
-        x = th.cat([obs_emb, context_emb], dim=-1)
-        # Pass through the MLP hidden layers
-        for layer in self.layers[:-1]:
-            x = F.relu(layer(x))
+        # 2. Process context through its dedicated layer
+        context_features = F.relu(self.context_encoder(context))
 
-        # Apply the final layer with softsign activation.
-        x = F.softsign(self.layers[-1](x))
-        return x
+        # 3. Concatenate the features
+        merged_features = th.cat([obs_features, context_features], dim=-1)
+
+        # 4. Pass merged features through the final layers
+        final_output = merged_features
+        for layer in self.final_layers[:-1]:
+            final_output = F.relu(layer(final_output))
+
+        # Apply the final layer with Tanh activation (common for TD3 actions)
+        action = th.tanh(self.final_layers[-1](final_output))
+
+        return action
 
 
 class LSTMActor(Actor):
