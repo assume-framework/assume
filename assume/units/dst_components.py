@@ -1581,6 +1581,117 @@ class SeasonalHydrogenStorage(GenericStorage):
         return model_block
 
 
+class ThermalStorage(GenericStorage):
+    """
+    Represents a flexible thermal energy storage system that can operate in either
+    short-term (daily) or long-term (seasonal) mode.
+
+    In "short-term" mode:
+        - Allows both charging and discharging with mutual exclusivity enforced using a binary status variable.
+
+    In "long-term" mode:
+        - Charging and discharging are restricted by a binary `availability_profile`.
+        - At time step t:
+            * 0 → Charging allowed only
+            * 1 → Discharging allowed only
+
+    Args:
+        max_capacity (float): Maximum energy capacity of the storage.
+        time_steps (list[int]): List of time step indices.
+        mode (str): "short-term" or "long-term".
+        availability_profile (pd.Series | None): Required if mode is "long-term".
+        min_capacity (float): Minimum allowed state of charge.
+        max_power_charge (float | None): Max charging power rate.
+        max_power_discharge (float | None): Max discharging power rate.
+        efficiency_charge (float): Charging efficiency.
+        efficiency_discharge (float): Discharging efficiency.
+        initial_soc (float): Initial SOC, as fraction of capacity.
+        ramp_up (float | None): Max charging ramp rate.
+        ramp_down (float | None): Max discharging ramp rate.
+        storage_loss_rate (float): SOC loss rate per timestep.
+        **kwargs: Additional config passed to base class.
+    """
+
+    def __init__(
+        self,
+        max_capacity: float,
+        time_steps: list[int],
+        storage_type: str = "short-term",
+        availability_profile: pd.Series | None = None,
+        min_capacity: float = 0.0,
+        max_power_charge: float | None = None,
+        max_power_discharge: float | None = None,
+        efficiency_charge: float = 1.0,
+        efficiency_discharge: float = 1.0,
+        initial_soc: float = 1.0,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        storage_loss_rate: float = 0.0,
+        **kwargs,
+    ):
+        if initial_soc > 1:
+            initial_soc /= max_capacity
+            logger.warning(
+                f"Initial SOC is greater than 1.0. Setting it to {initial_soc}."
+            )
+
+        super().__init__(
+            max_capacity=max_capacity,
+            time_steps=time_steps,
+            min_capacity=min_capacity,
+            max_power_charge=max_power_charge,
+            max_power_discharge=max_power_discharge,
+            efficiency_charge=efficiency_charge,
+            efficiency_discharge=efficiency_discharge,
+            initial_soc=initial_soc,
+            ramp_up=ramp_up,
+            ramp_down=ramp_down,
+            storage_loss_rate=storage_loss_rate,
+            **kwargs,
+        )
+        self.storage_type = storage_type
+        self.storage_schedule_profile = kwargs.get("storage_schedule_profile")
+
+        if self.storage_type == "long-term" and self.availability_profile is None:
+            raise ValueError(
+                "availability_profile must be provided in 'long-term' storage_type."
+            )
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        model_block = super().add_to_model(model, model_block)
+
+        if self.storage_type == "short-term":
+            model_block.status = pyo.Var(self.time_steps, within=pyo.Binary)
+
+            @model_block.Constraint(self.time_steps)
+            def charge_control_constraint(b, t):
+                return b.charge[t] <= b.max_power_charge * b.status[t]
+
+            @model_block.Constraint(self.time_steps)
+            def discharge_control_constraint(b, t):
+                return b.discharge[t] <= b.max_power_discharge * (1 - b.status[t])
+
+        elif self.storage_type == "long-term":
+
+            @model_block.Constraint(self.time_steps)
+            def availability_charge_constraint(b, t):
+                return (
+                    b.charge[t]
+                    <= (1 - self.storage_schedule_profile.iat[t]) * b.max_power_charge
+                )
+
+            @model_block.Constraint(self.time_steps)
+            def availability_discharge_constraint(b, t):
+                return (
+                    b.discharge[t]
+                    <= self.storage_schedule_profile.iat[t] * b.max_power_discharge
+                )
+
+        return model_block
+
+
 class DRIStorage(GenericStorage):
     """
     A class to represent a Direct Reduced Iron (DRI) storage unit in an energy system model.
@@ -1662,6 +1773,7 @@ demand_side_technologies: dict = {
     "electrolyser": Electrolyser,
     "hydrogen_buffer_storage": HydrogenBufferStorage,
     "hydrogen_seasonal_storage": SeasonalHydrogenStorage,
+    "thermal_storage": ThermalStorage,
     "dri_plant": DRIPlant,
     "dri_storage": DRIStorage,
     "eaf": ElectricArcFurnace,
