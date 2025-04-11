@@ -243,6 +243,27 @@ class DSMFlex:
                     - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
                     == total_power_input
                 )
+            elif self.technology == "paper_pulp_plant":
+                total_power_input = 0
+
+                # Add heat pump power if present
+                if self.has_heat_pump:
+                    total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
+
+                # Add boiler power if it's electric
+                if (
+                    self.has_boiler
+                    and self.components["boiler"]["fuel_type"] == "electricity"
+                ):
+                    total_power_input += self.model.dsm_blocks["boiler"].power_in[t]
+
+                # Apply flexibility adjustments
+                return (
+                    m.total_power_input[t]
+                    + m.load_shift_pos[t] * m.shift_indicator[t]
+                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
+                    == total_power_input
+                )
 
         @self.model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):

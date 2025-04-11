@@ -7,13 +7,12 @@ from datetime import datetime
 
 import pyomo.environ as pyo
 
-import logging
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import Forecaster
 from assume.units.dsm_load_shift import DSMFlex
-from assume.units.dst_components import HeatPump, Boiler, GenericStorage
 
 logger = logging.getLogger(__name__)
+
 
 class PaperPulpPlant(DSMFlex, SupportsMinMax):
     """
@@ -82,7 +81,7 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
                 raise ValueError(
                     f"Component {component} is not a valid component for the paper and pulp plant unit."
                 )
-            
+
         # Inject schedule into long-term thermal storage if applicable
         if "thermal_storage" in self.components:
             storage_cfg = self.components["thermal_storage"]
@@ -102,12 +101,9 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
         self.cost_tolerance = cost_tolerance
 
         # Check for the presence of components
-        self.has_thermal_storage = (
-            "thermal_storage" in self.components.keys()
-        )
+        self.has_thermal_storage = "thermal_storage" in self.components.keys()
         self.has_boiler = "boiler" in self.components.keys()
         self.has_heat_pump = "heat_pump" in self.components.keys()
-
 
         # Initialize the model
         self.setup_model()
@@ -120,13 +116,13 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
-        
+
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
             self.model.natural_gas_price = pyo.Param(
                 self.model.time_steps,
                 initialize={t: value for t, value in enumerate(self.natural_gas_price)},
             )
-        
+
         self.model.thermal_demand = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.thermal_demand)},
@@ -136,15 +132,22 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
         """
         Defines the decision variables for the optimization model.
         """
-        self.model.power_input = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-        self.model.heat_output = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
-        self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+        self.model.power_input = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
+        self.model.heat_output = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
+        self.model.variable_cost = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
 
     def initialize_process_sequence(self):
         """
         Initializes the process sequence and constraints for the paper and pulp plant.
         Connects heat sources (heat pump and/or boiler) with thermal storage if present.
         """
+
         @self.model.Constraint(self.model.time_steps)
         def heat_production_distribution(m, t):
             """
@@ -152,19 +155,24 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             Heat flows from sources to storage or demand.
             """
             total_heat_production = 0
-            
+
             # Add heat production from available sources
             if self.has_heat_pump:
                 total_heat_production += self.model.dsm_blocks["heat_pump"].heat_out[t]
-                
+
             if self.has_boiler:
                 total_heat_production += self.model.dsm_blocks["boiler"].heat_out[t]
-            
+
             # Connect with storage if present
             if self.has_thermal_storage:
-                storage_discharge = self.model.dsm_blocks["thermal_storage"].discharge[t]
+                storage_discharge = self.model.dsm_blocks["thermal_storage"].discharge[
+                    t
+                ]
                 storage_charge = self.model.dsm_blocks["thermal_storage"].charge[t]
-                return total_heat_production + storage_discharge == m.heat_output[t] + storage_charge
+                return (
+                    total_heat_production + storage_discharge
+                    == m.heat_output[t] + storage_charge
+                )
             else:
                 return total_heat_production == m.heat_output[t]
 
@@ -172,6 +180,7 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
         """
         Defines the constraints for the paper and pulp plant model.
         """
+
         # Heat demand constraint
         @self.model.Constraint(self.model.time_steps)
         def total_heat_demand_constraint(m, t):
@@ -187,15 +196,18 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             Calculates total electrical power input from components.
             """
             total_power = 0
-            
+
             if self.has_heat_pump:
                 total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
-            
-            if self.has_boiler and self.components["boiler"]["fuel_type"] == "electricity":
+
+            if (
+                self.has_boiler
+                and self.components["boiler"]["fuel_type"] == "electricity"
+            ):
                 total_power += self.model.dsm_blocks["boiler"].power_in[t]
-                
+
             return m.power_input[t] == total_power
-        
+
         # Operating cost constraint
         @self.model.Constraint(self.model.time_steps)
         def cost_per_time_step(m, t):
@@ -203,33 +215,32 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             Calculates total operating cost from all components.
             """
             total_cost = 0
-            
+
             if self.has_heat_pump:
                 total_cost += self.model.dsm_blocks["heat_pump"].operating_cost[t]
-                
+
             if self.has_boiler:
                 total_cost += self.model.dsm_blocks["boiler"].operating_cost[t]
 
-                
             return m.variable_cost[t] == total_cost
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculate the marginal cost of the unit based on the provided time and power.
-        
+
         Args:
             start (datetime): The start time of the dispatch
             power (float): The power output of the unit
-            
+
         Returns:
             float: The marginal cost of the unit
         """
         marginal_cost = 0
-        
+
         if self.opt_power_requirement.at[start] > 0:
             marginal_cost = (
-                self.variable_cost_series.at[start] 
+                self.variable_cost_series.at[start]
                 / self.opt_power_requirement.at[start]
             )
-            
+
         return marginal_cost
