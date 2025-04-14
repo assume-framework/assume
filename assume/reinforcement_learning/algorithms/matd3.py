@@ -63,8 +63,10 @@ class TD3(RLAlgorithm):
         self.grad_clip_norm = 1.0
 
         self.use_shared_actor = (
-            True if actor_architecture == "contextual_mlp" else False
+            True if actor_architecture in ["contextual_mlp", "filmed_mlp"] else False
         )
+        self.cluster_mapping = {}
+
         if self.use_shared_actor:
             self.actor_clustering_method = actor_clustering_method
             self.clustering_method_kwargs = clustering_method_kwargs
@@ -422,7 +424,6 @@ class TD3(RLAlgorithm):
             self.clusters = {0: list(self.learning_role.rl_strats.values())}
 
         # make a mapping from the cluster index to the unit IDs
-        self.cluster_mapping = {}
         for cluster_index, strategies in self.clusters.items():
             for strategy in strategies:
                 self.cluster_mapping[strategy.unit_id] = cluster_index
