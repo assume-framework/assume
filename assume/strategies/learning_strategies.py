@@ -84,7 +84,7 @@ class AbstractLearningStrategy(LearningStrategy):
         """
         if self.actor_architecture in ["mlp", "lstm"]:
             directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
-        elif self.actor_architecture == "contextual_mlp":
+        elif self.actor_architecture in ["contextual_mlp", "filmed_mlp"]:
             # first load the cluster mapping json
             cluster_mapping_path = f"{load_path}/actors/cluster_mapping.json"
             with open(cluster_mapping_path) as f:
