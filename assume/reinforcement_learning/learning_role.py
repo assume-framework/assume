@@ -160,15 +160,13 @@ class Learning(Role):
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
-        # if enough initial experience was collected according to specifications in learning config
-        # turn off initial exploration and go into full learning mode
+        # Disable initial exploration if initial experience collection is complete
         if self.episodes_done >= self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
-        # if we are in continue_learning mode we also turn off initial exploration
-        # but only for the loaded strategies
-        if self.continue_learning:
-            self.turn_off_initial_exploration(partial=True)
+        # In continue_learning mode, disable it only for loaded strategies
+        elif self.continue_learning:
+            self.turn_off_initial_exploration(loaded_only=True)
 
     def get_inter_episodic_data(self):
         """
@@ -224,15 +222,15 @@ class Learning(Role):
 
         self.update_policy()
 
-    def turn_off_initial_exploration(self, partial=False) -> None:
+    def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """
         Disable initial exploration mode.
 
-        If `partial=True`, only turn off exploration for strategies that were loaded (used in continue_learning mode).
-        If `partial=False`, turn it off for all strategies.
+        If `loaded_only=True`, only turn off exploration for strategies that were loaded (used in continue_learning mode).
+        If `loaded_only=False`, turn it off for all strategies.
         """
         for strategy in self.rl_strats.values():
-            if partial:
+            if loaded_only:
                 if strategy.loaded:
                     strategy.collect_initial_experience_mode = False
             else:
