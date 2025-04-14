@@ -1,9 +1,14 @@
 name,max_power_charge,technology,marginal_cost,efficiency_charge,efficiency_discharge,initial_soc,inflow,bidding_EOM,unit_operator,max_power_discharge,min_soc,max_soc,variable_cost_charge,variable_cost_discharge,additional_cost_charge,additional_cost_discharge,natural_inflow
-battery_0,797,battery,0.0,0.9791,0.9726,0.0,0.0,flexable_eom_storage,storage_eom_operator,765,0,4784,0.0,0.0,,,
-battery_1,443,battery,0.0,0.9814,0.9778,0.0,0.0,flexable_eom_storage,storage_eom_operator,425,0,2659,0.0,0.0,,,
-battery_2,232,battery,0.0,0.9788,0.9863,0.0,0.0,flexable_eom_storage,storage_eom_operator,222,0,1393,0.0,0.0,,,
-battery_3,633,battery,0.0,0.9718,0.9844,0.0,0.0,flexable_eom_storage,storage_eom_operator,607,0,3798,0.0,0.0,,,
-battery_4,455,battery,0.0,0.9862,0.9745,0.0,0.0,flexable_eom_storage,storage_eom_operator,437,0,2732,0.0,0.0,,,
+battery_0,0,battery,0.0,0.9843,0.9874,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,2,0.0,0.0,,,
+battery_1,0,battery,0.0,0.9867,0.9755,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,2,0.0,0.0,,,
+battery_2,0,battery,0.0,0.9848,0.9832,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,0,0.0,0.0,,,
+battery_3,0,battery,0.0,0.9737,0.98,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,1,0.0,0.0,,,
+battery_4,0,battery,0.0,0.9867,0.9885,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,1,0.0,0.0,,,
+battery_5,0,battery,0.0,0.9772,0.9797,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,3,0.0,0.0,,,
+battery_6,0,battery,0.0,0.9771,0.9806,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,1,0.0,0.0,,,
+battery_7,0,battery,0.0,0.9794,0.9778,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,0,0.0,0.0,,,
+battery_8,0,battery,0.0,0.9884,0.9806,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,1,0.0,0.0,,,
+battery_9,0,battery,0.0,0.9741,0.988,0.0,0.0,flexable_eom_storage,storage_eom_operator,0,0,0,0.0,0.0,,,
 Tanzmühle - Rabenleite,25,PSPP,,0.81,0.88,,,flexable_eom_storage,storage_eom_operator,35,1,404,,,0.28,0.28,0.0
 Schwarzenbachwerk,20,PSPP,,0.73,0.82,,,flexable_eom_storage,storage_eom_operator,46,1,198,,,0.28,0.28,1.2
 Leitzach II,38,PSPP,,0.86,0.9,,,flexable_eom_storage,storage_eom_operator,49,1,550,,,0.28,0.28,0.7
