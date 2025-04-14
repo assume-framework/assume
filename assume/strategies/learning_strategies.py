@@ -39,18 +39,6 @@ class AbstractLearningStrategy(LearningStrategy):
         ).to(self.device)
         self.actor.load_state_dict(params["actor"])
 
-        if self.learning_mode:
-            self.actor_target = self.actor_architecture_class(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
-                float_type=self.float_type,
-                unique_obs_dim=self.unique_obs_dim,
-                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-            ).to(self.device)
-            self.actor_target.load_state_dict(params["actor_target"])
-            self.actor_target.eval()
-            self.actor.optimizer.load_state_dict(params["actor_optimizer"])
-
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
         upper_scaling_factor_price = max(unit.forecaster[f"price_{market_id}"])
