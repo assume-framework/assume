@@ -158,16 +158,17 @@ class Learning(Role):
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
 
+        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+
         # if enough initial experience was collected according to specifications in learning config
         # turn off initial exploration and go into full learning mode
-        # or if we are in continue_learning mode we also turn off initial exploration
-        if (
-            self.episodes_done >= self.episodes_collecting_initial_experience
-            or self.continue_learning
-        ):
+        if self.episodes_done >= self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
-        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+        # if we are in continue_learning mode we also turn off initial exploration
+        # but only for the loaded strategies
+        if self.continue_learning:
+            self.turn_off_initial_exploration(partial=True)
 
     def get_inter_episodic_data(self):
         """
@@ -223,17 +224,19 @@ class Learning(Role):
 
         self.update_policy()
 
-    def turn_off_initial_exploration(self) -> None:
+    def turn_off_initial_exploration(self, partial=False) -> None:
         """
-        Disable initial exploration mode for all learning strategies.
+        Disable initial exploration mode.
 
-        Notes:
-            This method turns off the initial exploration mode for all learning strategies associated with the learning role. Initial
-            exploration is often used to collect initial experience before training begins. Disabling it can be useful when the agent
-            has collected sufficient initial data and is ready to focus on training.
+        If `partial=True`, only turn off exploration for strategies that were loaded (used in continue_learning mode).
+        If `partial=False`, turn it off for all strategies.
         """
         for strategy in self.rl_strats.values():
-            strategy.collect_initial_experience_mode = False
+            if partial:
+                if strategy.loaded:
+                    strategy.collect_initial_experience_mode = False
+            else:
+                strategy.collect_initial_experience_mode = False
 
     def get_progress_remaining(self) -> float:
         """

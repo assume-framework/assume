@@ -10,7 +10,11 @@ from torch.nn import functional as F
 from torch.optim import AdamW
 
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.learning_utils import polyak_update
+from assume.reinforcement_learning.learning_utils import (
+    infer_n_agents,
+    polyak_update,
+    transfer_weights,
+)
 from assume.reinforcement_learning.neural_network_architecture import CriticTD3
 
 logger = logging.getLogger(__name__)
@@ -124,35 +128,92 @@ class TD3(RLAlgorithm):
 
     def load_critic_params(self, directory: str) -> None:
         """
-        Load the parameters of critic networks from a specified directory.
-
-        This method loads the parameters of critic networks, including the critic's state_dict, critic_target's state_dict, and
-        the critic's optimizer state_dict, from the specified directory. It iterates through the learning strategies associated
-        with the learning role, loads the respective parameters, and updates the critic and target critic networks accordingly.
-
-        Args:
-            directory (str): The directory from which the parameters should be loaded.
+        Load critic, target_critic, and optimizer states for each agent strategy.
+        If agent count differs between saved and current model, performs weight transfer for both networks.
         """
         logger.info("Loading critic parameters...")
 
         if not os.path.exists(directory):
             logger.warning(
-                "Specified directory for loading the critics does not exist! Starting with randomly initialized values!"
+                "Specified directory does not exist. Using randomly initialized critics."
             )
             return
 
+        new_n_agents = len(self.learning_role.rl_strats)
+
         for u_id, strategy in self.learning_role.rl_strats.items():
+            critic_path = f"{directory}/critics/critic_{str(u_id)}.pt"
+            if not os.path.exists(critic_path):
+                logger.warning(f"No critic file found for agent {u_id}.")
+                continue
+
             try:
-                critic_params = self.load_obj(
-                    directory=f"{directory}/critics/critic_{str(u_id)}.pt"
+                critic_params = self.load_obj(directory=critic_path)
+
+                if not all(
+                    k in critic_params
+                    for k in ["critic", "critic_target", "critic_optimizer"]
+                ):
+                    logger.warning(
+                        f"Incomplete critic data for agent {u_id}. Skipping."
+                    )
+                    continue
+
+                old_n_agents = infer_n_agents(
+                    critic_params["critic"],
+                    strategy.obs_dim,
+                    strategy.act_dim,
+                    strategy.unique_obs_dim,
                 )
-                strategy.critics.load_state_dict(critic_params["critic"])
-                strategy.target_critics.load_state_dict(critic_params["critic_target"])
-                strategy.critics.optimizer.load_state_dict(
-                    critic_params["critic_optimizer"]
+
+                # Check if transfer is necessary
+                if old_n_agents == new_n_agents:
+                    strategy.critics.load_state_dict(critic_params["critic"])
+                    strategy.target_critics.load_state_dict(
+                        critic_params["critic_target"]
+                    )
+                    strategy.critics.optimizer.load_state_dict(
+                        critic_params["critic_optimizer"]
+                    )
+
+                else:
+                    logger.debug(
+                        f"Agent count mismatch for {u_id}: transferring weights (old={old_n_agents}, new={new_n_agents})"
+                    )
+
+                    critic_weights = transfer_weights(
+                        model=strategy.critics,
+                        old_state=critic_params["critic"],
+                        old_n_agents=old_n_agents,
+                        new_n_agents=new_n_agents,
+                        obs_base=strategy.obs_dim,
+                        act_dim=strategy.act_dim,
+                        unique_obs=strategy.unique_obs_dim,
+                    )
+                    target_critic_weights = transfer_weights(
+                        model=strategy.target_critics,
+                        old_state=critic_params["critic_target"],
+                        old_n_agents=old_n_agents,
+                        new_n_agents=new_n_agents,
+                        obs_base=strategy.obs_dim,
+                        act_dim=strategy.act_dim,
+                        unique_obs=strategy.unique_obs_dim,
+                    )
+                    if critic_weights is None or target_critic_weights is None:
+                        logger.warning(f"Failed to transfer weights for agent {u_id}.")
+                        continue
+
+                    strategy.critics.load_state_dict(critic_weights)
+                    strategy.target_critics.load_state_dict(target_critic_weights)
+
+                    logger.info(
+                        f"Transferred weights for agent {u_id} (old={old_n_agents}, new={new_n_agents})"
+                    )
+
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load critic parameters for agent {u_id}: {e}"
                 )
-            except Exception:
-                logger.warning(f"No critic values loaded for agent {u_id}")
 
     def load_actor_params(self, directory: str) -> None:
         """
@@ -182,6 +243,9 @@ class TD3(RLAlgorithm):
                 strategy.actor.optimizer.load_state_dict(
                     actor_params["actor_optimizer"]
                 )
+
+                # add a tag to the strategy to indicate that the actor was loaded
+                strategy.loaded = True
             except Exception:
                 logger.warning(f"No actor values loaded for agent {u_id}")
 
