@@ -1120,8 +1120,6 @@ def run_learning(
         terminate_learning=True,
     )
 
-    world.learning_role.load_inter_episodic_data(inter_episodic_data)
-
 
 if __name__ == "__main__":
     data = read_grid(Path("examples/inputs/example_01d"))

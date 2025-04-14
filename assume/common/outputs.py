@@ -45,11 +45,11 @@ class WriteOutput(Role):
         end (datetime.datetime): The end datetime of the simulation run.
         db_uri: The uri of the database engine. Defaults to ''.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
-        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
+        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to 48 hours.
+        outputs_buffer_size_mb (int, optional): The maximum storage size (in MB) for storing output data before saving it. Defaults to 300 MB.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
-        max_dfs_size_mb (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
     """
 
     def __init__(
@@ -59,13 +59,13 @@ class WriteOutput(Role):
         end: datetime,
         db_uri="",
         export_csv_path: str = "",
-        save_frequency_hours: int = None,
+        save_frequency_hours: int = 48,
+        outputs_buffer_size_mb: int = 300,
         learning_mode: bool = False,
         evaluation_mode: bool = False,
         episode: int = None,
         eval_episode: int = None,
         additional_kpis: dict[str, OutputDef] = {},
-        max_dfs_size_mb: int = 300,
     ):
         super().__init__()
 
@@ -96,8 +96,8 @@ class WriteOutput(Role):
         self.start = start
         self.end = end
 
-        self.max_dfs_size = max_dfs_size_mb * 1024 * 1024
-        self.current_dfs_size = 0
+        self.outputs_buffer_size_bytes = outputs_buffer_size_mb * 1024 * 1024
+        self.current_dfs_size_bytes = 0
 
         # initializes dfs for storing and writing asynchronous
         self.write_buffers: dict = defaultdict(list)
@@ -153,7 +153,7 @@ class WriteOutput(Role):
             # ignore spatial_ref_sys table
             if table_name == "spatial_ref_sys":
                 continue
-            # only delete rl_params during the first episode of learning
+            # only delete rl_params and rl_meta during the first episode of learning
             if table_name in ["rl_params", "rl_meta"] and not (
                 self.learning_mode and self.episode == 1
             ):
@@ -247,9 +247,9 @@ class WriteOutput(Role):
             self.write_buffers[content_type].append((content_data, market_id))
 
         # keep track of the memory usage of the data
-        self.current_dfs_size += calculate_content_size(content_data)
-        # if the current size is larger than self.max_dfs_size, store the data
-        if self.current_dfs_size > self.max_dfs_size:
+        self.current_dfs_size_bytes += calculate_content_size(content_data)
+        # if the current size is larger than self.outputs_buffer_size_bytes, store the data
+        if self.current_dfs_size_bytes > self.outputs_buffer_size_bytes:
             logger.debug("storing output data due to size limit")
             self.context.schedule_instant_task(coroutine=self.store_dfs())
 
@@ -531,7 +531,7 @@ class WriteOutput(Role):
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
 
-        self.current_dfs_size = 0
+        self.current_dfs_size_bytes = 0
 
     def store_grid(
         self,
@@ -741,30 +741,6 @@ class DatabaseMaintenance:
     It assumes that each table (except for system tables like "spatial_ref_sys") contains a column
     named 'simulation' that uniquely identifies the simulation.
 
-    Example:
-        from assume.common import DatabaseMaintenance
-
-        # Select to store the simulation results in a local database or in TimescaleDB.
-        # When using TimescaleDB, ensure Docker is installed and the Grafana dashboard is accessible.
-        data_format = "timescale"  # Options: "local_db" or "timescale"
-
-        if data_format == "local_db":
-            db_uri = "sqlite:///./examples/local_db/assume_db.db"
-        elif data_format == "timescale":
-            db_uri = "postgresql://assume:assume@localhost:5432/assume"
-
-        maintenance = DatabaseMaintenance(db_uri=db_uri)
-
-        # 1. Retrieve unique simulation IDs:
-        unique_ids = maintenance.get_unique_simulation_ids()
-        print("Unique simulation IDs:", unique_ids)
-
-        # 2. Delete specific simulations:
-        maintenance.delete_simulations(["example_01", "example_02"])
-
-        # 3. Delete all simulations except a few:
-        maintenance.delete_all_simulations(exclude=["example_01"])
-
     Args:
         db_uri (str): The URI of the database engine used to create a SQLAlchemy engine.
     """
@@ -823,7 +799,6 @@ class DatabaseMaintenance:
             logger.info("No simulation IDs provided for deletion.")
             return
 
-        sim_list_str = ", ".join([f"'{sim}'" for sim in simulation_ids])
         inspector = inspect(self.db)
         table_names = inspector.get_table_names()
         for table in table_names:
@@ -836,11 +811,11 @@ class DatabaseMaintenance:
                             f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
                         )
                     )
+                    # Safe parameterized query
                     delete_query = text(
-                        f'DELETE FROM "{table}" WHERE simulation IN ({sim_list_str})'
+                        f'DELETE FROM "{table}" WHERE simulation = ANY(:simulations)'
                     )
-                    result = conn.execute(delete_query)
-                    conn.commit()
+                    result = conn.execute(delete_query, {"simulations": simulation_ids})
                     logger.debug("Deleted %s rows from %s", result.rowcount, table)
             except Exception as e:
                 logger.error(
@@ -878,7 +853,6 @@ class DatabaseMaintenance:
                     else:
                         delete_query = text(f'DELETE FROM "{table}"')
                     result = conn.execute(delete_query)
-                    conn.commit()
                     logger.debug("Deleted %s rows from %s", result.rowcount, table)
             except Exception as e:
                 logger.error("Could not delete simulations from table %s: %s", table, e)
