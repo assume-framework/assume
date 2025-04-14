@@ -42,6 +42,10 @@ class Demand(SupportsMinMax):
         forecaster: Forecaster,
         node: str = "node0",
         price: float = 3000.0,
+        max_price: float = 3000.0,
+        min_price: float = 0.0,
+        elasticity: float = 0.0,
+        elasticity_model: str = "isoelastic",
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
@@ -68,6 +72,10 @@ class Demand(SupportsMinMax):
 
         self.volume = -abs(self.forecaster[self.id])  # demand is negative
         self.price = FastSeries(index=self.index, value=price)
+        self.max_price = max_price
+        self.min_price = min_price
+        self.elasticity = elasticity
+        self.elasticity_model = elasticity_model
 
     def execute_current_dispatch(
         self,

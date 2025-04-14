@@ -4,7 +4,7 @@
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
-
+import numpy as np
 
 class NaiveSingleBidStrategy(BaseStrategy):
     """
@@ -358,3 +358,131 @@ class NaiveExchangeStrategy(BaseStrategy):
         bids = self.remove_empty_bids(bids)
 
         return bids
+
+class NaiveMultiBidDemandStrategy(BaseStrategy):
+    """
+    A naive strategy of a Demand unit on the EOM that bids multiple bids with different prices and volumes
+    and hereby approximates a given marginal utility curve.
+    The linear (!) marginal utility curve is defined by the units max_price and elasticity.
+    """
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        num_bids: int = 10,
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Takes information from a demand unit that the unit operator manages and
+        defines how it bids to the market.
+
+        The bids take the following form:
+        For each hour several bids (num_bids) are created with different prices and volumes.
+        The bids are created according to the marginal utility curve of the unit.
+
+        Args:
+            unit (SupportsMinMax): The unit to be buying energy.
+            market_config (MarketConfig): The market configuration.
+            product_tuples (list[Product]): The list of all products the unit can demand.
+            num_bids (int): The number of bids to be created for each hour.
+
+        Returns:
+            Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
+        """
+        start = product_tuples[0][0]  # start time of the first product
+        end_all = product_tuples[-1][1]  # end time of the last product
+        
+        min_power_values, max_power_values = unit.calculate_min_max_power(
+            start, end_all
+        )  # minimum and maximum power demand of the unit between the start time of the first product and the end time of the last product
+
+        max_price = unit.max_price
+        elasticity = unit.elasticity
+        elasticity_model = 'isoelastic' #unit.elasticity_model
+
+        bids = []
+        for product, min_power, max_power in zip(
+            product_tuples, min_power_values, max_power_values
+        ):
+            # for each product, calculate the  of the unit at the start time of the product
+            # and the volume of the product. Dispatch the order to the market.
+            start = product[0]
+            end = product[1]
+            min_power = min_power *-1
+            max_power = max_power *-1
+            
+            first_bid_volume = self.find_first_block_bid(elasticity, max_price, max_power)
+            bids.append({
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": product[2],
+                        "price": max_price,
+                        "volume": -first_bid_volume,
+                        "node": unit.node,
+                    })
+            
+            bid_volume = (max_power - first_bid_volume) / (num_bids - 1)
+
+            for i in range(1, num_bids+1):
+                # P the Price
+                # Q the volume
+                # E the elasticity
+                if elasticity_model == 'linear':
+                    # P = P_max - (i * (P_max / num_bids))
+                    bid_price = max_price - (i * (max_price / num_bids) * elasticity)
+                elif elasticity_model == 'isoelastic':
+                    # constant elasticity over the whole quantity range means log-lin model
+                    # see https://en.wikipedia.org/wiki/Price_elasticity_of_demand
+                    # c is a shifting constant for the demand, that will always be served
+                    # P = Q ** (1/E) * exp(-c / E)
+                    bid_price = (first_bid_volume + (i * bid_volume)) ** (1 / elasticity) * np.exp(
+                        -np.log(max_power) / elasticity
+                    )
+
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": product[2],
+                        "price": bid_price,
+                        "volume": -bid_volume,
+                        "node": unit.node,
+                    }
+                )
+
+            
+        # clean up empty bids
+        bids = self.remove_empty_bids(bids)
+
+        return bids
+    
+    def find_first_block_bid(
+        self,
+        elasticity: float,
+        max_price: float,
+        max_power: float
+) -> float:
+        """
+        Calculate the first block bid for a given unit with a given marginal utility curve.
+        The first block bid is the volume that is always bid at maximum price, because the
+        willingness to pay for it is higher thant the markets maximal price.
+        The first block bid is calculated by finding the intersection of the isoelastic demand
+        curve and the maximum price.
+        """
+        E = elasticity
+        p_max = max_price
+        q_max = max_power
+        #c = q_max
+        # find intersection of isoelastic demand and p_max
+        # p = q**(1/E) * np.exp(-c/E)
+        # p/exp(-c/E) = q**(1/E)
+        # (p*exp(c/E))**E = q
+        # and p**E * exp(c) = q
+        # therefore for p = p_max:
+        # q = p_max**E * np.exp(c)
+        q = p_max**E * q_max
+        if abs(q) > abs(q_max):
+            raise ValueError("impossible values for E, p_max, q_max or c")
+        else:
+            return q
