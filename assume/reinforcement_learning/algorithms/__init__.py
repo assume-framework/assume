@@ -14,6 +14,6 @@ from assume.reinforcement_learning.neural_network_architecture import (
 actor_architecture_aliases: dict[str, type[nn.Module]] = {
     "mlp": MLPActor,
     "contextual_mlp": ContextualMLPActor,
-    "filmed_mlp": FilmActor,
+    "film_actor": FilmActor,
     "lstm": LSTMActor,
 }

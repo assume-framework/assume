@@ -55,7 +55,7 @@ try:
     )
 
     bidding_strategies["pp_learning"] = RLStrategy
-    bidding_strategies["single_bid_learning"] = RLStrategySingleBid
+    bidding_strategies["pp_learning_single_bid"] = RLStrategySingleBid
     bidding_strategies["storage_learning"] = StorageRLStrategy
 
 except ImportError:

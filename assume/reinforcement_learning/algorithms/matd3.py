@@ -63,7 +63,7 @@ class TD3(RLAlgorithm):
         self.grad_clip_norm = 1.0
 
         self.use_shared_actor = (
-            True if actor_architecture in ["contextual_mlp", "filmed_mlp"] else False
+            True if actor_architecture in ["contextual_mlp", "film_actor"] else False
         )
         self.cluster_mapping = {}
 
