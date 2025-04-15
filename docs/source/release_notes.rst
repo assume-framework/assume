@@ -17,8 +17,11 @@ Upcoming Release
 - **Flexible Agent Count in `continue_learning` Mode:** You can now change the number of learning agents between training runs while reusing previously trained critics.
   This enables flexible workflows like training power plants first and adding storage units later. When the core architectures match, critic weights are partially transferred when possible, ensuring smoother transitions.
 
+**Bug Fixes:**
 
-0.5.2 - (21th March 2025)
+- **Last policy loading**: Fixed a bug where the last policy loaded after a training run was not the best policy, but rather the last policy.
+
+0.5.2 - (21st March 2025)
 =========================
 
 **New Features:**
