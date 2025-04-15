@@ -10,7 +10,7 @@ import pytest
 try:
     import torch as th
 
-    from assume.common.base import LearningConfig, LearningStrategy
+    from assume.common.base import LearningStrategy
     from assume.reinforcement_learning.learning_role import Learning
     from assume.reinforcement_learning.learning_utils import get_hidden_sizes
 
@@ -19,7 +19,7 @@ except ImportError:
 
 
 @pytest.fixture
-def base_learning_config() -> LearningConfig:
+def base_learning_config():
     return {
         "obs_dim": 10,
         "act_dim": 3,
@@ -47,7 +47,7 @@ def base_learning_config() -> LearningConfig:
 
 
 @pytest.fixture(scope="function")
-def learning_role_n(base_learning_config) -> Learning:
+def learning_role_n(base_learning_config):
     config = base_learning_config.copy()
     learn = Learning(config)
     learn.rl_strats["agent_0"] = LearningStrategy(**config)
@@ -56,7 +56,7 @@ def learning_role_n(base_learning_config) -> Learning:
 
 
 @pytest.fixture(scope="function")
-def learning_role_n_plus_m(base_learning_config) -> Learning:
+def learning_role_n_plus_m(base_learning_config):
     config = base_learning_config.copy()
     learn = Learning(config)
     learn.rl_strats["agent_0"] = LearningStrategy(**config)
@@ -93,9 +93,6 @@ def saved_n_plus_m_agent_model(learning_role_n_plus_m, tmp_path) -> tuple[str, d
         "critic": agent.critics.state_dict(),
         "actor": agent.actor.state_dict(),
     }
-
-
-# -------------------- Utilities --------------------
 
 
 def compare_state_dicts(dict1, dict2):
