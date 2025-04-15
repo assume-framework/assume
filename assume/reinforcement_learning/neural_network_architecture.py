@@ -248,7 +248,7 @@ class ContextualMLPActor(Actor):
         return action
 
 
-class FilmedMLPActor(Actor):
+class FilmActor(Actor):
     """
     Contextual MLP Actor using FiLM layers.
     The context is used to generate modulation parameters (gamma, beta)

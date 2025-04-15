@@ -7,13 +7,13 @@ from torch import nn
 from assume.reinforcement_learning.neural_network_architecture import (
     MLPActor,
     ContextualMLPActor,
-    FilmedMLPActor,
+    FilmActor,
     LSTMActor,
 )
 
 actor_architecture_aliases: dict[str, type[nn.Module]] = {
     "mlp": MLPActor,
     "contextual_mlp": ContextualMLPActor,
-    "filmed_mlp": FilmedMLPActor,
+    "filmed_mlp": FilmActor,
     "lstm": LSTMActor,
 }
