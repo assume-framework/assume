@@ -46,6 +46,7 @@ class Demand(SupportsMinMax):
         min_price: float = 0.0,
         elasticity: float = 0.0,
         elasticity_model: str = "isoelastic",
+        num_bids: int = 10,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
@@ -76,6 +77,7 @@ class Demand(SupportsMinMax):
         self.min_price = min_price
         self.elasticity = elasticity
         self.elasticity_model = elasticity_model
+        self.num_bids = num_bids
 
     def execute_current_dispatch(
         self,

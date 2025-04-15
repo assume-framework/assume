@@ -370,7 +370,6 @@ class NaiveMultiBidDemandStrategy(BaseStrategy):
         unit: SupportsMinMax,
         market_config: MarketConfig,
         product_tuples: list[Product],
-        num_bids: int = 10,
         **kwargs,
     ) -> Orderbook:
         """
@@ -403,6 +402,7 @@ class NaiveMultiBidDemandStrategy(BaseStrategy):
         max_price = unit.max_price
         elasticity = unit.elasticity
         elasticity_model = 'isoelastic' #unit.elasticity_model
+        num_bids = unit.num_bids
 
         bids = []
         for product, min_power, max_power in zip(
