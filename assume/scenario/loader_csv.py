@@ -927,11 +927,13 @@ def run_learning(
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
 
-    if Path(save_path).is_dir() and not world.learning_config["continue_learning"]:
-        # we are in learning mode and about to train new policies, which might overwrite existing ones
-        accept = input(
-            f"{save_path=} exists - should we overwrite current learned strategies? (y/N) "
+    if Path(save_path).is_dir():
+        logger.warning(
+            f"Save path '{save_path}' exists. This run will overwrite previously trained strategies.\n"
+            f"To preserve them, set different 'trained_policies_save_path' in the config."
         )
+        # we are in learning mode and about to train new policies, which might overwrite existing ones
+        accept = input("Should we overwrite previous learned strategies? (y/N) ")
         if accept.lower().startswith("y"):
             # remove existing policies
             if os.path.exists(save_path):
@@ -940,7 +942,7 @@ def run_learning(
         else:
             # stop here - do not start learning or save anything
             raise AssumeException(
-                "Simulation aborted by user not to overwrite existing learned strategies. You can use 'simulation_id' parameter in the config to start a new simulation."
+                "Simulation aborted by user not to overwrite existing learned strategies. You can use 'simulation_id' parameter in the config to define a new simulation ID."
             )
 
     # also remove tensorboard logs
