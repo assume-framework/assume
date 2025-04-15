@@ -261,6 +261,7 @@ class TD3(RLAlgorithm):
 
         """
         if actors_and_critics is None:
+            self.check_policy_dimensions()
             self.create_actors()
             self.create_critics()
 
@@ -275,6 +276,44 @@ class TD3(RLAlgorithm):
             self.obs_dim = actors_and_critics["obs_dim"]
             self.act_dim = actors_and_critics["act_dim"]
             self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
+
+    def check_policy_dimensions(self) -> None:
+        obs_dim_list = []
+        act_dim_list = []
+        unique_obs_dim_list = []
+        num_timeseries_obs_dim_list = []
+
+        for strategy in self.learning_role.rl_strats.values():
+            obs_dim_list.append(strategy.obs_dim)
+            act_dim_list.append(strategy.act_dim)
+            unique_obs_dim_list.append(strategy.unique_obs_dim)
+            num_timeseries_obs_dim_list.append(strategy.num_timeseries_obs_dim)
+
+        if len(set(obs_dim_list)) > 1:
+            raise ValueError(
+                "All observation dimensions must be the same for all RL agents"
+            )
+        else:
+            self.obs_dim = obs_dim_list[0]
+
+        if len(set(act_dim_list)) > 1:
+            raise ValueError("All action dimensions must be the same for all RL agents")
+        else:
+            self.act_dim = act_dim_list[0]
+
+        if len(set(unique_obs_dim_list)) > 1:
+            raise ValueError(
+                "All unique_obs_dim values must be the same for all RL agents"
+            )
+        else:
+            self.unique_obs_dim = unique_obs_dim_list[0]
+
+        if len(set(num_timeseries_obs_dim_list)) > 1:
+            raise ValueError(
+                "All num_timeseries_obs_dim values must be the same for all RL agents"
+            )
+        else:
+            self.num_timeseries_obs_dim = num_timeseries_obs_dim_list[0]
 
     def create_actors(self) -> None:
         """
@@ -291,24 +330,21 @@ class TD3(RLAlgorithm):
 
         """
 
-        obs_dim_list = []
-        act_dim_list = []
-
         for strategy in self.learning_role.rl_strats.values():
             strategy.actor = self.actor_architecture_class(
-                obs_dim=strategy.obs_dim,
-                act_dim=strategy.act_dim,
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
                 float_type=self.float_type,
-                unique_obs_dim=strategy.unique_obs_dim,
-                num_timeseries_obs_dim=strategy.num_timeseries_obs_dim,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
             ).to(self.device)
 
             strategy.actor_target = self.actor_architecture_class(
-                obs_dim=strategy.obs_dim,
-                act_dim=strategy.act_dim,
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
                 float_type=self.float_type,
-                unique_obs_dim=strategy.unique_obs_dim,
-                num_timeseries_obs_dim=strategy.num_timeseries_obs_dim,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
             ).to(self.device)
 
             strategy.actor_target.load_state_dict(strategy.actor.state_dict())
@@ -323,21 +359,6 @@ class TD3(RLAlgorithm):
 
             strategy.actor.loaded = False
 
-            obs_dim_list.append(strategy.obs_dim)
-            act_dim_list.append(strategy.act_dim)
-
-        if len(set(obs_dim_list)) > 1:
-            raise ValueError(
-                "All observation dimensions must be the same for all RL agents"
-            )
-        else:
-            self.obs_dim = obs_dim_list[0]
-
-        if len(set(act_dim_list)) > 1:
-            raise ValueError("All action dimensions must be the same for all RL agents")
-        else:
-            self.act_dim = act_dim_list[0]
-
     def create_critics(self) -> None:
         """
         Create critic networks for reinforcement learning.
@@ -349,22 +370,21 @@ class TD3(RLAlgorithm):
             If you have units with different observation dimensions. They need to have different critics and hence learning roles.
         """
         n_agents = len(self.learning_role.rl_strats)
-        unique_obs_dim_list = []
 
         for strategy in self.learning_role.rl_strats.values():
             strategy.critics = CriticTD3(
                 n_agents=n_agents,
-                obs_dim=strategy.obs_dim,
-                act_dim=strategy.act_dim,
-                unique_obs_dim=strategy.unique_obs_dim,
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
+                unique_obs_dim=self.unique_obs_dim,
                 float_type=self.float_type,
             ).to(self.device)
 
             strategy.target_critics = CriticTD3(
                 n_agents=n_agents,
-                obs_dim=strategy.obs_dim,
-                act_dim=strategy.act_dim,
-                unique_obs_dim=strategy.unique_obs_dim,
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
+                unique_obs_dim=self.unique_obs_dim,
                 float_type=self.float_type,
             ).to(self.device)
 
@@ -377,17 +397,6 @@ class TD3(RLAlgorithm):
                     1
                 ),  # 1 = 100% of simulation remaining, uses learning_rate from config as starting point
             )
-
-            unique_obs_dim_list.append(strategy.unique_obs_dim)
-
-        # check if all unique_obs_dim are the same and raise an error if not
-        # if they are all the same, set the unique_obs_dim attribute
-        if len(set(unique_obs_dim_list)) > 1:
-            raise ValueError(
-                "All unique_obs_dim values must be the same for all RL agents"
-            )
-        else:
-            self.unique_obs_dim = unique_obs_dim_list[0]
 
     def extract_policy(self) -> dict:
         """

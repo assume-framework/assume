@@ -314,3 +314,60 @@ def test_td3_load_corrupted_or_incomplete_critic(tmp_path, base_learning_config)
 
     loaded_state = learning.rl_strats["agent_0"].critics.state_dict()
     assert compare_state_dicts(loaded_state, original_state)
+
+
+@pytest.mark.parametrize(
+    "mod_field, mod_value, expected_error",
+    [
+        ("obs_dim", 99, "All observation dimensions must be the same"),
+        ("act_dim", 99, "All action dimensions must be the same"),
+        ("unique_obs_dim", 99, "All unique_obs_dim values must be the same"),
+        (
+            "num_timeseries_obs_dim",
+            99,
+            "All num_timeseries_obs_dim values must be the same",
+        ),
+    ],
+)
+def test_initialize_policy_dimension_mismatch(
+    base_learning_config, mod_field, mod_value, expected_error
+):
+    """
+    Test that mismatches in observation/action/unique/timeseries dims raise ValueErrors.
+    """
+    config = base_learning_config.copy()
+    config["num_timeseries_obs_dim"] = 1  # Ensure field exists for valid check
+
+    learn = Learning(config)
+
+    # Create one agent with default config
+    strat_0 = LearningStrategy(**config)
+    # Create second agent with mismatching value
+    config_mismatch = config.copy()
+    config_mismatch[mod_field] = mod_value
+    strat_1 = LearningStrategy(**config_mismatch)
+
+    learn.rl_strats["agent_0"] = strat_0
+    learn.rl_strats["agent_1"] = strat_1
+
+    # This should raise a ValueError with the expected message
+    with pytest.raises(ValueError, match=expected_error):
+        learn.rl_algorithm.initialize_policy()
+
+
+def test_initialize_policy_all_dimensions_match(base_learning_config):
+    """
+    Test that initialize_policy succeeds with all matching dimensions.
+    """
+    config = base_learning_config.copy()
+    config["num_timeseries_obs_dim"] = 1  # Ensure the optional field is populated
+
+    learn = Learning(config)
+    learn.rl_strats["agent_0"] = LearningStrategy(**config)
+    learn.rl_strats["agent_1"] = LearningStrategy(**config)
+    learn.rl_strats["agent_2"] = LearningStrategy(**config)
+
+    try:
+        learn.rl_algorithm.initialize_policy()  # Should not raise
+    except Exception as e:
+        pytest.fail(f"initialize_policy raised an unexpected error: {e}")
