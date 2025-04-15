@@ -245,7 +245,7 @@ class TD3(RLAlgorithm):
                 )
 
                 # add a tag to the strategy to indicate that the actor was loaded
-                strategy.loaded = True
+                strategy.actor.loaded = True
             except Exception:
                 logger.warning(f"No actor values loaded for agent {u_id}")
 
@@ -320,6 +320,8 @@ class TD3(RLAlgorithm):
                     1
                 ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
             )
+
+            strategy.actor.loaded = False
 
             obs_dim_list.append(strategy.obs_dim)
             act_dim_list.append(strategy.act_dim)

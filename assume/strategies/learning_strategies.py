@@ -31,10 +31,6 @@ class BaseLearningStrategy(LearningStrategy):
         self.learning_mode = kwargs.get("learning_mode", False)
         self.evaluation_mode = kwargs.get("evaluation_mode", False)
 
-        # tag indicating if this strategy has been loaded
-        # this is used when learning is continuing from a checkpoint
-        self.loaded = False
-
         # based on learning config
         self.algorithm = kwargs.get("algorithm", "matd3")
         self.actor_architecture = kwargs.get("actor_architecture", "mlp")

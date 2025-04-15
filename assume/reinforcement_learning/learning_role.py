@@ -231,7 +231,7 @@ class Learning(Role):
         """
         for strategy in self.rl_strats.values():
             if loaded_only:
-                if strategy.loaded:
+                if strategy.actor.loaded:
                     strategy.collect_initial_experience_mode = False
             else:
                 strategy.collect_initial_experience_mode = False
