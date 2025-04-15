@@ -278,6 +278,11 @@ class TD3(RLAlgorithm):
             self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
 
     def check_policy_dimensions(self) -> None:
+        """
+        Iterate over all strategies and check if the dimensions of observations and actions are the same.
+        Also check if the unique observation dimensions are the same. If not, raise a ValueError.
+        This is important for the TD3 algorithm, as it uses a centralized critic that requires consistent dimensions across all agents.
+        """
         obs_dim_list = []
         act_dim_list = []
         unique_obs_dim_list = []
