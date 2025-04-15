@@ -142,12 +142,6 @@ class Learning(Role):
         self.db_addr = None
         self.freq_timedelta = None
         self.time_steps = None
-        
-        # test if the training episodes are higher than the eval runs + intial_expereicen
-        if self.training_episodes < (self.episodes_collecting_initial_experience + learning_config.get("validation_episodes_interval", 5)):
-            raise ValueError(
-                f"Training episodes {self.training_episodes} need to be higher than the episodes collecting initial experience {self.episodes_collecting_initial_experience} and one evaluation interval {learning_config.get('validation_episodes_interval', 5)}."
-                )
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
