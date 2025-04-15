@@ -329,6 +329,7 @@ def test_td3_load_corrupted_or_incomplete_critic(tmp_path, base_learning_config)
         ),
     ],
 )
+@pytest.mark.require_learning
 def test_initialize_policy_dimension_mismatch(
     base_learning_config, mod_field, mod_value, expected_error
 ):
@@ -355,6 +356,7 @@ def test_initialize_policy_dimension_mismatch(
         learn.rl_algorithm.initialize_policy()
 
 
+@pytest.mark.require_learning
 def test_initialize_policy_all_dimensions_match(base_learning_config):
     """
     Test that initialize_policy succeeds with all matching dimensions.
