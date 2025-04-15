@@ -1,27 +1,14 @@
 name,technology,max_power,min_power,fuel_type,additional_cost,efficiency,start_up_cost,shut_down_cost,EE_region,emission_factor,bidding_EOM,unit_operator
-OCGT_0,combined cycle gas turbine,598,0,natural gas,64.68,0.4353,0.0,0.0,0,0.198,naive_eom,eom_operator
-OCGT_1,combined cycle gas turbine,4,0,natural gas,64.68,0.4704,0.0,0.0,1,0.198,naive_eom,eom_operator
-OCGT_2,combined cycle gas turbine,20647,0,natural gas,64.29,0.5089,0.0,0.0,2,0.198,naive_eom,eom_operator
-OCGT_3,combined cycle gas turbine,1272,0,natural gas,64.68,0.4993,0.0,0.0,3,0.198,naive_eom,eom_operator
-OCGT_4,combined cycle gas turbine,3422,0,natural gas,64.68,0.4756,0.0,0.0,4,0.198,naive_eom,eom_operator
-OCGT_5,combined cycle gas turbine,231,0,natural gas,64.68,0.5082,0.0,0.0,5,0.198,naive_eom,eom_operator
-OCGT_6,combined cycle gas turbine,277,0,natural gas,64.68,0.568,0.0,0.0,6,0.198,naive_eom,eom_operator
-OCGT_7,combined cycle gas turbine,110,0,natural gas,64.68,0.3324,0.0,0.0,7,0.198,naive_eom,eom_operator
-OCGT_8,combined cycle gas turbine,725,0,natural gas,64.68,0.5449,0.0,0.0,8,0.198,naive_eom,eom_operator
-OCGT_9,combined cycle gas turbine,1,0,natural gas,64.68,0.4543,0.0,0.0,9,0.198,naive_eom,eom_operator
-offwind-ac_1,wind_offshore_1,3790,0,renewable,0.02,1.0,0.0,0.0,1,0.0,naive_eom,eom_operator
-offwind-ac_4,wind_offshore_4,2689,0,renewable,0.02,1.0,0.0,0.0,4,0.0,naive_eom,eom_operator
-offwind-ac_5,wind_offshore_5,1306,0,renewable,0.02,1.0,0.0,0.0,5,0.0,naive_eom,eom_operator
-onwind_0,wind_onshore_0,3779,0,renewable,0.02,1.0,0.0,0.0,0,0.0,naive_eom,eom_operator
-onwind_1,wind_onshore_1,20105,0,renewable,0.02,1.0,0.0,0.0,1,0.0,naive_eom,eom_operator
-onwind_2,wind_onshore_2,1314,0,renewable,0.02,1.0,0.0,0.0,2,0.0,naive_eom,eom_operator
-onwind_3,wind_onshore_3,1766,0,renewable,0.02,1.0,0.0,0.0,3,0.0,naive_eom,eom_operator
-onwind_4,wind_onshore_4,22100,0,renewable,0.02,1.0,0.0,0.0,4,0.0,naive_eom,eom_operator
-onwind_5,wind_onshore_5,6942,0,renewable,0.02,1.0,0.0,0.0,5,0.0,naive_eom,eom_operator
-onwind_6,wind_onshore_6,17286,0,renewable,0.02,1.0,0.0,0.0,6,0.0,naive_eom,eom_operator
-onwind_7,wind_onshore_7,16754,0,renewable,0.02,1.0,0.0,0.0,7,0.0,naive_eom,eom_operator
-onwind_8,wind_onshore_8,3565,0,renewable,0.02,1.0,0.0,0.0,8,0.0,naive_eom,eom_operator
-onwind_9,wind_onshore_9,1265,0,renewable,0.01,1.0,0.0,0.0,9,0.0,naive_eom,eom_operator
+OCGT_0,combined cycle gas turbine,598,0,natural gas,64.68,0.4567,0.0,0.0,0,0.198,naive_eom,eom_operator
+OCGT_1,combined cycle gas turbine,4,0,natural gas,64.68,0.4847,0.0,0.0,1,0.198,naive_eom,eom_operator
+OCGT_2,combined cycle gas turbine,20647,0,natural gas,64.29,0.4272,0.0,0.0,2,0.198,naive_eom,eom_operator
+OCGT_3,combined cycle gas turbine,1272,0,natural gas,64.68,0.5797,0.0,0.0,3,0.198,naive_eom,eom_operator
+OCGT_4,combined cycle gas turbine,3422,0,natural gas,64.68,0.3749,0.0,0.0,4,0.198,naive_eom,eom_operator
+OCGT_5,combined cycle gas turbine,231,0,natural gas,64.68,0.44,0.0,0.0,5,0.198,naive_eom,eom_operator
+OCGT_6,combined cycle gas turbine,277,0,natural gas,64.68,0.4195,0.0,0.0,6,0.198,naive_eom,eom_operator
+OCGT_7,combined cycle gas turbine,110,0,natural gas,64.68,0.4517,0.0,0.0,7,0.198,naive_eom,eom_operator
+OCGT_8,combined cycle gas turbine,725,0,natural gas,64.68,0.5679,0.0,0.0,8,0.198,naive_eom,eom_operator
+OCGT_9,combined cycle gas turbine,1,0,natural gas,64.68,0.4472,0.0,0.0,9,0.198,naive_eom,eom_operator
 solar_0,solar_0,3309,0,renewable,0.01,1.0,0.0,0.0,0,0.0,naive_eom,eom_operator
 solar_1,solar_1,9534,0,renewable,0.01,1.0,0.0,0.0,1,0.0,naive_eom,eom_operator
 solar_2,solar_2,6431,0,renewable,0.01,1.0,0.0,0.0,2,0.0,naive_eom,eom_operator
@@ -32,3 +19,16 @@ solar_6,solar_6,3988,0,renewable,0.01,1.0,0.0,0.0,6,0.0,naive_eom,eom_operator
 solar_7,solar_7,6661,0,renewable,0.01,1.0,0.0,0.0,7,0.0,naive_eom,eom_operator
 solar_8,solar_8,4212,0,renewable,0.01,1.0,0.0,0.0,8,0.0,naive_eom,eom_operator
 solar_9,solar_9,5870,0,renewable,0.01,1.0,0.0,0.0,9,0.0,naive_eom,eom_operator
+wind_offshore_1,wind_offshore_1,3790,0,renewable,0.02,1.0,0.0,0.0,1,0.0,naive_eom,eom_operator
+wind_offshore_4,wind_offshore_4,2689,0,renewable,0.02,1.0,0.0,0.0,4,0.0,naive_eom,eom_operator
+wind_offshore_5,wind_offshore_5,1306,0,renewable,0.02,1.0,0.0,0.0,5,0.0,naive_eom,eom_operator
+wind_onshore_0,wind_onshore_0,3779,0,renewable,0.02,1.0,0.0,0.0,0,0.0,naive_eom,eom_operator
+wind_onshore_1,wind_onshore_1,20105,0,renewable,0.02,1.0,0.0,0.0,1,0.0,naive_eom,eom_operator
+wind_onshore_2,wind_onshore_2,1314,0,renewable,0.02,1.0,0.0,0.0,2,0.0,naive_eom,eom_operator
+wind_onshore_3,wind_onshore_3,1766,0,renewable,0.02,1.0,0.0,0.0,3,0.0,naive_eom,eom_operator
+wind_onshore_4,wind_onshore_4,22100,0,renewable,0.02,1.0,0.0,0.0,4,0.0,naive_eom,eom_operator
+wind_onshore_5,wind_onshore_5,6942,0,renewable,0.02,1.0,0.0,0.0,5,0.0,naive_eom,eom_operator
+wind_onshore_6,wind_onshore_6,17286,0,renewable,0.02,1.0,0.0,0.0,6,0.0,naive_eom,eom_operator
+wind_onshore_7,wind_onshore_7,16754,0,renewable,0.02,1.0,0.0,0.0,7,0.0,naive_eom,eom_operator
+wind_onshore_8,wind_onshore_8,3565,0,renewable,0.02,1.0,0.0,0.0,8,0.0,naive_eom,eom_operator
+wind_onshore_9,wind_onshore_9,1265,0,renewable,0.01,1.0,0.0,0.0,9,0.0,naive_eom,eom_operator
