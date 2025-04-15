@@ -4,7 +4,6 @@
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
-import numpy as np
 
 class NaiveSingleBidStrategy(BaseStrategy):
     """
@@ -83,7 +82,8 @@ class NaiveSingleBidStrategy(BaseStrategy):
         if "node" in market_config.additional_fields:
             return bids
         else:
-            return self.remove_empty_bids(bids)
+            #return self.remove_empty_bids(bids)
+            return bids
 
 
 class NaiveProfileStrategy(BaseStrategy):
@@ -393,9 +393,12 @@ class NaiveMultiBidDemandStrategy(BaseStrategy):
         start = product_tuples[0][0]  # start time of the first product
         end_all = product_tuples[-1][1]  # end time of the last product
         
-        min_power_values, max_power_values = unit.calculate_min_max_power(
-            start, end_all
-        )  # minimum and maximum power demand of the unit between the start time of the first product and the end time of the last product
+        #min_power_values, max_power_values = unit.calculate_min_max_power(
+        #    start, end_all
+        #)  # minimum and maximum power demand of the unit between the start time of the first product and the end time of the last product
+        # this somehow does not yield reasonable results for this bidding strategy, so we use the units max_power instead
+        min_power_values = [unit.min_power] * len(product_tuples)
+        max_power_values = [unit.max_power] * len(product_tuples)
 
         max_price = unit.max_price
         elasticity = unit.elasticity
@@ -409,10 +412,10 @@ class NaiveMultiBidDemandStrategy(BaseStrategy):
             # and the volume of the product. Dispatch the order to the market.
             start = product[0]
             end = product[1]
-            min_power = min_power *-1
-            max_power = max_power *-1
             
-            first_bid_volume = self.find_first_block_bid(elasticity, max_price, max_power)
+            max_abs_power = max(abs(max_power), abs(min_power))
+            
+            first_bid_volume = self.find_first_block_bid(elasticity, max_price, max_abs_power)
             bids.append({
                         "start_time": start,
                         "end_time": end,
@@ -422,9 +425,9 @@ class NaiveMultiBidDemandStrategy(BaseStrategy):
                         "node": unit.node,
                     })
             
-            bid_volume = (max_power - first_bid_volume) / (num_bids - 1)
+            bid_volume = (max_abs_power - first_bid_volume) / (num_bids - 1)
 
-            for i in range(1, num_bids+1):
+            for i in range(1, num_bids):
                 # P the Price
                 # Q the volume
                 # E the elasticity
@@ -436,9 +439,13 @@ class NaiveMultiBidDemandStrategy(BaseStrategy):
                     # see https://en.wikipedia.org/wiki/Price_elasticity_of_demand
                     # c is a shifting constant for the demand, that will always be served
                     # P = Q ** (1/E) * exp(-c / E)
-                    bid_price = (first_bid_volume + (i * bid_volume)) ** (1 / elasticity) * np.exp(
-                        -np.log(max_power) / elasticity
-                    )
+                    # this can be reformulated, because c = ln(Q_max)
+                    # P = (Q/Q_max) ** (1/E)
+                    # TODO revisit when timesteps different from 1h
+                    bid_price = ((first_bid_volume + (i * bid_volume)) / max_abs_power) ** (1 / elasticity)
+                    #bid_price = (first_bid_volume + (i * bid_volume)) ** (1 / elasticity) * np.exp(
+                    #    -np.log(max_power) / elasticity
+                    #)
 
                 bids.append(
                     {
@@ -469,6 +476,7 @@ class NaiveMultiBidDemandStrategy(BaseStrategy):
         willingness to pay for it is higher thant the markets maximal price.
         The first block bid is calculated by finding the intersection of the isoelastic demand
         curve and the maximum price.
+        Returns volume > 0
         """
         E = elasticity
         p_max = max_price
@@ -481,6 +489,8 @@ class NaiveMultiBidDemandStrategy(BaseStrategy):
         # and p**E * exp(c) = q
         # therefore for p = p_max:
         # q = p_max**E * np.exp(c)
+        # as c = ln(q_max)
+        # q = p_max**E * q_max
         q = p_max**E * q_max
         if abs(q) > abs(q_max):
             raise ValueError("impossible values for E, p_max, q_max or c")
