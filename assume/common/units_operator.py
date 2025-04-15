@@ -115,7 +115,7 @@ class UnitsOperator(Role):
             self.store_units(),
             1,  # register after time was updated for the first time
         )
-        
+
     async def store_units(self) -> None:
         db_addr = self.context.data.get("output_agent_addr")
         logger.debug("store units to %s", db_addr)

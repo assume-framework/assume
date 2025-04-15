@@ -12,8 +12,11 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**Bug Fixes:**
 
-0.5.2 - (21th March 2025)
+- **Last policy loading**: Fixed a bug where the last policy loaded after a training run was not the best policy, but rather the last policy.
+
+0.5.2 - (21st March 2025)
 =========================
 
 **New Features:**
