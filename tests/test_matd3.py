@@ -6,14 +6,16 @@ import os
 from copy import deepcopy
 
 import pytest
-import torch as th
 
-from assume.reinforcement_learning.learning_role import (
-    Learning,
-    LearningConfig,
-    LearningStrategy,
-)
-from assume.reinforcement_learning.learning_utils import get_hidden_sizes
+try:
+    import torch as th
+
+    from assume.common.base import LearningConfig, LearningStrategy
+    from assume.reinforcement_learning.learning_role import Learning
+    from assume.reinforcement_learning.learning_utils import get_hidden_sizes
+
+except ImportError:
+    pass
 
 
 @pytest.fixture
