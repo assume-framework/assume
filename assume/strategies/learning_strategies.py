@@ -1076,11 +1076,12 @@ class StorageRLStrategy(AbstractLearningStrategy):
             unit.outputs["energy_cost"].at[next_time] = np.clip(
                 (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
                 / next_soc,
-                -self.max_bid_price,
+                0,
                 self.max_bid_price,
             )
 
-        profit = order_profit - order_cost
+        # substract energy_costs so that profit is only positive when we bought energy for less amount of money than we sell it here
+        profit = order_profit - order_cost - unit.outputs["energy_cost"].at[next_time]
 
         # scaling factor to normalize the reward to the range [-1,1]
         scaling_factor = 1 / (self.max_bid_price * unit.max_power_discharge)
