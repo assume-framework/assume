@@ -979,6 +979,16 @@ def run_learning(
         world.learning_config.get("validation_episodes_interval", 5),
     )
 
+    # Ensure training episodes exceed the sum of initial experience and one evaluation interval
+    min_required_episodes = (
+        world.learning_role.episodes_collecting_initial_experience + validation_interval
+    )
+
+    if world.learning_role.training_episodes < min_required_episodes:
+        raise ValueError(
+            f"Training episodes ({world.learning_role.training_episodes}) must be greater than the sum of initial experience episodes ({world.learning_role.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
+        )
+
     eval_episode = 1
 
     for episode in tqdm(
@@ -1078,8 +1088,6 @@ def run_learning(
         world=world,
         terminate_learning=True,
     )
-
-    world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
 
 if __name__ == "__main__":

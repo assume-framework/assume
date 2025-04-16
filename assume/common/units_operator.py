@@ -110,7 +110,15 @@ class UnitsOperator(Role):
                     self.register_market(market),
                     1,  # register after time was updated for the first time
                 )
+
+        self.context.schedule_timestamp_task(
+            self.store_units(),
+            1,  # register after time was updated for the first time
+        )
+
+    async def store_units(self) -> None:
         db_addr = self.context.data.get("output_agent_addr")
+        logger.debug("store units to %s", db_addr)
         if db_addr:
             # send unit data to db agent to store it
             for unit in self.units.values():
@@ -119,7 +127,7 @@ class UnitsOperator(Role):
                     "type": "store_units",
                     "data": unit.as_dict(),
                 }
-                self.context.schedule_instant_message(
+                await self.context.send_message(
                     content=message,
                     receiver_addr=db_addr,
                 )
