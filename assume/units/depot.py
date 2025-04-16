@@ -127,32 +127,15 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 # ✅ Direct assignment of range series
                 ev_config["range"] = self.forecaster[f"{self.id}_{ev_key}_range"]
 
-        # Load profiles for all EVs dynamically
-        for ev_key in self.components:
-            if ev_key.startswith("electric_vehicle"):
-                ev_config = self.components[ev_key]
-                use_charging_profile = str_to_bool(
-                    ev_config.get("charging_profile", "false")
-                )
-                ev_config.pop("charging_profile", None)
+        # Load profiles for all Charging Stations dynamically
+        for cs_key in self.components:
+            if cs_key.startswith("charging_station"):
+                cs_config = self.components[cs_key]
 
-                profile_key = (
-                    f"{self.id}_{ev_key}_charging_profile"
-                    if use_charging_profile
-                    else f"{self.id}_{ev_key}_availability_profile"
-                )
+                profile_key = f"{self.id}_{cs_key}_availability_profile"
+                cs_profile = self.forecaster[profile_key]
 
-                ev_profile = self.forecaster[profile_key]
-
-                ev_config[
-                    "charging_profile"
-                    if use_charging_profile
-                    else "availability_profile"
-                ] = ev_profile
-
-            # # ✅ Add this to preview the time series you're passing into EV
-            # print(f"[DEBUG] Loaded EV profile from '{profile_key_ev}':")
-            # print(ev_profile.as_pd_series().head(10))  # ✅ If you want a timestamped view
+                cs_config["availability_profile"] = cs_profile
 
         # Initialize the model
         self.setup_model(presolve=True)
