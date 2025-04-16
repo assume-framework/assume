@@ -10,8 +10,10 @@ import pytest
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
     from assume.strategies.learning_strategies import RLStrategy, RLStrategySingleBid
+
+    HAS_RL = True
 except ImportError:
-    pass
+    HAS_RL = False
 
 from assume.common.forecasts import NaiveForecast
 from assume.units import PowerPlant
@@ -50,7 +52,7 @@ def power_plant() -> PowerPlant:
     )
 
 
-@pytest.mark.require_learning
+@pytest.mark.skipif(not HAS_RL, reason="Reinforcement learning module not available")
 @pytest.mark.parametrize(
     "strategy_class, obs_dim, act_dim, actor_architecture, expected_bid_count, expected_volumes",
     [
