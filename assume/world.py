@@ -215,10 +215,6 @@ class World:
         self.learning_mode = self.learning_config.get("learning_mode", False)
         self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
 
-        # initialize a config dictionary for the scenario data if not already present
-        if not self.scenario_data.get("config"):
-            self.scenario_data["config"] = {}
-
         # make a descriptor for the tqdm progress bar
         # use simulation_id of not in learning mode; use Episode ID if in learning mode
         # and use Evaluation Episode ID if in evaluation mode
@@ -353,9 +349,6 @@ class World:
             episode=episode,
             eval_episode=eval_episode,
             additional_kpis=self.additional_kpis,
-            outputs_buffer_size_mb=self.scenario_data["config"].get(
-                "outputs_buffer_size_mb", 300
-            ),
         )
         if not self.output_agent_addr:
             return
@@ -570,11 +563,6 @@ class World:
                 continue
 
             if strategy not in self.bidding_strategies:
-                # raise a deprecated warning for learning_advanced_orders
-                if strategy == "learning_advanced_orders":
-                    logger.warning(
-                        "The bidding strategy 'learning_advanced_orders' is deprecated. Please use regular 'pp_learning' instead."
-                    )
                 raise ValueError(
                     f"""Bidding strategy {strategy} not registered. Please check the name of
                     the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""

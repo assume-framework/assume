@@ -72,17 +72,14 @@ Documentation
 
 **User Guide**
 
-User Guide
-==========
-
 * :doc:`market_config`
 * :doc:`market_mechanism`
 * :doc:`scenario_loader`
-* :doc:`outputs`
 * :doc:`unit_operator`
 * :doc:`units`
 * :doc:`learning`
 * :doc:`learning_algorithm`
+* :doc:`buffers`
 * :doc:`support_policies`
 * :doc:`distributed_simulation`
 * :doc:`manual_simulation`
@@ -91,17 +88,17 @@ User Guide
 
 .. toctree::
    :hidden:
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: User Guide
 
    market_config
    market_mechanism
    scenario_loader
-   outputs
    unit_operator
    units
    learning
    learning_algorithm
+   buffers
    support_policies
    distributed_simulation
    manual_simulation

@@ -78,6 +78,7 @@ available_examples = {
     "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
     "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
+    "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "dam"},
     "small_learning_with_storage": {"scenario": "example_02e", "study_case": "base"},
     #
     # full year examples to show real-world scenarios
@@ -96,9 +97,13 @@ available_examples = {
     },
     "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
-    "paper_plant_use_case": {
-        "scenario": "example_04",
-        "study_case": "base_case_2019",
+    "large_2019_storage": {
+        "scenario": "example_03c",
+        "study_case": "base_case_2019_with_storage",
+    },
+    "example_bus": {
+        "scenario": "example_bus",
+        "study_case": "eom",
     },
 }
 
@@ -116,7 +121,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "paper_plant_use_case"
+    example = "example_bus"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

@@ -48,6 +48,9 @@ bidding_strategies: dict[str, BaseStrategy] = {
 }
 
 try:
+    from assume.strategies.learning_advanced_orders import (
+        RLAdvancedOrderStrategy,
+    )
     from assume.strategies.learning_strategies import (
         RLStrategy,
         StorageRLStrategy,
@@ -55,6 +58,7 @@ try:
 
     bidding_strategies["pp_learning"] = RLStrategy
     bidding_strategies["storage_learning"] = StorageRLStrategy
+    bidding_strategies["learning_advanced_orders"] = RLAdvancedOrderStrategy
 
 except ImportError:
     pass

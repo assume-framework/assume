@@ -1,0 +1,3 @@
+name,unit_type,technology,node,bidding_EOM,fuel_type,unit_operator,objective,flexibility_measure,cost_tolerance,power_flow_directionality,mileage,charging_profile,availability_profile,demand,ramp_up,ramp_down,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,efficiency_charge,efficiency_discharge,is_prosumer
+bangkok_1,bus_depot,electric_vehicle_1,north,naive_da_dsm,,dsm_operator_1,min_variable_cost,cost_based_load_shift,10,unidirectional,0.77,,Yes,,200,324,324,,,,0,1,1,No
+bangkok_1,bus_depot,electric_vehicle_2,north,naive_da_dsm,,dsm_operator_1,min_variable_cost,cost_based_load_shift,,unidirectional,0.77,,Yes,,50,50,60,,,,0,1,1,No

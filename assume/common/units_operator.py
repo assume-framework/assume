@@ -110,15 +110,7 @@ class UnitsOperator(Role):
                     self.register_market(market),
                     1,  # register after time was updated for the first time
                 )
-
-        self.context.schedule_timestamp_task(
-            self.store_units(),
-            1,  # register after time was updated for the first time
-        )
-
-    async def store_units(self) -> None:
         db_addr = self.context.data.get("output_agent_addr")
-        logger.debug("store units to %s", db_addr)
         if db_addr:
             # send unit data to db agent to store it
             for unit in self.units.values():
@@ -127,7 +119,7 @@ class UnitsOperator(Role):
                     "type": "store_units",
                     "data": unit.as_dict(),
                 }
-                await self.context.send_message(
+                self.context.schedule_instant_message(
                     content=message,
                     receiver_addr=db_addr,
                 )
@@ -346,7 +338,7 @@ class UnitsOperator(Role):
         self, product_type: str, last: datetime
     ) -> tuple[list[tuple[datetime, float, str, str]], list[dict]]:
         """
-        Retrieves the actual dispatch since the last dispatch and commits it in the unit.
+        Retrieves the actual dispatch and commits it in the unit.
         We calculate the series of the actual market results dataframe with accepted bids.
         And the unit_dispatch for all units taken care of in the UnitsOperator.
 
@@ -358,7 +350,6 @@ class UnitsOperator(Role):
             tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
         """
         now = timestamp2datetime(self.context.current_timestamp)
-        # add one second to exclude the first time stamp, because it is already executed in the last step
         start = timestamp2datetime(last + 1)
 
         market_dispatch = aggregate_step_amount(

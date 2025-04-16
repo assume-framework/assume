@@ -16,7 +16,7 @@ from pyomo.opt import (
 )
 
 from assume.common.fast_pandas import FastSeries
-from assume.units.dst_components import demand_side_technologies
+from assume.units.dst_components import get_technology_class
 
 SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
@@ -70,36 +70,41 @@ class DSMFlex:
 
         This method iterates over the provided components, instantiates their corresponding classes,
         and adds the respective blocks to the Pyomo model.
-
-        Args:
-            components (dict[str, dict]): A dictionary where each key is a technology name and
-                                        the value is a dictionary of parameters for the respective technology.
-                                        Each technology is mapped to a corresponding class in `demand_side_technologies`.
-
-        The method:
-        - Looks up the corresponding class for each technology in `demand_side_technologies`.
-        - Instantiates the class by passing the required parameters.
-        - Adds the resulting block to the model under the `dsm_blocks` attribute.
         """
         components = self.components.copy()
         self.model.dsm_blocks = pyo.Block(list(components.keys()))
 
         for technology, component_data in components.items():
-            if technology in demand_side_technologies:
-                # Get the class from the dictionary mapping (adjust `demand_side_technologies` to hold classes)
-                component_class = demand_side_technologies[technology]
+            try:
+                # Dynamically get the class for the technology
+                component_class = get_technology_class(technology)
 
-                # Instantiate the component with the required parameters (unpack the component_data dictionary)
+                # Instantiate the component with the required parameters
                 component_instance = component_class(
                     time_steps=self.model.time_steps, **component_data
                 )
+
                 # Add the component to the components dictionary
                 self.components[technology] = component_instance
 
-                # Add the component's block to the model
-                component_instance.add_to_model(
-                    self.model, self.model.dsm_blocks[technology]
-                )
+                # Optional external range binding
+                range_param_name = f"{technology}_range"
+                external_range = getattr(self.model, range_param_name, None)
+
+                if external_range is not None:
+                    component_instance.add_to_model(
+                        self.model,
+                        self.model.dsm_blocks[technology],
+                        external_range=external_range,
+                    )
+                else:
+                    component_instance.add_to_model(
+                        self.model, self.model.dsm_blocks[technology]
+                    )
+
+            except ValueError as e:
+                logger.error(f"Error initializing component {technology}: {e}")
+                raise
 
     def setup_model(self, presolve=True):
         # Initialize the Pyomo model
@@ -237,32 +242,14 @@ class DSMFlex:
                 if self.has_pv:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
 
-                # Apply flexibility adjustments
-                return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * model.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
-                    == total_power_input
-                )
-            elif self.technology == "paper_pulp_plant":
-                total_power_input = 0
-
-                # Add heat pump power if present
-                if self.has_heat_pump:
-                    total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
-
-                # Add boiler power if it's electric
-                if self.has_boiler:
-                    boiler = self.components["boiler"]
-                    if boiler.fuel_type == "electricity":  # Access attribute directly
-                        total_power_input += self.model.dsm_blocks["boiler"].power_in[t]
-
-                # Apply flexibility adjustments
-                return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * m.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - m.shift_indicator[t])
-                    == total_power_input
+            elif self.technology == "bus_depot":
+                return m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[
+                    t
+                ] == sum(
+                    self.model.dsm_blocks[ev].charge[t]
+                    - self.model.dsm_blocks[ev].discharge[t]
+                    for ev in self.model.dsm_blocks
+                    if ev.startswith("electric_vehicle")
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -568,53 +555,48 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
-        # Setup plotting
+        # Plot
         time_steps = list(instance.time_steps)
-        fig, axs = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
+        variable_cost_series = [
+            pyo.value(instance.variable_cost[t]) for t in time_steps
+        ]
+        total_power_input_series = [
+            pyo.value(instance.total_power_input[t]) for t in time_steps
+        ]
 
-        # Plot 1: Heat Pump power input
-        if "heat_pump" in instance.dsm_blocks:
-            hp_power = [
-                pyo.value(instance.dsm_blocks["heat_pump"].power_in[t])
-                for t in time_steps
-            ]
-            axs[0].plot(time_steps, hp_power, label="Heat Pump Power In", color="green")
-            axs[0].set_ylabel("Power (kW)")
-            axs[0].legend()
-            axs[0].grid(True)
+        # Save time series data to attributes
+        self.opt_power_requirement = FastSeries(
+            index=self.index, value=total_power_input_series
+        )
+        self.variable_cost_series = FastSeries(
+            index=self.index, value=variable_cost_series
+        )
 
-        # Plot 2: Boiler fuel input
-        if "boiler" in instance.dsm_blocks and hasattr(
-            instance.dsm_blocks["boiler"], "natural_gas_in"
-        ):
-            boiler_gas = [
-                pyo.value(instance.dsm_blocks["boiler"].natural_gas_in[t])
-                for t in time_steps
-            ]
-            axs[1].plot(
-                time_steps, boiler_gas, label="Boiler Natural Gas In", color="orange"
-            )
-            axs[1].set_ylabel("Fuel Input (kW)")
-            axs[1].legend()
-            axs[1].grid(True)
+        # Plot for all EVs
+        plt.figure(figsize=(12, 6))
+        for ev in instance.dsm_blocks:
+            if ev.startswith("electric_vehicle"):
+                ev_charge = [
+                    pyo.value(instance.dsm_blocks[ev].charge[t]) for t in time_steps
+                ]
+                ev_discharge = [
+                    pyo.value(instance.dsm_blocks[ev].discharge[t]) for t in time_steps
+                ]
+                ev_soc = [pyo.value(instance.dsm_blocks[ev].soc[t]) for t in time_steps]
 
-        # Plot 3: Thermal Storage SOC, Charge, Discharge (Discharge in 4th quadrant)
-        if "thermal_storage" in instance.dsm_blocks:
-            soc = [pyo.value(instance.dsm_blocks["thermal_storage"].soc[t]) for t in time_steps]
-            charge = [pyo.value(instance.dsm_blocks["thermal_storage"].charge[t]) for t in time_steps]
-            discharge = [pyo.value(instance.dsm_blocks["thermal_storage"].discharge[t]) for t in time_steps]
+                plt.plot(time_steps, ev_charge, label=f"{ev} Charge", linestyle="solid")
+                plt.plot(
+                    time_steps,
+                    [-v for v in ev_discharge],
+                    label=f"{ev} Discharge",
+                    linestyle="dashed",
+                )
+                plt.plot(time_steps, ev_soc, label=f"{ev} SOC", linestyle="dotted")
 
-            axs[2].fill_between(time_steps, soc, alpha=0.3, label="SOC", color="blue")
-            axs[2].plot(time_steps, charge, label="Charge", linestyle="--", color="green")
-            axs[2].plot(time_steps, [-x for x in discharge], label="Discharge", linestyle="--", color="red")
-            axs[2].axhline(0, color='black', linewidth=0.5)
-            axs[2].set_ylabel("Storage (kWh)")
-            axs[2].legend()
-            axs[2].grid(True)
-
-
-        axs[2].set_xlabel("Time Step")
-        plt.suptitle("Paper & Pulp Plant Operation Overview")
+        plt.title("Electric Vehicle Charging Behavior")
+        plt.xlabel("Time Steps")
+        plt.ylabel("Power / SOC")
+        plt.legend()
         plt.tight_layout()
         plt.show()
 

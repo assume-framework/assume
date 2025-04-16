@@ -2,9 +2,8 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-###########
 Unit Types
-###########
+===========
 
 In power system modelling, various unit types are used to represent the components responsible for generating, storing, and consuming electricity. These units are essential for simulating the operation of the grid and ensuring a reliable balance between supply and demand.
 
@@ -18,5 +17,10 @@ The primary unit types in this context include:
 
 Each unit type has specific characteristics that affect how the power system operates, and understanding these is key to modelling and optimizing grid performance.
 
+Demand-Side Agent
+-----------------
 
-.. include:: demand_side_agent.rst
+.. toctree::
+   :maxdepth: 1
+
+   demand_side_agent

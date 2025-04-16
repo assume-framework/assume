@@ -164,6 +164,7 @@ async def test_formulate_bids(units_operator: UnitsOperator):
 
 @pytest.mark.require_learning
 async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
+    from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
     from assume.strategies.learning_strategies import RLStrategy
 
     marketconfig = rl_units_operator.available_markets[0]
@@ -173,7 +174,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     params_dict = {
         "bidding_strategies": {
-            "EOM": RLStrategy(
+            "EOM": RLAdvancedOrderStrategy(
                 unit_id="testplant",
                 learning_mode=True,
             )
