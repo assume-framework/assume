@@ -235,7 +235,7 @@ def transfer_weights(
     if old_hidden != new_hidden:
         logger.warning(
             f"Cannot transfer weights: architecture mismatch.\n"
-            f"Old hidden sizes: {old_hidden}, New hidden sizes: {new_hidden}. Skipping transfer."
+            f"Old sizes of hidden layers: {old_hidden}, New sizes of hidden layers: {new_hidden}. Skipping transfer."
         )
         return None
 
