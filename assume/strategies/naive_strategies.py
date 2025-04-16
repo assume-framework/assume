@@ -5,6 +5,7 @@
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
+
 class NaiveSingleBidStrategy(BaseStrategy):
     """
     A naive strategy that bids the marginal cost of the unit on the market.
@@ -82,8 +83,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
         if "node" in market_config.additional_fields:
             return bids
         else:
-            #return self.remove_empty_bids(bids)
-            return bids
+            return self.remove_empty_bids(bids)
 
 
 class NaiveProfileStrategy(BaseStrategy):
@@ -359,12 +359,20 @@ class NaiveExchangeStrategy(BaseStrategy):
 
         return bids
 
-class NaiveMultiBidDemandStrategy(BaseStrategy):
+
+class ElasticDemandStrategy(BaseStrategy):
     """
-    A naive strategy of a Demand unit on the EOM that bids multiple bids with different prices and volumes
-    and hereby approximates a given marginal utility curve.
-    The linear (!) marginal utility curve is defined by the units max_price and elasticity.
+    A naive strategy of a demand unit that submits multiple bids to approximate
+    a marginal utility curve, based on linear or isoelastic demand theory.
+
+    - Linear model: P = P_max - slope * Q
+    - Isoelastic model: P = (Q/Q_max) ** (1/E)
+      (derived from log-log price elasticity of demand)
+
+    See:
+    - https://en.wikipedia.org/wiki/Price_elasticity_of_demand
     """
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -372,127 +380,96 @@ class NaiveMultiBidDemandStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        """
-        Takes information from a demand unit that the unit operator manages and
-        defines how it bids to the market.
-
-        The bids take the following form:
-        For each hour several bids (num_bids) are created with different prices and volumes.
-        The bids are created according to the marginal utility curve of the unit.
-
-        Args:
-            unit (SupportsMinMax): The unit to be buying energy.
-            market_config (MarketConfig): The market configuration.
-            product_tuples (list[Product]): The list of all products the unit can demand.
-            num_bids (int): The number of bids to be created for each hour.
-
-        Returns:
-            Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
-        """
-        start = product_tuples[0][0]  # start time of the first product
-        end_all = product_tuples[-1][1]  # end time of the last product
-        
-        #min_power_values, max_power_values = unit.calculate_min_max_power(
-        #    start, end_all
-        #)  # minimum and maximum power demand of the unit between the start time of the first product and the end time of the last product
-        # this somehow does not yield reasonable results for this bidding strategy, so we use the units max_power instead
-        min_power_values = [unit.min_power] * len(product_tuples)
-        max_power_values = [unit.max_power] * len(product_tuples)
-
-        max_price = unit.max_price
-        elasticity = unit.elasticity
-        elasticity_model = 'isoelastic' #unit.elasticity_model
-        num_bids = unit.num_bids
+        if unit.elasticity == 0 or unit.num_bids == 1:
+            raise ValueError(
+                "ElasticDemandStrategy requires an elastic unit with num_bids > 1."
+            )
 
         bids = []
-        for product, min_power, max_power in zip(
-            product_tuples, min_power_values, max_power_values
-        ):
-            # for each product, calculate the  of the unit at the start time of the product
-            # and the volume of the product. Dispatch the order to the market.
-            start = product[0]
-            end = product[1]
-            
-            max_abs_power = max(abs(max_power), abs(min_power))
-            
-            first_bid_volume = self.find_first_block_bid(elasticity, max_price, max_abs_power)
-            bids.append({
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": product[2],
-                        "price": max_price,
-                        "volume": -first_bid_volume,
-                        "node": unit.node,
-                    })
-            
-            bid_volume = (max_abs_power - first_bid_volume) / (num_bids - 1)
+        max_price = unit.max_price
+        elasticity = unit.elasticity
+        elasticity_model = unit.elasticity_model
+        num_bids = unit.num_bids
+
+        for product in product_tuples:
+            start, end, only_hours = product
+            max_abs_power = max(abs(unit.min_power), abs(unit.max_power))
+
+            first_bid_volume = self.find_first_block_bid(
+                elasticity, max_price, max_abs_power
+            )
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": only_hours,
+                    "price": max_price,
+                    "volume": -first_bid_volume,
+                    "node": unit.node,
+                }
+            )
+
+            remaining_volume = max_abs_power - first_bid_volume
+            if remaining_volume < 0:
+                raise ValueError(
+                    "Negative remaining volume for bidding. Check max_power and elasticity."
+                )
+
+            bid_volume = remaining_volume / (num_bids - 1)
 
             for i in range(1, num_bids):
-                # P the Price
-                # Q the volume
-                # E the elasticity
-                if elasticity_model == 'linear':
-                    # P = P_max - (i * (P_max / num_bids))
-                    bid_price = max_price - (i * (max_price / num_bids) * elasticity)
-                elif elasticity_model == 'isoelastic':
-                    # constant elasticity over the whole quantity range means log-lin model
-                    # see https://en.wikipedia.org/wiki/Price_elasticity_of_demand
-                    # c is a shifting constant for the demand, that will always be served
-                    # P = Q ** (1/E) * exp(-c / E)
-                    # this can be reformulated, because c = ln(Q_max)
-                    # P = (Q/Q_max) ** (1/E)
-                    # TODO revisit when timesteps different from 1h
-                    bid_price = ((first_bid_volume + (i * bid_volume)) / max_abs_power) ** (1 / elasticity)
-                    #bid_price = (first_bid_volume + (i * bid_volume)) ** (1 / elasticity) * np.exp(
-                    #    -np.log(max_power) / elasticity
-                    #)
+                if elasticity_model == "linear":
+                    # LINEAR model: P = P_max - slope * Q
+                    # where slope = (P_max / Q_max) * elasticity
+                    # This ensures price drops linearly with volume
+                    bid_price = max_price + (i * (max_price / num_bids) * elasticity)
+
+                elif elasticity_model == "isoelastic":
+                    # ISOELASTIC model (constant elasticity of demand):
+                    # P = (Q / Q_max)^(1 / E)
+                    # Derived from:
+                    #   ln(Q) = ln(Q_max) + E * ln(P)
+                    #   => Q = Q_max * P^E
+                    # Solving for P:
+                    #   P = (Q / Q_max)^(1/E)
+                    # This yields decreasing price as volume increases
+                    ratio = (first_bid_volume + i * bid_volume) / max_abs_power
+                    if ratio <= 0:
+                        continue
+                    bid_price = ratio ** (1 / elasticity)
 
                 bids.append(
                     {
                         "start_time": start,
                         "end_time": end,
-                        "only_hours": product[2],
+                        "only_hours": only_hours,
                         "price": bid_price,
                         "volume": -bid_volume,
                         "node": unit.node,
                     }
                 )
 
-            
-        # clean up empty bids
-        bids = self.remove_empty_bids(bids)
+        return self.remove_empty_bids(bids)
 
-        return bids
-    
     def find_first_block_bid(
-        self,
-        elasticity: float,
-        max_price: float,
-        max_power: float
-) -> float:
+        self, elasticity: float, max_price: float, max_power: float
+    ) -> float:
         """
-        Calculate the first block bid for a given unit with a given marginal utility curve.
-        The first block bid is the volume that is always bid at maximum price, because the
-        willingness to pay for it is higher thant the markets maximal price.
-        The first block bid is calculated by finding the intersection of the isoelastic demand
-        curve and the maximum price.
-        Returns volume > 0
+        Calculate the first block bid volume at max_price.
+
+        Assumes isoelastic demand:
+            Q = Q_max * P^E
+
+        Therefore:
+            Q_first = max_power * (max_price ** E)
+
+        Returns:
+            float: Volume > 0, demand that is always bought at max willingness to pay
         """
-        E = elasticity
-        p_max = max_price
-        q_max = max_power
-        #c = q_max
-        # find intersection of isoelastic demand and p_max
-        # p = q**(1/E) * np.exp(-c/E)
-        # p/exp(-c/E) = q**(1/E)
-        # (p*exp(c/E))**E = q
-        # and p**E * exp(c) = q
-        # therefore for p = p_max:
-        # q = p_max**E * np.exp(c)
-        # as c = ln(q_max)
-        # q = p_max**E * q_max
-        q = p_max**E * q_max
-        if abs(q) > abs(q_max):
-            raise ValueError("impossible values for E, p_max, q_max or c")
-        else:
-            return q
+        volume = max_price**elasticity * max_power
+
+        if abs(volume) > abs(max_power):
+            raise ValueError(
+                f"Calculated first block bid volume ({volume}) exceeds max power ({max_power})."
+            )
+        return volume

@@ -18,7 +18,7 @@ from assume.strategies.naive_strategies import (
     NaiveRedispatchStrategy,
     NaiveSingleBidStrategy,
     NaiveExchangeStrategy,
-    NaiveMultiBidDemandStrategy,
+    ElasticDemandStrategy,
 )
 from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
@@ -31,7 +31,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "naive_pos_reserve": NaiveSingleBidStrategy,
     "naive_neg_reserve": NaiveSingleBidStrategy,
     "naive_exchange": NaiveExchangeStrategy,
-    "naive_eom_curve": NaiveMultiBidDemandStrategy,
+    "elastic_demand": ElasticDemandStrategy,
     "otc_strategy": OTCStrategy,
     "flexable_eom": flexableEOM,
     "flexable_eom_block": flexableEOMBlock,

@@ -100,7 +100,10 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
-    "DE_2013_pypsa": {"scenario":"future_markets_paper", "study_case" : "base_case_2013"},
+    "DE_2013_pypsa": {
+        "scenario": "future_markets_paper",
+        "study_case": "base_case_2013",
+    },
 }
 
 

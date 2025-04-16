@@ -25,10 +25,8 @@ class Demand(SupportsMinMax):
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
         node (str, optional): The node of the unit. Defaults to "node0".
         price (float): The price of the unit.
-        location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
-
-    Methods
-    -------
+        location (tuple[float, float]): Geographical location.
+        elasticity, elasticity_model, max_price, num_bids: Optional parameters for elastic demand modeling.
     """
 
     def __init__(
@@ -42,11 +40,6 @@ class Demand(SupportsMinMax):
         forecaster: Forecaster,
         node: str = "node0",
         price: float = 3000.0,
-        max_price: float = 3000.0,
-        min_price: float = 0.0,
-        elasticity: float = 0.0,
-        elasticity_model: str = "isoelastic",
-        num_bids: int = 10,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
@@ -60,7 +53,7 @@ class Demand(SupportsMinMax):
             location=location,
             **kwargs,
         )
-        """Create a demand unit."""
+
         self.max_power = max_power
         self.min_power = min_power
 
@@ -68,16 +61,29 @@ class Demand(SupportsMinMax):
             self.max_power = min_power
             self.min_power = -max_power
 
-        self.ramp_down = max(abs(min_power), abs(max_power))
-        self.ramp_up = max(abs(min_power), abs(max_power))
+        self.ramp_down = max(abs(self.min_power), abs(self.max_power))
+        self.ramp_up = self.ramp_down
 
         self.volume = -abs(self.forecaster[self.id])  # demand is negative
         self.price = FastSeries(index=self.index, value=price)
-        self.max_price = max_price
-        self.min_price = min_price
-        self.elasticity = elasticity
-        self.elasticity_model = elasticity_model
-        self.num_bids = num_bids
+
+        # Elastic demand parameters
+        self.max_price = kwargs.get("max_price", 10000.0)
+        self.min_price = kwargs.get("min_price", 0.0)
+        self.elasticity = kwargs.get("elasticity", 0.0)
+        self.elasticity_model = kwargs.get("elasticity_model", "linear")
+        self.num_bids = int(kwargs.get("num_bids", 1))
+
+        # Validate elastic configuration if elasticity is non-zero
+        if self.elasticity != 0.0:
+            if self.elasticity > 0.0:
+                raise ValueError("elasticity must be negative for elastic demand.")
+            if self.num_bids < 1:
+                raise ValueError("num_bids must be >= 1 for elastic demand.")
+            if self.elasticity_model not in ("linear", "isoelastic"):
+                raise ValueError(
+                    f"Invalid elasticity_model '{self.elasticity_model}'. Choose 'linear' or 'isoelastic'."
+                )
 
     def execute_current_dispatch(
         self,
@@ -96,7 +102,7 @@ class Demand(SupportsMinMax):
             np.array: The volume of the unit for the given time range.
         """
 
-        return self.volume.loc[start:end]
+        return self.outputs["energy"].loc[start:end]
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
