@@ -362,7 +362,7 @@ class NaiveExchangeStrategy(BaseStrategy):
 
 class ElasticDemandStrategy(BaseStrategy):
     """
-    A naive strategy of a demand unit that submits multiple bids to approximate
+    A bidding strategy for a demand unit that submits multiple bids to approximate
     a marginal utility curve, based on linear or isoelastic demand theory.
 
     - Linear model: P = P_max - slope * Q
