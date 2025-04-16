@@ -101,9 +101,9 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
-    "example_bus": {
-        "scenario": "example_bus",
-        "study_case": "eom",
+    "paper_plant_use_case": {
+        "scenario": "example_04",
+        "study_case": "base_case_2019",
     },
 }
 
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "example_bus"
+    example = "paper_plant_use_case"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
