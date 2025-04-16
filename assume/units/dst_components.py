@@ -1424,6 +1424,85 @@ class ElectricVehicle:
         return model_block
 
 
+class ChargingStation:
+    def __init__(
+        self,
+        time_steps: list[int],
+        max_power: float,
+        min_power: float = 0.0,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        availability_profile: pd.Series | None = None,
+        power_flow_directionality: str = "unidirectional",  # or "bidirectional"
+        **kwargs,
+    ):
+        self.time_steps = time_steps
+        self.max_power = max_power
+        self.min_power = min_power
+        self.ramp_up = ramp_up if ramp_up is not None else max_power
+        self.ramp_down = ramp_down if ramp_down is not None else max_power
+        self.availability_profile = availability_profile
+        self.power_flow_directionality = power_flow_directionality
+        self.kwargs = kwargs
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        # Param
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+
+        # Define variables
+        model_block.discharge = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(self.min_power, self.max_power),
+        )
+        if self.power_flow_directionality == "bidirectional":
+            model_block.charge = pyo.Var(
+                self.time_steps,
+                within=pyo.NonNegativeReals,
+                bounds=(self.min_power, self.max_power),
+            )
+
+        # Optional constraint: Discharge profile
+        if self.availability_profile is not None:
+
+            @model_block.Constraint(self.time_steps)
+            def availability_factor_constraint(b, t):
+                return b.discharge[t] <= self.availability_profile.iat[t] * b.max_power
+
+        @model_block.Constraint(self.time_steps)
+        def discharge_ramp_up(b, t):
+            if t == self.time_steps[0]:
+                return pyo.Constraint.Skip
+            return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
+
+        @model_block.Constraint(self.time_steps)
+        def discharge_ramp_down(b, t):
+            if t == self.time_steps[0]:
+                return pyo.Constraint.Skip
+            return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
+
+        if self.power_flow_directionality == "bidirectional":
+
+            @model_block.Constraint(self.time_steps)
+            def charge_ramp_up(b, t):
+                if t == self.time_steps[0]:
+                    return pyo.Constraint.Skip
+                return b.charge[t] - b.charge[t - 1] <= b.ramp_up
+
+            @model_block.Constraint(self.time_steps)
+            def charge_ramp_down(b, t):
+                if t == self.time_steps[0]:
+                    return pyo.Constraint.Skip
+                return b.charge[t - 1] - b.charge[t] <= b.ramp_down
+
+        return model_block
+
+
 class HydrogenBufferStorage(GenericStorage):
     """
     A class to represent a hydrogen storage unit in an energy system model.
@@ -1698,6 +1777,7 @@ demand_side_technologies: dict = {
     "generic_storage": GenericStorage,
     "pv_plant": PVPlant,
     "thermal_storage": GenericStorage,
+    "charging_station": ChargingStation,
 }
 
 

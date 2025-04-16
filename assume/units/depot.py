@@ -42,7 +42,7 @@ class BusDepot(DSMFlex, SupportsMinMax):
     """
 
     required_technologies = ["electric_vehicle"]
-    optional_technologies = []  # "charging_station",
+    optional_technologies = ["charging_station"]  # "charging_station",
 
     def __init__(
         self,
