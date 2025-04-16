@@ -363,7 +363,8 @@ class NaiveExchangeStrategy(BaseStrategy):
 class ElasticDemandStrategy(BaseStrategy):
     """
     A bidding strategy for a demand unit that submits multiple bids to approximate
-    a marginal utility curve, based on linear or isoelastic demand theory.
+    a marginal utility curve, based on linear or isoelastic demand theory. 
+    P = Price, Q = Quantity, E = Elasticity.
 
     - Linear model: P = P_max - slope * Q
     - Isoelastic model: P = (Q/Q_max) ** (1/E)
@@ -455,7 +456,7 @@ class ElasticDemandStrategy(BaseStrategy):
         self, elasticity: float, max_price: float, max_power: float
     ) -> float:
         """
-        Calculate the first block bid volume at max_price.
+        Calculate the first block bid volume at max_price. P = Price, Q = Quantity, E = Elasticity.
 
         Assumes isoelastic demand:
             Q = Q_max * P^E
@@ -466,7 +467,7 @@ class ElasticDemandStrategy(BaseStrategy):
         Returns:
             float: Volume > 0, demand that is always bought at max willingness to pay
         """
-        volume = max_price**elasticity * max_power
+        volume = max_power * max_price**elasticity 
 
         if abs(volume) > abs(max_power):
             raise ValueError(
