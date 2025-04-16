@@ -1476,13 +1476,13 @@ class ChargingStation:
 
         @model_block.Constraint(self.time_steps)
         def discharge_ramp_up(b, t):
-            if t == self.time_steps[0]:
+            if t == self.time_steps.first():
                 return pyo.Constraint.Skip
             return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
 
         @model_block.Constraint(self.time_steps)
         def discharge_ramp_down(b, t):
-            if t == self.time_steps[0]:
+            if t == self.time_steps.first():
                 return pyo.Constraint.Skip
             return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
 
@@ -1490,13 +1490,13 @@ class ChargingStation:
 
             @model_block.Constraint(self.time_steps)
             def charge_ramp_up(b, t):
-                if t == self.time_steps[0]:
+                if t == self.time_steps.first():
                     return pyo.Constraint.Skip
                 return b.charge[t] - b.charge[t - 1] <= b.ramp_up
 
             @model_block.Constraint(self.time_steps)
             def charge_ramp_down(b, t):
-                if t == self.time_steps[0]:
+                if t == self.time_steps.first():
                     return pyo.Constraint.Skip
                 return b.charge[t - 1] - b.charge[t] <= b.ramp_down
 

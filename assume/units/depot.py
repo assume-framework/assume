@@ -181,6 +181,21 @@ class BusDepot(DSMFlex, SupportsMinMax):
                     ),
                 )
 
+        # Global constraint: all EV charging must be met by all charging station discharging
+        @self.model.Constraint(self.model.time_steps)
+        def ev_station_power_balance(m, t):
+            total_ev_charge = sum(
+                m.dsm_blocks[ev].charge[t]
+                for ev in m.dsm_blocks
+                if ev.startswith("electric_vehicle")
+            )
+            total_station_discharge = sum(
+                m.dsm_blocks[cs].discharge[t]
+                for cs in m.dsm_blocks
+                if cs.startswith("charging_station")
+            )
+            return total_station_discharge == total_ev_charge
+
     def define_constraints(self):
         """
         Defines the optimization constraints for the Pyomo model, ensuring that the Bus Depot's
@@ -212,24 +227,17 @@ class BusDepot(DSMFlex, SupportsMinMax):
 
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
-            """
-            Ensures that the total power input is the sum of all component inputs minus any self-produced
-            or stored energy at each time step.
-
-            This constraint aggregates power from buses.
-
-            Args:
-                m: Pyomo model reference.
-                t: Current time step.
-
-            Returns:
-                Equality condition balancing total power input.
-            """
-            return m.total_power_input[t] == sum(
-                m.dsm_blocks[ev].charge[t]  # - m.dsm_blocks[ev].discharge[t]
+            ev_charge = sum(
+                m.dsm_blocks[ev].charge[t]
                 for ev in m.dsm_blocks
                 if ev.startswith("electric_vehicle")
             )
+            cs_discharge = sum(
+                m.dsm_blocks[cs].discharge[t]
+                for cs in m.dsm_blocks
+                if cs.startswith("charging_station")
+            )
+            return m.total_power_input[t] == ev_charge + cs_discharge
 
         @self.model.Constraint(self.model.time_steps)
         def variable_cost_constraint(m, t):

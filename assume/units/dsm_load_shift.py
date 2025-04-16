@@ -115,10 +115,8 @@ class DSMFlex:
         self.define_sets()
         self.define_parameters()
         self.define_variables()
-
         self.initialize_components()
         self.initialize_process_sequence()
-
         self.define_constraints()
         self.define_objective_opt()
 
@@ -557,46 +555,52 @@ class DSMFlex:
 
         # Plot
         time_steps = list(instance.time_steps)
-        variable_cost_series = [
-            pyo.value(instance.variable_cost[t]) for t in time_steps
-        ]
-        total_power_input_series = [
-            pyo.value(instance.total_power_input[t]) for t in time_steps
-        ]
 
-        # Save time series data to attributes
-        self.opt_power_requirement = FastSeries(
-            index=self.index, value=total_power_input_series
-        )
-        self.variable_cost_series = FastSeries(
-            index=self.index, value=variable_cost_series
-        )
+        # Plot EVs and Charging Stations
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
 
-        # Plot for all EVs
-        plt.figure(figsize=(12, 6))
-        for ev in instance.dsm_blocks:
-            if ev.startswith("electric_vehicle"):
-                ev_charge = [
-                    pyo.value(instance.dsm_blocks[ev].charge[t]) for t in time_steps
-                ]
-                ev_discharge = [
-                    pyo.value(instance.dsm_blocks[ev].discharge[t]) for t in time_steps
-                ]
-                ev_soc = [pyo.value(instance.dsm_blocks[ev].soc[t]) for t in time_steps]
+        for block_name in instance.dsm_blocks:
+            block = instance.dsm_blocks[block_name]
 
-                plt.plot(time_steps, ev_charge, label=f"{ev} Charge", linestyle="solid")
-                plt.plot(
+            if block_name.startswith("electric_vehicle"):
+                ev_charge = [pyo.value(block.charge[t]) for t in time_steps]
+                ev_discharge = [pyo.value(block.discharge[t]) for t in time_steps]
+                ev_soc = [pyo.value(block.soc[t]) for t in time_steps]
+
+                ax1.plot(
+                    time_steps,
+                    ev_charge,
+                    label=f"{block_name} Charge",
+                    linestyle="solid",
+                )
+                ax1.plot(
                     time_steps,
                     [-v for v in ev_discharge],
-                    label=f"{ev} Discharge",
+                    label=f"{block_name} Discharge",
                     linestyle="dashed",
                 )
-                plt.plot(time_steps, ev_soc, label=f"{ev} SOC", linestyle="dotted")
+                ax1.plot(
+                    time_steps, ev_soc, label=f"{block_name} SOC", linestyle="dotted"
+                )
 
-        plt.title("Electric Vehicle Charging Behavior")
-        plt.xlabel("Time Steps")
-        plt.ylabel("Power / SOC")
-        plt.legend()
+            elif block_name.startswith("charging_station"):
+                cs_discharge = [pyo.value(block.discharge[t]) for t in time_steps]
+                ax2.plot(
+                    time_steps,
+                    cs_discharge,
+                    label=f"{block_name} Discharge",
+                    linestyle="solid",
+                )
+
+        ax1.set_title("Electric Vehicle Charging Behavior")
+        ax1.set_ylabel("Power / SOC")
+        ax1.legend()
+
+        ax2.set_title("Charging Station Discharge Behavior")
+        ax2.set_xlabel("Time Steps")
+        ax2.set_ylabel("Discharge Power")
+        ax2.legend()
+
         plt.tight_layout()
         plt.show()
 
