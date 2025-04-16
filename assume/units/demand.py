@@ -68,8 +68,7 @@ class Demand(SupportsMinMax):
         self.price = FastSeries(index=self.index, value=price)
 
         # Elastic demand parameters
-        self.max_price = kwargs.get("max_price", 10000.0)
-        self.min_price = kwargs.get("min_price", 0.0)
+        self.max_price = price
         self.elasticity = kwargs.get("elasticity", 0.0)
         self.elasticity_model = kwargs.get("elasticity_model", "linear")
         self.num_bids = int(kwargs.get("num_bids", 1))
