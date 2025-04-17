@@ -2,12 +2,17 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
+import math
 from collections.abc import Callable
 from datetime import datetime
 from typing import TypedDict
 
 import numpy as np
 import torch as th
+from torch import nn
+
+logger = logging.getLogger(__name__)
 
 
 class ObsActRew(TypedDict):
@@ -166,3 +171,125 @@ def constant_schedule(val: float) -> Schedule:
         return val
 
     return func
+
+
+def get_hidden_sizes(state_dict: dict, prefix: str) -> list[int]:
+    sizes = []
+    i = 0
+    while f"{prefix}.{i}.weight" in state_dict:
+        weight = state_dict[f"{prefix}.{i}.weight"]
+        out_dim = weight.shape[0]
+        sizes.append(out_dim)
+        i += 1
+    return sizes[:-1]  # exclude the final output layer if needed
+
+
+def infer_n_agents(state_dict, obs_base, act_dim, unique_obs_dim):
+    key = "q1_layers.0.weight"
+    if key not in state_dict:
+        raise KeyError(f"Missing expected key '{key}' in state_dict.")
+
+    input_dim = state_dict[key].shape[1]
+
+    # If both are 0, cannot infer
+    denom = unique_obs_dim + act_dim
+    if denom == 0:
+        raise ValueError("Cannot infer N: unique_obs_dim and act_dim both zero.")
+
+    # Proper formula derived from CriticTD3 logic
+    num = input_dim - obs_base + unique_obs_dim
+    n_est = num / denom
+    n_rounded = round(n_est)
+
+    # Reconstruct the original input_dim as CriticTD3 would
+    reconstructed_input = (
+        obs_base + unique_obs_dim * (n_rounded - 1) + act_dim * n_rounded
+    )
+
+    if not math.isclose(reconstructed_input, input_dim) or n_rounded <= 0:
+        raise ValueError(
+            f"Inferred N={n_rounded} is invalid (Recalculated input={reconstructed_input}, got={input_dim})"
+        )
+
+    return n_rounded
+
+
+def copy_layer_data(dst, src):
+    for k in dst:
+        if k in src and dst[k].shape == src[k].shape:
+            dst[k].data.copy_(src[k].data)
+
+
+def transfer_weights(
+    model: nn.Module,
+    old_state: dict,
+    old_n_agents: int,
+    new_n_agents: int,
+    obs_base: int,
+    act_dim: int,
+    unique_obs: int,
+) -> dict | None:
+    # Check architecture compatibility (extract hidden sizes from state_dicts)
+    old_hidden = get_hidden_sizes(old_state, prefix="q1_layers")
+    new_hidden = get_hidden_sizes(model.state_dict(), prefix="q1_layers")
+    if old_hidden != new_hidden:
+        logger.warning(
+            f"Cannot transfer weights: architecture mismatch.\n"
+            f"Old hidden sizes: {old_hidden}, New hidden sizes: {new_hidden}. Skipping transfer."
+        )
+        return None
+
+    new_template = model.state_dict()
+    new_state = {k: v.clone() for k, v in new_template.items()}
+
+    # Calculate complete dimensions from both old and new agent counts
+    old_obs = obs_base + unique_obs * max(0, old_n_agents - 1)
+    new_obs = obs_base + unique_obs * max(0, new_n_agents - 1)
+
+    # Determine how many agents’ data can be safely copied.
+    copy_agent_count = min(old_n_agents, new_n_agents)
+    # For the unique observations we copy only (copy_agent_count - 1) agents worth,
+    # because the first agent’s observations are already counted in obs_base.
+    copy_unique_obs = unique_obs * max(0, copy_agent_count - 1)
+    # Thus the total observation columns to copy are:
+    copy_obs_end = obs_base + copy_unique_obs
+    # For actions, we copy act_dim columns per agent for copy_agent_count agents:
+    copy_action_count = act_dim * copy_agent_count
+
+    for prefix in ["q1_layers", "q2_layers"]:
+        try:
+            # Get input layer weights and biases
+            w_old = old_state[f"{prefix}.0.weight"]
+            b_old = old_state[f"{prefix}.0.bias"]
+            w_new = new_state[f"{prefix}.0.weight"]
+            b_new = new_state[f"{prefix}.0.bias"]
+
+            # --- Copy the shared observation part ---
+            w_new[:, :obs_base] = w_old[:, :obs_base]
+
+            # --- Copy the agent-unique observation part ---
+            # (Copy only if there is any agent-unique portion to copy.)
+            if copy_obs_end > obs_base:
+                w_new[:, obs_base:copy_obs_end] = w_old[:, obs_base:copy_obs_end]
+
+            # --- Copy the action part ---
+            # In the old state the action portion starts at old_obs,
+            # and in the new state it starts at new_obs.
+            w_new[:, new_obs : new_obs + copy_action_count] = w_old[
+                :, old_obs : old_obs + copy_action_count
+            ]
+
+            # --- Copy bias from the input layer (assumed to have matching shape) ---
+            b_new.copy_(b_old)
+
+            # --- Copy deeper layers ---
+            for i in range(1, len(new_hidden) + 1):
+                w_key, b_key = f"{prefix}.{i}.weight", f"{prefix}.{i}.bias"
+                copy_layer_data({w_key: new_state[w_key]}, old_state)
+                copy_layer_data({b_key: new_state[b_key]}, old_state)
+
+        except KeyError as e:
+            logger.warning(f"Missing key for {prefix} during transfer: {e}")
+            return None
+
+    return new_state
