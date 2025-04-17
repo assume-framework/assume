@@ -9,6 +9,48 @@ from typing import TypedDict
 import numpy as np
 import torch as th
 
+import holidays
+
+def encode_time_features (start: datetime) -> list:
+    """
+    Encode time features for a given datetime object.
+    This function extracts various time-related features from the datetime object
+    and encodes them using sine and cosine transformations to capture periodicity.
+    
+    Args:
+        start (datetime): The datetime object to encode.
+    
+    Returns:
+        list: A list containing the encoded time features.
+    """
+
+    start_hour = start.hour / 24.0
+    start_hour_cos = np.cos(2 * np.pi * start_hour)
+    start_hour_sin = np.sin(2 * np.pi * start_hour)
+    
+    start_month = start.month / 12.0
+    start_month_cos = np.cos(2 * np.pi * start_month)
+    start_month_sin = np.sin(2 * np.pi * start_month)
+    
+    start_weekday = start.weekday() / 7.0
+    
+    # flag every vacation day as a sunday
+    german_holidays = holidays.Germany()
+    if start in german_holidays:
+        start_weekday=7
+        
+    start_weekday_cos = np.cos(2 * np.pi * start_weekday)
+    start_weekday_sin = np.sin(2 * np.pi * start_weekday)
+    
+    return [
+        start_hour_cos,
+        start_hour_sin,
+        start_month_cos,
+        start_month_sin,
+        start_weekday_cos,
+        start_weekday_sin,
+    ]
+
 
 class ObsActRew(TypedDict):
     observation: list[th.Tensor]

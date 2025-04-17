@@ -31,7 +31,8 @@ class CriticTD3(nn.Module):
 
         # Select proper architecture based on `n_agents`
         if n_agents <= 20:
-            hidden_sizes = [256, 128]  # Shallow network for small `n_agents`
+            # hidden_sizes = [256, 128]  # Shallow network for small `n_agents`
+            hidden_sizes = [512, 256, 128]  # Increase it for Highcore run
         elif n_agents <= 50:
             hidden_sizes = [512, 256, 128]  # Medium network
         else:
@@ -123,9 +124,10 @@ class MLPActor(Actor):
     def __init__(self, obs_dim: int, act_dim: int, float_type, *args, **kwargs):
         super().__init__()
 
-        self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
-        self.FC2 = nn.Linear(256, 128, dtype=float_type)
-        self.FC3 = nn.Linear(128, act_dim, dtype=float_type)
+        self.FC1 = nn.Linear(obs_dim, 512, dtype=float_type)
+        self.FC2 = nn.Linear(512, 256, dtype=float_type)
+        self.FC3 = nn.Linear(256, 128, dtype=float_type)
+        self.FC4 = nn.Linear(128, act_dim, dtype=float_type)
 
         # Initialize weights
         self._init_weights()

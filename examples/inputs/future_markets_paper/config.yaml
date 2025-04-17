@@ -4,7 +4,7 @@
 
 base_case_2013:
   start_date: 2013-01-01 00:00
-  end_date: 2013-01-03 00:00
+  end_date: 2013-01-31 00:00
   time_step: 1h
   learning_mode: True
   save_frequency_hours: Null
@@ -12,21 +12,22 @@ base_case_2013:
   learning_config:
     continue_learning: False
     trained_policies_save_path: null
-    max_bid_price: 100
+    max_bid_price: 300
     algorithm: matd3
-    learning_rate: 0.001
-    training_episodes: 10
+    learning_rate: 0.0001
+    training_episodes: 500
     episodes_collecting_initial_experience: 5
     train_freq: 24h
     gradient_steps: 1
     batch_size: 256
-    gamma: 0.99
+    gamma: 0.999
     device: cpu
-    noise_sigma: 0.1
+    noise_sigma: 0.3
     noise_scale: 1
     noise_dt: 1
+    action_noise_schedule: linear
     validation_episodes_interval: 5
-    early_stopping_steps: 10
+    early_stopping_steps: 50
     early_stopping_threshold: 0.05
 
   markets_config:

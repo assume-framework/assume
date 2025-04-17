@@ -13,7 +13,7 @@ from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxC
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
-from assume.reinforcement_learning.learning_utils import NormalActionNoise
+from assume.reinforcement_learning.learning_utils import NormalActionNoise, encode_time_features
 
 logger = logging.getLogger(__name__)
 
@@ -498,6 +498,9 @@ class RLStrategy(AbstractLearningStrategy):
 
         # marginal cost
         scaled_marginal_cost = current_costs / self.max_bid_price
+        
+        # get encoded time features
+        time_features = encode_time_features(start)
 
         # concat all obsverations into one array
         observation = np.concatenate(
@@ -506,6 +509,7 @@ class RLStrategy(AbstractLearningStrategy):
                 scaled_price_forecast,
                 actual_price_history,
                 np.array([scaled_total_dispatch, scaled_marginal_cost]),
+                time_features,
             ]
         )
 
@@ -639,10 +643,10 @@ class RLStrategy(AbstractLearningStrategy):
 
 class RLStrategySingleBid(RLStrategy):
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=74, act_dim=1, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=26, act_dim=1, unique_obs_dim=2, *args, **kwargs)
 
         # we select 24 to be in line with the storage strategies
-        self.foresight = 24
+        self.foresight = 6
 
     def calculate_bids(
         self,
@@ -794,7 +798,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=74, act_dim=1, unique_obs_dim=2, *args, **kwargs)
+        super().__init__(obs_dim=26, act_dim=1, unique_obs_dim=2, *args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
         # defines bounds of actions space
@@ -832,7 +836,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # neural network architecture is predefined, and the size of the observations must remain consistent.
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
-        self.foresight = 24
+        self.foresight = 6
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -1195,7 +1199,10 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # get the current soc value
         soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
         energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
-
+        
+        # get encoded time features
+        time_features = encode_time_features(start)
+        
         # concat all obsverations into one array
         observation = np.concatenate(
             [
@@ -1203,6 +1210,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 scaled_price_forecast,
                 actual_price_history,
                 np.array([soc_scaled, energy_cost_scaled]),
+                time_features,
             ]
         )
 
