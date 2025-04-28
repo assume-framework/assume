@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import json
 import os
 from copy import deepcopy
 
@@ -12,7 +13,10 @@ try:
 
     from assume.common.base import LearningStrategy
     from assume.reinforcement_learning.learning_role import Learning
-    from assume.reinforcement_learning.learning_utils import get_hidden_sizes
+    from assume.reinforcement_learning.learning_utils import (
+        get_hidden_sizes,
+        transfer_weights,
+    )
 
 except ImportError:
     pass
@@ -112,6 +116,71 @@ def compare_state_dicts(dict1, dict2):
     return True
 
 
+class FakeModel:
+    """Minimal model wrapper so model.state_dict() returns our baseline."""
+
+    def __init__(self, baseline: dict):
+        self._sd = baseline
+
+    def state_dict(self):
+        return self._sd
+
+
+def make_state_dicts(
+    obs_base: int,
+    act_dim: int,
+    unique_obs: int,
+    old_id_order: list[str],
+    new_id_order: list[str],
+    hidden_dims: list[int],
+):
+    """
+    Construct:
+      - baseline_new: weights for the 'new' model (with new_input_dim)
+      - old_state: weights for the 'old' model (with old_input_dim),
+        offset by +10/+20 so we can detect copies.
+    Returns (model, old_state, baseline_new).
+    """
+    old_n = len(old_id_order)
+    new_n = len(new_id_order)
+
+    # Compute exact input dims
+    old_input_dim = obs_base + unique_obs * max(0, old_n - 1) + act_dim * old_n
+    new_input_dim = obs_base + unique_obs * max(0, new_n - 1) + act_dim * new_n
+
+    # Build baseline for new model
+    baseline_new = {}
+    for prefix in ("q1_layers", "q2_layers"):
+        # input layer
+        baseline_new[f"{prefix}.0.weight"] = th.randn(hidden_dims[0], new_input_dim)
+        baseline_new[f"{prefix}.0.bias"] = th.randn(hidden_dims[0])
+        # deeper layers
+        for i in range(1, len(hidden_dims)):
+            baseline_new[f"{prefix}.{i}.weight"] = th.randn(
+                hidden_dims[i], hidden_dims[i - 1]
+            )
+            baseline_new[f"{prefix}.{i}.bias"] = th.randn(hidden_dims[i])
+
+    # Build old_state with matching dims and offsets
+    old_state = {}
+    for prefix in ("q1_layers", "q2_layers"):
+        # input layer
+        w0 = th.randn(hidden_dims[0], old_input_dim) + 10.0
+        b0 = th.randn(hidden_dims[0]) + 20.0
+        old_state[f"{prefix}.0.weight"] = w0
+        old_state[f"{prefix}.0.bias"] = b0
+        # deeper layers: clone from baseline_new for shape consistency
+        for i in range(1, len(hidden_dims)):
+            old_state[f"{prefix}.{i}.weight"] = baseline_new[
+                f"{prefix}.{i}.weight"
+            ].clone()
+            old_state[f"{prefix}.{i}.bias"] = baseline_new[f"{prefix}.{i}.bias"].clone()
+
+    # FakeModel returns baseline_new for model.state_dict()
+    model = FakeModel(baseline_new)
+    return model, old_state, baseline_new
+
+
 # -------------------- Tests --------------------
 
 
@@ -124,9 +193,17 @@ def test_td3_save_params(learning_role_n, tmp_path):
     td3_n.save_params(directory=str(save_dir))
 
     assert os.path.exists(save_dir / "critics" / "critic_agent_0.pt")
-    assert os.path.exists(save_dir / "actors" / "actor_agent_0.pt")
     assert os.path.exists(save_dir / "critics" / "critic_agent_1.pt")
+
+    assert os.path.exists(save_dir / "actors" / "actor_agent_0.pt")
     assert os.path.exists(save_dir / "actors" / "actor_agent_1.pt")
+
+    # Verify u_id_order.json was written correctly
+    order_file = save_dir / "critics" / "u_id_order.json"
+    assert order_file.exists(), "u_id_order.json must exist"
+    with open(order_file) as f:
+        mapping = json.load(f)
+    assert mapping.get("u_id_order") == ["agent_0", "agent_1"]
 
 
 @pytest.mark.require_learning
@@ -373,3 +450,86 @@ def test_initialize_policy_all_dimensions_match(base_learning_config):
         learn.rl_algorithm.initialize_policy()  # Should not raise
     except Exception as e:
         pytest.fail(f"initialize_policy raised an unexpected error: {e}")
+
+
+@pytest.mark.parametrize(
+    "new_id_order",
+    [
+        # 1) new units inserted before existing
+        ["pp_5", "pp_6", "pp_3", "pp_4", "st_1"],
+        # 2) new units appended after existing
+        ["pp_3", "pp_4", "st_1", "pp_5", "pp_6"],
+        # 3) new units mixed in the middle
+        ["pp_3", "pp_5", "pp_4", "pp_6", "st_1"],
+        # 4) one old unit deleted (pp_4 removed)
+        ["pp_3", "st_1"],
+    ],
+)
+@pytest.mark.parametrize("prefix", ["q1_layers", "q2_layers"])
+def test_transfer_weights_various_orders(prefix, new_id_order):
+    obs_base = 10
+    act_dim = 3
+    unique_obs = 2
+    hidden_dims = [5, 4]
+    old_id_order = ["pp_3", "pp_4", "st_1"]
+
+    # Build our fake model and states
+    model, old_state, baseline = make_state_dicts(
+        obs_base, act_dim, unique_obs, old_id_order, new_id_order, hidden_dims
+    )
+
+    # Run transfer
+    new_state = transfer_weights(
+        model, old_state, old_id_order, new_id_order, obs_base, act_dim, unique_obs
+    )
+    assert isinstance(new_state, dict)
+
+    # Recompute dims
+    old_n = len(old_id_order)
+    new_n = len(new_id_order)
+    old_obs_tot = obs_base + unique_obs * max(0, old_n - 1)
+    new_obs_tot = obs_base + unique_obs * max(0, new_n - 1)
+
+    w_old = old_state[f"{prefix}.0.weight"]
+    w_base = baseline[f"{prefix}.0.weight"]
+    w_new = new_state[f"{prefix}.0.weight"]
+
+    # 1) shared obs_base copied from old
+    assert th.equal(w_new[:, :obs_base], w_old[:, :obs_base])
+
+    # 2) unique_obs slices
+    for new_idx, u in enumerate(new_id_order):
+        if new_idx == 0:
+            continue
+        start = obs_base + unique_obs * (new_idx - 1)
+        end = start + unique_obs
+
+        if u in old_id_order:
+            old_idx = old_id_order.index(u)
+            if old_idx > 0:
+                ostart = obs_base + unique_obs * (old_idx - 1)
+                oend = ostart + unique_obs
+                assert th.equal(w_new[:, start:end], w_old[:, ostart:oend])
+        else:
+            # brand-new unit: matches baseline
+            assert th.equal(w_new[:, start:end], w_base[:, start:end])
+
+    # 3) action slices
+    for new_idx, u in enumerate(new_id_order):
+        start = new_obs_tot + act_dim * new_idx
+        end = start + act_dim
+
+        if u in old_id_order:
+            old_idx = old_id_order.index(u)
+            ostart = old_obs_tot + act_dim * old_idx
+            oend = ostart + act_dim
+            assert th.equal(w_new[:, start:end], w_old[:, ostart:oend])
+        else:
+            assert th.equal(w_new[:, start:end], w_base[:, start:end])
+
+    # 4) deeper layers copied wholesale from old_state
+    for i in range(1, len(hidden_dims)):
+        w_key = f"{prefix}.{i}.weight"
+        b_key = f"{prefix}.{i}.bias"
+        assert th.equal(new_state[w_key], old_state[w_key])
+        assert th.equal(new_state[b_key], old_state[b_key])

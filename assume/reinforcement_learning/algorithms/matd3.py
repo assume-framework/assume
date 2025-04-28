@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import json
 import logging
 import os
 
@@ -11,7 +12,6 @@ from torch.optim import AdamW
 
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.learning_utils import (
-    infer_n_agents,
     polyak_update,
     transfer_weights,
 )
@@ -92,6 +92,13 @@ class TD3(RLAlgorithm):
             path = f"{directory}/critic_{u_id}.pt"
             th.save(obj, path)
 
+        # record the exact order of u_ids to ensure that the same order is used when loading the parameters
+        u_id_list = [str(u) for u in self.learning_role.rl_strats.keys()]
+        mapping = {"u_id_order": u_id_list}
+        map_path = os.path.join(directory, "u_id_order.json")
+        with open(map_path, "w") as f:
+            json.dump(mapping, f, indent=2)
+
     def save_actor_params(self, directory):
         """
         Save the parameters of actor networks.
@@ -139,35 +146,40 @@ class TD3(RLAlgorithm):
             )
             return
 
-        new_n_agents = len(self.learning_role.rl_strats)
+        map_path = os.path.join(directory, "critics", "u_id_order.json")
+        if os.path.exists(map_path):
+            with open(map_path) as f:
+                old_id_order = json.load(f).get("u_id_order", [])
+        else:
+            logger.warning("No u_id_order.json: assuming same order as current.")
+            old_id_order = [str(u) for u in self.learning_role.rl_strats.keys()]
+
+        new_id_order = [str(u) for u in self.learning_role.rl_strats.keys()]
+        direct_load = old_id_order == new_id_order
+
+        if direct_load:
+            logger.info("Agent order unchanged. Loading weights directly.")
+        else:
+            logger.info(
+                f"Agent order mismatch: n_old={len(old_id_order)}, n_new={len(new_id_order)}. Attempting to transfer weights for critics and target critics."
+            )
 
         for u_id, strategy in self.learning_role.rl_strats.items():
-            critic_path = f"{directory}/critics/critic_{str(u_id)}.pt"
+            critic_path = os.path.join(directory, "critics", f"critic_{u_id}.pt")
             if not os.path.exists(critic_path):
-                logger.warning(f"No critic file found for agent {u_id}.")
+                logger.warning(f"No saved critic for {u_id}; skipping.")
                 continue
 
             try:
-                critic_params = self.load_obj(directory=critic_path)
+                critic_params = th.load(critic_path, weights_only=True)
+                for key in ("critic", "critic_target", "critic_optimizer"):
+                    if key not in critic_params:
+                        logger.warning(
+                            f"Missing {key} in critic params for {u_id}; skipping."
+                        )
+                        continue
 
-                if not all(
-                    k in critic_params
-                    for k in ["critic", "critic_target", "critic_optimizer"]
-                ):
-                    logger.warning(
-                        f"Incomplete critic data for agent {u_id}. Skipping."
-                    )
-                    continue
-
-                old_n_agents = infer_n_agents(
-                    critic_params["critic"],
-                    strategy.obs_dim,
-                    strategy.act_dim,
-                    strategy.unique_obs_dim,
-                )
-
-                # Check if transfer is necessary
-                if old_n_agents == new_n_agents:
+                if direct_load:
                     strategy.critics.load_state_dict(critic_params["critic"])
                     strategy.target_critics.load_state_dict(
                         critic_params["critic_target"]
@@ -175,17 +187,13 @@ class TD3(RLAlgorithm):
                     strategy.critics.optimizer.load_state_dict(
                         critic_params["critic_optimizer"]
                     )
-
+                    logger.info(f"Loaded critic for {u_id} directly.")
                 else:
-                    logger.debug(
-                        f"Agent count mismatch for {u_id}: transferring weights (old={old_n_agents}, new={new_n_agents})"
-                    )
-
                     critic_weights = transfer_weights(
                         model=strategy.critics,
                         old_state=critic_params["critic"],
-                        old_n_agents=old_n_agents,
-                        new_n_agents=new_n_agents,
+                        old_id_order=old_id_order,
+                        new_id_order=new_id_order,
                         obs_base=strategy.obs_dim,
                         act_dim=strategy.act_dim,
                         unique_obs=strategy.unique_obs_dim,
@@ -193,27 +201,25 @@ class TD3(RLAlgorithm):
                     target_critic_weights = transfer_weights(
                         model=strategy.target_critics,
                         old_state=critic_params["critic_target"],
-                        old_n_agents=old_n_agents,
-                        new_n_agents=new_n_agents,
+                        old_id_order=old_id_order,
+                        new_id_order=new_id_order,
                         obs_base=strategy.obs_dim,
                         act_dim=strategy.act_dim,
                         unique_obs=strategy.unique_obs_dim,
                     )
+
                     if critic_weights is None or target_critic_weights is None:
-                        logger.warning(f"Failed to transfer weights for agent {u_id}.")
+                        logger.warning(
+                            f"Critic weights transfer failed for {u_id}; skipping."
+                        )
                         continue
 
                     strategy.critics.load_state_dict(critic_weights)
                     strategy.target_critics.load_state_dict(target_critic_weights)
-
-                    logger.info(
-                        f"Transferred weights for agent {u_id} (old={old_n_agents}, new={new_n_agents})"
-                    )
+                    logger.info(f"Critic weights transferred for {u_id}.")
 
             except Exception as e:
-                logger.warning(
-                    f"Failed to load critic parameters for agent {u_id}: {e}"
-                )
+                logger.warning(f"Failed to load critic for {u_id}: {e}")
 
     def load_actor_params(self, directory: str) -> None:
         """
