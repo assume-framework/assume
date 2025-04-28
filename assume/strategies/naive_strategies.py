@@ -471,7 +471,7 @@ class ElasticDemandStrategy(BaseStrategy):
                 # This ensures price drops linearly with volume
                 bid_volume = max_abs_power / num_bids
                 slope = (max_price / max_abs_power)
-                for i in range(0, num_bids):
+                for i in range(num_bids):
                     bid_price = max_price - (slope * i * bid_volume)
 
                     bids.append(
