@@ -466,6 +466,7 @@ def test_initialize_policy_all_dimensions_match(base_learning_config):
     ],
 )
 @pytest.mark.parametrize("prefix", ["q1_layers", "q2_layers"])
+@pytest.mark.require_learning
 def test_transfer_weights_various_orders(prefix, new_id_order):
     obs_base = 10
     act_dim = 3
