@@ -158,10 +158,10 @@ class TD3(RLAlgorithm):
         direct_load = old_id_order == new_id_order
 
         if direct_load:
-            logger.info("Agent order unchanged. Loading weights directly.")
+            logger.info("Agents order unchanged. Loading critic weights directly.")
         else:
             logger.info(
-                f"Agent order mismatch: n_old={len(old_id_order)}, n_new={len(new_id_order)}. Attempting to transfer weights for critics and target critics."
+                f"Agents length and/or order mismatch: n_old={len(old_id_order)}, n_new={len(new_id_order)}. Attempting to transfer weights for critics and target critics."
             )
 
         for u_id, strategy in self.learning_role.rl_strats.items():
@@ -187,7 +187,7 @@ class TD3(RLAlgorithm):
                     strategy.critics.optimizer.load_state_dict(
                         critic_params["critic_optimizer"]
                     )
-                    logger.info(f"Loaded critic for {u_id} directly.")
+                    logger.debug(f"Loaded critic for {u_id} directly.")
                 else:
                     critic_weights = transfer_weights(
                         model=strategy.critics,
@@ -216,7 +216,7 @@ class TD3(RLAlgorithm):
 
                     strategy.critics.load_state_dict(critic_weights)
                     strategy.target_critics.load_state_dict(target_critic_weights)
-                    logger.info(f"Critic weights transferred for {u_id}.")
+                    logger.debug(f"Critic weights transferred for {u_id}.")
 
             except Exception as e:
                 logger.warning(f"Failed to load critic for {u_id}: {e}")
