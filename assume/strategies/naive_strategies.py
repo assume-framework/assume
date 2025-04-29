@@ -404,10 +404,6 @@ class ElasticDemandStrategy(BaseStrategy):
                 )
             else:
                 elasticity = unit.elasticity
-                if elasticity >= 0:
-                    raise ValueError(
-                        "Elasticity must be negative for isoelastic model."
-                    )
 
         for product in product_tuples:
             start, end, only_hours = product
