@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base:
+  simulation_id: example_02e_contextual_fusion
   start_date: 2019-03-01 00:00
   end_date: 2019-05-30 00:00
   time_step: 1h
@@ -15,12 +16,17 @@ base:
     trained_policies_load_path: null
     max_bid_price: 100
     algorithm: matd3
-    actor_architecture: mlp
+    actor_architecture: contextual_late_fusion
+    actor_clustering_method: k-means
+    clustering_method_kwargs:
+      n_clusters: 2
+      random_state: 42
     learning_rate: 0.0003
-    training_episodes: 50
+    # learning_rate_schedule: linear
+    training_episodes: 100
     episodes_collecting_initial_experience: 5
-    train_freq: 720h
-    gradient_steps: 720
+    train_freq: 100h
+    gradient_steps: 10
     batch_size: 256
     gamma: 0.999
     device: cpu
