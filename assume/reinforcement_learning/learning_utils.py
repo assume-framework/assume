@@ -2,12 +2,15 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from collections.abc import Callable
 from datetime import datetime
 from typing import TypedDict
 
 import numpy as np
 import torch as th
+
+logger = logging.getLogger(__name__)
 
 
 class ObsActRew(TypedDict):
@@ -166,3 +169,100 @@ def constant_schedule(val: float) -> Schedule:
         return val
 
     return func
+
+
+def get_hidden_sizes(state_dict: dict, prefix: str) -> list[int]:
+    sizes = []
+    i = 0
+    while f"{prefix}.{i}.weight" in state_dict:
+        weight = state_dict[f"{prefix}.{i}.weight"]
+        out_dim = weight.shape[0]
+        sizes.append(out_dim)
+        i += 1
+    return sizes[:-1]  # exclude the final output layer if needed
+
+
+def copy_layer_data(dst, src):
+    for k in dst:
+        if k in src and dst[k].shape == src[k].shape:
+            dst[k].data.copy_(src[k].data)
+
+
+def transfer_weights(
+    model: th.nn.Module,
+    old_state: dict,
+    old_id_order: list[str],
+    new_id_order: list[str],
+    obs_base: int,
+    act_dim: int,
+    unique_obs: int,
+) -> dict | None:
+    """
+    Copy only those obs_ and action-slices for matching IDs.
+    New IDs keep their original (random) weights.
+    """
+    # 1) Architecture check
+    new_state = model.state_dict()
+    old_hidden = get_hidden_sizes(old_state, prefix="q1_layers")
+    new_hidden = get_hidden_sizes(new_state, prefix="q1_layers")
+    if old_hidden != new_hidden:
+        logger.warning(
+            f"Cannot transfer weights: architecture mismatch.\n"
+            f"Old sizes: {old_hidden}, New sizes: {new_hidden}."
+        )
+        return None
+
+    # 2) Compute total dims
+    old_n = len(old_id_order)
+    new_n = len(new_id_order)
+    old_obs_tot = obs_base + unique_obs * max(0, old_n - 1)
+    new_obs_tot = obs_base + unique_obs * max(0, new_n - 1)
+
+    # 3) Clone new state
+    new_state_copy = {k: v.clone() for k, v in new_state.items()}
+
+    # 4) Transfer per-prefix
+    for prefix in ("q1_layers", "q2_layers"):
+        w_old = old_state[f"{prefix}.0.weight"]
+        b_old = old_state[f"{prefix}.0.bias"]
+        w_new = new_state_copy[f"{prefix}.0.weight"]
+        b_new = new_state_copy[f"{prefix}.0.bias"]
+        orig_w = new_state[f"{prefix}.0.weight"].clone()
+
+        # a) shared obs_base
+        w_new[:, :obs_base] = w_old[:, :obs_base]
+
+        # b) matched-ID blocks
+        for new_idx, u in enumerate(new_id_order):
+            if u not in old_id_order:
+                continue
+            old_idx = old_id_order.index(u)
+
+            # unique_obs for agents beyond the first
+            if new_idx > 0 and old_idx > 0:
+                ns = obs_base + unique_obs * (new_idx - 1)
+                os_ = obs_base + unique_obs * (old_idx - 1)
+                w_new[:, ns : ns + unique_obs] = w_old[:, os_ : os_ + unique_obs]
+
+            # action blocks for every agent
+            nact = new_obs_tot + act_dim * new_idx
+            oact = old_obs_tot + act_dim * old_idx
+            w_new[:, nact : nact + act_dim] = w_old[:, oact : oact + act_dim]
+
+        # c) restore unmatched agents’ unique_obs
+        for new_idx, u in enumerate(new_id_order):
+            if new_idx == 0 or u in old_id_order:
+                continue
+            ns = obs_base + unique_obs * (new_idx - 1)
+            w_new[:, ns : ns + unique_obs] = orig_w[:, ns : ns + unique_obs]
+            # actions untouched
+
+        # d) bias and deeper layers
+        b_new.copy_(b_old)
+        for i in range(1, len(new_hidden) + 1):
+            new_state_copy[f"{prefix}.{i}.weight"].copy_(
+                old_state[f"{prefix}.{i}.weight"]
+            )
+            new_state_copy[f"{prefix}.{i}.bias"].copy_(old_state[f"{prefix}.{i}.bias"])
+
+    return new_state_copy

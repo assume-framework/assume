@@ -19,7 +19,7 @@ from assume.reinforcement_learning.learning_utils import NormalActionNoise
 logger = logging.getLogger(__name__)
 
 
-class AbstractLearningStrategy(LearningStrategy):
+class BaseLearningStrategy(LearningStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -162,7 +162,7 @@ class AbstractLearningStrategy(LearningStrategy):
         self.context = th.as_tensor(context, dtype=self.float_type, device=self.device)
 
 
-class RLStrategy(AbstractLearningStrategy):
+class RLStrategy(BaseLearningStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -763,7 +763,7 @@ class RLStrategySingleBid(RLStrategy):
         return bids
 
 
-class StorageRLStrategy(AbstractLearningStrategy):
+class StorageRLStrategy(BaseLearningStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.

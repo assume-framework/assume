@@ -14,7 +14,10 @@ from torch.nn import functional as F
 from torch.optim import AdamW
 
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.learning_utils import polyak_update
+from assume.reinforcement_learning.learning_utils import (
+    polyak_update,
+    transfer_weights,
+)
 from assume.reinforcement_learning.neural_network_architecture import CriticTD3
 
 logger = logging.getLogger(__name__)
@@ -113,6 +116,13 @@ class TD3(RLAlgorithm):
             path = f"{directory}/critic_{u_id}.pt"
             th.save(obj, path)
 
+        # record the exact order of u_ids to ensure that the same order is used when loading the parameters
+        u_id_list = [str(u) for u in self.learning_role.rl_strats.keys()]
+        mapping = {"u_id_order": u_id_list}
+        map_path = os.path.join(directory, "u_id_order.json")
+        with open(map_path, "w") as f:
+            json.dump(mapping, f, indent=2)
+
     def save_actor_params(self, directory):
         """
         Save the parameters of actor networks.
@@ -174,35 +184,91 @@ class TD3(RLAlgorithm):
 
     def load_critic_params(self, directory: str) -> None:
         """
-        Load the parameters of critic networks from a specified directory.
-
-        This method loads the parameters of critic networks, including the critic's state_dict, critic_target's state_dict, and
-        the critic's optimizer state_dict, from the specified directory. It iterates through the learning strategies associated
-        with the learning role, loads the respective parameters, and updates the critic and target critic networks accordingly.
-
-        Args:
-            directory (str): The directory from which the parameters should be loaded.
+        Load critic, target_critic, and optimizer states for each agent strategy.
+        If agent count differs between saved and current model, performs weight transfer for both networks.
         """
         logger.info("Loading critic parameters...")
 
         if not os.path.exists(directory):
             logger.warning(
-                "Specified directory for loading the critics does not exist! Starting with randomly initialized values!"
+                "Specified directory does not exist. Using randomly initialized critics."
             )
             return
 
+        map_path = os.path.join(directory, "critics", "u_id_order.json")
+        if os.path.exists(map_path):
+            with open(map_path) as f:
+                old_id_order = json.load(f).get("u_id_order", [])
+        else:
+            logger.warning("No u_id_order.json: assuming same order as current.")
+            old_id_order = [str(u) for u in self.learning_role.rl_strats.keys()]
+
+        new_id_order = [str(u) for u in self.learning_role.rl_strats.keys()]
+        direct_load = old_id_order == new_id_order
+
+        if direct_load:
+            logger.info("Agents order unchanged. Loading critic weights directly.")
+        else:
+            logger.info(
+                f"Agents length and/or order mismatch: n_old={len(old_id_order)}, n_new={len(new_id_order)}. Attempting to transfer weights for critics and target critics."
+            )
+
         for u_id, strategy in self.learning_role.rl_strats.items():
+            critic_path = os.path.join(directory, "critics", f"critic_{u_id}.pt")
+            if not os.path.exists(critic_path):
+                logger.warning(f"No saved critic for {u_id}; skipping.")
+                continue
+
             try:
-                critic_params = self.load_obj(
-                    directory=f"{directory}/critics/critic_{str(u_id)}.pt"
-                )
-                strategy.critics.load_state_dict(critic_params["critic"])
-                strategy.target_critics.load_state_dict(critic_params["critic_target"])
-                strategy.critics.optimizer.load_state_dict(
-                    critic_params["critic_optimizer"]
-                )
-            except Exception:
-                logger.warning(f"No critic values loaded for agent {u_id}")
+                critic_params = th.load(critic_path, weights_only=True)
+                for key in ("critic", "critic_target", "critic_optimizer"):
+                    if key not in critic_params:
+                        logger.warning(
+                            f"Missing {key} in critic params for {u_id}; skipping."
+                        )
+                        continue
+
+                if direct_load:
+                    strategy.critics.load_state_dict(critic_params["critic"])
+                    strategy.target_critics.load_state_dict(
+                        critic_params["critic_target"]
+                    )
+                    strategy.critics.optimizer.load_state_dict(
+                        critic_params["critic_optimizer"]
+                    )
+                    logger.debug(f"Loaded critic for {u_id} directly.")
+                else:
+                    critic_weights = transfer_weights(
+                        model=strategy.critics,
+                        old_state=critic_params["critic"],
+                        old_id_order=old_id_order,
+                        new_id_order=new_id_order,
+                        obs_base=strategy.obs_dim,
+                        act_dim=strategy.act_dim,
+                        unique_obs=strategy.unique_obs_dim,
+                    )
+                    target_critic_weights = transfer_weights(
+                        model=strategy.target_critics,
+                        old_state=critic_params["critic_target"],
+                        old_id_order=old_id_order,
+                        new_id_order=new_id_order,
+                        obs_base=strategy.obs_dim,
+                        act_dim=strategy.act_dim,
+                        unique_obs=strategy.unique_obs_dim,
+                    )
+
+                    if critic_weights is None or target_critic_weights is None:
+                        logger.warning(
+                            f"Critic weights transfer failed for {u_id}; skipping."
+                        )
+                        continue
+
+                    strategy.critics.load_state_dict(critic_weights)
+                    strategy.target_critics.load_state_dict(target_critic_weights)
+                    logger.debug(f"Critic weights transferred for {u_id}.")
+
+            except Exception as e:
+                logger.warning(f"Failed to load critic for {u_id}: {e}")
 
     def load_actor_params(self, directory: str) -> None:
         """
@@ -232,6 +298,9 @@ class TD3(RLAlgorithm):
                 strategy.actor.optimizer.load_state_dict(
                     actor_params["actor_optimizer"]
                 )
+
+                # add a tag to the strategy to indicate that the actor was loaded
+                strategy.actor.loaded = True
             except Exception:
                 logger.warning(f"No actor values loaded for agent {u_id}")
 
@@ -393,19 +462,19 @@ class TD3(RLAlgorithm):
 
         for strategy in self.learning_role.rl_strats.values():
             strategy.actor = self.actor_architecture_class(
-                obs_dim=strategy.obs_dim,
-                act_dim=strategy.act_dim,
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
                 float_type=self.float_type,
-                unique_obs_dim=strategy.unique_obs_dim,
-                num_timeseries_obs_dim=strategy.num_timeseries_obs_dim,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
             ).to(self.device)
 
             strategy.actor_target = self.actor_architecture_class(
-                obs_dim=strategy.obs_dim,
-                act_dim=strategy.act_dim,
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
                 float_type=self.float_type,
-                unique_obs_dim=strategy.unique_obs_dim,
-                num_timeseries_obs_dim=strategy.num_timeseries_obs_dim,
+                unique_obs_dim=self.unique_obs_dim,
+                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
             ).to(self.device)
 
             strategy.actor_target.load_state_dict(strategy.actor.state_dict())
@@ -482,17 +551,17 @@ class TD3(RLAlgorithm):
         for strategy in self.learning_role.rl_strats.values():
             strategy.critics = CriticTD3(
                 n_agents=n_agents,
-                obs_dim=strategy.obs_dim,
-                act_dim=strategy.act_dim,
-                unique_obs_dim=strategy.unique_obs_dim,
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
+                unique_obs_dim=self.unique_obs_dim,
                 float_type=self.float_type,
             ).to(self.device)
 
             strategy.target_critics = CriticTD3(
                 n_agents=n_agents,
-                obs_dim=strategy.obs_dim,
-                act_dim=strategy.act_dim,
-                unique_obs_dim=strategy.unique_obs_dim,
+                obs_dim=self.obs_dim,
+                act_dim=self.act_dim,
+                unique_obs_dim=self.unique_obs_dim,
                 float_type=self.float_type,
             ).to(self.device)
 
