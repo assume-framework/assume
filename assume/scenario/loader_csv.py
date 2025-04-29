@@ -438,22 +438,29 @@ def read_units(
     return units_dict
 
 
-def define_global_normalization_values(world):
-    max_power = 0
-    max_marginal_cost = 0
-    max_soc = 0
-    rl_units = []
+def prepare_learning_strategies(world):
+    # Initialize global maximums
+    max_power = max_marginal_cost = max_soc = 0
+    rl_units, rl_strategies = [], []
 
-    # Collect relevant RL units
+    # Helper: Check if strategy is a LearningStrategy
+    def is_learning_strategy(strategy):
+        return isinstance(strategy, LearningStrategy)
+
+    # Step 1: Collect RL units and strategies
     for unit_operator in world.unit_operators.values():
         for unit in unit_operator.units.values():
-            if any(
-                isinstance(strategy, LearningStrategy)
-                for strategy in unit.bidding_strategies.values()
-            ):
-                rl_units.append(unit)
+            for strategy in unit.bidding_strategies.values():
+                if is_learning_strategy(strategy):
+                    rl_strategies.append(strategy)
+                    if unit not in rl_units:
+                        rl_units.append(unit)
 
-    # Calculate global maximums
+    # skip the rest if no RL units are found
+    if not rl_units:
+        return
+
+    # Step 2: Compute global max values
     for unit in rl_units:
         max_power = max(
             max_power,
@@ -461,23 +468,59 @@ def define_global_normalization_values(world):
             getattr(unit, "max_power_charge", 0),
             getattr(unit, "max_power_discharge", 0),
         )
-
         if hasattr(unit, "marginal_cost") and unit.marginal_cost:
             max_marginal_cost = max(max_marginal_cost, max(unit.marginal_cost))
-
         max_soc = max(max_soc, getattr(unit, "max_soc", 0))
 
-    # Set global normalization values for all units
+    # Step 3: Set global values on all units
     for unit in rl_units:
         unit.global_max_power = max_power
         unit.global_max_marginal_cost = max_marginal_cost
         unit.global_max_soc = max_soc
 
-    # Prepare observations for RL units with LearningStrategy
+    # Step 4: Prepare observations
     for unit in rl_units:
         for market_id, strategy in unit.bidding_strategies.items():
-            if isinstance(strategy, LearningStrategy):
+            if is_learning_strategy(strategy):
                 strategy.prepare_observations(unit, market_id)
+
+    # Step 5: Perform actor clustering (if configured)
+    actor_clustering_method = world.learning_config.get("actor_clustering_method")
+    if actor_clustering_method:
+        try:
+            from assume.reinforcement_learning.learning_utils import create_clusters
+
+            clustering_kwargs = world.learning_config.get(
+                "actor_clustering_method_kwargs", {}
+            )
+            clusters = create_clusters(
+                strategies=rl_strategies,
+                actor_clustering_method=actor_clustering_method,
+                clustering_method_kwargs=clustering_kwargs,
+            )
+
+            cluster_mapping = {
+                strategy.unit_id: cluster_idx
+                for cluster_idx, strategies in clusters.items()
+                for strategy in strategies
+            }
+
+            for unit in rl_units:
+                cluster_id = cluster_mapping.get(unit.id)
+                for strategy in unit.bidding_strategies.values():
+                    if is_learning_strategy(strategy):
+                        strategy.cluster_id = cluster_id
+        except ImportError:
+            pass
+
+    # Step 6: Load trained policies if not in learning/evaluation mode
+    if not world.learning_mode and not world.evaluation_mode:
+        load_path = world.learning_config.get("trained_policies_load_path")
+        if load_path:
+            for unit in rl_units:
+                for strategy in unit.bidding_strategies.values():
+                    if is_learning_strategy(strategy):
+                        strategy.load_actor_params(load_path)
 
 
 def load_config_and_create_forecaster(
@@ -832,7 +875,7 @@ def setup_world(
     if world.learning_mode or world.evaluation_mode:
         world.add_learning_strategies_to_learning_role()
 
-    define_global_normalization_values(world)
+    prepare_learning_strategies(world)
 
     if (
         world.learning_mode

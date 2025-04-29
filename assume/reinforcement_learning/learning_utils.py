@@ -9,6 +9,7 @@ from typing import TypedDict
 
 import numpy as np
 import torch as th
+from sklearn.cluster import KMeans
 
 logger = logging.getLogger(__name__)
 
@@ -266,3 +267,182 @@ def transfer_weights(
             new_state_copy[f"{prefix}.{i}.bias"].copy_(old_state[f"{prefix}.{i}.bias"])
 
     return new_state_copy
+
+
+def cluster_strategies_k_means(strategies: list, n_groups: int, random_state: int):
+    contexts = np.array(
+        [strategy.context.detach().cpu().numpy() for strategy in strategies]
+    )
+
+    kmeans = KMeans(n_clusters=n_groups, random_state=random_state)
+    labels = kmeans.fit_predict(contexts)
+
+    clusters = {i: [] for i in range(n_groups)}
+    for strategy, label in zip(strategies, labels):
+        clusters[label].append(strategy)
+
+    return clusters
+
+
+def cluster_strategies_max_size(strategies: list, max_size: int, random_state: int):
+    """
+    Clusters strategies such that no cluster exceeds `max_size`.
+
+    Args:
+        strategies (list): List of strategy objects with `.context` attributes.
+        max_size (int): Maximum allowed number of strategies per cluster.
+        random_state (int): Seed for reproducible KMeans clustering.
+
+    Returns:
+        dict[int, list]: Dictionary of clustered strategies.
+
+    Raises:
+        ValueError: If a cluster still exceeds `max_size` after processing.
+        RecursionError: If too many recursive splits occur.
+    """
+
+    n_clusters = max(1, len(strategies) // max_size)
+
+    clusters = cluster_strategies_k_means(
+        strategies=strategies, n_groups=n_clusters, random_state=random_state
+    )
+
+    def split_clusters(clusters_dict):
+        final_clusters = {}
+        cluster_id_counter = 0
+
+        for cluster in clusters_dict.values():
+            if len(cluster) <= max_size:
+                final_clusters[cluster_id_counter] = cluster
+                cluster_id_counter += 1
+            else:
+                # Check for identical contexts before attempting split
+                sub_contexts = np.array(
+                    [s.context.detach().cpu().numpy() for s in cluster]
+                )
+                unique_sub_contexts = np.unique(sub_contexts, axis=0)
+
+                if len(unique_sub_contexts) <= 1:
+                    logger.warning(
+                        f"Cannot split cluster of size {len(cluster)} further "
+                        f"as contexts are identical. Keeping oversized cluster (violates max_size)."
+                    )
+                    final_clusters[cluster_id_counter] = cluster
+                    cluster_id_counter += 1
+                    continue
+
+                # Split cluster further
+                n_subclusters = max(2, len(cluster) // max_size)
+                sub_clusters = cluster_strategies_k_means(
+                    strategies=cluster,
+                    n_groups=n_subclusters,
+                    random_state=random_state
+                    + len(cluster),  # add cluster size to random state for uniqueness
+                )
+
+                # Recursively process sub-clusters
+                sub_result = split_clusters(sub_clusters)
+                for sub_cluster in sub_result.values():
+                    final_clusters[cluster_id_counter] = sub_cluster
+                    cluster_id_counter += 1
+
+        return final_clusters
+
+    try:
+        final_clusters = split_clusters(clusters)
+    except RecursionError:
+        logger.error(
+            "Recursion limit reached while splitting clusters. "
+            "Consider increasing the max_number_of_actors parameter"
+        )
+        raise
+
+    # Final safety check
+    for cluster in final_clusters.values():
+        if len(cluster) > max_size:
+            raise ValueError(
+                f"Cluster size exceeds max size: {len(cluster)} > {max_size}"
+            )
+
+    return final_clusters
+
+
+def create_clusters(
+    strategies,
+    actor_clustering_method,
+    clustering_method_kwargs,
+):
+    """
+    Create clusters of strategies based on the specified clustering method and return them.
+
+    Supports two clustering methods:
+    - 'max-size': Uses Agglomerative Clustering to create groups with a maximum number of strategies.
+    - 'k-means': Uses KMeans to create a predefined number of clusters.
+
+    Args:
+        strategies (list): List of strategy objects.
+        actor_clustering_method (str): Clustering method to use ('max-size' or 'k-means').
+        max_number_of_actors (int): Maximum number of strategies per cluster for 'max-size'.
+        n_clusters (int): Number of clusters for 'k-means'.
+        random_state (int): Seed for reproducibility.
+
+    Returns:
+        dict[int, list]: A dictionary where keys are cluster indices and values are lists of strategies.
+
+    Raises:
+        ValueError: If the required parameters are missing or if the clustering method is unknown.
+    """
+
+    n_clusters = clustering_method_kwargs.get("n_clusters", 2)
+    max_number_of_actors = clustering_method_kwargs.get("max_number_of_actors", 10)
+    random_state = clustering_method_kwargs.get("random_state", 42)
+
+    n_strategies = len(strategies)
+
+    if not strategies:
+        raise ValueError("No strategies available for clustering.")
+
+    all_contexts = np.array([s.context.detach().cpu().numpy() for s in strategies])
+    if len(np.unique(all_contexts, axis=0)) == 1:
+        logger.warning(
+            "All strategy contexts are identical — clustering is not possible."
+        )
+        return {0: strategies}  # Return a single cluster with all strategies
+
+    if actor_clustering_method == "max-size":
+        # Validate 'max-size' method
+        if not isinstance(max_number_of_actors, int) or max_number_of_actors <= 0:
+            raise ValueError(
+                "'max_number_of_actors' must be a positive integer when using 'max-size' clustering method."
+            )
+
+        clusters = cluster_strategies_max_size(
+            strategies=strategies,
+            max_size=max_number_of_actors,
+            random_state=random_state,
+        )
+
+    elif actor_clustering_method == "k-means":
+        # Validate 'k-means' method
+        if not isinstance(n_clusters, int) or n_clusters <= 0:
+            raise ValueError(
+                "'n_clusters' must be a positive integer when using 'k-means' clustering method."
+            )
+
+        if n_clusters > n_strategies:
+            raise ValueError(
+                f"'n_clusters' ({n_clusters}) cannot be greater than the number of strategies ({n_strategies})."
+            )
+
+        clusters = cluster_strategies_k_means(
+            strategies=strategies,
+            n_groups=n_clusters,
+            random_state=random_state,
+        )
+
+    else:
+        raise ValueError(
+            f"Unknown clustering method '{actor_clustering_method}'. Supported methods are 'max-size' and 'k-means'."
+        )
+
+    return clusters

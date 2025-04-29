@@ -55,7 +55,7 @@ class BaseLearningStrategy(LearningStrategy):
         # float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float
 
-        if self.learning_mode or self.evaluation_mode:
+        if self.learning_mode:
             self.collect_initial_experience_mode = bool(
                 kwargs.get("episodes_collecting_initial_experience", True)
             )
@@ -68,13 +68,6 @@ class BaseLearningStrategy(LearningStrategy):
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
-        elif Path(kwargs["trained_policies_load_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
-        else:
-            raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
-
     def load_actor_params(self, load_path):
         """
         Load actor parameters.
@@ -84,19 +77,32 @@ class BaseLearningStrategy(LearningStrategy):
         """
         if self.actor_architecture in ["mlp", "lstm"]:
             directory = f"{load_path}/actors/actor_{self.unit_id}.pt"
+
         elif self.actor_architecture in ["contextual_late_fusion", "contextual_film"]:
             # first load the cluster mapping json
             cluster_mapping_path = f"{load_path}/actors/cluster_mapping.json"
             with open(cluster_mapping_path) as f:
                 cluster_mapping = json.load(f)
-            # get the cluster id for the unit
-            cluster_id = cluster_mapping.get(self.unit_id)
-            if cluster_id is None:
-                raise ValueError(
-                    f"Unit {self.unit_id} not found in cluster mapping file."
+
+            # raise error if the unit is not in the cluster mapping
+            if self.unit_id in cluster_mapping:
+                # get the cluster id for the unit
+                cluster_id = cluster_mapping.get(self.unit_id)
+            else:
+                cluster_id = self.cluster_id
+                logger.warning(
+                    f"Unit {self.unit_id} not found in cluster mapping file. "
+                    f"Using newly created cluster mapping. Unit will be assigned to cluster {cluster_id}."
                 )
-            # load the actor parameters for the cluster
+
+            #  load the actor parameters for the cluster
             directory = f"{load_path}/actors/shared_actor_{cluster_id}.pt"
+
+        # if the directory does not exist, raise an error
+        if not Path(directory).exists():
+            raise FileNotFoundError(
+                f"Actor parameters for unit {self.unit_id} not found in {directory}"
+            )
 
         params = th.load(directory, map_location=self.device, weights_only=True)
 

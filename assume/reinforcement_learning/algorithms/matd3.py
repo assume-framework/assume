@@ -7,14 +7,13 @@ import logging
 import os
 from collections import defaultdict
 
-import numpy as np
 import torch as th
-from sklearn.cluster import KMeans
 from torch.nn import functional as F
 from torch.optim import AdamW
 
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.learning_utils import (
+    create_clusters,
     polyak_update,
     transfer_weights,
 )
@@ -395,12 +394,6 @@ class TD3(RLAlgorithm):
             self.act_dim = actors_and_critics["act_dim"]
             self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
 
-            # check for consistency and raise error if not
-            if not self.verify_actor_sharing():
-                raise ValueError(
-                    "Actor sharing is not consistent across strategies in the same cluster."
-                )
-
     def check_policy_dimensions(self) -> None:
         obs_dim_list = []
         context_dim_list = []
@@ -494,7 +487,12 @@ class TD3(RLAlgorithm):
 
     def create_shared_actors(self):
         if self.actor_clustering_method:
-            self.clusters = self.create_clusters()
+            strategies = list(self.learning_role.rl_strats.values())
+            self.clusters = create_clusters(
+                strategies=strategies,
+                actor_clustering_method=self.actor_clustering_method,
+                clustering_method_kwargs=self.clustering_method_kwargs,
+            )
         else:
             # If no clustering method is specified, use a single cluster for all strategies
             self.clusters = {0: list(self.learning_role.rl_strats.values())}
@@ -934,258 +932,3 @@ class TD3(RLAlgorithm):
                 polyak_update(all_actor_params, all_target_actor_params, self.tau)
 
         self.learning_role.write_rl_critic_params_to_output(learning_rate, unit_params)
-
-    def cluster_strategies_k_means(
-        self, strategies: list, n_groups: int, random_state: int
-    ):
-        contexts = np.array(
-            [strategy.context.detach().cpu().numpy() for strategy in strategies]
-        )
-
-        kmeans = KMeans(n_clusters=n_groups, random_state=random_state)
-        labels = kmeans.fit_predict(contexts)
-
-        clusters = {i: [] for i in range(n_groups)}
-        for strategy, label in zip(strategies, labels):
-            clusters[label].append(strategy)
-
-        return clusters
-
-    def cluster_strategies_max_size(
-        self, strategies: list, max_size: int, random_state: int
-    ):
-        """
-        Clusters strategies such that no cluster exceeds `max_size`.
-
-        Args:
-            strategies (list): List of strategy objects with `.context` attributes.
-            max_size (int): Maximum allowed number of strategies per cluster.
-            random_state (int): Seed for reproducible KMeans clustering.
-
-        Returns:
-            dict[int, list]: Dictionary of clustered strategies.
-
-        Raises:
-            ValueError: If a cluster still exceeds `max_size` after processing.
-            RecursionError: If too many recursive splits occur.
-        """
-
-        n_clusters = max(1, len(strategies) // max_size)
-
-        clusters = self.cluster_strategies_k_means(
-            strategies=strategies, n_groups=n_clusters, random_state=random_state
-        )
-
-        def split_clusters(clusters_dict):
-            final_clusters = {}
-            cluster_id_counter = 0
-
-            for cluster in clusters_dict.values():
-                if len(cluster) <= max_size:
-                    final_clusters[cluster_id_counter] = cluster
-                    cluster_id_counter += 1
-                else:
-                    # Check for identical contexts before attempting split
-                    sub_contexts = np.array(
-                        [s.context.detach().cpu().numpy() for s in cluster]
-                    )
-                    unique_sub_contexts = np.unique(sub_contexts, axis=0)
-
-                    if len(unique_sub_contexts) <= 1:
-                        logger.warning(
-                            f"Cannot split cluster of size {len(cluster)} further "
-                            f"as contexts are identical. Keeping oversized cluster (violates max_size)."
-                        )
-                        final_clusters[cluster_id_counter] = cluster
-                        cluster_id_counter += 1
-                        continue
-
-                    # Split cluster further
-                    n_subclusters = max(2, len(cluster) // max_size)
-                    sub_clusters = self.cluster_strategies_k_means(
-                        strategies=cluster,
-                        n_groups=n_subclusters,
-                        random_state=random_state
-                        + len(
-                            cluster
-                        ),  # add cluster size to random state for uniqueness
-                    )
-
-                    # Recursively process sub-clusters
-                    sub_result = split_clusters(sub_clusters)
-                    for sub_cluster in sub_result.values():
-                        final_clusters[cluster_id_counter] = sub_cluster
-                        cluster_id_counter += 1
-
-            return final_clusters
-
-        try:
-            final_clusters = split_clusters(clusters)
-        except RecursionError:
-            logger.error(
-                "Recursion limit reached while splitting clusters. "
-                "Consider increasing the max_number_of_actors parameter"
-            )
-            raise
-
-        # Final safety check
-        for cluster in final_clusters.values():
-            if len(cluster) > max_size:
-                raise ValueError(
-                    f"Cluster size exceeds max size: {len(cluster)} > {max_size}"
-                )
-
-        return final_clusters
-
-    def create_clusters(self):
-        """
-        Create clusters of strategies based on the specified clustering method and return them.
-
-        Supports two clustering methods:
-        - 'max-size': Uses Agglomerative Clustering to create groups with a maximum number of strategies.
-        - 'k-means': Uses KMeans to create a predefined number of clusters.
-
-        Returns:
-            dict[int, list]: A dictionary where keys are cluster indices and values are lists of strategies.
-
-        Raises:
-            ValueError: If the required parameters are missing or if the clustering method is unknown.
-        """
-        strategies = list(self.learning_role.rl_strats.values())
-        n_strategies = len(strategies)
-
-        if not strategies:
-            raise ValueError("No strategies available for clustering.")
-
-        all_contexts = np.array([s.context.detach().cpu().numpy() for s in strategies])
-        if len(np.unique(all_contexts, axis=0)) == 1:
-            logger.warning(
-                "All strategy contexts are identical — clustering is not possible."
-            )
-            return {0: strategies}  # Return a single cluster with all strategies
-
-        if self.actor_clustering_method == "max-size":
-            # Validate 'max-size' method
-            max_number_of_actors = self.clustering_method_kwargs.get(
-                "max_number_of_actors"
-            )
-            if not isinstance(max_number_of_actors, int) or max_number_of_actors <= 0:
-                raise ValueError(
-                    "'max_number_of_actors' must be a positive integer when using 'max-size' clustering method."
-                )
-
-            clusters = self.cluster_strategies_max_size(
-                strategies=strategies,
-                max_size=max_number_of_actors,
-                random_state=self.clustering_method_kwargs.get("random_state", 42),
-            )
-
-        elif self.actor_clustering_method == "k-means":
-            # Validate 'k-means' method
-            n_clusters = self.clustering_method_kwargs.get("n_clusters")
-            if not isinstance(n_clusters, int) or n_clusters <= 0:
-                raise ValueError(
-                    "'n_clusters' must be a positive integer when using 'k-means' clustering method."
-                )
-
-            if n_clusters > n_strategies:
-                raise ValueError(
-                    f"'n_clusters' ({n_clusters}) cannot be greater than the number of strategies ({n_strategies})."
-                )
-
-            clusters = self.cluster_strategies_k_means(
-                strategies=strategies,
-                n_groups=n_clusters,
-                random_state=self.clustering_method_kwargs.get("random_state", 42),
-            )
-
-        else:
-            raise ValueError(
-                f"Unknown clustering method '{self.actor_clustering_method}'. Supported methods are 'max-size' and 'k-means'."
-            )
-
-        return clusters
-
-    def verify_actor_sharing(self):
-        """
-        Verifies that all strategies within the same cluster point to the
-        exact same actor network instance in memory.
-
-        Should be called after initialize_policy when using shared actors.
-
-        Returns:
-            bool: True if actor sharing is consistent, False otherwise.
-        """
-        if not self.use_shared_actor:
-            logger.debug("Verification skipped: Not in shared actor mode.")
-            return True  # Nothing to verify
-
-        if not hasattr(self, "clusters") or not self.clusters:
-            logger.error(
-                "Verification failed: `self.clusters` attribute not found or empty."
-            )
-            return False
-
-        logger.debug("Starting actor sharing verification...")
-        overall_consistent = True
-
-        for cluster_index, strategies_in_cluster in self.clusters.items():
-            if not strategies_in_cluster:
-                logger.debug(f"Cluster {cluster_index}: Skipping empty cluster.")
-                continue
-
-            # Get the actor instance from the first strategy as the reference
-            try:
-                reference_actor = strategies_in_cluster[0].actor
-                reference_actor_id = id(reference_actor)  # Get memory address (ID)
-                logger.debug(
-                    f"Cluster {cluster_index}: Reference actor ID is {reference_actor_id}"
-                )
-            except AttributeError:
-                logger.error(
-                    f"Cluster {cluster_index}: First strategy {strategies_in_cluster[0].unit_id} missing 'actor' attribute."
-                )
-                overall_consistent = False
-                continue  # Cannot check this cluster
-
-            # Compare all other strategies in the cluster to the reference
-            is_cluster_consistent = True
-            for i, strategy in enumerate(strategies_in_cluster):
-                try:
-                    current_actor = strategy.actor
-                    current_actor_id = id(current_actor)
-
-                    # Check if they are the *exact same object* in memory
-                    if current_actor is not reference_actor:
-                        logger.error(
-                            f"Inconsistency in Cluster {cluster_index}! "
-                            f"Strategy '{strategy.unit_id}' (index {i}) has actor ID {current_actor_id}, "
-                            f"expected {reference_actor_id}."
-                        )
-                        is_cluster_consistent = False
-                        overall_consistent = False
-                        # Optional: break here if you only care about the first mismatch per cluster
-                        # break
-                except AttributeError:
-                    logger.error(
-                        f"Cluster {cluster_index}: Strategy '{strategy.unit_id}' missing 'actor' attribute during verification."
-                    )
-                    is_cluster_consistent = False
-                    overall_consistent = False
-                    # Optional: break here
-
-            if is_cluster_consistent:
-                logger.debug(
-                    f"Cluster {cluster_index}: OK - All {len(strategies_in_cluster)} strategies share the same actor instance (ID: {reference_actor_id})."
-                )
-
-        if overall_consistent:
-            logger.debug(
-                "Actor sharing verification finished: All clusters consistent."
-            )
-        else:
-            logger.warning(
-                "Actor sharing verification finished: Inconsistencies detected!"
-            )
-
-        return overall_consistent
