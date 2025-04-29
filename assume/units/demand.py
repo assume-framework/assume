@@ -70,19 +70,22 @@ class Demand(SupportsMinMax):
         # Elastic demand parameters
         self.max_price = price
         self.elasticity = kwargs.get("elasticity", 0.0)
-        self.elasticity_model = kwargs.get("elasticity_model", "linear")
+        self.elasticity_model = kwargs.get("elasticity_model", None)
         self.num_bids = int(kwargs.get("num_bids", 1))
 
         # Validate elastic configuration if elasticity is non-zero
-        if self.elasticity != 0.0:
-            if self.elasticity > 0.0:
-                raise ValueError("elasticity must be negative for elastic demand.")
-            if self.num_bids < 1:
-                raise ValueError("num_bids must be >= 1 for elastic demand.")
+        if self.elasticity_model is not None:
             if self.elasticity_model not in ("linear", "isoelastic"):
                 raise ValueError(
-                    f"Invalid elasticity_model '{self.elasticity_model}'. Choose 'linear' or 'isoelastic'."
+                    f"Invalid elasticity_model '{self.elasticity_model}' at unit {self.id}. Choose 'linear' or 'isoelastic'."
                 )
+            if self.num_bids <= 1:
+                raise ValueError(f"'num_bids' parameter must be >= 1 for elastic demand at unit {self.id}")
+            if self.elasticity_model == "isoelastic":
+                if self.elasticity >= 0.0:
+                    raise ValueError(f"'elasticity' parameter must be given and negative for isoelastic demand at unit {self.id}.")
+        
+            
 
     def execute_current_dispatch(
         self,

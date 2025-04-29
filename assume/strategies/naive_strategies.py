@@ -384,32 +384,14 @@ class ElasticDemandStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        if unit.num_bids == 1:
-            raise ValueError(
-                "ElasticDemandStrategy requires an elastic unit with num_bids > 1."
-            )
-        # check if unit has elasticity_model attribute
-        if not hasattr(unit, "elasticity_model"):
-            raise ValueError(
-                "ElasticDemandStrategy requires an elastic unit with defined  elasticity_model."
-            )
+                
         bids = []
-        max_price = unit.max_price
-        num_bids = unit.num_bids
-        elasticity_model = unit.elasticity_model
-        if elasticity_model == 'isoelastic':
-            if not hasattr(unit, "elasticity"):
-                raise ValueError(
-                    "ElasticDemandStrategy requires an elastic unit with defined elasticity."
-                )
-            else:
-                elasticity = unit.elasticity
-
+        
         for product in product_tuples:
             start, end, only_hours = product
             max_abs_power = max(abs(unit.min_power), abs(unit.max_power))
 
-            if elasticity_model == "isoelastic":
+            if unit.elasticity_model == "isoelastic":
                 # ISOELASTIC model (constant elasticity of demand):
                 # P = (Q / Q_max)^(1 / E)
                 # Derived from:
@@ -436,14 +418,14 @@ class ElasticDemandStrategy(BaseStrategy):
 
                 # calculate first bid in isoelastic model (the volume that is bid at max price)
                 first_bid_volume = self.find_first_block_bid(
-                    elasticity, max_price, max_abs_power
+                    unit.elasticity, unit.max_price, max_abs_power
                 )
                 bids.append(
                     {
                         "start_time": start,
                         "end_time": end,
                         "only_hours": only_hours,
-                        "price": max_price,
+                        "price": unit.max_price,
                         "volume": -first_bid_volume,
                         "node": unit.node,
                     }
@@ -455,14 +437,14 @@ class ElasticDemandStrategy(BaseStrategy):
                         "Negative remaining volume for bidding. Check max_power and elasticity."
                     )
 
-                bid_volume = remaining_volume / (num_bids - 1)
+                bid_volume = remaining_volume / (unit.num_bids - 1)
                 # calculate the remaining bids in isoelastic model
                 # P = (Q/Q_max) ** (1/E)
-                for i in range(1, num_bids):
+                for i in range(1, unit.num_bids):
                     ratio = (first_bid_volume + i * bid_volume) / max_abs_power
                     if ratio <= 0:
                         continue
-                    bid_price = ratio ** (1 / elasticity)
+                    bid_price = ratio ** (1 / unit.elasticity)
 
                     bids.append(
                         {
@@ -475,14 +457,14 @@ class ElasticDemandStrategy(BaseStrategy):
                         }
                     )
 
-            elif elasticity_model == "linear":
+            elif unit.elasticity_model == "linear":
                 # LINEAR model: P = P_max - slope * Q
                 # where slope = (P_max / Q_max)
                 # This ensures price drops linearly with volume
-                bid_volume = max_abs_power / num_bids
-                slope = (max_price / max_abs_power)
-                for i in range(num_bids):
-                    bid_price = max_price - (slope * i * bid_volume)
+                bid_volume = max_abs_power / unit.num_bids
+                slope = (unit.max_price / max_abs_power)
+                for i in range(unit.num_bids):
+                    bid_price = unit.max_price - (slope * i * bid_volume)
 
                     bids.append(
                         {
