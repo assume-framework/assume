@@ -171,7 +171,7 @@ class MLPActor(Actor):
         return x
 
 
-class ContextualMLPActor(Actor):
+class ContextualLateFusionActor(Actor):
     """
     Contextual MLP Actor where observations are processed first,
     then merged with processed context before final layers.
@@ -248,7 +248,7 @@ class ContextualMLPActor(Actor):
         return action
 
 
-class FilmActor(Actor):
+class ContextualFiLMActor(Actor):
     """
     Contextual MLP Actor using FiLM layers.
     The context is used to generate modulation parameters (gamma, beta)
