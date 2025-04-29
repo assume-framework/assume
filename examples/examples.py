@@ -78,7 +78,10 @@ available_examples = {
     "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
     "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
-    "small_learning_with_storage": {"scenario": "example_02e", "study_case": "base"},
+    "small_learning_with_pp_and_storage": {
+        "scenario": "example_02e",
+        "study_case": "base",
+    },
     #
     # full year examples to show real-world scenarios
     "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
@@ -116,7 +119,7 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_learning_with_storage_and_pp"
+    example = "small_learning_with_pp_and_storage"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

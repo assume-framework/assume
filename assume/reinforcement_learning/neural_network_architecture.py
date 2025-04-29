@@ -171,7 +171,7 @@ class MLPActor(Actor):
         return x
 
 
-class ContextualMLPActor(Actor):
+class ContextualLateFusionActor(Actor):
     """
     Contextual MLP Actor where observations are processed first,
     then merged with processed context before final layers.
@@ -244,6 +244,109 @@ class ContextualMLPActor(Actor):
 
         # Apply the final layer with Tanh activation (common for TD3 actions)
         action = th.tanh(self.final_layers[-1](final_output))
+
+        return action
+
+
+class ContextualFiLMActor(Actor):
+    """
+    Contextual MLP Actor using FiLM layers.
+    The context is used to generate modulation parameters (gamma, beta)
+    which are applied to the processed observation features.
+    """
+
+    def __init__(
+        self,
+        obs_dim: int,
+        context_dim: int,
+        act_dim: int,
+        float_type,
+        obs_hidden_sizes=[512, 256, 128],  # Layers processing observation ONLY
+        film_hidden_dim=64,  # Hidden layer size(s) for FiLM generator
+        post_film_hidden_sizes=[128],  # Layers processing features AFTER FiLM
+        *args,
+        **kwargs,
+    ):
+        super().__init__()
+        self.float_type = float_type
+        self.obs_dim = obs_dim
+        self.context_dim = context_dim
+        self.act_dim = act_dim
+
+        # 1. Observation Processing Layers (Encoder)
+        self.obs_encoder = nn.ModuleList()
+        current_dim = obs_dim
+        if not obs_hidden_sizes:  # Handle no obs encoder layers
+            self.obs_feature_dim = obs_dim  # FiLM will modulate raw obs
+        else:
+            for h_size in obs_hidden_sizes:
+                self.obs_encoder.append(
+                    nn.Linear(current_dim, h_size, dtype=float_type)
+                )
+                current_dim = h_size
+            # Output dimension of the observation features to be modulated by FiLM
+            self.obs_feature_dim = current_dim
+
+        # 2. FiLM Generator Network
+        # Takes context as input, outputs 2 * obs_feature_dim (for gamma and beta)
+        self.film_generator = nn.Sequential(
+            nn.Linear(context_dim, film_hidden_dim, dtype=float_type),
+            nn.ReLU(),
+            nn.Linear(film_hidden_dim, 2 * self.obs_feature_dim, dtype=float_type),
+            # Note: No activation here, gamma/beta are produced directly.
+            # Consider initializing the bias of the final layer near 1s (for gamma)
+            # and 0s (for beta) for stability, e.g., via a hook or manual init.
+        )
+
+        # 3. Post-FiLM Processing Layers (using _build_mlp_layers helper)
+        # Takes the modulated features (size: obs_feature_dim) as input
+        self.post_film_layers = self._build_mlp_layers(
+            self.obs_feature_dim, act_dim, post_film_hidden_sizes, float_type
+        )
+
+        self._init_weights()  # Initialize all defined layers (uses default Xavier)
+        # Optional: Custom initialization for FiLM generator's final layer bias
+        # Could initialize gamma biases to 1 and beta biases to 0
+        nn.init.constant_(
+            self.film_generator[-1].bias[: self.obs_feature_dim], 1.0
+        )  # Gammas near 1
+        nn.init.constant_(
+            self.film_generator[-1].bias[self.obs_feature_dim :], 0.0
+        )  # Betas near 0
+
+    def forward(self, obs, context):
+        """
+        Forward pass: Process obs, generate FiLM params from context, modulate, process modulated.
+        """
+        # Expand context to match batch size if necessary.
+        if obs.dim() != context.dim():
+            context = context.unsqueeze(0).expand(obs.size(0), -1)
+
+        # 1. Process observation through its dedicated layers
+        obs_features = obs
+        for layer in self.obs_encoder:
+            obs_features = F.relu(layer(obs_features))
+        # obs_features now has shape (batch_size, obs_feature_dim)
+
+        # 2. Generate FiLM parameters (gamma, beta) from context
+        # film_params has shape (batch_size, 2 * obs_feature_dim)
+        film_params = self.film_generator(context)
+
+        # Split into gamma and beta
+        # gamma, beta each have shape (batch_size, obs_feature_dim)
+        gamma, beta = th.chunk(film_params, 2, dim=-1)
+
+        # 3. Apply FiLM modulation
+        # Element-wise multiplication (gamma * features) and addition ( + beta)
+        modulated_features = gamma * obs_features + beta
+
+        # 4. Pass modulated features through the final layers
+        final_output = modulated_features
+        for layer in self.post_film_layers[:-1]:
+            final_output = F.relu(layer(final_output))
+
+        # Apply the final layer with Tanh activation (common for continuous actions)
+        action = th.tanh(self.post_film_layers[-1](final_output))
 
         return action
 
