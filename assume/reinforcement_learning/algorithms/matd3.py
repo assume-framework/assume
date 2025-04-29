@@ -335,6 +335,9 @@ class TD3(RLAlgorithm):
                     actor_params["actor_optimizer"]
                 )
 
+                # add a tag to the strategy to indicate that the actor was loaded
+                self.shared_actors[cluster_index].loaded = True
+
         except Exception:
             logger.warning("No shared actor values loaded")
 
@@ -487,6 +490,8 @@ class TD3(RLAlgorithm):
                 ),  # 1=100% of simulation remaining, uses learning_rate from config as starting point
             )
 
+            strategy.actor.loaded = False
+
     def create_shared_actors(self):
         if self.actor_clustering_method:
             self.clusters = self.create_clusters()
@@ -528,6 +533,8 @@ class TD3(RLAlgorithm):
                 shared_actor.parameters(),
                 lr=self.learning_role.calc_lr_from_progress(1),
             )
+
+            shared_actor.loaded = False
 
             for strategy in strategies:
                 strategy.actor = shared_actor
