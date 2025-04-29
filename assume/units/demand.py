@@ -84,7 +84,11 @@ class Demand(SupportsMinMax):
             if self.elasticity_model == "isoelastic":
                 if self.elasticity >= 0.0:
                     raise ValueError(f"'elasticity' parameter must be given and negative for isoelastic demand at unit {self.id}.")
-        
+            if self.elasticity_model == "linear":
+                if -(self.max_price / max(abs(self.min_power), abs(self.max_power))) >= 0.0:
+                    raise ValueError(
+                        f"Invalid slope of demand curve at unit {self.id}. Slope must be negative for linear demand. Set 'max_price' positive."
+                    )
             
 
     def execute_current_dispatch(

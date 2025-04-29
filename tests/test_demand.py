@@ -138,7 +138,7 @@ def test_elastic_demand_config_and_errors():
     )
     forecaster = NaiveForecast(index, demand=100)
 
-    # Valid elastic demand
+    # Valid elastic demand (isoelastic model)
     dem = Demand(
         id="elastic_demand",
         unit_operator="UO1",
@@ -166,8 +166,35 @@ def test_elastic_demand_config_and_errors():
     for bid in bids:
         assert "price" in bid and "volume" in bid and bid["price"] > 0
 
-    # Invalid: elasticity is positive
-    with pytest.raises(ValueError, match="elasticity must be negative"):
+    # Valid elastic demand (linear model)
+    dem = Demand(
+        id="elastic_demand",
+        unit_operator="UO1",
+        technology="energy",
+        bidding_strategies=strategies,
+        max_power=100,
+        min_power=0,
+        forecaster=forecaster,
+        price=1000,
+        elasticity_model="linear",
+        num_bids=4,
+    )
+
+    mc = MarketConfig(
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    )
+
+    bids = dem.calculate_bids(mc, [product_tuple])
+    assert len(bids) == 4
+    for bid in bids:
+        assert "price" in bid and "volume" in bid and bid["price"] > 0
+
+    # Invalid: elasticity is positive (isoelastic model)
+    with pytest.raises(ValueError, match="must be given and negative for isoelastic demand"):
         Demand(
             id="bad_elasticity",
             unit_operator="UO1",
@@ -178,6 +205,21 @@ def test_elastic_demand_config_and_errors():
             forecaster=forecaster,
             price=1000,
             elasticity=0.3,
+            elasticity_model="isoelastic",
+            num_bids=3,
+        )
+
+    # Invalid: slope of demand curve is positive (linear model)
+    with pytest.raises(ValueError, match="Invalid slope of demand curve"):
+        Demand(
+            id="bad_slope",
+            unit_operator="UO1",
+            technology="energy",
+            bidding_strategies=strategies,
+            max_power=100,
+            min_power=0,
+            forecaster=forecaster,
+            price=-1000,
             elasticity_model="linear",
             num_bids=3,
         )
@@ -193,7 +235,6 @@ def test_elastic_demand_config_and_errors():
             min_power=0,
             forecaster=forecaster,
             price=1000,
-            elasticity=-1.0,
             elasticity_model="linear",
             num_bids=0,
         )

@@ -459,12 +459,12 @@ class ElasticDemandStrategy(BaseStrategy):
 
             elif unit.elasticity_model == "linear":
                 # LINEAR model: P = P_max - slope * Q
-                # where slope = (P_max / Q_max)
+                # where slope = -(P_max / Q_max)
                 # This ensures price drops linearly with volume
                 bid_volume = max_abs_power / unit.num_bids
-                slope = (unit.max_price / max_abs_power)
+                slope = -(unit.max_price / max_abs_power)
                 for i in range(unit.num_bids):
-                    bid_price = unit.max_price - (slope * i * bid_volume)
+                    bid_price = unit.max_price + (slope * i * bid_volume)
 
                     bids.append(
                         {
