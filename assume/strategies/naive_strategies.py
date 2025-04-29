@@ -384,16 +384,30 @@ class ElasticDemandStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        if unit.elasticity == 0 or unit.num_bids == 1:
+        if unit.num_bids == 1:
             raise ValueError(
                 "ElasticDemandStrategy requires an elastic unit with num_bids > 1."
             )
-
+        # check if unit has elasticity_model attribute
+        if not hasattr(unit, "elasticity_model"):
+            raise ValueError(
+                "ElasticDemandStrategy requires an elastic unit with defined  elasticity_model."
+            )
         bids = []
         max_price = unit.max_price
-        elasticity = unit.elasticity
-        elasticity_model = unit.elasticity_model
         num_bids = unit.num_bids
+        elasticity_model = unit.elasticity_model
+        if elasticity_model == 'isoelastic':
+            if not hasattr(unit, "elasticity"):
+                raise ValueError(
+                    "ElasticDemandStrategy requires an elastic unit with defined elasticity."
+                )
+            else:
+                elasticity = unit.elasticity
+                if elasticity >= 0:
+                    raise ValueError(
+                        "Elasticity must be negative for isoelastic model."
+                    )
 
         for product in product_tuples:
             start, end, only_hours = product
