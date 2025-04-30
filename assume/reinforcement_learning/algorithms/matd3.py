@@ -305,40 +305,70 @@ class TD3(RLAlgorithm):
 
     def load_shared_actor_params(self, directory: str) -> None:
         """
-        Load the parameters of shared actor networks from a specified directory.
-
-        This method loads the parameters of shared actor networks, including the shared actor's state_dict, shared actor_target's
-        state_dict, and the shared actor's optimizer state_dict, from the specified directory. It updates the shared actor and
-        target actor networks accordingly.
-
-        Args:
-            directory (str): The directory from which the parameters should be loaded.
+        Load the parameters of shared actor networks from a specified directory,
+        reconciling any changes in clustering by reverting mismatched units.
         """
-        logger.info("Loading shared actor parameters...")
-        if not os.path.exists(directory):
-            logger.warning(
-                "Specified directory for loading the actors does not exist! Starting with randomly initialized values!"
-            )
+        logger.info("Loading shared actor parameters…")
+        actors_dir = os.path.join(directory, "actors")
+        if not os.path.isdir(actors_dir):
+            logger.warning("No 'actors' folder found; skipping.")
             return
 
-        try:
-            for cluster_index in self.clusters.keys():
-                actor_params = self.load_obj(
-                    directory=f"{directory}/actors/shared_actor_{cluster_index}.pt"
-                )
-                self.shared_actors[cluster_index].load_state_dict(actor_params["actor"])
-                self.shared_actor_targets[cluster_index].load_state_dict(
-                    actor_params["actor_target"]
-                )
-                self.shared_actors[cluster_index].optimizer.load_state_dict(
-                    actor_params["actor_optimizer"]
-                )
+        # ——— 1) Load old mapping (if any) ———
+        map_path = os.path.join(actors_dir, "cluster_mapping.json")
+        if os.path.exists(map_path):
+            with open(map_path) as f:
+                old_mapping = json.load(f)
+            old_clusters = set(old_mapping.values())
+            logger.info(f"Found old mapping for {len(old_mapping)} units.")
+        else:
+            old_mapping = {}
+            old_clusters = set()
+            logger.warning(
+                "No previous cluster_mapping.json; treating all clusters as new."
+            )
 
-                # add a tag to the strategy to indicate that the actor was loaded
-                self.shared_actors[cluster_index].loaded = True
+        # ——— 2) Detect & revert any mismatches ———
+        mismatches = {
+            uid: (self.cluster_mapping.get(uid), orig_cl)
+            for uid, orig_cl in old_mapping.items()
+            if uid in self.cluster_mapping and self.cluster_mapping[uid] != orig_cl
+        }
+        if mismatches:
+            logger.info(
+                f"Detected {len(mismatches)} unit(s) whose cluster was changed by the new clustering: "
+                f"{list(mismatches.keys())}. Reverting them to their original clusters."
+            )
+            for uid, (_, orig_cl) in mismatches.items():
+                self.cluster_mapping[uid] = orig_cl
+            # Only rebuild if something changed
+            self._rebuild_clusters_from_mapping()
+        else:
+            logger.info("No mapping mismatches detected; keeping current clusters.")
 
-        except Exception:
-            logger.warning("No shared actor values loaded")
+        # ——— 3) Instantiate fresh actors for each (possibly updated) cluster ———
+        self._instantiate_shared_actors()
+
+        # ——— 4) Load saved weights for clusters seen before ———
+        for cl, actor in self.shared_actors.items():
+            if cl not in old_clusters:
+                logger.info(f"Cluster {cl} is new; keeping random init.")
+                continue
+
+            weight_file = os.path.join(actors_dir, f"shared_actor_{cl}.pt")
+            if not os.path.exists(weight_file):
+                logger.warning(f"Missing weights for cluster {cl}; skipping load.")
+                continue
+
+            try:
+                params = self.load_obj(directory=weight_file)
+                actor.load_state_dict(params["actor"])
+                self.shared_actor_targets[cl].load_state_dict(params["actor_target"])
+                actor.optimizer.load_state_dict(params["actor_optimizer"])
+                actor.loaded = True
+                logger.info(f"Loaded weights for cluster {cl}")
+            except Exception as e:
+                logger.warning(f"Failed to load cluster {cl}: {e}")
 
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
@@ -486,6 +516,10 @@ class TD3(RLAlgorithm):
             strategy.actor.loaded = False
 
     def create_shared_actors(self):
+        """
+        Initial clustering & actor construction at the start of training.
+        """
+        # 1) Cluster your strategies however you like
         if self.actor_clustering_method:
             strategies = list(self.learning_role.rl_strats.values())
             self.clusters = create_clusters(
@@ -494,14 +528,24 @@ class TD3(RLAlgorithm):
                 clustering_method_kwargs=self.clustering_method_kwargs,
             )
         else:
-            # If no clustering method is specified, use a single cluster for all strategies
+            # fallback: all in one cluster
             self.clusters = {0: list(self.learning_role.rl_strats.values())}
 
-        # make a mapping from the cluster index to the unit IDs
-        for cluster_index, strategies in self.clusters.items():
-            for strategy in strategies:
-                self.cluster_mapping[strategy.unit_id] = cluster_index
+        # 2) Build unit_id → cluster_index map
+        self.cluster_mapping = {
+            strategy.unit_id: cl
+            for cl, strategies in self.clusters.items()
+            for strategy in strategies
+        }
 
+        # 3) Instantiate actor nets for each cluster
+        self._instantiate_shared_actors()
+
+    def _instantiate_shared_actors(self):
+        """
+        For each cluster in self.clusters, create a fresh actor + target + optimizer,
+        wire them into the strategies, and store in self.shared_actors / self.shared_actor_targets.
+        """
         self.shared_actors = {}
         self.shared_actor_targets = {}
 
@@ -540,6 +584,18 @@ class TD3(RLAlgorithm):
 
             self.shared_actors[cluster_index] = shared_actor
             self.shared_actor_targets[cluster_index] = shared_actor_target
+
+    def _rebuild_clusters_from_mapping(self):
+        """
+        Regroup self.learning_role.rl_strats into self.clusters
+        based on the current self.cluster_mapping.
+        """
+        self.clusters = defaultdict(list)
+        for unit_id, strategy in self.learning_role.rl_strats.items():
+            cl = self.cluster_mapping.get(unit_id)
+            if cl is None:
+                raise ValueError(f"No cluster assigned for unit '{unit_id}'")
+            self.clusters[cl].append(strategy)
 
     def create_critics(self) -> None:
         """
