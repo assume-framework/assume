@@ -66,7 +66,7 @@ class TD3(RLAlgorithm):
 
         self.use_shared_actor = (
             True
-            if actor_architecture in ["contextual_late_fusion", "contextual_film"]
+            if actor_architecture in ["contextual_fusion", "contextual_film"]
             else False
         )
         self.cluster_mapping = {}

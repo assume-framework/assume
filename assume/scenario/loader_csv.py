@@ -486,7 +486,11 @@ def prepare_learning_strategies(world):
 
     # Step 5: Perform actor clustering (if configured)
     actor_clustering_method = world.learning_config.get("actor_clustering_method")
-    if actor_clustering_method:
+    if (
+        not world.learning_mode
+        and not world.evaluation_mode
+        and actor_clustering_method
+    ):
         try:
             from assume.reinforcement_learning.learning_utils import create_clusters
 

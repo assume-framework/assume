@@ -60,7 +60,7 @@ contextual:
     trained_policies_load_path: null
     max_bid_price: 100
     algorithm: matd3
-    actor_architecture: contextual_late_fusion
+    actor_architecture: contextual_fusion
     learning_rate: 0.001
     training_episodes: 100
     episodes_collecting_initial_experience: 5

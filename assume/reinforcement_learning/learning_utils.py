@@ -402,6 +402,11 @@ def create_clusters(
     if not strategies:
         raise ValueError("No strategies available for clustering.")
 
+    # return a single cluster if only one strategy is available
+    if n_strategies == 1:
+        return {0: strategies}
+
+    # Check if all strategies have the same context
     all_contexts = np.array([s.context.detach().cpu().numpy() for s in strategies])
     if len(np.unique(all_contexts, axis=0)) == 1:
         logger.warning(

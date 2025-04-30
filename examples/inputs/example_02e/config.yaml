@@ -16,7 +16,7 @@ base:
     trained_policies_load_path: null
     max_bid_price: 100
     algorithm: matd3
-    actor_architecture: contextual_late_fusion
+    actor_architecture: contextual_fusion
     actor_clustering_method: k-means
     clustering_method_kwargs:
       n_clusters: 2
