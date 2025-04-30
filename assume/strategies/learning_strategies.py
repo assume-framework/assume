@@ -141,31 +141,37 @@ class BaseLearningStrategy(LearningStrategy):
             upper_scaling_factor_price,
         )
 
-        # prepare a context observation consisting of unit's max_power, min_power and fuel type
-        if isinstance(unit, SupportsMinMax):
-            # convert fuel type to a numerical value
-            context = [
-                0.0,
-                unit.max_power / unit.global_max_power,
-                unit.min_power / unit.global_max_power,
-                unit.efficiency,
-                max(unit.marginal_cost) / unit.global_max_marginal_cost,
-                0.0,
-            ]
-        elif isinstance(unit, SupportsMinMaxCharge):
-            context = [
-                1.0,
-                unit.max_soc / unit.global_max_soc,
-                unit.max_power_charge / unit.global_max_power,
-                unit.max_power_discharge / unit.global_max_power,
-                unit.efficiency_charge,
-                unit.efficiency_discharge,
-            ]
-        else:
-            logger.warning(f"No valid context can be created for unit {unit.unit_id}.")
+        # prepare context if actor architecture is contextual
+        if self.actor_architecture in ["contextual_fusion", "contextual_film"]:
+            # prepare a context observation consisting of unit's max_power, min_power and fuel type
+            if isinstance(unit, SupportsMinMax):
+                # convert fuel type to a numerical value
+                context = [
+                    0.0,
+                    unit.max_power / unit.global_max_power,
+                    unit.min_power / unit.global_max_power,
+                    unit.efficiency,
+                    max(unit.marginal_cost) / unit.global_max_marginal_cost,
+                    0.0,
+                ]
+            elif isinstance(unit, SupportsMinMaxCharge):
+                context = [
+                    1.0,
+                    unit.max_soc / unit.global_max_soc,
+                    unit.max_power_charge / unit.global_max_power,
+                    unit.max_power_discharge / unit.global_max_power,
+                    unit.efficiency_charge,
+                    unit.efficiency_discharge,
+                ]
+            else:
+                logger.warning(
+                    f"No valid context can be created for unit {unit.unit_id}."
+                )
 
-        # convert context to tensor
-        self.context = th.as_tensor(context, dtype=self.float_type, device=self.device)
+            # convert context to tensor
+            self.context = th.as_tensor(
+                context, dtype=self.float_type, device=self.device
+            )
 
 
 class RLStrategy(BaseLearningStrategy):

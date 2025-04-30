@@ -86,6 +86,8 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
     # get the strategy
     strategy = storage_unit.bidding_strategies["EOM"]
+    # initialize observations for the strategy
+    strategy.prepare_observations(storage_unit, "EOM")
 
     # Define the 'sell' action: [0.2, 0.5] -> price=20, direction='sell'
     sell_action = [0.2, 0.5]
@@ -178,8 +180,10 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
 
-    # Instantiate the StorageRLStrategy
+    # get the strategy
     strategy = storage_unit.bidding_strategies["EOM"]
+    # initialize observations for the strategy
+    strategy.prepare_observations(storage_unit, "EOM")
 
     # Define the 'buy' action: [-0.3] -> price=30, direction='buy'
     buy_action = [-0.3]

@@ -337,38 +337,44 @@ class TD3(RLAlgorithm):
         if mismatches:
             logger.info(
                 f"Detected {len(mismatches)} unit(s) whose cluster was changed by the new clustering: "
-                f"{list(mismatches.keys())}. Reverting them to their original clusters."
+                "Reverting them to their original clusters."
             )
             for uid, (_, orig_cl) in mismatches.items():
                 self.cluster_mapping[uid] = orig_cl
+
             # Only rebuild if something changed
             self._rebuild_clusters_from_mapping()
+
         else:
             logger.info("No mapping mismatches detected; keeping current clusters.")
 
         # ——— 3) Instantiate fresh actors for each (possibly updated) cluster ———
         self._instantiate_shared_actors()
 
-        # ——— 4) Load saved weights for clusters seen before ———
-        for cl, actor in self.shared_actors.items():
-            if cl not in old_clusters:
-                logger.info(f"Cluster {cl} is new; keeping random init.")
+        # ——— 4) Load saved weights for clusters seen before, in ascending order ———
+        for cluster in sorted(self.shared_actors.keys()):
+            actor = self.shared_actors[cluster]
+
+            if cluster not in old_clusters:
+                logger.info(f"Cluster {cluster} is new; keeping random init.")
                 continue
 
-            weight_file = os.path.join(actors_dir, f"shared_actor_{cl}.pt")
+            weight_file = os.path.join(actors_dir, f"shared_actor_{cluster}.pt")
             if not os.path.exists(weight_file):
-                logger.warning(f"Missing weights for cluster {cl}; skipping load.")
+                logger.warning(f"Missing weights for cluster {cluster}; skipping load.")
                 continue
 
             try:
                 params = self.load_obj(directory=weight_file)
                 actor.load_state_dict(params["actor"])
-                self.shared_actor_targets[cl].load_state_dict(params["actor_target"])
+                self.shared_actor_targets[cluster].load_state_dict(
+                    params["actor_target"]
+                )
                 actor.optimizer.load_state_dict(params["actor_optimizer"])
                 actor.loaded = True
-                logger.info(f"Loaded weights for cluster {cl}")
+                logger.info(f"Loaded weights for cluster {cluster}")
             except Exception as e:
-                logger.warning(f"Failed to load cluster {cl}: {e}")
+                logger.warning(f"Failed to load cluster {cluster}: {e}")
 
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
@@ -533,8 +539,8 @@ class TD3(RLAlgorithm):
 
         # 2) Build unit_id → cluster_index map
         self.cluster_mapping = {
-            strategy.unit_id: cl
-            for cl, strategies in self.clusters.items()
+            strategy.unit_id: cluster
+            for cluster, strategies in self.clusters.items()
             for strategy in strategies
         }
 
@@ -592,10 +598,10 @@ class TD3(RLAlgorithm):
         """
         self.clusters = defaultdict(list)
         for unit_id, strategy in self.learning_role.rl_strats.items():
-            cl = self.cluster_mapping.get(unit_id)
-            if cl is None:
+            cluster = self.cluster_mapping.get(unit_id)
+            if cluster is None:
                 raise ValueError(f"No cluster assigned for unit '{unit_id}'")
-            self.clusters[cl].append(strategy)
+            self.clusters[cluster].append(strategy)
 
     def create_critics(self) -> None:
         """

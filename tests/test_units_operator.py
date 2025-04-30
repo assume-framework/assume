@@ -187,6 +187,19 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     unit = PowerPlant("testplant", **params_dict)
     rl_units_operator.add_unit(unit)
 
+    rl_units_operator.units["testplant"].bidding_strategies["EOM"].prepare_observations(
+        rl_units_operator.units["testplant"], "EOM"
+    )
+
+    rl_units_operator.units["testplant"].bidding_strategies[
+        "EOM"
+    ].bidding_strategies = RLStrategy(
+        unit_id="testplant",
+        learning_mode=True,
+        observation_dimension=50,
+        action_dimension=2,
+    )
+
     rl_units_operator.learning_mode = True
     rl_units_operator.learning_data = {"test": 1}
 
@@ -209,15 +222,6 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
     )
 
     assert len(rl_units_operator.context.scheduler._scheduled_tasks) == open_tasks + 1
-
-    rl_units_operator.units["testplant"].bidding_strategies[
-        "EOM"
-    ].bidding_strategies = RLStrategy(
-        unit_id="testplant",
-        learning_mode=True,
-        observation_dimension=50,
-        action_dimension=2,
-    )
 
     rl_units_operator.learning_data = {"test": 2}
 

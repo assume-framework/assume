@@ -730,8 +730,8 @@ def test_load_shared_actor_params_no_actors_directory(
 
     # should have early-returned; actors dict unchanged
     assert alg.shared_actors.keys() == before_shared.keys()
-    for cl, actor in alg.shared_actors.items():
-        assert actor is before_shared[cl]
+    for cluster, actor in alg.shared_actors.items():
+        assert actor is before_shared[cluster]
     # check warning
     assert "No 'actors' folder found; skipping." in caplog.text
 
@@ -773,8 +773,8 @@ def test_load_shared_actor_params_no_mismatches(clustering_config, tmp_path, cap
 
     assert "No mapping mismatches detected; keeping current clusters." in caplog.text
     # all old clusters should have been loaded
-    for cl in old_clusters:
-        assert alg2.shared_actors[cl].loaded is True
+    for cluster in old_clusters:
+        assert alg2.shared_actors[cluster].loaded is True
 
 
 @pytest.mark.require_learning
@@ -825,12 +825,12 @@ def test_brand_new_clusters(clustering_config, tmp_path, caplog):
     assert old_clusters.issubset(new_clusters)
 
     # 2) Old clusters were loaded
-    for cl in old_clusters:
-        assert alg2.shared_actors[cl].loaded is True
+    for cluster in old_clusters:
+        assert alg2.shared_actors[cluster].loaded is True
 
     # 3) Any truly new clusters remain unloaded
-    for cl in new_clusters - old_clusters:
-        assert alg2.shared_actors[cl].loaded is False
+    for cluster in new_clusters - old_clusters:
+        assert alg2.shared_actors[cluster].loaded is False
 
 
 @pytest.mark.require_learning
@@ -888,7 +888,7 @@ def test_max_size_clustering(clustering_config):
 
     # Should have exactly 3 clusters (size ≤1 each)
     assert len(alg.clusters) == 3
-    for cl, strategies in alg.clusters.items():
+    for cluster, strategies in alg.clusters.items():
         assert len(strategies) == 1
         # each cluster index appears exactly once in mapping
-        assert list(alg.cluster_mapping.values()).count(cl) == 1
+        assert list(alg.cluster_mapping.values()).count(cluster) == 1

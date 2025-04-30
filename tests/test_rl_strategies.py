@@ -90,7 +90,11 @@ def test_learning_strategies(mock_market_config, power_plant_mcp):
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
 
+    # get the strategy
     strategy = power_plant_mcp.bidding_strategies["EOM"]
+    # initialize observations for the strategy
+    strategy.prepare_observations(power_plant_mcp, "EOM")
+
     bids = strategy.calculate_bids(power_plant_mcp, mc, product_tuples=product_tuples)
 
     assert len(bids) == 2
@@ -122,7 +126,10 @@ def test_lstm_learning_strategies(mock_market_config, power_plant_lstm):
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
 
+    # get the strategy
     strategy = power_plant_lstm.bidding_strategies["EOM"]
+    # initialize observations for the strategy
+    strategy.prepare_observations(power_plant_lstm, "EOM")
     bids = strategy.calculate_bids(power_plant_lstm, mc, product_tuples=product_tuples)
 
     assert len(bids) == 2
