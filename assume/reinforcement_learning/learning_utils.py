@@ -190,32 +190,45 @@ def copy_layer_data(dst, src):
 
 def transfer_weights(
     model: th.nn.Module,
-    old_state: dict,
-    old_id_order: list[str],
+    loaded_state: dict,
+    loaded_id_order: list[str],
     new_id_order: list[str],
     obs_base: int,
     act_dim: int,
     unique_obs: int,
 ) -> dict | None:
     """
-    Copy only those obs_ and action-slices for matching IDs.
-    New IDs keep their original (random) weights.
+    Transfer weights from loaded model to new model. Copy only those obs_ and action-slices for matching IDs.
+    New IDs keep their original (random) weights. Function only works if the neural network architeczture remained stable besides the input layer, namely with the same hidden layers.
+    
+    Args:
+        model (th.nn.Module): The model to transfer weights to.
+        loaded_state (dict): The state dictionary of the loaded model.
+        loaded_id_order (list[str]): The list of unit IDs from the loaded model that shows us the order of units.
+        new_id_order (list[str]): The list of IDs from the new model, inlcudes potentially different agents in comparison to the loaded model.
+        obs_base (int): The base observation size.
+        act_dim (int): The action dimension size.
+        unique_obs (int): The unique observation size per agent, smaller than obs_base as these include also shared observation values.
+        
+    returns:
+        dict | None: The updated state dictionary with transferred weights, or None if architecture mismatch.
     """
+    
     # 1) Architecture check
     new_state = model.state_dict()
-    old_hidden = get_hidden_sizes(old_state, prefix="q1_layers")
+    loaded_hidden = get_hidden_sizes(loaded_state, prefix="q1_layers")
     new_hidden = get_hidden_sizes(new_state, prefix="q1_layers")
-    if old_hidden != new_hidden:
+    if loaded_hidden != new_hidden:
         logger.warning(
-            f"Cannot transfer weights: architecture mismatch.\n"
-            f"Old sizes: {old_hidden}, New sizes: {new_hidden}."
+            f"Cannot transfer weights: neural network architecture mismatch.\n"
+            f"Loaded sizes: {loaded_hidden}, New sizes: {new_hidden}."
         )
         return None
 
     # 2) Compute total dims
-    old_n = len(old_id_order)
+    loaded_n = len(loaded_id_order)
     new_n = len(new_id_order)
-    old_obs_tot = obs_base + unique_obs * max(0, old_n - 1)
+    loaded_obs_tot = obs_base + unique_obs * max(0, loaded_n - 1)
     new_obs_tot = obs_base + unique_obs * max(0, new_n - 1)
 
     # 3) Clone new state
@@ -223,46 +236,49 @@ def transfer_weights(
 
     # 4) Transfer per-prefix
     for prefix in ("q1_layers", "q2_layers"):
-        w_old = old_state[f"{prefix}.0.weight"]
-        b_old = old_state[f"{prefix}.0.bias"]
+        w_loaded = loaded_state[f"{prefix}.0.weight"]
+        b_loaded = loaded_state[f"{prefix}.0.bias"]
         w_new = new_state_copy[f"{prefix}.0.weight"]
         b_new = new_state_copy[f"{prefix}.0.bias"]
-        orig_w = new_state[f"{prefix}.0.weight"].clone()
+        w_loaded_random = new_state[f"{prefix}.0.weight"].clone()
 
         # a) shared obs_base
-        w_new[:, :obs_base] = w_old[:, :obs_base]
+        w_new[:, :obs_base] = w_loaded[:, :obs_base]
 
-        # b) matched-ID blocks
+        # b) matched agents’ ID 
+        # copy weights from loaded to new model
         for new_idx, u in enumerate(new_id_order):
-            if u not in old_id_order:
+            if u not in loaded_id_order:
                 continue
-            old_idx = old_id_order.index(u)
+            loaded_idx = loaded_id_order.index(u)
 
             # unique_obs for agents beyond the first
-            if new_idx > 0 and old_idx > 0:
+            if new_idx > 0 and loaded_idx > 0:
                 ns = obs_base + unique_obs * (new_idx - 1)
-                os_ = obs_base + unique_obs * (old_idx - 1)
-                w_new[:, ns : ns + unique_obs] = w_old[:, os_ : os_ + unique_obs]
+                os_ = obs_base + unique_obs * (loaded_idx - 1)
+                w_new[:, ns : ns + unique_obs] = w_loaded[:, os_ : os_ + unique_obs]
 
             # action blocks for every agent
-            nact = new_obs_tot + act_dim * new_idx
-            oact = old_obs_tot + act_dim * old_idx
-            w_new[:, nact : nact + act_dim] = w_old[:, oact : oact + act_dim]
+            new_act = new_obs_tot + act_dim * new_idx
+            loaded_act = loaded_obs_tot + act_dim * loaded_idx
+            w_new[:, new_act : new_act + act_dim] = w_loaded[:, loaded_act : loaded_act + act_dim]
 
-        # c) restore unmatched agents’ unique_obs
+        # c) unmatched agents’ ID 
+        # use randomly initilized weights for unmatched agents
         for new_idx, u in enumerate(new_id_order):
-            if new_idx == 0 or u in old_id_order:
+            if new_idx == 0 or u in loaded_id_order:
                 continue
             ns = obs_base + unique_obs * (new_idx - 1)
-            w_new[:, ns : ns + unique_obs] = orig_w[:, ns : ns + unique_obs]
+            w_new[:, ns : ns + unique_obs] = w_loaded_random[:, ns : ns + unique_obs]
             # actions untouched
 
         # d) bias and deeper layers
-        b_new.copy_(b_old)
+        # copy all other wigths and biases (besides input layer) from loaded to new model
+        b_new.copy_(b_loaded)
         for i in range(1, len(new_hidden) + 1):
             new_state_copy[f"{prefix}.{i}.weight"].copy_(
-                old_state[f"{prefix}.{i}.weight"]
+                loaded_state[f"{prefix}.{i}.weight"]
             )
-            new_state_copy[f"{prefix}.{i}.bias"].copy_(old_state[f"{prefix}.{i}.bias"])
+            new_state_copy[f"{prefix}.{i}.bias"].copy_(loaded_state[f"{prefix}.{i}.bias"])
 
     return new_state_copy

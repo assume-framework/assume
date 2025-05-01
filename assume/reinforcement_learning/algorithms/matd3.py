@@ -92,7 +92,7 @@ class TD3(RLAlgorithm):
             path = f"{directory}/critic_{u_id}.pt"
             th.save(obj, path)
 
-        # record the exact order of u_ids to ensure that the same order is used when loading the parameters
+        # record the exact order of u_ids and save it with critics to ensure that the same order is used when loading the parameters
         u_id_list = [str(u) for u in self.learning_role.rl_strats.keys()]
         mapping = {"u_id_order": u_id_list}
         map_path = os.path.join(directory, "u_id_order.json")
@@ -137,6 +137,8 @@ class TD3(RLAlgorithm):
         """
         Load critic, target_critic, and optimizer states for each agent strategy.
         If agent count differs between saved and current model, performs weight transfer for both networks.
+        Args:
+            directory (str): The directory from which the parameters should be loaded.
         """
         logger.info("Loading critic parameters...")
 
@@ -148,20 +150,21 @@ class TD3(RLAlgorithm):
 
         map_path = os.path.join(directory, "critics", "u_id_order.json")
         if os.path.exists(map_path):
+            # read the saved order of u_ids from critics save directory
             with open(map_path) as f:
-                old_id_order = json.load(f).get("u_id_order", [])
+                loaded_id_order = json.load(f).get("u_id_order", [])
         else:
             logger.warning("No u_id_order.json: assuming same order as current.")
-            old_id_order = [str(u) for u in self.learning_role.rl_strats.keys()]
+            loaded_id_order = [str(u) for u in self.learning_role.rl_strats.keys()]
 
         new_id_order = [str(u) for u in self.learning_role.rl_strats.keys()]
-        direct_load = old_id_order == new_id_order
+        direct_load = loaded_id_order == new_id_order
 
         if direct_load:
             logger.info("Agents order unchanged. Loading critic weights directly.")
         else:
             logger.info(
-                f"Agents length and/or order mismatch: n_old={len(old_id_order)}, n_new={len(new_id_order)}. Attempting to transfer weights for critics and target critics."
+                f"Agents length and/or order mismatch: n_old={len(loaded_id_order)}, n_new={len(new_id_order)}. Transfering weights for critics and target critics."
             )
 
         for u_id, strategy in self.learning_role.rl_strats.items():
@@ -191,8 +194,8 @@ class TD3(RLAlgorithm):
                 else:
                     critic_weights = transfer_weights(
                         model=strategy.critics,
-                        old_state=critic_params["critic"],
-                        old_id_order=old_id_order,
+                        loaded_state=critic_params["critic"],
+                        loaded_id_order=loaded_id_order,
                         new_id_order=new_id_order,
                         obs_base=strategy.obs_dim,
                         act_dim=strategy.act_dim,
@@ -200,8 +203,8 @@ class TD3(RLAlgorithm):
                     )
                     target_critic_weights = transfer_weights(
                         model=strategy.target_critics,
-                        old_state=critic_params["critic_target"],
-                        old_id_order=old_id_order,
+                        loaded_state=critic_params["critic_target"],
+                        loaded_id_order=loaded_id_order,
                         new_id_order=new_id_order,
                         obs_base=strategy.obs_dim,
                         act_dim=strategy.act_dim,
@@ -267,7 +270,7 @@ class TD3(RLAlgorithm):
 
         """
         if actors_and_critics is None:
-            self.check_policy_dimensions()
+            self.check_strategy_dimensions()
             self.create_actors()
             self.create_critics()
 
@@ -283,9 +286,9 @@ class TD3(RLAlgorithm):
             self.act_dim = actors_and_critics["act_dim"]
             self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
 
-    def check_policy_dimensions(self) -> None:
+    def check_strategy_dimensions(self) -> None:
         """
-        Iterate over all strategies and check if the dimensions of observations and actions are the same.
+        Iterate over all learning strategies and check if the dimensions of observations and actions are the same.
         Also check if the unique observation dimensions are the same. If not, raise a ValueError.
         This is important for the TD3 algorithm, as it uses a centralized critic that requires consistent dimensions across all agents.
         """
@@ -302,26 +305,26 @@ class TD3(RLAlgorithm):
 
         if len(set(obs_dim_list)) > 1:
             raise ValueError(
-                "All observation dimensions must be the same for all RL agents"
+                f"All observation dimensions must be the same for all RL agents. The dfined learning strategies have the following observation dimensions: {obs_dim_list}"
             )
         else:
             self.obs_dim = obs_dim_list[0]
 
         if len(set(act_dim_list)) > 1:
-            raise ValueError("All action dimensions must be the same for all RL agents")
+            raise ValueError(f"All action dimensions must be the same for all RL agents. The defined learning strategies have the following action dimensions: {act_dim_list}")
         else:
             self.act_dim = act_dim_list[0]
 
         if len(set(unique_obs_dim_list)) > 1:
             raise ValueError(
-                "All unique_obs_dim values must be the same for all RL agents"
+                f"All unique_obs_dim values must be the same for all RL agents. The defined learning strategies have the following unique_obs_dim values: {unique_obs_dim_list}"
             )
         else:
             self.unique_obs_dim = unique_obs_dim_list[0]
 
         if len(set(num_timeseries_obs_dim_list)) > 1:
             raise ValueError(
-                "All num_timeseries_obs_dim values must be the same for all RL agents"
+                f"All num_timeseries_obs_dim values must be the same for all RL agents. The defined learning strategies have the following num_timeseries_obs_dim values: {num_timeseries_obs_dim_list}"
             )
         else:
             self.num_timeseries_obs_dim = num_timeseries_obs_dim_list[0]
