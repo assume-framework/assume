@@ -60,7 +60,7 @@ The continue learning function allows you to load pre-trained strategies (actor 
 
 To use this feature, you need to set the ``continue_learning`` config item to ``True`` and specify the path where the pre-trained strategies are stored in the ``trained_policies_load_path`` config item. The path you specify here is relative to the folder in which the rest of your input data is stored.
 
-The learning process will then start from these pre-trained networks instead of initializing new ones. As described in :doc:`learning_implementation`, the critics are used to evaluate the actions of the actor based on global information. The dimensions of this global observation depend on the number of agents in the simulation.
+The learning process will then start from these pre-trained networks instead of initializing new ones. As described in :ref:`learning_implementation`, the critics are used to evaluate the actions of the actor based on global information. The dimensions of this global observation depend on the number of agents in the simulation.
 
 In other words, the input layer of the critics will vary depending on the number of agents. To enable the use of continue learning between simulations with varying agent sizes, a mapping is implemented that ensures the loaded critics are adapted to match the new number of agents.
 
