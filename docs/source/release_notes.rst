@@ -12,6 +12,11 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+
+- **Add single bid RL strategy:** Added a new reinforcement learning strategy that allows agents to submit bids based on one action value only that determines the price at which the full capacity is offered.
+
+
 **Improvements:**
 
 - **Flexible Agent Count in `continue_learning` Mode:** You can now change the number of learning agents between training runs while reusing previously trained critics.
