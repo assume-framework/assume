@@ -930,21 +930,37 @@ def run_learning(
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
 
-    if Path(save_path).is_dir() and not world.learning_config["continue_learning"]:
-        # we are in learning mode and about to train new policies, which might overwrite existing ones
-        accept = input(
-            f"{save_path=} exists - should we overwrite current learned strategies? (y/N) "
-        )
-        if accept.lower().startswith("y"):
-            # remove existing policies
-            if os.path.exists(save_path):
-                shutil.rmtree(save_path, ignore_errors=True)
-
-        else:
-            # stop here - do not start learning or save anything
-            raise AssumeException(
-                "Simulation aborted by user not to overwrite existing learned strategies. You can use 'simulation_id' parameter in the config to start a new simulation."
+    if Path(save_path).is_dir():
+        if world.learning_config.get("continue_learning", False):
+            logger.warning(
+                f"Save path '{save_path}' exists.\n"
+                "You are in continue learning mode. New strategies may overwrite previous ones.\n"
+                "It is recommended to use a different save path to avoid unintended overwrites.\n"
+                "You can set 'trained_policies_save_path' in the config."
             )
+            proceed = input(
+                "Do you still want to proceed with the existing save path? (y/N) "
+            )
+            if not proceed.lower().startswith("y"):
+                raise AssumeException(
+                    "Simulation aborted by user to avoid overwriting previous learned strategies. "
+                    "Consider setting a new 'simulation_id' or 'trained_policies_save_path' in the config."
+                )
+        else:
+            logger.warning(
+                f"Save path '{save_path}' exists. Previous training data will be deleted to start fresh."
+            )
+            accept = input("Do you want to overwrite and start fresh? (y/N) ")
+            if accept.lower().startswith("y"):
+                shutil.rmtree(save_path, ignore_errors=True)
+                logger.info(
+                    f"Previous strategies at '{save_path}' deleted. Starting fresh training."
+                )
+            else:
+                raise AssumeException(
+                    "Simulation aborted by user not to overwrite existing learned strategies. "
+                    "You can set a different 'simulation_id' or 'trained_policies_save_path' in the config."
+                )
 
     # also remove tensorboard logs
     tensorboard_path = f"tensorboard/{world.scenario_data['simulation_id']}"
