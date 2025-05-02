@@ -117,13 +117,9 @@ if __name__ == "__main__":
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
     data_format = "local_db"  # "local_db" or "timescale"
-<<<<<<< HEAD
-    example = "redisp_dsm_3_nodes"
-=======
-
+    
     # select the example to run from the available examples above
-    example = "small"
->>>>>>> 44fb0fce3e67d02550d66c7c67b89c2a2b5c5920
+    example = "redisp_dsm_3_nodes"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
