@@ -5,7 +5,6 @@
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
-
 class NaiveSingleBidStrategy(BaseStrategy):
     """
     A naive strategy that bids the marginal cost of the unit on the market.
@@ -180,8 +179,6 @@ class NaiveDADSMStrategy(BaseStrategy):
 
         return bids
 
-
-<<<<<<< HEAD
 class NaivePosReserveStrategy(BaseStrategy):
     """
     A naive strategy that bids the ramp up volume on the positive reserve market (price = 0).
@@ -194,14 +191,11 @@ class NaivePosReserveStrategy(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-=======
 class NaiveRedispatchDSMStrategy(BaseStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of the unit on the redispatch market.
     The bid volume is the flexible power requirement of the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
     """
-
->>>>>>> 44fb0fce3e67d02550d66c7c67b89c2a2b5c5920
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -209,7 +203,6 @@ class NaiveRedispatchDSMStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-<<<<<<< HEAD
         """
         Takes information from a unit that the unit operator manages and
         defines how it is dispatched to the market.
@@ -316,7 +309,6 @@ class NaiveNegReserveStrategy(BaseStrategy):
             previous_power = volume + current_power
 
         bids = self.remove_empty_bids(bids)
-=======
         # calculate the optimal operation of the unit according to the objective function
         unit.calculate_optimal_operation_if_needed()
 
@@ -338,8 +330,6 @@ class NaiveNegReserveStrategy(BaseStrategy):
                     "volume": -volume,
                 }
             )
->>>>>>> 44fb0fce3e67d02550d66c7c67b89c2a2b5c5920
-
         return bids
 
 
