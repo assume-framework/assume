@@ -65,6 +65,10 @@ Naive
 
                                                                        A demand unit can realise a "price-inelastic" demand bid by setting
                                                                        the bid price very high and volume equalling demand at the timepoint.
+  elastic_demand            demand                  EOM                This bidding strategy is formulated for a demand unit to realise a "price-elastic" demand bid,
+                                                                       approximating a marginal utility curve.
+                                                                       
+                                                                       The elasticity can be set to "linear" or "isoelastic".
   naive_profile             powerplant,             EOM, CRM_pos,      Similar to :code:`naive`, however it is a block bid for 24 hours to
                             Energy-supplying        CRM_neg            simulate a bid for the Day-Ahead market, where bid price is set to the marginal cost
                             units (e.g. Fuel Cell)                     at the starting timepoint.
