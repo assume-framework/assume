@@ -5,11 +5,12 @@
 from datetime import datetime, timedelta
 
 import pandas as pd
+import pytest
 from dateutil import rrule as rr
 
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import NaiveSingleBidStrategy
+from assume.strategies import ElasticDemandStrategy, NaiveSingleBidStrategy
 from assume.units.demand import Demand
 
 
@@ -120,6 +121,139 @@ def test_demand_series():
     assert len(bids) == 1
     assert bids[0]["volume"] == max_power
     assert bids[0]["price"] == price.iloc[1]
+
+
+def test_elastic_demand_config_and_errors():
+    strategies = {"EOM": ElasticDemandStrategy()}
+
+    index = pd.date_range(
+        start=datetime(2023, 7, 1),
+        end=datetime(2023, 7, 2),
+        freq="1h",
+    )
+    product_tuple = (
+        datetime(2023, 7, 1, hour=1),
+        datetime(2023, 7, 1, hour=2),
+        None,
+    )
+    forecaster = NaiveForecast(index, demand=100)
+
+    # Valid elastic demand (isoelastic model)
+    dem = Demand(
+        id="elastic_demand",
+        unit_operator="UO1",
+        technology="energy",
+        bidding_strategies=strategies,
+        max_power=100,
+        min_power=0,
+        forecaster=forecaster,
+        price=1000,
+        elasticity=-0.5,
+        elasticity_model="isoelastic",
+        num_bids=4,
+    )
+
+    mc = MarketConfig(
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    )
+
+    bids = dem.calculate_bids(mc, [product_tuple])
+    assert len(bids) == 4
+    for bid in bids:
+        assert "price" in bid and "volume" in bid and bid["price"] > 0
+
+    # Valid elastic demand (linear model)
+    dem = Demand(
+        id="elastic_demand",
+        unit_operator="UO1",
+        technology="energy",
+        bidding_strategies=strategies,
+        max_power=100,
+        min_power=0,
+        forecaster=forecaster,
+        price=1000,
+        elasticity_model="linear",
+        num_bids=4,
+    )
+
+    mc = MarketConfig(
+        market_id="EOM",
+        opening_hours=rr.rrule(rr.HOURLY),
+        opening_duration=timedelta(hours=1),
+        market_mechanism="not needed",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    )
+
+    bids = dem.calculate_bids(mc, [product_tuple])
+    assert len(bids) == 4
+    for bid in bids:
+        assert "price" in bid and "volume" in bid and bid["price"] > 0
+
+    # Invalid: elasticity is positive (isoelastic model)
+    with pytest.raises(ValueError, match="'elasticity' parameter must be given and negative for isoelastic demand"):
+        Demand(
+            id="bad_elasticity",
+            unit_operator="UO1",
+            technology="energy",
+            bidding_strategies=strategies,
+            max_power=100,
+            min_power=0,
+            forecaster=forecaster,
+            price=1000,
+            elasticity=0.3,
+            elasticity_model="isoelastic",
+            num_bids=3,
+        )
+
+    # Invalid: slope of demand curve is positive (linear model)
+    with pytest.raises(ValueError, match="Invalid slope of demand curve"):
+        Demand(
+            id="bad_slope",
+            unit_operator="UO1",
+            technology="energy",
+            bidding_strategies=strategies,
+            max_power=100,
+            min_power=0,
+            forecaster=forecaster,
+            price=-1000,
+            elasticity_model="linear",
+            num_bids=3,
+        )
+
+    # Invalid: num_bids < 1
+    with pytest.raises(ValueError, match="'num_bids' parameter must be >= 1"):
+        Demand(
+            id="bad_num_bids",
+            unit_operator="UO1",
+            technology="energy",
+            bidding_strategies=strategies,
+            max_power=100,
+            min_power=0,
+            forecaster=forecaster,
+            price=1000,
+            elasticity_model="linear",
+            num_bids=0,
+        )
+
+    # Invalid: unsupported elasticity model
+    with pytest.raises(ValueError, match="Invalid elasticity_model"):
+        Demand(
+            id="bad_model",
+            unit_operator="UO1",
+            technology="energy",
+            bidding_strategies=strategies,
+            max_power=100,
+            min_power=0,
+            forecaster=forecaster,
+            price=1000,
+            elasticity=-1.0,
+            elasticity_model="invalid_model",
+            num_bids=3,
+        )
 
 
 if __name__ == "__main__":

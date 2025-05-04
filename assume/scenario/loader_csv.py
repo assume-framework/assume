@@ -503,7 +503,10 @@ def load_config_and_create_forecaster(
     )
     demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
     if demand_df is None:
-        raise ValueError("No demand time series was provided!")
+        logger.warning(
+            "!! No demand_df timeseries provided !! Filling demand_df with zeros. Make sure this is what you actually want."
+        )
+        demand_df = pd.DataFrame(index=index, columns=demand_units.index, data=0.0)
 
     exchanges_df = load_file(
         path=path, config=config, file_name="exchanges_df", index=index
