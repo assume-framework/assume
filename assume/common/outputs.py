@@ -797,128 +797,116 @@ class WriteOutput(Role):
 
 class DatabaseMaintenance:
     """
-    A utility class for managing simulation data stored in a database.
+    Utility class for managing simulation data in a partitioned TimescaleDB setup.
 
-    This class creates a database engine from a provided URI and offers methods to:
-      1. Retrieve a list of unique simulation IDs across all tables.
-      2. Delete specific simulations from every table.
-      3. Delete all simulations, or all except those specified, across every table.
+    Supports:
+      - Listing all simulation IDs.
+      - Dropping specific simulation partitions.
+      - Dropping all simulations (or all except exclusions).
 
-    It assumes that each table (except for system tables like "spatial_ref_sys") contains a column
-    named 'simulation' that uniquely identifies the simulation.
-
-    Args:
-        db_uri (str): The URI of the database engine used to create a SQLAlchemy engine.
+    Tables partitioned by simulation: market_meta, market_dispatch, unit_dispatch,
+    rl_params, grid_flows, kpis. Other tables are dropped via DELETE if needed.
     """
 
+    PARTITIONED_TABLES = [
+        "market_meta",
+        "market_dispatch",
+        "unit_dispatch",
+        "rl_params",
+        "grid_flows",
+        "kpis",
+    ]
+
     def __init__(self, db_uri: str):
-        """
-        Initializes the DatabaseMaintenance instance by creating a database engine.
+        self.db = create_engine(db_uri)
+        self._inspector = inspect(self.db)
+        self._table_cache = None
 
-        Args:
-            db_uri (str): The URI of the database engine.
-        """
-        self.db_uri = db_uri
-        self.db = create_engine(self.db_uri)
+    def _get_tables(self) -> list[str]:
+        # List only parent tables (exclude partition children)
+        if self._table_cache is None:
+            all_tables = self._inspector.get_table_names()
+            # exclude system table
+            tables = [t for t in all_tables if t != "spatial_ref_sys"]
+            # only include parent tables, not partitions of form '<parent>_<sim>'
+            parent_tables = []
+            for t in tables:
+                if any(t.startswith(f"{p}_") for p in self.PARTITIONED_TABLES):
+                    continue
+                parent_tables.append(t)
+            self._table_cache = parent_tables
+        return self._table_cache
 
-    def get_unique_simulation_ids(self) -> list[str]:
-        """
-        Retrieves a list of unique simulation IDs found in all tables.
-
-        This method inspects all tables in the database (skipping system tables such as "spatial_ref_sys")
-        and returns the distinct simulation IDs found in the 'simulation' column.
-
-        Returns:
-            list[str]: A list of unique simulation IDs.
-        """
-        unique_ids = set()
-        inspector = inspect(self.db)
-        table_names = inspector.get_table_names()
-        for table in table_names:
-            if table == "spatial_ref_sys":
+    def get_simulation_ids(self) -> list[str]:
+        ids = set()
+        for table in self._get_tables():
+            # skip tables without simulation column
+            cols = [c["name"] for c in self._inspector.get_columns(table)]
+            if "simulation" not in cols:
                 continue
-            try:
-                query = text(f'SELECT DISTINCT simulation FROM "{table}"')
-                with self.db.begin() as conn:
-                    result = conn.execute(query)
-                    for row in result:
-                        if row[0]:
-                            unique_ids.add(row[0])
-            except Exception as e:
-                logger.error(
-                    "Error retrieving simulation ids from table %s: %s", table, e
-                )
-        return list(unique_ids)
+            query = text(f"SELECT DISTINCT simulation FROM {table}")
+            with self.db.begin() as conn:
+                for (sim,) in conn.execute(query):
+                    if sim:
+                        ids.add(sim)
+        return sorted(ids)
 
     def delete_simulations(self, simulation_ids: list[str]) -> None:
-        """
-        Deletes specific simulation records from all tables.
-
-        This method deletes rows from every table where the 'simulation' column matches any of the
-        provided simulation IDs. An index is created on the simulation column to optimize the deletion,
-        if one does not already exist.
-
-        Args:
-            simulation_ids (list[str]): A list of simulation IDs to delete.
-        """
         if not simulation_ids:
-            logger.info("No simulation IDs provided for deletion.")
+            logger.info("No simulations specified to delete.")
             return
-
-        inspector = inspect(self.db)
-        table_names = inspector.get_table_names()
-        for table in table_names:
-            if table == "spatial_ref_sys":
-                continue
-            try:
-                with self.db.begin() as conn:
-                    conn.execute(
-                        text(
-                            f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
-                        )
+        with self.db.begin() as conn:
+            # Drop partitions for partitioned tables
+            for table in self.PARTITIONED_TABLES:
+                for sim in simulation_ids:
+                    part = f"{table}_{sim}"
+                    conn.execute(text(f"DROP TABLE IF EXISTS {part};"))
+                    logger.debug("Dropped partition %s", part)
+            # For non-partitioned tables, do DELETE
+            non_part = set(self._get_tables()) - set(self.PARTITIONED_TABLES)
+            for table in non_part:
+                # ensure simulation index
+                conn.execute(
+                    text(
+                        f"CREATE INDEX IF NOT EXISTS {table}_simulation_idx"
+                        f" ON {table}(simulation)"
                     )
-                    # Safe parameterized query
-                    delete_query = text(
-                        f'DELETE FROM "{table}" WHERE simulation = ANY(:simulations)'
-                    )
-                    result = conn.execute(delete_query, {"simulations": simulation_ids})
-                    logger.debug("Deleted %s rows from %s", result.rowcount, table)
-            except Exception as e:
-                logger.error(
-                    "Could not delete simulation(s) from table %s: %s", table, e
                 )
+                del_q = text(f"DELETE FROM {table} WHERE simulation = ANY(:s)")
+                res = conn.execute(del_q, {"s": simulation_ids})
+                logger.debug("Deleted %s rows from %s", res.rowcount, table)
 
     def delete_all_simulations(self, exclude: list[str] = None) -> None:
-        """
-        Deletes all simulation records from every table, with an option to exclude specific simulations.
-
-        If an exclusion list is provided, simulations with those IDs will not be deleted. Otherwise,
-        all simulation records are removed from all tables (excluding system tables).
-
-        Args:
-            exclude (list[str], optional): A list of simulation IDs that should NOT be deleted.
-                If None, all simulation records are deleted.
-        """
-        inspector = inspect(self.db)
-        table_names = inspector.get_table_names()
-        for table in table_names:
-            if table == "spatial_ref_sys":
-                continue
-            try:
-                with self.db.begin() as conn:
-                    conn.execute(
-                        text(
-                            f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
-                        )
+        with self.db.begin() as conn:
+            # Partitioned: drop partitions
+            for table in self.PARTITIONED_TABLES:
+                # list existing partitions
+                parts = [
+                    p
+                    for p in self._inspector.get_table_names()
+                    if p.startswith(f"{table}_")
+                ]
+                to_drop = []
+                if exclude:
+                    keep = {f"{table}_{s}" for s in exclude}
+                    to_drop = [p for p in parts if p not in keep]
+                else:
+                    to_drop = parts
+                for part in to_drop:
+                    conn.execute(text(f"DROP TABLE IF EXISTS {part};"))
+                    logger.debug("Dropped partition %s", part)
+            # Non-partitioned: delete or exclude
+            non_part = set(self._get_tables()) - set(self.PARTITIONED_TABLES)
+            for table in non_part:
+                conn.execute(
+                    text(
+                        f"CREATE INDEX IF NOT EXISTS {table}_simulation_idx"
+                        f" ON {table}(simulation)"
                     )
-                    if exclude:
-                        exclude_str = ", ".join([f"'{sim}'" for sim in exclude])
-                        delete_query = text(
-                            f'DELETE FROM "{table}" WHERE simulation NOT IN ({exclude_str})'
-                        )
-                    else:
-                        delete_query = text(f'DELETE FROM "{table}"')
-                    result = conn.execute(delete_query)
-                    logger.debug("Deleted %s rows from %s", result.rowcount, table)
-            except Exception as e:
-                logger.error("Could not delete simulations from table %s: %s", table, e)
+                )
+                if exclude:
+                    q = text(f"DELETE FROM {table} WHERE simulation NOT IN :ex")
+                    res = conn.execute(q, {"ex": exclude})
+                else:
+                    res = conn.execute(text(f"DELETE FROM {table}"))
+                logger.debug("Deleted %s rows from %s", res.rowcount, table)
