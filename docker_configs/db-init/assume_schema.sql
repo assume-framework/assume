@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS unit_dispatch (
 )
 PARTITION BY LIST (simulation);
 
--- 5) power_plant_meta (static)
+-- 5.1) power_plant_meta (static)
 CREATE TABLE IF NOT EXISTS power_plant_meta (
   simulation      TEXT    NOT NULL,
   "index"         TEXT,
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS power_plant_meta (
   efficiency      REAL
 );
 
--- 6) storage_meta (static)
+-- 5.2) storage_meta (static)
 CREATE TABLE IF NOT EXISTS storage_meta (
   simulation            TEXT    NOT NULL,
   "index"               TEXT,
@@ -95,13 +95,25 @@ CREATE TABLE IF NOT EXISTS storage_meta (
   efficiency_discharge  REAL
 );
 
--- 7) demand_meta (static; add additional fields as needed)
+-- 5.3) demand_meta (static; add additional fields as needed)
 CREATE TABLE IF NOT EXISTS demand_meta (
   simulation  TEXT    NOT NULL,
-  "index"     TEXT
+  "index"     TEXT,
+  unit_type   TEXT,
+  max_power   REAL,
+  min_power   REAL,
 );
 
--- 8) rl_params (partitioned by simulation)
+-- 5.4) exchange_meta (static; add additional fields as needed)
+CREATE TABLE IF NOT EXISTS exchange_meta (
+  simulation   TEXT    NOT NULL,
+  "index"      TEXT,
+  unit_type    TEXT,
+  price_import REAL,
+  price_export REAL,
+);
+
+-- 6) rl_params (partitioned by simulation)
 CREATE TABLE IF NOT EXISTS rl_params (
   simulation         TEXT      NOT NULL,
   "index"            INTEGER,
@@ -121,7 +133,7 @@ CREATE TABLE IF NOT EXISTS rl_params (
 )
 PARTITION BY LIST (simulation);
 
--- 9) rl_meta (static)
+-- 7) rl_meta (static)
 CREATE TABLE IF NOT EXISTS rl_meta (
   simulation       TEXT    NOT NULL,
   "index"          INTEGER,
@@ -131,7 +143,7 @@ CREATE TABLE IF NOT EXISTS rl_meta (
   evaluation_mode  BOOLEAN
 );
 
--- 10) grid_flows (partitioned by simulation)
+-- 8) grid_flows (partitioned by simulation)
 CREATE TABLE IF NOT EXISTS grid_flows (
   "index"     INTEGER,
   datetime    TIMESTAMP NOT NULL,
@@ -141,7 +153,7 @@ CREATE TABLE IF NOT EXISTS grid_flows (
 )
 PARTITION BY LIST (simulation);
 
--- 11) kpis (partitioned by simulation)
+-- 9) kpis (partitioned by simulation)
 CREATE TABLE IF NOT EXISTS kpis (
   "index"     INTEGER,
   variable    TEXT,

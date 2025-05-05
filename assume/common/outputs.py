@@ -18,7 +18,12 @@ from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from psycopg2.errors import UndefinedColumn
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
+from sqlalchemy.exc import (
+    DataError,
+    NoSuchTableError,
+    OperationalError,
+    ProgrammingError,
+)
 
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
@@ -103,6 +108,8 @@ class WriteOutput(Role):
         # initializes dfs for storing and writing asynchronous
         self.write_buffers: dict = defaultdict(list)
         self.locks = defaultdict(lambda: Lock())
+
+        self._column_cache: dict[str, list[str]] = {}
 
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {
@@ -487,12 +494,15 @@ class WriteOutput(Role):
             if df is None or df.empty:
                 continue
 
+            # check and correct dtypes
             if table == "rl_params":
                 df = df.apply(convert_tensors)
+
             float_cols = df.select_dtypes(include=["float64"]).columns
             if len(float_cols):
                 df[float_cols] = df[float_cols].astype("float32")
 
+            # export to csv if path is set
             if self.export_csv_path:
                 data_path = self.export_csv_path / f"{table}.csv"
                 df.to_csv(
@@ -502,11 +512,17 @@ class WriteOutput(Role):
                     float_format="%.5g",
                 )
 
+            # store to db if db is set
             if self.db is not None:
                 try:
                     self._copy_df_to_db(table, df)
+                except NoSuchTableError:
+                    # if the table does not exist, create it
+                    self._ensure_table(table, df)
+                    # now try again
+                    self._copy_df_to_db(table, df)
                 except (ProgrammingError, OperationalError, DataError):
-                    self.check_columns(table, df)
+                    self._check_columns(table, df)
                     # now try again
                     self._copy_df_to_db(table, df)
 
@@ -573,48 +589,10 @@ class WriteOutput(Role):
                     df.to_sql(geo_table, db, if_exists="append")
             except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
                 # if a column is missing, check and try again
-                self.check_columns(geo_table, df)
+                self._check_columns(geo_table, df)
                 # now try again
                 with self.db.begin() as db:
                     df.to_sql(geo_table, db, if_exists="append")
-
-    def check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
-        """
-        Checks and adds columns to the database table if necessary.
-
-        Args:
-            table (str): The name of the database table.
-            df (pandas.DataFrame): The DataFrame to be checked.
-        """
-        with self.db.begin() as db:
-            # Read table into Pandas DataFrame
-            query = f"select * from {table} where 1=0"
-            db_columns = pd.read_sql(query, db).columns
-
-        for column in df.columns:
-            if column.lower() not in db_columns:
-                try:
-                    # TODO this only works for float and text
-                    if is_bool_dtype(df[column]):
-                        column_type = "boolean"
-                    elif is_numeric_dtype(df[column]):
-                        column_type = "float"
-                    else:
-                        column_type = "text"
-                    query = f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
-                    with self.db.begin() as db:
-                        db.execute(text(query))
-                except Exception:
-                    logger.exception("Error converting column")
-
-        if index and df.index.name:
-            df.index.name = df.index.name.lower()
-            if df.index.name in db_columns:
-                return
-            column_type = "float" if is_numeric_dtype(df.index) else "text"
-            query = f"ALTER TABLE {table} ADD COLUMN {df.index.name} {column_type}"
-            with self.db.begin() as db:
-                db.execute(text(query))
 
     async def on_stop(self):
         """
@@ -707,14 +685,21 @@ class WriteOutput(Role):
 
         return rewards_by_unit
 
+    def _get_columns(self, table: str) -> list[str]:
+        if table not in self._column_cache:
+            inspector = inspect(self.db)
+            self._column_cache[table] = [
+                c["name"] for c in inspector.get_columns(table)
+            ]
+        return self._column_cache[table]
+
     def _copy_df_to_db(self, table: str, df: pd.DataFrame):
         # 1) If there’s a named index (e.g. time/datetime), turn it into a real column
         if df.index.name:
             df = df.reset_index()
 
         # 2) Introspect the exact column order from Postgres
-        inspector = inspect(self.db)
-        cols = [col["name"] for col in inspector.get_columns(table)]
+        cols = self._get_columns(table)
 
         # 3) Reindex the DataFrame to those columns (missing → NaN)
         df = df.reindex(columns=cols)
@@ -755,6 +740,59 @@ class WriteOutput(Role):
                 """
                 conn.execute(text(sql))
                 logger.debug("created partition %s", part)
+
+    def _ensure_table(self, table: str, df: pd.DataFrame):
+        """
+        If `table` doesn’t exist in the DB yet, create it using df.head(0).to_sql(),
+        so that future copies will succeed.
+        """
+        if not inspect(self.db).has_table(table):
+            # Use zero‐row to create the right columns & types
+            df.head(0).to_sql(
+                name=table,
+                con=self.db,
+                if_exists="append",  # create if missing, then do nothing
+                index=bool(df.index.name),
+                method=None,
+            )
+
+    def _check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
+        """
+        Checks and adds columns to the database table if necessary.
+
+        Args:
+            table (str): The name of the database table.
+            df (pandas.DataFrame): The DataFrame to be checked.
+        """
+        with self.db.begin() as db:
+            # Read table into Pandas DataFrame
+            query = f"select * from {table} where 1=0"
+            db_columns = pd.read_sql(query, db).columns
+
+        for column in df.columns:
+            if column.lower() not in db_columns:
+                try:
+                    # TODO this only works for float and text
+                    if is_bool_dtype(df[column]):
+                        column_type = "boolean"
+                    elif is_numeric_dtype(df[column]):
+                        column_type = "float"
+                    else:
+                        column_type = "text"
+                    query = f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
+                    with self.db.begin() as db:
+                        db.execute(text(query))
+                except Exception:
+                    logger.exception("Error converting column")
+
+        if index and df.index.name:
+            df.index.name = df.index.name.lower()
+            if df.index.name in db_columns:
+                return
+            column_type = "float" if is_numeric_dtype(df.index) else "text"
+            query = f"ALTER TABLE {table} ADD COLUMN {df.index.name} {column_type}"
+            with self.db.begin() as db:
+                db.execute(text(query))
 
 
 class DatabaseMaintenance:
