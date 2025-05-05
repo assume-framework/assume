@@ -71,9 +71,8 @@ PARTITION BY LIST (simulation);
 CREATE TABLE IF NOT EXISTS power_plant_meta (
   simulation      TEXT    NOT NULL,
   "index"         TEXT,
-  technology      TEXT,
+  unit_type       TEXT,
   unit_operator   TEXT,
-  node            TEXT,
   max_power       REAL,
   min_power       REAL,
   emission_factor REAL,
@@ -85,6 +84,7 @@ CREATE TABLE IF NOT EXISTS storage_meta (
   simulation            TEXT    NOT NULL,
   "index"               TEXT,
   unit_type             TEXT,
+  unit_operator         TEXT,
   max_soc               REAL,
   min_soc               REAL,
   max_power_charge      REAL,
@@ -97,20 +97,22 @@ CREATE TABLE IF NOT EXISTS storage_meta (
 
 -- 5.3) demand_meta (static; add additional fields as needed)
 CREATE TABLE IF NOT EXISTS demand_meta (
-  simulation  TEXT    NOT NULL,
-  "index"     TEXT,
-  unit_type   TEXT,
-  max_power   REAL,
-  min_power   REAL,
+  simulation      TEXT    NOT NULL,
+  "index"         TEXT,
+  unit_type       TEXT,
+  unit_operator   TEXT,
+  max_power       REAL,
+  min_power       REAL,
 );
 
 -- 5.4) exchange_meta (static; add additional fields as needed)
 CREATE TABLE IF NOT EXISTS exchange_meta (
-  simulation   TEXT    NOT NULL,
-  "index"      TEXT,
-  unit_type    TEXT,
-  price_import REAL,
-  price_export REAL,
+  simulation      TEXT    NOT NULL,
+  "index"         TEXT,
+  unit_type       TEXT,
+  unit_operator   TEXT,
+  price_import    REAL,
+  price_export    REAL,
 );
 
 -- 6) rl_params (partitioned by simulation)
