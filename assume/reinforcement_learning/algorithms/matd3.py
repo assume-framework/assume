@@ -14,6 +14,7 @@ from torch.optim import AdamW
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.learning_utils import (
     create_clusters,
+    merge_and_cluster,
     polyak_update,
     transfer_weights,
 )
@@ -305,8 +306,7 @@ class TD3(RLAlgorithm):
 
     def load_shared_actor_params(self, directory: str) -> None:
         """
-        Load the parameters of shared actor networks from a specified directory,
-        reconciling any changes in clustering by reverting mismatched units.
+        Load shared actors, but only rebuild clusters & re-instantiate nets if the mapping changed.
         """
         logger.info("Loading shared actor parameters…")
         actors_dir = os.path.join(directory, "actors")
@@ -314,67 +314,60 @@ class TD3(RLAlgorithm):
             logger.warning("No 'actors' folder found; skipping.")
             return
 
-        # ——— 1) Load old mapping (if any) ———
+        # 1) Load old mapping
         map_path = os.path.join(actors_dir, "cluster_mapping.json")
         if os.path.exists(map_path):
             with open(map_path) as f:
                 old_mapping = json.load(f)
             old_clusters = set(old_mapping.values())
-            logger.info(f"Found old mapping for {len(old_mapping)} units.")
+            logger.info(
+                f"Found old mapping for {len(old_mapping)} units; clusters={sorted(old_clusters)}."
+            )
         else:
             old_mapping = {}
             old_clusters = set()
-            logger.warning(
-                "No previous cluster_mapping.json; treating all clusters as new."
-            )
+            logger.warning("No previous cluster_mapping.json; treating all as new.")
 
-        # ——— 2) Detect & revert any mismatches ———
-        mismatches = {
-            uid: (self.cluster_mapping.get(uid), orig_cl)
-            for uid, orig_cl in old_mapping.items()
-            if uid in self.cluster_mapping and self.cluster_mapping[uid] != orig_cl
-        }
-        if mismatches:
+        # 2) Compute the merged mapping
+        strategies = list(self.learning_role.rl_strats.values())
+        requested = self.clustering_method_kwargs.get("n_clusters", len(old_clusters))
+        thresh = self.clustering_method_kwargs.get("merge_threshold_factor", 1.2)
+        merged = merge_and_cluster(strategies, old_mapping, requested, thresh)
+
+        # 3) If mapping changed, rebuild & re-instantiate
+        if merged != self.cluster_mapping:
             logger.info(
-                f"Detected {len(mismatches)} unit(s) whose cluster was changed by the new clustering: "
-                "Reverting them to their original clusters."
+                "Cluster mapping changed—rebuilding clusters and re-instantiating actors."
             )
-            for uid, (_, orig_cl) in mismatches.items():
-                self.cluster_mapping[uid] = orig_cl
-
-            # Only rebuild if something changed
+            self.cluster_mapping = merged
             self._rebuild_clusters_from_mapping()
-
+            self._instantiate_shared_actors()
         else:
-            logger.info("No mapping mismatches detected; keeping current clusters.")
+            logger.info(
+                "Cluster mapping unchanged—skipping rebuild and re-instantiate."
+            )
 
-        # ——— 3) Instantiate fresh actors for each (possibly updated) cluster ———
-        self._instantiate_shared_actors()
-
-        # ——— 4) Load saved weights for clusters seen before, in ascending order ———
-        for cluster in sorted(self.shared_actors.keys()):
-            actor = self.shared_actors[cluster]
-
-            if cluster not in old_clusters:
-                logger.info(f"Cluster {cluster} is new; keeping random init.")
+        # 4) Load weights only into the old clusters
+        for cl in sorted(self.shared_actors):
+            actor = self.shared_actors[cl]
+            if cl not in old_clusters:
+                logger.info(f"Cluster {cl} is brand-new; keeping random init.")
                 continue
 
-            weight_file = os.path.join(actors_dir, f"shared_actor_{cluster}.pt")
-            if not os.path.exists(weight_file):
-                logger.warning(f"Missing weights for cluster {cluster}; skipping load.")
+            path = os.path.join(actors_dir, f"shared_actor_{cl}.pt")
+            if not os.path.exists(path):
+                logger.warning(f"Missing weights for cluster {cl}; skipping load.")
                 continue
 
             try:
-                params = self.load_obj(directory=weight_file)
+                params = self.load_obj(directory=path)
                 actor.load_state_dict(params["actor"])
-                self.shared_actor_targets[cluster].load_state_dict(
-                    params["actor_target"]
-                )
+                self.shared_actor_targets[cl].load_state_dict(params["actor_target"])
                 actor.optimizer.load_state_dict(params["actor_optimizer"])
                 actor.loaded = True
-                logger.info(f"Loaded weights for cluster {cluster}")
+                logger.info(f"Loaded weights for cluster {cl}")
             except Exception as e:
-                logger.warning(f"Failed to load cluster {cluster}: {e}")
+                logger.warning(f"Failed to load cluster {cl}: {e}")
 
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """

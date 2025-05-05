@@ -451,3 +451,65 @@ def create_clusters(
         )
 
     return clusters
+
+
+def merge_and_cluster(
+    strategies: list,
+    old_mapping: dict[str, int],
+    requested_n_clusters: int,
+    threshold_factor: float = 1.2,
+) -> dict[str, int]:
+    """
+    1) Graft new units onto old clusters if they're 'close enough'.
+    2) Cluster the remainder into exactly `additional = requested_n_clusters - old_n` groups
+       (or 1 if `additional < 1`), warning if the user didn't actually increase clusters.
+
+    Returns a full unit_id → cluster_id map.
+    """
+    # 1) Old‐cluster centroids & radii
+    old_clusters = sorted(set(old_mapping.values()))
+    centroids, radii = {}, {}
+    for cl in old_clusters:
+        members = [s for s in strategies if old_mapping.get(s.unit_id) == cl]
+        X = np.vstack([m.context.detach().cpu().numpy() for m in members])
+        centroids[cl] = X.mean(axis=0)
+        radii[cl] = np.max(np.linalg.norm(X - centroids[cl], axis=1))
+
+    # 2) Figure out how many new clusters
+    old_n = len(old_clusters)
+    additional = requested_n_clusters - old_n
+    if additional < 1:
+        if any(s.unit_id not in old_mapping for s in strategies):
+            logger.warning(
+                f"Requested {requested_n_clusters} total clusters ≤ existing {old_n}; "
+                "will form 1 new cluster for the truly novel units."
+            )
+            additional = 1
+        else:
+            additional = 0
+
+    # 3) Assign close units to existing clusters
+    final_map = dict(old_mapping)
+    leftovers = []
+    for s in strategies:
+        uid = s.unit_id
+        if uid in old_mapping:
+            continue
+        x = s.context.detach().cpu().numpy()
+        # distance to each old centroid
+        dists = {cl: np.linalg.norm(x - centroids[cl]) for cl in old_clusters}
+        best = min(dists, key=dists.get)
+        if dists[best] <= radii[best] * threshold_factor:
+            final_map[uid] = best
+        else:
+            leftovers.append(s)
+
+    # 4) Cluster leftovers if needed
+    if leftovers and additional > 0:
+        X_new = np.vstack([s.context.detach().cpu().numpy() for s in leftovers])
+        km = KMeans(n_clusters=additional, random_state=0, n_init=10).fit(X_new)
+        base = max(old_clusters) + 1 if old_clusters else 0
+        for s, lbl in zip(leftovers, km.labels_):
+            final_map[s.unit_id] = base + int(lbl)
+
+    return final_map
