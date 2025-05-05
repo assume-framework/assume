@@ -30,3 +30,7 @@ repos:
     -   id: codespell
         types_or: [python, rst, markdown]
         files: ^(assume|docs|tests)/
+        args:
+          # comma-separated list of words you want codespell to skip
+          - --ignore-words-list=DED,esy,flexable,Meger,ore
+          - --ignore-regex=https?://\S+
