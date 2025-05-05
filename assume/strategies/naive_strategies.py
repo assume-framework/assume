@@ -363,7 +363,7 @@ class NaiveExchangeStrategy(BaseStrategy):
 class ElasticDemandStrategy(BaseStrategy):
     """
     A bidding strategy for a demand unit that submits multiple bids to approximate
-    a marginal utility curve, based on linear or isoelastic demand theory. 
+    a marginal utility curve, based on linear or isoelastic demand theory.
     P = Price, Q = Quantity, E = Elasticity.
 
     - Linear model: P = P_max + slope * Q (slope is only defined by P_max and Q_max, negative value)
@@ -384,9 +384,8 @@ class ElasticDemandStrategy(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-                
         bids = []
-        
+
         for product in product_tuples:
             start, end, only_hours = product
             max_abs_power = max(abs(unit.min_power), abs(unit.max_power))
@@ -402,14 +401,14 @@ class ElasticDemandStrategy(BaseStrategy):
                 #   integrate:
                 #   \int 1/Q dQ = E * \int 1/P dP
                 #   ln(Q) = E * ln(P) + C
-                #   exp(ln(Q)) = exp(E * ln(p) + C)  
+                #   exp(ln(Q)) = exp(E * ln(p) + C)
                 #   Q(p) = (exp(ln(p))^E) * exp(C)
                 #   Q(p) = P^E * exp(C)
                 #   possibly C = 0, C = 1 or C >= 1. We assume C >= 1.
                 #   C shifts the demand curve (demand vs. price) up / down and
                 #   can be interpreted as the demand that will always be served
                 #   we set C = ln(Q_max) and derive the demand curve from there:
-                #   P = Q^(1/E) * exp(-C/E) and C = ln(Q_max) 
+                #   P = Q^(1/E) * exp(-C/E) and C = ln(Q_max)
                 #   => P = Q^(1/E) * exp(-ln(Q_max)/E) and because exp(-ln(Q_max)/E) = Q_max^(-1/E)
                 #   => P = Q^(1/E) * Q_max^(-1/E)
                 #   finally
@@ -430,7 +429,7 @@ class ElasticDemandStrategy(BaseStrategy):
                         "node": unit.node,
                     }
                 )
-            
+
                 remaining_volume = max_abs_power - first_bid_volume
                 if remaining_volume < 0:
                     raise ValueError(
@@ -468,12 +467,12 @@ class ElasticDemandStrategy(BaseStrategy):
 
                     bids.append(
                         {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": only_hours,
-                        "price": bid_price,
-                        "volume": -bid_volume,
-                        "node": unit.node,
+                            "start_time": start,
+                            "end_time": end,
+                            "only_hours": only_hours,
+                            "price": bid_price,
+                            "volume": -bid_volume,
+                            "node": unit.node,
                         }
                     )
 
@@ -486,7 +485,7 @@ class ElasticDemandStrategy(BaseStrategy):
         Calculate the first block bid volume at max_price. P = Price, Q = Quantity, E = Elasticity.
         Assumes isoelastic demand:
             Q = Q_max * P^E
-        
+
         The first block bid is the volume that is always bid at maximum price, because the
         willingness to pay for it is higher than the markets maximal price.
         The first block bid volume is calculated by finding the intersection of the isoelastic demand
@@ -495,14 +494,14 @@ class ElasticDemandStrategy(BaseStrategy):
 
             Q_first = Q
             Q_first = Q_max * P^E
-    
+
         Therefore:
             Q_first = max_power * (max_price ** E)
 
         Returns:
             float: Volume > 0, demand that is always bought at max willingness to pay
         """
-        volume = max_power * max_price**elasticity 
+        volume = max_power * max_price**elasticity
 
         if abs(volume) > abs(max_power):
             raise ValueError(

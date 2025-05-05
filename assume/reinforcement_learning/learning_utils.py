@@ -200,20 +200,20 @@ def transfer_weights(
     """
     Transfer weights from loaded model to new model. Copy only those obs_ and action-slices for matching IDs.
     New IDs keep their original (random) weights. Function only works if the neural network architeczture remained stable besides the input layer, namely with the same hidden layers.
-    
+
     Args:
         model (th.nn.Module): The model to transfer weights to.
         loaded_state (dict): The state dictionary of the loaded model.
         loaded_id_order (list[str]): The list of unit IDs from the loaded model that shows us the order of units.
-        new_id_order (list[str]): The list of IDs from the new model, inlcudes potentially different agents in comparison to the loaded model.
+        new_id_order (list[str]): The list of IDs from the new model, includes potentially different agents in comparison to the loaded model.
         obs_base (int): The base observation size.
         act_dim (int): The action dimension size.
         unique_obs (int): The unique observation size per agent, smaller than obs_base as these include also shared observation values.
-        
+
     returns:
         dict | None: The updated state dictionary with transferred weights, or None if architecture mismatch.
     """
-    
+
     # 1) Architecture check
     new_state = model.state_dict()
     loaded_hidden = get_hidden_sizes(loaded_state, prefix="q1_layers")
@@ -245,7 +245,7 @@ def transfer_weights(
         # a) shared obs_base
         w_new[:, :obs_base] = w_loaded[:, :obs_base]
 
-        # b) matched agents’ ID 
+        # b) matched agents’ ID
         # copy weights from loaded to new model
         for new_idx, u in enumerate(new_id_order):
             if u not in loaded_id_order:
@@ -261,10 +261,12 @@ def transfer_weights(
             # action blocks for every agent
             new_act = new_obs_tot + act_dim * new_idx
             loaded_act = loaded_obs_tot + act_dim * loaded_idx
-            w_new[:, new_act : new_act + act_dim] = w_loaded[:, loaded_act : loaded_act + act_dim]
+            w_new[:, new_act : new_act + act_dim] = w_loaded[
+                :, loaded_act : loaded_act + act_dim
+            ]
 
-        # c) unmatched agents’ ID 
-        # use randomly initilized weights for unmatched agents
+        # c) unmatched agents’ ID
+        # use randomly initialized weights for unmatched agents
         for new_idx, u in enumerate(new_id_order):
             if new_idx == 0 or u in loaded_id_order:
                 continue
@@ -279,6 +281,8 @@ def transfer_weights(
             new_state_copy[f"{prefix}.{i}.weight"].copy_(
                 loaded_state[f"{prefix}.{i}.weight"]
             )
-            new_state_copy[f"{prefix}.{i}.bias"].copy_(loaded_state[f"{prefix}.{i}.bias"])
+            new_state_copy[f"{prefix}.{i}.bias"].copy_(
+                loaded_state[f"{prefix}.{i}.bias"]
+            )
 
     return new_state_copy
