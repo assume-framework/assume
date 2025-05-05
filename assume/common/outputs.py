@@ -6,6 +6,7 @@ import logging
 import shutil
 from collections import defaultdict
 from datetime import datetime
+from io import StringIO
 from multiprocessing import Lock
 from pathlib import Path
 from typing import TypedDict
@@ -137,47 +138,6 @@ class WriteOutput(Role):
                 }
             ]
 
-    def delete_db_scenario(self, simulation_id: str):
-        """
-        Deletes all data from the database for the given simulation id.
-
-        Args:
-            simulation_id (str): The ID of the simulation as a unique classifier.
-        """
-
-        # Loop throuph all database tables
-        # Get list of table names in database
-        table_names = inspect(self.db).get_table_names()
-        # Iterate through each table
-        for table_name in table_names:
-            # ignore spatial_ref_sys table
-            if table_name == "spatial_ref_sys":
-                continue
-            # only delete rl_params and rl_meta during the first episode of learning
-            if table_name in ["rl_params", "rl_meta"] and not (
-                self.learning_mode and self.episode == 1
-            ):
-                continue
-            try:
-                with self.db.begin() as db:
-                    # create index on table
-                    query = text(
-                        f'create index if not exists "{table_name}_scenario" on "{table_name}" (simulation)'
-                    )
-                    db.execute(query)
-
-                    query = text(
-                        f"delete from \"{table_name}\" where simulation = '{simulation_id}'"
-                    )
-                    rowcount = db.execute(query).rowcount
-                    # has to be done manually with raw queries
-                    db.commit()
-                    logger.debug("deleted %s rows from %s", rowcount, table_name)
-            except Exception as e:
-                logger.error(
-                    f"could not clear old scenarios from table {table_name} - {e}"
-                )
-
     def setup(self):
         """
         Sets up the WriteOutput instance by subscribing to messages and scheduling recurrent tasks of storing the data.
@@ -193,8 +153,13 @@ class WriteOutput(Role):
     def on_ready(self):
         if self.db_uri:
             self.db = create_engine(self.db_uri)
+
         if self.db is not None:
+            # 1) delete any old partitions for this simulation first
             self.delete_db_scenario(self.simulation_id)
+
+            # 2) then create fresh partitions for this run
+            self._create_partitions(self.simulation_id)
 
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
@@ -208,8 +173,25 @@ class WriteOutput(Role):
                 self.store_dfs,
                 recurrency_task,
                 src="no_wait",
-                # this should not wait for the task to finish to block the simulation
             )
+
+    def delete_db_scenario(self, simulation_id: str):
+        if not self.db:
+            return
+
+        tables = [
+            "market_meta",
+            "market_dispatch",
+            "unit_dispatch",
+            "rl_params",
+            "grid_flows",
+            "kpis",
+        ]
+        with self.db.begin() as conn:
+            for tbl in tables:
+                part = f"{tbl}_{simulation_id}"
+                conn.execute(text(f"DROP TABLE IF EXISTS {part};"))
+                logger.debug("dropped partition %s", part)
 
     def handle_output_message(self, content: dict, meta: MetaDict):
         """
@@ -501,16 +483,15 @@ class WriteOutput(Role):
                             dfs.append(df)
                         df = pd.concat(dfs, axis=0, join="outer")
                 data_list.clear()
-            # concat all dataframes
-            # use join='outer' to keep all columns and fill missing values with NaN
+
             if df is None or df.empty:
                 continue
 
-            # check for tensors and convert them to floats
-            df = df.apply(convert_tensors)
-
-            # check for any float64 columns and convert them to floats
-            df = df.map(lambda x: float(x) if isinstance(x, np.float64) else x)
+            if table == "rl_params":
+                df = df.apply(convert_tensors)
+            float_cols = df.select_dtypes(include=["float64"]).columns
+            if len(float_cols):
+                df[float_cols] = df[float_cols].astype("float32")
 
             if self.export_csv_path:
                 data_path = self.export_csv_path / f"{table}.csv"
@@ -523,13 +504,11 @@ class WriteOutput(Role):
 
             if self.db is not None:
                 try:
-                    with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
+                    self._copy_df_to_db(table, df)
                 except (ProgrammingError, OperationalError, DataError):
                     self.check_columns(table, df)
                     # now try again
-                    with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
+                    self._copy_df_to_db(table, df)
 
         self.current_dfs_size_bytes = 0
 
@@ -727,6 +706,55 @@ class WriteOutput(Role):
         rewards_by_unit = np.array(rewards_by_unit)
 
         return rewards_by_unit
+
+    def _copy_df_to_db(self, table: str, df: pd.DataFrame):
+        # 1) If there’s a named index (e.g. time/datetime), turn it into a real column
+        if df.index.name:
+            df = df.reset_index()
+
+        # 2) Introspect the exact column order from Postgres
+        inspector = inspect(self.db)
+        cols = [col["name"] for col in inspector.get_columns(table)]
+
+        # 3) Reindex the DataFrame to those columns (missing → NaN)
+        df = df.reindex(columns=cols)
+
+        # 4) Serialize CSV with header
+        buf = StringIO()
+        df.to_csv(buf, index=False, header=True)
+        buf.seek(0)
+
+        # 5) Bulk‐load via COPY, matching on header
+        col_list = ",".join(cols)
+        sql = f"COPY {table} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)"
+        raw = self.db.raw_connection()
+        try:
+            cur = raw.cursor()
+            cur.copy_expert(sql, buf)
+            raw.commit()
+        finally:
+            cur.close()
+
+    def _create_partitions(self, simulation_id: str):
+        """Create one child‐partition per parent table for this simulation_id."""
+        tables = [
+            "market_meta",
+            "market_dispatch",
+            "unit_dispatch",
+            "rl_params",
+            "grid_flows",
+            "kpis",
+        ]
+        with self.db.begin() as conn:
+            for tbl in tables:
+                part = f"{tbl}_{simulation_id}"
+                sql = f"""
+                CREATE TABLE IF NOT EXISTS {part}
+                  PARTITION OF {tbl}
+                  FOR VALUES IN ('{simulation_id}');
+                """
+                conn.execute(text(sql))
+                logger.debug("created partition %s", part)
 
 
 class DatabaseMaintenance:

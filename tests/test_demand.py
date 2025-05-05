@@ -194,7 +194,10 @@ def test_elastic_demand_config_and_errors():
         assert "price" in bid and "volume" in bid and bid["price"] > 0
 
     # Invalid: elasticity is positive (isoelastic model)
-    with pytest.raises(ValueError, match="'elasticity' parameter must be given and negative for isoelastic demand"):
+    with pytest.raises(
+        ValueError,
+        match="'elasticity' parameter must be given and negative for isoelastic demand",
+    ):
         Demand(
             id="bad_elasticity",
             unit_operator="UO1",

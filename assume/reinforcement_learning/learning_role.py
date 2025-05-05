@@ -228,7 +228,7 @@ class Learning(Role):
 
         If `loaded_only=True`, only turn off exploration for strategies that were loaded (used in continue_learning mode).
         If `loaded_only=False`, turn it off for all strategies.
-        
+
         Args:
             loaded_only (bool): Whether to disable exploration only for loaded strategies.
         """
