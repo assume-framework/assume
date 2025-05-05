@@ -27,10 +27,8 @@ repos:
   - repo: https://github.com/codespell-project/codespell
     rev: v2.3.0
     hooks:
-    -   id: codespell
+      - id: codespell
+        additional_dependencies:
+          - tomli
         types_or: [python, rst, markdown]
         files: ^(assume|docs|tests)/
-        args:
-          # comma-separated list of words you want codespell to skip
-          - --ignore-words-list=DED,esy,flexable,Meger,ore
-          - --ignore-regex=https?://\S+
