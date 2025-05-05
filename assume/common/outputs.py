@@ -158,14 +158,39 @@ class WriteOutput(Role):
         )
 
     def on_ready(self):
+        """
+        Called once when the agent/container starts.
+        Sets up the database connection (per‐simulation SQLite or Postgres),
+        tears down any old data, creates partitions if needed, and schedules
+        the periodic store_dfs task.
+        """
+        # 1) Initialize the engine
         if self.db_uri:
-            self.db = create_engine(self.db_uri)
+            # Always create a temporary engine to inspect the dialect
+            engine = create_engine(self.db_uri)
 
-        if self.db is not None:
-            # 1) delete any old partitions for this simulation first
+            if engine.dialect.name == "sqlite":
+                # We’re in “local_db” mode: derive a per‐simulation filename
+                db_path = engine.url.database  # e.g. "./examples/local_db/assume_db.db"
+                base = Path(db_path)
+                sim_db = base.with_name(
+                    f"{base.stem}_{self.simulation_id}{base.suffix}"
+                )
+                # Remove any old file so we start fresh
+                if sim_db.exists():
+                    sim_db.unlink()
+                    logger.debug("Removed existing local DB %s", sim_db)
+                # Point SQLAlchemy at the new per‐simulation file
+                engine = create_engine(f"sqlite:///{sim_db}")
+
+            # For any other dialect (postgresql, etc.) just use the original engine
+            self.db = engine
+
+        # 2) If using Postgres/Timescale, drop & recreate partitions
+        if self.db is not None and self.db.dialect.name == "postgresql":
+            # drop old partitions (instant metadata operation)
             self.delete_db_scenario(self.simulation_id)
-
-            # 2) then create fresh partitions for this run
+            # create fresh partitions for this run
             self._create_partitions(self.simulation_id)
 
         if self.save_frequency_hours is not None:
@@ -694,6 +719,18 @@ class WriteOutput(Role):
         return self._column_cache[table]
 
     def _copy_df_to_db(self, table: str, df: pd.DataFrame):
+        # ---- SQLite fallback ----
+        if self.db.dialect.name == "sqlite":
+            # simple append via pandas
+            df.to_sql(
+                name=table,
+                con=self.db,
+                if_exists="append",
+                index=False,
+                method="multi",  # batches INSERTs
+            )
+            return
+
         # 1) If there’s a named index (e.g. time/datetime), turn it into a real column
         if df.index.name:
             df = df.reset_index()
