@@ -314,25 +314,27 @@ class TD3(RLAlgorithm):
             logger.warning("No 'actors' folder found; skipping.")
             return
 
-        # 1) Load old mapping
+        # 1) Load previous mapping
         map_path = os.path.join(actors_dir, "cluster_mapping.json")
         if os.path.exists(map_path):
             with open(map_path) as f:
-                old_mapping = json.load(f)
-            old_clusters = set(old_mapping.values())
+                loaded_mapping = json.load(f)
+            loaded_clusters = set(loaded_mapping.values())
             logger.info(
-                f"Found old mapping for {len(old_mapping)} units; clusters={sorted(old_clusters)}."
+                f"Found previous mapping for {len(loaded_mapping)} units; clusters={sorted(loaded_clusters)}."
             )
         else:
-            old_mapping = {}
-            old_clusters = set()
+            loaded_mapping = {}
+            loaded_clusters = set()
             logger.warning("No previous cluster_mapping.json; treating all as new.")
 
         # 2) Compute the merged mapping
         strategies = list(self.learning_role.rl_strats.values())
-        requested = self.clustering_method_kwargs.get("n_clusters", len(old_clusters))
+        requested = self.clustering_method_kwargs.get(
+            "n_clusters", len(loaded_clusters)
+        )
         thresh = self.clustering_method_kwargs.get("merge_threshold_factor", 1.2)
-        merged = merge_and_cluster(strategies, old_mapping, requested, thresh)
+        merged = merge_and_cluster(strategies, loaded_mapping, requested, thresh)
 
         # 3) If mapping changed, rebuild & re-instantiate
         if merged != self.cluster_mapping:
@@ -347,10 +349,10 @@ class TD3(RLAlgorithm):
                 "Cluster mapping unchanged—skipping rebuild and re-instantiate."
             )
 
-        # 4) Load weights only into the old clusters
+        # 4) Load weights only into the previous clusters
         for cl in sorted(self.shared_actors):
             actor = self.shared_actors[cl]
-            if cl not in old_clusters:
+            if cl not in loaded_clusters:
                 logger.info(f"Cluster {cl} is brand-new; keeping random init.")
                 continue
 

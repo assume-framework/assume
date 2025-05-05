@@ -475,20 +475,7 @@ def merge_and_cluster(
         centroids[cl] = X.mean(axis=0)
         radii[cl] = np.max(np.linalg.norm(X - centroids[cl], axis=1))
 
-    # 2) Figure out how many new clusters
-    old_n = len(old_clusters)
-    additional = requested_n_clusters - old_n
-    if additional < 1:
-        if any(s.unit_id not in old_mapping for s in strategies):
-            logger.warning(
-                f"Requested {requested_n_clusters} total clusters ≤ existing {old_n}; "
-                "will form 1 new cluster for the truly novel units."
-            )
-            additional = 1
-        else:
-            additional = 0
-
-    # 3) Assign close units to existing clusters
+    # 2) Assign close units to existing clusters
     final_map = dict(old_mapping)
     leftovers = []
     for s in strategies:
@@ -504,8 +491,19 @@ def merge_and_cluster(
         else:
             leftovers.append(s)
 
-    # 4) Cluster leftovers if needed
-    if leftovers and additional > 0:
+    # 3) Cluster leftovers if needed
+    if leftovers:
+        # Figure out how many new clusters
+        old_n = len(old_clusters)
+        additional = requested_n_clusters - old_n
+        if additional < 1:
+            if any(s.unit_id not in old_mapping for s in strategies):
+                logger.warning(
+                    f"Requested {requested_n_clusters} total clusters ≤ existing {old_n}; "
+                    "will form 1 new cluster for the truly novel units."
+                )
+                additional = 1
+
         X_new = np.vstack([s.context.detach().cpu().numpy() for s in leftovers])
         km = KMeans(n_clusters=additional, random_state=0, n_init=10).fit(X_new)
         base = max(old_clusters) + 1 if old_clusters else 0
