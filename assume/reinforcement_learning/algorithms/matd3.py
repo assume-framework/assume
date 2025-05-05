@@ -164,7 +164,7 @@ class TD3(RLAlgorithm):
             logger.info("Agents order unchanged. Loading critic weights directly.")
         else:
             logger.info(
-                f"Agents length and/or order mismatch: n_old={len(loaded_id_order)}, n_new={len(new_id_order)}. Transfering weights for critics and target critics."
+                f"Agents length and/or order mismatch: n_old={len(loaded_id_order)}, n_new={len(new_id_order)}. Transferring weights for critics and target critics."
             )
 
         for u_id, strategy in self.learning_role.rl_strats.items():
@@ -305,13 +305,15 @@ class TD3(RLAlgorithm):
 
         if len(set(obs_dim_list)) > 1:
             raise ValueError(
-                f"All observation dimensions must be the same for all RL agents. The dfined learning strategies have the following observation dimensions: {obs_dim_list}"
+                f"All observation dimensions must be the same for all RL agents. The defined learning strategies have the following observation dimensions: {obs_dim_list}"
             )
         else:
             self.obs_dim = obs_dim_list[0]
 
         if len(set(act_dim_list)) > 1:
-            raise ValueError(f"All action dimensions must be the same for all RL agents. The defined learning strategies have the following action dimensions: {act_dim_list}")
+            raise ValueError(
+                f"All action dimensions must be the same for all RL agents. The defined learning strategies have the following action dimensions: {act_dim_list}"
+            )
         else:
             self.act_dim = act_dim_list[0]
 
