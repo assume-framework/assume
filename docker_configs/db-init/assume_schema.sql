@@ -5,85 +5,108 @@
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 CREATE EXTENSION IF NOT EXISTS postgis;
 
+----------------------------
 -- 1) market_meta (partitioned by simulation)
+----------------------------
 CREATE TABLE IF NOT EXISTS market_meta (
   simulation               TEXT      NOT NULL,
   market_id                TEXT,
-  "index"                  INTEGER,
   time                     TIMESTAMP NOT NULL,
-  node                     TEXT,
   product_start            TIMESTAMP NOT NULL,
   product_end              TIMESTAMP NOT NULL,
-  only_hours               TEXT,
+  only_hours               TIMESTAMP,
+  supply_volume            REAL,
+  demand_volume            REAL,
+  supply_volume_energy     REAL,
+  demand_volume_energy     REAL,
   price                    REAL,
   max_price                REAL,
   min_price                REAL,
-  supply_volume            REAL,
-  supply_volume_energy     REAL,
-  demand_volume            REAL,
-  demand_volume_energy     REAL
+  node                     TEXT,
+  PRIMARY KEY (simulation, market_id, time)
 )
 PARTITION BY LIST (simulation);
 
+CREATE INDEX ON market_meta (simulation, time);
+
+----------------------------
 -- 2) market_dispatch (partitioned by simulation)
+----------------------------
 CREATE TABLE IF NOT EXISTS market_dispatch (
   simulation  TEXT    NOT NULL,
-  "index"     INTEGER,
   market_id   TEXT,
   datetime    TIMESTAMP NOT NULL,
   unit_id     TEXT,
-  power       REAL
+  power       REAL,
+  PRIMARY KEY (simulation, market_id, datetime, unit_id)
 )
 PARTITION BY LIST (simulation);
 
+CREATE INDEX ON market_dispatch (simulation, datetime);
+
+----------------------------
 -- 3) market_orders (partitioned by simulation)
+----------------------------
 CREATE TABLE IF NOT EXISTS market_orders (
   simulation           TEXT      NOT NULL,
   market_id            TEXT,
   start_time           TIMESTAMP NOT NULL,
-  volume               REAL,
-  accepted_volume      REAL,
+  end_time             TIMESTAMP NOT NULL,
   price                REAL,
-  unit_id              TEXT,
+  volume               REAL,
   bid_type             TEXT,
   node                 TEXT,
-  evaluation_frequency TEXT,
-  eligible_lambda      TEXT
+  bid_id               TEXT,
+  unit_id              TEXT,
+  accepted_price       REAL,
+  accepted_volume      REAL,
+  PRIMARY KEY (simulation, market_id, start_time, bid_id)
 )
 PARTITION BY LIST (simulation);
 
+CREATE INDEX ON market_orders (simulation, start_time);
+
+----------------------------
 -- 4) unit_dispatch (partitioned by simulation)
+----------------------------
 CREATE TABLE IF NOT EXISTS unit_dispatch (
   simulation               TEXT    NOT NULL,
   time                     TIMESTAMP NOT NULL,
-  "index"                  INTEGER,
   unit                     TEXT,
   power                    REAL,
   heat                     REAL,
   soc                      REAL,
   energy_generation_costs  REAL,
   energy_cashflow          REAL,
-  total_costs              REAL
+  total_costs              REAL,
+  PRIMARY KEY (simulation, unit, time)
 )
 PARTITION BY LIST (simulation);
 
+CREATE INDEX ON unit_dispatch (simulation, time);
+
+----------------------------
 -- 5.1) power_plant_meta (static)
+----------------------------
 CREATE TABLE IF NOT EXISTS power_plant_meta (
   simulation      TEXT    NOT NULL,
-  "index"         TEXT,
-  unit_type       TEXT,
+  unit_id         TEXT,
   unit_operator   TEXT,
   max_power       REAL,
   min_power       REAL,
   emission_factor REAL,
-  efficiency      REAL
+  efficiency      REAL,
+  technology      TEXT,
+  node            TEXT,
+  PRIMARY KEY (simulation, unit_id)
 );
 
+----------------------------
 -- 5.2) storage_meta (static)
+----------------------------
 CREATE TABLE IF NOT EXISTS storage_meta (
   simulation            TEXT    NOT NULL,
-  "index"               TEXT,
-  unit_type             TEXT,
+  unit_id               TEXT,
   unit_operator         TEXT,
   max_soc               REAL,
   min_soc               REAL,
@@ -92,33 +115,46 @@ CREATE TABLE IF NOT EXISTS storage_meta (
   min_power_charge      REAL,
   min_power_discharge   REAL,
   efficiency_charge     REAL,
-  efficiency_discharge  REAL
+  efficiency_discharge  REAL,
+  technology            TEXT,
+  node                  TEXT,
+  PRIMARY KEY (simulation, unit_id)
 );
 
+----------------------------
 -- 5.3) demand_meta (static)
+----------------------------
 CREATE TABLE IF NOT EXISTS demand_meta (
   simulation      TEXT    NOT NULL,
-  "index"         TEXT,
+  unit_id         TEXT,
   unit_type       TEXT,
   unit_operator   TEXT,
   max_power       REAL,
-  min_power       REAL
+  min_power       REAL,
+  technology      TEXT,
+  node            TEXT,
+  PRIMARY KEY (simulation, unit_id)
 );
 
+----------------------------
 -- 5.4) exchange_meta (static)
+----------------------------
 CREATE TABLE IF NOT EXISTS exchange_meta (
   simulation      TEXT    NOT NULL,
-  "index"         TEXT,
-  unit_type       TEXT,
+  unit_id         TEXT,
   unit_operator   TEXT,
   price_import    REAL,
-  price_export    REAL
+  price_export    REAL,
+  technology      TEXT,
+  node            TEXT,
+  PRIMARY KEY (simulation, unit_id)
 );
 
+----------------------------
 -- 6) rl_params (partitioned by simulation)
+----------------------------
 CREATE TABLE IF NOT EXISTS rl_params (
   simulation         TEXT      NOT NULL,
-  "index"            INTEGER,
   unit               TEXT,
   datetime           TIMESTAMP NOT NULL,
   evaluation_mode    BOOLEAN,
@@ -126,42 +162,53 @@ CREATE TABLE IF NOT EXISTS rl_params (
   profit             REAL,
   reward             REAL,
   regret             REAL,
-  actions            TEXT,
-  exploration_noise  REAL,
   critic_loss        REAL,
   total_grad_norm    REAL,
   max_grad_norm      REAL,
-  learning_rate      REAL
+  learning_rate      REAL,
+  PRIMARY KEY (simulation, episode, evaluation_mode, datetime)
 )
 PARTITION BY LIST (simulation);
 
+CREATE INDEX ON rl_params (simulation, datetime);
+
+----------------------------
 -- 7) rl_meta (static)
+----------------------------
 CREATE TABLE IF NOT EXISTS rl_meta (
   simulation       TEXT    NOT NULL,
-  "index"          INTEGER,
   episode          INTEGER,
   eval_episode     INTEGER,
   learning_mode    BOOLEAN,
-  evaluation_mode  BOOLEAN
+  evaluation_mode  BOOLEAN,
+  PRIMARY KEY (simulation, episode, evaluation_mode)
 );
 
+----------------------------
 -- 8) grid_flows (partitioned by simulation)
+----------------------------
 CREATE TABLE IF NOT EXISTS grid_flows (
   simulation  TEXT    NOT NULL,
-  "index"     INTEGER,
   datetime    TIMESTAMP NOT NULL,
   line        TEXT,
-  flow        REAL
+  flow        REAL,
+  PRIMARY KEY (simulation, datetime)
 )
 PARTITION BY LIST (simulation);
 
+CREATE INDEX ON grid_flows (simulation, datetime);
+
+----------------------------
 -- 9) kpis (partitioned by simulation)
+----------------------------
 CREATE TABLE IF NOT EXISTS kpis (
   simulation  TEXT    NOT NULL,
-  "index"     INTEGER,
   variable    TEXT,
   ident       TEXT,
   value       REAL,
-  time        TIMESTAMP DEFAULT now()
+  time        TIMESTAMP DEFAULT now(),
+  PRIMARY KEY (simulation, variable, ident)
 )
 PARTITION BY LIST (simulation);
+
+CREATE INDEX ON kpis (simulation, time);

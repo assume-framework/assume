@@ -349,12 +349,21 @@ class WriteOutput(Role):
         Args:
             unit_info (dict): The unit information.
         """
+        # 1) Copy so we don't mutate the original
         info = dict(unit_info)
+
+        # 2) Remove anything you don't want
         info.pop("unit_type", None)
-        row_id = info.pop("id", None)
+
+        # 3) Pull out the id and stash it back in as its own column
+        unit_id = info.pop("id", None)
+        info["unit_id"] = unit_id
+
+        # 4) Always include the simulation
         info["simulation"] = self.simulation_id
 
-        return pd.DataFrame([info], index=[row_id])
+        # 5) Return a single-row DataFrame; pandas will treat unit_id & simulation as columns
+        return pd.DataFrame([info])
 
     def convert_market_dispatch(self, market_dispatch: list[dict]):
         """
@@ -715,14 +724,8 @@ class WriteOutput(Role):
         # ---- SQLite fallback ----
         if self.db.dialect.name == "sqlite":
             # simple append via pandas
-            df.to_sql(
-                name=table,
-                con=self.db,
-                if_exists="append",
-                index=df.index.name is not None,
-                index_label=df.index.name,
-                method="multi",  # batches INSERTs
-            )
+            with self.db.begin() as db:
+                df.to_sql(table, db, if_exists="append")
             return
 
         # 1) If there’s a named index (e.g. time/datetime), turn it into a real column
@@ -823,12 +826,19 @@ class WriteOutput(Role):
         Deletes rows from every table where simulation = simulation_id,
         but skips any tables that don’t yet exist.
         """
-        with self.db.begin() as conn:
-            for table in ALL_SIM_TABLES:
-                if not self._inspector.has_table(table):
-                    logger.debug("Skipping purge: table %s does not exist", table)
-                    continue
+        for table in ALL_SIM_TABLES:
+            # do not delete rl table if in learning mode
+            if not self._inspector.has_table(table):
+                logger.debug("Skipping purge: table %s does not exist", table)
+                continue
 
+            # only delete rl_params and rl_meta during the first episode of learning
+            if table in ["rl_params", "rl_meta"] and not (
+                self.learning_mode and self.episode == 1
+            ):
+                continue
+
+            with self.db.begin() as conn:
                 sql = text(f'DELETE FROM "{table}" WHERE simulation = :sim')
                 res = conn.execute(sql, {"sim": simulation_id})
                 logger.debug("Deleted %s rows from %s", res.rowcount, table)
@@ -839,16 +849,24 @@ class WriteOutput(Role):
         1) Drop any simulation-specific partitions.
         2) Delete all rows in the static tables for that simulation.
         """
-        with self.db.begin() as conn:
-            # 1) drop per-simulation partitions
-            for tbl in PARTITIONED_TABLES:
-                conn.execute(text(f"DROP TABLE IF EXISTS {tbl}_{simulation_id};"))
+        # 1) drop per-simulation partitions
+        for table in PARTITIONED_TABLES:
+            # only delete rl_params during the first episode of learning
+            if table == "rl_params" and not (self.learning_mode and self.episode == 1):
+                continue
 
-            # 2) delete from the static tables
-            static_tables = [t for t in ALL_SIM_TABLES if t not in PARTITIONED_TABLES]
-            for tbl in static_tables:
+            with self.db.begin() as conn:
+                conn.execute(text(f"DROP TABLE IF EXISTS {table}_{simulation_id};"))
+
+        # 2) delete from the static tables
+        static_tables = [t for t in ALL_SIM_TABLES if t not in PARTITIONED_TABLES]
+        for table in static_tables:
+            if table == "rl_meta" and not (self.learning_mode and self.episode == 1):
+                continue
+
+            with self.db.begin() as conn:
                 conn.execute(
-                    text(f"DELETE FROM {tbl} WHERE simulation = :sim;"),
+                    text(f"DELETE FROM {table} WHERE simulation = :sim;"),
                     {"sim": simulation_id},
                 )
 
