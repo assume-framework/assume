@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import functools
 import logging
 import shutil
 from collections import defaultdict
@@ -53,6 +54,29 @@ ALL_SIM_TABLES = PARTITIONED_TABLES + [
     "exchange_meta",
     "rl_meta",
 ]
+
+
+# --- Decorator to retry on missing tables or columns ---
+def retry_on_schema_errors(func):
+    @functools.wraps(func)
+    def wrapper(self, table: str, df: pd.DataFrame):
+        try:
+            return func(self, table, df)
+        except NoSuchTableError:
+            self._ensure_table(table, df)
+            return func(self, table, df)
+        except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+            self._check_columns(table, df)
+            return func(self, table, df)
+        except Exception as e:
+            logger.error("%s failed for %s: %s", func.__name__, table, e)
+
+    return wrapper
+
+
+# --- Helper for index normalization ---
+def _prepare_df(df: pd.DataFrame) -> pd.DataFrame:
+    return df.reset_index() if df.index.name else df
 
 
 class OutputDef(TypedDict):
@@ -710,253 +734,170 @@ class WriteOutput(Role):
         return rewards_by_unit
 
     def _get_columns(self, table: str) -> list[str]:
-        if table not in self._column_cache:
-            self._column_cache[table] = [
-                c["name"] for c in self._inspector.get_columns(table)
-            ]
-        return self._column_cache[table]
-
-    def _copy_df_to_db(self, table: str, df: pd.DataFrame):
-        """
-        Main entry: normalize index, then dispatch to the correct backend
-        and the correct strategy (upsert only for unit_dispatch).
-        """
-        # 1) If there’s a named index, turn it into a real column
-        if df.index.name:
-            df = df.reset_index()
-
-        # 2) Dispatch based on dialect and table
-        if self.db.dialect.name == "sqlite":
-            return self._copy_df_to_db_sqlite_append(table, df)
-        else:
-            if table == "unit_dispatch":
-                return self._copy_df_to_unit_dispatch(table, df)
-            else:
-                return self._copy_df_to_db_postgres_copy(table, df)
-
-    def _copy_df_to_db_sqlite_append(self, table: str, df: pd.DataFrame):
-        """
-        SQLite append‐only: pandas.to_sql, with retry‐on‐missing‐schema.
-        """
-        try:
-            with self.db.begin() as conn:
-                df.to_sql(
-                    name=table,
-                    con=conn,
-                    if_exists="append",
-                    index=df.index.name is not None,
-                    index_label=df.index.name,
-                )
-        except NoSuchTableError:
-            self._ensure_table(table, df)
-            return self._copy_df_to_db_sqlite_append(table, df)
-        except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
-            self._check_columns(table, df)
-            return self._copy_df_to_db_sqlite_append(table, df)
-        except Exception as e:
-            logger.error("SQLite append failed for %s: %s", table, e)
-
-    def _copy_df_to_db_postgres_copy(self, table: str, df: pd.DataFrame):
-        """
-        Postgres COPY for all tables except unit_dispatch.
-        """
-        try:
-            buf = StringIO()
-            df.to_csv(buf, index=False, header=True)
-            buf.seek(0)
-
-            cols = df.columns.tolist()
-            col_list = ",".join(f'"{c}"' for c in cols)
-            sql = (
-                f'COPY "{table}" ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)'
-            )
-
-            raw = self.db.raw_connection()
-            cur = raw.cursor()
-            cur.copy_expert(sql, buf)
-            raw.commit()
-
-        except NoSuchTableError:
-            self._ensure_table(table, df)
-            return self._copy_df_to_db_postgres_copy(table, df)
-        except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
-            self._check_columns(table, df)
-            return self._copy_df_to_db_postgres_copy(table, df)
-        except Exception as e:
-            logger.error("Postgres COPY failed for %s: %s", table, e)
-        finally:
-            try:
-                cur.close()
-            except Exception:
-                pass
-
-    def _copy_df_to_unit_dispatch(self, table: str, df: pd.DataFrame):
-        # drop duplicates in the staging DataFrame
-        df = df.sort_values(["simulation", "time", "unit"]).drop_duplicates(
-            subset=["simulation", "time", "unit"], keep="last"
+        return self._column_cache.setdefault(
+            table, [c["name"] for c in self._inspector.get_columns(table)]
         )
 
+    def _copy_df_to_db(self, table: str, df: pd.DataFrame):
+        df = _prepare_df(df)
+        key = (self.db.dialect.name, table == "unit_dispatch")
+        handler = {
+            ("sqlite", False): self._copy_sqlite,
+            ("sqlite", True): self._copy_sqlite_upsert,
+            ("postgresql", False): self._copy_postgres,
+            ("postgresql", True): self._copy_postgres_upsert,
+        }.get(key)
+        if not handler:
+            raise ValueError(f"No copy strategy for {key}")
+        return handler(table, df)
+
+    @retry_on_schema_errors
+    def _copy_sqlite(self, table: str, df: pd.DataFrame):
+        with self.db.begin() as conn:
+            df.to_sql(
+                table,
+                conn,
+                if_exists="append",
+                index=df.index.name is not None,
+                index_label=df.index.name,
+            )
+
+    @retry_on_schema_errors
+    def _copy_sqlite_upsert(self, table: str, df: pd.DataFrame):
+        df = df.sort_values(["simulation", "time", "unit"]).drop_duplicates(
+            ["simulation", "time", "unit"], keep="last"
+        )
+        cols = df.columns.tolist()
+        col_list = ", ".join(f'"{c}"' for c in cols)
+        placeholders = ", ".join(f":{c}" for c in cols)
+        stmt = text(
+            f'INSERT OR REPLACE INTO "{table}" ({col_list}) VALUES ({placeholders})'
+        )
+        with self.db.begin() as conn:
+            conn.execute(stmt, df.to_dict("records"))
+
+    @retry_on_schema_errors
+    def _copy_postgres(self, table: str, df: pd.DataFrame):
         buf = StringIO()
         df.to_csv(buf, index=False, header=True)
         buf.seek(0)
-
         cols = df.columns.tolist()
         col_list = ",".join(f'"{c}"' for c in cols)
-
+        sql = f'COPY "{table}" ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)'
         raw = self.db.raw_connection()
         cur = raw.cursor()
-        try:
-            cur.execute(f"""
-                CREATE TEMP TABLE tmp_{table} (
-                LIKE "{table}" INCLUDING ALL
-                ) ON COMMIT DROP;
-            """)
-            cur.copy_expert(
-                f"COPY tmp_{table} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
-                buf,
-            )
+        cur.copy_expert(sql, buf)
+        raw.commit()
+        cur.close()
 
-            pk_cols = ["simulation", "time", "unit"]
-            update_cols = [c for c in cols if c not in pk_cols]
-            update_clause = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in update_cols)
-
-            cur.execute(f"""
-                INSERT INTO "{table}" ({col_list})
-                SELECT {col_list} FROM tmp_{table}
-                ON CONFLICT (simulation, time, unit)
-                DO UPDATE SET {update_clause};
-            """)
-            raw.commit()
-
-        finally:
-            cur.close()
+    @retry_on_schema_errors
+    def _copy_postgres_upsert(self, table: str, df: pd.DataFrame):
+        df = df.sort_values(["simulation", "time", "unit"]).drop_duplicates(
+            ["simulation", "time", "unit"], keep="last"
+        )
+        buf = StringIO()
+        df.to_csv(buf, index=False, header=True)
+        buf.seek(0)
+        cols = df.columns.tolist()
+        col_list = ",".join(f'"{c}"' for c in cols)
+        raw = self.db.raw_connection()
+        cur = raw.cursor()
+        cur.execute("SELECT 1")  # ensure connection
+        # create temp table
+        cur.execute(f"""
+            CREATE TEMP TABLE tmp_{table} (LIKE "{table}" INCLUDING ALL) ON COMMIT DROP;
+        """)
+        cur.copy_expert(
+            f"COPY tmp_{table} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
+            buf,
+        )
+        pk = ["simulation", "time", "unit"]
+        updates = ", ".join(f'"{c}"=EXCLUDED."{c}"' for c in cols if c not in pk)
+        cur.execute(f"""
+            INSERT INTO "{table}" ({col_list})
+            SELECT {col_list} FROM tmp_{table}
+            ON CONFLICT ({','.join(pk)}) DO UPDATE SET {updates};
+        """)
+        raw.commit()
+        cur.close()
 
     def _create_partitions(self, simulation_id: str):
-        """Create one child‐partition per parent table for this simulation_id."""
         with self.db.begin() as conn:
             for table in PARTITIONED_TABLES:
                 partition = f"{table}_{simulation_id}"
-                sql = f"""
-                CREATE TABLE IF NOT EXISTS {partition}
-                  PARTITION OF {table}
-                  FOR VALUES IN ('{simulation_id}');
-                """
-                conn.execute(text(sql))
+                conn.execute(
+                    text(
+                        f"CREATE TABLE IF NOT EXISTS {partition} "
+                        f"PARTITION OF {table} FOR VALUES IN ('{simulation_id}');"
+                    )
+                )
                 logger.debug("created partition %s", partition)
 
     def _ensure_table(self, table: str, df: pd.DataFrame):
-        """
-        If `table` doesn’t exist in the DB yet, create it using df.head(0).to_sql(),
-        so that future copies will succeed.
-        """
         if not self._inspector.has_table(table):
-            # Use zero‐row to create the right columns & types
             df.head(0).to_sql(
                 name=table,
                 con=self.db,
-                if_exists="append",  # create if missing, then do nothing
+                if_exists="append",
                 index=bool(df.index.name),
                 method=None,
             )
 
     def _check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
-        """
-        Checks and adds columns to the database table if necessary.
-
-        Args:
-            table (str): The name of the database table.
-            df (pandas.DataFrame): The DataFrame to be checked.
-            index (bool): Whether to also ensure the index name exists as a column.
-        """
-        # 1) Fetch current columns from the database
         with self.db.begin() as conn:
-            query = f"SELECT * FROM {table} WHERE 1=0"
-            db_columns = pd.read_sql(query, conn).columns
-
-        # Normalize to lowercase for robust comparison
-        db_cols_lower = [c.lower() for c in db_columns]
-
-        # 2) Add any missing DataFrame columns
-        for column in df.columns:
-            if column.lower() not in db_cols_lower:
-                try:
-                    if is_bool_dtype(df[column]):
-                        column_type = "BOOLEAN"
-                    elif is_numeric_dtype(df[column]):
-                        column_type = "DOUBLE PRECISION"
-                    else:
-                        column_type = "TEXT"
-                    alter = f'ALTER TABLE {table} ADD COLUMN "{column}" {column_type}'
-                    with self.db.begin() as conn:
-                        conn.execute(text(alter))
-                    logger.debug("Added column %s to table %s", column, table)
-                    # update our lowercase cache list immediately
-                    db_cols_lower.append(column.lower())
-                except Exception:
-                    logger.exception("Error adding column %s to %s", column, table)
-
-        # 3) Optionally add the index name as a column
+            db_columns = pd.read_sql(f"SELECT * FROM {table} WHERE 1=0", conn).columns
+        db_cols_lower = {c.lower() for c in db_columns}
+        for col in df.columns:
+            if col.lower() not in db_cols_lower:
+                dtype = (
+                    "BOOLEAN"
+                    if is_bool_dtype(df[col])
+                    else "DOUBLE PRECISION"
+                    if is_numeric_dtype(df[col])
+                    else "TEXT"
+                )
+                alter = text(f'ALTER TABLE {table} ADD COLUMN "{col}" {dtype}')
+                with self.db.begin() as conn:
+                    conn.execute(alter)
+                db_cols_lower.add(col.lower())
         if index and df.index.name:
-            idx = df.index.name.lower()
-            if idx not in db_cols_lower:
-                try:
-                    column_type = (
-                        "DOUBLE PRECISION" if is_numeric_dtype(df.index) else "TEXT"
-                    )
-                    alter = f'ALTER TABLE {table} ADD COLUMN "{idx}" {column_type}'
-                    with self.db.begin() as conn:
-                        conn.execute(text(alter))
-                    logger.info("Added index-column %s to table %s", idx, table)
-                    db_cols_lower.append(idx)
-                except Exception:
-                    logger.exception("Error adding index column %s to %s", idx, table)
-
-        # 4) Invalidate the cached column list so _get_columns() will re-fetch next time
+            idx = df.index.name
+            if idx.lower() not in db_cols_lower:
+                dtype = "DOUBLE PRECISION" if is_numeric_dtype(df.index) else "TEXT"
+                alter = text(f'ALTER TABLE {table} ADD COLUMN "{idx}" {dtype}')
+                with self.db.begin() as conn:
+                    conn.execute(alter)
         self._column_cache.pop(table, None)
 
     def _purge_simulation_data_sqlite(self, simulation_id: str):
-        """
-        SQLite‐only fallback for clearing out old simulation data.
-        Deletes rows from every table where simulation = simulation_id,
-        but skips any tables that don’t yet exist.
-        """
         for table in ALL_SIM_TABLES:
-            # do not delete rl table if in learning mode
             if not self._inspector.has_table(table):
-                logger.debug("Skipping purge: table %s does not exist", table)
                 continue
-
-            # only delete rl_params and rl_meta during the first episode of learning
-            if table in ["rl_params", "rl_meta"] and not (
+            if table in {"rl_params", "rl_meta"} and not (
                 self.learning_mode and self.episode == 1
             ):
                 continue
-
             with self.db.begin() as conn:
-                sql = text(f'DELETE FROM "{table}" WHERE simulation = :sim')
-                res = conn.execute(sql, {"sim": simulation_id})
-                logger.debug("Deleted %s rows from %s", res.rowcount, table)
+                conn.execute(
+                    text(f'DELETE FROM "{table}" WHERE simulation = :sim'),
+                    {"sim": simulation_id},
+                )
 
     def _purge_simulation_data_postgresql(self, simulation_id: str):
         """
         TimescaleDB/Postgres cleanup:
         1) Drop any simulation-specific partitions.
         2) Delete all rows in the static tables for that simulation,
-           but only if the table actually exists.
+        but only if the table actually exists.
         """
-        inspector = self._inspector
-
         # 1) drop per-simulation partitions
         for table in PARTITIONED_TABLES:
             # only delete rl_params during the first episode of learning
             if table == "rl_params" and not (self.learning_mode and self.episode == 1):
                 continue
-
-            partition_name = f"{table}_{simulation_id}"
-            sql_drop = text(f'DROP TABLE IF EXISTS "{partition_name}";')
             with self.db.begin() as conn:
-                conn.execute(sql_drop)
-                logger.debug("Dropped partition %s if it existed", partition_name)
+                conn.execute(text(f'DROP TABLE IF EXISTS "{table}_{simulation_id}";'))
+                logger.debug("Dropped partition %s", f"{table}_{simulation_id}")
 
         # 2) delete from the static tables, skipping any that don’t exist
         static_tables = [t for t in ALL_SIM_TABLES if t not in PARTITIONED_TABLES]
@@ -964,15 +905,16 @@ class WriteOutput(Role):
             # only delete rl_meta during the first episode of learning
             if table == "rl_meta" and not (self.learning_mode and self.episode == 1):
                 continue
-
-            if not inspector.has_table(table):
-                logger.debug("Skipping purge: table %s does not exist", table)
+            if not self._inspector.has_table(table):
                 continue
-
             with self.db.begin() as conn:
-                sql_delete = text(f'DELETE FROM "{table}" WHERE simulation = :sim;')
-                res = conn.execute(sql_delete, {"sim": simulation_id})
-                logger.debug("Deleted %s rows from %s", res.rowcount, table)
+                conn.execute(
+                    text(f'DELETE FROM "{table}" WHERE simulation = :sim;'),
+                    {"sim": simulation_id},
+                )
+                logger.debug(
+                    "Deleted rows from %s for simulation %s", table, simulation_id
+                )
 
 
 class DatabaseMaintenance:
