@@ -17,9 +17,7 @@ from dateutil import rrule as rr
 from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from psycopg2.errors import UndefinedColumn
-from sqlalchemy import MetaData, Table, create_engine, inspect, text
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import (
     DataError,
     NoSuchTableError,
@@ -729,13 +727,10 @@ class WriteOutput(Role):
 
         # 2) Dispatch based on dialect and table
         if self.db.dialect.name == "sqlite":
-            if table == "unit_dispatch":
-                return self._copy_df_to_db_sqlite_upsert(table, df)
-            else:
-                return self._copy_df_to_db_sqlite_append(table, df)
+            return self._copy_df_to_db_sqlite_append(table, df)
         else:
             if table == "unit_dispatch":
-                return self._copy_df_to_db_postgres_upsert(table, df)
+                return self._copy_df_to_unit_dispatch(table, df)
             else:
                 return self._copy_df_to_db_postgres_copy(table, df)
 
@@ -760,36 +755,6 @@ class WriteOutput(Role):
             return self._copy_df_to_db_sqlite_append(table, df)
         except Exception as e:
             logger.error("SQLite append failed for %s: %s", table, e)
-
-    def _copy_df_to_db_sqlite_upsert(self, table: str, df: pd.DataFrame):
-        """
-        SQLite UPSERT for unit_dispatch: INSERT...ON CONFLICT DO UPDATE.
-        """
-        # 1) Ensure table exists
-        if not self._inspector.has_table(table):
-            self._ensure_table(table, df)
-
-        try:
-            meta = MetaData()
-            tbl = Table(table, meta, autoload_with=self.db)
-            records = df.to_dict(orient="records")
-            stmt = sqlite_insert(tbl).values(records)
-
-            pk_cols = [c.name for c in tbl.primary_key.columns]
-            update_cols = [c for c in df.columns if c not in pk_cols]
-
-            stmt = stmt.on_conflict_do_update(
-                index_elements=pk_cols,
-                set_={col: getattr(stmt.excluded, col) for col in update_cols},
-            )
-            with self.db.begin() as conn:
-                conn.execute(stmt)
-
-        except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
-            self._check_columns(table, df)
-            return self._copy_df_to_db_sqlite_upsert(table, df)
-        except Exception as e:
-            logger.error("SQLite upsert failed for %s: %s", table, e)
 
     def _copy_df_to_db_postgres_copy(self, table: str, df: pd.DataFrame):
         """
@@ -825,35 +790,46 @@ class WriteOutput(Role):
             except Exception:
                 pass
 
-    def _copy_df_to_db_postgres_upsert(self, table: str, df: pd.DataFrame):
-        """
-        Postgres UPSERT for unit_dispatch: INSERT...ON CONFLICT DO UPDATE.
-        """
-        # 1) Ensure table exists
-        if not self._inspector.has_table(table):
-            self._ensure_table(table, df)
+    def _copy_df_to_unit_dispatch(self, table: str, df: pd.DataFrame):
+        # drop duplicates in the staging DataFrame
+        df = df.sort_values(["simulation", "time", "unit"]).drop_duplicates(
+            subset=["simulation", "time", "unit"], keep="last"
+        )
 
+        buf = StringIO()
+        df.to_csv(buf, index=False, header=True)
+        buf.seek(0)
+
+        cols = df.columns.tolist()
+        col_list = ",".join(f'"{c}"' for c in cols)
+
+        raw = self.db.raw_connection()
+        cur = raw.cursor()
         try:
-            meta = MetaData()
-            tbl = Table(table, meta, autoload_with=self.db)
-            records = df.to_dict(orient="records")
-
-            stmt = pg_insert(tbl).values(records)
-            pk_cols = [c.name for c in tbl.primary_key.columns]
-            update_cols = [c for c in df.columns if c not in pk_cols]
-
-            stmt = stmt.on_conflict_do_update(
-                index_elements=pk_cols,
-                set_={col: getattr(stmt.excluded, col) for col in update_cols},
+            cur.execute(f"""
+                CREATE TEMP TABLE tmp_{table} (
+                LIKE "{table}" INCLUDING ALL
+                ) ON COMMIT DROP;
+            """)
+            cur.copy_expert(
+                f"COPY tmp_{table} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
+                buf,
             )
-            with self.db.begin() as conn:
-                conn.execute(stmt)
 
-        except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
-            self._check_columns(table, df)
-            return self._copy_df_to_db_postgres_upsert(table, df)
-        except Exception as e:
-            logger.error("Postgres upsert failed for %s: %s", table, e)
+            pk_cols = ["simulation", "time", "unit"]
+            update_cols = [c for c in cols if c not in pk_cols]
+            update_clause = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in update_cols)
+
+            cur.execute(f"""
+                INSERT INTO "{table}" ({col_list})
+                SELECT {col_list} FROM tmp_{table}
+                ON CONFLICT (simulation, time, unit)
+                DO UPDATE SET {update_clause};
+            """)
+            raw.commit()
+
+        finally:
+            cur.close()
 
     def _create_partitions(self, simulation_id: str):
         """Create one child‐partition per parent table for this simulation_id."""
@@ -965,28 +941,38 @@ class WriteOutput(Role):
         """
         TimescaleDB/Postgres cleanup:
         1) Drop any simulation-specific partitions.
-        2) Delete all rows in the static tables for that simulation.
+        2) Delete all rows in the static tables for that simulation,
+           but only if the table actually exists.
         """
+        inspector = self._inspector
+
         # 1) drop per-simulation partitions
         for table in PARTITIONED_TABLES:
             # only delete rl_params during the first episode of learning
             if table == "rl_params" and not (self.learning_mode and self.episode == 1):
                 continue
 
+            partition_name = f"{table}_{simulation_id}"
+            sql_drop = text(f'DROP TABLE IF EXISTS "{partition_name}";')
             with self.db.begin() as conn:
-                conn.execute(text(f"DROP TABLE IF EXISTS {table}_{simulation_id};"))
+                conn.execute(sql_drop)
+                logger.debug("Dropped partition %s if it existed", partition_name)
 
-        # 2) delete from the static tables
+        # 2) delete from the static tables, skipping any that don’t exist
         static_tables = [t for t in ALL_SIM_TABLES if t not in PARTITIONED_TABLES]
         for table in static_tables:
+            # only delete rl_meta during the first episode of learning
             if table == "rl_meta" and not (self.learning_mode and self.episode == 1):
                 continue
 
+            if not inspector.has_table(table):
+                logger.debug("Skipping purge: table %s does not exist", table)
+                continue
+
             with self.db.begin() as conn:
-                conn.execute(
-                    text(f"DELETE FROM {table} WHERE simulation = :sim;"),
-                    {"sim": simulation_id},
-                )
+                sql_delete = text(f'DELETE FROM "{table}" WHERE simulation = :sim;')
+                res = conn.execute(sql_delete, {"sim": simulation_id})
+                logger.debug("Deleted %s rows from %s", res.rowcount, table)
 
 
 class DatabaseMaintenance:
