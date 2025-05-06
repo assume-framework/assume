@@ -23,11 +23,13 @@ CREATE TABLE IF NOT EXISTS market_meta (
   max_price                REAL,
   min_price                REAL,
   node                     TEXT,
-  PRIMARY KEY (simulation, market_id, time)
+  PRIMARY KEY (simulation, market_id, node, time)
 )
 PARTITION BY LIST (simulation);
 
 CREATE INDEX ON market_meta (simulation, time);
+CREATE INDEX idx_market_meta_sim_market_prod_start
+  ON market_meta (simulation, market_id, product_start);
 
 ----------------------------
 -- 2) market_dispatch (partitioned by simulation)
@@ -43,6 +45,8 @@ CREATE TABLE IF NOT EXISTS market_dispatch (
 PARTITION BY LIST (simulation);
 
 CREATE INDEX ON market_dispatch (simulation, datetime);
+CREATE INDEX idx_market_dispatch_sim_unit_datetime
+  ON market_dispatch (simulation, unit_id, datetime);
 
 ----------------------------
 -- 3) market_orders (partitioned by simulation)
@@ -60,11 +64,16 @@ CREATE TABLE IF NOT EXISTS market_orders (
   unit_id              TEXT,
   accepted_price       REAL,
   accepted_volume      REAL,
+  parent_bid_id        TEXT,
+  min_acceptance_ratio REAL,
   PRIMARY KEY (simulation, market_id, start_time, bid_id)
 )
 PARTITION BY LIST (simulation);
 
-CREATE INDEX ON market_orders (simulation, start_time);
+CREATE INDEX ON market_orders (simulation, market_id, start_time);
+CREATE INDEX ON market_orders (simulation, unit_id);
+CREATE INDEX idx_market_orders_sim_unit_start
+  ON market_orders (simulation, unit_id, start_time);
 
 ----------------------------
 -- 4) unit_dispatch (partitioned by simulation)
@@ -79,11 +88,13 @@ CREATE TABLE IF NOT EXISTS unit_dispatch (
   energy_generation_costs  REAL,
   energy_cashflow          REAL,
   total_costs              REAL,
-  PRIMARY KEY (simulation, unit, time)
+  PRIMARY KEY (simulation, time, unit)
 )
 PARTITION BY LIST (simulation);
 
 CREATE INDEX ON unit_dispatch (simulation, time);
+CREATE INDEX idx_unit_dispatch_sim_unit_time
+  ON unit_dispatch (simulation, unit, time);
 
 ----------------------------
 -- 5.1) power_plant_meta (static)
@@ -100,6 +111,9 @@ CREATE TABLE IF NOT EXISTS power_plant_meta (
   node            TEXT,
   PRIMARY KEY (simulation, unit_id)
 );
+
+CREATE INDEX idx_power_plant_meta_sim_tech
+  ON power_plant_meta (simulation, technology);
 
 ----------------------------
 -- 5.2) storage_meta (static)
@@ -166,7 +180,7 @@ CREATE TABLE IF NOT EXISTS rl_params (
   total_grad_norm    REAL,
   max_grad_norm      REAL,
   learning_rate      REAL,
-  PRIMARY KEY (simulation, episode, evaluation_mode, datetime)
+  PRIMARY KEY (simulation, episode, evaluation_mode, unit, datetime)
 )
 PARTITION BY LIST (simulation);
 
