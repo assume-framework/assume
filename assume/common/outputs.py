@@ -34,6 +34,26 @@ from assume.common.utils import (
 
 logger = logging.getLogger(__name__)
 
+# time-series (partitioned) tables
+PARTITIONED_TABLES = [
+    "market_meta",
+    "market_dispatch",
+    "market_orders",
+    "unit_dispatch",
+    "rl_params",
+    "grid_flows",
+    "kpis",
+]
+
+# all tables that carry a `simulation` column, whether static or hypertable
+ALL_SIM_TABLES = PARTITIONED_TABLES + [
+    "power_plant_meta",
+    "storage_meta",
+    "demand_meta",
+    "exchange_meta",
+    "rl_meta",
+]
+
 
 class OutputDef(TypedDict):
     name: str
@@ -164,34 +184,23 @@ class WriteOutput(Role):
         tears down any old data, creates partitions if needed, and schedules
         the periodic store_dfs task.
         """
-        # 1) Initialize the engine
+        # 1) Initialize the engine from URI and an inspector
         if self.db_uri:
-            # Always create a temporary engine to inspect the dialect
-            engine = create_engine(self.db_uri)
+            self.db = create_engine(self.db_uri)
+            self._inspector = inspect(self.db)
 
-            if engine.dialect.name == "sqlite":
-                # We’re in “local_db” mode: derive a per‐simulation filename
-                db_path = engine.url.database  # e.g. "./examples/local_db/assume_db.db"
-                base = Path(db_path)
-                sim_db = base.with_name(
-                    f"{base.stem}_{self.simulation_id}{base.suffix}"
-                )
-                # Remove any old file so we start fresh
-                if sim_db.exists():
-                    sim_db.unlink()
-                    logger.debug("Removed existing local DB %s", sim_db)
-                # Point SQLAlchemy at the new per‐simulation file
-                engine = create_engine(f"sqlite:///{sim_db}")
+        # 2) Clear out previous data
+        if self.db is not None:
+            dialect = self.db.dialect.name
 
-            # For any other dialect (postgresql, etc.) just use the original engine
-            self.db = engine
+            if dialect == "sqlite":
+                # SQLite fallback: DELETE all rows for this simulation
+                self._purge_simulation_data_sqlite(self.simulation_id)
 
-        # 2) If using Postgres/Timescale, drop & recreate partitions
-        if self.db is not None and self.db.dialect.name == "postgresql":
-            # drop old partitions (instant metadata operation)
-            self.delete_db_scenario(self.simulation_id)
-            # create fresh partitions for this run
-            self._create_partitions(self.simulation_id)
+            elif dialect == "postgresql":
+                # Postgres/Timescale: drop & recreate partitions
+                self._purge_simulation_data_postgresql(self.simulation_id)
+                self._create_partitions(self.simulation_id)
 
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
@@ -206,24 +215,6 @@ class WriteOutput(Role):
                 recurrency_task,
                 src="no_wait",
             )
-
-    def delete_db_scenario(self, simulation_id: str):
-        if not self.db:
-            return
-
-        tables = [
-            "market_meta",
-            "market_dispatch",
-            "unit_dispatch",
-            "rl_params",
-            "grid_flows",
-            "kpis",
-        ]
-        with self.db.begin() as conn:
-            for tbl in tables:
-                part = f"{tbl}_{simulation_id}"
-                conn.execute(text(f"DROP TABLE IF EXISTS {part};"))
-                logger.debug("dropped partition %s", part)
 
     def handle_output_message(self, content: dict, meta: MetaDict):
         """
@@ -358,12 +349,12 @@ class WriteOutput(Role):
         Args:
             unit_info (dict): The unit information.
         """
-        del unit_info["unit_type"]
-        unit_info["simulation"] = self.simulation_id
-        u_info = {unit_info["id"]: unit_info}
-        del unit_info["id"]
+        info = dict(unit_info)
+        info.pop("unit_type", None)
+        row_id = info.pop("id", None)
+        info["simulation"] = self.simulation_id
 
-        return pd.DataFrame(u_info).T
+        return pd.DataFrame([info], index=[row_id])
 
     def convert_market_dispatch(self, market_dispatch: list[dict]):
         """
@@ -550,6 +541,9 @@ class WriteOutput(Role):
                     self._check_columns(table, df)
                     # now try again
                     self._copy_df_to_db(table, df)
+                except Exception as e:
+                    logger.error("could not write to db: %s", e)
+                    continue
 
         self.current_dfs_size_bytes = 0
 
@@ -712,9 +706,8 @@ class WriteOutput(Role):
 
     def _get_columns(self, table: str) -> list[str]:
         if table not in self._column_cache:
-            inspector = inspect(self.db)
             self._column_cache[table] = [
-                c["name"] for c in inspector.get_columns(table)
+                c["name"] for c in self._inspector.get_columns(table)
             ]
         return self._column_cache[table]
 
@@ -726,7 +719,8 @@ class WriteOutput(Role):
                 name=table,
                 con=self.db,
                 if_exists="append",
-                index=False,
+                index=df.index.name is not None,
+                index_label=df.index.name,
                 method="multi",  # batches INSERTs
             )
             return
@@ -742,48 +736,40 @@ class WriteOutput(Role):
         df = df.reindex(columns=cols)
 
         # 4) Serialize CSV with header
-        buf = StringIO()
-        df.to_csv(buf, index=False, header=True)
-        buf.seek(0)
+        with StringIO() as buffer:
+            df.to_csv(buffer, index=False, header=True)
+            buffer.seek(0)
 
-        # 5) Bulk‐load via COPY, matching on header
-        col_list = ",".join(cols)
-        sql = f"COPY {table} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)"
-        raw = self.db.raw_connection()
-        try:
-            cur = raw.cursor()
-            cur.copy_expert(sql, buf)
-            raw.commit()
-        finally:
-            cur.close()
+            # 5) Bulk‐load via COPY, matching on header
+            col_list = ",".join(cols)
+            sql = f"COPY {table} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)"
+            raw_connection = self.db.raw_connection()
+            try:
+                cursor = raw_connection.cursor()
+                cursor.copy_expert(sql, buffer)
+                raw_connection.commit()
+            finally:
+                cursor.close()
 
     def _create_partitions(self, simulation_id: str):
         """Create one child‐partition per parent table for this simulation_id."""
-        tables = [
-            "market_meta",
-            "market_dispatch",
-            "unit_dispatch",
-            "rl_params",
-            "grid_flows",
-            "kpis",
-        ]
         with self.db.begin() as conn:
-            for tbl in tables:
-                part = f"{tbl}_{simulation_id}"
+            for table in PARTITIONED_TABLES:
+                partition = f"{table}_{simulation_id}"
                 sql = f"""
-                CREATE TABLE IF NOT EXISTS {part}
-                  PARTITION OF {tbl}
+                CREATE TABLE IF NOT EXISTS {partition}
+                  PARTITION OF {table}
                   FOR VALUES IN ('{simulation_id}');
                 """
                 conn.execute(text(sql))
-                logger.debug("created partition %s", part)
+                logger.debug("created partition %s", partition)
 
     def _ensure_table(self, table: str, df: pd.DataFrame):
         """
         If `table` doesn’t exist in the DB yet, create it using df.head(0).to_sql(),
         so that future copies will succeed.
         """
-        if not inspect(self.db).has_table(table):
+        if not self._inspector.has_table(table):
             # Use zero‐row to create the right columns & types
             df.head(0).to_sql(
                 name=table,
@@ -831,6 +817,41 @@ class WriteOutput(Role):
             with self.db.begin() as db:
                 db.execute(text(query))
 
+    def _purge_simulation_data_sqlite(self, simulation_id: str):
+        """
+        SQLite‐only fallback for clearing out old simulation data.
+        Deletes rows from every table where simulation = simulation_id,
+        but skips any tables that don’t yet exist.
+        """
+        with self.db.begin() as conn:
+            for table in ALL_SIM_TABLES:
+                if not self._inspector.has_table(table):
+                    logger.debug("Skipping purge: table %s does not exist", table)
+                    continue
+
+                sql = text(f'DELETE FROM "{table}" WHERE simulation = :sim')
+                res = conn.execute(sql, {"sim": simulation_id})
+                logger.debug("Deleted %s rows from %s", res.rowcount, table)
+
+    def _purge_simulation_data_postgresql(self, simulation_id: str):
+        """
+        TimescaleDB/Postgres cleanup:
+        1) Drop any simulation-specific partitions.
+        2) Delete all rows in the static tables for that simulation.
+        """
+        with self.db.begin() as conn:
+            # 1) drop per-simulation partitions
+            for tbl in PARTITIONED_TABLES:
+                conn.execute(text(f"DROP TABLE IF EXISTS {tbl}_{simulation_id};"))
+
+            # 2) delete from the static tables
+            static_tables = [t for t in ALL_SIM_TABLES if t not in PARTITIONED_TABLES]
+            for tbl in static_tables:
+                conn.execute(
+                    text(f"DELETE FROM {tbl} WHERE simulation = :sim;"),
+                    {"sim": simulation_id},
+                )
+
 
 class DatabaseMaintenance:
     """
@@ -844,15 +865,6 @@ class DatabaseMaintenance:
     Tables partitioned by simulation: market_meta, market_dispatch, unit_dispatch,
     rl_params, grid_flows, kpis. Other tables are dropped via DELETE if needed.
     """
-
-    PARTITIONED_TABLES = [
-        "market_meta",
-        "market_dispatch",
-        "unit_dispatch",
-        "rl_params",
-        "grid_flows",
-        "kpis",
-    ]
 
     def __init__(self, db_uri: str):
         self.db = create_engine(db_uri)
@@ -868,7 +880,7 @@ class DatabaseMaintenance:
             # only include parent tables, not partitions of form '<parent>_<sim>'
             parent_tables = []
             for t in tables:
-                if any(t.startswith(f"{p}_") for p in self.PARTITIONED_TABLES):
+                if any(t.startswith(f"{p}_") for p in PARTITIONED_TABLES):
                     continue
                 parent_tables.append(t)
             self._table_cache = parent_tables
@@ -894,13 +906,13 @@ class DatabaseMaintenance:
             return
         with self.db.begin() as conn:
             # Drop partitions for partitioned tables
-            for table in self.PARTITIONED_TABLES:
+            for table in PARTITIONED_TABLES:
                 for sim in simulation_ids:
-                    part = f"{table}_{sim}"
-                    conn.execute(text(f"DROP TABLE IF EXISTS {part};"))
-                    logger.debug("Dropped partition %s", part)
+                    partition = f"{table}_{sim}"
+                    conn.execute(text(f"DROP TABLE IF EXISTS {partition};"))
+                    logger.debug("Dropped partition %s", partition)
             # For non-partitioned tables, do DELETE
-            non_part = set(self._get_tables()) - set(self.PARTITIONED_TABLES)
+            non_part = set(self._get_tables()) - set(PARTITIONED_TABLES)
             for table in non_part:
                 # ensure simulation index
                 conn.execute(
@@ -916,7 +928,7 @@ class DatabaseMaintenance:
     def delete_all_simulations(self, exclude: list[str] = None) -> None:
         with self.db.begin() as conn:
             # Partitioned: drop partitions
-            for table in self.PARTITIONED_TABLES:
+            for table in PARTITIONED_TABLES:
                 # list existing partitions
                 parts = [
                     p
@@ -929,11 +941,11 @@ class DatabaseMaintenance:
                     to_drop = [p for p in parts if p not in keep]
                 else:
                     to_drop = parts
-                for part in to_drop:
-                    conn.execute(text(f"DROP TABLE IF EXISTS {part};"))
-                    logger.debug("Dropped partition %s", part)
+                for partition in to_drop:
+                    conn.execute(text(f"DROP TABLE IF EXISTS {partition};"))
+                    logger.debug("Dropped partition %s", partition)
             # Non-partitioned: delete or exclude
-            non_part = set(self._get_tables()) - set(self.PARTITIONED_TABLES)
+            non_part = set(self._get_tables()) - set(PARTITIONED_TABLES)
             for table in non_part:
                 conn.execute(
                     text(

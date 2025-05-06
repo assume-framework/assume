@@ -1,5 +1,4 @@
 -- SPDX-FileCopyrightText: ASSUME Developers
---
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 
 -- 0) Enable extensions
@@ -37,7 +36,7 @@ CREATE TABLE IF NOT EXISTS market_dispatch (
 )
 PARTITION BY LIST (simulation);
 
--- 3) market_orders (static)
+-- 3) market_orders (partitioned by simulation)
 CREATE TABLE IF NOT EXISTS market_orders (
   simulation           TEXT      NOT NULL,
   market_id            TEXT,
@@ -50,7 +49,8 @@ CREATE TABLE IF NOT EXISTS market_orders (
   node                 TEXT,
   evaluation_frequency TEXT,
   eligible_lambda      TEXT
-);
+)
+PARTITION BY LIST (simulation);
 
 -- 4) unit_dispatch (partitioned by simulation)
 CREATE TABLE IF NOT EXISTS unit_dispatch (
@@ -95,24 +95,24 @@ CREATE TABLE IF NOT EXISTS storage_meta (
   efficiency_discharge  REAL
 );
 
--- 5.3) demand_meta (static; add additional fields as needed)
+-- 5.3) demand_meta (static)
 CREATE TABLE IF NOT EXISTS demand_meta (
   simulation      TEXT    NOT NULL,
   "index"         TEXT,
   unit_type       TEXT,
   unit_operator   TEXT,
   max_power       REAL,
-  min_power       REAL,
+  min_power       REAL
 );
 
--- 5.4) exchange_meta (static; add additional fields as needed)
+-- 5.4) exchange_meta (static)
 CREATE TABLE IF NOT EXISTS exchange_meta (
   simulation      TEXT    NOT NULL,
   "index"         TEXT,
   unit_type       TEXT,
   unit_operator   TEXT,
   price_import    REAL,
-  price_export    REAL,
+  price_export    REAL
 );
 
 -- 6) rl_params (partitioned by simulation)
@@ -147,21 +147,21 @@ CREATE TABLE IF NOT EXISTS rl_meta (
 
 -- 8) grid_flows (partitioned by simulation)
 CREATE TABLE IF NOT EXISTS grid_flows (
+  simulation  TEXT    NOT NULL,
   "index"     INTEGER,
   datetime    TIMESTAMP NOT NULL,
   line        TEXT,
-  flow        REAL,
-  simulation  TEXT
+  flow        REAL
 )
 PARTITION BY LIST (simulation);
 
 -- 9) kpis (partitioned by simulation)
 CREATE TABLE IF NOT EXISTS kpis (
+  simulation  TEXT    NOT NULL,
   "index"     INTEGER,
   variable    TEXT,
   ident       TEXT,
   value       REAL,
-  simulation  TEXT,
   time        TIMESTAMP DEFAULT now()
 )
 PARTITION BY LIST (simulation);
