@@ -22,6 +22,8 @@ services:
     volumes:
       # needed for normal image
       - ./assume-db:/var/lib/postgresql/data
+      # new init-script folder (runs only on first container init)
+      - ./docker_configs/db-init:/docker-entrypoint-initdb.d:ro
     ports:
       - 5432:5432
     deploy:
