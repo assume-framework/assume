@@ -222,9 +222,6 @@ The project is developed by a collaborative team of researchers from INATECH at 
 
 ASSUME is funded by the Federal Ministry for Economic Affairs and Climate Action (BMWK). We are grateful for their support in making this project possible.
 
-Here's a proposed section you can include in your `README.md` file, modeled closely on the PyPSA example and tailored to your project **ASSUME**:
-
-
 ## Citing ASSUME
 
 If you use **ASSUME** in your research, we would appreciate it if you cite the following paper:
