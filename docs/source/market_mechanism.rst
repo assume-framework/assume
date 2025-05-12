@@ -2,8 +2,9 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
+##################
 Market Mechanisms
-=================
+##################
 
 A Market Mechanism is used to execute the clearing, scheduled by the MarketRole in base_market.py
 
@@ -50,7 +51,7 @@ The :code:`PayAsBidRole` clears the market in the same manner as the pay-as-clea
 the price of the supply order for both the demand order and the supply orders that meet this demand.
 
 Complex clearing
-^^^^^^^^^^^^^^^^
+=================
 
 The :code:`ComplexClearingRole` performs an electricity market clearing using an optimization to clear the market.
 Here, also profile block and linked orders are supported.
@@ -89,13 +90,4 @@ Because with this algorithm, paradoxically accepted bids (PABs) can occur, the o
 
 If you want a hands-on use-case of the complex clearing check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
 
-
-If you want a hands-on use-case of the complex clearing check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
-
-Redispatch Modeling
--------------------
-
-.. toctree::
-   :maxdepth: 1
-
-   redispatch_modeling
+.. include:: redispatch_modeling.rst

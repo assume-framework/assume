@@ -56,14 +56,6 @@ assume.strategies.flexable\_storage module
    :undoc-members:
    :show-inheritance:
 
-assume.strategies.learning\_advanced\_orders module
----------------------------------------------------
-
-.. automodule:: assume.strategies.learning_advanced_orders
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 assume.strategies.learning\_strategies module
 ---------------------------------------------
 

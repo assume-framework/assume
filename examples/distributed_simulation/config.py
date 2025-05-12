@@ -42,7 +42,7 @@ index = pd.date_range(
     end=end + timedelta(hours=24),
     freq="h",
 )
-sim_id = "handmade_simulation"
+simulation_id = "handmade_simulation"
 
 marketdesign = [
     MarketConfig(
@@ -68,8 +68,7 @@ async def worker(
         start=start,
         end=end,
         save_frequency_hours=48,
-        simulation_id=sim_id,
-        index=index,
+        simulation_id=simulation_id,
         manager_address=manager_protocol_addr,
         broker_addr=broker_addr,
     )

@@ -18,7 +18,63 @@ from assume.reinforcement_learning.learning_utils import NormalActionNoise
 logger = logging.getLogger(__name__)
 
 
-class AbstractLearningStrategy(LearningStrategy):
+class BaseLearningStrategy(LearningStrategy):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.unit_id = kwargs["unit_id"]
+
+        # defines bounds of actions space
+        self.max_bid_price = kwargs.get("max_bid_price", 100)
+
+        # tells us whether we are training the agents or just executing per-learning strategies
+        self.learning_mode = kwargs.get("learning_mode", False)
+        self.evaluation_mode = kwargs.get("evaluation_mode", False)
+
+        # based on learning config
+        self.algorithm = kwargs.get("algorithm", "matd3")
+        self.actor_architecture = kwargs.get("actor_architecture", "mlp")
+        self.original_implementation = kwargs.get("original_implementation", None)
+
+        if self.actor_architecture in actor_architecture_aliases.keys():
+            self.actor_architecture_class = actor_architecture_aliases[
+                self.actor_architecture
+            ]
+        else:
+            raise ValueError(
+                f"Policy '{self.actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
+            )
+
+        # sets the device of the actor network
+        device = kwargs.get("device", "cpu")
+        self.device = th.device(device if th.cuda.is_available() else "cpu")
+        if not self.learning_mode:
+            self.device = th.device("cpu")
+
+        # future: add option to choose between float16 and float32
+        # float_type = kwargs.get("float_type", "float32")
+        self.float_type = th.float
+
+        if self.learning_mode or self.evaluation_mode:
+            self.collect_initial_experience_mode = bool(
+                kwargs.get("episodes_collecting_initial_experience", True)
+            )
+
+            self.action_noise = NormalActionNoise(
+                mu=0.0,
+                sigma=kwargs.get("noise_sigma", 0.1),
+                action_dimension=self.act_dim,
+                scale=kwargs.get("noise_scale", 1.0),
+                dt=kwargs.get("noise_dt", 1.0),
+            )
+
+        elif Path(kwargs["trained_policies_load_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
+        else:
+            raise FileNotFoundError(
+                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+            )
+
     def load_actor_params(self, load_path):
         """
         Load actor parameters.
@@ -38,18 +94,7 @@ class AbstractLearningStrategy(LearningStrategy):
             num_timeseries_obs_dim=self.num_timeseries_obs_dim,
         ).to(self.device)
         self.actor.load_state_dict(params["actor"])
-
-        if self.learning_mode:
-            self.actor_target = self.actor_architecture_class(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
-                float_type=self.float_type,
-                unique_obs_dim=self.unique_obs_dim,
-                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-            ).to(self.device)
-            self.actor_target.load_state_dict(params["actor_target"])
-            self.actor_target.eval()
-            self.actor.optimizer.load_state_dict(params["actor_optimizer"])
+        self.actor.eval()  # set the actor to evaluation mode
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
@@ -75,7 +120,7 @@ class AbstractLearningStrategy(LearningStrategy):
         )
 
 
-class RLStrategy(AbstractLearningStrategy):
+class RLStrategy(BaseLearningStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -148,41 +193,16 @@ class RLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=38, act_dim=2, unique_obs_dim=2, *args, **kwargs)
-
-        self.unit_id = kwargs["unit_id"]
-        self.act_dim = kwargs.get("action_dimension", 2)
-
-        # defines bounds of actions space
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
-
-        # tells us whether we are training the agents or just executing per-learning strategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.perform_evaluation = kwargs.get("perform_evaluation", False)
-
-        # based on learning config
-        self.algorithm = kwargs.get("algorithm", "matd3")
-        actor_architecture = kwargs.get("actor_architecture", "mlp")
-        self.original_implementation = kwargs.get("original_implementation", None)
-
-        if actor_architecture in actor_architecture_aliases.keys():
-            self.actor_architecture_class = actor_architecture_aliases[
-                actor_architecture
-            ]
-        else:
-            raise ValueError(
-                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
-            )
-
-        # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
-
-        # future: add option to choose between float16 and float32
-        # float_type = kwargs.get("float_type", "float32")
-        self.float_type = th.float
+        obd_dim = kwargs.pop("obs_dim", 38)
+        act_dim = kwargs.pop("act_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            obs_dim=obd_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         # 'foresight' represents the number of time steps into the future that we will consider
         # when constructing the observations. This value is fixed for each strategy, as the
@@ -191,28 +211,11 @@ class RLStrategy(AbstractLearningStrategy):
         # as the observation dimension depends on the foresight value.
         self.foresight = 12
 
+        # define standard deviation for the initial exploration noise
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
+
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
-
-        if self.learning_mode or self.perform_evaluation:
-            self.collect_initial_experience_mode = bool(
-                kwargs.get("episodes_collecting_initial_experience", True)
-            )
-
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
-                action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
-            )
-
-        elif Path(kwargs["trained_policies_load_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
-        else:
-            raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
 
     def calculate_bids(
         self,
@@ -397,14 +400,14 @@ class RLStrategy(AbstractLearningStrategy):
         """
 
         # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.perform_evaluation:
+        if self.learning_mode and not self.evaluation_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
                 # define current action as solely noise
                 noise = th.normal(
                     mean=0.0,
-                    std=0.2,
+                    std=self.exploration_noise_std,
                     size=(self.act_dim,),
                     dtype=self.float_type,
                     device=self.device,
@@ -698,89 +701,121 @@ class RLStrategy(AbstractLearningStrategy):
         # Instead of directly setting reward = profit, we incorporate a regret term (opportunity cost penalty).
         # This guides the agent toward strategies that maximize accepted bids while minimizing lost opportunities.
 
-        scaling = 0.1 / unit.max_power
-        reward = (profit - regret_scale * opportunity_cost) * scaling
+        # scaling factor to normalize the reward to the range [-1,1]
+        scaling = 1 / (self.max_bid_price * unit.max_power)
 
-        # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[products_index] = profit
+        reward = scaling * (profit - regret_scale * opportunity_cost)
+
+        # Store results in unit outputs, which are later written to the database by the unit operator.
+        unit.outputs["profit"].loc[products_index] += profit
         unit.outputs["reward"].loc[products_index] = reward
         unit.outputs["regret"].loc[products_index] = opportunity_cost
         unit.outputs["total_costs"].loc[products_index] = operational_cost
 
         unit.outputs["rl_rewards"].append(reward.sum())
 
-        # TODO: check different behavior!
-        # # iterate over all orders in the orderbook, to calculate order specific profit
-        # for order in orderbook:
-        #     start = order["start_time"]
-        #     end = order["end_time"]
-        #     # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-        #     end_excl = end - unit.index.freq
 
-        #     # depending on way the unit calculates marginal costs we take costs
-        #     marginal_cost = unit.calculate_marginal_cost(
-        #         start, unit.outputs[product_type].at[start]
-        #     )
+class RLStrategySingleBid(RLStrategy):
+    """
+    Reinforcement Learning Strategy with Single-Bid Structure for Energy-Only Markets.
 
-        #     duration = (end - start) / timedelta(hours=1)
+    This strategy is a simplified variant of the standard `RLStrategy`, which typically submits two
+    separate price bids for inflexible (P_min) and flexible (P_max - P_min) components. Instead,
+    `RLStrategySingleBid` submits a single bid that always offers the unit's maximum power,
+    effectively treating the full capacity as inflexible from a bidding perspective.
 
-        #     accepted_volume = order.get("accepted_volume", 0)
-        #     accepted_price = order.get("accepted_price", 0)
+    The core reinforcement learning mechanics, including the observation structure, actor network
+    architecture, and reward formulation, remain consistent with the two-bid `RLStrategy`. However,
+    this strategy modifies the action space to produce only a single bid price, and omits the
+    decomposition of capacity into flexible and inflexible parts.
 
-        #     # calculate profit as income - running_cost from this event
-        #     order_profit = accepted_price * accepted_volume * duration
-        #     order_cost = marginal_cost * accepted_volume * duration
+    Attributes
+    ----------
+    Inherits all attributes from RLStrategy, with the exception of:
+    - act_dim : int
+        Reduced to 1 to reflect single bid pricing.
+    - foresight : int
+        Set to 24 to match typical storage strategy setups.
 
-        #     # collect profit and opportunity cost for all orders
-        #     profit += order_profit
-        #     costs += order_cost
+    """
 
-        # # calculate opportunity cost
-        # # as the loss of income we have because we are not running at full power
-        # opportunity_cost = (
-        #     (accepted_price - marginal_cost)
-        #     * (unit.max_power - unit.outputs[product_type].loc[start:end_excl]).sum()
-        #     * duration
-        # )
+    def __init__(self, *args, **kwargs):
+        super().__init__(obs_dim=74, act_dim=1, unique_obs_dim=2, *args, **kwargs)
 
-        # # if our opportunity costs are negative, we did not miss an opportunity to earn money and we set them to 0
-        # opportunity_cost = max(opportunity_cost, 0)
+        # we select 24 to be in line with the storage strategies
+        self.foresight = 24
 
-        # # consideration of start-up costs, which are evenly divided between the
-        # # upward and downward regulation events
-        # if (
-        #     unit.outputs[product_type].at[start] != 0
-        #     and unit.outputs[product_type].loc[start - unit.index.freq] == 0
-        # ):
-        #     costs += unit.hot_start_cost / 2
-        # elif (
-        #     unit.outputs[product_type].at[start] == 0
-        #     and unit.outputs[product_type].loc[start - unit.index.freq] != 0
-        # ):
-        #     costs += unit.hot_start_cost / 2
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Generates a single price bid for the full available capacity (max_power).
 
-        # profit = profit - costs
+        The method observes market and unit state, derives an action (bid price) from
+        the actor network, and constructs one bid covering the entire capacity, without
+        distinguishing between flexible and inflexible components.
 
-        # # ---------------------------
-        # # 4.1 Calculate Reward
-        # # The straight forward implementation would be reward = profit, yet we would like to give the agent more guidance
-        # # in the learning process, so we add a regret term to the reward, which is the opportunity cost
-        # # define the reward and scale it
+        Returns
+        -------
+        Orderbook
+            A list containing one bid with start/end time, full volume, and calculated price.
+        """
 
-        # scaling = 0.1 / unit.max_power
-        # regret_scale = 0.2
-        # reward = float(profit - regret_scale * opportunity_cost) * scaling
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        # get technical bounds for the unit output from the unit
+        _, max_power = unit.calculate_min_max_power(start, end)
+        max_power = max_power[0]
 
-        # # store results in unit outputs which are written to database by unit operator
-        # unit.outputs["profit"].loc[start:end_excl] += profit
-        # unit.outputs["reward"].loc[start:end_excl] = reward
-        # unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
-        # unit.outputs["total_costs"].loc[start:end_excl] = costs
+        # =============================================================================
+        # 1. Get the Observations, which are the basis of the action decision
+        # =============================================================================
+        next_observation = self.create_observation(
+            unit=unit,
+            market_id=market_config.market_id,
+            start=start,
+        )
 
-        # unit.outputs["rl_rewards"].append(reward)
+        # =============================================================================
+        # 2. Get the Actions, based on the observations
+        # =============================================================================
+        actions, noise = self.get_actions(next_observation)
+
+        # =============================================================================
+        # 3. Transform Actions into bids
+        # =============================================================================
+        # actions are in the range [-1,1], we need to transform them into actual bids
+        # we can use our domain knowledge to guide the bid formulation
+        bid_price = actions[0] * self.max_bid_price
+
+        # actually formulate bids in orderbook format
+        bids = [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price,
+                "volume": max_power,
+                "node": unit.node,
+            },
+        ]
+
+        # store results in unit outputs as lists to be written to the buffer for learning
+        unit.outputs["rl_observations"].append(next_observation)
+        unit.outputs["rl_actions"].append(actions)
+
+        # store results in unit outputs as series to be written to the database by the unit operator
+        unit.outputs["actions"].at[start] = actions
+        unit.outputs["exploration_noise"].at[start] = noise
+
+        return bids
 
 
-class StorageRLStrategy(AbstractLearningStrategy):
+class StorageRLStrategy(BaseLearningStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -799,11 +834,10 @@ class StorageRLStrategy(AbstractLearningStrategy):
     dictating the bid type. The storage agent can also decide to stay inactive by submitting a zero bid
     as this can be a valid strategy in some market conditions and also improves the learning process.
 
-    - **Bid Price**: The first action value determines the price at which the agent will bid.
-    - **Bid Direction**: The second action value defines the type of bid:
-        - If `action[1] < -0.1`: The agent submits a **sell bid**.
-        - If `action[1] > 0.1`: The agent submits a **buy bid**.
-        - Otherwise: The agent submits a **zero bid** to stay inactive.
+    - **Bid Price**: The one action value determines the price at which the agent will bid.
+    - **Bid Direction**: This is implicitly set based on the action:
+        - If `action < 0`: The agent submits a **buy bid**.
+        - If `action >= 0`: The agent submits a **sell bid**.
 
     Rewards are based on the profit generated by the agent's market bids, with sell bids contributing
     positive profit and buy bids contributing negative profit. Additional components in the reward
@@ -847,68 +881,29 @@ class StorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=38, act_dim=2, unique_obs_dim=2, *args, **kwargs)
-
-        self.unit_id = kwargs["unit_id"]
-        # defines bounds of actions space
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
-
-        # tells us whether we are training the agents or just executing per-learnind strategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.perform_evaluation = kwargs.get("perform_evaluation", False)
-
-        # based on learning config
-        self.algorithm = kwargs.get("algorithm", "matd3")
-        actor_architecture = kwargs.get("actor_architecture", "mlp")
-
-        if actor_architecture in actor_architecture_aliases.keys():
-            self.actor_architecture_class = actor_architecture_aliases[
-                actor_architecture
-            ]
-        else:
-            raise ValueError(
-                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
-            )
-
-        # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
-
-        # future: add option to choose between float16 and float32
-        # float_type = kwargs.get("float_type", "float32")
-        self.float_type = th.float
+        obd_dim = kwargs.pop("obs_dim", 74)
+        act_dim = kwargs.pop("act_dim", 1)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            obs_dim=obd_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         # 'foresight' represents the number of time steps into the future that we will consider
         # when constructing the observations. This value is fixed for each strategy, as the
         # neural network architecture is predefined, and the size of the observations must remain consistent.
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
-        self.foresight = 12
+        self.foresight = 24
+
+        # define standard deviation for the initial exploration noise
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
-
-        if self.learning_mode or self.perform_evaluation:
-            self.collect_initial_experience_mode = bool(
-                kwargs.get("episodes_collecting_initial_experience", True)
-            )
-
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
-                action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
-            )
-
-        elif Path(kwargs["trained_policies_load_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
-        else:
-            raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
 
     def calculate_bids(
         self,
@@ -958,18 +953,13 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
-        # the first action is the bid price
-        bid_price = actions[0] * self.max_bid_price
-
-        # the second action is the bid direction
-        # the interval [-0.1, 0.1] for the 'ignore' action is based on the learning
-        # process observation and should be adjusted in the future to improve performance
-        if actions[1] <= -0.1:
+        # the absolute value of the action determines the bid price
+        bid_price = abs(actions[0]) * self.max_bid_price
+        # the sign of the action determines the bid direction
+        if actions[0] < 0:
             bid_direction = "buy"
-        elif actions[1] >= 0.1:
+        elif actions[0] >= 0:
             bid_direction = "sell"
-        else:
-            bid_direction = "ignore"
 
         _, max_discharge = unit.calculate_min_max_discharge(start, end_all)
         _, max_charge = unit.calculate_min_max_charge(start, end_all)
@@ -986,10 +976,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
                     "end_time": end_all,
                     "only_hours": None,
                     "price": bid_price,
-                    # zero bids are ignored by the market clearing and orders are deleted,
-                    # but we need the orderbook for the DRL to function,
-                    # therefore we add a small amount
-                    "volume": bid_quantity_supply + 1e-6,
+                    "volume": bid_quantity_supply,
                     "node": unit.node,
                 }
             )
@@ -1001,18 +988,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
                     "end_time": end_all,
                     "only_hours": None,
                     "price": bid_price,
-                    "volume": bid_quantity_demand + 1e-6,  # negative value for demand
-                    "node": unit.node,
-                }
-            )
-        elif bid_direction == "ignore":
-            bids.append(
-                {
-                    "start_time": start,
-                    "end_time": end_all,
-                    "only_hours": None,
-                    "price": 0,
-                    "volume": 1e-6,  # negative value for demand
+                    "volume": bid_quantity_demand,  # negative value for demand
                     "node": unit.node,
                 }
             )
@@ -1028,7 +1004,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
     def get_actions(self, next_observation):
         """
-        Determines actions based on observations and optionally applies noise for exploration.
+        Determines one action for the storage bidding based on observations and optionally applies noise for exploration.
 
         Args
         ----
@@ -1047,14 +1023,14 @@ class StorageRLStrategy(AbstractLearningStrategy):
         """
 
         # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.perform_evaluation:
+        if self.learning_mode and not self.evaluation_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
                 # define current action as solely noise
                 noise = th.normal(
                     mean=0.0,
-                    std=0.4,
+                    std=self.exploration_noise_std,
                     size=(self.act_dim,),
                     dtype=self.float_type,
                     device=self.device,
@@ -1105,58 +1081,66 @@ class StorageRLStrategy(AbstractLearningStrategy):
         Rewards are based on profit and include fixed costs for charging and discharging.
         """
 
-        scaling_factor = 0.1 / unit.max_power_discharge
-
         product_type = marketconfig.product_type
         reward = 0
 
-        # Iterate over all orders in the orderbook to calculate order-specific profit
-        for order in orderbook:
-            start = order["start_time"]
-            end = order["end_time"]
-            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-            end_excl = end - unit.index.freq
-
-            next_time = start + unit.index.freq
-            duration_hours = (end - start) / timedelta(hours=1)
-
-            # Calculate marginal and starting costs
-            marginal_cost = unit.calculate_marginal_cost(
-                start, unit.outputs[product_type].at[start]
+        # check if orderbook contains only one order and raise an error if not and notify the user
+        # that the strategy is not designed for multiple orders and the market configuration should be adjusted
+        if len(orderbook) > 1:
+            raise ValueError(
+                "StorageRLStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
             )
-            marginal_cost += unit.get_starting_costs(int(duration_hours))
 
-            accepted_volume = order.get("accepted_volume", 0)
-            # ignore very small volumes due to calculations
-            accepted_volume = accepted_volume if abs(accepted_volume) > 1 else 0
-            accepted_price = order.get("accepted_price", 0)
+        order = orderbook[0]
+        start = order["start_time"]
+        end = order["end_time"]
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+        end_excl = end - unit.index.freq
 
-            # Calculate profit and cost for the order
-            order_profit = accepted_price * accepted_volume * duration_hours
-            order_cost = abs(marginal_cost * accepted_volume * duration_hours)
+        next_time = start + unit.index.freq
+        duration_hours = (end - start) / timedelta(hours=1)
 
-            current_soc = unit.outputs["soc"].at[start]
-            next_soc = unit.outputs["soc"].at[next_time]
+        # Calculate marginal and starting costs
+        marginal_cost = unit.calculate_marginal_cost(
+            start, unit.outputs[product_type].at[start]
+        )
+        marginal_cost += unit.get_starting_costs(int(duration_hours))
 
-            # Calculate and clip the energy cost for the start time
-            if next_soc < 1:
-                unit.outputs["energy_cost"].at[next_time] = 0
-            else:
-                unit.outputs["energy_cost"].at[next_time] = np.clip(
-                    (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
-                    / next_soc,
-                    0,
-                    self.max_bid_price,
-                )
+        accepted_volume = order.get("accepted_volume", 0)
+        # ignore very small volumes due to calculations
+        accepted_volume = accepted_volume if abs(accepted_volume) > 1 else 0
+        accepted_price = order.get("accepted_price", 0)
 
-            profit = order_profit - order_cost
-            reward += profit * scaling_factor
+        # Calculate profit and cost for the order
+        order_profit = accepted_price * accepted_volume * duration_hours
+        order_cost = abs(marginal_cost * accepted_volume * duration_hours)
 
-            # Store results in unit outputs
-            unit.outputs["profit"].loc[start:end_excl] += profit
-            unit.outputs["reward"].loc[start:end_excl] = reward
-            unit.outputs["total_costs"].loc[start:end_excl] = order_cost
-            unit.outputs["rl_rewards"].append(reward)
+        current_soc = unit.outputs["soc"].at[start]
+        next_soc = unit.outputs["soc"].at[next_time]
+
+        # Calculate and clip the energy cost for the start time
+        if next_soc < 1:
+            unit.outputs["energy_cost"].at[next_time] = 0
+        else:
+            unit.outputs["energy_cost"].at[next_time] = np.clip(
+                (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
+                / next_soc,
+                -self.max_bid_price,
+                self.max_bid_price,
+            )
+
+        profit = order_profit - order_cost
+
+        # scaling factor to normalize the reward to the range [-1,1]
+        scaling_factor = 1 / (self.max_bid_price * unit.max_power_discharge)
+
+        reward += scaling_factor * profit
+
+        # Store results in unit outputs
+        unit.outputs["profit"].loc[start:end_excl] += profit
+        unit.outputs["reward"].loc[start:end_excl] = reward
+        unit.outputs["total_costs"].loc[start:end_excl] = order_cost
+        unit.outputs["rl_rewards"].append(reward)
 
     def create_observation(
         self,

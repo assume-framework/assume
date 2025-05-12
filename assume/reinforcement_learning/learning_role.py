@@ -51,8 +51,8 @@ class Learning(Role):
         # define whether we train model or evaluate it
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
+        self.evaluation_mode = learning_config["evaluation_mode"]
         self.continue_learning = learning_config["continue_learning"]
-        self.perform_evaluation = learning_config["perform_evaluation"]
         self.trained_policies_save_path = learning_config["trained_policies_save_path"]
         self.trained_policies_load_path = learning_config.get(
             "trained_policies_load_path", self.trained_policies_save_path
@@ -158,16 +158,15 @@ class Learning(Role):
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
 
-        # if enough initial experience was collected according to specifications in learning config
-        # turn off initial exploration and go into full learning mode
-        # or if we are in continue_learning mode we also turn off initial exploration
-        if (
-            self.episodes_done >= self.episodes_collecting_initial_experience
-            or self.continue_learning
-        ):
+        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+
+        # Disable initial exploration if initial experience collection is complete
+        if self.episodes_done >= self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
-        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+        # In continue_learning mode, disable it only for loaded strategies
+        elif self.continue_learning:
+            self.turn_off_initial_exploration(loaded_only=True)
 
     def get_inter_episodic_data(self):
         """
@@ -197,7 +196,7 @@ class Learning(Role):
         """
 
         # subscribe to messages for handling the training process
-        if not self.perform_evaluation:
+        if not self.evaluation_mode:
             self.context.subscribe_message(
                 self,
                 self.save_buffer_and_update,
@@ -223,17 +222,22 @@ class Learning(Role):
 
         self.update_policy()
 
-    def turn_off_initial_exploration(self) -> None:
+    def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """
-        Disable initial exploration mode for all learning strategies.
+        Disable initial exploration mode.
 
-        Notes:
-            This method turns off the initial exploration mode for all learning strategies associated with the learning role. Initial
-            exploration is often used to collect initial experience before training begins. Disabling it can be useful when the agent
-            has collected sufficient initial data and is ready to focus on training.
+        If `loaded_only=True`, only turn off exploration for strategies that were loaded (used in continue_learning mode).
+        If `loaded_only=False`, turn it off for all strategies.
+
+        Args:
+            loaded_only (bool): Whether to disable exploration only for loaded strategies.
         """
         for strategy in self.rl_strats.values():
-            strategy.collect_initial_experience_mode = False
+            if loaded_only:
+                if strategy.actor.loaded:
+                    strategy.collect_initial_experience_mode = False
+            else:
+                strategy.collect_initial_experience_mode = False
 
     def get_progress_remaining(self) -> float:
         """
@@ -374,10 +378,16 @@ class Learning(Role):
                 )
 
                 if len(self.avg_rewards) >= self.early_stopping_steps:
-                    avg_change = (
-                        max(self.avg_rewards[-self.early_stopping_steps :])
-                        - min(self.avg_rewards[-self.early_stopping_steps :])
-                    ) / min(self.avg_rewards[-self.early_stopping_steps :])
+                    recent_rewards = self.avg_rewards[-self.early_stopping_steps :]
+                    min_reward = min(recent_rewards)
+                    max_reward = max(recent_rewards)
+
+                    # Avoid division by zero or unexpected behavior with negative values
+                    denominator = max(
+                        abs(min_reward), 1e-8
+                    )  # Use small value to avoid zero-division
+
+                    avg_change = (max_reward - min_reward) / denominator
 
                     if avg_change < self.early_stopping_threshold:
                         logger.info(
@@ -400,6 +410,8 @@ class Learning(Role):
     def init_logging(
         self,
         simulation_id: str,
+        episode: int,
+        eval_episode: int,
         db_uri: str,
         output_agent_addr: str,
         train_start: str,
@@ -423,8 +435,10 @@ class Learning(Role):
             simulation_id=simulation_id,
             db_uri=db_uri,
             learning_mode=self.learning_mode,
+            evaluation_mode=self.evaluation_mode,
+            episode=episode,
+            eval_episode=eval_episode,
             episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
-            perform_evaluation=self.perform_evaluation,
         )
 
         # Parameters required for sending data to the output role
