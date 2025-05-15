@@ -757,7 +757,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select time, sum(volume) as \"volume\", tech FROM \n(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  sum(accepted_volume) AS \"volume\", unit_id, pm.technology as tech\nFROM market_orders mo\njoin power_plant_meta pm on pm.index=mo.unit_id and pm.simulation=mo.simulation\nWHERE\n\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  mo.simulation = '$simulation'\n\nGROUP BY 1, unit_id, bid_id, pm.technology\nORDER BY 1\n\n) a\ngroup by 1, tech\nORDER BY 1, tech desc",
+          "rawSql": "SELECT\n  time,\n  SUM(volume) AS volume,\n  tech\nFROM (\n  SELECT\n    $__timeGroupAlias(mo.start_time, $__interval),\n    SUM(mo.accepted_volume)     AS volume,\n    mo.unit_id                  AS unit_id,\n    pm.technology               AS tech\n  FROM market_orders mo\n  JOIN power_plant_meta pm\n    ON pm.unit_id    = mo.unit_id\n   AND pm.simulation = mo.simulation\n  WHERE\n    $__timeFilter(mo.start_time)\n    AND mo.market_id   = '$market'\n    AND mo.simulation  = '$simulation'\n  GROUP BY 1, mo.unit_id, mo.bid_id, pm.technology\n) AS a\nGROUP BY 1, tech\nORDER BY 1, tech DESC;\n",
           "refId": "A",
           "select": [
             [
@@ -1932,7 +1932,7 @@
       "id": 26,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{unit_id}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -1948,7 +1948,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.6.0",
+      "pluginVersion": "5.7.0",
       "targets": [
         {
           "datasource": {
@@ -1960,7 +1960,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM power_plant_meta\nWHERE index in ($Gen_Units) and simulation = '$simulation'\n",
+          "rawSql": "SELECT * FROM power_plant_meta\nWHERE unit_id in ($Gen_Units) and simulation = '$simulation'\n",
           "refId": "A",
           "select": [
             [
@@ -2627,8 +2627,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2808,8 +2807,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2963,8 +2961,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -2984,7 +2981,7 @@
       "id": 37,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{unit_id}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -3012,7 +3009,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM demand_meta\nWHERE index in ($Demand_Units) and simulation = '$simulation'\n",
+          "rawSql": "SELECT * FROM demand_meta\nWHERE unit_id in ($Demand_Units) and simulation = '$simulation'\n",
           "refId": "A",
           "select": [
             [
@@ -3105,8 +3102,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3268,8 +3264,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3451,8 +3446,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3587,8 +3581,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3696,8 +3689,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -3838,8 +3830,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4009,8 +4000,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4164,8 +4154,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4185,7 +4174,7 @@
       "id": 47,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\nUnit Operator: {{unit_operator}}\n\n### Technical Specifications\nMaximum Capacity: {{max_soc}} MWh <br>\nMinimum Capacity: {{min_soc}} MWh <br>\n\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} % <br>  ",
+        "content": "### General Information\n\nName: {{unit_id}} <br>\nTechnology: {{technology}} <br>\nUnit Operator: {{unit_operator}}\n\n### Technical Specifications\nMaximum Capacity: {{max_soc}} MWh <br>\nMinimum Capacity: {{min_soc}} MWh <br>\n\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} % <br>  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -4212,7 +4201,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM storage_meta\nWHERE index in ($Storage_Units) and simulation = '$simulation'\n",
+          "rawSql": "SELECT * FROM storage_meta\nWHERE unit_id in ($Storage_Units) and simulation = '$simulation'\n",
           "refId": "A",
           "select": [
             [
@@ -4288,8 +4277,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4430,8 +4418,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4645,8 +4632,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -4833,8 +4819,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -5006,8 +4991,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "red",
@@ -5186,13 +5170,13 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT unit_id\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
         "includeAll": false,
         "multi": true,
         "name": "Gen_Units",
         "options": [],
-        "query": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT unit_id\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
         "sort": 1,
@@ -5201,23 +5185,23 @@
       {
         "current": {
           "text": [
-            "demand_CRM_neg"
+            "demand_EOM"
           ],
           "value": [
-            "demand_CRM_neg"
+            "demand_EOM"
           ]
         },
         "datasource": {
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT unit_id\nFROM demand_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
         "includeAll": false,
         "multi": true,
         "name": "Demand_Units",
         "options": [],
-        "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT unit_id\nFROM demand_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
         "sort": 1,
@@ -5236,13 +5220,13 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT unit_id\nFROM storage_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which storage units we want to display ",
         "includeAll": false,
         "multi": true,
         "name": "Storage_Units",
         "options": [],
-        "query": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT unit_id\nFROM storage_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
         "sort": 1,
@@ -5250,8 +5234,8 @@
       },
       {
         "current": {
-          "text": "2019-01-01 10:00:00",
-          "value": "2019-01-01 10:00:00"
+          "text": "2019-01-01 01:00:00",
+          "value": "2019-01-01 01:00:00"
         },
         "definition": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
         "description": "The minimum time we have in the time range.\nUsed for the merit order plot title",

@@ -1463,7 +1463,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM power_plant_meta\nWHERE index in ($Gen_Units) and simulation = '$simulation'\n",
+          "rawSql": "SELECT * FROM power_plant_meta\nWHERE unit_id in ($Gen_Units) and simulation = '$simulation'\n",
           "refId": "A",
           "select": [
             [
@@ -1949,7 +1949,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT * FROM demand_meta\nWHERE index in ($Demand_Units) and simulation = '$simulation'\n",
+          "rawSql": "SELECT * FROM demand_meta\nWHERE unit_id in ($Demand_Units) and simulation = '$simulation'\n",
           "refId": "A",
           "select": [
             [
@@ -2212,7 +2212,7 @@
               "group": [],
               "metricColumn": "none",
               "rawQuery": true,
-              "rawSql": "SELECT * FROM storage_meta\nWHERE index in ($Storage_Units) and simulation = '$simulation'\n",
+              "rawSql": "SELECT * FROM storage_meta\nWHERE unit_id in ($Storage_Units) and simulation = '$simulation'\n",
               "refId": "A",
               "select": [
                 [
@@ -2324,13 +2324,13 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT unit_id\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
         "includeAll": false,
         "multi": true,
         "name": "Gen_Units",
         "options": [],
-        "query": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT unit_id\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
         "sort": 1,
@@ -2349,13 +2349,13 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT unit_id\nFROM demand_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
         "includeAll": false,
         "multi": true,
         "name": "Demand_Units",
         "options": [],
-        "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT unit_id\nFROM demand_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
         "sort": 1,
@@ -2370,13 +2370,13 @@
           "type": "postgres",
           "uid": "P7B13B9DF907EC40C"
         },
-        "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
+        "definition": "SELECT unit_id\nFROM storage_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which storage units we want to display ",
         "includeAll": false,
         "multi": true,
         "name": "Storage_Units",
         "options": [],
-        "query": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
+        "query": "SELECT unit_id\nFROM storage_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
         "sort": 1,
