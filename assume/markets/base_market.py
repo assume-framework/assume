@@ -652,16 +652,6 @@ class MarketRole(MarketMechanism, Role):
                 else:
                     order["accepted_volume"] = 0.0
                     order["accepted_price"] = market_meta[0]["price"]
-                    # TODO: shouldn't this be dependent on the product start for multiple products?
-                    # a while ago, I came up with this:
-                    # next(
-                    #     (
-                    #         product["price"]
-                    #         for product in market_meta
-                    #         if product.get("product_start") == order["start_time"]
-                    #     ),
-                    #     None,
-                    # )
 
         self.open_auctions - set(market_products)
 
