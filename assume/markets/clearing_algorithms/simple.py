@@ -69,9 +69,10 @@ class PayAsClearRole(MarketRole):
         for product, product_orders in groupby(orderbook, market_getter):
             accepted_demand_orders: Orderbook = []
             accepted_supply_orders: Orderbook = []
+            rejected_product_orders: Orderbook = []
             product_orders = list(product_orders)
             if product not in market_products:
-                rejected_orders.extend(product_orders)
+                rejected_product_orders.extend(product_orders)
                 # logger.debug(f'found unwanted bids for {product} should be {market_products}')
                 continue
 
@@ -115,7 +116,7 @@ class PayAsClearRole(MarketRole):
                         gen_vol += added
                     # if supply is not partially accepted before, reject it
                     elif not supply_order.get("accepted_volume"):
-                        rejected_orders.append(supply_order)
+                        rejected_product_orders.append(supply_order)
                 # now we know which orders we need
                 # we only need to see how to arrange it.
 
@@ -147,8 +148,11 @@ class PayAsClearRole(MarketRole):
             # these will be rejected
             for order in product_orders:
                 # if the order was not accepted partially, it is rejected
-                if not order.get("accepted_volume") and order not in rejected_orders:
-                    rejected_orders.append(order)
+                if (
+                    not order.get("accepted_volume")
+                    and order not in rejected_product_orders
+                ):
+                    rejected_product_orders.append(order)
 
             # set clearing price - merit order - uniform pricing
             if accepted_supply_orders:
@@ -164,9 +168,10 @@ class PayAsClearRole(MarketRole):
             accepted_orders.extend(accepted_product_orders)
 
             # set accepted volume to 0 and price to clear price for rejected orders
-            for order in rejected_orders:
+            for order in rejected_product_orders:
                 order["accepted_volume"] = 0
                 order["accepted_price"] = clear_price
+            rejected_orders.extend(rejected_product_orders)
 
             meta.append(
                 calculate_meta(

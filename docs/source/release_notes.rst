@@ -34,6 +34,8 @@ Upcoming Release
 **Bug Fixes:**
 
 - **Last policy loading**: Fixed a bug where the last policy loaded after a training run was not the best policy, but rather the last policy.
+- **Changed market price in rejected orders**: Fixed a bug where the wrong market price was written in the rejected orders, namely any auction with more than 1 product had the price of the last product written as the market price instead of the price of the respective hour.
+This was, however, only a mistake for the rejected orders.
 
 0.5.2 - (21st March 2025)
 =========================
