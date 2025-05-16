@@ -127,12 +127,13 @@ def cli(args=None):
     warnings.filterwarnings("ignore", "coroutine.*?was never awaited.*")
     logging.getLogger("asyncio").setLevel("FATAL")
 
-    try:
-        # import package after argcomplete.autocomplete
-        # to improve autocompletion speed
-        from assume import World
-        from assume.scenario.loader_csv import load_scenario_folder, run_learning
+    # import package after argcomplete.autocomplete
+    # to improve autocompletion speed
+    from assume import World
+    from assume.common.exceptions import AssumeException
+    from assume.scenario.loader_csv import load_scenario_folder, run_learning
 
+    try:
         os.makedirs("./examples/local_db", exist_ok=True)
 
         if args.parallel:
@@ -159,16 +160,14 @@ def cli(args=None):
         logging.info(f"loaded {args.scenario} - {args.case_study}")
 
         if world.learning_config.get("learning_mode", False):
-            run_learning(
-                world,
-                inputs_path=args.input_path,
-                scenario=args.scenario,
-                study_case=args.case_study,
-            )
+            run_learning(world)
+
         world.run()
 
     except KeyboardInterrupt:
         pass
+    except AssumeException as e:
+        logging.error(f"Stopping: {e}")
     except Exception:
         logging.exception("Simulation aborted")
 

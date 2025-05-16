@@ -12,7 +12,7 @@ from mango import AgentAddress
 from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import check_for_tensors, create_incidence_matrix
+from assume.common.utils import create_incidence_matrix
 from assume.markets.base_market import MarketRole
 
 # Set the log level to WARNING
@@ -258,36 +258,46 @@ def market_clearing_opt(
 
 class ComplexClearingRole(MarketRole):
     """
-    Defines the clearing algorithm for the complex market.
+    This class defines an optimization-based market clearing algorithm with support for complex bid types,
+    including block bids, linked bids, minimum acceptance ratios, and profiled volumes. It supports network
+    representations with either zonal or nodal configurations, enabling the modeling of complex markets with
+    multiple zones and power flow constraints.
 
-    The complex market is a pay-as-clear market with more complex bid structures, including minimum acceptance ratios, bid types, and profiled volumes.
+    The market clearing algorithm accepts additional arguments via the ``param_dict`` in the market configuration.
 
-    The class supports two types of network representations:
-
-    1. **Zonal Representation**: The network is divided into zones, and the incidence matrix represents the connections between these zones.
-
-    2. **Nodal Representation**: Each bus in the network is treated as a node, and the incidence matrix represents the connections between these nodes.
-
-    Zonal Representation:
-        If a `zones_identifier` is provided in the market configuration param_dict, the buses are grouped into zones based on this identifier.
-        The incidence matrix is then constructed to represent the power connections between these zones. The total transfer
-        capacity between zones is determined by the sum of the capacities of the lines connecting the zones.
-        - `zones_identifier` (str): The key in the bus data that identifies the zone to which each bus belongs.
-
-    Nodal Representation:
-        If no `zones_identifier` is provided, each bus is treated as a separate node.
-        The incidence matrix is constructed to represent the power connections between these nodes.
+    Args:
+        marketconfig (MarketConfig): The market configuration object containing all parameters for the market clearing process.
 
     Attributes:
         marketconfig (MarketConfig): The market configuration.
-        incidence_matrix (pd.DataFrame): The incidence matrix representing the network connections.
-        nodes (list): List of nodes or zones in the network.
+        incidence_matrix (pd.DataFrame): The incidence matrix representing the power network connections.
+        nodes (list): List of nodes or zones in the network, depending on the selected representation.
 
-    Args:
-        marketconfig (MarketConfig): The market configuration.
+    Supported Parameters in ``param_dict``:
+        - ``solver`` (str): Specifies the solver to be used for the optimization problem. Default is `'appsi_highs'`.
+        - ``log_flows`` (bool): Indicates whether to log the power flows on the lines. Default is `False`.
+        - ``pricing_mechanism`` (str): Defines the pricing mechanism to be used. Default is `'pay_as_clear'`, with an alternative option of `'pay_as_bid'`.
+        - ``zones_identifier`` (str): The key in the bus data that identifies the zone each bus belongs to. Used for zonal representation.
+
+    Example market configuration:
+
+    .. code-block:: yaml
+
+        market_mechanism: complex_clearing
+        param_dict:
+            solver: apps_highs
+            log_flows: true
+            pricing_mechanism: pay_as_clear
+            zones_identifier: zone_id
+
+    Network Representations:
+        - **Zonal Representation**: The network is divided into zones, and the incidence matrix represents the connections between these zones.
+            - If a ``zones_identifier`` is provided, buses are grouped into zones based on this identifier.
+            - The incidence matrix is constructed to represent the power connections between these zones.
+            - The total transfer capacity between zones is determined by the sum of the capacities of the lines connecting the zones.
+
+        - **Nodal Representation**: If no ``zones_identifier`` is provided, each bus is treated as a separate node, and the incidence matrix represents the connections between these nodes.
     """
-
-    required_fields = ["bid_type"]
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
@@ -319,6 +329,11 @@ class ComplexClearingRole(MarketRole):
                 # Nodal Case
                 self.incidence_matrix = create_incidence_matrix(self.lines, buses)
                 self.nodes = buses.index.values
+
+        self.log_flows = self.marketconfig.param_dict.get("log_flows", False)
+        self.pricing_mechanism = self.marketconfig.param_dict.get(
+            "pricing_mechanism", "pay_as_clear"
+        )
 
     def define_solver(self, solver: str):
         # Get the solver from the market configuration
@@ -362,7 +377,7 @@ class ComplexClearingRole(MarketRole):
 
         for order in orderbook:
             # if bid_type is None, set to default bid_type
-            if order["bid_type"] is None:
+            if order.get("bid_type") is None:
                 order["bid_type"] = "SB"
             # Validate bid_type
             elif order["bid_type"] not in ["SB", "BB", "LB"]:
@@ -423,6 +438,7 @@ class ComplexClearingRole(MarketRole):
             accepted_orders (Orderbook): The accepted orders.
             rejected_orders (Orderbook): The rejected orders.
             meta (list[dict]): The market clearing results.
+            flows (dict): The power flows on the lines.
 
         Notes:
             First the market clearing is solved using the cost minimization with the pyomo model market_clearing_opt.
@@ -436,8 +452,6 @@ class ComplexClearingRole(MarketRole):
             return [], [], []
 
         orderbook.sort(key=itemgetter("start_time", "end_time", "only_hours"))
-
-        orderbook = check_for_tensors(orderbook)
 
         # create a list of all orders linked as child to a bid
         child_orders = []
@@ -523,15 +537,14 @@ class ComplexClearingRole(MarketRole):
             if all(order_surplus >= 0 for order_surplus in orders_surplus):
                 break
 
-        log_flows = True
-
         accepted_orders, rejected_orders, meta, flows = extract_results(
             model=instance,
             orders=orderbook,
             rejected_orders=rejected_orders,
             market_products=market_products,
             market_clearing_prices=market_clearing_prices,
-            log_flows=log_flows,
+            pricing_mechanism=self.pricing_mechanism,
+            log_flows=self.log_flows,
         )
 
         self.all_orders = []
@@ -622,6 +635,7 @@ def extract_results(
     rejected_orders: Orderbook,
     market_products: list[MarketProduct],
     market_clearing_prices: dict,
+    pricing_mechanism: str = "pay_as_clear",
     log_flows: bool = False,
 ):
     """
@@ -638,6 +652,9 @@ def extract_results(
         tuple[Orderbook, Orderbook, list[dict]]: The accepted orders, rejected orders, and meta information
 
     """
+    if pricing_mechanism not in ["pay_as_clear", "pay_as_bid"]:
+        raise ValueError(f"Invalid pricing mechanism {pricing_mechanism}")
+
     accepted_orders: Orderbook = []
     meta = []
 
@@ -651,9 +668,12 @@ def extract_results(
 
             # set the accepted volume and price for each simple bid
             order["accepted_volume"] = acceptance * order["volume"]
-            order["accepted_price"] = market_clearing_prices[order["node"]][
-                order["start_time"]
-            ]
+            if pricing_mechanism == "pay_as_clear":
+                order["accepted_price"] = market_clearing_prices[order["node"]][
+                    order["start_time"]
+                ]
+            elif pricing_mechanism == "pay_as_bid":
+                order["accepted_price"] = order["price"]
 
             # calculate the total cleared supply and demand volume
             if order["accepted_volume"] > 0:
@@ -672,9 +692,12 @@ def extract_results(
             # set the accepted volume and price for each block bid
             for start_time, volume in order["volume"].items():
                 order["accepted_volume"][start_time] = acceptance * volume
-                order["accepted_price"][start_time] = market_clearing_prices[
-                    order["node"]
-                ][start_time]
+                if pricing_mechanism == "pay_as_clear":
+                    order["accepted_price"][start_time] = market_clearing_prices[
+                        order["node"]
+                    ][start_time]
+                elif pricing_mechanism == "pay_as_bid":
+                    order["accepted_price"][start_time] = order["price"]
 
                 # calculate the total cleared supply and demand volume
                 if order["accepted_volume"][start_time] > 0:

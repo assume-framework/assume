@@ -4,15 +4,20 @@
 
 import logging
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
 import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
+from assume.common.utils import datetime2timestamp
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
+from assume.reinforcement_learning.learning_utils import linear_schedule_func
+from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +36,11 @@ class Learning(Role):
     def __init__(
         self,
         learning_config: LearningConfig,
+        start: datetime = None,
+        end: datetime = None,
     ):
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
-        self.early_stopping_steps = learning_config.get("early_stopping_steps", 10)
-        self.early_stopping_threshold = learning_config.get(
-            "early_stopping_threshold", 0.05
-        )
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.rl_algorithm = learning_config.get("algorithm", "matd3")
@@ -48,11 +51,24 @@ class Learning(Role):
         # define whether we train model or evaluate it
         self.training_episodes = learning_config["training_episodes"]
         self.learning_mode = learning_config["learning_mode"]
+        self.evaluation_mode = learning_config["evaluation_mode"]
         self.continue_learning = learning_config["continue_learning"]
-        self.perform_evaluation = learning_config["perform_evaluation"]
         self.trained_policies_save_path = learning_config["trained_policies_save_path"]
         self.trained_policies_load_path = learning_config.get(
             "trained_policies_load_path", self.trained_policies_save_path
+        )
+
+        # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
+        self.early_stopping_steps = learning_config.get(
+            "early_stopping_steps",
+            int(
+                self.training_episodes
+                / learning_config.get("validation_episodes_interval", 5)
+                + 1
+            ),
+        )
+        self.early_stopping_threshold = learning_config.get(
+            "early_stopping_threshold", 0.05
         )
 
         cuda_device = (
@@ -69,7 +85,28 @@ class Learning(Role):
         th.backends.cuda.matmul.allow_tf32 = True
         th.backends.cudnn.allow_tf32 = True
 
+        if start is not None:
+            self.start = datetime2timestamp(start)
+        if end is not None:
+            self.end = datetime2timestamp(end)
+
+        self.datetime = None
+
         self.learning_rate = learning_config.get("learning_rate", 1e-4)
+        self.learning_rate_schedule = learning_config.get(
+            "learning_rate_schedule", None
+        )
+        if self.learning_rate_schedule == "linear":
+            self.calc_lr_from_progress = linear_schedule_func(self.learning_rate)
+        else:
+            self.calc_lr_from_progress = lambda x: self.learning_rate
+
+        noise_dt = learning_config.get("noise_dt", 1)
+        self.action_noise_schedule = learning_config.get("action_noise_schedule", None)
+        if self.action_noise_schedule == "linear":
+            self.calc_noise_from_progress = linear_schedule_func(noise_dt)
+        else:
+            self.calc_noise_from_progress = lambda x: noise_dt
 
         # if we do not have initial experience collected we will get an error as no samples are available on the
         # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
@@ -78,12 +115,15 @@ class Learning(Role):
             learning_config.get("episodes_collecting_initial_experience", 5), 1
         )
 
-        self.train_freq = learning_config.get("train_freq", "1h")
-        self.gradient_steps = (
-            int(self.train_freq[:-1])
-            if learning_config.get("gradient_steps", -1) == -1
-            else learning_config["gradient_steps"]
-        )
+        self.train_freq = learning_config.get("train_freq", "24h")
+        self.gradient_steps = learning_config.get("gradient_steps", 100)
+
+        # check that gradient_steps is positive
+        if self.gradient_steps <= 0:
+            raise ValueError(
+                f"gradient_steps need to be positive, got {self.gradient_steps}"
+            )
+
         self.batch_size = learning_config.get("batch_size", 128)
         self.gamma = learning_config.get("gamma", 0.99)
 
@@ -97,6 +137,11 @@ class Learning(Role):
         self.rl_eval = defaultdict(list)
         # list of avg_changes
         self.avg_rewards = []
+
+        self.tensor_board_logger = None
+        self.db_addr = None
+        self.freq_timedelta = None
+        self.time_steps = None
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -113,14 +158,15 @@ class Learning(Role):
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
 
-        # if enough initial experience was collected according to specifications in learning config
-        # turn off initial exploration and go into full learning mode
-        if self.episodes_done > self.episodes_collecting_initial_experience:
+        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+
+        # Disable initial exploration if initial experience collection is complete
+        if self.episodes_done >= self.episodes_collecting_initial_experience:
             self.turn_off_initial_exploration()
 
-        self.set_noise_scale(inter_episodic_data["noise_scale"])
-
-        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+        # In continue_learning mode, disable it only for loaded strategies
+        elif self.continue_learning:
+            self.turn_off_initial_exploration(loaded_only=True)
 
     def get_inter_episodic_data(self):
         """
@@ -138,7 +184,6 @@ class Learning(Role):
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
-            "noise_scale": self.get_noise_scale(),
         }
 
     def setup(self) -> None:
@@ -149,9 +194,9 @@ class Learning(Role):
             This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
             for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
-        # subscribe to messages for handling the training process
 
-        if not self.perform_evaluation:
+        # subscribe to messages for handling the training process
+        if not self.evaluation_mode:
             self.context.subscribe_message(
                 self,
                 self.save_buffer_and_update,
@@ -177,38 +222,48 @@ class Learning(Role):
 
         self.update_policy()
 
-    def turn_off_initial_exploration(self) -> None:
+    def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """
-        Disable initial exploration mode for all learning strategies.
+        Disable initial exploration mode.
 
-        Notes:
-            This method turns off the initial exploration mode for all learning strategies associated with the learning role. Initial
-            exploration is often used to collect initial experience before training begins. Disabling it can be useful when the agent
-            has collected sufficient initial data and is ready to focus on training.
+        If `loaded_only=True`, only turn off exploration for strategies that were loaded (used in continue_learning mode).
+        If `loaded_only=False`, turn it off for all strategies.
+
+        Args:
+            loaded_only (bool): Whether to disable exploration only for loaded strategies.
         """
-        for _, unit in self.rl_strats.items():
-            unit.collect_initial_experience_mode = False
+        for strategy in self.rl_strats.values():
+            if loaded_only:
+                if strategy.actor.loaded:
+                    strategy.collect_initial_experience_mode = False
+            else:
+                strategy.collect_initial_experience_mode = False
 
-    def set_noise_scale(self, stored_scale) -> None:
+    def get_progress_remaining(self) -> float:
         """
-        Set the noise scale for all learning strategies (units) in rl_strats.
-
-        """
-        for _, unit in self.rl_strats.items():
-            unit.action_noise.scale = stored_scale
-
-    def get_noise_scale(self) -> None:
-        """
-        Get the noise scale from the first learning strategy (unit) in rl_strats.
-
-        Notes:
-            The noise scale is the same for all learning strategies (units) in rl_strats, so we only need to get it from one unit.
-            It is only depended on the number of updates done so far, which is determined by the number of episodes done and the update frequency.
+        Get the remaining learning progress from the simulation run.
 
         """
-        stored_scale = list(self.rl_strats.values())[0].action_noise.scale
+        total_duration = self.end - self.start
+        elapsed_duration = self.context.current_timestamp - self.start
 
-        return stored_scale
+        learning_episodes = (
+            self.training_episodes - self.episodes_collecting_initial_experience
+        )
+
+        if self.episodes_done < self.episodes_collecting_initial_experience:
+            progress_remaining = 1
+        else:
+            progress_remaining = (
+                1
+                - (
+                    (self.episodes_done - self.episodes_collecting_initial_experience)
+                    / learning_episodes
+                )
+                - ((1 / learning_episodes) * (elapsed_duration / total_duration))
+            )
+
+        return progress_remaining
 
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """
@@ -224,7 +279,6 @@ class Learning(Role):
             self.rl_algorithm = TD3(
                 learning_role=self,
                 learning_rate=self.learning_rate,
-                episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
                 gradient_steps=self.gradient_steps,
                 batch_size=self.batch_size,
                 gamma=self.gamma,
@@ -250,8 +304,8 @@ class Learning(Role):
                 logger.info(f"Loading pretrained policies from {directory}!")
                 self.rl_algorithm.load_params(directory)
             else:
-                logger.warning(
-                    f"Folder with pretrained policies {directory} does not exist"
+                raise FileNotFoundError(
+                    f"Directory {directory} does not exist! Cannot load pretrained policies!"
                 )
 
     def update_policy(self) -> None:
@@ -265,7 +319,7 @@ class Learning(Role):
         Notes:
             This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
-        if self.episodes_done > self.episodes_collecting_initial_experience:
+        if self.episodes_done >= self.episodes_collecting_initial_experience:
             self.rl_algorithm.update_policy()
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
@@ -311,6 +365,10 @@ class Learning(Role):
                     logger.info(
                         f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
                     )
+            else:
+                logger.info(
+                    f"Current policy not better than best policy, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
+                )
 
             # if we do not see any improvement in the last x evaluation runs we stop the training
             if len(self.rl_eval[metric]) >= self.early_stopping_steps:
@@ -320,15 +378,27 @@ class Learning(Role):
                 )
 
                 if len(self.avg_rewards) >= self.early_stopping_steps:
-                    avg_change = (
-                        max(self.avg_rewards[-self.early_stopping_steps :])
-                        - min(self.avg_rewards[-self.early_stopping_steps :])
-                    ) / min(self.avg_rewards[-self.early_stopping_steps :])
+                    recent_rewards = self.avg_rewards[-self.early_stopping_steps :]
+                    min_reward = min(recent_rewards)
+                    max_reward = max(recent_rewards)
+
+                    # Avoid division by zero or unexpected behavior with negative values
+                    denominator = max(
+                        abs(min_reward), 1e-8
+                    )  # Use small value to avoid zero-division
+
+                    avg_change = (max_reward - min_reward) / denominator
 
                     if avg_change < self.early_stopping_threshold:
                         logger.info(
-                            f"Stopping training as no improvement above {self.early_stopping_threshold} in last {self.early_stopping_steps} evaluations for {metric}"
+                            f"Stopping training as no improvement above {self.early_stopping_threshold*100}% in last {self.early_stopping_steps} evaluations for {metric}"
                         )
+                        if (
+                            self.learning_rate_schedule or self.action_noise_schedule
+                        ) is not None:
+                            logger.info(
+                                f"Learning rate schedule ({self.learning_rate_schedule}) or action noise schedule ({self.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
+                            )
 
                         self.rl_algorithm.save_params(
                             directory=f"{self.trained_policies_save_path}/last_policies"
@@ -336,3 +406,99 @@ class Learning(Role):
 
                         return True
             return False
+
+    def init_logging(
+        self,
+        simulation_id: str,
+        episode: int,
+        eval_episode: int,
+        db_uri: str,
+        output_agent_addr: str,
+        train_start: str,
+        freq: str,
+    ):
+        """
+        Initialize the logging for the reinforcement learning agent.
+
+        This method initializes the tensor board logger for the reinforcement learning agent.
+        It also initializes the parameters required for sending data to the output role.
+
+        Args:
+            simulation_id (str): The unique identifier for the simulation.
+            db_uri (str): URI for connecting to the database.
+            output_agent_addr (str): The address of the output agent.
+            train_start (str): The start time of simulation.
+            freq (str): The frequency of simulation.
+        """
+
+        self.tensor_board_logger = TensorBoardLogger(
+            simulation_id=simulation_id,
+            db_uri=db_uri,
+            learning_mode=self.learning_mode,
+            evaluation_mode=self.evaluation_mode,
+            episode=episode,
+            eval_episode=eval_episode,
+            episodes_collecting_initial_experience=self.episodes_collecting_initial_experience,
+        )
+
+        # Parameters required for sending data to the output role
+        self.db_addr = output_agent_addr
+
+        self.datetime = pd.to_datetime(train_start)
+
+        self.freq_timedelta = pd.Timedelta(freq)
+        # This is for padding the output list when the gradient steps are not identical to the train frequency
+        self.time_steps = max(
+            1,
+            pd.Timedelta(self.train_freq)
+            // (self.freq_timedelta * self.gradient_steps),
+        )
+
+    def write_rl_critic_params_to_output(
+        self, learning_rate: float, unit_params_list: list[dict]
+    ) -> None:
+        """
+        Writes learning parameters and critic losses to output at specified time intervals.
+
+        This function processes training metrics for each critic over multiple time steps and
+        sends them to a database for storage. It tracks the learning rate and critic losses
+        across training iterations, associating each record with a timestamp.
+
+        Parameters
+        ----------
+        learning_rate : float
+            The current learning rate used in training.
+        unit_params_list : list[dict]
+            A list of dictionaries containing critic losses for each time step.
+            Each dictionary maps critic names to their corresponding loss values.
+        """
+
+        output_list = [
+            {
+                "unit": u_id,
+                "critic_loss": params["loss"],
+                "total_grad_norm": params["total_grad_norm"],
+                "max_grad_norm": params["max_grad_norm"],
+                "learning_rate": learning_rate,
+                "datetime": self.datetime
+                + (
+                    (time_step * self.gradient_steps + gradient_step)
+                    * self.freq_timedelta
+                ),
+            }
+            for time_step in range(self.time_steps)
+            for gradient_step in range(self.gradient_steps)
+            for u_id, params in unit_params_list[gradient_step].items()
+        ]
+
+        if self.db_addr:
+            self.context.schedule_instant_message(
+                receiver_addr=self.db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "rl_critic_params",
+                    "data": output_list,
+                },
+            )
+
+        self.datetime = self.datetime + pd.Timedelta(self.train_freq)

@@ -274,6 +274,78 @@ def test_aggregate_step_amount_long():
     # this returns the bids in a minimal representation
 
 
+def test_aggregate_step_amount_block_bid():
+    # create a 3-hour block bid from 00:00 to 03:00 with accepted volumes 1, 2, 3
+    index = pd.date_range(start=datetime(2020, 1, 1, 0), periods=3, freq="1h")
+    accepted = {dt: i + 1 for i, dt in enumerate(index)}  # {00:00→1, 01:00→2, 02:00→3}
+    orderbook = [
+        {
+            "start_time": index[0],
+            "end_time": index[-1] + timedelta(hours=1),  # 00:00→03:00
+            "only_hours": None,
+            "accepted_volume": accepted,
+        },
+    ]
+
+    # aggregate over the full interval
+    result = aggregate_step_amount(
+        orderbook,
+        begin=datetime(2020, 1, 1, 0),
+        end=datetime(2020, 1, 1, 4),
+    )
+
+    # we expect:
+    # at 00:00 →  1
+    # at 01:00 →  2 (1 removed, 2 added ⇒ 2)
+    # at 02:00 →  3 (2 removed, 3 added ⇒ 3)
+    # at 03:00 →  0 (3 removed ⇒ 0)
+    expected = [
+        [pd.Timestamp(2020, 1, 1, 0), 1.0],
+        [pd.Timestamp(2020, 1, 1, 1), 2.0],
+        [pd.Timestamp(2020, 1, 1, 2), 3.0],
+        [pd.Timestamp(2020, 1, 1, 3), 0.0],
+    ]
+
+    assert result == expected
+
+
+def test_mixed_block_and_simple_bid():
+    # Block bid 00→02h, volumes 5, 5
+    idx = pd.date_range("2020-01-01 00:00", periods=2, freq="1h")
+    accepted = {ts: 5.0 for ts in idx}
+    bb = {
+        "start_time": idx[0],
+        "end_time": idx[-1] + timedelta(hours=1),
+        "only_hours": None,
+        "accepted_volume": accepted,
+    }
+    # Simple bid 01→03h, volume 3
+    sb = {
+        "start_time": datetime(2020, 1, 1, 1),
+        "end_time": datetime(2020, 1, 1, 3),
+        "only_hours": None,
+        "accepted_volume": 3.0,
+    }
+
+    result = aggregate_step_amount(
+        [bb, sb], begin=datetime(2020, 1, 1, 0), end=datetime(2020, 1, 1, 4)
+    )
+
+    # Expected step-function:
+    # 00:00 →  5.0
+    # 01:00 →  5.0 + 3.0 = 8.0
+    # 02:00 →  0.0 + 3.0 = 3.0  (block bid ends)
+    # 03:00 →  0.0              (simple bid ends)
+    expected = [
+        [pd.Timestamp("2020-01-01 00:00"), 5.0],
+        [pd.Timestamp("2020-01-01 01:00"), 8.0],
+        [pd.Timestamp("2020-01-01 02:00"), 3.0],
+        [pd.Timestamp("2020-01-01 03:00"), 0.0],
+    ]
+
+    assert result == expected
+
+
 def test_initializer():
     class Test:
         @initializer
@@ -619,6 +691,36 @@ def test_set_list():
     print(res_fds)
     print(res_pd)
     assert res_fds < res_pd
+
+
+def test_slicing_fastseries_even():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+    b = start + timedelta(hours=1)
+    e = start + timedelta(hours=4)
+    result = fs[b:e]
+
+    datelist = fs.index.get_date_list(b, e)
+    series = pd.Series(0, index=pd.date_range(start, end, freq="h"))
+    assert list(series[b:e].index) == datelist
+    assert len(series[b:e]) == len(fs[b:e])
+
+
+def test_slicing_fastseries_uneven():
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 5)
+    index = FastIndex(start, end, freq="1h")
+    fs = FastSeries(index)
+    b = start + timedelta(seconds=1)
+    e = start + timedelta(hours=4, seconds=1)
+    result = fs[b:e]
+
+    datelist = fs.index.get_date_list(b, e)
+    series = pd.Series(0, index=pd.date_range(start, end, freq="h"))
+    assert list(series[b:e].index) == datelist
+    assert len(series[b:e]) == len(fs[b:e])
 
 
 def test_parse_duration():

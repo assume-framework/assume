@@ -25,9 +25,10 @@ eom_only:
       price_unit: EUR/MWh
       additional_fields:
         - bid_type
-      market_mechanism: pay_as_clear_complex
+      market_mechanism: complex_clearing
       param_dict:
         solver: highs
+        pricing_mechanism: pay_as_clear
 
 eom_and_crm:
   start_date: 2019-01-01 00:00
@@ -55,9 +56,10 @@ eom_and_crm:
       price_unit: EUR/MWh
       additional_fields:
         - bid_type
-      market_mechanism: pay_as_clear_complex
+      market_mechanism: complex_clearing
       param_dict:
         solver: highs
+        pricing_mechanism: pay_as_clear
 
     CRM_pos:
       operator: CRM_operator
@@ -106,7 +108,7 @@ dam_with_complex_opt_clearing:
       products:
         - duration: 1h
           count: 24
-          first_delivery: 1h
+          first_delivery: 24h
       opening_frequency: 24h
       opening_duration: 24h
       volume_unit: MWh
@@ -114,10 +116,11 @@ dam_with_complex_opt_clearing:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex
+      market_mechanism: complex_clearing
+      param_dict:
+        solver: highs
+        pricing_mechanism: pay_as_clear
       additional_fields:
         - bid_type
         - min_acceptance_ratio
         - parent_bid_id
-      param_dict:
-        solver: highs

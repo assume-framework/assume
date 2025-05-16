@@ -254,7 +254,8 @@ def add_agent_to_world(
                         "technology": "demand",
                         "price": load["ValueOfLostLoad"],
                     },
-                    NaiveForecast(index, demand=demand_series),
+                    # demand_series might contain more values than index
+                    NaiveForecast(index, demand=demand_series[: len(index)]),
                 )
 
         case "StorageTrader":
@@ -479,14 +480,14 @@ def load_amiris(
     # AMIRIS caveat: start and end is always two minutes before actual start
     start += timedelta(minutes=2)
     end += timedelta(minutes=2)
-    sim_id = f"{scenario}_{study_case}"
+    simulation_id = f"{scenario}_{study_case}"
     prices = {}
     index = pd.date_range(start=start, end=end, freq="1h", inclusive="left")
     world.bidding_strategies["support"] = SupportStrategy
     world.setup(
         start=start,
         end=end,
-        simulation_id=sim_id,
+        simulation_id=simulation_id,
     )
     # helper dict to map trader markups/markdowns to powerplants
     markups = {}

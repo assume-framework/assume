@@ -7,6 +7,7 @@ import contextlib
 import inspect
 import logging
 import os
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -26,9 +27,13 @@ logger = logging.getLogger(__name__)
 
 freq_map = {
     "h": rr.HOURLY,
+    "hour": rr.HOURLY,
     "m": rr.MINUTELY,
+    "min": rr.MINUTELY,
     "d": rr.DAILY,
+    "day": rr.DAILY,
     "w": rr.WEEKLY,
+    "week": rr.WEEKLY,
 }
 
 
@@ -288,7 +293,7 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
         elif isinstance(bid["accepted_volume"], dict):
             start_hour = bid["start_time"]
             end_hour = bid["end_time"]
-            duration = (start_hour - end_hour) / len(bid["accepted_volume"])
+            duration = (end_hour - start_hour) / len(bid["accepted_volume"])
             for key in bid["accepted_volume"].keys():
                 deltas.append((key, bid["accepted_volume"][key]) + add)
                 deltas.append((key + duration, -bid["accepted_volume"][key]) + add)
@@ -448,8 +453,17 @@ def convert_to_rrule_freq(string: str) -> tuple[int, int]:
     Returns:
         tuple[int, int]: The rrule frequency and interval.
     """
-    freq = freq_map[string[-1]]
-    interval = int(string[:-1])
+
+    # try to identify the frequency and raise an error if it is not found
+    try:
+        freq = freq_map["".join(re.findall(r"\D", string))]
+    except KeyError:
+        raise ValueError(
+            f"Frequency '{string}' not supported. Supported frequencies are {list(freq_map.keys())}"
+        )
+
+    interval = int("".join(re.findall(r"\d", string)))
+
     return freq, interval
 
 
@@ -577,40 +591,40 @@ def rename_study_case(path: str, old_key: str, new_key: str):
         yaml.safe_dump(data, file, sort_keys=False)
 
 
-def check_for_tensors(data):
+def convert_tensors(data):
     """
-    Checks if the data contains tensors and converts them to native Python types.
+    Recursively checks if the data contains PyTorch tensors and converts them to
+    native Python types (floats, ints, lists).
 
-    Supports both pandas.Series and list of dictionaries.
+    Supports:
+    - pandas.Series (vectorized for efficiency)
+    - Lists of dictionaries (including nested structures)
+    - Any nested list/dict structure
 
     Args:
-        data (pandas.Series or list of dicts): The data to be checked.
+        data (pandas.Series, list, dict, or other Python data types)
 
     Returns:
-        The data with tensors converted to native Python types.
+        The data with all tensors converted to Python-native types.
     """
     try:
         import torch as th
 
         if isinstance(data, pd.Series):
-            # Vectorized check for tensors
-            tensor_mask = data.apply(lambda x: isinstance(x, th.Tensor))
-            if tensor_mask.any():
-                # Convert tensors to their scalar values
-                data[tensor_mask] = data[tensor_mask].apply(lambda x: x.item())
+            # Vectorized conversion
+            return data.map(lambda x: x.tolist() if isinstance(x, th.Tensor) else x)
+
+        elif isinstance(data, dict):
+            # Recursively convert tensors in a dictionary
+            return {k: convert_tensors(v) for k, v in data.items()}
 
         elif isinstance(data, list):
-            # Check if it's a list of dictionaries
-            if all(isinstance(item, dict) for item in data):
-                for d in data:
-                    for key, value in d.items():
-                        if isinstance(value, th.Tensor):
-                            d[key] = value.item()
+            # Recursively convert tensors in a list
+            return [convert_tensors(item) for item in data]
 
-        else:
-            # If data is a single value, check its type directly
-            if isinstance(data, th.Tensor):
-                data = data.item()
+        elif isinstance(data, th.Tensor):
+            # Handles both scalars and multi-dimensional tensors
+            return data.tolist()  # Converts to Python-native lists/ints/floats
 
     except ImportError:
         # If torch is not installed, return the data unchanged
@@ -682,3 +696,34 @@ def calculate_content_size(content: list | dict) -> int:
             calculate_content_size(item) for item in content
         )
     return sys.getsizeof(content)
+
+
+def min_max_scale(x, min_val: float, max_val: float):
+    """
+    Min-Max scaling of a value x to the range [0, 1]
+
+    Args:
+        x: value(s) to scale
+        min_val: minimum value of the parameter
+        max_val: maximum value of the parameter
+    """
+    # Avoid division by zero
+    if min_val == max_val:
+        return x
+    return (x - min_val) / (max_val - min_val)
+
+
+def str_to_bool(val):
+    """Convert a string representation of truth to True or False.
+
+    True values are 'y', 'yes', 't', 'true', 'on', and '1';
+    false values are 'n', 'no', 'f', 'false', 'off', and '0'.
+    Raises ValueError if 'val' is anything else.
+    """
+    val = val.lower()
+    if val in {"y", "yes", "t", "true", "on", "1"}:
+        return True
+    elif val in {"n", "no", "f", "false", "off", "0"}:
+        return False
+    else:
+        raise ValueError(f"Invalid truth value: {val!r}")

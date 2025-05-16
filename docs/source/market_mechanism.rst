@@ -2,8 +2,9 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
+##################
 Market Mechanisms
-=================
+##################
 
 A Market Mechanism is used to execute the clearing, scheduled by the MarketRole in base_market.py
 
@@ -31,11 +32,11 @@ The available market mechanisms are the following:
 
 1. :py:meth:`assume.markets.clearing_algorithms.simple.PayAsClearRole`
 2. :py:meth:`assume.markets.clearing_algorithms.simple.PayAsBidRole`
-5. :py:meth:`assume.markets.clearing_algorithms.complex_clearing.ComplexClearingRole`
-6. :py:meth:`assume.markets.clearing_algorithms.complex_clearing_dmas.ComplexDmasClearingRole`
-7. :py:meth:`assume.markets.clearing_algorithms.redispatch.RedispatchMarketRole`
-8. :py:meth:`assume.markets.clearing_algorithms.nodal_pricing.NodalMarketRole`
-9. :py:meth:`assume.markets.clearing_algorithms.contracts.PayAsBidContractRole`
+3. :py:meth:`assume.markets.clearing_algorithms.complex_clearing.ComplexClearingRole`
+4. :py:meth:`assume.markets.clearing_algorithms.complex_clearing_dmas.ComplexDmasClearingRole`
+5. :py:meth:`assume.markets.clearing_algorithms.redispatch.RedispatchMarketRole`
+6. :py:meth:`assume.markets.clearing_algorithms.contracts.PayAsBidContractRole`
+
 
 The :code:`PayAsClearRole` performs an electricity market clearing using a pay-as-clear mechanism.
 This means that the clearing price is the highest price that is still accepted.
@@ -50,7 +51,7 @@ The :code:`PayAsBidRole` clears the market in the same manner as the pay-as-clea
 the price of the supply order for both the demand order and the supply orders that meet this demand.
 
 Complex clearing
-^^^^^^^^^^^^^^^^
+=================
 
 The :code:`ComplexClearingRole` performs an electricity market clearing using an optimization to clear the market.
 Here, also profile block and linked orders are supported.
@@ -89,13 +90,4 @@ Because with this algorithm, paradoxically accepted bids (PABs) can occur, the o
 
 If you want a hands-on use-case of the complex clearing check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
 
-
-If you want a hands-on use-case of the complex clearing check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
-
-Redispatch Modeling
--------------------
-
-.. toctree::
-   :maxdepth: 1
-
-   redispatch_modeling
+.. include:: redispatch_modeling.rst

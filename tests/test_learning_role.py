@@ -33,8 +33,9 @@ def test_learning_init():
         "algorithm": "matd3",
         "actor_architecture": "mlp",
         "learning_mode": False,
-        "perform_evaluation": False,
+        "evaluation_mode": False,
         "training_episodes": 3,
+        "episodes_collecting_initial_experience": 1,
         "continue_learning": False,
         "trained_policies_save_path": None,
         "early_stopping_steps": 10,
@@ -55,11 +56,11 @@ def test_learning_init():
         assert isinstance(strategy.actor_target, Actor)
 
     # now we have a critic for every strategy
-    for str_id in learn.rl_strats.keys():
-        assert isinstance(learn.critics[str_id], CriticTD3)
-        assert isinstance(learn.target_critics[str_id], CriticTD3)
+    for strategy in learn.rl_strats.values():
+        assert isinstance(strategy.critics, CriticTD3)
+        assert isinstance(strategy.target_critics, CriticTD3)
 
     ac = learn.rl_algorithm.extract_policy()
 
-    assert ac["target_critics"] == learn.target_critics
-    assert ac["critics"] == learn.critics
+    assert ac["target_critics"]["test_id"] == learn.rl_strats["test_id"].target_critics
+    assert ac["critics"]["test_id"] == learn.rl_strats["test_id"].critics

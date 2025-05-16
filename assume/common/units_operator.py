@@ -19,6 +19,7 @@ from assume.common.market_objects import (
     OpeningMessage,
     Orderbook,
     RegistrationMessage,
+    lambda_functions,
 )
 from assume.common.utils import (
     aggregate_step_amount,
@@ -75,7 +76,6 @@ class UnitsOperator(Role):
 
     def setup(self):
         super().setup()
-        self.id = self.context.aid
         self.context.subscribe_message(
             self,
             self.handle_opening,
@@ -102,6 +102,7 @@ class UnitsOperator(Role):
 
     def on_ready(self):
         super().on_ready()
+        self.id = self.context.aid
 
         for market in self.available_markets:
             if self.participate(market):
@@ -109,7 +110,15 @@ class UnitsOperator(Role):
                     self.register_market(market),
                     1,  # register after time was updated for the first time
                 )
+
+        self.context.schedule_timestamp_task(
+            self.store_units(),
+            1,  # register after time was updated for the first time
+        )
+
+    async def store_units(self) -> None:
         db_addr = self.context.data.get("output_agent_addr")
+        logger.debug("store units to %s", db_addr)
         if db_addr:
             # send unit data to db agent to store it
             for unit in self.units.values():
@@ -118,7 +127,7 @@ class UnitsOperator(Role):
                     "type": "store_units",
                     "data": unit.as_dict(),
                 }
-                self.context.schedule_instant_message(
+                await self.context.send_message(
                     content=message,
                     receiver_addr=db_addr,
                 )
@@ -146,7 +155,20 @@ class UnitsOperator(Role):
         Returns:
             bool: True if participate, False otherwise.
         """
-        return True
+        if callable(market.eligible_obligations_lambda):
+            requirement = market.eligible_obligations_lambda
+        else:
+            requirement = lambda_functions.get(
+                market.eligible_obligations_lambda, lambda u: True
+            )
+
+        for u in self.units.values():
+            if market.market_id in u.bidding_strategies.keys() and requirement(
+                u.as_dict()
+            ):
+                return True
+
+        return False
 
     async def register_market(self, market: MarketConfig) -> None:
         """
@@ -169,6 +191,7 @@ class UnitsOperator(Role):
                 self.context.addr,
                 acl_metadata={
                     "reply_with": market.market_id,
+                    "performative": Performatives.propose,
                 },
             ),
             receiver_addr=market.addr,
@@ -212,6 +235,15 @@ class UnitsOperator(Role):
         self.valid_orders[marketconfig.product_type].extend(orderbook)
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_actual_dispatch(marketconfig.product_type)
+
+        # now once we have the market results and the dispatch has been set
+        # we can calculate the cashflow and reward for the units
+        self.calculate_unit_cashflow_and_reward(orderbook, marketconfig)
+
+        # if unit operator is a subclass of learning unit operator
+        # we need to write the learning data to the output agent
+        if hasattr(self, "write_learning_to_output"):
+            self.write_learning_to_output(orderbook, marketconfig.market_id)
 
     def handle_registration_feedback(
         self, content: RegistrationMessage, meta: MetaDict
@@ -268,6 +300,7 @@ class UnitsOperator(Role):
                 sender_addr=self.context.addr,
                 acl_metadata={
                     "in_reply_to": meta.get("reply_with"),
+                    "performative": Performatives.inform,
                 },
             ),
             receiver_addr=sender_addr(meta),
@@ -291,11 +324,29 @@ class UnitsOperator(Role):
                 orderbook=orderbook,
             )
 
+    def calculate_unit_cashflow_and_reward(
+        self, orderbook: Orderbook, marketconfig: MarketConfig
+    ) -> None:
+        """
+        Feeds the current market result back to the units.
+
+        Args:
+            orderbook (Orderbook): The orderbook of the market.
+            marketconfig (MarketConfig): The market configuration.
+        """
+        orderbook.sort(key=itemgetter("unit_id"))
+        for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
+            orderbook = list(orders)
+            self.units[unit_id].calculate_cashflow_and_reward(
+                marketconfig=marketconfig,
+                orderbook=orderbook,
+            )
+
     def get_actual_dispatch(
         self, product_type: str, last: datetime
     ) -> tuple[list[tuple[datetime, float, str, str]], list[dict]]:
         """
-        Retrieves the actual dispatch and commits it in the unit.
+        Retrieves the actual dispatch since the last dispatch and commits it in the unit.
         We calculate the series of the actual market results dataframe with accepted bids.
         And the unit_dispatch for all units taken care of in the UnitsOperator.
 
@@ -307,6 +358,7 @@ class UnitsOperator(Role):
             tuple[list[tuple[datetime, float, str, str]], list[dict]]: market_dispatch and unit_dispatch dataframes
         """
         now = timestamp2datetime(self.context.current_timestamp)
+        # add one second to exclude the first time stamp, because it is already executed in the last step
         start = timestamp2datetime(last + 1)
 
         market_dispatch = aggregate_step_amount(
@@ -325,8 +377,9 @@ class UnitsOperator(Role):
             valid_outputs = [
                 "soc",
                 "cashflow",
-                "marginal_costs",
+                "generation_costs",
                 "total_costs",
+                "heat",
             ]
 
             for key in unit.outputs.keys():

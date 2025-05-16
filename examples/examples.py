@@ -18,6 +18,10 @@ os.makedirs("./examples/local_db", exist_ok=True)
 available_examples = {
     # small examples for easier understanding of different features and configurations
     "small": {"scenario": "example_01a", "study_case": "base"},
+    "small_with_exchanges": {
+        "scenario": "example_01a",
+        "study_case": "base_with_exchanges",
+    },
     "small_dam": {"scenario": "example_01a", "study_case": "dam"},
     "small_with_opt_clearing": {
         "scenario": "example_01a",
@@ -44,10 +48,6 @@ available_examples = {
         "scenario": "example_01d",
         "study_case": "base",
     },
-    "small_with_nodal_clearing": {
-        "scenario": "example_01d",
-        "study_case": "nodal_case",
-    },
     "small_with_zonal_clearing": {
         "scenario": "example_01d",
         "study_case": "zonal_case",
@@ -63,6 +63,10 @@ available_examples = {
     },
     # example_01f is used in the tutorial notebook #5: Market configuration comparison example
     # example_01g is used in the tutorial notebook #6: Advanced order types example
+    "small_household": {
+        "scenario": "example_01h",
+        "study_case": "eom",
+    },
     #
     # DRL references case for learning advancement testing
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
@@ -72,7 +76,6 @@ available_examples = {
     "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
     "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
-    "learning_with_complex_bids": {"scenario": "example_02d", "study_case": "dam"},
     "small_learning_with_storage": {"scenario": "example_02e", "study_case": "base"},
     #
     # full year examples to show real-world scenarios
@@ -91,7 +94,10 @@ available_examples = {
     },
     "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
-    
+    "large_2019_storage": {
+        "scenario": "example_03c",
+        "study_case": "base_case_2019_with_storage",
+    },
     # redispatch validation examples
     "redisp_valid_2_nodes": {"scenario": "example_05a", "study_case": "base"},
     "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
@@ -153,11 +159,6 @@ if __name__ == "__main__":
 
     if world.learning_config.get("learning_mode", False):
         # run learning if learning mode is enabled
-        run_learning(
-            world,
-            inputs_path="examples/inputs",
-            scenario=available_examples[example]["scenario"],
-            study_case=available_examples[example]["study_case"],
-        )
+        run_learning(world)
 
     world.run()

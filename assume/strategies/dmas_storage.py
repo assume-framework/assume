@@ -144,7 +144,7 @@ class DmasStorageStrategy(BaseStrategy):
         ]
 
         self.model.vol_con = pyo.ConstraintList()
-        v0 = unit.get_soc_before(start)
+        v0 = unit.outputs["soc"].at[start]
 
         for t in time_range:
             if t == 0:

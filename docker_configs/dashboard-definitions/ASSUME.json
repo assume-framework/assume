@@ -26,14 +26,13 @@
   "graphTooltip": 0,
   "id": 2,
   "links": [],
-  "liveNow": false,
   "panels": [
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 4,
         "w": 24,
@@ -50,7 +49,7 @@
         "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "title": "Overview Dashboard",
       "type": "text"
     },
@@ -68,9 +67,9 @@
       "type": "row"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
       },
       "gridPos": {
         "h": 3,
@@ -88,41 +87,8 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "11.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": false,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  supply_volume\nFROM market_meta\nWHERE\n  $__timeFilter(product_start)\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "supply_volume"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "market_meta",
-          "timeColumn": "product_start",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
+      "pluginVersion": "11.4.0",
+      "title": "",
       "type": "text"
     },
     {
@@ -191,58 +157,17 @@
         "overrides": [
           {
             "matcher": {
-              "id": "byFrameRefID",
-              "options": "Volume"
+              "id": "byRegexp",
+              "options": "/Price.*/"
             },
             "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
               {
                 "id": "unit",
-                "value": "MWh"
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byFrameRefID",
-              "options": "Price"
-            },
-            "properties": [
-              {
-                "id": "custom.axisPlacement",
-                "value": "left"
+                "value": "€/MWh"
               },
               {
-                "id": "unit",
-                "value": "EUR/MWh"
-              }
-            ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "Supply volume",
-                  "Price"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
+                "id": "custom.axisPlacement",
+                "value": "auto"
               }
             ]
           }
@@ -276,19 +201,19 @@
           "sort": "none"
         }
       },
-      "repeat": "market",
-      "repeatDirection": "h",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  demand_volume AS \"Demand volume\",\n  supply_volume AS \"Supply volume\",\n  node\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, demand_volume, supply_volume, node\nORDER BY product_start, node;\n",
+          "rawSql": "SELECT\n  $__timeGroupAlias(product_start, $__interval),\n  avg(demand_volume) AS \"Demand volume\",\n  avg(supply_volume) AS \"Supply volume\",\n  avg(price) AS \"Price\",\n  node\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND \"market_id\" ='$market' AND $__timeFilter(product_start)\nGROUP BY 1, market_id, simulation, node\nORDER BY 1, node;\n",
           "refId": "Volume",
           "select": [
             [
@@ -300,6 +225,233 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "market_meta",
+          "timeColumn": "product_start",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        }
+      ],
+      "title": "Market Summary $market",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Big Point Size is demand match. Unused generation after that point",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "pointShape": "circle",
+            "pointSize": {
+              "fixed": 2,
+              "max": 20,
+              "min": 1
+            },
+            "pointStrokeWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "show": "points+lines"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "megwatt"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Price"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "€/MWh"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "id": 100,
+      "maxPerRow": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "min"
+          ],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mapping": "manual",
+        "series": [
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 1
+              }
+            },
+            "name": {
+              "fixed": "Demand"
+            },
+            "size": {
+              "matcher": {
+                "id": "byName",
+                "options": "size"
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "Volume"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "Price"
+              }
+            }
+          },
+          {
+            "frame": {
+              "matcher": {
+                "id": "byIndex",
+                "options": 0
+              }
+            },
+            "name": {
+              "fixed": "Generation"
+            },
+            "size": {
+              "matcher": {
+                "id": "byName",
+                "options": "size"
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "Volume"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "Price"
+              }
+            }
+          }
+        ],
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "group": [],
+          "metricColumn": "none",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  \n  sum(volume::float) OVER (PARTITION BY market_id ORDER BY price asc, unit_id) AS \"Volume\",\n  price::float AS \"Price\", unit_id,\n  1/(volume - accepted_volume +1)/2 as size\n  --'rgba(255,255,255,1)' as delta\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume > 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, price, market_id --, bid_id\nORDER BY price asc\n\n-- ",
+          "refId": "Volume",
+          "select": [
+            [
+              {
+                "params": [
+                  "supply_volume"
+                ],
+                "type": "column"
+              }
+            ]
+          ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_meta",
           "timeColumn": "product_start",
           "timeColumnType": "timestamp",
@@ -316,36 +468,383 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
-          "format": "time_series",
-          "group": [],
+          "editorMode": "code",
+          "format": "table",
           "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\n  -sum(volume::float) OVER (PARTITION BY market_id ORDER BY accepted_price asc, unit_id) AS \"Volume\",\n  accepted_price::float AS \"Price\", unit_id,\n  10 as size\nFROM market_orders\nWHERE\n  \n  start_time = (select min(start_time) from market_orders where market_id = '$market' AND\n  simulation = '$simulation' and $__timeFilter(start_time))\n  AND\n  volume < 0 AND\n  --accepted_volume != 0 AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY unit_id, volume, accepted_volume, accepted_price, market_id --, bid_id\nORDER BY accepted_price asc\n\n-- ",
+          "refId": "Demand",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Merit Order $market at $min_time",
+      "type": "xychart"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "Dispatch by technology",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 76,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "megwatt"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume solar"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume wind_offshore"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume wind_onshore"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume biomass"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume gas"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume hard coal"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "text",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume hydro"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "blue",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume lignite"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#a52a2a",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume nuclear"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "light-red",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume oil"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#120c12",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "id": 101,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "maxHeight": 600,
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "group": [
+            {
+              "params": [
+                "$__interval",
+                "none"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "unit_id"
+              ],
+              "type": "column"
+            }
+          ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  product_start AS \"time\",\n  price AS \"Price\",\n  node\nFROM market_meta\nWHERE (\"simulation\" LIKE '$simulation') AND (\"market_id\" LIKE '$market') AND $__timeFilter(product_start)\nGROUP BY market_id, simulation, product_start, price, node\nORDER BY product_start, node;\n",
-          "refId": "Price",
+          "rawSql": "select time, sum(volume) as \"volume\", tech FROM \n(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  sum(accepted_volume) AS \"volume\", unit_id, pm.technology as tech\nFROM market_orders mo\njoin power_plant_meta pm on pm.index=mo.unit_id and pm.simulation=mo.simulation\nWHERE\n\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  mo.simulation = '$simulation'\n\nGROUP BY 1, unit_id, bid_id, pm.technology\nORDER BY 1\n\n) a\ngroup by 1, tech\nORDER BY 1, tech desc",
+          "refId": "A",
           "select": [
             [
               {
                 "params": [
-                  "supply_volume"
+                  "volume"
                 ],
                 "type": "column"
+              },
+              {
+                "params": [
+                  "avg"
+                ],
+                "type": "aggregate"
+              },
+              {
+                "params": [
+                  "volume"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "unit_id"
+                ],
+                "type": "alias"
               }
             ]
           ],
-          "table": "market_meta",
-          "timeColumn": "product_start",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "market_orders",
+          "timeColumn": "start_time",
           "timeColumnType": "timestamp",
           "where": [
             {
               "name": "$__timeFilter",
               "params": [],
               "type": "macro"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "market_id",
+                "=",
+                "'$market'"
+              ],
+              "type": "expression"
+            },
+            {
+              "datatype": "text",
+              "name": "",
+              "params": [
+                "simulation",
+                "=",
+                "'$simulation'"
+              ],
+              "type": "expression"
             }
           ]
         }
       ],
-      "title": "Market Summary $market",
+      "title": "Market result by technology",
       "type": "timeseries"
     },
     {
@@ -414,7 +913,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 29
       },
       "id": 19,
       "options": {
@@ -432,12 +931,14 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [
             {
@@ -456,7 +957,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \"Price\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_price::float) AS \"Price\", unit_id\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id --, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -494,6 +995,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_orders",
           "timeColumn": "start_time",
           "timeColumnType": "timestamp",
@@ -595,7 +1113,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 29
       },
       "id": 20,
       "options": {
@@ -613,12 +1131,14 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [
             {
@@ -637,7 +1157,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \"Volume\"\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \"Volume\", unit_id\nFROM market_orders\nWHERE\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  simulation = '$simulation'\nGROUP BY 1, unit_id, bid_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -675,6 +1195,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_orders",
           "timeColumn": "start_time",
           "timeColumnType": "timestamp",
@@ -716,7 +1253,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 29
+        "y": 38
       },
       "id": 74,
       "panels": [],
@@ -809,7 +1346,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 30
+        "y": 39
       },
       "id": 72,
       "options": {
@@ -835,7 +1372,7 @@
         "xTickLabelRotation": 0,
         "xTickLabelSpacing": 0
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -940,6 +1477,18 @@
                 "value": "currencyEUR"
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "simulation"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 372
+              }
+            ]
           }
         ]
       },
@@ -947,7 +1496,7 @@
         "h": 12,
         "w": 9,
         "x": 10,
-        "y": 30
+        "y": 39
       },
       "id": 76,
       "options": {
@@ -968,19 +1517,20 @@
           }
         ]
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  simulation,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as avg_price,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,\n  sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'sum_reward') as sum_reward,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'sum_profit') as sum_profit,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'sum_regret') as sum_regret\nFROM kpis\ngroup by simulation\nORDER BY simulation",
+          "rawSql": "SELECT\n  simulation,\n  avg(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'avg_price') as avg_price,\n  sum(round(CAST(value AS numeric), 2))  FILTER (WHERE variable = 'total_cost') as total_cost,\n  sum(round(CAST(value AS numeric), 2)*1000)  FILTER (WHERE variable = 'total_volume') as total_volume\nFROM kpis\ngroup by simulation\nORDER BY simulation",
           "refId": "A",
           "select": [
             [
@@ -992,6 +1542,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -1034,7 +1601,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 30
+        "y": 39
       },
       "id": 7,
       "options": {
@@ -1061,6 +1628,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1124,7 +1692,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 51
       },
       "id": 41,
       "panels": [],
@@ -1132,16 +1700,16 @@
       "type": "row"
     },
     {
-      "datasource": {
-        "type": "postgres",
-        "uid": "P7B13B9DF907EC40C"
-      },
       "description": "",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
       "gridPos": {
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 43
+        "y": 52
       },
       "id": 22,
       "options": {
@@ -1153,41 +1721,8 @@
         "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.2.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "postgres",
-            "uid": "P7B13B9DF907EC40C"
-          },
-          "format": "time_series",
-          "group": [],
-          "metricColumn": "none",
-          "rawQuery": false,
-          "rawSql": "SELECT\n  \"Timestamp\" AS \"time\",\n  volume\nFROM demand_meta\nWHERE\n  $__timeFilter(\"Timestamp\")\nORDER BY 1",
-          "refId": "A",
-          "select": [
-            [
-              {
-                "params": [
-                  "volume"
-                ],
-                "type": "column"
-              }
-            ]
-          ],
-          "table": "demand_meta",
-          "timeColumn": "\"Timestamp\"",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
-        }
-      ],
+      "pluginVersion": "11.4.0",
+      "title": "",
       "type": "text"
     },
     {
@@ -1258,9 +1793,10 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 46
+        "y": 55
       },
       "id": 24,
+      "interval": "15m",
       "options": {
         "legend": {
           "calcs": [
@@ -1278,18 +1814,20 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  avg(power) AS \"Market dispatch\",\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Gen_Units)\nGROUP BY 1, unit_id, power, market_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  avg(power) AS \"Market dispatch\",\n  concat(unit_id, ' - ', market_id) as \"unit\"\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Gen_Units)\nGROUP BY 1, unit_id, power, market_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1301,6 +1839,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -1317,33 +1872,29 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
-          "group": [],
           "hide": false,
-          "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  avg(power) AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation = '$simulation' AND\n  unit in ($Gen_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(time,$__interval),\n  avg(power) AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  simulation = '$simulation' AND\n  unit in ($Gen_Units)\nGROUP BY 1, unit\nORDER BY 1",
           "refId": "B",
-          "select": [
-            [
+          "sql": {
+            "columns": [
               {
-                "params": [
-                  "volume"
-                ],
-                "type": "column"
+                "parameters": [],
+                "type": "function"
               }
-            ]
-          ],
-          "table": "demand_meta",
-          "timeColumn": "\"Timestamp\"",
-          "timeColumnType": "timestamp",
-          "where": [
-            {
-              "name": "$__timeFilter",
-              "params": [],
-              "type": "macro"
-            }
-          ]
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
         }
       ],
       "title": "Unitwise Dispatch",
@@ -1376,7 +1927,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 46
+        "y": 55
       },
       "id": 26,
       "options": {
@@ -1397,13 +1948,14 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.4.0",
+      "pluginVersion": "5.6.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "none",
@@ -1420,6 +1972,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -1514,7 +2083,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 55
+        "y": 64
       },
       "id": 70,
       "options": {
@@ -1534,7 +2103,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1760,7 +2329,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 55
+        "y": 64
       },
       "id": 78,
       "options": {
@@ -1776,10 +2345,11 @@
         },
         "tooltip": {
           "maxHeight": 600,
-          "mode": "single",
+          "mode": "multi",
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -1932,7 +2502,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 63
+        "y": 72
       },
       "id": 93,
       "options": {
@@ -1952,18 +2522,19 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -1975,6 +2546,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2087,7 +2675,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 81
       },
       "id": 99,
       "options": {
@@ -2103,18 +2691,19 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2126,6 +2715,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2147,7 +2753,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 77
+        "y": 86
       },
       "id": 39,
       "panels": [],
@@ -2219,7 +2825,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 78
+        "y": 87
       },
       "id": 36,
       "options": {
@@ -2239,17 +2845,19 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"Market dispatch\",\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Demand_Units)\nGROUP BY 1, unit_id, power, market_id\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(datetime,$__interval),\n  power AS \"Market dispatch\",\n  concat(unit_id, ' - ', market_id) as unit\nFROM market_dispatch\nWHERE\n  $__timeFilter(datetime) AND\n  simulation = '$simulation' AND\n  unit_id in ($Demand_Units)\nGROUP BY 1, unit_id, power, market_id\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2261,6 +2869,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -2277,12 +2902,13 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(time,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -2294,6 +2920,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2336,7 +2979,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 78
+        "y": 87
       },
       "id": 37,
       "options": {
@@ -2357,13 +3000,14 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.4.0",
+      "pluginVersion": "5.6.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "metricColumn": "none",
@@ -2380,6 +3024,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -2474,7 +3135,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 87
+        "y": 96
       },
       "id": 89,
       "options": {
@@ -2494,7 +3155,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2622,7 +3283,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "energy_marginal_costs demand_EOM"
+              "options": "energy_generation_costs demand_EOM"
             },
             "properties": [
               {
@@ -2664,7 +3325,7 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 87
+        "y": 96
       },
       "id": 95,
       "options": {
@@ -2684,19 +3345,20 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  -energy_cashflow AS \"Cashflow\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -energy_cashflow AS \"Cashflow\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2708,6 +3370,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2817,7 +3496,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 87
+        "y": 96
       },
       "id": 90,
       "options": {
@@ -2837,6 +3516,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -2924,7 +3604,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 92
+        "y": 101
       },
       "id": 96,
       "options": {
@@ -2944,19 +3624,20 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "table",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  sum(energy_cashflow)/sum(power) as \"Price per MW\",\n  unit\nFROM unit_dispatch d\nWHERE\n  $__timeFilter(index) AND\n  d.simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY unit\nORDER BY 1",
+          "rawSql": "SELECT\n  sum(energy_cashflow)/sum(power) as \"Price per MW\",\n  unit\nFROM unit_dispatch d\nWHERE\n  $__timeFilter(time) AND\n  d.simulation = '$simulation' AND\n  unit in ($Demand_Units)\nGROUP BY unit\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2968,6 +3649,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3015,7 +3713,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 92
+        "y": 101
       },
       "id": 94,
       "options": {
@@ -3035,19 +3733,20 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  -power*1e3 as \"Volume\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -power*1e3 as \"Volume\",\r\n  unit\r\nFROM unit_dispatch d\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  d.simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, power\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3059,6 +3758,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3137,7 +3853,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "energy_marginal_costs demand_EOM"
+              "options": "energy_generation_costs demand_EOM"
             },
             "properties": [
               {
@@ -3155,7 +3871,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 96
+        "y": 105
       },
       "id": 86,
       "options": {
@@ -3176,17 +3892,19 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  -energy_cashflow AS \"Cashflow\",\r\n  -energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  -energy_cashflow AS \"Cashflow:\",\r\n  -energy_generation_costs AS \"Production costs:\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Demand_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3198,6 +3916,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3219,7 +3954,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 105
+        "y": 114
       },
       "id": 44,
       "panels": [],
@@ -3291,7 +4026,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 106
+        "y": 115
       },
       "id": 65,
       "options": {
@@ -3311,12 +4046,14 @@
           "sort": "desc"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
@@ -3333,6 +4070,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "demand_meta",
           "timeColumn": "\"Timestamp\"",
           "timeColumnType": "timestamp",
@@ -3349,12 +4103,13 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(index,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(index) AND\n  simulation = '$simulation' AND\n  unit in ($Storage_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
+          "rawSql": "SELECT\n  $__timeGroupAlias(time,$__interval),\n  power AS \"Actual dispatch\",\n  unit\nFROM unit_dispatch\nWHERE\n  $__timeFilter(time) AND\n  simulation = '$simulation' AND\n  unit in ($Storage_Units)\nGROUP BY 1, unit, power\nORDER BY 1",
           "refId": "B",
           "select": [
             [
@@ -3366,6 +4121,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3408,12 +4180,12 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 106
+        "y": 115
       },
       "id": 47,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power Disharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\nUnit Operator: {{unit_operator}}\n\n### Technical Specifications\nMaximum Capacity: {{max_soc}} MWh <br>\nMinimum Capacity: {{min_soc}} MWh <br>\n\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} % <br>  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
@@ -3429,7 +4201,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.4.0",
+      "pluginVersion": "5.6.0",
       "targets": [
         {
           "datasource": {
@@ -3470,7 +4242,7 @@
     {
       "datasource": {
         "default": true,
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -3533,7 +4305,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 115
+        "y": 124
       },
       "id": 80,
       "options": {
@@ -3553,6 +4325,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3564,7 +4337,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  SOC AS \"State of Charge\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, SOC\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  SOC AS \"State of Charge\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, SOC\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3610,7 +4383,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "Bid prices of accepted bids per unit in the chosen market",
@@ -3680,31 +4453,6 @@
                 "value": "€/MW"
               }
             ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "Bid price Discharge Storage 1 - EOM",
-                  "Bid price Charge Storage 1 - EOM"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
           }
         ]
       },
@@ -3712,7 +4460,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 124
+        "y": 133
       },
       "id": 91,
       "options": {
@@ -3732,7 +4480,7 @@
           "sort": "desc"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -3850,7 +4598,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-postgresql-datasource",
+        "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "",
@@ -3935,31 +4683,6 @@
                 "id": "unit"
               }
             ]
-          },
-          {
-            "__systemRef": "hideSeriesFrom",
-            "matcher": {
-              "id": "byNames",
-              "options": {
-                "mode": "exclude",
-                "names": [
-                  "Bid volume charge: Storage 1 - EOM",
-                  "Bid volume discharge: Storage 1 - EOM"
-                ],
-                "prefix": "All except:",
-                "readOnly": true
-              }
-            },
-            "properties": [
-              {
-                "id": "custom.hideFrom",
-                "value": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": true
-                }
-              }
-            ]
           }
         ]
       },
@@ -3967,7 +4690,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 124
+        "y": 133
       },
       "id": 92,
       "options": {
@@ -3987,6 +4710,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
@@ -4157,7 +4881,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 133
+        "y": 142
       },
       "id": 97,
       "options": {
@@ -4177,18 +4901,19 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.2.0",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -4200,6 +4925,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -4312,7 +5054,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 142
+        "y": 151
       },
       "id": 98,
       "options": {
@@ -4328,18 +5070,19 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "9.2.15",
+      "pluginVersion": "11.4.0",
       "targets": [
         {
           "datasource": {
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(index,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_marginal_costs AS \"Production costs\",\r\n  energy_cashflow - energy_marginal_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(index) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_marginal_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -4351,6 +5094,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -4367,16 +5127,16 @@
       "type": "timeseries"
     }
   ],
+  "preload": false,
   "refresh": "",
-  "schemaVersion": 39,
+  "schemaVersion": 40,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
-          "selected": false,
-          "text": "example_02e_base",
-          "value": "example_02e_base"
+          "text": "example_01c_eom_only",
+          "value": "example_01c_eom_only"
         },
         "datasource": {
           "type": "postgres",
@@ -4384,21 +5144,17 @@
         },
         "definition": "SELECT simulation\nFROM market_meta",
         "description": "Can choose which simulation we want to show ",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "simulation",
         "options": [],
         "query": "SELECT simulation\nFROM market_meta",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
           "text": "EOM",
           "value": "EOM"
         },
@@ -4408,23 +5164,23 @@
         },
         "definition": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "description": "Choose for which market the data is displayed",
-        "hide": 0,
         "includeAll": false,
-        "multi": false,
         "name": "market",
         "options": [],
         "query": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
-          "text": "pp_1",
-          "value": "pp_1"
+          "text": [
+            "Biomass"
+          ],
+          "value": [
+            "Biomass"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -4432,24 +5188,24 @@
         },
         "definition": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
-        "hide": 0,
         "includeAll": false,
-        "label": "",
         "multi": true,
         "name": "Gen_Units",
         "options": [],
         "query": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": false,
-          "text": "demand_EOM",
-          "value": "demand_EOM"
+          "text": [
+            "demand_CRM_neg"
+          ],
+          "value": [
+            "demand_CRM_neg"
+          ]
         },
         "datasource": {
           "type": "postgres",
@@ -4457,22 +5213,18 @@
         },
         "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
-        "hide": 0,
         "includeAll": false,
-        "label": "",
         "multi": true,
         "name": "Demand_Units",
         "options": [],
         "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "selected": true,
           "text": [
             "Storage 1"
           ],
@@ -4486,24 +5238,36 @@
         },
         "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which storage units we want to display ",
-        "hide": 0,
         "includeAll": false,
-        "label": "",
         "multi": true,
         "name": "Storage_Units",
         "options": [],
         "query": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
-        "skipUrlSync": false,
         "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": "2019-01-01 10:00:00",
+          "value": "2019-01-01 10:00:00"
+        },
+        "definition": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
+        "description": "The minimum time we have in the time range.\nUsed for the merit order plot title",
+        "hide": 2,
+        "name": "min_time",
+        "options": [],
+        "query": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
+        "refresh": 1,
+        "regex": "",
         "type": "query"
       }
     ]
   },
   "time": {
-    "from": "2019-03-01T00:00:00.000Z",
-    "to": "2019-04-30T23:59:59.000Z"
+    "from": "2019-01-01T00:00:00.000Z",
+    "to": "2019-01-31T23:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -4518,6 +5282,6 @@
   "timezone": "utc",
   "title": "ASSUME: Main overview",
   "uid": "mQ3Lvkr4k",
-  "version": 4,
+  "version": 6,
   "weekStart": ""
 }

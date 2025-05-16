@@ -4,6 +4,7 @@
 
 from datetime import datetime
 
+import numpy as np
 import pandas as pd
 import pytest
 from dateutil import rrule as rr
@@ -163,7 +164,6 @@ async def test_formulate_bids(units_operator: UnitsOperator):
 
 @pytest.mark.require_learning
 async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
-    from assume.strategies.learning_advanced_orders import RLAdvancedOrderStrategy
     from assume.strategies.learning_strategies import RLStrategy
 
     marketconfig = rl_units_operator.available_markets[0]
@@ -173,7 +173,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     params_dict = {
         "bidding_strategies": {
-            "EOM": RLAdvancedOrderStrategy(
+            "EOM": RLStrategy(
                 unit_id="testplant",
                 learning_mode=True,
             )
@@ -244,10 +244,8 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
     # THEN resulting unit dispatch dataframe contains one row
     # which is for the current time - as we must know our current dispatch
-    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
-    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
-    # only 1 start and stop contained
-    assert len(unit_dfs[0]["time"]) == 2
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
 
     # WHEN another hour passes
@@ -256,16 +254,281 @@ async def test_get_actual_dispatch(units_operator: UnitsOperator):
 
     # THEN resulting unit dispatch dataframe contains only one row with current dispatch
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
-    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
-    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
-    assert len(unit_dfs[0]["time"]) == 2
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
 
     last = clock.time
     clock.set_time(clock.time + 3600)
 
     market_dispatch, unit_dfs = units_operator.get_actual_dispatch("energy", last)
-    assert datetime2timestamp(unit_dfs[0]["time"][0]) == last
-    assert datetime2timestamp(unit_dfs[0]["time"][1]) == clock.time
-    assert len(unit_dfs[0]["time"]) == 2
+    assert datetime2timestamp(unit_dfs[0]["time"][0]) == clock.time
+    assert len(unit_dfs[0]["time"]) == 1
     assert len(market_dispatch) == 0
+
+
+def test_participate():
+    """
+    Tests that an operator without units does not participate.
+    And an operator with units for the wrong market does not participate.
+    A correct units operator participates correctly.
+    """
+    market_id = "EOM"
+    marketconfig = MarketConfig(
+        market_id=market_id,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
+    )
+    clock = ExternalClock(0)
+    units_role = UnitsOperator(available_markets=[marketconfig])
+
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"wrong_market": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = Demand("testdemand", **params_dict)
+    units_role.add_unit(unit)
+
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = Demand("testdemand", **params_dict)
+    units_role.add_unit(unit)
+
+    assert units_role.participate(marketconfig)
+
+
+def test_participate_lambda():
+    """
+    Tests that one of the selected lambda functions works correctly in the participation
+    """
+    market_id = "EOM"
+    marketconfig = MarketConfig(
+        market_id=market_id,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
+        eligible_obligations_lambda="only_renewables",
+    )
+    units_role = UnitsOperator(available_markets=[marketconfig])
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 10,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = PowerPlant("testdemand", **params_dict)
+    units_role.add_unit(unit)
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "wind offshore",
+        "unit_operator": "x",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = PowerPlant("testdemand", **params_dict)
+    units_role.add_unit(unit)
+
+    assert units_role.participate(marketconfig)
+
+
+def test_participate_custom_lambda():
+    """
+    Tests that the custom lambda function is respected in the participation
+    """
+    market_id = "EOM"
+    marketconfig = MarketConfig(
+        market_id=market_id,
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
+        eligible_obligations_lambda=lambda u: abs(u.get("max_power", 0)) > 100,
+    )
+    units_role = UnitsOperator(available_markets=[marketconfig])
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
+
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 10,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = PowerPlant("testdemand", **params_dict)
+    units_role.add_unit(unit)
+    assert not units_role.participate(marketconfig)
+
+    params_dict = {
+        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "technology": "energy",
+        "unit_operator": "x",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, demand=1000),
+    }
+    unit = PowerPlant("testdemand", **params_dict)
+    units_role.add_unit(unit)
+
+    assert units_role.participate(marketconfig)
+
+
+@pytest.mark.require_learning
+async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
+    """Test that learning data from two RL units is correctly formatted and sent."""
+    import torch as th
+
+    from assume.strategies.learning_strategies import RLStrategy
+
+    # Constants
+    obs_dim = 2
+    act_dim = 1
+    num_timesteps = 3
+    start = datetime(2020, 1, 1)
+    end = datetime(2020, 1, 2)
+
+    # Monkey-patch schedule_instant_message to capture the scheduled message.
+    scheduled_messages = []
+
+    def dummy_schedule_instant_message(content, receiver_addr):
+        scheduled_messages.append((content, receiver_addr))
+
+    rl_units_operator.context.schedule_instant_message = dummy_schedule_instant_message
+
+    # Set required addresses in the context.
+    rl_units_operator.context.data.update(
+        {
+            "learning_output_agent_addr": addr("world", "export_agent_1"),
+            "learning_agent_addr": addr("world_0", "learning_agent"),
+        }
+    )
+
+    # Create index for forecasting
+    index = FastIndex(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
+
+    # --- Add two RL-enabled PowerPlant units ---
+    params_dict = {
+        "bidding_strategies": {
+            "EOM": RLStrategy(unit_id="testplant1", learning_mode=True),
+        },
+        "technology": "energy",
+        "unit_operator": "test_operator",
+        "max_power": 1000,
+        "min_power": 0,
+        "forecaster": NaiveForecast(index, powerplant=1000),
+    }
+
+    unit1 = PowerPlant("testplant1", **params_dict)
+    rl_units_operator.add_unit(unit1)
+
+    # Clone params_dict and update for the second unit
+    params_dict["bidding_strategies"]["EOM"] = RLStrategy(
+        unit_id="testplant2", learning_mode=True
+    )
+    unit2 = PowerPlant("testplant2", **params_dict)
+    rl_units_operator.add_unit(unit2)
+
+    # Set learning mode and strategy details
+    rl_units_operator.learning_mode = True
+    rl_units_operator.learning_data = {"test": 1}
+    rl_units_operator.learning_strategies.update(
+        {
+            "obs_dim": obs_dim,
+            "act_dim": act_dim,
+        }
+    )
+
+    # Get units from the operator
+    unit1 = rl_units_operator.units["testplant1"]
+    unit2 = rl_units_operator.units["testplant2"]
+
+    # Define sample outputs
+    unit1.outputs["rl_observations"] = [
+        th.tensor([1.0, 2.0]),
+        th.tensor([3.0, 4.0]),
+        th.tensor([5.0, 6.0]),
+    ]
+    unit1.outputs["rl_actions"] = [
+        th.tensor([10.0]),
+        th.tensor([20.0]),
+        th.tensor([30.0]),
+    ]
+    unit1.outputs["rl_rewards"] = pd.Series([100, 200, 300])
+
+    unit2.outputs["rl_observations"] = [
+        th.tensor([7.0, 8.0]),
+        th.tensor([9.0, 10.0]),
+        th.tensor([11.0, 12.0]),
+    ]
+    unit2.outputs["rl_actions"] = [
+        th.tensor([40.0]),
+        th.tensor([50.0]),
+        th.tensor([60.0]),
+    ]
+    unit2.outputs["rl_rewards"] = pd.Series([400, 500, 600])
+
+    # --- Call the function under test ---
+    await rl_units_operator.write_to_learning_role()
+
+    # Verify that a message was scheduled.
+    assert len(scheduled_messages) == 1
+    content, receiver_addr = scheduled_messages[0]
+    assert receiver_addr == addr("world_0", "learning_agent")
+
+    # Unpack the data tuple: (observations, actions, rewards)
+    all_observations, all_actions, all_rewards = content["data"]
+
+    # Validate array shapes
+    assert all_observations.shape == (num_timesteps, 2, obs_dim)
+    assert all_actions.shape == (num_timesteps, 2, act_dim)
+    assert all_rewards.shape == (num_timesteps, 2)
+
+    # Expected values for validation
+    expected_observations = np.array(
+        [
+            [[1.0, 2.0], [7.0, 8.0]],
+            [[3.0, 4.0], [9.0, 10.0]],
+            [[5.0, 6.0], [11.0, 12.0]],
+        ]
+    )
+    expected_actions = np.array([[[10.0], [40.0]], [[20.0], [50.0]], [[30.0], [60.0]]])
+    expected_rewards = np.array([[100, 400], [200, 500], [300, 600]])
+
+    # Validate observations, actions, and rewards
+    np.testing.assert_array_equal(all_observations, expected_observations)
+    np.testing.assert_array_equal(all_actions, expected_actions)
+    np.testing.assert_array_equal(all_rewards, expected_rewards)
+
+    # Confirm that unit outputs have been reset
+    assert unit1.outputs["rl_rewards"] == []
+    assert unit2.outputs["rl_rewards"] == []

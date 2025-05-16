@@ -116,7 +116,7 @@ class FastIndex:
                 else item.start or 0
             )
             stop_idx = (
-                self._get_idx_from_date(item.stop) + 1
+                self._get_idx_from_date(item.stop, round_up=False) + 1
                 if isinstance(item.stop, datetime)
                 else item.stop or len(self._date_list)
             )
@@ -201,7 +201,7 @@ class FastIndex:
             self._date_list = [self._start + timedelta(seconds=s) for s in total_dates]
 
         start_idx = self._get_idx_from_date(start or self.start)
-        end_idx = self._get_idx_from_date(end or self.end) + 1
+        end_idx = self._get_idx_from_date(end or self.end, round_up=False) + 1
         return self._date_list[start_idx:end_idx]
 
     def as_datetimeindex(self) -> pd.DatetimeIndex:
@@ -217,7 +217,7 @@ class FastIndex:
         return pd.DatetimeIndex(pd.to_datetime(datetimes), name="FastIndex")
 
     @lru_cache(maxsize=1000)
-    def _get_idx_from_date(self, date: datetime) -> int:
+    def _get_idx_from_date(self, date: datetime, round_up: bool = True) -> int:
         """
         Convert a datetime to its corresponding index in the range.
 
@@ -237,13 +237,9 @@ class FastIndex:
         delta_seconds = (date - self.start).total_seconds()
         remainder = delta_seconds % self.freq_seconds
 
-        if remainder > self.tolerance_seconds and remainder < (
-            self.freq_seconds - self.tolerance_seconds
-        ):
-            raise ValueError(
-                f"Date {date} is not aligned with frequency {self.freq_seconds} seconds. "
-                f"Allowed tolerance: {self.tolerance_seconds} seconds."
-            )
+        if round_up and remainder > 0:
+            # if there is a large remainder, we need to add to return the value of the next date as begin
+            delta_seconds += self.freq_seconds
 
         return round(delta_seconds / self.freq_seconds)
 
@@ -310,6 +306,9 @@ class FastSeries:
 
         self._index = index
         self._name = name
+
+        if isinstance(value, pd.Series) and is_datetime64_any_dtype(value.index):
+            value = value[self.start : self.end]
 
         count = len(self.index)  # Use index length directly
         self._data = (
@@ -445,7 +444,7 @@ class FastSeries:
                 else 0
             )
             stop_idx = (
-                self.index._get_idx_from_date(item.stop) + 1
+                self.index._get_idx_from_date(item.stop, round_up=False) + 1
                 if item.stop is not None
                 else len(self.data)
             )
@@ -512,7 +511,7 @@ class FastSeries:
                 )
             )
             stop_idx = (
-                self.index._get_idx_from_date(item.stop) + 1
+                self.index._get_idx_from_date(item.stop, round_up=False) + 1
                 if isinstance(item.stop, datetime)
                 else (
                     len(self.data) + item.stop
@@ -720,27 +719,29 @@ class FastSeries:
         Returns:
             str: String representation of the FastSeries.
         """
+        repr_string = f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, freq='{self.freq}', dtype={self.dtype})\n\nData Preview:\n"
         if len(self) == 0:
-            return f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, freq='{self.freq}', dtype={self.dtype})\n\nData Preview:\n[Empty Series]"
+            return repr_string + "[Empty Series]"
 
-        data_preview = np.concatenate(
-            (self.data[:preview_length], self.data[-preview_length:])
-        )
-        dates_preview = (
-            self.index.get_date_list()[:preview_length]
-            + self.index.get_date_list()[-preview_length:]
-        )
+        if len(self.index.get_date_list()) <= 2 * preview_length:
+            preview_str = "\n".join(
+                f"{date}: {value}"
+                for date, value in zip(self.index.get_date_list(), self.data)
+            )
+        else:
+            first_dates = self.index.get_date_list()[:preview_length]
+            last_dates = self.index.get_date_list()[-preview_length:]
+            first_str = "\n".join(
+                f"{date}: {value}"
+                for date, value in zip(first_dates, self.data[:preview_length])
+            )
+            last_str = "\n".join(
+                f"{date}: {value}"
+                for date, value in zip(last_dates, self.data[-preview_length:])
+            )
+            preview_str = first_str + "\n...\n" + last_str
 
-        preview_str = "\n".join(
-            f"{date}: {value}" for date, value in zip(dates_preview, data_preview)
-        )
-
-        metadata = (
-            f"FastSeries(name='{self.name}', start={self.start}, end={self.end}, "
-            f"freq='{self.freq}', dtype={self.dtype})"
-        )
-
-        return f"{metadata}\n\nData Preview:\n{preview_str}\n{'...' if len(self) > 2 * preview_length else ''}"
+        return f"{repr_string}{preview_str}"
 
     def __str__(self) -> str:
         """

@@ -40,10 +40,24 @@ The `assume.units.storage` module provides classes for various energy storage so
    :undoc-members:
    :show-inheritance:
 
-Demand Side Technology Components Module
------------------------------------------
+Demand Side Technology Module
+--------------------------------
+The `assume.units.dsm_load_shift` module integrates load-shifting capabilities into agents, allowing them to optimize their energy consumption based on market conditions.
 
-The `assume.units.dst_components` module focuses on components used in Demand Side Technology systems, such as generators and converters.
+.. automodule:: assume.units.dsm_load_shift
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+Demand Side Technology Components
+---------------------------------
+
+The `assume.units.dst_components` module focuses on components used in Demand Side Technology systems such as electrolizers or storage units.
+
+.. automodule:: assume.units.dst_components
+   :undoc-members:
+   :show-inheritance:
 
 The following classes are defined within the `assume.units.dst_components` module:
 
@@ -56,12 +70,22 @@ A class representing an electrolyser component for hydrogen production.
    :members:
    :undoc-members:
 
-Hydrogen Storage
-^^^^^^^^^^^^^^^^
+
+Hydrogen Buffer Storage
+^^^^^^^^^^^^^^^^^^^^^^^
 
 A class representing a hydrogen storage unit.
 
-.. autoclass:: assume.units.dst_components.HydrogenStorage
+.. autoclass:: assume.units.dst_components.HydrogenBufferStorage
+   :members:
+   :undoc-members:
+
+Seasonal Hydrogen Storage
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+A class representing a seasonal hydrogen storage unit.
+
+.. autoclass:: assume.units.dst_components.SeasonalHydrogenStorage
    :members:
    :undoc-members:
 

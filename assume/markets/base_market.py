@@ -7,7 +7,7 @@ import math
 from itertools import groupby
 from operator import itemgetter
 
-from mango import AgentAddress, Role, create_acl, sender_addr
+from mango import AgentAddress, Performatives, Role, create_acl, sender_addr
 
 from assume.common.market_objects import (
     ClearingMessage,
@@ -20,6 +20,7 @@ from assume.common.market_objects import (
     OrderBookMessage,
     RegistrationMessage,
     RegistrationReplyMessage,
+    lambda_functions,
 )
 from assume.common.utils import (
     datetime2timestamp,
@@ -29,6 +30,8 @@ from assume.common.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+process_time = 0
 
 
 class MarketMechanism:
@@ -49,10 +52,17 @@ class MarketMechanism:
     def __init__(self, marketconfig: MarketConfig):
         super().__init__()
         self.marketconfig = marketconfig
+        # calculate last possible market opening as the difference between the market end
+        # and the length of the longest product plus the delivery time of the products
+        self.last_market_opening = marketconfig.opening_hours._until - max(
+            market_product.duration * market_product.count
+            + market_product.first_delivery
+            for market_product in marketconfig.market_products
+        )
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
-    ) -> tuple[Orderbook, Orderbook, list[dict]]:
+    ) -> tuple[Orderbook, Orderbook, list[dict], dict[tuple, float]]:
         """
         Clears the market.
 
@@ -252,6 +262,7 @@ class MarketRole(MarketMechanism, Role):
                     sender_addr=self.context.addr,
                     acl_metadata={
                         "reply_with": f"{self.marketconfig.market_id}_{market_open}",
+                        "performative": Performatives.call_for_proposal,
                     },
                 ),
                 receiver_addr=agent,
@@ -263,7 +274,7 @@ class MarketRole(MarketMechanism, Role):
 
         # schedule the next opening too
         next_opening = self.marketconfig.opening_hours.after(market_open)
-        if next_opening:
+        if next_opening <= self.last_market_opening:
             next_opening_ts = datetime2timestamp(next_opening)
             self.context.schedule_timestamp_task(self.opening(), next_opening_ts)
             logger.debug(
@@ -289,12 +300,14 @@ class MarketRole(MarketMechanism, Role):
         Returns:
             bool: True if the registration is valid, False otherwise.
         """
+        if callable(self.marketconfig.eligible_obligations_lambda):
+            requirement = self.marketconfig.eligible_obligations_lambda
+        else:
+            requirement = lambda_functions.get(
+                self.marketconfig.eligible_obligations_lambda, lambda u: True
+            )
 
-        # simple check that 1 MW can be bid at least by  powerplants
-        def requirement(unit: dict):
-            return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 0
-
-        return all([requirement(info) for info in content["information"]])
+        return all([requirement(unit_info) for unit_info in content["information"]])
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
@@ -446,6 +459,10 @@ class MarketRole(MarketMechanism, Role):
             "accepted": accepted,
         }
 
+        performative = (
+            Performatives.accept_proposal if accepted else Performatives.reject_proposal
+        )
+
         self.context.schedule_instant_message(
             create_acl(
                 content=msg,
@@ -453,6 +470,7 @@ class MarketRole(MarketMechanism, Role):
                 sender_addr=self.context.addr,
                 acl_metadata={
                     "in_reply_to": meta.get("reply_with"),
+                    "performative": performative,
                 },
             ),
             receiver_addr=agent_addr,
@@ -509,6 +527,7 @@ class MarketRole(MarketMechanism, Role):
                     sender_addr=self.context.addr,
                     acl_metadata={
                         "in_reply_to": meta.get("reply_with", 1),
+                        "performative": Performatives.refuse,
                     },
                 ),
                 receiver_addr=agent_addr,
@@ -550,6 +569,7 @@ class MarketRole(MarketMechanism, Role):
                 sender_addr=self.context.addr,
                 acl_metadata={
                     "in_reply_to": meta.get("reply_with"),
+                    "performative": Performatives.inform,
                 },
             ),
             receiver_addr=sender_addr(meta),
@@ -603,6 +623,12 @@ class MarketRole(MarketMechanism, Role):
         Args:
             market_products (list[MarketProduct]): The products to be traded.
         """
+        if not self.all_orders:
+            logger.warning(
+                f"[{self.context.current_timestamp}] The order book for market {self.marketconfig.market_id} with products {market_products} is empty. No orders were found."
+            )
+            return
+
         try:
             (accepted_orderbook, rejected_orderbook, market_meta, flows) = self.clear(
                 self.all_orders, market_products
@@ -646,7 +672,11 @@ class MarketRole(MarketMechanism, Role):
         }
 
         for agent in self.registered_agents.keys():
-            meta = {"sender_addr": self.context.addr, "sender_id": self.context.aid}
+            meta = {
+                "sender_addr": self.context.addr,
+                "sender_id": self.context.aid,
+                "performative": Performatives.accept_proposal,
+            }
             closing: ClearingMessage = {
                 "context": "clearing",
                 "market_id": self.marketconfig.market_id,
@@ -663,12 +693,7 @@ class MarketRole(MarketMechanism, Role):
                 receiver_addr=agent,
             )
         # store order book in db agent
-        if not accepted_orderbook:
-            logger.warning(
-                f"{self.context.current_timestamp} Market result {market_products} for market {self.marketconfig.market_id} are empty!"
-            )
-        all_orders = accepted_orderbook + rejected_orderbook
-        await self.store_order_book(all_orders)
+        await self.store_order_book(accepted_orderbook + rejected_orderbook)
 
         for meta in market_meta:
             logger.debug(

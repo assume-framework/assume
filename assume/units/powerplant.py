@@ -23,14 +23,14 @@ class PowerPlant(SupportsMinMax):
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
-        index (pandas.DatetimeIndex): The index of the unit.
+        forecaster (Forecaster): A forecaster used to get key variables such as fuel or electricity prices.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
         efficiency (float, optional): The efficiency of the power plant in converting fuel to electricity. Defaults to 1.0.
         additional_cost (float, optional): Additional costs associated with power generation, in EUR/MWh. Defaults to 0.
         partial_load_eff (bool, optional): Does the efficiency vary at part loads? Defaults to False.
         fuel_type (str, optional): The type of fuel used by the power plant for power generation. Defaults to "others".
-        emission_factor (float, optional): The emission factor associated with the power plant's fuel type (CO2 emissions per unit of energy produced). Defaults to 0.0.
+        emission_factor (float, optional): The emission factor associated with the power plant's fuel type (tons of CO2 emissions per MWh). Defaults to 0.0.
         ramp_up (Union[float, None], optional): The ramp-up rate of the power plant, indicating how quickly it can increase power output. Defaults to None.
         ramp_down (Union[float, None], optional): The ramp-down rate of the power plant, indicating how quickly it can decrease power output. Defaults to None.
         hot_start_cost (float, optional): The cost of a hot start, where the power plant is restarted after a recent shutdown. Defaults to 0.
@@ -247,8 +247,8 @@ class PowerPlant(SupportsMinMax):
         self, start: datetime, end: datetime, product_type="energy"
     ) -> tuple[np.array, np.array]:
         """
-        Calculates the minimum and maximum power output of the unit and returns it.
-
+        Calculates the minimum and maximum power output of the unit and returns it,
+        while considering heat demand and positive capacity reserve power.
         Args:
             start (pandas.Timestamp): The start time of the dispatch.
             end (pandas.Timestamp): The end time of the dispatch.
@@ -273,13 +273,13 @@ class PowerPlant(SupportsMinMax):
         min_power = min_power.clip(min=heat_demand)
 
         available_power = self.forecaster.get_availability(self.id).loc[start:end_excl]
+        max_power = available_power * self.max_power
         # check if available power is larger than max_power and raise an error if so
-        if (available_power > self.max_power).any():
+        if (max_power > self.max_power).any():
             raise ValueError(
                 f"Available power is larger than max_power for unit {self.id} at time {start}."
             )
 
-        max_power = available_power * self.max_power
         # provide reserve for capacity_pos
         max_power = max_power - self.outputs["capacity_pos"].loc[start:end_excl]
         # remove what has already been bid

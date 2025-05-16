@@ -17,6 +17,8 @@ from assume.strategies.naive_strategies import (
     NaiveRedispatchDSMStrategy,
     NaiveRedispatchStrategy,
     NaiveSingleBidStrategy,
+    NaiveExchangeStrategy,
+    ElasticDemandStrategy,
 )
 from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
@@ -28,6 +30,8 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "naive_dam": NaiveProfileStrategy,
     "naive_pos_reserve": NaiveSingleBidStrategy,
     "naive_neg_reserve": NaiveSingleBidStrategy,
+    "naive_exchange": NaiveExchangeStrategy,
+    "elastic_demand": ElasticDemandStrategy,
     "otc_strategy": OTCStrategy,
     "flexable_eom": flexableEOM,
     "flexable_eom_block": flexableEOMBlock,
@@ -46,17 +50,15 @@ bidding_strategies: dict[str, BaseStrategy] = {
 }
 
 try:
-    from assume.strategies.learning_advanced_orders import (
-        RLAdvancedOrderStrategy,
-    )
     from assume.strategies.learning_strategies import (
         RLStrategy,
+        RLStrategySingleBid,
         StorageRLStrategy,
     )
 
     bidding_strategies["pp_learning"] = RLStrategy
+    bidding_strategies["pp_learning_single_bid"] = RLStrategySingleBid
     bidding_strategies["storage_learning"] = StorageRLStrategy
-    bidding_strategies["learning_advanced_orders"] = RLAdvancedOrderStrategy
 
 except ImportError:
     pass

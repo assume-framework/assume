@@ -22,7 +22,7 @@ from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
     calculate_content_size,
-    check_for_tensors,
+    convert_tensors,
     separate_orders,
 )
 
@@ -45,11 +45,11 @@ class WriteOutput(Role):
         end (datetime.datetime): The end datetime of the simulation run.
         db_uri: The uri of the database engine. Defaults to ''.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
-        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to None.
+        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to 48 hours.
+        outputs_buffer_size_mb (int, optional): The maximum storage size (in MB) for storing output data before saving it. Defaults to 300 MB.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
-        perform_evaluation (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
+        evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
         additional_kpis (dict[str, OutputDef], optional): makes it possible to define additional kpis evaluated
-        max_dfs_size_mb (int, optional): The maximum storage size for storing output data before saving it. Defaults to 250 MB.
     """
 
     def __init__(
@@ -59,11 +59,13 @@ class WriteOutput(Role):
         end: datetime,
         db_uri="",
         export_csv_path: str = "",
-        save_frequency_hours: int = None,
+        save_frequency_hours: int = 48,
+        outputs_buffer_size_mb: int = 300,
         learning_mode: bool = False,
-        perform_evaluation: bool = False,
+        evaluation_mode: bool = False,
+        episode: int = None,
+        eval_episode: int = None,
         additional_kpis: dict[str, OutputDef] = {},
-        max_dfs_size_mb: int = 300,
     ):
         super().__init__()
 
@@ -84,25 +86,18 @@ class WriteOutput(Role):
         self.db_uri = db_uri
 
         self.learning_mode = learning_mode
-        self.perform_evaluation = perform_evaluation
+        self.evaluation_mode = evaluation_mode
 
         # get episode number if in learning or evaluation mode
-        self.episode = None
-        if self.learning_mode or self.perform_evaluation:
-            episode = self.simulation_id.split("_")[-1]
-            if episode.isdigit():
-                self.episode = int(episode)
-
-            # check if episode=0 and delete all similar runs
-            if self.episode == 0:
-                self.delete_similar_runs()
+        self.episode = episode
+        self.eval_episode = eval_episode
 
         # construct all timeframe under which hourly values are written to excel and db
         self.start = start
         self.end = end
 
-        self.max_dfs_size = max_dfs_size_mb * 1024 * 1024
-        self.current_dfs_size = 0
+        self.outputs_buffer_size_bytes = outputs_buffer_size_mb * 1024 * 1024
+        self.current_dfs_size_bytes = 0
 
         # initializes dfs for storing and writing asynchronous
         self.write_buffers: dict = defaultdict(list)
@@ -129,6 +124,19 @@ class WriteOutput(Role):
         }
         self.kpi_defs.update(additional_kpis)
 
+        # add rl_meta if in learning or evaluation mode
+        if self.learning_mode or self.evaluation_mode:
+            # Add rl_meta entry to write_buffers
+            self.write_buffers["rl_meta"] = [
+                {
+                    "simulation": self.simulation_id,
+                    "evaluation_mode": self.evaluation_mode,
+                    "learning_mode": self.learning_mode,
+                    "episode": self.episode,
+                    "eval_episode": self.eval_episode,
+                }
+            ]
+
     def delete_db_scenario(self, simulation_id: str):
         """
         Deletes all data from the database for the given simulation id.
@@ -142,8 +150,13 @@ class WriteOutput(Role):
         table_names = inspect(self.db).get_table_names()
         # Iterate through each table
         for table_name in table_names:
-            # ignore postgis table
-            if "spatial_ref_sys" == table_name:
+            # ignore spatial_ref_sys table
+            if table_name == "spatial_ref_sys":
+                continue
+            # only delete rl_params and rl_meta during the first episode of learning
+            if table_name in ["rl_params", "rl_meta"] and not (
+                self.learning_mode and self.episode == 1
+            ):
                 continue
             try:
                 with self.db.begin() as db:
@@ -165,24 +178,6 @@ class WriteOutput(Role):
                     f"could not clear old scenarios from table {table_name} - {e}"
                 )
 
-    def delete_similar_runs(self):
-        """
-        Deletes all similar runs from the database based on the simulation ID. This ensures that we overwrite simulations results when restarting one. Please note that a simulation which you also want to keep need to be assigned anew ID.
-        """
-        query = text("select distinct simulation from rl_params")
-
-        try:
-            with self.db.begin() as db:
-                simulations = db.execute(query).fetchall()
-        except Exception:
-            simulations = []
-        simulations = [s[0] for s in simulations]
-
-        for simulation_id in simulations:
-            # delete all simulation_id which are similar to my simulation_id
-            if simulation_id.startswith(self.simulation_id[:-1]):
-                self.delete_db_scenario(simulation_id)
-
     def setup(self):
         """
         Sets up the WriteOutput instance by subscribing to messages and scheduling recurrent tasks of storing the data.
@@ -200,6 +195,7 @@ class WriteOutput(Role):
             self.db = create_engine(self.db_uri)
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
+
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
                 freq=rr.HOURLY,
@@ -227,14 +223,15 @@ class WriteOutput(Role):
         content_type = content.get("type")
         market_id = content.get("market_id")
 
-        if not content_data:
+        if content_data is None or len(content_data) == 0:
             return
 
         if content_type in [
             "market_meta",
             "market_dispatch",
             "unit_dispatch",
-            "rl_learning_params",
+            "rl_params",
+            "rl_critic_params",
         ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
@@ -250,9 +247,9 @@ class WriteOutput(Role):
             self.write_buffers[content_type].append((content_data, market_id))
 
         # keep track of the memory usage of the data
-        self.current_dfs_size += calculate_content_size(content_data)
-        # if the current size is larger than self.max_dfs_size, store the data
-        if self.current_dfs_size > self.max_dfs_size:
+        self.current_dfs_size_bytes += calculate_content_size(content_data)
+        # if the current size is larger than self.outputs_buffer_size_bytes, store the data
+        if self.current_dfs_size_bytes > self.outputs_buffer_size_bytes:
             logger.debug("storing output data due to size limit")
             self.context.schedule_instant_task(coroutine=self.store_dfs())
 
@@ -266,9 +263,18 @@ class WriteOutput(Role):
 
         df = pd.DataFrame.from_records(rl_params, index="datetime")
         df["simulation"] = self.simulation_id
-        df["learning_mode"] = self.learning_mode
-        df["perform_evaluation"] = self.perform_evaluation
-        df["episode"] = self.episode
+        df["evaluation_mode"] = self.evaluation_mode
+        df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
+        # Add missing rl_critic_params columns in case of initial_exploration
+        required_columns = [
+            "critic_loss",
+            "total_grad_norm",
+            "max_grad_norm",
+            "learning_rate",
+        ]
+        for col in required_columns:
+            if col not in df.columns:
+                df[col] = np.nan
 
         return df
 
@@ -313,7 +319,11 @@ class WriteOutput(Role):
             df["evaluation_frequency"] = df["evaluation_frequency"].astype(str)
 
         # Remove unnecessary columns (use a list to minimize deletion calls)
-        df.drop(columns=["only_hours", "agent_addr"], inplace=True, errors=False)
+        df.drop(
+            columns=["only_hours", "agent_addr", "contractor_addr"],
+            inplace=True,
+            errors="ignore",
+        )
 
         # Add missing columns with defaults
         for col in ["bid_type", "node"]:
@@ -404,21 +414,23 @@ class WriteOutput(Role):
         if isinstance(data, pd.DataFrame):
             df = data
 
-        # if data is dict
+        # if data is list
+        elif isinstance(data, list):
+            df = pd.DataFrame.from_dict(data)
         elif isinstance(data, dict):
             # Convert the dictionary to a DataFrame
             df = pd.DataFrame.from_dict(
                 data, orient="index", columns=["flow"]
             ).reset_index()
             # Split the 'index' column into 'timestamp' and 'line'
-            df[["timestamp", "line"]] = pd.DataFrame(
+            df[["datetime", "line"]] = pd.DataFrame(
                 df["index"].tolist(), index=df.index
             )
             # Rename the columns
             df = df.drop(columns=["index"])
 
             # set timestamp to index
-            df.set_index("timestamp", inplace=True)
+            df.set_index("datetime", inplace=True)
 
         df["simulation"] = self.simulation_id
 
@@ -430,6 +442,22 @@ class WriteOutput(Role):
         """
         if not self.db and not self.export_csv_path:
             return
+
+        # If both rl_critic_params and rl_params exist, merge them before uploading to db
+        if (
+            "rl_params" in self.write_buffers
+            and "rl_critic_params" in self.write_buffers
+        ):
+            df1 = pd.DataFrame(self.write_buffers["rl_params"])
+            df2 = pd.DataFrame(self.write_buffers["rl_critic_params"])
+            merged_df = pd.merge(df1, df2, how="outer")
+            merged_list = merged_df.to_dict("records")
+            self.write_buffers["rl_params"] = merged_list
+            del self.write_buffers["rl_critic_params"]
+        # elif only rl_critic_params exist, rename them to rl_params
+        elif "rl_critic_params" in self.write_buffers:
+            self.write_buffers["rl_params"] = self.write_buffers["rl_critic_params"]
+            del self.write_buffers["rl_critic_params"]
 
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:
@@ -449,8 +477,10 @@ class WriteOutput(Role):
                         df = self.convert_market_dispatch(data_list)
                     case "unit_dispatch":
                         df = self.convert_unit_dispatch(data_list)
-                    case "rl_learning_params":
+                    case "rl_params":
                         df = self.convert_rl_params(data_list)
+                    case "rl_meta":
+                        df = pd.DataFrame(data_list)
                     case "grid_flows":
                         dfs = []
                         for data in data_list:
@@ -473,14 +503,14 @@ class WriteOutput(Role):
                 data_list.clear()
             # concat all dataframes
             # use join='outer' to keep all columns and fill missing values with NaN
-            if df is None:
+            if df is None or df.empty:
                 continue
 
-            df.reset_index()
-            if df.empty:
-                continue
+            # check for tensors and convert them to floats
+            df = df.apply(convert_tensors)
 
-            df = df.apply(check_for_tensors)
+            # check for any float64 columns and convert them to floats
+            df = df.map(lambda x: float(x) if isinstance(x, np.float64) else x)
 
             if self.export_csv_path:
                 data_path = self.export_csv_path / f"{table}.csv"
@@ -501,7 +531,7 @@ class WriteOutput(Role):
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
 
-        self.current_dfs_size = 0
+        self.current_dfs_size_bytes = 0
 
     def store_grid(
         self,
@@ -557,6 +587,7 @@ class WriteOutput(Role):
                 continue
             df["simulation"] = self.simulation_id
             df.reset_index()
+            df.columns = df.columns.str.lower()
 
             try:
                 with self.db.begin() as db:
@@ -671,7 +702,7 @@ class WriteOutput(Role):
             with self.db.begin() as db:
                 df.to_sql("kpis", db, if_exists="append", index=None)
 
-    def get_sum_reward(self):
+    def get_sum_reward(self, episode: int, evaluation_mode=True):
         """
         Retrieves the total reward for each learning unit.
 
@@ -679,14 +710,149 @@ class WriteOutput(Role):
             np.array: The total reward for each learning unit.
         """
         query = text(
-            f"select unit, SUM(reward) FROM rl_params where simulation='{self.simulation_id}' GROUP BY unit"
+            f"SELECT unit, SUM(reward) FROM rl_params "
+            f"WHERE simulation='{self.simulation_id}' "
+            f"AND evaluation_mode={evaluation_mode} "
+            f"AND episode={episode} "
+            f"GROUP BY unit"
         )
-        if self.db is not None:
-            with self.db.begin() as db:
-                rewards_by_unit = db.execute(query).fetchall()
+        if self.db is None:
+            return []
+
+        with self.db.begin() as db:
+            rewards_by_unit = db.execute(query).fetchall()
 
         # convert into a numpy array
         rewards_by_unit = [r[1] for r in rewards_by_unit]
         rewards_by_unit = np.array(rewards_by_unit)
 
         return rewards_by_unit
+
+
+class DatabaseMaintenance:
+    """
+    A utility class for managing simulation data stored in a database.
+
+    This class creates a database engine from a provided URI and offers methods to:
+      1. Retrieve a list of unique simulation IDs across all tables.
+      2. Delete specific simulations from every table.
+      3. Delete all simulations, or all except those specified, across every table.
+
+    It assumes that each table (except for system tables like "spatial_ref_sys") contains a column
+    named 'simulation' that uniquely identifies the simulation.
+
+    Args:
+        db_uri (str): The URI of the database engine used to create a SQLAlchemy engine.
+    """
+
+    def __init__(self, db_uri: str):
+        """
+        Initializes the DatabaseMaintenance instance by creating a database engine.
+
+        Args:
+            db_uri (str): The URI of the database engine.
+        """
+        self.db_uri = db_uri
+        self.db = create_engine(self.db_uri)
+
+    def get_unique_simulation_ids(self) -> list[str]:
+        """
+        Retrieves a list of unique simulation IDs found in all tables.
+
+        This method inspects all tables in the database (skipping system tables such as "spatial_ref_sys")
+        and returns the distinct simulation IDs found in the 'simulation' column.
+
+        Returns:
+            list[str]: A list of unique simulation IDs.
+        """
+        unique_ids = set()
+        inspector = inspect(self.db)
+        table_names = inspector.get_table_names()
+        for table in table_names:
+            if table == "spatial_ref_sys":
+                continue
+            try:
+                query = text(f'SELECT DISTINCT simulation FROM "{table}"')
+                with self.db.begin() as conn:
+                    result = conn.execute(query)
+                    for row in result:
+                        if row[0]:
+                            unique_ids.add(row[0])
+            except Exception as e:
+                logger.error(
+                    "Error retrieving simulation ids from table %s: %s", table, e
+                )
+        return list(unique_ids)
+
+    def delete_simulations(self, simulation_ids: list[str]) -> None:
+        """
+        Deletes specific simulation records from all tables.
+
+        This method deletes rows from every table where the 'simulation' column matches any of the
+        provided simulation IDs. An index is created on the simulation column to optimize the deletion,
+        if one does not already exist.
+
+        Args:
+            simulation_ids (list[str]): A list of simulation IDs to delete.
+        """
+        if not simulation_ids:
+            logger.info("No simulation IDs provided for deletion.")
+            return
+
+        inspector = inspect(self.db)
+        table_names = inspector.get_table_names()
+        for table in table_names:
+            if table == "spatial_ref_sys":
+                continue
+            try:
+                with self.db.begin() as conn:
+                    conn.execute(
+                        text(
+                            f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
+                        )
+                    )
+                    # Safe parameterized query
+                    delete_query = text(
+                        f'DELETE FROM "{table}" WHERE simulation = ANY(:simulations)'
+                    )
+                    result = conn.execute(delete_query, {"simulations": simulation_ids})
+                    logger.debug("Deleted %s rows from %s", result.rowcount, table)
+            except Exception as e:
+                logger.error(
+                    "Could not delete simulation(s) from table %s: %s", table, e
+                )
+
+    def delete_all_simulations(self, exclude: list[str] = None) -> None:
+        """
+        Deletes all simulation records from every table, with an option to exclude specific simulations.
+
+        If an exclusion list is provided, simulations with those IDs will not be deleted. Otherwise,
+        all simulation records are removed from all tables (excluding system tables).
+
+        Args:
+            exclude (list[str], optional): A list of simulation IDs that should NOT be deleted.
+                If None, all simulation records are deleted.
+        """
+        inspector = inspect(self.db)
+        table_names = inspector.get_table_names()
+        for table in table_names:
+            if table == "spatial_ref_sys":
+                continue
+            try:
+                with self.db.begin() as conn:
+                    conn.execute(
+                        text(
+                            f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
+                        )
+                    )
+                    if exclude:
+                        exclude_str = ", ".join([f"'{sim}'" for sim in exclude])
+                        delete_query = text(
+                            f'DELETE FROM "{table}" WHERE simulation NOT IN ({exclude_str})'
+                        )
+                    else:
+                        delete_query = text(f'DELETE FROM "{table}"')
+                    result = conn.execute(delete_query)
+                    logger.debug("Deleted %s rows from %s", result.rowcount, table)
+            except Exception as e:
+                logger.error("Could not delete simulations from table %s: %s", table, e)

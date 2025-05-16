@@ -43,23 +43,26 @@ To install the core package:
 pip install assume-framework
 ```
 
-To install with reinforcement learning capabilities:
+**To install with reinforcement learning capabilities:**
 
 ```bash
 pip install 'assume-framework[learning]'
 ```
 
-We also include network-based market clearing algorithms such as for the re-dispatch or nodal market clearing, which requires the PyPSA library. To install the package with these capabilities, use:
+Please keep in mind, that the above installation method will install pytorch package without CUDA support. If you want to make use of your GPU with CUDA cores, please install pytorch with GPU support separately as described [here](https://pytorch.org/get-started/locally/).
+
+We also include **network-based market clearing algorithms** such as for the re-dispatch or nodal market clearing, which requires the PyPSA library. To install the package with these capabilities, use:
 
 ```bash
 pip install 'assume-framework[network]'
 ```
 
-To install with testing capabilities:
+To install with all capabilities:
 
 ```bash
-pip install 'assume-framework[test]'
+pip install 'assume-framework[all]'
 ```
+
 
 ### Timescale Database and Grafana Dashboards
 
@@ -81,12 +84,16 @@ docker-compose up -d
 ```
 
 This will launch a container for TimescaleDB and Grafana with preconfigured dashboards for analysis. You can access the Grafana dashboards at `http://localhost:3000`.
+### Using TensorBoard to display Learning Metrics
 
-### Using Learning Capabilities
+When running an example with learning capabilities, you can start TensorBoard to observe the learning process. Use the following shell command to start TensorBoard:
+```shell
+tensorboard --logdir tensorboard
+```
 
-If you intend to use the reinforcement learning capabilities of ASSUME and train your agents, make sure to install Torch. Detailed installation instructions can be found [here](https://pytorch.org/get-started/locally/).
+You can then head to `http://localhost:6006/` to view and evaluate the training progress.
 
-
+Please note that TensorBoard should ideally be shut down via `Ctrl + C` every time you want to start a new simulation run in the same folder structure and want to overwrite existing results, as failing to do so may lead to conflicts deleting old logs.
 
 ## Trying out ASSUME and the provided Examples
 
@@ -144,8 +151,20 @@ For additional CLI options, run `assume -h`.
 ## Development
 
 If you're contributing to the development of ASSUME, follow these steps:
+1. Clone the repository and navigate to its directory:
 
-1. Install pre-commit:
+```bash
+git clone https://github.com/assume-framework/assume.git
+cd assume
+```
+
+2. Install the package in editable mode:
+
+```bash
+pip install -e ".[all]"
+```
+
+3. Install pre-commit:
 
 ```bash
 pip install pre-commit
@@ -156,6 +175,12 @@ To run pre-commit checks directly, use:
 
 ```bash
 pre-commit run --all-files
+```
+
+4. Install also testing capabilities:
+
+```bash
+pip install -e ".[testing]"
 ```
 
 ### Release
@@ -197,8 +222,36 @@ The project is developed by a collaborative team of researchers from INATECH at 
 
 ASSUME is funded by the Federal Ministry for Economic Affairs and Climate Action (BMWK). We are grateful for their support in making this project possible.
 
+## Citing ASSUME
+
+If you use **ASSUME** in your research, we would appreciate it if you cite the following paper:
+
+* Nick Harder, Kim K. Miskiw, Manish Khanra, Florian Maurer, Parag Patil, Ramiz Qussous, Christof Weinhardt, Marian Klobasa, Mario Ragwitz, Anke Weidlich,
+[ASSUME: An agent-based simulation framework for exploring electricity market dynamics with reinforcement learning](https://www.sciencedirect.com/science/article/pii/S2352711025001438),  published in [*SoftwareX*](https://www.sciencedirect.com/journal/softwarex), Volume 30, 2025, Article 102176.
+
+Please use the following BibTeX to cite our work:
+
+```bibtex
+@article{ASSUME,
+  title = {{ASSUME: An agent-based simulation framework for exploring electricity market dynamics with reinforcement learning}},
+  author = {Harder, Nick and Miskiw, Kim K and Khanra, Manish and Maurer, Florian and Patil, Parag and Qussous, Ramiz and Weinhardt, Christof and Klobasa, Marian and Ragwitz, Mario and Weidlich, Anke},
+  journal = {SoftwareX},
+  volume = {30},
+  pages = {102176},
+  year = {2025},
+  issn = {2352-7110},
+  doi = {10.1016/j.softx.2025.102176},
+  url = {https://www.sciencedirect.com/science/article/pii/S2352711025001438},
+  keywords = {Electricity markets, Python, Reinforcement learning, Agent-based modeling}
+}
+```
+
+If you want to cite a specific version of ASSUME, all releases are archived on Zenodo with version-specific DOIs:
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15065164.svg)](https://doi.org/10.5281/zenodo.15065164)
+
 ## License
 
-Copyright 2022-2024 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
+Copyright 2022-2025 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).
 
 ASSUME is licensed under the [GNU Affero General Public License v3.0](./LICENSES/AGPL-3.0-or-later.txt). This license is a strong copyleft license that requires that any derivative work be licensed under the same terms as the original work. It is approved by the [Open Source Initiative](https://opensource.org/licenses/AGPL-3.0).
