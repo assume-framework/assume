@@ -18,7 +18,62 @@ from assume.reinforcement_learning.learning_utils import NormalActionNoise, enco
 logger = logging.getLogger(__name__)
 
 
-class AbstractLearningStrategy(LearningStrategy):
+class BaseLearningStrategy(LearningStrategy):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.unit_id = kwargs["unit_id"]
+
+        # defines bounds of actions space
+        self.max_bid_price = kwargs.get("max_bid_price", 100)
+
+        # tells us whether we are training the agents or just executing per-learning strategies
+        self.learning_mode = kwargs.get("learning_mode", False)
+        self.evaluation_mode = kwargs.get("evaluation_mode", False)
+
+        # based on learning config
+        self.algorithm = kwargs.get("algorithm", "matd3")
+        self.actor_architecture = kwargs.get("actor_architecture", "mlp")
+
+        if self.actor_architecture in actor_architecture_aliases.keys():
+            self.actor_architecture_class = actor_architecture_aliases[
+                self.actor_architecture
+            ]
+        else:
+            raise ValueError(
+                f"Policy '{self.actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
+            )
+
+        # sets the device of the actor network
+        device = kwargs.get("device", "cpu")
+        self.device = th.device(device if th.cuda.is_available() else "cpu")
+        if not self.learning_mode:
+            self.device = th.device("cpu")
+
+        # future: add option to choose between float16 and float32
+        # float_type = kwargs.get("float_type", "float32")
+        self.float_type = th.float
+
+        if self.learning_mode or self.evaluation_mode:
+            self.collect_initial_experience_mode = bool(
+                kwargs.get("episodes_collecting_initial_experience", True)
+            )
+
+            self.action_noise = NormalActionNoise(
+                mu=0.0,
+                sigma=kwargs.get("noise_sigma", 0.1),
+                action_dimension=self.act_dim,
+                scale=kwargs.get("noise_scale", 1.0),
+                dt=kwargs.get("noise_dt", 1.0),
+            )
+
+        elif Path(kwargs["trained_policies_load_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
+        else:
+            raise FileNotFoundError(
+                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+            )
+
     def load_actor_params(self, load_path):
         """
         Load actor parameters.
@@ -38,18 +93,7 @@ class AbstractLearningStrategy(LearningStrategy):
             num_timeseries_obs_dim=self.num_timeseries_obs_dim,
         ).to(self.device)
         self.actor.load_state_dict(params["actor"])
-
-        if self.learning_mode:
-            self.actor_target = self.actor_architecture_class(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
-                float_type=self.float_type,
-                unique_obs_dim=self.unique_obs_dim,
-                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-            ).to(self.device)
-            self.actor_target.load_state_dict(params["actor_target"])
-            self.actor_target.eval()
-            self.actor.optimizer.load_state_dict(params["actor_optimizer"])
+        self.actor.eval()  # set the actor to evaluation mode
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
@@ -75,7 +119,7 @@ class AbstractLearningStrategy(LearningStrategy):
         )
 
 
-class RLStrategy(AbstractLearningStrategy):
+class RLStrategy(BaseLearningStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -159,38 +203,6 @@ class RLStrategy(AbstractLearningStrategy):
             **kwargs,
         )
 
-        self.unit_id = kwargs["unit_id"]
-
-        # defines bounds of actions space
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
-
-        # tells us whether we are training the agents or just executing per-learning strategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.evaluation_mode = kwargs.get("evaluation_mode", False)
-
-        # based on learning config
-        self.algorithm = kwargs.get("algorithm", "matd3")
-        actor_architecture = kwargs.get("actor_architecture", "mlp")
-
-        if actor_architecture in actor_architecture_aliases.keys():
-            self.actor_architecture_class = actor_architecture_aliases[
-                actor_architecture
-            ]
-        else:
-            raise ValueError(
-                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
-            )
-
-        # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
-
-        # future: add option to choose between float16 and float32
-        # float_type = kwargs.get("float_type", "float32")
-        self.float_type = th.float
-
         # 'foresight' represents the number of time steps into the future that we will consider
         # when constructing the observations. This value is fixed for each strategy, as the
         # neural network architecture is predefined, and the size of the observations must remain consistent.
@@ -198,28 +210,11 @@ class RLStrategy(AbstractLearningStrategy):
         # as the observation dimension depends on the foresight value.
         self.foresight = 12
 
+        # define standard deviation for the initial exploration noise
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
+
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
-
-        if self.learning_mode or self.evaluation_mode:
-            self.collect_initial_experience_mode = bool(
-                kwargs.get("episodes_collecting_initial_experience", True)
-            )
-
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
-                action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
-            )
-
-        elif Path(kwargs["trained_policies_load_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
-        else:
-            raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
 
     def calculate_bids(
         self,
@@ -355,7 +350,7 @@ class RLStrategy(AbstractLearningStrategy):
                 # define current action as solely noise
                 noise = th.normal(
                     mean=0.0,
-                    std=0.2,
+                    std=self.exploration_noise_std,
                     size=(self.act_dim,),
                     dtype=self.float_type,
                     device=self.device,
@@ -645,7 +640,7 @@ class RLStrategySingleBid(RLStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(obs_dim=26, act_dim=1, unique_obs_dim=2, *args, **kwargs)
 
-        # we select 24 to be in line with the storage strategies
+        # we select 6 to be in line with the storage strategies
         self.foresight = 6
 
     def calculate_bids(
@@ -732,7 +727,8 @@ class RLStrategySingleBid(RLStrategy):
         return bids
 
 
-class StorageRLStrategy(AbstractLearningStrategy):
+
+class StorageRLStrategy(BaseLearningStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -798,38 +794,16 @@ class StorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=26, act_dim=1, unique_obs_dim=2, *args, **kwargs)
-
-        self.unit_id = kwargs["unit_id"]
-        # defines bounds of actions space
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
-
-        # tells us whether we are training the agents or just executing per-learnind strategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.evaluation_mode = kwargs.get("evaluation_mode", False)
-
-        # based on learning config
-        self.algorithm = kwargs.get("algorithm", "matd3")
-        actor_architecture = kwargs.get("actor_architecture", "mlp")
-
-        if actor_architecture in actor_architecture_aliases.keys():
-            self.actor_architecture_class = actor_architecture_aliases[
-                actor_architecture
-            ]
-        else:
-            raise ValueError(
-                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
-            )
-
-        # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
-
-        # future: add option to choose between float16 and float32
-        # float_type = kwargs.get("float_type", "float32")
-        self.float_type = th.float
+        obd_dim = kwargs.pop("obs_dim", 26)
+        act_dim = kwargs.pop("act_dim", 1)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            obs_dim=obd_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         # 'foresight' represents the number of time steps into the future that we will consider
         # when constructing the observations. This value is fixed for each strategy, as the
@@ -838,28 +812,11 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # as the observation dimension depends on the foresight value.
         self.foresight = 6
 
+        # define standard deviation for the initial exploration noise
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
+
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
-
-        if self.learning_mode or self.evaluation_mode:
-            self.collect_initial_experience_mode = bool(
-                kwargs.get("episodes_collecting_initial_experience", True)
-            )
-
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
-                action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
-            )
-
-        elif Path(kwargs["trained_policies_load_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
-        else:
-            raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
 
     def calculate_bids(
         self,
@@ -985,7 +942,7 @@ class StorageRLStrategy(AbstractLearningStrategy):
                 # define current action as solely noise
                 noise = th.normal(
                     mean=0.0,
-                    std=0.4,
+                    std=self.exploration_noise_std,
                     size=(self.act_dim,),
                     dtype=self.float_type,
                     device=self.device,

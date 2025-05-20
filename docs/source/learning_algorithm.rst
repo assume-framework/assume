@@ -53,6 +53,20 @@ The following table shows the options that can be adjusted and gives a short exp
   early_stopping_threshold                The value by which the average reward needs to improve to avoid early stopping.
  ======================================== ==========================================================================================================
 
+How to use continue learning
+----------------------------
+
+The continue learning function allows you to load pre-trained strategies (actor and critic networks) and continue the learning process with these networks.
+
+To use this feature, you need to set the ``continue_learning`` config item to ``True`` and specify the path where the pre-trained strategies are stored in the ``trained_policies_load_path`` config item. The path you specify here is relative to the folder in which the rest of your input data is stored.
+
+The learning process will then start from these pre-trained networks instead of initializing new ones. As described in :ref:`learning_implementation`, the critics are used to evaluate the actions of the actor based on global information. The dimensions of this global observation depend on the number of agents in the simulation.
+
+In other words, the input layer of the critics will vary depending on the number of agents. To enable the use of continue learning between simulations with varying agent sizes, a mapping is implemented that ensures the loaded critics are adapted to match the new number of agents.
+
+This process will fail, when the number of hidden layers differs between the loaded critic and the new critic. In this case, you will need to retrain the networks from scratch. Further, different chosen neural network arhcitectures for the critic (or actor) between the loaded and new networks will also lead to a failure of the continue learning process.
+
+
 The Algorithms
 ==============
 

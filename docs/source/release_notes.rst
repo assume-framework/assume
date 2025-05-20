@@ -12,8 +12,30 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
 
-0.5.2 - (21th March 2025)
+- **Add single bid RL strategy:** Added a new reinforcement learning strategy that allows agents to submit bids based on one action value only that determines the price at which the full capacity is offered.
+
+
+**Improvements:**
+
+- **Flexible Agent Count in `continue_learning` Mode:** You can now change the number of learning agents between training runs while reusing previously trained critics.
+  This enables flexible workflows like training power plants first and adding storage units later. When the core architectures match, critic weights are partially transferred when possible, ensuring smoother transitions.
+
+**New Features:**
+
+- **Bidding Strategy for Elastic Demand**: The new `ElasticDemandStrategy` enables demand units to submit multiple bids that approximate a marginal utility curve, using
+  either linear or isoelastic price elasticity models. Unlike other strategies, it does **not** rely on predefined volumes—bids are dynamically generated based on the
+  unit’s elasticity configuration. To use this strategy, set `bidding_strategy` to `"elastic_demand"` in the `demand_units.csv` file and specify the following
+  parameters: `elasticity` (must be negative), `elasticity_model` (`"linear"` or `"isoelastic"`), `num_bids`, and `price` (which acts as `max_price`). The `elasticity_model`
+  defines the shape of the demand curve, with `"linear"` producing a straight-line decrease and `"isoelastic"` generating a hyperbolic curve. `num_bids` determines how many
+  bid steps are submitted, allowing control over the granularity of demand flexibility.
+
+**Bug Fixes:**
+
+- **Last policy loading**: Fixed a bug where the last policy loaded after a training run was not the best policy, but rather the last policy.
+
+0.5.2 - (21st March 2025)
 =========================
 
 **New Features:**
