@@ -131,6 +131,10 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
 
     model.shut_down = pyo.Constraint(model.gens, model.time, rule=shut_down_rule)
 
+    # ---------------------------------------------------------------------------
+    # solve
+    # Comment: Because duals (shadow prices) are not well-defined for mixed-integer problems — so we solve the second time as a pure LP, after fixing all binaries.
+    
     instance = model.create_instance()
 
     solver = SolverFactory("gurobi")
@@ -143,8 +147,12 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
         for t in demand_df.index:
             instance_fixed_u.u[gen, t].fix(instance.u[gen, t].value)
 
+    
     solver.solve(instance_fixed_u, tee=False)
 
+    # ---------------------------------------------------------------------------
+    # extract results
+    
     # get price as dual variable of balance constraint
     prices = pd.DataFrame(columns=["mcp"], index=demand_df.index, data=0.0)
     for t in demand_df.index:
@@ -188,22 +196,3 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
 
     return main_df, supp_df
 
-
-# %%
-if __name__ == "__main__":
-    start = pd.to_datetime("2019-03-01 00:00")
-    end = pd.to_datetime("2019-03-02 00:00")
-
-    # generators
-    gens_df = pd.read_csv("inputs/gens.csv", index_col=0)
-
-    # 24 hours of demand first increasing and then decreasing
-    demand_df = pd.read_csv("inputs/demand.csv", index_col=0)
-    demand_df.index = pd.to_datetime(demand_df.index)
-    demand_df = demand_df.loc[start:end]
-
-    # reset index to start at 0
-    demand_df = demand_df.reset_index(drop=True)
-
-    k_values_df = pd.read_csv("outputs/k_values_df.csv", index_col=0)
-    k_values_df.columns = k_values_df.columns.astype(int)

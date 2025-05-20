@@ -17,7 +17,7 @@ def find_optimal_dispatch(
     big_w=10000,
     time_limit=60,
     print_results=False,
-    K=5,
+    K=5, # number of discrete binary steps considered in the linearisation
     big_M=10e6,
 ):
     model = pyo.ConcreteModel()
@@ -29,7 +29,7 @@ def find_optimal_dispatch(
     # primary variables
     model.g = pyo.Var(
         model.gens, model.time, within=pyo.NonNegativeReals
-    )  # Power output of producer 𝑖 at period 𝑡 (MW)
+    )  # Power output of producer 𝑖 at period 𝑡 (MW) — lower-level primal variable
     model.d = pyo.Var(
         model.time, within=pyo.NonNegativeReals
     )  # satisfied demand at period 𝑡 (MW)
@@ -41,10 +41,10 @@ def find_optimal_dispatch(
     )  # Shut-down cost of producer 𝑖 at period 𝑡 (€)
     model.k = pyo.Var(
         model.time, bounds=(1, k_max), within=pyo.NonNegativeReals
-    )  # Bidding decision at timestep t as a multiplier of the marginal costs
+    )  # Bidding decision at timestep t as a multiplier of the marginal costs — upper-level decision
     model.lambda_ = pyo.Var(
         model.time, within=pyo.Reals, bounds=(-500, 200)
-    )  # TODO: Check what this is
+    )  # Market clearing price — lower-level dual variable
     model.u = pyo.Var(
         model.gens, model.time, within=pyo.Binary
     )  # Binary UC status of producer 𝑖 at period 𝑡 (𝑢 = 1 if it is on, 𝑢 = 0 if it is off)
@@ -75,6 +75,7 @@ def find_optimal_dispatch(
     model.g_binary = pyo.Var(model.time, range(K), within=pyo.Binary)
     model.z_lambda = pyo.Var(model.time, range(K), within=pyo.NonNegativeReals)
     model.z_k = pyo.Var(model.time, range(K), within=pyo.NonNegativeReals)
+    model.mu_max_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
 
     model.M = pyo.Param(initialize=max(gens_df["mc"]) * k_max)
     delta = [gens_df.at[gen, "g_max"] / (pow(2, K) - 1) for gen in gens_df.index]
@@ -133,6 +134,8 @@ def find_optimal_dispatch(
     # ---------------------------------------------------------------------------
     # objective rules
     def primary_objective_rule(model):
+        # This is the strategic producer’s revenue based on the market clearing price (approximated via z_lambda) and actual production, minus their marginal cost and startup/shutdown costs.
+        # (7a) (1st line)
         return sum(
             delta[opt_gen] * sum(pow(2, n) * model.z_lambda[t, n] for n in range(K))
             - gens_df.at[opt_gen, "mc"] * model.g[opt_gen, t]
@@ -142,6 +145,8 @@ def find_optimal_dispatch(
         )
 
     def duality_gap_part_1_rule(model):
+        # (7a) (2nd line)
+        # Lower-level primal cost, basically system costs
         expr = sum(
             (
                 (
@@ -165,6 +170,8 @@ def find_optimal_dispatch(
         return expr
 
     def duality_gap_part_2_rule(model):
+        # (7a) (3rd line)
+        # objective value of the dual problem, using the current values of the dual variables
         expr = -sum(model.nu_max[t] * demand_df.at[t, "volume"] for t in model.time)
 
         expr -= sum(
@@ -198,6 +205,8 @@ def find_optimal_dispatch(
         return expr
 
     def final_objective_rule(model):
+        # (7a) overall
+        # summing up the primal objective and the duality gap (difference between the primal cost and dual value, which should be zero at optimality)
         return primary_objective_rule(model) - big_w * (
             duality_gap_part_1_rule(model) - duality_gap_part_2_rule(model)
         )
@@ -208,24 +217,28 @@ def find_optimal_dispatch(
     # constraints
     # energy balance constraint
     def balance_rule(model, t):
+        # (7d)
         return model.d[t] - sum(model.g[i, t] for i in model.gens) == 0
 
     model.balance = pyo.Constraint(model.time, rule=balance_rule)
 
     # max generation constraint
     def g_max_rule(model, i, t):
+        # (7e)
         return model.g[i, t] <= gens_df.at[i, "g_max"] * model.u[i, t]
 
     model.g_max = pyo.Constraint(model.gens, model.time, rule=g_max_rule)
 
     # max demand constraint
     def d_max_rule(model, t):
+        # (7f)
         return model.d[t] <= demand_df.at[t, "volume"]
 
     model.d_max = pyo.Constraint(model.time, rule=d_max_rule)
 
     # max ramp up constraint
     def ru_max_rule(model, i, t):
+        # 	(7h)
         if t == 0:
             return model.g[i, t] - gens_df.at[i, "g_0"] <= gens_df.at[i, "r_up"]
         else:
@@ -235,6 +248,7 @@ def find_optimal_dispatch(
 
     # max ramp down constraint
     def rd_max_rule(model, i, t):
+        # (7i)
         if t == 0:
             return gens_df.at[i, "g_0"] - model.g[i, t] <= gens_df.at[i, "r_down"]
         else:
@@ -244,6 +258,7 @@ def find_optimal_dispatch(
 
     # start up cost constraint
     def start_up_cost_rule(model, i, t):
+        # (7m)
         if t == 0:
             return (
                 model.c_up[i, t]
@@ -261,6 +276,7 @@ def find_optimal_dispatch(
 
     # shut down cost constraint
     def shut_down_cost_rule(model, i, t):
+        # (7n)
         if t == 0:
             return (
                 model.c_down[i, t]
@@ -278,6 +294,7 @@ def find_optimal_dispatch(
 
     # dual constraints
     def gen_dual_rule(model, i, t):
+        # (7aa) – Stationarity with respect to generation variable 𝑔𝑖,𝑡
         # Conditional parts based on `i` and `t`
         k_term = model.k[t] if i == opt_gen else k_values_df.at[t, i]
         pi_u_next_term = 0 if t == model.time.at(-1) else model.pi_u[i, t + 1]
@@ -299,6 +316,7 @@ def find_optimal_dispatch(
     model.gen_dual = pyo.Constraint(model.gens, model.time, rule=gen_dual_rule)
 
     def status_dual_rule(model, i, t):
+        # (7ab) – Stationarity w.r.t. the binary unit commitment variable
         if t != model.time.at(-1):
             return (
                 -model.mu_max[i, t] * gens_df.at[i, "g_max"]
@@ -321,6 +339,7 @@ def find_optimal_dispatch(
     model.status_dual = pyo.Constraint(model.gens, model.time, rule=status_dual_rule)
 
     def demand_dual_rule(model, t):
+        # (7ac) – Stationarity w.r.t. demand variable 𝑑𝑡
         return -demand_df.at[t, "price"] + model.lambda_[t] + model.nu_max[t] >= 0
 
     model.demand_dual = pyo.Constraint(model.time, rule=demand_dual_rule)
@@ -328,6 +347,7 @@ def find_optimal_dispatch(
     # KKT conditions
     # Stationarity conditions
     def kkt_gen_rule(model, i, t):
+        #(7ae) – Stationarity (relaxed KKT) w.r.t. the generation variable 𝑔𝑖,𝑡
         # Conditional parts based on `i` and `t`
         k_term = model.k[t] if i == opt_gen else k_values_df.at[t, i]
         pi_u_hat_next_term = 0 if t == model.time.at(-1) else model.pi_u_hat[i, t + 1]
@@ -349,6 +369,7 @@ def find_optimal_dispatch(
     model.kkt_gen = pyo.Constraint(model.gens, model.time, rule=kkt_gen_rule)
 
     def kkt_demand_rule(model, t):
+        # (7af) – Stationarity (relaxed KKT) w.r.t. the demand variable 𝑑𝑡
         return (
             -demand_df.at[t, "price"]
             + model.lambda_hat[t]
@@ -360,8 +381,8 @@ def find_optimal_dispatch(
     model.kkt_demand = pyo.Constraint(model.time, rule=kkt_demand_rule)
 
     # Complementary slackness conditions
-    model.mu_max_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
-
+    # for generation and demand upper bounds
+    # (7t)–(7y), Relaxed or reformulated versions of (7ad)–(7ah), MILP-friendly using binaries + big-M
     def mu_max_hat_binary_rule_1(model, i, t):
         return (model.g[i, t] - gens_df.at[i, "g_max"] * model.u[i, t]) <= max(
             gens_df["g_max"]
@@ -425,7 +446,10 @@ def find_optimal_dispatch(
     model.nu_min_hat_binary_constr_3 = pyo.Constraint(
         model.time, rule=nu_min_hat_binary_rule_3
     )
-
+    
+    # Complementary slackness conditions
+    # for ramp-up and ramp-down residuals
+    # (??)–(??), Relaxed or reformulated versions of (7ai)–(7aj), MILP-friendly using binaries + big-M
     model.pi_u_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
 
     def pi_u_hat_binary_rule_1(model, i, t):
@@ -496,6 +520,7 @@ def find_optimal_dispatch(
         model.gens, model.time, rule=pi_d_hat_binary_rule_3
     )
 
+    # ---------------------------------------------------------------------------
     # solve
     instance = model.create_instance()
 
@@ -513,6 +538,8 @@ def find_optimal_dispatch(
     if results.solver.termination_condition == pyo.TerminationCondition.maxTimeLimit:
         print("Solver did not converge to an optimal solution")
 
+    # ---------------------------------------------------------------------------
+    # extract results
     generation_df = pd.DataFrame(
         index=demand_df.index, columns=[f"gen_{gen}" for gen in gens_df.index]
     )

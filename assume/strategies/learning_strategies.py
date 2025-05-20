@@ -493,9 +493,6 @@ class RLStrategy(BaseLearningStrategy):
 
         # marginal cost
         scaled_marginal_cost = current_costs / self.max_bid_price
-        
-        # get encoded time features
-        time_features = encode_time_features(start)
 
         # concat all obsverations into one array
         observation = np.concatenate(
@@ -504,7 +501,6 @@ class RLStrategy(BaseLearningStrategy):
                 scaled_price_forecast,
                 actual_price_history,
                 np.array([scaled_total_dispatch, scaled_marginal_cost]),
-                time_features,
             ]
         )
 
@@ -642,6 +638,137 @@ class RLStrategySingleBid(RLStrategy):
 
         # we select 6 to be in line with the storage strategies
         self.foresight = 6
+        
+    def create_observation(
+        self,
+        unit: SupportsMinMax,
+        market_id: str,
+        start: datetime,
+    ):
+        """
+        Constructs a scaled observation tensor based on the unit's forecast data and internal state.
+
+        Args
+        ----
+        unit : SupportsMinMax
+            The unit providing forecast and internal state data.
+        market_id : str
+            Identifier for the specific market.
+        start : datetime
+            Start time for the observation period.
+        end : datetime
+            End time for the observation period.
+
+        Returns
+        -------
+        torch.Tensor
+            Observation tensor with data on forecasted residual load, price, total capacity, and marginal cost.
+
+        Notes
+        -----
+        Observations are constructed from forecasted residual load and price over the foresight period,
+        scaled by maximum demand and bid price. The last two values in the observation vector represent
+        the total capacity and marginal cost, scaled by maximum power and bid price, respectively.
+        """
+
+        # check if scaled observations are already available and if not prepare them
+        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
+            self, "scaled_prices_obs"
+        ):
+            self.prepare_observations(unit, market_id)
+
+        # get the forecast length depending on the tme unit considered in the modelled unit
+        forecast_len = (self.foresight - 1) * unit.index.freq
+
+        # =============================================================================
+        # 1.1 Get the Observations, which are the basis of the action decision
+        # =============================================================================
+
+        # checks if we are at end of simulation horizon, since we need to change the forecast then
+        # for residual load and price forecast and scale them
+        if start + forecast_len > self.scaled_res_load_obs.index[-1]:
+            scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
+
+            scaled_res_load_forecast = np.concatenate(
+                [
+                    scaled_res_load_forecast,
+                    self.scaled_res_load_obs.iloc[
+                        : self.foresight - len(scaled_res_load_forecast)
+                    ],
+                ]
+            )
+
+        else:
+            scaled_res_load_forecast = self.scaled_res_load_obs.loc[
+                start : start + forecast_len
+            ]
+
+        if start + forecast_len > self.scaled_prices_obs.index[-1]:
+            scaled_price_forecast = self.scaled_prices_obs.loc[start:]
+            scaled_price_forecast = np.concatenate(
+                [
+                    scaled_price_forecast,
+                    self.scaled_prices_obs.iloc[
+                        : self.foresight - len(scaled_price_forecast)
+                    ],
+                ]
+            )
+
+        else:
+            scaled_price_forecast = self.scaled_prices_obs.loc[
+                start : start + forecast_len
+            ]
+
+        # collect historical past market clearing prices
+        actual_price = unit.outputs["energy_accepted_price"]
+        if start - forecast_len < actual_price.index[0]:
+            # Not enough historical data, use available actual prices and prepend forecasted values for missing past data
+            actual_price_history = actual_price.loc[:start] / self.max_bid_price
+            missing_values = self.foresight - len(actual_price_history)
+
+            if missing_values > 0:
+                forecasted_prices = self.scaled_prices_obs.iloc[:missing_values]
+                actual_price_history = np.concatenate(
+                    [forecasted_prices, actual_price_history]
+                )
+
+        else:
+            # Sufficient historical data exists, collect past actual prices
+            actual_price_history = (
+                actual_price.loc[start - forecast_len : start] / self.max_bid_price
+            )
+
+        # get last accepted bid volume and the current marginal costs of the unit
+        current_volume = unit.get_output_before(start)
+        current_costs = unit.calculate_marginal_cost(start, current_volume)
+
+        # scale unit outputs
+        # if unit is not running, total dispatch is 0
+        scaled_total_dispatch = current_volume / unit.max_power
+
+        # marginal cost
+        scaled_marginal_cost = current_costs / self.max_bid_price
+        
+        # get encoded time features
+        time_features = encode_time_features(start)
+
+        # concat all obsverations into one array
+        observation = np.concatenate(
+            [
+                scaled_res_load_forecast,
+                scaled_price_forecast,
+                actual_price_history,
+                np.array([scaled_total_dispatch, scaled_marginal_cost]),
+                time_features,
+            ]
+        )
+
+        # transfer array to GPU for NN processing
+        observation = th.as_tensor(
+            observation, dtype=self.float_type, device=self.device
+        ).flatten()
+
+        return observation
 
     def calculate_bids(
         self,

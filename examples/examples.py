@@ -119,10 +119,9 @@ if __name__ == "__main__":
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
     data_format = "timescale"  # "local_db" or "timescale"
-    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "case_study_2013"
+    example = "small_learning_2"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
@@ -140,25 +139,6 @@ if __name__ == "__main__":
         study_case=available_examples[example]["study_case"],
     )
 
-    # to add custom bidding strategies, you need to import them
-    # and add them to the world as follows:
-    # from custom_bidding_strategy import CustomBiddingStrategy
-    # world.bidding_strategies["custom_bidding_strategy"] = CustomBiddingStrategy
-
-    # to add a custom unit type, you need to import it
-    # and add it to the world as follows:
-    # from custom_unit import CustomUnit
-    # world.unit_types["custom_unit"] = CustomUnit
-
-    # next you need to load and add the custom units to the scenario
-    # from assume import load_custom_units
-    # load_custom_units(
-    #     world,
-    #     inputs_path="examples/inputs",
-    #     scenario=availabe_examples[example]["scenario"],
-    #     file_name="custom_units",
-    #     unit_type="custom_unit",
-    # )
 
     if world.learning_config.get("learning_mode", False):
         # run learning if learning mode is enabled
