@@ -1,7 +1,2 @@
-name,EE_region,technology,bidding_EOM,max_power,min_power,unit_operator,fuel_type,additional_cost,efficiency,start_up_cost,shut_down_cost,emission_factor
-demand_0,0,inflex_demand,naive_eom,100000,0,eom_0,,,,,,
-demand_1,1,inflex_demand,naive_eom,100000,0,eom_1,,,,,,
-demand_2,2,inflex_demand,naive_eom,100000,0,eom_2,,,,,,
-demand_3,3,inflex_demand,naive_eom,100000,0,eom_3,,,,,,
-demand_4,4,inflex_demand,naive_eom,100000,0,eom_4,,,,,,
-
+name,technology,bidding_EOM,max_power,min_power,unit_operator,max_price,elasticity,elasticity_model,num_bids
+demand,demand,elastic_demand,83102,0,eom_operator,3000.0,-0.0361,isoelastic,10
