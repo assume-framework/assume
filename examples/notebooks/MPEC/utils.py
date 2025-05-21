@@ -254,7 +254,7 @@ def retrieve_best_episode_actions(inputs_dir, scenario, study_case, db):
     """
     Retrieve the actions of the best episode based on the average reward of each episode.
     """
-    simulation = f"{scenario}_{study_case}_eval"
+    simulation = f"{scenario}_{study_case}"
     # Get the number of validation episodes
     no_of_val_episodes = get_no_of_val_episodes(inputs_dir, scenario, study_case)
     # Get the average reward for each episode in order to determine the best episode.
@@ -262,7 +262,7 @@ def retrieve_best_episode_actions(inputs_dir, scenario, study_case, db):
         columns=["avg_reward"], index=range(1, no_of_val_episodes + 1)
     )
     for episode in range(1, no_of_val_episodes + 1):
-        query = f"SELECT AVG(reward) as avg_reward FROM rl_params where simulation = '{simulation}_{episode}'"
+        query = f"SELECT AVG(reward) as avg_reward FROM rl_params where simulation = '{simulation}' and episode ='{episode}' and evaluation_mode = true"
         reward_df.at[episode, "avg_reward"] = pd.read_sql(query, db).values[0][0]
 
     # Use the episode with the best reward to get the respective actions
