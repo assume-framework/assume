@@ -34,6 +34,7 @@ Upcoming Release
 **Bug Fixes:**
 
 - **Last policy loading**: Fixed a bug where the last policy loaded after a training run was not the best policy, but rather the last policy.
+- **Grafana Dashboard adjustments**: Fixed a bug where the Grafana dashboard was wrongly summing values due to time bucketing. The dashboard now consistently displays the avergae per time bucket which does underestimate variance in the data, but a note was added to explain this.
 
 0.5.2 - (21st March 2025)
 =========================
