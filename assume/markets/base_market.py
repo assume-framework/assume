@@ -653,7 +653,6 @@ class MarketRole(MarketMechanism, Role):
                     order["accepted_volume"] = 0.0
                     order["accepted_price"] = 0.0
 
-
         self.open_auctions - set(market_products)
 
         accepted_orderbook = sorted(
