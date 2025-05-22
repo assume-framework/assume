@@ -42,7 +42,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.\n\n*IMPORTANT NOTE:* Grafan uses automated aggregation of data into time buckets with large time horizons displayed, e.g. time horizon > 1 month. It will display the avergae of the selected metric in the time buckt which underestimates the variance of the data and smoothes it. ",
+        "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.\n\n*IMPORTANT NOTE:* Grafana uses automated aggregation of data into time buckets with large time horizons displayed, e.g. time horizon > 1 month. It will display the average of the selected metric in the time bucket which underestimates the variance of the data and smoothes it. ",
         "mode": "markdown"
       },
       "pluginVersion": "11.0.1",
