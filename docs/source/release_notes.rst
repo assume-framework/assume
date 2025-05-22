@@ -35,7 +35,7 @@ Upcoming Release
 
 - **Last policy loading**: Fixed a bug where the last policy loaded after a training run was not the best policy, but rather the last policy.
 
-- **Grafana Dashboard adjustments**: Fixed a bug where the Grafana dashboard was wrongly summing values due to time bucketing. The dashboard now consistently displays the avergae per time bucket which does underestimate variance in the data, but a note was added to explain this.
+- **Grafana Dashboard adjustments**: Fixed a bug where the Grafana dashboard was wrongly summing values due to time bucketing. The dashboard now consistently displays the average per time bucket which does underestimate variance in the data, but a note was added to explain this.
 
 - **Changed market price in rejected orders**: Fixed a bug where the wrong market price was written in the rejected orders, namely any auction with more than 1 product had the price of the last product written as the market price instead of the price of the respective hour.
 This was, however, only a mistake for the rejected orders.
