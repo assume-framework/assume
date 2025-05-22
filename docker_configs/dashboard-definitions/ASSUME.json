@@ -24,17 +24,13 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 6,
   "links": [],
   "panels": [
     {
       "description": "",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
       "gridPos": {
-        "h": 4,
+        "h": 5,
         "w": 24,
         "x": 0,
         "y": 0
@@ -46,10 +42,10 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.",
+        "content": "# Welcome to our ASSUME demo\n\nThis is the Grafana Dashboard which makes interacting with the simulation data very easy.\n\n*IMPORTANT NOTE:* Grafan uses automated aggregation of data into time buckets with large time horizons displayed, e.g. time horizon > 1 month. It will display the avergae of the selected metric in the time buckt which underestimates the variance of the data and smoothes it. ",
         "mode": "markdown"
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.0.1",
       "title": "Overview Dashboard",
       "type": "text"
     },
@@ -59,7 +55,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 4
+        "y": 5
       },
       "id": 30,
       "panels": [],
@@ -67,15 +63,11 @@
       "type": "row"
     },
     {
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
       "gridPos": {
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 6
       },
       "id": 17,
       "options": {
@@ -87,8 +79,7 @@
         "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
         "mode": "markdown"
       },
-      "pluginVersion": "11.4.0",
-      "title": "",
+      "pluginVersion": "11.0.1",
       "type": "text"
     },
     {
@@ -109,7 +100,6 @@
             "axisLabel": "",
             "axisPlacement": "left",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 1,
             "gradientMode": "none",
@@ -177,7 +167,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 9
       },
       "id": 11,
       "maxPerRow": 4,
@@ -274,7 +264,6 @@
             "axisColorMode": "text",
             "axisLabel": "",
             "axisPlacement": "auto",
-            "fillOpacity": 50,
             "hideFrom": {
               "legend": false,
               "tooltip": false,
@@ -283,13 +272,9 @@
             "lineStyle": {
               "fill": "solid"
             },
-            "pointShape": "circle",
             "pointSize": {
-              "fixed": 2,
-              "max": 20,
-              "min": 1
+              "fixed": 2
             },
-            "pointStrokeWidth": 1,
             "scaleDistribution": {
               "type": "linear"
             },
@@ -331,7 +316,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 20
+        "y": 21
       },
       "id": 100,
       "maxPerRow": 4,
@@ -406,7 +391,9 @@
             }
           }
         ],
+        "seriesMapping": "auto",
         "tooltip": {
+          "maxHeight": 600,
           "mode": "single",
           "sort": "none"
         }
@@ -498,7 +485,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "Dispatch by technology",
@@ -514,7 +501,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 76,
             "gradientMode": "none",
@@ -713,7 +699,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 20
+        "y": 21
       },
       "id": 101,
       "options": {
@@ -757,7 +743,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select time, sum(volume) as \"volume\", tech FROM \n(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  sum(accepted_volume) AS \"volume\", unit_id, pm.technology as tech\nFROM market_orders mo\njoin power_plant_meta pm on pm.index=mo.unit_id and pm.simulation=mo.simulation\nWHERE\n\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  mo.simulation = '$simulation'\n\nGROUP BY 1, unit_id, bid_id, pm.technology\nORDER BY 1\n\n) a\ngroup by 1, tech\nORDER BY 1, tech desc",
+          "rawSql": "select time, sum(volume) as \"volume\", tech FROM \n(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \"volume\", unit_id, pm.technology as tech\nFROM market_orders mo\njoin power_plant_meta pm on pm.index=mo.unit_id and pm.simulation=mo.simulation\nWHERE\n\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  mo.simulation = '$simulation'\n\nGROUP BY 1, unit_id, bid_id, pm.technology\nORDER BY 1\n\n) a\ngroup by 1, tech\nORDER BY 1, tech desc",
           "refId": "A",
           "select": [
             [
@@ -865,7 +851,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -913,7 +898,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 29
+        "y": 30
       },
       "id": 19,
       "options": {
@@ -1065,7 +1050,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1113,7 +1097,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 29
+        "y": 30
       },
       "id": 20,
       "options": {
@@ -1253,7 +1237,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 39
       },
       "id": 74,
       "panels": [],
@@ -1346,7 +1330,7 @@
         "h": 12,
         "w": 10,
         "x": 0,
-        "y": 39
+        "y": 40
       },
       "id": 72,
       "options": {
@@ -1493,10 +1477,10 @@
         ]
       },
       "gridPos": {
-        "h": 12,
+        "h": 6,
         "w": 9,
         "x": 10,
-        "y": 39
+        "y": 40
       },
       "id": 76,
       "options": {
@@ -1517,7 +1501,7 @@
           }
         ]
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -1601,7 +1585,7 @@
         "h": 12,
         "w": 5,
         "x": 19,
-        "y": 39
+        "y": 40
       },
       "id": 7,
       "options": {
@@ -1687,12 +1671,127 @@
       "type": "piechart"
     },
     {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "series",
+            "axisLabel": "Market price €/MWh",
+            "axisPlacement": "auto",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "pointSize": {
+              "fixed": 4
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "show": "lines"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "percentage_of_time"
+            },
+            "properties": [
+              {
+                "id": "custom.axisLabel",
+                "value": "Percentage of time"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 9,
+        "x": 10,
+        "y": 46
+      },
+      "id": 102,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "series": [],
+        "seriesMapping": "auto",
+        "tooltip": {
+          "maxHeight": 600,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH ranked_prices AS (\r\n    SELECT\r\n        price, \r\n        ROW_NUMBER() OVER (ORDER BY price DESC) AS ranking,\r\n        COUNT(*) OVER () AS total_hours\r\n    FROM market_meta\r\n    WHERE simulation = '$simulation' and market_id = '$market'\r\n)\r\nSELECT \r\n    (ranking::float / total_hours) AS percentage_of_time, \r\n    price\r\nFROM ranked_prices\r\n \r\nORDER BY percentage_of_time;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Price duration curve",
+      "type": "xychart"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 52
       },
       "id": 41,
       "panels": [],
@@ -1701,15 +1800,11 @@
     },
     {
       "description": "",
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
       "gridPos": {
         "h": 3,
         "w": 24,
         "x": 0,
-        "y": 52
+        "y": 53
       },
       "id": 22,
       "options": {
@@ -1721,8 +1816,7 @@
         "content": "# Unit Specific Data\n\nFor the chosen market and the chosen unit here the dispatch is displayed.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.4.0",
-      "title": "",
+      "pluginVersion": "11.0.1",
       "type": "text"
     },
     {
@@ -1742,7 +1836,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -1793,7 +1886,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 55
+        "y": 56
       },
       "id": 24,
       "interval": "15m",
@@ -1927,7 +2020,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 55
+        "y": 56
       },
       "id": 26,
       "options": {
@@ -1948,7 +2041,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.6.0",
+      "pluginVersion": "5.7.0",
       "targets": [
         {
           "datasource": {
@@ -2006,7 +2099,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "Bid prices of accepted bids per unit in the chosen market",
@@ -2022,7 +2115,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2083,7 +2175,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 64
+        "y": 65
       },
       "id": 70,
       "options": {
@@ -2110,6 +2202,7 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "hide": false,
@@ -2127,6 +2220,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2237,7 +2347,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "",
@@ -2253,7 +2363,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2329,7 +2438,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 64
+        "y": 65
       },
       "id": 78,
       "options": {
@@ -2356,11 +2465,12 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  sum(accepted_volume) AS \"Accepted volume:\",\r\n  avg(volume) AS \"Bid volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_volume) AS \"Accepted volume:\",\r\n  avg(volume) AS \"Bid volume:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Gen_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id\r\nORDER BY 1\r\n",
           "refId": "A",
           "select": [
             [
@@ -2372,6 +2482,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -2502,7 +2629,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 72
+        "y": 73
       },
       "id": 93,
       "options": {
@@ -2522,7 +2649,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -2580,7 +2707,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "",
@@ -2596,7 +2723,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2675,7 +2801,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 81
+        "y": 82
       },
       "id": 99,
       "options": {
@@ -2753,7 +2879,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 86
+        "y": 87
       },
       "id": 39,
       "panels": [],
@@ -2777,7 +2903,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -2825,7 +2950,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 87
+        "y": 88
       },
       "id": 36,
       "options": {
@@ -2979,7 +3104,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 87
+        "y": 88
       },
       "id": 37,
       "options": {
@@ -3000,7 +3125,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.6.0",
+      "pluginVersion": "5.7.0",
       "targets": [
         {
           "datasource": {
@@ -3058,7 +3183,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "Bid prices of accepted bids per unit in the chosen market",
@@ -3074,7 +3199,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3135,7 +3259,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 96
+        "y": 97
       },
       "id": 89,
       "options": {
@@ -3162,6 +3286,7 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [
             {
@@ -3180,7 +3305,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  price AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Demand_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(start_time,$__interval),\r\n  avg(accepted_price::float) AS \"Accepted price:\",\r\n  avg(price) AS \"Bid price:\",\r\n  concat(unit_id, ' - ', market_id) as \"unit_id\"\r\nFROM market_orders\r\nWHERE\r\n  $__timeFilter(start_time) AND\r\n  unit_id in ($Demand_Units) AND\r\n  simulation = '$simulation'\r\nGROUP BY 1, unit_id, market_id, price\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -3218,6 +3343,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_orders",
           "timeColumn": "start_time",
           "timeColumnType": "timestamp",
@@ -3325,7 +3467,7 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 96
+        "y": 97
       },
       "id": 95,
       "options": {
@@ -3345,7 +3487,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -3404,7 +3546,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "description": "",
@@ -3420,7 +3562,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3496,7 +3637,7 @@
         "h": 5,
         "w": 8,
         "x": 16,
-        "y": 96
+        "y": 97
       },
       "id": 90,
       "options": {
@@ -3523,6 +3664,7 @@
             "type": "postgres",
             "uid": "P7B13B9DF907EC40C"
           },
+          "editorMode": "code",
           "format": "time_series",
           "group": [],
           "metricColumn": "none",
@@ -3539,6 +3681,23 @@
               }
             ]
           ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
           "table": "market_dispatch",
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
@@ -3604,7 +3763,7 @@
         "h": 4,
         "w": 4,
         "x": 12,
-        "y": 101
+        "y": 102
       },
       "id": 96,
       "options": {
@@ -3624,7 +3783,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -3713,7 +3872,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 101
+        "y": 102
       },
       "id": 94,
       "options": {
@@ -3733,7 +3892,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -3807,7 +3966,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -3871,7 +4029,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 105
+        "y": 106
       },
       "id": 86,
       "options": {
@@ -3954,7 +4112,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 114
+        "y": 115
       },
       "id": 44,
       "panels": [],
@@ -3978,7 +4136,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4026,7 +4183,7 @@
         "h": 9,
         "w": 18,
         "x": 0,
-        "y": 115
+        "y": 116
       },
       "id": 65,
       "options": {
@@ -4180,7 +4337,7 @@
         "h": 9,
         "w": 6,
         "x": 18,
-        "y": 115
+        "y": 116
       },
       "id": 47,
       "options": {
@@ -4201,7 +4358,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.6.0",
+      "pluginVersion": "5.7.0",
       "targets": [
         {
           "datasource": {
@@ -4257,7 +4414,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4305,7 +4461,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 124
+        "y": 125
       },
       "id": 80,
       "options": {
@@ -4399,7 +4555,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4460,7 +4615,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 133
+        "y": 134
       },
       "id": 91,
       "options": {
@@ -4614,7 +4769,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -4690,7 +4844,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 133
+        "y": 134
       },
       "id": 92,
       "options": {
@@ -4881,7 +5035,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 142
+        "y": 143
       },
       "id": 97,
       "options": {
@@ -4901,7 +5055,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "11.0.1",
       "targets": [
         {
           "datasource": {
@@ -4975,7 +5129,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 0,
             "gradientMode": "none",
@@ -5054,7 +5207,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 151
+        "y": 152
       },
       "id": 98,
       "options": {
@@ -5127,14 +5280,14 @@
       "type": "timeseries"
     }
   ],
-  "preload": false,
   "refresh": "",
-  "schemaVersion": 40,
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
     "list": [
       {
         "current": {
+          "selected": false,
           "text": "example_01c_eom_only",
           "value": "example_01c_eom_only"
         },
@@ -5144,17 +5297,21 @@
         },
         "definition": "SELECT simulation\nFROM market_meta",
         "description": "Can choose which simulation we want to show ",
+        "hide": 0,
         "includeAll": false,
+        "multi": false,
         "name": "simulation",
         "options": [],
         "query": "SELECT simulation\nFROM market_meta",
         "refresh": 2,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
+          "selected": false,
           "text": "EOM",
           "value": "EOM"
         },
@@ -5164,22 +5321,26 @@
         },
         "definition": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "description": "Choose for which market the data is displayed",
+        "hide": 0,
         "includeAll": false,
+        "multi": false,
         "name": "market",
         "options": [],
         "query": "SELECT \n  market_id\nFROM market_meta\nwhere simulation='$simulation'\ngroup by market_id ;",
         "refresh": 2,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
+          "selected": true,
           "text": [
-            "Biomass"
+            "Unit 4"
           ],
           "value": [
-            "Biomass"
+            "Unit 4"
           ]
         },
         "datasource": {
@@ -5188,6 +5349,7 @@
         },
         "definition": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
+        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "Gen_Units",
@@ -5195,16 +5357,18 @@
         "query": "SELECT index\nFROM power_plant_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
+          "selected": true,
           "text": [
-            "demand_CRM_neg"
+            "demand_EOM"
           ],
           "value": [
-            "demand_CRM_neg"
+            "demand_EOM"
           ]
         },
         "datasource": {
@@ -5213,6 +5377,7 @@
         },
         "definition": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which units we want to display ",
+        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "Demand_Units",
@@ -5220,11 +5385,13 @@
         "query": "SELECT index\nFROM demand_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
+          "selected": true,
           "text": [
             "Storage 1"
           ],
@@ -5238,6 +5405,7 @@
         },
         "definition": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "description": "Can choose which storage units we want to display ",
+        "hide": 0,
         "includeAll": false,
         "multi": true,
         "name": "Storage_Units",
@@ -5245,30 +5413,41 @@
         "query": "SELECT index\nFROM storage_meta\nwhere simulation = '$simulation';",
         "refresh": 2,
         "regex": "",
+        "skipUrlSync": false,
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "text": "2019-01-01 10:00:00",
-          "value": "2019-01-01 10:00:00"
+          "selected": false,
+          "text": "2019-01-01 01:00:00",
+          "value": "2019-01-01 01:00:00"
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "P7B13B9DF907EC40C"
         },
         "definition": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
         "description": "The minimum time we have in the time range.\nUsed for the merit order plot title",
         "hide": 2,
+        "includeAll": false,
+        "multi": false,
         "name": "min_time",
         "options": [],
         "query": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
         "refresh": 1,
         "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
         "type": "query"
       }
     ]
   },
   "time": {
     "from": "2019-01-01T00:00:00.000Z",
-    "to": "2019-01-31T23:59:59.000Z"
+    "to": "2019-12-01T23:59:59.000Z"
   },
+  "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {
     "refresh_intervals": [
       "5s",
@@ -5280,8 +5459,8 @@
     ]
   },
   "timezone": "utc",
-  "title": "ASSUME: Main overview",
-  "uid": "mQ3Lvkr4k",
-  "version": 6,
+  "title": "ASSUME: Main overview Copy",
+  "uid": "aemnxld4ukgsga",
+  "version": 2,
   "weekStart": ""
 }
