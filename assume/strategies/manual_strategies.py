@@ -35,17 +35,18 @@ class SimpleManualTerminalStrategy(BaseStrategy):
             Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
         """
         start = product_tuples[0][0]  # start time of the first product
-        end_all = product_tuples[-1][1]  # end time of the last product
+        end = product_tuples[-1][1]  # end time of the last product
         previous_power = unit.get_output_before(
             start
         )  # power output of the unit before the start time of the first product
         op_time = unit.get_operation_time(start)
-        min_power, max_power = unit.calculate_min_max_power(
-            start, end_all
-        )  # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
+        min_power_values, max_power_values = unit.calculate_min_max_power(start, end)
+        # minimum and maximum power output of the unit between the start time of the first product and the end time of the last product
 
         bids = []
-        for product in product_tuples:
+        for product, min_power, max_power in zip(
+            product_tuples, min_power_values, max_power_values
+        ):
             # for each product, calculate the marginal cost of the unit at the start time of the product
             # and the volume of the product. Dispatch the order to the market.
             start = product[0]
@@ -56,10 +57,10 @@ class SimpleManualTerminalStrategy(BaseStrategy):
                 start, previous_power
             )  # calculation of the marginal costs
             volume = unit.calculate_ramp(
-                op_time, previous_power, max_power[start], current_power
+                op_time, previous_power, max_power, current_power
             )
             print(f"> requesting bid for time from {product[0]} to {product[1]}")
-            print(f"> power must be between {min_power[start]} and {max_power[start]}")
+            print(f"> power must be between {min_power} and {max_power}")
             print(f"> {previous_power=}, {current_power=}, {marginal_cost=}")
             try:
                 prompt = input(
@@ -83,9 +84,7 @@ class SimpleManualTerminalStrategy(BaseStrategy):
 
             if "node" in market_config.additional_fields:
                 bids[-1]["max_power"] = unit.max_power if volume > 0 else unit.min_power
-                bids[-1]["min_power"] = (
-                    min_power[start] if volume > 0 else unit.max_power
-                )
+                bids[-1]["min_power"] = min_power if volume > 0 else unit.max_power
 
             previous_power = volume + current_power
             if previous_power > 0:
