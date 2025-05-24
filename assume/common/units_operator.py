@@ -23,9 +23,10 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import (
     aggregate_step_amount,
+    convert_tensors,
     timestamp2datetime,
 )
-from assume.strategies import BaseStrategy
+from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,8 @@ class UnitsOperator(Role):
         # valid_orders per product_type
         self.valid_orders = defaultdict(list)
         self.units: dict[str, BaseUnit] = {}
+
+        self.rl_operator = False
 
     def setup(self):
         super().setup()
@@ -143,6 +146,14 @@ class UnitsOperator(Role):
             unit (BaseUnit): The unit to be added.
         """
         self.units[unit.id] = unit
+
+        # only do the market‐loop if we haven't already flipped rl_operator
+        if not self.rl_operator:
+            for market in self.available_markets:
+                strategy = unit.bidding_strategies.get(market.market_id)
+                if isinstance(strategy, LearningStrategy):
+                    self.rl_operator = True
+                    break
 
     def participate(self, market: MarketConfig) -> bool:
         """
@@ -545,4 +556,10 @@ class UnitsOperator(Role):
                 order["unit_id"] = unit_id
                 orderbook.append(order)
 
-        return orderbook
+        if not self.rl_operator:
+            # if we are not a learning agent, we can just return the orderbook
+            return orderbook
+        # if we are a learning agent, we need to convert the orderbook to tensors
+        else:
+            # convert all CUDA tensors to CPU in one pass
+            orderbook = convert_tensors(orderbook)
