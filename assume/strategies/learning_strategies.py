@@ -193,11 +193,11 @@ class RLStrategy(BaseLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obd_dim = kwargs.pop("obs_dim", 38)
+        obs_dim = kwargs.pop("obs_dim", 38)
         act_dim = kwargs.pop("act_dim", 2)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
-            obs_dim=obd_dim,
+            obs_dim=obs_dim,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
@@ -881,11 +881,11 @@ class StorageRLStrategy(BaseLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obd_dim = kwargs.pop("obs_dim", 74)
+        obs_dim = kwargs.pop("obs_dim", 74)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
-            obs_dim=obd_dim,
+            obs_dim=obs_dim,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
