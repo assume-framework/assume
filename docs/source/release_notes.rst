@@ -12,18 +12,12 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+0.5.3 - (13th May 2025)
+=========================
+
 **New Features:**
 
 - **Add single bid RL strategy:** Added a new reinforcement learning strategy that allows agents to submit bids based on one action value only that determines the price at which the full capacity is offered.
-
-
-**Improvements:**
-
-- **Flexible Agent Count in `continue_learning` Mode:** You can now change the number of learning agents between training runs while reusing previously trained critics.
-  This enables flexible workflows like training power plants first and adding storage units later. When the core architectures match, critic weights are partially transferred when possible, ensuring smoother transitions.
-
-**New Features:**
-
 - **Bidding Strategy for Elastic Demand**: The new `ElasticDemandStrategy` enables demand units to submit multiple bids that approximate a marginal utility curve, using
   either linear or isoelastic price elasticity models. Unlike other strategies, it does **not** rely on predefined volumes—bids are dynamically generated based on the
   unit’s elasticity configuration. To use this strategy, set `bidding_strategy` to `"elastic_demand"` in the `demand_units.csv` file and specify the following
@@ -31,14 +25,20 @@ Upcoming Release
   defines the shape of the demand curve, with `"linear"` producing a straight-line decrease and `"isoelastic"` generating a hyperbolic curve. `num_bids` determines how many
   bid steps are submitted, allowing control over the granularity of demand flexibility.
 
+
+**Improvements:**
+
+- **Flexible Agent Count in `continue_learning` Mode:** You can now change the number of learning agents between training runs while reusing previously trained critics.
+  This enables flexible workflows like training power plants first and adding storage units later. When the core architectures match, critic weights are partially transferred when possible, ensuring smoother transitions.
+
 **Bug Fixes:**
 
 - **Last policy loading**: Fixed a bug where the last policy loaded after a training run was not the best policy, but rather the last policy.
-
-- **Grafana Dashboard adjustments**: Fixed a bug where the Grafana dashboard was wrongly summing values due to time bucketing. The dashboard now consistently displays the average per time bucket which does underestimate variance in the data, but a note was added to explain this.
-
-- **Changed market price in rejected orders**: Fixed a bug where the wrong market price was written in the rejected orders, namely any auction with more than 1 product had the price of the last product written as the market price instead of the price of the respective hour.
-This was, however, only a mistake for the rejected orders.
+- **Negative accepted volume in block bids**: Fixed a bug where accepted volume from block bids was converted to negative.
+- **Grafana Dashboard adjustments**: Fixed a bug where the Grafana dashboard was wrongly summing values due to time bucketing. The dashboard now consistently displays the average per time bucket which does underestimate
+  variance in the data, but a note was added to explain this.
+- **Changed market price in rejected orders**: Fixed a bug where the wrong market price was written in the rejected orders, namely any auction with more than 1 product had the price of the last product written as the
+  market price instead of the price of the respective hour. This was, however, only a mistake for the rejected orders.
 
 
 0.5.2 - (21st March 2025)

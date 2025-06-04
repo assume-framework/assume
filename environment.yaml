@@ -15,7 +15,7 @@ dependencies:
 - SQLAlchemy>=2
 - matplotlib
 - pyomo
-- pypsa>=0.32.0
+- pypsa<0.33
 - pyyaml
 
 - pip:
