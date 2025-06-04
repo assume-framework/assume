@@ -2,10 +2,12 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import functools
 import logging
 import shutil
 from collections import defaultdict
 from datetime import datetime
+from io import StringIO
 from multiprocessing import Lock
 from pathlib import Path
 from typing import TypedDict
@@ -17,7 +19,12 @@ from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from psycopg2.errors import UndefinedColumn
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
+from sqlalchemy.exc import (
+    DataError,
+    NoSuchTableError,
+    OperationalError,
+    ProgrammingError,
+)
 
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
@@ -27,6 +34,49 @@ from assume.common.utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+# time-series (partitioned) tables
+PARTITIONED_TABLES = [
+    "market_meta",
+    "market_dispatch",
+    "market_orders",
+    "unit_dispatch",
+    "rl_params",
+    "grid_flows",
+    "kpis",
+]
+
+# all tables that carry a `simulation` column, whether static or hypertable
+ALL_SIM_TABLES = PARTITIONED_TABLES + [
+    "power_plant_meta",
+    "storage_meta",
+    "demand_meta",
+    "exchange_meta",
+    "rl_meta",
+]
+
+
+# --- Decorator to retry on missing tables or columns ---
+def retry_on_schema_errors(func):
+    @functools.wraps(func)
+    def wrapper(self, table: str, df: pd.DataFrame):
+        try:
+            return func(self, table, df)
+        except NoSuchTableError:
+            self._ensure_table(table, df)
+            return func(self, table, df)
+        except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+            self._check_columns(table, df)
+            return func(self, table, df)
+        except Exception as e:
+            logger.error("%s failed for %s: %s", func.__name__, table, e)
+
+    return wrapper
+
+
+# --- Helper for index normalization ---
+def _prepare_df(df: pd.DataFrame) -> pd.DataFrame:
+    return df.reset_index() if df.index.name else df
 
 
 class OutputDef(TypedDict):
@@ -103,6 +153,8 @@ class WriteOutput(Role):
         self.write_buffers: dict = defaultdict(list)
         self.locks = defaultdict(lambda: Lock())
 
+        self._column_cache: dict[str, list[str]] = {}
+
         self.kpi_defs: dict[str, OutputDef] = {
             "avg_price": {
                 "value": "avg(price)",
@@ -137,47 +189,6 @@ class WriteOutput(Role):
                 }
             ]
 
-    def delete_db_scenario(self, simulation_id: str):
-        """
-        Deletes all data from the database for the given simulation id.
-
-        Args:
-            simulation_id (str): The ID of the simulation as a unique classifier.
-        """
-
-        # Loop throuph all database tables
-        # Get list of table names in database
-        table_names = inspect(self.db).get_table_names()
-        # Iterate through each table
-        for table_name in table_names:
-            # ignore spatial_ref_sys table
-            if table_name == "spatial_ref_sys":
-                continue
-            # only delete rl_params and rl_meta during the first episode of learning
-            if table_name in ["rl_params", "rl_meta"] and not (
-                self.learning_mode and self.episode == 1
-            ):
-                continue
-            try:
-                with self.db.begin() as db:
-                    # create index on table
-                    query = text(
-                        f'create index if not exists "{table_name}_scenario" on "{table_name}" (simulation)'
-                    )
-                    db.execute(query)
-
-                    query = text(
-                        f"delete from \"{table_name}\" where simulation = '{simulation_id}'"
-                    )
-                    rowcount = db.execute(query).rowcount
-                    # has to be done manually with raw queries
-                    db.commit()
-                    logger.debug("deleted %s rows from %s", rowcount, table_name)
-            except Exception as e:
-                logger.error(
-                    f"could not clear old scenarios from table {table_name} - {e}"
-                )
-
     def setup(self):
         """
         Sets up the WriteOutput instance by subscribing to messages and scheduling recurrent tasks of storing the data.
@@ -191,10 +202,29 @@ class WriteOutput(Role):
         )
 
     def on_ready(self):
+        """
+        Called once when the agent/container starts.
+        Sets up the database connection (per‐simulation SQLite or Postgres),
+        tears down any old data, creates partitions if needed, and schedules
+        the periodic store_dfs task.
+        """
+        # 1) Initialize the engine from URI and an inspector
         if self.db_uri:
             self.db = create_engine(self.db_uri)
+            self._inspector = inspect(self.db)
+
+        # 2) Clear out previous data
         if self.db is not None:
-            self.delete_db_scenario(self.simulation_id)
+            dialect = self.db.dialect.name
+
+            if dialect == "sqlite":
+                # SQLite fallback: DELETE all rows for this simulation
+                self._purge_simulation_data_sqlite(self.simulation_id)
+
+            elif dialect == "postgresql":
+                # Postgres/Timescale: drop & recreate partitions
+                self._purge_simulation_data_postgresql(self.simulation_id)
+                self._create_partitions(self.simulation_id)
 
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
@@ -208,7 +238,6 @@ class WriteOutput(Role):
                 self.store_dfs,
                 recurrency_task,
                 src="no_wait",
-                # this should not wait for the task to finish to block the simulation
             )
 
     def handle_output_message(self, content: dict, meta: MetaDict):
@@ -290,6 +319,11 @@ class WriteOutput(Role):
 
         df = pd.DataFrame(market_results)
         df["simulation"] = self.simulation_id
+
+        # in df["node"] replace null with "node0" for consistency in the database
+        if "node" in df.columns:
+            df["node"] = df["node"].fillna("node0")
+
         return df
 
     def convert_market_orders(self, market_orders: any, market_id: str):
@@ -344,12 +378,21 @@ class WriteOutput(Role):
         Args:
             unit_info (dict): The unit information.
         """
-        del unit_info["unit_type"]
-        unit_info["simulation"] = self.simulation_id
-        u_info = {unit_info["id"]: unit_info}
-        del unit_info["id"]
+        # 1) Copy so we don't mutate the original
+        info = dict(unit_info)
 
-        return pd.DataFrame(u_info).T
+        # 2) Remove anything you don't want
+        info.pop("unit_type", None)
+
+        # 3) Pull out the id and stash it back in as its own column
+        unit_id = info.pop("id", None)
+        info["unit_id"] = unit_id
+
+        # 4) Always include the simulation
+        info["simulation"] = self.simulation_id
+
+        # 5) Return a single-row DataFrame; pandas will treat unit_id & simulation as columns
+        return pd.DataFrame([info])
 
     def convert_market_dispatch(self, market_dispatch: list[dict]):
         """
@@ -501,17 +544,19 @@ class WriteOutput(Role):
                             dfs.append(df)
                         df = pd.concat(dfs, axis=0, join="outer")
                 data_list.clear()
-            # concat all dataframes
-            # use join='outer' to keep all columns and fill missing values with NaN
+
             if df is None or df.empty:
                 continue
 
-            # check for tensors and convert them to floats
-            df = df.apply(convert_tensors)
+            # check and correct dtypes
+            if table == "rl_params":
+                df = df.apply(convert_tensors)
 
-            # check for any float64 columns and convert them to floats
-            df = df.map(lambda x: float(x) if isinstance(x, np.float64) else x)
+            float_cols = df.select_dtypes(include=["float64"]).columns
+            if len(float_cols):
+                df[float_cols] = df[float_cols].astype("float32")
 
+            # export to csv if path is set
             if self.export_csv_path:
                 data_path = self.export_csv_path / f"{table}.csv"
                 df.to_csv(
@@ -521,15 +566,13 @@ class WriteOutput(Role):
                     float_format="%.5g",
                 )
 
+            # store to db if db is set
             if self.db is not None:
                 try:
-                    with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
-                except (ProgrammingError, OperationalError, DataError):
-                    self.check_columns(table, df)
-                    # now try again
-                    with self.db.begin() as db:
-                        df.to_sql(table, db, if_exists="append")
+                    self._copy_df_to_db(table, df)
+                except Exception as e:
+                    logger.error("could not write to db: %s", e)
+                    continue
 
         self.current_dfs_size_bytes = 0
 
@@ -594,48 +637,10 @@ class WriteOutput(Role):
                     df.to_sql(geo_table, db, if_exists="append")
             except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
                 # if a column is missing, check and try again
-                self.check_columns(geo_table, df)
+                self._check_columns(geo_table, df)
                 # now try again
                 with self.db.begin() as db:
                     df.to_sql(geo_table, db, if_exists="append")
-
-    def check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
-        """
-        Checks and adds columns to the database table if necessary.
-
-        Args:
-            table (str): The name of the database table.
-            df (pandas.DataFrame): The DataFrame to be checked.
-        """
-        with self.db.begin() as db:
-            # Read table into Pandas DataFrame
-            query = f"select * from {table} where 1=0"
-            db_columns = pd.read_sql(query, db).columns
-
-        for column in df.columns:
-            if column.lower() not in db_columns:
-                try:
-                    # TODO this only works for float and text
-                    if is_bool_dtype(df[column]):
-                        column_type = "boolean"
-                    elif is_numeric_dtype(df[column]):
-                        column_type = "float"
-                    else:
-                        column_type = "text"
-                    query = f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
-                    with self.db.begin() as db:
-                        db.execute(text(query))
-                except Exception:
-                    logger.exception("Error converting column")
-
-        if index and df.index.name:
-            df.index.name = df.index.name.lower()
-            if df.index.name in db_columns:
-                return
-            column_type = "float" if is_numeric_dtype(df.index) else "text"
-            query = f"ALTER TABLE {table} ADD COLUMN {df.index.name} {column_type}"
-            with self.db.begin() as db:
-                db.execute(text(query))
 
     async def on_stop(self):
         """
@@ -728,131 +733,293 @@ class WriteOutput(Role):
 
         return rewards_by_unit
 
+    def _get_columns(self, table: str) -> list[str]:
+        return self._column_cache.setdefault(
+            table, [c["name"] for c in self._inspector.get_columns(table)]
+        )
+
+    def _copy_df_to_db(self, table: str, df: pd.DataFrame):
+        df = _prepare_df(df)
+        key = (self.db.dialect.name, table == "unit_dispatch")
+        handler = {
+            ("sqlite", False): self._copy_sqlite,
+            ("sqlite", True): self._copy_sqlite_upsert,
+            ("postgresql", False): self._copy_postgres,
+            ("postgresql", True): self._copy_postgres_upsert,
+        }.get(key)
+        if not handler:
+            raise ValueError(f"No copy strategy for {key}")
+        return handler(table, df)
+
+    @retry_on_schema_errors
+    def _copy_sqlite(self, table: str, df: pd.DataFrame):
+        with self.db.begin() as conn:
+            df.to_sql(
+                table,
+                conn,
+                if_exists="append",
+                index=df.index.name is not None,
+                index_label=df.index.name,
+            )
+
+    @retry_on_schema_errors
+    def _copy_sqlite_upsert(self, table: str, df: pd.DataFrame):
+        df = df.sort_values(["simulation", "time", "unit"]).drop_duplicates(
+            ["simulation", "time", "unit"], keep="last"
+        )
+        cols = df.columns.tolist()
+        col_list = ", ".join(f'"{c}"' for c in cols)
+        placeholders = ", ".join(f":{c}" for c in cols)
+        stmt = text(
+            f'INSERT OR REPLACE INTO "{table}" ({col_list}) VALUES ({placeholders})'
+        )
+        with self.db.begin() as conn:
+            conn.execute(stmt, df.to_dict("records"))
+
+    @retry_on_schema_errors
+    def _copy_postgres(self, table: str, df: pd.DataFrame):
+        buf = StringIO()
+        df.to_csv(buf, index=False, header=True)
+        buf.seek(0)
+        cols = df.columns.tolist()
+        col_list = ",".join(f'"{c}"' for c in cols)
+        sql = f'COPY "{table}" ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)'
+        raw = self.db.raw_connection()
+        cur = raw.cursor()
+        cur.copy_expert(sql, buf)
+        raw.commit()
+        cur.close()
+
+    @retry_on_schema_errors
+    def _copy_postgres_upsert(self, table: str, df: pd.DataFrame):
+        df = df.sort_values(["simulation", "time", "unit"]).drop_duplicates(
+            ["simulation", "time", "unit"], keep="last"
+        )
+        buf = StringIO()
+        df.to_csv(buf, index=False, header=True)
+        buf.seek(0)
+        cols = df.columns.tolist()
+        col_list = ",".join(f'"{c}"' for c in cols)
+        raw = self.db.raw_connection()
+        cur = raw.cursor()
+        cur.execute("SELECT 1")  # ensure connection
+        # create temp table
+        cur.execute(f"""
+            CREATE TEMP TABLE tmp_{table} (LIKE "{table}" INCLUDING ALL) ON COMMIT DROP;
+        """)
+        cur.copy_expert(
+            f"COPY tmp_{table} ({col_list}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
+            buf,
+        )
+        pk = ["simulation", "time", "unit"]
+        updates = ", ".join(f'"{c}"=EXCLUDED."{c}"' for c in cols if c not in pk)
+        cur.execute(f"""
+            INSERT INTO "{table}" ({col_list})
+            SELECT {col_list} FROM tmp_{table}
+            ON CONFLICT ({','.join(pk)}) DO UPDATE SET {updates};
+        """)
+        raw.commit()
+        cur.close()
+
+    def _create_partitions(self, simulation_id: str):
+        with self.db.begin() as conn:
+            for table in PARTITIONED_TABLES:
+                partition = f"{table}_{simulation_id}"
+                conn.execute(
+                    text(
+                        f"CREATE TABLE IF NOT EXISTS {partition} "
+                        f"PARTITION OF {table} FOR VALUES IN ('{simulation_id}');"
+                    )
+                )
+                logger.debug("created partition %s", partition)
+
+    def _ensure_table(self, table: str, df: pd.DataFrame):
+        if not self._inspector.has_table(table):
+            df.head(0).to_sql(
+                name=table,
+                con=self.db,
+                if_exists="append",
+                index=bool(df.index.name),
+                method=None,
+            )
+
+    def _check_columns(self, table: str, df: pd.DataFrame, index: bool = True):
+        with self.db.begin() as conn:
+            db_columns = pd.read_sql(f"SELECT * FROM {table} WHERE 1=0", conn).columns
+        db_cols_lower = {c.lower() for c in db_columns}
+        for col in df.columns:
+            if col.lower() not in db_cols_lower:
+                dtype = (
+                    "BOOLEAN"
+                    if is_bool_dtype(df[col])
+                    else "DOUBLE PRECISION"
+                    if is_numeric_dtype(df[col])
+                    else "TEXT"
+                )
+                alter = text(f'ALTER TABLE {table} ADD COLUMN "{col}" {dtype}')
+                with self.db.begin() as conn:
+                    conn.execute(alter)
+                db_cols_lower.add(col.lower())
+        if index and df.index.name:
+            idx = df.index.name
+            if idx.lower() not in db_cols_lower:
+                dtype = "DOUBLE PRECISION" if is_numeric_dtype(df.index) else "TEXT"
+                alter = text(f'ALTER TABLE {table} ADD COLUMN "{idx}" {dtype}')
+                with self.db.begin() as conn:
+                    conn.execute(alter)
+        self._column_cache.pop(table, None)
+
+    def _purge_simulation_data_sqlite(self, simulation_id: str):
+        for table in ALL_SIM_TABLES:
+            if not self._inspector.has_table(table):
+                continue
+            if table in {"rl_params", "rl_meta"} and not (
+                self.learning_mode and self.episode == 1
+            ):
+                continue
+            with self.db.begin() as conn:
+                conn.execute(
+                    text(f'DELETE FROM "{table}" WHERE simulation = :sim'),
+                    {"sim": simulation_id},
+                )
+
+    def _purge_simulation_data_postgresql(self, simulation_id: str):
+        """
+        TimescaleDB/Postgres cleanup:
+        1) Drop any simulation-specific partitions.
+        2) Delete all rows in the static tables for that simulation,
+        but only if the table actually exists.
+        """
+        # 1) drop per-simulation partitions
+        for table in PARTITIONED_TABLES:
+            # only delete rl_params during the first episode of learning
+            if table == "rl_params" and not (self.learning_mode and self.episode == 1):
+                continue
+            with self.db.begin() as conn:
+                conn.execute(text(f'DROP TABLE IF EXISTS "{table}_{simulation_id}";'))
+                logger.debug("Dropped partition %s", f"{table}_{simulation_id}")
+
+        # 2) delete from the static tables, skipping any that don’t exist
+        static_tables = [t for t in ALL_SIM_TABLES if t not in PARTITIONED_TABLES]
+        for table in static_tables:
+            # only delete rl_meta during the first episode of learning
+            if table == "rl_meta" and not (self.learning_mode and self.episode == 1):
+                continue
+            if not self._inspector.has_table(table):
+                continue
+            with self.db.begin() as conn:
+                conn.execute(
+                    text(f'DELETE FROM "{table}" WHERE simulation = :sim;'),
+                    {"sim": simulation_id},
+                )
+                logger.debug(
+                    "Deleted rows from %s for simulation %s", table, simulation_id
+                )
+
 
 class DatabaseMaintenance:
     """
-    A utility class for managing simulation data stored in a database.
+    Utility class for managing simulation data in a partitioned TimescaleDB setup.
 
-    This class creates a database engine from a provided URI and offers methods to:
-      1. Retrieve a list of unique simulation IDs across all tables.
-      2. Delete specific simulations from every table.
-      3. Delete all simulations, or all except those specified, across every table.
+    Supports:
+      - Listing all simulation IDs.
+      - Dropping specific simulation partitions.
+      - Dropping all simulations (or all except exclusions).
 
-    It assumes that each table (except for system tables like "spatial_ref_sys") contains a column
-    named 'simulation' that uniquely identifies the simulation.
-
-    Args:
-        db_uri (str): The URI of the database engine used to create a SQLAlchemy engine.
+    Tables partitioned by simulation: market_meta, market_dispatch, unit_dispatch,
+    rl_params, grid_flows, kpis. Other tables are dropped via DELETE if needed.
     """
 
     def __init__(self, db_uri: str):
-        """
-        Initializes the DatabaseMaintenance instance by creating a database engine.
+        self.db = create_engine(db_uri)
+        self._inspector = inspect(self.db)
+        self._table_cache = None
 
-        Args:
-            db_uri (str): The URI of the database engine.
-        """
-        self.db_uri = db_uri
-        self.db = create_engine(self.db_uri)
+    def _get_tables(self) -> list[str]:
+        # List only parent tables (exclude partition children)
+        if self._table_cache is None:
+            all_tables = self._inspector.get_table_names()
+            # exclude system table
+            tables = [t for t in all_tables if t != "spatial_ref_sys"]
+            # only include parent tables, not partitions of form '<parent>_<sim>'
+            parent_tables = []
+            for t in tables:
+                if any(t.startswith(f"{p}_") for p in PARTITIONED_TABLES):
+                    continue
+                parent_tables.append(t)
+            self._table_cache = parent_tables
+        return self._table_cache
 
-    def get_unique_simulation_ids(self) -> list[str]:
-        """
-        Retrieves a list of unique simulation IDs found in all tables.
-
-        This method inspects all tables in the database (skipping system tables such as "spatial_ref_sys")
-        and returns the distinct simulation IDs found in the 'simulation' column.
-
-        Returns:
-            list[str]: A list of unique simulation IDs.
-        """
-        unique_ids = set()
-        inspector = inspect(self.db)
-        table_names = inspector.get_table_names()
-        for table in table_names:
-            if table == "spatial_ref_sys":
+    def get_simulation_ids(self) -> list[str]:
+        ids = set()
+        for table in self._get_tables():
+            # skip tables without simulation column
+            cols = [c["name"] for c in self._inspector.get_columns(table)]
+            if "simulation" not in cols:
                 continue
-            try:
-                query = text(f'SELECT DISTINCT simulation FROM "{table}"')
-                with self.db.begin() as conn:
-                    result = conn.execute(query)
-                    for row in result:
-                        if row[0]:
-                            unique_ids.add(row[0])
-            except Exception as e:
-                logger.error(
-                    "Error retrieving simulation ids from table %s: %s", table, e
-                )
-        return list(unique_ids)
+            query = text(f"SELECT DISTINCT simulation FROM {table}")
+            with self.db.begin() as conn:
+                for (sim,) in conn.execute(query):
+                    if sim:
+                        ids.add(sim)
+        return sorted(ids)
 
     def delete_simulations(self, simulation_ids: list[str]) -> None:
-        """
-        Deletes specific simulation records from all tables.
-
-        This method deletes rows from every table where the 'simulation' column matches any of the
-        provided simulation IDs. An index is created on the simulation column to optimize the deletion,
-        if one does not already exist.
-
-        Args:
-            simulation_ids (list[str]): A list of simulation IDs to delete.
-        """
         if not simulation_ids:
-            logger.info("No simulation IDs provided for deletion.")
+            logger.info("No simulations specified to delete.")
             return
-
-        inspector = inspect(self.db)
-        table_names = inspector.get_table_names()
-        for table in table_names:
-            if table == "spatial_ref_sys":
-                continue
-            try:
-                with self.db.begin() as conn:
-                    conn.execute(
-                        text(
-                            f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
-                        )
+        with self.db.begin() as conn:
+            # Drop partitions for partitioned tables
+            for table in PARTITIONED_TABLES:
+                for sim in simulation_ids:
+                    partition = f"{table}_{sim}"
+                    conn.execute(text(f"DROP TABLE IF EXISTS {partition};"))
+                    logger.debug("Dropped partition %s", partition)
+            # For non-partitioned tables, do DELETE
+            non_part = set(self._get_tables()) - set(PARTITIONED_TABLES)
+            for table in non_part:
+                # ensure simulation index
+                conn.execute(
+                    text(
+                        f"CREATE INDEX IF NOT EXISTS {table}_simulation_idx"
+                        f" ON {table}(simulation)"
                     )
-                    # Safe parameterized query
-                    delete_query = text(
-                        f'DELETE FROM "{table}" WHERE simulation = ANY(:simulations)'
-                    )
-                    result = conn.execute(delete_query, {"simulations": simulation_ids})
-                    logger.debug("Deleted %s rows from %s", result.rowcount, table)
-            except Exception as e:
-                logger.error(
-                    "Could not delete simulation(s) from table %s: %s", table, e
                 )
+                del_q = text(f"DELETE FROM {table} WHERE simulation = ANY(:s)")
+                res = conn.execute(del_q, {"s": simulation_ids})
+                logger.debug("Deleted %s rows from %s", res.rowcount, table)
 
     def delete_all_simulations(self, exclude: list[str] = None) -> None:
-        """
-        Deletes all simulation records from every table, with an option to exclude specific simulations.
-
-        If an exclusion list is provided, simulations with those IDs will not be deleted. Otherwise,
-        all simulation records are removed from all tables (excluding system tables).
-
-        Args:
-            exclude (list[str], optional): A list of simulation IDs that should NOT be deleted.
-                If None, all simulation records are deleted.
-        """
-        inspector = inspect(self.db)
-        table_names = inspector.get_table_names()
-        for table in table_names:
-            if table == "spatial_ref_sys":
-                continue
-            try:
-                with self.db.begin() as conn:
-                    conn.execute(
-                        text(
-                            f'CREATE INDEX IF NOT EXISTS "{table}_simulation_idx" ON "{table}" (simulation)'
-                        )
+        with self.db.begin() as conn:
+            # Partitioned: drop partitions
+            for table in PARTITIONED_TABLES:
+                # list existing partitions
+                parts = [
+                    p
+                    for p in self._inspector.get_table_names()
+                    if p.startswith(f"{table}_")
+                ]
+                to_drop = []
+                if exclude:
+                    keep = {f"{table}_{s}" for s in exclude}
+                    to_drop = [p for p in parts if p not in keep]
+                else:
+                    to_drop = parts
+                for partition in to_drop:
+                    conn.execute(text(f"DROP TABLE IF EXISTS {partition};"))
+                    logger.debug("Dropped partition %s", partition)
+            # Non-partitioned: delete or exclude
+            non_part = set(self._get_tables()) - set(PARTITIONED_TABLES)
+            for table in non_part:
+                conn.execute(
+                    text(
+                        f"CREATE INDEX IF NOT EXISTS {table}_simulation_idx"
+                        f" ON {table}(simulation)"
                     )
-                    if exclude:
-                        exclude_str = ", ".join([f"'{sim}'" for sim in exclude])
-                        delete_query = text(
-                            f'DELETE FROM "{table}" WHERE simulation NOT IN ({exclude_str})'
-                        )
-                    else:
-                        delete_query = text(f'DELETE FROM "{table}"')
-                    result = conn.execute(delete_query)
-                    logger.debug("Deleted %s rows from %s", result.rowcount, table)
-            except Exception as e:
-                logger.error("Could not delete simulations from table %s: %s", table, e)
+                )
+                if exclude:
+                    q = text(f"DELETE FROM {table} WHERE simulation NOT IN :ex")
+                    res = conn.execute(q, {"ex": exclude})
+                else:
+                    res = conn.execute(text(f"DELETE FROM {table}"))
+                logger.debug("Deleted %s rows from %s", res.rowcount, table)
