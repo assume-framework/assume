@@ -225,8 +225,8 @@ class BusDepot(DSMFlex, SupportsMinMax):
         self.model.in_queue = pyo.Var(
         self.model.evs,
         self.model.time_steps,
-    domain=pyo.Binary,
-    doc="EV is waiting in queue"
+        domain=pyo.Binary,
+        doc="EV is waiting in queue"
 )
 
         # Variable representing charge amount assigned from a specific CS to a specific EV at time t
@@ -299,10 +299,13 @@ class BusDepot(DSMFlex, SupportsMinMax):
 
     def define_constraints(self):
         """Defines core operational constraints for the bus depot model."""
-        @self.model.Constraint(self.model.evs, self.model.charging_stations, self.model.time_steps, doc="Enforce EV-CS compatibility")
-        def compatibility_constraint(m, ev, cs, t):
-                return m.charge_assignment[ev, cs, t] <= m.compatible[ev, cs] * 1e5 # Big-M formulation
+         
+#        @self.model.Constraint(self.model.evs, self.model.time_steps, doc="Set EV availability based on input profile")
+#        def link_availability_to_profile(m, ev, t):
+#                availability_param = getattr(m, f"{ev}_availability_profile")
+ #               return m.is_available[ev, t] == availability_param[t]
 
+ 
         # Constraint: If not a prosumer, total power input must be non-negative (no grid export).
         if not self.is_prosumer:
             @self.model.Constraint(self.model.time_steps, doc="Prevents grid export for non-prosumers")
@@ -314,12 +317,22 @@ class BusDepot(DSMFlex, SupportsMinMax):
           #      m.charge_assignment[ev, cs, t] for cs in m.charging_stations
            # )
      
-        
-        @self.model.Constraint(self.model.evs, self.model.time_steps, doc="Queue logic for unassigned but available EVs")
-        def queue_if_unassigned(m, ev, t):
-                return m.in_queue[ev, t] >= m.is_available[ev, t] - sum(
-            m.charge_assignment[ev, cs, t] for cs in m.charging_stations
-        )
+                
+        @self.model.Constraint(self.model.evs, self.model.time_steps, doc="Queue logic: EV is in queue if available and not assigned")
+        def enforce_queue_logic(m, ev, t):
+            return m.in_queue[ev, t] == m.is_available[ev, t] - sum(
+                m.is_assigned[ev, cs, t] for cs in m.charging_stations
+            )
+                    
+        @self.model.Constraint(self.model.evs, self.model.charging_stations, self.model.time_steps, doc="Link is_assigned with actual charge flow")
+        def assignment_indicator_constraint(m, ev, cs, t):
+            return m.charge_assignment[ev, cs, t] <= 1e5 * m.is_assigned[ev, cs, t]
+            
+ #       @self.model.Constraint(self.model.evs, self.model.time_steps, doc="Queue logic for unassigned but available EVs")
+ #       def queue_if_unassigned(m, ev, t):
+ #               return m.in_queue[ev, t] >= m.is_available[ev, t] - sum(
+  #          m.charge_assignment[ev, cs, t] for cs in m.charging_stations
+  #      )
         @self.model.Constraint(self.model.charging_stations, self.model.time_steps, doc="Charging station capacity constraint")
         def station_capacity_limit(m, cs, t):
             return sum(m.charge_assignment[ev, cs, t] for ev in m.evs) <= 1e5 * sum(
@@ -346,10 +359,7 @@ class BusDepot(DSMFlex, SupportsMinMax):
             )
             # return m.total_power_input[t] == ev_charge_sum # Assumes CSs are lossless passthrough
             return m.total_power_input[t] == cs_discharge_sum # Assumes CS discharge is what's drawn from grid perspective
-        @self.model.Constraint(self.model.evs, self.model.charging_stations, self.model.time_steps, doc="Link is_assigned with actual charge flow")
-        def assignment_indicator_constraint(m, ev, cs, t):
-            return m.charge_assignment[ev, cs, t] <= m.is_assigned[ev, cs, t] * 1e5  # Big-M
-
+        
         @self.model.Constraint(self.model.charging_stations, self.model.time_steps, doc="Max 1 EV per CS at each timestep")
         def max_one_ev_per_station(m, cs, t):
             return sum(m.is_assigned[ev, cs, t] for ev in m.evs) <= 1

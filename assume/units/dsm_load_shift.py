@@ -578,6 +578,10 @@ class DSMFlex:
         time_steps = list(instance.time_steps)
         added_labels = set()
 
+        electric_vehicles = list(instance.evs)
+        charging_stations = list(instance.charging_stations)
+       
+
         # 1. Grafik: EV States
         ax = axs[0]
         for block_name in instance.dsm_blocks:
@@ -593,14 +597,28 @@ class DSMFlex:
                     if ev_obj.availability_profile is not None
                     else [1] * len(time_steps)
                 )
+                for ev in electric_vehicles:
+                    print(f"EV: {ev}")
+                for charging_station in charging_stations:
+                    print
+                for t in time_steps:
+                    if availability[time_steps.index(t)] == 1:
+                        if (block_name, t) in self.model.in_queue:
+                            in_queue_val = pyo.value(self.model.in_queue[block_name, t])
+                        else:
+                            in_queue_val = 0
 
-                for avail, charge in zip(availability, charging):
-                    if avail == 1:
-                        status = "Charging" if charge > 0 else "Queued"
+                        print(in_queue_val)  
+
+                        if in_queue_val == 1:
+                            status = "Queued"
+                        elif charging[time_steps.index(t)] > 0:
+                            status = "Charging"
+                        else:
+                            status = "Idle"
                     else:
                         status = "Idle"
-                    charging_status.append(status)
-
+                    print(in_queue_val) 
                 for i, status in enumerate(charging_status):
                     label = status if status not in added_labels else None
                     if label:
