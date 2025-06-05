@@ -111,7 +111,7 @@ class FastIndex:
 
         elif isinstance(item, slice):
             start_idx = (
-                self._get_idx_from_date(item.start, round_up=False)
+                self._get_idx_from_date(item.start)
                 if isinstance(item.start, datetime)
                 else item.start or 0
             )
@@ -200,7 +200,7 @@ class FastIndex:
             total_dates = np.arange(self._count) * self._freq_seconds
             self._date_list = [self._start + timedelta(seconds=s) for s in total_dates]
 
-        start_idx = self._get_idx_from_date(start or self.start, round_up=False)
+        start_idx = self._get_idx_from_date(start or self.start)
         end_idx = self._get_idx_from_date(end or self.end, round_up=False) + 1
         return self._date_list[start_idx:end_idx]
 
@@ -439,7 +439,7 @@ class FastSeries:
         if isinstance(item, slice):
             # Handle slicing with datetime start/stop
             start_idx = (
-                self.index._get_idx_from_date(item.start, round_up=False)
+                self.index._get_idx_from_date(item.start)
                 if item.start is not None
                 else 0
             )
@@ -502,7 +502,7 @@ class FastSeries:
         if isinstance(item, slice):
             # Handle slicing
             start_idx = (
-                self.index._get_idx_from_date(item.start, round_up=False)
+                self.index._get_idx_from_date(item.start)
                 if isinstance(item.start, datetime)
                 else (
                     len(self.data) + item.start
