@@ -2202,7 +2202,7 @@
               "options": {
                 "mode": "exclude",
                 "names": [
-                  "noisy_action_1 pp_6"
+                  "noisy_action_0"
                 ],
                 "prefix": "All except:",
                 "readOnly": true
@@ -2255,6 +2255,7 @@
           "editorMode": "code",
           "format": "table",
           "group": [],
+          "hide": false,
           "metricColumn": "simulation",
           "rawQuery": true,
           "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_0 AS noisy_action_0,\n    actions_0 - exploration_noise_0 AS action_0\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
@@ -2364,6 +2365,7 @@
       "title": "Training ACTIONS during Episode ${episode}",
       "transformations": [
         {
+          "disabled": true,
           "id": "partitionByValues",
           "options": {
             "fields": [
@@ -2586,6 +2588,487 @@
         }
       ],
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "max": 1,
+          "min": -1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 65
+      },
+      "id": 53,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "maxHeight": 600,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "group": [],
+          "hide": true,
+          "metricColumn": "simulation",
+          "rawQuery": true,
+          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_0 AS noisy_action_0,\n    actions_0 - exploration_noise_0 AS action_0\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "refId": "A",
+          "select": [
+            [
+              {
+                "params": [
+                  "reward"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg",
+                  "24"
+                ],
+                "type": "moving_window"
+              },
+              {
+                "params": [
+                  "avg_reward"
+                ],
+                "type": "alias"
+              }
+            ],
+            [
+              {
+                "params": [
+                  "reward"
+                ],
+                "type": "column"
+              },
+              {
+                "params": [
+                  "avg",
+                  "24"
+                ],
+                "type": "moving_window"
+              },
+              {
+                "params": [
+                  "avg_reward"
+                ],
+                "type": "alias"
+              }
+            ]
+          ],
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          },
+          "table": "rl_params",
+          "timeColumn": "index",
+          "timeColumnType": "timestamp",
+          "where": [
+            {
+              "name": "$__timeFilter",
+              "params": [],
+              "type": "macro"
+            }
+          ]
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": true,
+          "rawQuery": true,
+          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_1 AS noisy_action_1,  -- Handle missing actions_1\n    actions_1 - exploration_noise_1 AS action_1\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "hide": true,
+          "rawQuery": true,
+          "rawSql": "WITH unpivoted_data AS (\r\n  SELECT\r\n    simulation,\r\n    datetime + ((column_offset / 1) || ' hour')::INTERVAL AS bid_time, -- Adjust timestamp based on column                                              -- Original column name\\r\\n        \r\n    action_price                                                   -- Unpivoted bid price\\r\\n    \r\n    FROM (\r\n      SELECT\r\n        simulation,\r\n        datetime,\r\n        unnest(array[\r\n          actions_0::float, actions_1::float, actions_2::float, actions_3::float, actions_4::float, actions_5::float, actions_6::float, actions_7::float, actions_8::float, actions_9::float,\r\n          actions_10::float, actions_11::float, actions_12::float, actions_13::float, actions_14::float, actions_15::float, actions_16::float, actions_17::float, actions_18::float, actions_19::float,\r\n          actions_20::float, actions_21::float, actions_22::float, actions_23::float, actions_24::float]) AS action_price, --actions_25::float, actions_26::float, actions_27::float, actions_28::float, actions_29::float,\\r\\n                actions_30::float, actions_31::float, actions_32::float, actions_33::float, actions_34::float, actions_35::float, actions_36::float, actions_37::float, actions_38::float, actions_39::float,\\r\\n                actions_40::float, actions_41::float, actions_42::float, actions_43::float, actions_44::float, actions_45::float, actions_46::float, actions_47::float\\r\\n            \r\n                                        -- Unpivot the bid prices\\r\\n            \r\n          generate_series(0, 23) AS column_offset,               -- Generate column indices dynamically\\r\\n        \r\n      FROM rl_params      \r\n      WHERE simulation = '$simulation' AND unit = '$rl_unit')\r\n    )\r\n          -- Final output for plotting\r\nSELECT\r\n  $__timeGroupAlias(bid_time,$__interval),\r\n  MIN(action_price) AS \"min_action_price\",\r\n  MAX(action_price) AS \"max_action_price\",\r\n  simulation as \"simulation\"\r\nFROM unpivoted_data\r\nWHERE $__timeFilter(bid_time)\r\nGROUP BY simulation, bid_time\r\nORDER BY 1",
+          "refId": "C",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": true,
+          "rawQuery": true,
+          "rawSql": "WITH unpivoted_data AS (\r\n  SELECT\r\n    simulation,\r\n    datetime + ((column_offset / 1) || ' hour')::INTERVAL AS bid_time, -- Adjust timestamp based on column                                              -- Original column name\\r\\n        \r\n    action_price                                                   -- Unpivoted bid price\\r\\n    \r\n    FROM (\r\n      SELECT\r\n        simulation,\r\n        datetime,\r\n        unnest(array[exploration_noise_0::float, exploration_noise_1::float, exploration_noise_2::float, exploration_noise_3::float, exploration_noise_4::float, exploration_noise_5::float, exploration_noise_6::float, exploration_noise_7::float, exploration_noise_8::float, exploration_noise_9::float,\r\n                exploration_noise_10::float, exploration_noise_11::float, exploration_noise_12::float, exploration_noise_13::float, exploration_noise_14::float, exploration_noise_15::float, exploration_noise_16::float, exploration_noise_17::float, exploration_noise_18::float, exploration_noise_19::float,\r\n                exploration_noise_20::float, exploration_noise_21::float, exploration_noise_22::float, exploration_noise_23::float, exploration_noise_24::float]) as action_price,--exploration_noise_25::float, exploration_noise_26::float, exploration_noise_27::float, exploration_noise_28::float, exploration_noise_29::float,\\r\\n                exploration_noise_30::float, exploration_noise_31::float, exploration_noise_32::float, exploration_noise_33::float, exploration_noise_34::float, exploration_noise_35::float, exploration_noise_36::float, exploration_noise_37::float, exploration_noise_38::float, exploration_noise_39::float,\\r\\n                exploration_noise_40::float, exploration_noise_41::float, exploration_noise_42::float, exploration_noise_43::float, exploration_noise_44::float, exploration_noise_45::float, exploration_noise_46::float, exploration_noise_47::float\\r\\n                                       \r\n        generate_series(0, 23) AS column_offset \r\n      FROM rl_params   \r\n      WHERE \r\n        simulation = '$simulation'\r\n        AND evaluation_mode = FALSE \r\n        AND exploration_noise_0 is not NULL\r\n        AND unit IN (${rl_unit})  -- Supports multiple units\r\n        AND episode = ${episode}  -- Filtering for the specific episode\r\n      )\r\n)\r\n\r\nSELECT\r\n  bid_time, \r\n  avg(action_price) as exploration_noise\r\nFROM unpivoted_data\r\nWHERE $__timeFilter(bid_time)\r\nGROUP BY bid_time\r\nORDER BY 1",
+          "refId": "D",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "WITH unpivoted_data AS (\r\n  SELECT\r\n    datetime + ((column_offset / 1) || ' hour')::INTERVAL AS bid_time, -- Adjust timestamp based on column                                              -- Original column name\\r\\n        \r\n    action_price                                                   -- Unpivoted bid price\\r\\n    \r\n    FROM (\r\n      SELECT\r\n        simulation,\r\n        datetime,\r\n        unnest(array[actions_0::float, actions_1::float, actions_2::float, actions_3::float, actions_4::float, actions_5::float, actions_6::float, actions_7::float, actions_8::float, actions_9::float,\r\n                actions_10::float, actions_11::float, actions_12::float, actions_13::float, actions_14::float, actions_15::float, actions_16::float, actions_17::float, actions_18::float, actions_19::float,\r\n                actions_20::float, actions_21::float, actions_22::float, actions_23::float, actions_24::float]) as action_price,--actions_25::float, actions_26::float, actions_27::float, actions_28::float, actions_29::float,\\r\\n                actions_30::float, actions_31::float, actions_32::float, actions_33::float, actions_34::float, actions_35::float, actions_36::float, actions_37::float, actions_38::float, actions_39::float,\\r\\n                actions_40::float, actions_41::float, actions_42::float, actions_43::float, actions_44::float, actions_45::float, actions_46::float, actions_47::float\\r\\n                                       \r\n        generate_series(0, 23) AS column_offset \r\n      FROM rl_params   \r\n      WHERE \r\n        simulation = '$simulation'\r\n        AND evaluation_mode = FALSE \r\n        AND actions_0 is not NULL\r\n        AND unit IN (${rl_unit})  -- Supports multiple units\r\n        AND episode = ${episode}  -- Filtering for the specific episode\r\n      )\r\n)\r\n\r\nSELECT\r\n  bid_time, \r\n  avg(action_price) as noisy_action\r\nFROM unpivoted_data\r\nWHERE $__timeFilter(bid_time)\r\nGROUP BY bid_time\r\nORDER BY 1",
+          "refId": "E",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "name": "Expression",
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "$E-$D",
+          "hide": false,
+          "refId": "action",
+          "type": "math"
+        }
+      ],
+      "title": "Training ACTIONS during Episode ${episode}",
+      "transformations": [
+        {
+          "disabled": true,
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "unit"
+            ],
+            "keepFields": false
+          }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "max": 1,
+          "min": -1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 65
+      },
+      "id": 54,
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "maxHeight": 600,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": true,
+          "rawQuery": true,
+          "rawSql": "WITH unpivoted_data AS (\r\n  SELECT\r\n    simulation,\r\n    datetime + ((column_offset / 1) || ' hour')::INTERVAL AS bid_time, -- Adjust timestamp based on column                                              -- Original column name\\r\\n        \r\n    action_price                                                   -- Unpivoted bid price\\r\\n    \r\n    FROM (\r\n      SELECT\r\n        simulation,\r\n        datetime,\r\n        unnest(array[exploration_noise_0::float, exploration_noise_1::float, exploration_noise_2::float, exploration_noise_3::float, exploration_noise_4::float, exploration_noise_5::float, exploration_noise_6::float, exploration_noise_7::float, exploration_noise_8::float, exploration_noise_9::float,\r\n                exploration_noise_10::float, exploration_noise_11::float, exploration_noise_12::float, exploration_noise_13::float, exploration_noise_14::float, exploration_noise_15::float, exploration_noise_16::float, exploration_noise_17::float, exploration_noise_18::float, exploration_noise_19::float,\r\n                exploration_noise_20::float, exploration_noise_21::float, exploration_noise_22::float, exploration_noise_23::float, exploration_noise_24::float]) as action_price,--exploration_noise_25::float, exploration_noise_26::float, exploration_noise_27::float, exploration_noise_28::float, exploration_noise_29::float,\\r\\n                exploration_noise_30::float, exploration_noise_31::float, exploration_noise_32::float, exploration_noise_33::float, exploration_noise_34::float, exploration_noise_35::float, exploration_noise_36::float, exploration_noise_37::float, exploration_noise_38::float, exploration_noise_39::float,\\r\\n                exploration_noise_40::float, exploration_noise_41::float, exploration_noise_42::float, exploration_noise_43::float, exploration_noise_44::float, exploration_noise_45::float, exploration_noise_46::float, exploration_noise_47::float\\r\\n                                       \r\n        generate_series(0, 23) AS column_offset \r\n      FROM rl_params   \r\n      WHERE \r\n        simulation = '$simulation'\r\n        AND evaluation_mode = TRUE \r\n        AND exploration_noise_0 is not NULL\r\n        AND unit IN (${rl_unit})  -- Supports multiple units\r\n        AND episode = ${eval_episode}  -- Filtering for the specific episode\r\n      )\r\n)\r\n\r\nSELECT\r\n  bid_time, \r\n  avg(action_price) as exploration_noise\r\nFROM unpivoted_data\r\nWHERE $__timeFilter(bid_time)\r\nGROUP BY bid_time\r\nORDER BY 1",
+          "refId": "D",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "WITH unpivoted_data AS (\r\n  SELECT\r\n    datetime + ((column_offset / 1) || ' hour')::INTERVAL AS bid_time, -- Adjust timestamp based on column                                              -- Original column name\\r\\n        \r\n    action_price                                                   -- Unpivoted bid price\\r\\n    \r\n    FROM (\r\n      SELECT\r\n        simulation,\r\n        datetime,\r\n        unnest(array[actions_0::float, actions_1::float, actions_2::float, actions_3::float, actions_4::float, actions_5::float, actions_6::float, actions_7::float, actions_8::float, actions_9::float,\r\n                actions_10::float, actions_11::float, actions_12::float, actions_13::float, actions_14::float, actions_15::float, actions_16::float, actions_17::float, actions_18::float, actions_19::float,\r\n                actions_20::float, actions_21::float, actions_22::float, actions_23::float, actions_24::float]) as action_price,--actions_25::float, actions_26::float, actions_27::float, actions_28::float, actions_29::float,\\r\\n                actions_30::float, actions_31::float, actions_32::float, actions_33::float, actions_34::float, actions_35::float, actions_36::float, actions_37::float, actions_38::float, actions_39::float,\\r\\n                actions_40::float, actions_41::float, actions_42::float, actions_43::float, actions_44::float, actions_45::float, actions_46::float, actions_47::float\\r\\n                                       \r\n        generate_series(0, 23) AS column_offset \r\n      FROM rl_params   \r\n      WHERE \r\n        simulation = '$simulation'\r\n        AND evaluation_mode = TRUE \r\n        AND actions_0 is not NULL\r\n        AND unit IN (${rl_unit})  -- Supports multiple units\r\n        AND episode = ${eval_episode}  -- Filtering for the specific episode\r\n      )\r\n)\r\n\r\nSELECT\r\n  bid_time, \r\n  avg(action_price) as noisy_action\r\nFROM unpivoted_data\r\nWHERE $__timeFilter(bid_time)\r\nGROUP BY bid_time\r\nORDER BY 1",
+          "refId": "E",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "datasource": {
+            "name": "Expression",
+            "type": "__expr__",
+            "uid": "__expr__"
+          },
+          "expression": "$E-$D",
+          "hide": false,
+          "refId": "action",
+          "type": "math"
+        }
+      ],
+      "title": "Evaluation ACTIONS during Episode ${eval_episode}",
+      "transformations": [
+        {
+          "disabled": true,
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "unit"
+            ],
+            "keepFields": false
+          }
+        }
+      ],
+      "type": "timeseries"
     }
   ],
   "preload": false,
@@ -2596,8 +3079,8 @@
     "list": [
       {
         "current": {
-          "text": "example_02a_base",
-          "value": "example_02a_base"
+          "text": "example_02a_base_lstm",
+          "value": "example_02a_base_lstm"
         },
         "datasource": {
           "type": "postgres",
@@ -2617,8 +3100,8 @@
       },
       {
         "current": {
-          "text": "1",
-          "value": "1"
+          "text": "100",
+          "value": "100"
         },
         "datasource": {
           "type": "grafana-postgresql-datasource",
@@ -2636,8 +3119,8 @@
       },
       {
         "current": {
-          "text": "1",
-          "value": "1"
+          "text": "15",
+          "value": "15"
         },
         "datasource": {
           "type": "grafana-postgresql-datasource",
@@ -2681,8 +3164,8 @@
     ]
   },
   "time": {
-    "from": "2019-02-28T23:00:00.000Z",
-    "to": "2019-03-31T21:59:59.000Z"
+    "from": "2019-03-01T00:00:00.000Z",
+    "to": "2019-03-31T23:59:59.000Z"
   },
   "timepicker": {
     "refresh_intervals": [
@@ -2698,6 +3181,6 @@
   "timezone": "",
   "title": "ASSUME: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 20,
+  "version": 11,
   "weekStart": ""
 }

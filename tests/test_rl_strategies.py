@@ -9,11 +9,16 @@ import pytest
 
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
-    from assume.strategies.learning_strategies import RLStrategy, RLStrategySingleBid
+    from assume.strategies.learning_strategies import (
+        RLStrategy,
+        RLStrategyDAM,
+        RLStrategySingleBid,
+    )
 
 except ImportError:
     RLStrategy = None
     RLStrategySingleBid = None
+    RLStrategyDAM = None
 
 from assume.common.forecasts import NaiveForecast
 from assume.units import PowerPlant
@@ -54,11 +59,12 @@ def power_plant() -> PowerPlant:
 
 @pytest.mark.require_learning
 @pytest.mark.parametrize(
-    "strategy_class, obs_dim, act_dim, actor_architecture, expected_bid_count, expected_volumes",
+    "strategy_class, obs_dim, act_dim, actor_architecture, expected_bid_count, expected_volumes, products",
     [
-        (RLStrategy, 38, 2, "mlp", 2, [200, 800]),
-        (RLStrategy, 38, 2, "lstm", 2, [200, 800]),
-        (RLStrategySingleBid, 74, 1, "mlp", 1, [1000]),
+        (RLStrategy, 38, 2, "mlp", 2, [200, 800], 1),
+        (RLStrategy, 38, 2, "lstm", 2, [200, 800], 1),
+        (RLStrategySingleBid, 74, 1, "mlp", 1, [1000], 1),
+        (RLStrategyDAM, 74, 24, "mlp", 24, [1000] * 24, 24),
     ],
 )
 def test_learning_strategies_parametrized(
@@ -70,8 +76,9 @@ def test_learning_strategies_parametrized(
     actor_architecture,
     expected_bid_count,
     expected_volumes,
+    products,
 ):
-    product_index = pd.date_range("2023-07-01", periods=1, freq="h")
+    product_index = pd.date_range("2023-07-01", periods=products, freq="h")
     mc = mock_market_config
     mc.product_type = "energy_eom"
     product_tuples = [
@@ -121,6 +128,6 @@ def test_learning_strategies_parametrized(
     costs = power_plant.outputs["total_costs"].loc[product_index]
 
     assert reward[0] == 0.01
-    assert profit[0] == 1000.0
+    assert profit[0] == 10000.0
     assert regret[0] == 0.0
     assert costs[0] == 40000.0  # Assumes hot_start_cost = 20000 by default

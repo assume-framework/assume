@@ -68,6 +68,7 @@ available_examples = {
     #
     # DRL references case for learning advancement testing
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
+    "small_learning_1_dam": {"scenario": "example_02a", "study_case": "base_dam"},
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     # DRL cases with lstm instead of mlp as actor neural network architecture
@@ -118,8 +119,9 @@ if __name__ == "__main__":
     # select the example to run from the available examples above
     examples = [
         "small_learning_1",
-        "small_learning_1_lstm",
-        "small_learning_1_lstm_original",
+        # "small_learning_1_dam",
+        # "small_learning_1_lstm",
+        # "small_learning_1_lstm_original",
     ]
 
     if data_format == "local_db":

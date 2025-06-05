@@ -109,7 +109,7 @@ class RLUnitsOperator(UnitsOperator):
                         {
                             "profit": unit.outputs["profit"].loc[products_index].sum(),
                             "reward": unit.outputs["reward"].loc[products_index].sum()
-                            / 24,
+                            / len(products_index),
                             "regret": unit.outputs["regret"].loc[products_index].sum(),
                         }
                     )
