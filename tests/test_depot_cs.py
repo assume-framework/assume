@@ -1,10 +1,15 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
-from assume.units.dst_components import ChargingStation  
+from assume.units.dst_components import ChargingStation
 
 use_solver = "appsigurob_highs"
+
 
 @pytest.fixture
 def cs_config():
@@ -37,8 +42,7 @@ def cs_model_with_availability(cs_config):
 
     # maximize total discharge
     model.total_discharge = pyo.Objective(
-        expr=sum(model.cs.discharge[t] for t in model.time_steps),
-        sense=pyo.maximize
+        expr=sum(model.cs.discharge[t] for t in model.time_steps), sense=pyo.maximize
     )
 
     solver = pyo.SolverFactory(use_solver)

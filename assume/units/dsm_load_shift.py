@@ -6,7 +6,9 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import numpy as np
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -140,8 +142,29 @@ class DSMFlex:
         self.model.time_steps = pyo.Set(
             initialize=[idx for idx, _ in enumerate(self.index)]
         )
-        self.model.evs = pyo.Set(initialize=[ev for ev in self.components if ev.startswith("electric_vehicle")])
-        self.model.charging_stations = pyo.Set(initialize=[cs for cs in self.components if cs.startswith("charging_station")])
+        # self.model.evs = pyo.Set(initialize=[ev for ev in self.components if ev.startswith("electric_vehicle")])
+        # self.model.charging_stations = pyo.Set(initialize=[cs for cs in self.components if cs.startswith("charging_station")])
+        self.model.evs = pyo.Set(
+            initialize=[
+                ev for ev in self.components if ev.startswith("electric_vehicle")
+            ],
+            ordered=True,
+        )
+
+        self.model.charging_stations = pyo.Set(
+            initialize=[
+                cs
+                for cs, _ in sorted(
+                    (
+                        (cs, self.components[cs]["max_power"])
+                        for cs in self.components
+                        if cs.startswith("charging_station")
+                    ),
+                    key=lambda x: -x[1],  # descending by max_power
+                )
+            ],
+            ordered=True,
+        )
 
     def define_objective_opt(self):
         """
@@ -548,121 +571,92 @@ class DSMFlex:
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
         )
-        
+
         # Variable cost series
         variable_cost = [
             pyo.value(instance.variable_cost[t]) for t in instance.time_steps
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
-      
-  
+
         """
         Plots the states of electric vehicles (Charging / Queued / Idle) over time.
         """
         self.plot_ev_states(instance)
-    
+
     def plot_ev_states(self, instance):
         """
-        Plots the states of electric vehicles (Charging / Queued / Idle) over time.
-        Also plots charging station discharge and electric vehicle charge as additional graphs.
+        Plots:
+        1. EV Status Over Time (Idle = 0, Queued = 1, Charging = 2)
+        2. Charging Station Discharge
+        3. EV Charge and SOC
         """
-      
-        fig, axs = plt.subplots(3, 1, figsize=(14, 12), sharex=True)
-
-        colors = {
-            "Charging": "green",
-            "Queued": "orange",
-            "Idle": "gray"
-        }
 
         time_steps = list(instance.time_steps)
-        added_labels = set()
-
-        electric_vehicles = list(instance.evs)
+        evs = list(instance.evs)
         charging_stations = list(instance.charging_stations)
-       
 
-        # 1. Grafik: EV States
-        ax = axs[0]
-        for block_name in instance.dsm_blocks:
-            if block_name.startswith("electric_vehicle"):
-                block = instance.dsm_blocks[block_name]
-                ev_obj = self.components[block_name]
+        fig, axs = plt.subplots(3, 1, figsize=(15, 12), sharex=True)
 
-                charging_status = []
+        # Graph 1: EV Status Matrix Plot
+        status_matrix = np.zeros((len(evs), len(time_steps)))
 
-                charging = [pyo.value(block.charge[t]) for t in time_steps]
-                availability = (
-                    list(ev_obj.availability_profile.as_pd_series())
-                    if ev_obj.availability_profile is not None
-                    else [1] * len(time_steps)
+        for i, ev in enumerate(evs):
+            for j, t in enumerate(time_steps):
+                queued = pyo.value(instance.in_queue[ev, t])
+                assigned = sum(
+                    pyo.value(instance.is_assigned[ev, cs, t])
+                    for cs in charging_stations
                 )
-                for ev in electric_vehicles:
-                    print(f"EV: {ev}")
-                for charging_station in charging_stations:
-                    print
-                for t in time_steps:
-                    if availability[time_steps.index(t)] == 1:
-                        if (block_name, t) in self.model.in_queue:
-                            in_queue_val = pyo.value(self.model.in_queue[block_name, t])
-                        else:
-                            in_queue_val = 0
+                if assigned >= 1:
+                    status_matrix[i, j] = 2  # Charging
+                elif queued >= 1:
+                    status_matrix[i, j] = 1  # Queued
+                # else:
+                #     status_matrix[i, j] = 0  # Idle
 
-                        print(in_queue_val)  
+        cmap = plt.cm.get_cmap("viridis", 3)
+        im = axs[0].imshow(
+            status_matrix, aspect="auto", cmap=cmap, interpolation="nearest"
+        )
 
-                        if in_queue_val == 1:
-                            status = "Queued"
-                        elif charging[time_steps.index(t)] > 0:
-                            status = "Charging"
-                        else:
-                            status = "Idle"
-                    else:
-                        status = "Idle"
-                    print(in_queue_val) 
-                for i, status in enumerate(charging_status):
-                    label = status if status not in added_labels else None
-                    if label:
-                        added_labels.add(status)
-                    ax.scatter(
-                        time_steps[i],
-                        block_name,
-                        color=colors[status],
-                        label=label,
-                        s=50,
-                        marker="s",
-                    )
+        axs[0].set_yticks(np.arange(len(evs)))
+        axs[0].set_yticklabels(evs)
+        axs[0].set_title("EV Status Over Time (1=Queued, 2=Charging)")  # 0=Idle,
+        axs[0].set_ylabel("Electric Vehicle")
 
-        ax.set_title("EV States Over Time (Charging / Queued / Idle)")
-        ax.set_ylabel("EV")
-        ax.legend(title="Status", loc="upper right")
-        ax.grid(True, linestyle="--", alpha=0.5)
+        # Add legend for status
+        status_legend = [
+            # mpatches.Patch(color=cmap(0), label='Idle (0)'),
+            mpatches.Patch(color=cmap(1), label="Queued (1)"),
+            mpatches.Patch(color=cmap(2), label="Charging (2)"),
+        ]
+        axs[0].legend(handles=status_legend, loc="upper right")
 
-        # 2. Grafik: Charging Station Discharge
-        ax2 = axs[1]
-        for block_name in instance.dsm_blocks:
-            if block_name.startswith("charging_station"):
-                block = instance.dsm_blocks[block_name]
-                discharge = [pyo.value(block.discharge[t]) for t in time_steps]
-                ax2.plot(time_steps, discharge, label=block_name)
+        # Graph 2: Charging Station Discharge
+        for cs in charging_stations:
+            discharge = [
+                pyo.value(instance.dsm_blocks[cs].discharge[t]) for t in time_steps
+            ]
+            axs[1].plot(time_steps, discharge, label=f"{cs} Discharge")
 
-        ax2.set_title("Charging Station Discharge Over Time")
-        ax2.set_ylabel("Discharge Power")
-        ax2.legend(loc="upper right")
-        ax2.grid(True, linestyle="--", alpha=0.5)
+        axs[1].set_title("Charging Station Discharge")
+        axs[1].set_ylabel("Discharge Power")
+        axs[1].legend()
+        axs[1].grid(True, linestyle="--", alpha=0.5)
 
-        # 3. Grafik: Electric Vehicle Charge
-        ax3 = axs[2]
-        for block_name in instance.dsm_blocks:
-            if block_name.startswith("electric_vehicle"):
-                block = instance.dsm_blocks[block_name]
-                charge = [pyo.value(block.charge[t]) for t in time_steps]
-                ax3.plot(time_steps, charge, label=block_name)
+        # Graph 3: EV Charge and SOC
+        for ev in evs:
+            block = instance.dsm_blocks[ev]
+            charge = [pyo.value(block.charge[t]) for t in time_steps]
+            soc = [pyo.value(block.soc[t]) for t in time_steps]
+            axs[2].plot(time_steps, charge, label=f"{ev} Charge")
+            axs[2].plot(time_steps, soc, label=f"{ev} SOC", linestyle="--")
 
-        ax3.set_title("Electric Vehicle Charge Over Time")
-        ax3.set_xlabel("Time Step")
-        ax3.set_ylabel("Charge Power")
-        ax3.legend(loc="upper right")
-        ax3.grid(True, linestyle="--", alpha=0.5)
+        axs[2].set_title("EV Charge and SOC Over Time")
+        axs[2].set_xlabel("Time Step")
+        axs[2].set_ylabel("Power / SOC")
+        axs[2].legend()
+        axs[2].grid(True, linestyle="--", alpha=0.5)
 
         plt.tight_layout()
         plt.show()

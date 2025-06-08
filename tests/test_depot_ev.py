@@ -1,10 +1,15 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
-from assume.units.dst_components import ElectricVehicle  
+from assume.units.dst_components import ElectricVehicle
 
 use_solver = "appsi_highs"
+
 
 @pytest.fixture
 def ev_config():
@@ -20,12 +25,11 @@ def ev_config():
         "ramp_down": 10,
     }
 
+
 @pytest.fixture
 def ev_model_with_availability(ev_config):
     time_steps = list(range(10))
-    availability_profile = pd.Series(
-        [0, 1, 0, 0, 1, 1, 1, 0, 0, 1], index=time_steps
-    )
+    availability_profile = pd.Series([0, 1, 0, 0, 1, 1, 1, 0, 0, 1], index=time_steps)
     external_range = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     electricity_price = [0.25] * 10
 
@@ -92,11 +96,23 @@ def test_soc_balance_and_constraints(ev_model_with_availability):
 
         # Ramp constraints
         if i > 0:
-            assert pyo.value(charge[t]) - pyo.value(charge[ts[i - 1]]) <= pyo.value(model.ev.ramp_up) + 1e-5
-            assert pyo.value(charge[ts[i - 1]]) - pyo.value(charge[t]) <= pyo.value(model.ev.ramp_down) + 1e-5
+            assert (
+                pyo.value(charge[t]) - pyo.value(charge[ts[i - 1]])
+                <= pyo.value(model.ev.ramp_up) + 1e-5
+            )
+            assert (
+                pyo.value(charge[ts[i - 1]]) - pyo.value(charge[t])
+                <= pyo.value(model.ev.ramp_down) + 1e-5
+            )
 
-            assert pyo.value(discharge[t]) - pyo.value(discharge[ts[i - 1]]) <= pyo.value(model.ev.ramp_up) + 1e-5
-            assert pyo.value(discharge[ts[i - 1]]) - pyo.value(discharge[t]) <= pyo.value(model.ev.ramp_down) + 1e-5
+            assert (
+                pyo.value(discharge[t]) - pyo.value(discharge[ts[i - 1]])
+                <= pyo.value(model.ev.ramp_up) + 1e-5
+            )
+            assert (
+                pyo.value(discharge[ts[i - 1]]) - pyo.value(discharge[t])
+                <= pyo.value(model.ev.ramp_down) + 1e-5
+            )
 
         # Charge/discharge availability
         max_pc = pyo.value(model.ev.max_power_charge)
@@ -109,7 +125,9 @@ def test_soc_balance_and_constraints(ev_model_with_availability):
             assert pyo.value(discharge[t]) <= max_pd + 1e-5
 
         # Usage check
-        expected_usage = (1 - availability_profile[t]) * (ext_range[t] / pyo.value(model.ev.mileage))
+        expected_usage = (1 - availability_profile[t]) * (
+            ext_range[t] / pyo.value(model.ev.mileage)
+        )
         assert abs(pyo.value(usage[t]) - expected_usage) < 1e-4
 
 
