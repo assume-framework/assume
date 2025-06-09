@@ -16,6 +16,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 [![](https://img.shields.io/pypi/l/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
 [![](https://img.shields.io/pypi/status/assume-framework.svg)](https://pypi.org/pypi/assume-framework/)
 [![](https://img.shields.io/readthedocs/assume)](https://assume.readthedocs.io/)
+[![DOI](https://joss.theoj.org/papers/a8843ad1978808dc593b16437a2a029e/status.svg)](https://joss.theoj.org/papers/a8843ad1978808dc593b16437a2a029e)
 
 [![Try examples in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://github.com/assume-framework/assume/tree/main/examples/notebooks)
 
