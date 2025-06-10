@@ -320,25 +320,32 @@ class BusDepot(DSMFlex, SupportsMinMax):
                     f"Skipping ev_total_charge constraint for {ev} at time {t} due to missing block/variable."
                 )
                 return pyo.Constraint.Skip  # Skip constraint if EV block/var is missing
+            
+        @self.model.Constraint(self.model.charging_stations, self.model.time_steps)
+        def station_capacity_limit(m, cs, t):
+            return (
+                sum(m.charge_assignment[ev, cs, t] for ev in m.evs)
+                <= m.dsm_blocks[cs].discharge[t]
+            )
 
-        # Constraint: Total discharge from a charging station at time t must equal the sum of charge
-        # assigned from it to all EVs.
-        @self.model.Constraint(
-            self.model.charging_stations,
-            self.model.time_steps,
-            doc="Links CS total discharge to assignments to EVs",
-        )
-        def station_discharge_balance(m, cs, t):
-            # Ensure the CS exists in dsm_blocks and has 'discharge' variable
-            if cs in m.dsm_blocks and hasattr(m.dsm_blocks[cs], "discharge"):
-                return m.dsm_blocks[cs].discharge[t] == sum(
-                    m.charge_assignment[ev, cs, t] for ev in m.evs
-                )
-            else:
-                logger.warning(
-                    f"Skipping station_discharge_balance constraint for {cs} at time {t} due to missing block/variable."
-                )
-                return pyo.Constraint.Skip  # Skip constraint if CS block/var is missing
+        # # Constraint: Total discharge from a charging station at time t must equal the sum of charge
+        # # assigned from it to all EVs.
+        # @self.model.Constraint(
+        #     self.model.charging_stations,
+        #     self.model.time_steps,
+        #     doc="Links CS total discharge to assignments to EVs",
+        # )
+        # def station_discharge_balance(m, cs, t):
+        #     # Ensure the CS exists in dsm_blocks and has 'discharge' variable
+        #     if cs in m.dsm_blocks and hasattr(m.dsm_blocks[cs], "discharge"):
+        #         return m.dsm_blocks[cs].discharge[t] == sum(
+        #             m.charge_assignment[ev, cs, t] for ev in m.evs
+        #         )
+        #     else:
+        #         logger.warning(
+        #             f"Skipping station_discharge_balance constraint for {cs} at time {t} due to missing block/variable."
+        #         )
+        #         return pyo.Constraint.Skip  # Skip constraint if CS block/var is missing
 
     def define_constraints(self):
         """Defines core operational constraints for the bus depot model."""
@@ -391,19 +398,14 @@ class BusDepot(DSMFlex, SupportsMinMax):
 
             # Assuming is_available = 1 means at depot/can charge
             return charge_sum <= M * m.is_available[ev, t]
-
-        @self.model.Constraint(self.model.evs, self.model.time_steps)
-        def link_ev_charge_from_assignment(m, ev, t):
-            return m.dsm_blocks[ev].charge[t] == sum(
-                m.charge_assignment[ev, cs, t] for cs in m.charging_stations
-            )
-
-        @self.model.Constraint(self.model.charging_stations, self.model.time_steps)
-        def station_capacity_limit(m, cs, t):
-            return (
-                sum(m.charge_assignment[ev, cs, t] for ev in m.evs)
-                <= m.dsm_blocks[cs].discharge[t]
-            )
+        
+        # # Need to be decided
+        # @self.model.Constraint(self.model.evs, self.model.time_steps)
+        # def link_ev_charge_from_assignment(m, ev, t):
+        #     return m.dsm_blocks[ev].charge[t] == sum(
+        #         m.charge_assignment[ev, cs, t] for cs in m.charging_stations
+        #     )
+        
 
         @self.model.Constraint(self.model.evs, self.model.time_steps)
         def cumulative_charging_tracking(m, ev, t):
