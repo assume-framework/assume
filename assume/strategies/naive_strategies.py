@@ -358,3 +358,153 @@ class NaiveExchangeStrategy(BaseStrategy):
         bids = self.remove_empty_bids(bids)
 
         return bids
+
+
+class ElasticDemandStrategy(BaseStrategy):
+    """
+    A bidding strategy for a demand unit that submits multiple bids to approximate
+    a marginal utility curve, based on linear or isoelastic demand theory.
+    P = Price, Q = Quantity, E = Elasticity.
+
+    - Linear model: P = P_max + slope * Q (slope is only defined by P_max and Q_max, negative value)
+    - Isoelastic model: P = (Q/Q_max) ** (1/E) (E is negative)
+      (derived from log-log price elasticity of demand)
+
+    See:
+    - https://en.wikipedia.org/wiki/Price_elasticity_of_demand
+    - Arnold, Fabian. 2023. https://hdl.handle.net/10419/286380
+    - Hirth, Lion et al. 2024. https://doi.org/10.1016/j.eneco.2024.107652.
+
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids = []
+
+        for product in product_tuples:
+            start, end, only_hours = product
+            max_abs_power = max(abs(unit.min_power), abs(unit.max_power))
+
+            if unit.elasticity_model == "isoelastic":
+                # ISOELASTIC model (constant elasticity of demand):
+                # P = (Q / Q_max)^(1 / E)
+                # Derived from:
+                #   E = (dQ/dP) * (P / Q(P)), E == constant
+                #   E = Q'(P) * (P / Q(P))
+                #   Q'(P) = E * 1/P * Q(P)
+                #   dQ/dP = E * (1 / P) * Q
+                #   integrate:
+                #   \int 1/Q dQ = E * \int 1/P dP
+                #   ln(Q) = E * ln(P) + C
+                #   exp(ln(Q)) = exp(E * ln(p) + C)
+                #   Q(p) = (exp(ln(p))^E) * exp(C)
+                #   Q(p) = P^E * exp(C)
+                #   possibly C = 0, C = 1 or C >= 1. We assume C >= 1.
+                #   C shifts the demand curve (demand vs. price) up / down and
+                #   can be interpreted as the demand that will always be served
+                #   we set C = ln(Q_max) and derive the demand curve from there:
+                #   P = Q^(1/E) * exp(-C/E) and C = ln(Q_max)
+                #   => P = Q^(1/E) * exp(-ln(Q_max)/E) and because exp(-ln(Q_max)/E) = Q_max^(-1/E)
+                #   => P = Q^(1/E) * Q_max^(-1/E)
+                #   finally
+                #   => P = (Q / Q_max)^(1/E)
+                # This yields decreasing price as volume increases
+
+                # calculate first bid in isoelastic model (the volume that is bid at max price)
+                first_bid_volume = self.find_first_block_bid(
+                    unit.elasticity, unit.max_price, max_abs_power
+                )
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": only_hours,
+                        "price": unit.max_price,
+                        "volume": -first_bid_volume,
+                        "node": unit.node,
+                    }
+                )
+
+                remaining_volume = max_abs_power - first_bid_volume
+                if remaining_volume < 0:
+                    raise ValueError(
+                        "Negative remaining volume for bidding. Check max_power and elasticity."
+                    )
+
+                bid_volume = remaining_volume / (unit.num_bids - 1)
+                # calculate the remaining bids in isoelastic model
+                # P = (Q/Q_max) ** (1/E)
+                for i in range(1, unit.num_bids):
+                    ratio = (first_bid_volume + i * bid_volume) / max_abs_power
+                    if ratio <= 0:
+                        continue
+                    bid_price = ratio ** (1 / unit.elasticity)
+
+                    bids.append(
+                        {
+                            "start_time": start,
+                            "end_time": end,
+                            "only_hours": only_hours,
+                            "price": bid_price,
+                            "volume": -bid_volume,
+                            "node": unit.node,
+                        }
+                    )
+
+            elif unit.elasticity_model == "linear":
+                # LINEAR model: P = P_max - slope * Q
+                # where slope = -(P_max / Q_max)
+                # This ensures price drops linearly with volume
+                bid_volume = max_abs_power / unit.num_bids
+                slope = -(unit.max_price / max_abs_power)
+                for i in range(unit.num_bids):
+                    bid_price = unit.max_price + (slope * i * bid_volume)
+
+                    bids.append(
+                        {
+                            "start_time": start,
+                            "end_time": end,
+                            "only_hours": only_hours,
+                            "price": bid_price,
+                            "volume": -bid_volume,
+                            "node": unit.node,
+                        }
+                    )
+
+        return self.remove_empty_bids(bids)
+
+    def find_first_block_bid(
+        self, elasticity: float, max_price: float, max_power: float
+    ) -> float:
+        """
+        Calculate the first block bid volume at max_price. P = Price, Q = Quantity, E = Elasticity.
+        Assumes isoelastic demand:
+            Q = Q_max * P^E
+
+        The first block bid is the volume that is always bid at maximum price, because the
+        willingness to pay for it is higher than the markets maximal price.
+        The first block bid volume is calculated by finding the intersection of the isoelastic demand
+        curve and the maximum price in the marginal utility plot. All demand left of the intersection
+        is always bought at maximum price and is called Q_first.
+
+            Q_first = Q
+            Q_first = Q_max * P^E
+
+        Therefore:
+            Q_first = max_power * (max_price ** E)
+
+        Returns:
+            float: Volume > 0, demand that is always bought at max willingness to pay
+        """
+        volume = max_power * max_price**elasticity
+
+        if abs(volume) > abs(max_power):
+            raise ValueError(
+                f"Calculated first block bid volume ({volume}) exceeds max power ({max_power})."
+            )
+        return volume

@@ -108,7 +108,7 @@ dam_with_complex_opt_clearing:
       products:
         - duration: 1h
           count: 24
-          first_delivery: 1h
+          first_delivery: 24h
       opening_frequency: 24h
       opening_duration: 24h
       volume_unit: MWh

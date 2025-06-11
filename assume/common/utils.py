@@ -293,7 +293,7 @@ def aggregate_step_amount(orderbook: Orderbook, begin=None, end=None, groupby=No
         elif isinstance(bid["accepted_volume"], dict):
             start_hour = bid["start_time"]
             end_hour = bid["end_time"]
-            duration = (start_hour - end_hour) / len(bid["accepted_volume"])
+            duration = (end_hour - start_hour) / len(bid["accepted_volume"])
             for key in bid["accepted_volume"].keys():
                 deltas.append((key, bid["accepted_volume"][key]) + add)
                 deltas.append((key + duration, -bid["accepted_volume"][key]) + add)
