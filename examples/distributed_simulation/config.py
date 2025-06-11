@@ -69,7 +69,6 @@ async def worker(
         end=end,
         save_frequency_hours=48,
         simulation_id=simulation_id,
-        index=index,
         manager_address=manager_protocol_addr,
         broker_addr=broker_addr,
     )

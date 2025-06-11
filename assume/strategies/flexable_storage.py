@@ -58,47 +58,37 @@ class flexableEOMStorage(BaseStrategy):
         """
 
         # =============================================================================
-        # Storage Unit is either charging, discharging, or off
-        # =============================================================================
-        start = product_tuples[0][0]
-        end_all = product_tuples[-1][1]
-
-        previous_power = unit.get_output_before(start)
-
-        # save a theoretic SOC to calculate the ramping
-        theoretic_SOC = unit.get_soc_before(start)
-
-        # calculate min and max power for charging and discharging
-        min_power_charge_values, max_power_charge_values = (
-            unit.calculate_min_max_charge(start, end_all)
-        )
-        min_power_discharge_values, max_power_discharge_values = (
-            unit.calculate_min_max_discharge(start, end_all, soc=theoretic_SOC)
-        )
-
-        # =============================================================================
         # Calculate bids
         # =============================================================================
-        bids = []
+        # save a theoretic SOC to calculate the ramping
+        start = product_tuples[0][0]
+        theoretic_SOC = unit.outputs["soc"].at[start]
+        previous_power = unit.get_output_before(start)
 
-        for (
-            product,
-            max_power_discharge,
-            min_power_discharge,
-            max_power_charge,
-            min_power_charge,
-        ) in zip(
-            product_tuples,
-            max_power_discharge_values,
-            min_power_discharge_values,
-            max_power_charge_values,
-            min_power_charge_values,
-        ):
+        bids = []
+        for product in product_tuples:
             start, end = product[0], product[1]
 
             current_power = unit.outputs["energy"].at[start]
             current_power_discharge = max(current_power, 0)
             current_power_charge = min(current_power, 0)
+
+            # calculate min and max power for charging and discharging
+            min_power_charge, max_power_charge = unit.calculate_min_max_charge(
+                start, end, soc=theoretic_SOC
+            )
+            min_power_discharge, max_power_discharge = unit.calculate_min_max_discharge(
+                start, end, soc=theoretic_SOC
+            )
+
+            min_power_charge, max_power_charge = (
+                min_power_charge[0],
+                max_power_charge[0],
+            )
+            min_power_discharge, max_power_discharge = (
+                min_power_discharge[0],
+                max_power_discharge[0],
+            )
 
             # Calculate ramping constraints using helper function
             max_power_discharge = unit.calculate_ramp_discharge(
@@ -267,7 +257,7 @@ class flexablePosCRMStorage(BaseStrategy):
         end = product_tuples[-1][1]
 
         previous_power = unit.get_output_before(start)
-        theoretic_SOC = unit.get_soc_before(start)
+        theoretic_SOC = unit.outputs["soc"].at[start]
 
         _, max_power_discharge_values = unit.calculate_min_max_discharge(
             start, end, soc=theoretic_SOC
@@ -400,7 +390,7 @@ class flexableNegCRMStorage(BaseStrategy):
 
         previous_power = unit.get_output_before(start)
 
-        theoretic_SOC = unit.get_soc_before(start)
+        theoretic_SOC = unit.outputs["soc"].at[start]
 
         _, max_power_charge_values = unit.calculate_min_max_charge(start, end)
 

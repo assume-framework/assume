@@ -214,7 +214,9 @@ class Storage(SupportsMinMaxCharge):
                 delta_soc = -current_power * time_delta * self.efficiency_charge
 
             # update the values of the state of charge and the energy
-            self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
+            next_freq = t + self.index.freq
+            if next_freq in self.index:
+                self.outputs["soc"].at[next_freq] = soc + delta_soc
             self.outputs["energy"].at[t] = current_power
 
         return self.outputs["energy"].loc[start:end]
@@ -286,17 +288,17 @@ class Storage(SupportsMinMaxCharge):
         return power
 
     def calculate_min_max_charge(
-        self, start: datetime, end: datetime, product_type="energy"
+        self, start: datetime, end: datetime, soc: float = None
     ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max charging power for the given time period.
         This is relative to the already sold output on other markets for the same period.
-        It also adheres to reserved positive and negative capacities.
+        It also adheres to reserved positive and negative capacities reserved for other markets.
 
         Args:
             start (datetime.datetime): The start of the current dispatch.
             end (datetime.datetime): The end of the current dispatch.
-            product_type (str): The product type of the storage unit.
+            soc (float): The current state-of-charge. Defaults to None, then using soc at given start time.
 
         Returns:
             tuple[np.array, np.array]: The minimum and maximum charge power levels of the storage unit in MW.
@@ -320,17 +322,15 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict charging according to max_soc
-        max_soc_charge = self.calculate_soc_max_charge(self.outputs["soc"].at[start])
+        if soc is None:
+            soc = self.outputs["soc"].at[start]
+        max_soc_charge = self.calculate_soc_max_charge(soc)
         max_power_charge = max_power_charge.clip(min=max_soc_charge)
 
         return min_power_charge, max_power_charge
 
     def calculate_min_max_discharge(
-        self,
-        start: datetime,
-        end: datetime,
-        product_type: str = "energy",
-        soc: float = None,
+        self, start: datetime, end: datetime, soc: float = None
     ) -> tuple[np.array, np.array]:
         """
         Calculates the min and max discharging power for the given time period.
@@ -340,7 +340,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             start (datetime.datetime): The start of the current dispatch.
             end (datetime.datetime): The end of the current dispatch.
-            product_type (str): The product type of the storage unit.
+            soc (float): The current state-of-charge. Defaults to None, then using soc at given start time.
 
         Returns:
             tuple[np.array, np.array]: The minimum and maximum discharge power levels of the storage unit in MW.
@@ -368,9 +368,9 @@ class Storage(SupportsMinMaxCharge):
         )
 
         # restrict according to min_soc
-        max_soc_discharge = self.calculate_soc_max_discharge(
-            self.outputs["soc"].at[start]
-        )
+        if soc is None:
+            soc = self.outputs["soc"].at[start]
+        max_soc_discharge = self.calculate_soc_max_discharge(soc)
         max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 
         return min_power_discharge, max_power_discharge

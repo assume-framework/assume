@@ -170,19 +170,21 @@ Example Configuration - Eligible Obligations Lambda
 If not all agents are allowed to bid on a market, one can configure this in the market as well.
 For example, because only agents with a given minimum or maximum power are allowed or only agents with renewable generation:
 
-   markets_config:
-    EOM:
-      operator: EOM_operator
-      product_type: energy
-      start_date: 2019-01-01 01:00
-      products:
-        - duration: 1h
+.. code-block:: yaml
+
+    markets_config:
+      EOM:
+        operator: EOM_operator
+        product_type: energy
+        start_date: 2019-01-01 01:00
+        products:
+          duration: 1h
           count: 1
           first_delivery: 1h
-      opening_frequency: 1h
-      opening_duration: 1h
-      market_mechanism: pay_as_clear
-      eligible_obligations_lambda: only_renewables
+        opening_frequency: 1h
+        opening_duration: 1h
+        market_mechanism: pay_as_clear
+        eligible_obligations_lambda: only_renewables
 
 When configuring the market as a Python object, it is also possible to configure a customized lambda function for the market object to reflect to special conditions.
 
