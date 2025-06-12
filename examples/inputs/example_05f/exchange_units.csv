@@ -1,0 +1,23 @@
+name,bidding_EOM,price_import,price_export,unit_operator
+DE_NL_export,naive_exchange,0,2999,Exchanges Operator
+DE_NL_import,naive_exchange,0,2999,Exchanges Operator
+DE_CH_export,naive_exchange,0,2999,Exchanges Operator
+DE_CH_import,naive_exchange,0,2999,Exchanges Operator
+DE_DK_export,naive_exchange,0,2999,Exchanges Operator
+DE_DK_import,naive_exchange,0,2999,Exchanges Operator
+DE_CZ_export,naive_exchange,0,2999,Exchanges Operator
+DE_CZ_import,naive_exchange,0,2999,Exchanges Operator
+DE_LU_export,naive_exchange,0,2999,Exchanges Operator
+DE_LU_import,naive_exchange,0,2999,Exchanges Operator
+DE_SE_export,naive_exchange,0,2999,Exchanges Operator
+DE_SE_import,naive_exchange,0,2999,Exchanges Operator
+DE_AT_export,naive_exchange,0,2999,Exchanges Operator
+DE_AT_import,naive_exchange,0,2999,Exchanges Operator
+DE_FR_export,naive_exchange,0,2999,Exchanges Operator
+DE_FR_import,naive_exchange,0,2999,Exchanges Operator
+DE_PL_export,naive_exchange,0,2999,Exchanges Operator
+DE_PL_import,naive_exchange,0,2999,Exchanges Operator
+DE_NO_export,naive_exchange,0,2999,Exchanges Operator
+DE_NO_import,naive_exchange,0,2999,Exchanges Operator
+DE_BE_export,naive_exchange,0,2999,Exchanges Operator
+DE_BE_import,naive_exchange,0,2999,Exchanges Operator
