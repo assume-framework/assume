@@ -12,7 +12,11 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
-  **Improvements:**
+**New Features:**
+
+- **Realtime simulation**: A simulation which runs in real-time instead of simulation time can be created and used for hardware-in-the-loop with real assets. Manual configuration of the agents is required for this.
+
+**Improvements:**
 
 - **Changed Logging for DRL metrics**: TensorBoard logging was restructured to separate metrics collected per gradient step and per simulation time step. This avoids unnecessary padding, ensures consistency, and prevents data loss across different logging frequencies.
 - **Additional learning strategy for renewables**: Introduced a new learning strategy specifically designed for renewable energy sources. Most of the functionalities can just be inherited, we chose to add the availability of the unit into the individual observations and calculate the opportunity costs based on the available generation as well.
