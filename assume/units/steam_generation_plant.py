@@ -14,7 +14,7 @@ from assume.units.dsm_load_shift import DSMFlex
 logger = logging.getLogger(__name__)
 
 
-class PaperPulpPlant(DSMFlex, SupportsMinMax):
+class SteamGeneratorPlant(DSMFlex, SupportsMinMax):
     """
     Represents a paper and pulp plant in an energy system. This includes components like heat pumps,
     boilers, and storage units for operational optimization.
@@ -34,8 +34,8 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
         **kwargs: Additional keyword arguments to support more specific configurations or parameters.
     """
 
-    required_technologies = ["heat_pump", "boiler"]
-    optional_technologies = ["thermal_storage"]
+    required_technologies = []
+    optional_technologies = ["heat_pump", "boiler", "thermal_storage"]
 
     def __init__(
         self,
@@ -44,7 +44,7 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
         bidding_strategies: dict,
         forecaster: Forecaster,
         components: dict[str, dict] = None,
-        technology: str = "paper_pulp_plant",
+        technology: str = "steap_generation_plant",
         objective: str = "min_variable_cost",
         flexibility_measure: str = "max_load_shift",
         demand: float = 0,
@@ -84,7 +84,7 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
         # Check for the presence of components first
         self.has_thermal_storage = "thermal_storage" in self.components.keys()
         self.has_boiler = "boiler" in self.components.keys()
-        self.has_heat_pump = "heat_pump" in self.components.keys()
+        self.has_heatpump = "heat_pump" in self.components.keys()
 
         # Inject schedule into long-term thermal storage if applicable
         if "thermal_storage" in self.components:
@@ -99,6 +99,8 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
         self.electricity_price = self.forecaster["electricity_price"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
             self.natural_gas_price = self.forecaster["natural_gas_price"]
+        if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
+            self.hydrogen_gas_price = self.forecaster["hydrogen_gas_price"]
         self.thermal_demand = self.forecaster[f"{self.id}_thermal_demand"]
         self.objective = objective
         self.flexibility_measure = flexibility_measure
@@ -120,6 +122,12 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             self.model.natural_gas_price = pyo.Param(
                 self.model.time_steps,
                 initialize={t: value for t, value in enumerate(self.natural_gas_price)},
+            )
+
+        if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
+            self.model.hydrogen_gas_price = pyo.Param(
+                self.model.time_steps,
+                initialize={t: value for t, value in enumerate(self.hydrogen_gas_price)},
             )
 
         self.model.thermal_demand = pyo.Param(
@@ -156,7 +164,7 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             total_heat_production = 0
 
             # Add heat production from available sources
-            if self.has_heat_pump:
+            if self.has_heatpump:
                 total_heat_production += self.model.dsm_blocks["heat_pump"].heat_out[t]
 
             if self.has_boiler:
@@ -186,7 +194,8 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             """
             Ensures total heat production meets demand over optimization horizon.
             """
-            return m.heat_output[t] == m.thermal_demand[t]
+            return sum(m.heat_output[t] for t in m.time_steps) == sum(m.thermal_demand[t] for t in m.time_steps)
+            # return m.heat_output[t] == m.thermal_demand[t]
 
         # Power input constraint
         @self.model.Constraint(self.model.time_steps)
@@ -196,7 +205,7 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             """
             total_power = 0
 
-            if self.has_heat_pump:
+            if self.has_heatpump:
                 total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
 
             if self.has_boiler:
@@ -215,7 +224,7 @@ class PaperPulpPlant(DSMFlex, SupportsMinMax):
             """
             total_cost = 0
 
-            if self.has_heat_pump:
+            if self.has_heatpump:
                 total_cost += self.model.dsm_blocks["heat_pump"].operating_cost[t]
 
             if self.has_boiler:

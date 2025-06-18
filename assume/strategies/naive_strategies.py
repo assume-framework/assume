@@ -292,6 +292,7 @@ class NaiveRedispatchStrategy(BaseStrategy):
 
         return bids
 
+
 class NaiveRedispatchSteelplantStrategy(BaseStrategy):
     def calculate_bids(
         self,
@@ -359,7 +360,8 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                 )
 
         return bids
-    
+
+
 class NaiveExchangeStrategy(BaseStrategy):
     """
     A naive strategy for an exchange unit that bids the defined import and export prices on the market.

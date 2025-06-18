@@ -237,9 +237,9 @@ class DSMFlex:
                 if self.has_pv:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
 
-            elif self.technology == "paper_pulp_plant":
+            elif self.technology == "steam_generator_plant":
                 total_power = 0
-                if self.has_heat_pump:
+                if self.has_heatpump:
                     total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
                 if self.has_boiler:
                     boiler = self.components["boiler"]
@@ -587,14 +587,14 @@ class DSMFlex:
 
         # Plot 2: Boiler fuel input
         if "boiler" in instance.dsm_blocks and hasattr(
-            instance.dsm_blocks["boiler"], "natural_gas_in"
+            instance.dsm_blocks["boiler"], "hydrogen_gas_in"
         ):
             boiler_gas = [
-                pyo.value(instance.dsm_blocks["boiler"].natural_gas_in[t])
+                pyo.value(instance.dsm_blocks["boiler"].hydrogen_gas_in[t])
                 for t in time_steps
             ]
             axs[1].plot(
-                time_steps, boiler_gas, label="Boiler Natural Gas In", color="orange"
+                time_steps, boiler_gas, label="Boiler Hydrogen Gas In", color="orange"
             )
             axs[1].set_ylabel("Fuel Input (kW)")
             axs[1].legend()

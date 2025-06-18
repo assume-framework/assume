@@ -108,7 +108,9 @@ available_examples = {
     # redispatch for DSM validation example
     "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
     "redisp_dsm_3_nodes": {"scenario": "example_05e", "study_case": "base"},
-    "redisp_valid_2023": {"scenario": "example_05f","study_case": "base",
+    "redisp_valid_2023": {
+        "scenario": "example_05f",
+        "study_case": "base",
     },
 }
 
@@ -126,7 +128,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "redisp_dsm_3_nodes"
+    example = "paper_plant_use_case"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

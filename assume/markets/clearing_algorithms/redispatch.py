@@ -106,9 +106,11 @@ class RedispatchMarketRole(MarketRole):
         p_max_pu_up = (max_power_pivot - volume_pivot).div(
             max_power_pivot.where(max_power_pivot != 0, np.inf)
         )
-        p_max_pu_down = (volume_pivot - min_power_pivot).div(
-            max_power_pivot.where(max_power_pivot != 0, np.inf)
-        ).clip(lower=0)
+        p_max_pu_down = (
+            (volume_pivot - min_power_pivot)
+            .div(max_power_pivot.where(max_power_pivot != 0, np.inf))
+            .clip(lower=0)
+        )
         costs = price_pivot
 
         negative_only_units = volume_pivot.lt(0).all()

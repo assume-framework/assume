@@ -194,6 +194,7 @@ def add_loads(
             columns=loads.index,
         )
 
+
 def add_storage_units(
     network: pypsa.Network,
     storage_units: pd.DataFrame,
@@ -220,6 +221,7 @@ def add_storage_units(
             columns=storage_units.index,
         )
 
+
 def add_exchange_units(
     network: pypsa.Network,
     exchange_units: pd.DataFrame,
@@ -245,6 +247,7 @@ def add_exchange_units(
             index=network.snapshots,
             columns=exchange_units.index,
         )
+
 
 def add_redispatch_loads(
     network: pypsa.Network,
