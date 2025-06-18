@@ -126,7 +126,8 @@ The actor policy of each agent is updated using the deterministic policy gradien
 The actor is updated similarly using only one critic network :math:`Q_{θ1}`. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the foregoing section.
 Please note that the actor and critics are updated by sampling experience from the buffer where all interactions of the agents are stored, namely the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :ref:`replay-buffer`.
 
-.. _learning_implemenation:
+.. _learning_implementation:
+
 The Learning Implementation in ASSUME
 =====================================
 

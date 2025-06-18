@@ -484,19 +484,24 @@ class ElasticDemandStrategy(BaseStrategy):
         """
         Calculate the first block bid volume at max_price. P = Price, Q = Quantity, E = Elasticity.
         Assumes isoelastic demand:
-            Q = Q_max * P^E
+
+        .. math::
+            Q = Q_{max} * P^E
 
         The first block bid is the volume that is always bid at maximum price, because the
         willingness to pay for it is higher than the markets maximal price.
         The first block bid volume is calculated by finding the intersection of the isoelastic demand
         curve and the maximum price in the marginal utility plot. All demand left of the intersection
-        is always bought at maximum price and is called Q_first.
+        is always bought at maximum price and is called $Q_{first}$.
 
-            Q_first = Q
-            Q_first = Q_max * P^E
+        .. math::
+            Q_{first} = Q
+            Q_{first} = Q_{max} * P^E
 
         Therefore:
-            Q_first = max_power * (max_price ** E)
+
+        .. math::
+            Q_{first} = power_{max} * (price_{max} ^ E)
 
         Returns:
             float: Volume > 0, demand that is always bought at max willingness to pay
