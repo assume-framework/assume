@@ -44,11 +44,12 @@ class SteamGeneratorPlant(DSMFlex, SupportsMinMax):
         bidding_strategies: dict,
         forecaster: Forecaster,
         components: dict[str, dict] = None,
-        technology: str = "steap_generation_plant",
+        technology: str = "steam_generator_plant",
         objective: str = "min_variable_cost",
         flexibility_measure: str = "max_load_shift",
         demand: float = 0,
         cost_tolerance: float = 10,
+        congestion_threshold: float = 0,
         node: str = "node0",
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
@@ -69,7 +70,7 @@ class SteamGeneratorPlant(DSMFlex, SupportsMinMax):
         for component in self.required_technologies:
             if component not in components.keys():
                 raise ValueError(
-                    f"Component {component} is required for the paper and pulp plant unit."
+                    f"Component {component} is required for the steam generator plant unit."
                 )
 
         # Check if the provided components are valid and do not contain any unknown components
@@ -79,7 +80,7 @@ class SteamGeneratorPlant(DSMFlex, SupportsMinMax):
                 and component not in self.optional_technologies
             ):
                 raise ValueError(
-                    f"Component {component} is not a valid component for the paper and pulp plant unit."
+                    f"Component {component} is not a valid component for the steam generator plant unit."
                 )
         # Check for the presence of components first
         self.has_thermal_storage = "thermal_storage" in self.components.keys()
@@ -97,11 +98,14 @@ class SteamGeneratorPlant(DSMFlex, SupportsMinMax):
 
         # Add price forecasts
         self.electricity_price = self.forecaster["electricity_price"]
+        self.electricity_price_flex = self.forecaster["electricity_price_flex"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
             self.natural_gas_price = self.forecaster["natural_gas_price"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
             self.hydrogen_gas_price = self.forecaster["hydrogen_gas_price"]
         self.thermal_demand = self.forecaster[f"{self.id}_thermal_demand"]
+        self.congestion_signal = self.forecaster[f"{self.id}_congestion_signal"]
+        self.congestion_threshold = congestion_threshold
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
@@ -127,7 +131,9 @@ class SteamGeneratorPlant(DSMFlex, SupportsMinMax):
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
             self.model.hydrogen_gas_price = pyo.Param(
                 self.model.time_steps,
-                initialize={t: value for t, value in enumerate(self.hydrogen_gas_price)},
+                initialize={
+                    t: value for t, value in enumerate(self.hydrogen_gas_price)
+                },
             )
 
         self.model.thermal_demand = pyo.Param(
@@ -194,8 +200,8 @@ class SteamGeneratorPlant(DSMFlex, SupportsMinMax):
             """
             Ensures total heat production meets demand over optimization horizon.
             """
-            return sum(m.heat_output[t] for t in m.time_steps) == sum(m.thermal_demand[t] for t in m.time_steps)
-            # return m.heat_output[t] == m.thermal_demand[t]
+            # return sum(m.heat_output[t] for t in m.time_steps) == sum(m.thermal_demand[t] for t in m.time_steps)
+            return m.heat_output[t] >= m.thermal_demand[t]
 
         # Power input constraint
         @self.model.Constraint(self.model.time_steps)

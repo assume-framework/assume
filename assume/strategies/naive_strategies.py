@@ -170,7 +170,7 @@ class NaiveDADSMStrategy(BaseStrategy):
 
         # check if unit has opt_power_requirement attribute
         # if not hasattr(unit, "opt_power_requirement"):
-        unit.determine_optimal_operation_without_flex()
+        unit.determine_optimal_operation_with_flex()
 
         bids = []
         for product in product_tuples:
@@ -293,7 +293,7 @@ class NaiveRedispatchStrategy(BaseStrategy):
         return bids
 
 
-class NaiveRedispatchSteelplantStrategy(BaseStrategy):
+class NaiveRedispatchStrategyDSM(BaseStrategy):
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -302,7 +302,10 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
         **kwargs,
     ) -> Orderbook:
         # calculate the optimal operation of the unit according to the objective function
-        unit.calculate_optimal_operation_if_needed()
+        if unit.optimisation_counter == 0:
+            unit.determine_optimal_operation_with_flex()
+            # self.plot_power_requirements(unit)
+            unit.optimisation_counter = 1
 
         bids = []
         for product in product_tuples:
