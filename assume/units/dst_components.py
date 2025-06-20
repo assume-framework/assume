@@ -198,9 +198,9 @@ class Boiler:
         self.initial_operational_status = initial_operational_status
         self.kwargs = kwargs
 
-        if self.fuel_type not in ["electricity", "natural_gas"]:
+        if self.fuel_type not in ["electricity", "natural_gas", "hydrogen_gas"]:
             raise ValueError(
-                "Unsupported fuel_type for a boiler. Choose 'electricity' or 'natural_gas'."
+                "Unsupported fuel_type for a boiler. Choose 'electricity' or 'natural_gas' or 'hydrogen_gas'."
             )
 
     def add_to_model(
@@ -257,6 +257,11 @@ class Boiler:
                 raise ValueError(
                     "Natural gas boiler requires a natural gas price profile in the model."
                 )
+        elif self.fuel_type == "hydrogen_gas":
+            if not hasattr(model, "hydrogen_gas_price"):
+                raise ValueError(
+                    "Hydrogen gas boiler requires a hydrogen gas price profile in the model."
+                )
 
         # Define parameters
         model_block.max_power = pyo.Param(initialize=self.max_power)
@@ -277,7 +282,14 @@ class Boiler:
             bounds=(0, model_block.max_power),
         )
         model_block.natural_gas_in = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+        )
+        model_block.hydrogen_gas_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
         )
 
         model_block.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
@@ -290,23 +302,41 @@ class Boiler:
                 return b.heat_out[t] == b.power_in[t] * b.efficiency
             elif self.fuel_type == "natural_gas":
                 return b.heat_out[t] == b.natural_gas_in[t] * b.efficiency
+            elif self.fuel_type == "hydrogen_gas":
+                return b.heat_out[t] == b.hydrogen_gas_in[t] * b.efficiency
             else:
-                raise ValueError(
-                    "Unsupported fuel_type. Choose 'electricity' or 'natural_gas'."
-                )
+                raise ValueError("Unsupported fuel_type for constraint.")
 
-        # Set the unused fuel input variable to zero
+        # Set unused fuel input variables to zero
         if self.fuel_type == "electricity":
 
             @model_block.Constraint(self.time_steps)
             def natural_gas_input_zero_constraint(b, t):
                 return b.natural_gas_in[t] == 0
 
+            @model_block.Constraint(self.time_steps)
+            def hydrogen_input_zero_constraint(b, t):
+                return b.hydrogen_gas_in[t] == 0
+
         elif self.fuel_type == "natural_gas":
 
             @model_block.Constraint(self.time_steps)
             def power_input_zero_constraint(b, t):
                 return b.power_in[t] == 0
+
+            @model_block.Constraint(self.time_steps)
+            def hydrogen_input_zero_constraint(b, t):
+                return b.hydrogen_gas_in[t] == 0
+
+        elif self.fuel_type == "hydrogen_gas":
+
+            @model_block.Constraint(self.time_steps)
+            def power_input_zero_constraint(b, t):
+                return b.power_in[t] == 0
+
+            @model_block.Constraint(self.time_steps)
+            def natural_gas_input_zero_constraint(b, t):
+                return b.natural_gas_in[t] == 0
 
         # Operating cost constraint based on fuel type
         @model_block.Constraint(self.time_steps)
@@ -317,6 +347,11 @@ class Boiler:
                 return (
                     b.operating_cost[t]
                     == b.natural_gas_in[t] * model.natural_gas_price[t]
+                )
+            elif self.fuel_type == "hydrogen_gas":
+                return (
+                    b.operating_cost[t]
+                    == b.hydrogen_gas_in[t] * model.hydrogen_gas_price[t]
                 )
 
         # Ramp-up constraint and ramp-down constraints
@@ -333,6 +368,20 @@ class Boiler:
                 if t == self.time_steps.at(1):
                     return b.natural_gas_in[t] <= b.ramp_down
                 return b.natural_gas_in[t - 1] - b.natural_gas_in[t] <= b.ramp_down
+
+        elif self.fuel_type == "hydrogen_gas":
+
+            @model_block.Constraint(self.time_steps)
+            def ramp_up_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return b.hydrogen_gas_in[t] <= b.ramp_up
+                return b.hydrogen_gas_in[t] - b.hydrogen_gas_in[t - 1] <= b.ramp_up
+
+            @model_block.Constraint(self.time_steps)
+            def ramp_down_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return b.hydrogen_gas_in[t] <= b.ramp_down
+                return b.hydrogen_gas_in[t - 1] - b.hydrogen_gas_in[t] <= b.ramp_down
 
         elif self.fuel_type == "electricity":
             add_ramping_constraints(

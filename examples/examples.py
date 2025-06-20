@@ -109,7 +109,9 @@ available_examples = {
     "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
     "redisp_storage_3_nodes": {"scenario": "example_05c", "study_case": "base"},
     "redisp_dsm_3_nodes": {"scenario": "example_05e", "study_case": "base"},
-    "redisp_valid_2023": {"scenario": "example_05f","study_case": "base",
+    "redisp_valid_2023": {
+        "scenario": "example_05f",
+        "study_case": "base",
     },
 }
 

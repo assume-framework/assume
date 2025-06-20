@@ -16,7 +16,7 @@ from assume.strategies.naive_strategies import (
     NaiveProfileStrategy,
     NaiveRedispatchDSMStrategy,
     NaiveRedispatchStrategy,
-    NaiveRedispatchSteelplantStrategy,
+    NaiveRedispatchStrategyDSM,
     NaiveSingleBidStrategy,
     NaiveExchangeStrategy,
     FixedDispatchStrategy,

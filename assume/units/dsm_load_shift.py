@@ -26,6 +26,9 @@ logger = logging.getLogger(__name__)
 class DSMFlex:
     # Mapping of flexibility measures to their respective functions
     flexibility_map: dict[str, Callable[[pyo.ConcreteModel], None]] = {
+        "electricity_price_signal": lambda self, model: self.electricity_price_signal(
+            model
+        ),
         "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
         "congestion_management_flexibility": lambda self,
         model: self.grid_congestion_management(model),
@@ -106,6 +109,7 @@ class DSMFlex:
         # along with optimal and flexibility constraints
         # and the objective functions
 
+        self.optimisation_counter = 0
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
@@ -160,6 +164,35 @@ class DSMFlex:
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
+
+    def electricity_price_signal(self, model):
+        """
+        Determine the optimal operation using a new electricity price signal.
+        """
+        # Delete the existing electricity_price component
+        model.del_component(model.electricity_price)
+
+        # Add the updated electricity_price component explicitly
+        model.add_component(
+            "electricity_price",
+            pyo.Param(
+                model.time_steps,
+                initialize={
+                    t: value for t, value in enumerate(self.electricity_price_flex)
+                },
+            ),
+        )
+
+        @self.model.Objective(sense=pyo.minimize)
+        def obj_rule_flex(m):
+            """
+            Maximizes the load shift over all time steps.
+            """
+            total_variable_cost = pyo.quicksum(
+                self.model.variable_cost[t] for t in self.model.time_steps
+            )
+
+            return total_variable_cost
 
     def cost_based_flexibility(self, model):
         """
@@ -237,9 +270,9 @@ class DSMFlex:
                 if self.has_pv:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
 
-            elif self.technology == "paper_pulp_plant":
+            elif self.technology == "steam_generator_plant":
                 total_power = 0
-                if self.has_heat_pump:
+                if self.has_heatpump:
                     total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
                 if self.has_boiler:
                     boiler = self.components["boiler"]
@@ -308,18 +341,35 @@ class DSMFlex:
         # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
-            if self.has_electrolyser:
+            if self.technology == "steel_plant":
+                if self.has_electrolyser:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["electrolyser"].power_in[t]
+                        + self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+                else:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+            elif self.technology == "steam_generator_plant":
+                total_power = 0
+                if self.has_heatpump:
+                    total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    boiler = self.components["boiler"]
+                    if boiler.fuel_type == "electricity":
+                        total_power += self.model.dsm_blocks["boiler"].power_in[t]
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == self.model.dsm_blocks["electrolyser"].power_in[t]
-                    + self.model.dsm_blocks["eaf"].power_in[t]
-                    + self.model.dsm_blocks["dri_plant"].power_in[t]
-                )
-            else:
-                return (
-                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == self.model.dsm_blocks["eaf"].power_in[t]
-                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    == total_power
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -587,14 +637,14 @@ class DSMFlex:
 
         # Plot 2: Boiler fuel input
         if "boiler" in instance.dsm_blocks and hasattr(
-            instance.dsm_blocks["boiler"], "natural_gas_in"
+            instance.dsm_blocks["boiler"], "hydrogen_gas_in"
         ):
             boiler_gas = [
-                pyo.value(instance.dsm_blocks["boiler"].natural_gas_in[t])
+                pyo.value(instance.dsm_blocks["boiler"].hydrogen_gas_in[t])
                 for t in time_steps
             ]
             axs[1].plot(
-                time_steps, boiler_gas, label="Boiler Natural Gas In", color="orange"
+                time_steps, boiler_gas, label="Boiler Hydrogen Gas In", color="orange"
             )
             axs[1].set_ylabel("Fuel Input (kW)")
             axs[1].legend()
@@ -632,7 +682,7 @@ class DSMFlex:
             axs[2].grid(True)
 
         axs[2].set_xlabel("Time Step")
-        plt.suptitle("Paper & Pulp Plant Operation Overview")
+        plt.suptitle("Paper & Pulp Plant Inflex")
         plt.tight_layout()
         plt.show()
 
@@ -666,21 +716,29 @@ class DSMFlex:
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        # Compute adjusted total power input with load shift applied
-        adjusted_total_power_input = []
-        for t in instance.time_steps:
-            # Calculate the load-shifted value of total_power_input
-            adjusted_power = (
-                instance.total_power_input[t].value
-                + instance.load_shift_pos[t].value
-                - instance.load_shift_neg[t].value
+        if self.flexibility_measure == "electricity_price_signal":
+            flex_power_requirement = [
+                pyo.value(instance.total_power_input[t]) for t in instance.time_steps
+            ]
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=flex_power_requirement
             )
-            adjusted_total_power_input.append(adjusted_power)
+        else:
+            # Compute adjusted total power input with load shift applied
+            adjusted_total_power_input = []
+            for t in instance.time_steps:
+                # Calculate the load-shifted value of total_power_input
+                adjusted_power = (
+                    instance.total_power_input[t].value
+                    + instance.load_shift_pos[t].value
+                    - instance.load_shift_neg[t].value
+                )
+                adjusted_total_power_input.append(adjusted_power)
 
-        # Assign this list to flex_power_requirement as a pandas Series
-        self.flex_power_requirement = FastSeries(
-            index=self.index, value=adjusted_total_power_input
-        )
+            # Assign this list to flex_power_requirement as a pandas Series
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=adjusted_total_power_input
+            )
 
         # Variable cost series
         flex_variable_cost = [
@@ -689,6 +747,72 @@ class DSMFlex:
         self.flex_variable_cost_series = FastSeries(
             index=self.index, value=flex_variable_cost
         )
+
+        # Setup plotting
+        time_steps = list(instance.time_steps)
+        fig, axs = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
+
+        # Plot 1: Heat Pump power input
+        if "heat_pump" in instance.dsm_blocks:
+            hp_power = [
+                pyo.value(instance.dsm_blocks["heat_pump"].power_in[t])
+                for t in time_steps
+            ]
+            axs[0].plot(time_steps, hp_power, label="Heat Pump Power In", color="green")
+            axs[0].set_ylabel("Power (kW)")
+            axs[0].legend()
+            axs[0].grid(True)
+
+        # Plot 2: Boiler fuel input
+        if "boiler" in instance.dsm_blocks and hasattr(
+            instance.dsm_blocks["boiler"], "hydrogen_gas_in"
+        ):
+            boiler_gas = [
+                pyo.value(instance.dsm_blocks["boiler"].hydrogen_gas_in[t])
+                for t in time_steps
+            ]
+            axs[1].plot(
+                time_steps, boiler_gas, label="Boiler Hydrogen Gas In", color="orange"
+            )
+            axs[1].set_ylabel("Fuel Input (kW)")
+            axs[1].legend()
+            axs[1].grid(True)
+
+        # Plot 3: Thermal Storage SOC, Charge, Discharge (Discharge in 4th quadrant)
+        if "thermal_storage" in instance.dsm_blocks:
+            soc = [
+                pyo.value(instance.dsm_blocks["thermal_storage"].soc[t])
+                for t in time_steps
+            ]
+            charge = [
+                pyo.value(instance.dsm_blocks["thermal_storage"].charge[t])
+                for t in time_steps
+            ]
+            discharge = [
+                pyo.value(instance.dsm_blocks["thermal_storage"].discharge[t])
+                for t in time_steps
+            ]
+
+            axs[2].fill_between(time_steps, soc, alpha=0.3, label="SOC", color="blue")
+            axs[2].plot(
+                time_steps, charge, label="Charge", linestyle="--", color="green"
+            )
+            axs[2].plot(
+                time_steps,
+                [-x for x in discharge],
+                label="Discharge",
+                linestyle="--",
+                color="red",
+            )
+            axs[2].axhline(0, color="black", linewidth=0.5)
+            axs[2].set_ylabel("Storage (kWh)")
+            axs[2].legend()
+            axs[2].grid(True)
+
+        axs[2].set_xlabel("Time Step")
+        plt.suptitle("Paper & Pulp Plant Flex")
+        plt.tight_layout()
+        plt.show()
 
     def switch_to_opt(self, instance):
         """
@@ -700,8 +824,7 @@ class DSMFlex:
         Returns:
             pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
         """
-        # Deactivate the flexibility objective if it exists
-        # if hasattr(instance, "obj_rule_flex"):
+
         instance.obj_rule_flex.deactivate()
 
         # Deactivate flexibility constraints if they exist
