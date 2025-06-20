@@ -19,6 +19,7 @@ from assume.strategies.naive_strategies import (
     NaiveRedispatchSteelplantStrategy,
     NaiveSingleBidStrategy,
     NaiveExchangeStrategy,
+    FixedDispatchStrategy,
 )
 from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
@@ -46,7 +47,8 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "manual_strategy": SimpleManualTerminalStrategy,
     "dmas_powerplant": DmasPowerplantStrategy,
     "dmas_storage": DmasStorageStrategy,
-    "NaiveRedispatchSteelplantStrategy":NaiveRedispatchSteelplantStrategy
+    "NaiveRedispatchSteelplantStrategy":NaiveRedispatchSteelplantStrategy,
+    "fixed_dispatch_strategy": FixedDispatchStrategy,
 }
 
 try:

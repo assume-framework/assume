@@ -333,9 +333,16 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
     lines = pd.read_csv(network_path / "lines.csv", index_col=0)
     generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
     loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
-    storage_units = pd.read_csv(network_path / "storage_units.csv", index_col=0)
-    exchange_units = pd.read_csv(network_path / "storage_units.csv", index_col=0)
+    try:
+        storage_units = pd.read_csv(network_path / "storage_units.csv", index_col=0)
+    except FileNotFoundError:
+        storage_units = None
 
+    try:
+        exchange_units = pd.read_csv(network_path / "exchange_units.csv", index_col=0)
+    except FileNotFoundError:
+        exchange_units = None
+        
     return {
         "buses": buses,
         "lines": lines,
