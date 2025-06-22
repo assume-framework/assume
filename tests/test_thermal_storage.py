@@ -10,9 +10,11 @@ from assume.units.dst_components import ThermalStorage
 
 use_solver = "appsi_highs"
 
+
 @pytest.fixture
 def price_profile():
     return pd.Series([20, 22, 25, 21, 18, 19, 23, 24, 26, 22], index=range(10))
+
 
 @pytest.fixture
 def storage_config():
@@ -29,18 +31,24 @@ def storage_config():
         "storage_loss_rate": 0.0,
     }
 
+
 @pytest.fixture
 def storage_schedule():
     # 0: Only charge, 1: Only discharge
     return pd.Series([0, 0, 1, 1, 0, 0, 1, 1, 0, 1], index=range(10))
 
+
 @pytest.fixture
 def short_term_storage_model(storage_config, price_profile):
     model = pyo.ConcreteModel()
     model.time_steps = pyo.Set(initialize=range(10))
-    model.electricity_price = pyo.Param(model.time_steps, initialize=price_profile.to_dict())
+    model.electricity_price = pyo.Param(
+        model.time_steps, initialize=price_profile.to_dict()
+    )
 
-    storage = ThermalStorage(storage_type="short-term", **storage_config, time_steps=model.time_steps)
+    storage = ThermalStorage(
+        storage_type="short-term", **storage_config, time_steps=model.time_steps
+    )
     model.storage = pyo.Block()
     storage.add_to_model(model, model.storage)
 
@@ -61,18 +69,21 @@ def short_term_storage_model(storage_config, price_profile):
     solver = pyo.SolverFactory(use_solver)
     results = solver.solve(model, tee=False)
     return model, results
+
 
 @pytest.fixture
 def long_term_storage_model(storage_config, storage_schedule, price_profile):
     model = pyo.ConcreteModel()
     model.time_steps = pyo.Set(initialize=range(10))
-    model.electricity_price = pyo.Param(model.time_steps, initialize=price_profile.to_dict())
+    model.electricity_price = pyo.Param(
+        model.time_steps, initialize=price_profile.to_dict()
+    )
 
     storage = ThermalStorage(
         storage_type="long-term",
         storage_schedule_profile=storage_schedule,
         **storage_config,
-        time_steps=model.time_steps
+        time_steps=model.time_steps,
     )
     model.storage = pyo.Block()
     storage.add_to_model(model, model.storage)
@@ -94,6 +105,7 @@ def long_term_storage_model(storage_config, storage_schedule, price_profile):
     solver = pyo.SolverFactory(use_solver)
     results = solver.solve(model, tee=False)
     return model, results
+
 
 # --- SHORT-TERM TESTS ---
 def test_short_term_storage_solves(short_term_storage_model):
@@ -102,6 +114,7 @@ def test_short_term_storage_solves(short_term_storage_model):
         results.solver.termination_condition == pyo.TerminationCondition.optimal
     )
 
+
 # --- LONG-TERM TESTS ---
 def test_long_term_storage_solves(long_term_storage_model):
     model, results = long_term_storage_model
@@ -109,7 +122,10 @@ def test_long_term_storage_solves(long_term_storage_model):
         results.solver.termination_condition == pyo.TerminationCondition.optimal
     )
 
-def test_long_term_storage_follows_schedule(long_term_storage_model, storage_schedule, storage_config):
+
+def test_long_term_storage_follows_schedule(
+    long_term_storage_model, storage_schedule, storage_config
+):
     model, _ = long_term_storage_model
     max_charge = storage_config["max_power_charge"]
     max_discharge = storage_config["max_power_discharge"]
@@ -126,6 +142,7 @@ def test_long_term_storage_follows_schedule(long_term_storage_model, storage_sch
             assert charge <= 1e-6, f"Charge at t={t} not allowed by schedule"
             assert discharge <= max_discharge + 1e-5, f"Discharge at t={t} exceeds max"
 
+
 def test_long_term_storage_soc_limits(long_term_storage_model, storage_config):
     model, _ = long_term_storage_model
     max_capacity = storage_config["max_capacity"]
@@ -135,11 +152,17 @@ def test_long_term_storage_soc_limits(long_term_storage_model, storage_config):
         assert soc <= max_capacity + 1e-5
         assert soc >= min_capacity - 1e-5
 
+
 def test_long_term_storage_initial_soc(long_term_storage_model, storage_config):
     model, _ = long_term_storage_model
-    initial_soc = storage_config["initial_soc"] * storage_config["max_capacity"] if storage_config["initial_soc"] <= 1 else storage_config["initial_soc"]
+    initial_soc = (
+        storage_config["initial_soc"] * storage_config["max_capacity"]
+        if storage_config["initial_soc"] <= 1
+        else storage_config["initial_soc"]
+    )
     soc_0 = pyo.value(model.storage.soc[0])
     assert soc_0 == initial_soc
+
 
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
