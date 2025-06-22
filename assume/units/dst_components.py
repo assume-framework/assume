@@ -198,9 +198,9 @@ class Boiler:
         self.initial_operational_status = initial_operational_status
         self.kwargs = kwargs
 
-        if self.fuel_type not in ["electricity", "natural_gas"]:
+        if self.fuel_type not in ["electricity", "natural_gas", "hydrogen_gas"]:
             raise ValueError(
-                "Unsupported fuel_type for a boiler. Choose 'electricity' or 'natural_gas'."
+                "Unsupported fuel_type for a boiler. Choose 'electricity' or 'natural_gas' or 'hydrogen_gas'."
             )
 
     def add_to_model(
@@ -257,6 +257,11 @@ class Boiler:
                 raise ValueError(
                     "Natural gas boiler requires a natural gas price profile in the model."
                 )
+        elif self.fuel_type == "hydrogen_gas":
+            if not hasattr(model, "hydrogen_gas_price"):
+                raise ValueError(
+                    "Hydrogen gas boiler requires a hydrogen gas price profile in the model."
+                )
 
         # Define parameters
         model_block.max_power = pyo.Param(initialize=self.max_power)
@@ -277,7 +282,14 @@ class Boiler:
             bounds=(0, model_block.max_power),
         )
         model_block.natural_gas_in = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+        )
+        model_block.hydrogen_gas_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
         )
 
         model_block.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
@@ -290,23 +302,41 @@ class Boiler:
                 return b.heat_out[t] == b.power_in[t] * b.efficiency
             elif self.fuel_type == "natural_gas":
                 return b.heat_out[t] == b.natural_gas_in[t] * b.efficiency
+            elif self.fuel_type == "hydrogen_gas":
+                return b.heat_out[t] == b.hydrogen_gas_in[t] * b.efficiency
             else:
-                raise ValueError(
-                    "Unsupported fuel_type. Choose 'electricity' or 'natural_gas'."
-                )
+                raise ValueError("Unsupported fuel_type for constraint.")
 
-        # Set the unused fuel input variable to zero
+        # Set unused fuel input variables to zero
         if self.fuel_type == "electricity":
 
             @model_block.Constraint(self.time_steps)
             def natural_gas_input_zero_constraint(b, t):
                 return b.natural_gas_in[t] == 0
 
+            @model_block.Constraint(self.time_steps)
+            def hydrogen_input_zero_constraint(b, t):
+                return b.hydrogen_gas_in[t] == 0
+
         elif self.fuel_type == "natural_gas":
 
             @model_block.Constraint(self.time_steps)
             def power_input_zero_constraint(b, t):
                 return b.power_in[t] == 0
+
+            @model_block.Constraint(self.time_steps)
+            def hydrogen_input_zero_constraint(b, t):
+                return b.hydrogen_gas_in[t] == 0
+
+        elif self.fuel_type == "hydrogen_gas":
+
+            @model_block.Constraint(self.time_steps)
+            def power_input_zero_constraint(b, t):
+                return b.power_in[t] == 0
+
+            @model_block.Constraint(self.time_steps)
+            def natural_gas_input_zero_constraint(b, t):
+                return b.natural_gas_in[t] == 0
 
         # Operating cost constraint based on fuel type
         @model_block.Constraint(self.time_steps)
@@ -317,6 +347,11 @@ class Boiler:
                 return (
                     b.operating_cost[t]
                     == b.natural_gas_in[t] * model.natural_gas_price[t]
+                )
+            elif self.fuel_type == "hydrogen_gas":
+                return (
+                    b.operating_cost[t]
+                    == b.hydrogen_gas_in[t] * model.hydrogen_gas_price[t]
                 )
 
         # Ramp-up constraint and ramp-down constraints
@@ -333,6 +368,20 @@ class Boiler:
                 if t == self.time_steps.at(1):
                     return b.natural_gas_in[t] <= b.ramp_down
                 return b.natural_gas_in[t - 1] - b.natural_gas_in[t] <= b.ramp_down
+
+        elif self.fuel_type == "hydrogen_gas":
+
+            @model_block.Constraint(self.time_steps)
+            def ramp_up_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return b.hydrogen_gas_in[t] <= b.ramp_up
+                return b.hydrogen_gas_in[t] - b.hydrogen_gas_in[t - 1] <= b.ramp_up
+
+            @model_block.Constraint(self.time_steps)
+            def ramp_down_constraint(b, t):
+                if t == self.time_steps.at(1):
+                    return b.hydrogen_gas_in[t] <= b.ramp_down
+                return b.hydrogen_gas_in[t - 1] - b.hydrogen_gas_in[t] <= b.ramp_down
 
         elif self.fuel_type == "electricity":
             add_ramping_constraints(
@@ -399,10 +448,12 @@ class GenericStorage:
 
         # check if initial_soc is within the bounds [0, 1] and fix it if not
         if initial_soc > 1:
-            initial_soc /= max_capacity
+            initial_soc_frac = initial_soc / max_capacity
             logger.warning(
-                f"Initial SOC is greater than 1.0. Setting it to {initial_soc}."
+                f"Initial SOC is greater than 1.0. Setting it to {initial_soc_frac} (as fraction of max_capacity)."
             )
+        else:
+            initial_soc_frac = initial_soc
 
         self.max_capacity = max_capacity
         self.min_capacity = min_capacity
@@ -415,7 +466,7 @@ class GenericStorage:
         )
         self.efficiency_charge = efficiency_charge
         self.efficiency_discharge = efficiency_discharge
-        self.initial_soc = initial_soc
+        self.initial_soc = initial_soc_frac * max_capacity
         self.ramp_up = max_power_charge if ramp_up is None else ramp_up
         self.ramp_down = max_power_charge if ramp_down is None else ramp_down
         self.storage_loss_rate = storage_loss_rate
@@ -469,9 +520,6 @@ class GenericStorage:
         model_block.efficiency_discharge = pyo.Param(
             initialize=self.efficiency_discharge
         )
-        model_block.initial_soc = pyo.Param(
-            initialize=self.initial_soc * self.max_capacity
-        )
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
@@ -496,18 +544,24 @@ class GenericStorage:
             doc="Discharging power at each time step",
         )
 
-        # Define SOC dynamics with energy loss and efficiency
+        initial_soc_value = self.initial_soc
+
+        @model_block.Constraint()
+        def initial_soc_rule(b):
+            return b.soc[self.time_steps.at(1)] == initial_soc_value
+
         @model_block.Constraint(self.time_steps)
         def soc_balance_rule(b, t):
             if t == self.time_steps.at(1):
-                prev_soc = b.initial_soc
-            else:
-                prev_soc = b.soc[t - 1]
-            return b.soc[t] == (
-                prev_soc
-                + b.efficiency_charge * b.charge[t]
-                - (1 / b.efficiency_discharge) * b.discharge[t]
-                - b.storage_loss_rate * prev_soc
+                return pyo.Constraint.Skip
+            prev_idx = list(self.time_steps).index(t) - 1
+            prev_t = list(self.time_steps)[prev_idx]
+            return (
+                b.soc[t]
+                == b.soc[prev_t]
+                + b.charge[prev_t] * b.efficiency_charge
+                - b.discharge[prev_t] / b.efficiency_discharge
+                - b.storage_loss_rate * b.soc[prev_t]
             )
 
         # Apply ramp-up constraints if ramp_up is specified
@@ -535,6 +589,85 @@ class GenericStorage:
             if t == self.time_steps.at(1):
                 return b.discharge[t] <= b.ramp_down
             return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
+
+        return model_block
+
+
+class ThermalStorage(GenericStorage):
+    """
+    A flexible thermal storage class that extends GenericStorage to support short-term and long-term scheduling.
+
+    This class enables control over when the storage can charge or discharge, based on a binary profile.
+    It is useful in seasonal or scheduled operations like industrial heating cycles.
+
+    - For 'short-term': behaves like GenericStorage without behavioral restrictions.
+    - For 'long-term': follows a storage schedule (0: charge-only, 1: discharge-only).
+
+    Args:
+        storage_type (str): Type of storage behavior: 'short-term' or 'long-term'.
+        storage_schedule_profile (pd.Series, optional): Binary schedule for discharge availability (only required for 'long-term').
+        **kwargs: All other parameters are inherited from GenericStorage.
+    """
+
+    def __init__(
+        self,
+        storage_type: str = "short-term",
+        storage_schedule_profile: pd.Series | None = None,
+        **kwargs,
+    ):
+        """
+        Initializes the thermal storage instance.
+
+        Raises:
+            ValueError: If `storage_type` is 'long-term' and no schedule is provided.
+            ValueError: If `storage_type` is not one of ['short-term', 'long-term'].
+        """
+        super().__init__(**kwargs)
+
+        self.storage_type = storage_type.lower()
+        self.storage_schedule_profile = storage_schedule_profile
+
+        if self.storage_type == "long-term" and self.storage_schedule_profile is None:
+            raise ValueError(
+                "storage_schedule_profile is required for 'long-term' storage_type."
+            )
+
+        if self.storage_type not in ["short-term", "long-term"]:
+            raise ValueError("storage_type must be either 'short-term' or 'long-term'.")
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """
+        Adds thermal storage constraints to the model based on storage type.
+
+        - If 'long-term', restrict charge/discharge based on the binary schedule profile.
+        - Otherwise, behaves identically to GenericStorage.
+
+        Args:
+            model (pyo.ConcreteModel): The Pyomo optimization model.
+            model_block (pyo.Block): The block to which this storage is added.
+
+        Returns:
+            pyo.Block: Updated model block with thermal storage constraints.
+        """
+        model_block = super().add_to_model(model, model_block)
+
+        if self.storage_type == "long-term":
+
+            @model_block.Constraint(self.time_steps)
+            def availability_charge_constraint(b, t):
+                return (
+                    b.charge[t]
+                    <= (1 - self.storage_schedule_profile.iat[t]) * b.max_power_charge
+                )
+
+            @model_block.Constraint(self.time_steps)
+            def availability_discharge_constraint(b, t):
+                return (
+                    b.discharge[t]
+                    <= self.storage_schedule_profile.iat[t] * b.max_power_discharge
+                )
 
         return model_block
 
@@ -1658,7 +1791,7 @@ demand_side_technologies: dict = {
     "electric_vehicle": ElectricVehicle,
     "generic_storage": GenericStorage,
     "pv_plant": PVPlant,
-    "thermal_storage": GenericStorage,
+    "thermal_storage": ThermalStorage,
 }
 
 
