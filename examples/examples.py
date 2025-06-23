@@ -116,12 +116,6 @@ available_examples = {
 }
 
 
-
-
-
-
-
-
 # %%
 if __name__ == "__main__":
     """
@@ -135,7 +129,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "redisp_storage_3_nodes"
+    example = "paper_plant_use_case"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
@@ -174,7 +168,6 @@ if __name__ == "__main__":
     # )
 
     if world.learning_config.get("learning_mode", False):
-
         # run learning if learning mode is enabled
         run_learning(world)
 

@@ -171,10 +171,9 @@ class NaiveDADSMStrategy(BaseStrategy):
         # check if unit has opt_power_requirement attribute
         # if not hasattr(unit, "opt_power_requirement"):
         if unit.optimisation_counter == 0:
-            unit.determine_optimal_operation_with_flex()
+            unit.determine_optimal_operation_without_flex()
             # self.plot_power_requirements(unit)
             unit.optimisation_counter = 1
-
         bids = []
         for product in product_tuples:
             """
@@ -294,7 +293,8 @@ class NaiveRedispatchStrategy(BaseStrategy):
             )
 
         return bids
-    
+
+
 class FixedDispatchStrategy(BaseStrategy):
     """
     A naive strategy that simply submits all information about the unit and
@@ -346,6 +346,8 @@ class FixedDispatchStrategy(BaseStrategy):
             )
 
         return bids
+
+
 '''
 class NaiveRedispatchSteelplantStrategy(BaseStrategy):
     def calculate_bids(
@@ -417,7 +419,9 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
 
         return bids
 '''
-class NaiveRedispatchSteelplantStrategy(BaseStrategy):
+
+
+class NaiveRedispatchStrategyDSM(BaseStrategy):
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -444,10 +448,11 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                     "volume": -5,
                     "max_power": 5,
                     "min_power": 0,
-                    "node": 'west', #unit.node,
+                    "node": "west",  # unit.node,
                 }
             )
         return bids
+
 
 class NaiveExchangeStrategy(BaseStrategy):
     """

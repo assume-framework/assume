@@ -14,7 +14,7 @@ from assume.units.dsm_load_shift import DSMFlex
 logger = logging.getLogger(__name__)
 
 
-class SteamGeneratorPlant(DSMFlex, SupportsMinMax):
+class SteamPlant(DSMFlex, SupportsMinMax):
     """
     Represents a paper and pulp plant in an energy system. This includes components like heat pumps,
     boilers, and storage units for operational optimization.
@@ -148,60 +148,34 @@ class SteamGeneratorPlant(DSMFlex, SupportsMinMax):
         self.model.total_power_input = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
-        self.model.heat_output = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
-        )
         self.model.variable_cost = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
 
     def initialize_process_sequence(self):
-        """
-        Initializes the process sequence and constraints for the paper and pulp plant.
-        Connects heat sources (heat pump and/or boiler) with thermal storage if present.
-        """
-
         @self.model.Constraint(self.model.time_steps)
-        def heat_production_distribution(m, t):
-            """
-            Balances heat produced by available sources with storage operations.
-            Heat flows from sources to storage or demand.
-            """
+        def direct_heat_balance(m, t):
             total_heat_production = 0
-
-            # Add heat production from available sources
             if self.has_heatpump:
                 total_heat_production += self.model.dsm_blocks["heat_pump"].heat_out[t]
-
             if self.has_boiler:
                 total_heat_production += self.model.dsm_blocks["boiler"].heat_out[t]
-
-            # Connect with storage if present
             if self.has_thermal_storage:
                 storage_discharge = self.model.dsm_blocks["thermal_storage"].discharge[
                     t
                 ]
                 storage_charge = self.model.dsm_blocks["thermal_storage"].charge[t]
                 return (
-                    total_heat_production + storage_discharge
-                    == m.heat_output[t] + storage_charge
+                    total_heat_production + storage_discharge - storage_charge
+                    == m.thermal_demand[t]
                 )
             else:
-                return total_heat_production == m.heat_output[t]
+                return total_heat_production == m.thermal_demand[t]
 
     def define_constraints(self):
         """
         Defines the constraints for the paper and pulp plant model.
         """
-
-        # Heat demand constraint
-        @self.model.Constraint(self.model.time_steps)
-        def total_heat_demand_constraint(m, t):
-            """
-            Ensures total heat production meets demand over optimization horizon.
-            """
-            # return sum(m.heat_output[t] for t in m.time_steps) == sum(m.thermal_demand[t] for t in m.time_steps)
-            return m.heat_output[t] >= m.thermal_demand[t]
 
         # Power input constraint
         @self.model.Constraint(self.model.time_steps)

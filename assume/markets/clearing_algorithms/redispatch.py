@@ -10,8 +10,8 @@ import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
-    add_redispatch_generators,
     add_fix_units,
+    add_redispatch_generators,
     calculate_network_meta,
     read_pypsa_grid,
 )
@@ -61,15 +61,14 @@ class RedispatchMarketRole(MarketRole):
         )
 
         add_fix_units(
-        network=self.network,
-        units=self.grid_data["storage_units"],
+            network=self.network,
+            units=self.grid_data["storage_units"],
         )
-        
+
         add_fix_units(
-        network=self.network,
-        units=self.grid_data["exchange_units"],
-        
-    )
+            network=self.network,
+            units=self.grid_data["exchange_units"],
+        )
 
         self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
@@ -117,9 +116,11 @@ class RedispatchMarketRole(MarketRole):
         p_max_pu_up = (max_power_pivot - volume_pivot).div(
             max_power_pivot.where(max_power_pivot != 0, np.inf)
         )
-        p_max_pu_down = (volume_pivot - min_power_pivot).div(
-            max_power_pivot.where(max_power_pivot != 0, np.inf)
-        ).clip(lower=0)
+        p_max_pu_down = (
+            (volume_pivot - min_power_pivot)
+            .div(max_power_pivot.where(max_power_pivot != 0, np.inf))
+            .clip(lower=0)
+        )
         costs = price_pivot
 
         negative_only_units = volume_pivot.lt(0).all()
