@@ -79,7 +79,10 @@ available_examples = {
     "small_learning_2_lstm": {"scenario": "example_02b", "study_case": "base_lstm"},
     # Further DRL example simulation showcasing learning features
     "small_learning_with_storage": {"scenario": "example_02e", "study_case": "base"},
-    "small_learning_with_storage_and_pp": {"scenario": "example_02f", "study_case": "base_longer"},
+    "small_learning_with_storage_and_pp": {
+        "scenario": "example_02f",
+        "study_case": "base_longer",
+    },
     #
     # full year examples to show real-world scenarios
     "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
@@ -121,7 +124,7 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "case_study_2013"
+    example = "small_learning_2"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
@@ -138,7 +141,6 @@ if __name__ == "__main__":
         scenario=available_examples[example]["scenario"],
         study_case=available_examples[example]["study_case"],
     )
-
 
     if world.learning_config.get("learning_mode", False):
         # run learning if learning mode is enabled

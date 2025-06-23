@@ -1,6 +1,10 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 base:
   start_date: 2019-03-01 00:00
-  end_date: 2019-08-01 00:00
+  end_date: 2019-04-01 00:00
   time_step: 1h
   save_frequency_hours: null
   learning_mode: true
@@ -83,7 +87,7 @@ base_lstm:
       market_mechanism: pay_as_clear
 base_dispatch:
   start_date: 2019-03-01 00:00
-  end_date: 2019-08-01 00:00
+  end_date: 2019-04-01 00:00
   time_step: 1h
   save_frequency_hours: null
   learning_mode: false

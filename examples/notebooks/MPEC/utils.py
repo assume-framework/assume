@@ -271,7 +271,8 @@ def retrieve_best_episode_actions(inputs_dir, scenario, study_case, db):
         f"Best episode: {best_episode} found with an average reward of {reward_df.at[best_episode, 'avg_reward']:.3f}"
     )
 
-    query = f"SELECT datetime as dt, unit, actions_0, actions_1 FROM rl_params where simulation = '{simulation}_{best_episode}'"
+    query = f"SELECT datetime as dt, unit, actions_0 FROM rl_params where simulation = '{simulation}' and episode ='{best_episode}' and evaluation_mode = true"
+
     actions_df = pd.read_sql(query, db)
     actions_df.index = pd.to_datetime(actions_df["dt"])
     actions_df.drop(columns=["dt"], inplace=True)
