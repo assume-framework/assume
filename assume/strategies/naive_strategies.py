@@ -2,6 +2,9 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import matplotlib.pyplot as plt
+import pandas as pd
+
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
@@ -170,7 +173,11 @@ class NaiveDADSMStrategy(BaseStrategy):
 
         # check if unit has opt_power_requirement attribute
         # if not hasattr(unit, "opt_power_requirement"):
-        unit.determine_optimal_operation_without_flex()
+        unit.determine_optimal_operation_with_flex()
+        self.export_power_requirements_to_csv(
+            unit, "./examples/inputs/example_bus/power_requirements_timeseries.csv"
+        )
+        self.plot_power_requirements(unit)
 
         bids = []
         for product in product_tuples:
@@ -193,6 +200,59 @@ class NaiveDADSMStrategy(BaseStrategy):
             )
 
         return bids
+
+    def plot_power_requirements(self, unit: SupportsMinMax):
+        """
+        Plots the optimal power requirement and flexibility power requirement for comparison.
+
+        Args:
+            unit (SupportsMinMax): The unit containing power requirements.
+        """
+        # Retrieve power requirements data
+        opt_power_requirement = unit.opt_power_requirement
+        flex_power_requirement = unit.flex_power_requirement
+
+        # Plotting
+        plt.figure(figsize=(10, 6))
+        plt.plot(
+            opt_power_requirement.index,
+            opt_power_requirement,
+            label="Optimal Power Requirement",
+            color="blue",
+        )
+        plt.plot(
+            flex_power_requirement.index,
+            flex_power_requirement,
+            label="Flex Power Requirement",
+            color="orange",
+            linestyle="--",
+        )
+
+        # Labels and title
+        plt.xlabel("Time")
+        plt.ylabel("Power Requirement (kW)")
+        plt.title("Comparison of Optimal and Flexible Power Requirements")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def export_power_requirements_to_csv(self, unit: SupportsMinMax, file_path: str):
+        """
+        Exports the optimal and flexible power requirements time series to a CSV file.
+
+        Args:
+            unit (SupportsMinMax): The unit containing power requirements.
+            file_path (str): The path to save the CSV file.
+        """
+        # Combine the two series into a DataFrame for parallel export
+        df = pd.DataFrame(
+            {
+                "Optimal Power Requirement (kW)": unit.opt_power_requirement,
+                "Flex Power Requirement (kW)": unit.flex_power_requirement,
+            }
+        )
+        # Save to CSV
+        df.to_csv(file_path)
 
 
 class NaiveRedispatchDSMStrategy(BaseStrategy):

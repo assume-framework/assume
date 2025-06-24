@@ -6,9 +6,6 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 
-import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
-import numpy as np
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -28,6 +25,9 @@ logger = logging.getLogger(__name__)
 class DSMFlex:
     # Mapping of flexibility measures to their respective functions
     flexibility_map: dict[str, Callable[[pyo.ConcreteModel], None]] = {
+        "electricity_price_signal": lambda self, model: self.electricity_price_signal(
+            model
+        ),
         "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
         "congestion_management_flexibility": lambda self,
         model: self.grid_congestion_management(model),
@@ -144,27 +144,27 @@ class DSMFlex:
         )
         # self.model.evs = pyo.Set(initialize=[ev for ev in self.components if ev.startswith("electric_vehicle")])
         # self.model.charging_stations = pyo.Set(initialize=[cs for cs in self.components if cs.startswith("charging_station")])
-        self.model.evs = pyo.Set(
-            initialize=[
-                ev for ev in self.components if ev.startswith("electric_vehicle")
-            ],
-            ordered=True,
-        )
+        # self.model.evs = pyo.Set(
+        #     initialize=[
+        #         ev for ev in self.components if ev.startswith("electric_vehicle")
+        #     ],
+        #     ordered=True,
+        # )
 
-        self.model.charging_stations = pyo.Set(
-            initialize=[
-                cs
-                for cs, _ in sorted(
-                    (
-                        (cs, self.components[cs]["max_power"])
-                        for cs in self.components
-                        if cs.startswith("charging_station")
-                    ),
-                    key=lambda x: -x[1],  # descending by max_power
-                )
-            ],
-            ordered=True,
-        )
+        # self.model.charging_stations = pyo.Set(
+        #     initialize=[
+        #         cs
+        #         for cs, _ in sorted(
+        #             (
+        #                 (cs, self.components[cs]["max_power"])
+        #                 for cs in self.components
+        #                 if cs.startswith("charging_station")
+        #             ),
+        #             key=lambda x: -x[1],  # descending by max_power
+        #         )
+        #     ],
+        #     ordered=True,
+        # )
 
     def define_objective_opt(self):
         """
@@ -188,6 +188,35 @@ class DSMFlex:
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
+
+    def electricity_price_signal(self, model):
+        """
+        Determine the optimal operation using a new electricity price signal.
+        """
+        # Delete the existing electricity_price component
+        model.del_component(model.electricity_price)
+
+        # Add the updated electricity_price component explicitly
+        model.add_component(
+            "electricity_price",
+            pyo.Param(
+                model.time_steps,
+                initialize={
+                    t: value for t, value in enumerate(self.electricity_price_flex)
+                },
+            ),
+        )
+
+        @self.model.Objective(sense=pyo.minimize)
+        def obj_rule_flex(m):
+            """
+            Maximizes the load shift over all time steps.
+            """
+            total_variable_cost = pyo.quicksum(
+                self.model.variable_cost[t] for t in self.model.time_steps
+            )
+
+            return total_variable_cost
 
     def cost_based_flexibility(self, model):
         """
@@ -266,13 +295,14 @@ class DSMFlex:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
 
             elif self.technology == "bus_depot":
-                return m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[
-                    t
-                ] == sum(
-                    self.model.dsm_blocks[ev].charge[t]
-                    - self.model.dsm_blocks[ev].discharge[t]
-                    for ev in self.model.dsm_blocks
-                    if ev.startswith("electric_vehicle")
+                cs_discharge = sum(
+                    m.dsm_blocks[cs].discharge[t]
+                    for cs in m.dsm_blocks
+                    if cs.startswith("charging_station")
+                )
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == cs_discharge
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -333,18 +363,62 @@ class DSMFlex:
         # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
-            if self.has_electrolyser:
+            # Apply constraints based on the technology type
+            if self.technology == "hydrogen_plant":
+                # Hydrogen plant constraint
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == self.model.dsm_blocks["electrolyser"].power_in[t]
-                    + self.model.dsm_blocks["eaf"].power_in[t]
-                    + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
-            else:
+            elif self.technology == "steel_plant":
+                # Steel plant constraint with conditional electrolyser inclusion
+                if self.has_electrolyser:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["electrolyser"].power_in[t]
+                        + self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+                else:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+
+            elif self.technology == "building":
+                total_power_input = m.inflex_demand[t]
+                # Building components (e.g., heat_pump, boiler, pv_plant, generic_storage)
+                if self.has_heatpump:
+                    total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    total_power_input += self.model.dsm_blocks["boiler"].power_in[t]
+                if self.has_ev:
+                    total_power_input += (
+                        self.model.dsm_blocks["electric_vehicle"].charge[t]
+                        - self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                    )
+                if self.has_battery_storage:
+                    total_power_input += (
+                        self.model.dsm_blocks["generic_storage"].charge[t]
+                        - self.model.dsm_blocks["generic_storage"].discharge[t]
+                    )
+                if self.has_pv:
+                    total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
+
+            elif self.technology == "bus_depot":
+                cs_discharge = sum(
+                    m.dsm_blocks[cs].discharge[t]
+                    for cs in m.dsm_blocks
+                    if cs.startswith("charging_station")
+                )
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == self.model.dsm_blocks["eaf"].power_in[t]
-                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    == cs_discharge
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -410,19 +484,63 @@ class DSMFlex:
 
         # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
-        def total_power_input_constraint_with_peak_shift(m, t):
-            if self.has_electrolyser:
+        def total_power_input_constraint_with_flex(m, t):
+            # Apply constraints based on the technology type
+            if self.technology == "hydrogen_plant":
+                # Hydrogen plant constraint
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    == self.model.dsm_blocks["electrolyser"].power_in[t]
                 )
-            else:
+            elif self.technology == "steel_plant":
+                # Steel plant constraint with conditional electrolyser inclusion
+                if self.has_electrolyser:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["electrolyser"].power_in[t]
+                        + self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+                else:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+
+            elif self.technology == "building":
+                total_power_input = m.inflex_demand[t]
+                # Building components (e.g., heat_pump, boiler, pv_plant, generic_storage)
+                if self.has_heatpump:
+                    total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    total_power_input += self.model.dsm_blocks["boiler"].power_in[t]
+                if self.has_ev:
+                    total_power_input += (
+                        self.model.dsm_blocks["electric_vehicle"].charge[t]
+                        - self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                    )
+                if self.has_battery_storage:
+                    total_power_input += (
+                        self.model.dsm_blocks["generic_storage"].charge[t]
+                        - self.model.dsm_blocks["generic_storage"].discharge[t]
+                    )
+                if self.has_pv:
+                    total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
+
+            elif self.technology == "bus_depot":
+                cs_discharge = sum(
+                    m.dsm_blocks[cs].discharge[t]
+                    for cs in m.dsm_blocks
+                    if cs.startswith("charging_station")
+                )
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    == cs_discharge
                 )
 
         @model.Constraint(model.time_steps)
@@ -430,19 +548,35 @@ class DSMFlex:
             """
             Ensures that the power input during peak periods does not exceed the peak threshold value.
             """
-            if self.has_electrolyser:
+            if self.technology == "hydrogen_plant":
+                # Hydrogen plant constraint
                 return (
-                    m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_load_cap_value
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == self.model.dsm_blocks["electrolyser"].power_in[t]
                 )
-            else:
-                return (
-                    m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_load_cap_value
+            elif self.technology == "steel_plant":
+                # Steel plant constraint with conditional electrolyser inclusion
+                if self.has_electrolyser:
+                    return (
+                        self.model.dsm_blocks["electrolyser"].power_in[t]
+                        + self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                        <= peak_load_cap_value
+                    )
+                else:
+                    return (
+                        m.dsm_blocks["eaf"].power_in[t]
+                        + m.dsm_blocks["dri_plant"].power_in[t]
+                        <= peak_load_cap_value
+                    )
+
+            elif self.technology == "bus_depot":
+                cs_discharge = sum(
+                    m.dsm_blocks[cs].discharge[t]
+                    for cs in m.dsm_blocks
+                    if cs.startswith("charging_station")
                 )
+                return cs_discharge <= peak_load_cap_value
 
         @self.model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):
@@ -502,21 +636,65 @@ class DSMFlex:
         def flex_constraint_lower(m, t):
             return m.load_shift_neg[t] <= m.shift_indicator[t] * self.big_M
 
-        # Power input constraint integrating flexibility
+        # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
-        def total_power_input_constraint_flex(m, t):
-            if self.has_electrolyser:
+        def total_power_input_constraint_with_flex(m, t):
+            # Apply constraints based on the technology type
+            if self.technology == "hydrogen_plant":
+                # Hydrogen plant constraint
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    == self.model.dsm_blocks["electrolyser"].power_in[t]
                 )
-            else:
+            elif self.technology == "steel_plant":
+                # Steel plant constraint with conditional electrolyser inclusion
+                if self.has_electrolyser:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["electrolyser"].power_in[t]
+                        + self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+                else:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+
+            elif self.technology == "building":
+                total_power_input = m.inflex_demand[t]
+                # Building components (e.g., heat_pump, boiler, pv_plant, generic_storage)
+                if self.has_heatpump:
+                    total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    total_power_input += self.model.dsm_blocks["boiler"].power_in[t]
+                if self.has_ev:
+                    total_power_input += (
+                        self.model.dsm_blocks["electric_vehicle"].charge[t]
+                        - self.model.dsm_blocks["electric_vehicle"].discharge[t]
+                    )
+                if self.has_battery_storage:
+                    total_power_input += (
+                        self.model.dsm_blocks["generic_storage"].charge[t]
+                        - self.model.dsm_blocks["generic_storage"].discharge[t]
+                    )
+                if self.has_pv:
+                    total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
+
+            elif self.technology == "bus_depot":
+                cs_discharge = sum(
+                    m.dsm_blocks[cs].discharge[t]
+                    for cs in m.dsm_blocks
+                    if cs.startswith("charging_station")
+                )
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    == cs_discharge
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -581,85 +759,56 @@ class DSMFlex:
         """
         Plots the states of electric vehicles (Charging / Queued / Idle) over time.
         """
-        self.plot_ev_states(instance)
+        # # Plot
+        # time_steps = list(instance.time_steps)
 
-    def plot_ev_states(self, instance):
-        """
-        Plots:
-        1. EV Status Over Time (Idle = 0, Queued = 1, Charging = 2)
-        2. Charging Station Discharge
-        3. EV Charge and SOC
-        """
+        # # Plot EVs and Charging Stations
+        # fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
 
-        time_steps = list(instance.time_steps)
-        evs = list(instance.evs)
-        charging_stations = list(instance.charging_stations)
+        # for block_name in instance.dsm_blocks:
+        #     block = instance.dsm_blocks[block_name]
 
-        fig, axs = plt.subplots(3, 1, figsize=(15, 12), sharex=True)
+        #     if block_name.startswith("electric_vehicle"):
+        #         ev_charge = [pyo.value(block.charge[t]) for t in time_steps]
+        #         ev_discharge = [pyo.value(block.discharge[t]) for t in time_steps]
+        #         ev_soc = [pyo.value(block.soc[t]) for t in time_steps]
 
-        # Graph 1: EV Status Matrix Plot
-        status_matrix = np.zeros((len(evs), len(time_steps)))
+        #         ax1.plot(
+        #             time_steps,
+        #             ev_charge,
+        #             label=f"{block_name} Charge",
+        #             linestyle="solid",
+        #         )
+        #         ax1.plot(
+        #             time_steps,
+        #             [-v for v in ev_discharge],
+        #             label=f"{block_name} Discharge",
+        #             linestyle="dashed",
+        #         )
+        #         ax1.plot(
+        #             time_steps, ev_soc, label=f"{block_name} SOC", linestyle="dotted"
+        #         )
 
-        for i, ev in enumerate(evs):
-            for j, t in enumerate(time_steps):
-                queued = pyo.value(instance.in_queue[ev, t])
-                assigned = sum(
-                    pyo.value(instance.is_assigned[ev, cs, t])
-                    for cs in charging_stations
-                )
-                if assigned >= 1:
-                    status_matrix[i, j] = 2  # Charging
-                elif queued >= 1:
-                    status_matrix[i, j] = 1  # Queued
-                # else:
-                #     status_matrix[i, j] = 0  # Idle
+        #     elif block_name.startswith("charging_station"):
+        #         cs_discharge = [pyo.value(block.discharge[t]) for t in time_steps]
+        #         ax2.plot(
+        #             time_steps,
+        #             cs_discharge,
+        #             label=f"{block_name} Discharge",
+        #             linestyle="solid",
+        #         )
 
-        cmap = plt.cm.get_cmap("viridis", 3)
-        im = axs[0].imshow(
-            status_matrix, aspect="auto", cmap=cmap, interpolation="nearest"
-        )
+        # ax1.set_title("Electric Vehicle Charging Behavior")
+        # ax1.set_ylabel("Power / SOC")
+        # ax1.legend()
 
-        axs[0].set_yticks(np.arange(len(evs)))
-        axs[0].set_yticklabels(evs)
-        axs[0].set_title("EV Status Over Time (1=Queued, 2=Charging)")  # 0=Idle,
-        axs[0].set_ylabel("Electric Vehicle")
+        # ax2.set_title("Charging Station Discharge Behavior")
+        # ax2.set_xlabel("Time Steps")
+        # ax2.set_ylabel("Discharge Power")
+        # ax2.legend()
 
-        # Add legend for status
-        status_legend = [
-            # mpatches.Patch(color=cmap(0), label='Idle (0)'),
-            mpatches.Patch(color=cmap(1), label="Queued (1)"),
-            mpatches.Patch(color=cmap(2), label="Charging (2)"),
-        ]
-        axs[0].legend(handles=status_legend, loc="upper right")
-
-        # Graph 2: Charging Station Discharge
-        for cs in charging_stations:
-            discharge = [
-                pyo.value(instance.dsm_blocks[cs].discharge[t]) for t in time_steps
-            ]
-            axs[1].plot(time_steps, discharge, label=f"{cs} Discharge")
-
-        axs[1].set_title("Charging Station Discharge")
-        axs[1].set_ylabel("Discharge Power")
-        axs[1].legend()
-        axs[1].grid(True, linestyle="--", alpha=0.5)
-
-        # Graph 3: EV Charge and SOC
-        for ev in evs:
-            block = instance.dsm_blocks[ev]
-            charge = [pyo.value(block.charge[t]) for t in time_steps]
-            soc = [pyo.value(block.soc[t]) for t in time_steps]
-            axs[2].plot(time_steps, charge, label=f"{ev} Charge")
-            axs[2].plot(time_steps, soc, label=f"{ev} SOC", linestyle="--")
-
-        axs[2].set_title("EV Charge and SOC Over Time")
-        axs[2].set_xlabel("Time Step")
-        axs[2].set_ylabel("Power / SOC")
-        axs[2].legend()
-        axs[2].grid(True, linestyle="--", alpha=0.5)
-
-        plt.tight_layout()
-        plt.show()
+        # plt.tight_layout()
+        # plt.show()
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -691,21 +840,29 @@ class DSMFlex:
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        # Compute adjusted total power input with load shift applied
-        adjusted_total_power_input = []
-        for t in instance.time_steps:
-            # Calculate the load-shifted value of total_power_input
-            adjusted_power = (
-                instance.total_power_input[t].value
-                + instance.load_shift_pos[t].value
-                - instance.load_shift_neg[t].value
+        if self.flexibility_measure == "electricity_price_signal":
+            flex_power_requirement = [
+                pyo.value(instance.total_power_input[t]) for t in instance.time_steps
+            ]
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=flex_power_requirement
             )
-            adjusted_total_power_input.append(adjusted_power)
+        else:
+            # Compute adjusted total power input with load shift applied
+            adjusted_total_power_input = []
+            for t in instance.time_steps:
+                # Calculate the load-shifted value of total_power_input
+                adjusted_power = (
+                    instance.total_power_input[t].value
+                    + instance.load_shift_pos[t].value
+                    - instance.load_shift_neg[t].value
+                )
+                adjusted_total_power_input.append(adjusted_power)
 
-        # Assign this list to flex_power_requirement as a pandas Series
-        self.flex_power_requirement = FastSeries(
-            index=self.index, value=adjusted_total_power_input
-        )
+            # Assign this list to flex_power_requirement as a pandas Series
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=adjusted_total_power_input
+            )
 
         # Variable cost series
         flex_variable_cost = [

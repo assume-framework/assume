@@ -1361,7 +1361,7 @@ class ElectricVehicle:
             @model_block.Constraint(self.time_steps)
             def usage_constraint(b, t):
                 return b.usage[t] == (1 - self.availability_profile.iat[t]) * (
-                    external_range[t] / b.mileage
+                    external_range[t] * b.mileage
                 )
 
             @model_block.Constraint(self.time_steps)
@@ -1419,7 +1419,14 @@ class ElectricVehicle:
         # Operating costs
         @model_block.Constraint(self.time_steps)
         def operating_cost_constraint_rule(b, t):
-            return b.operating_cost[t] == b.charge[t] * model.electricity_price[t]
+            if self.power_flow_directionality == "unidirectional":
+                return b.operating_cost[t] == b.charge[t] * model.electricity_price[t]
+            elif self.power_flow_directionality == "bidirectional":
+                return (
+                    b.operating_cost[t]
+                    == b.charge[t] * model.electricity_price[t]
+                    - b.discharge[t] * model.electricity_price_flex[t]
+                )
 
         return model_block
 

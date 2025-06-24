@@ -56,7 +56,9 @@ class BusDepot(DSMFlex, SupportsMinMax):
         is_prosumer: str = "No",
         objective: str = "min_cost",
         flexibility_measure: str = "cost_based_load_shift",
-        cost_tolerance: float = 10,
+        congestion_threshold: float = 0,
+        cost_tolerance: float = 0,
+        peak_load_cap: float = 0,
         node: str = "bus_node",
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
@@ -109,6 +111,13 @@ class BusDepot(DSMFlex, SupportsMinMax):
             self.electricity_price = self.forecaster["electricity_price"]
         except KeyError:
             raise ValueError("Forecaster must provide 'electricity_price'.")
+
+        self.electricity_price_flex = self.forecaster["electricity_price_flex"]
+        self.congestion_signal = self.forecaster["congestion_signal"]
+        self.renewable_utilisation_signal = self.forecaster["RE_availability"]
+        self.unidirectional_load = self.forecaster["unidirectional_load"]
+        self.congestion_threshold = congestion_threshold
+        self.peak_load_cap = peak_load_cap
 
         for ev_key in self.components:
             if ev_key.startswith("electric_vehicle"):
@@ -164,330 +173,125 @@ class BusDepot(DSMFlex, SupportsMinMax):
         # Setup the Pyomo model after configuration is complete
         self.setup_model(presolve=True)
 
+    def define_variables(self):
+        """
+        Defines the decision variables for the Pyomo optimization model.
+
+        - `total_power_input`: Represents the total power input required at each time step.
+        - `variable_cost`: Represents the variable cost associated with power usage at each time step.
+
+        Both variables are defined over the `time_steps` set and are continuous real numbers.
+        """
+        self.model.total_power_input = pyo.Var(self.model.time_steps, within=pyo.Reals)
+        self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.Reals)
+
     def define_parameters(self):
-        """Defines Pyomo parameters based on fetched forecasts and configurations."""
+        """Defines parameters including electricity price, power capacity, and bus availability."""
         self.model.electricity_price = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.electricity_price)},
-            doc="Electricity price forecast",
         )
 
-        # Define range parameter for each EV
-        for (
-            ev
-        ) in self.model.evs:  # Assuming self.model.evs is populated during setup_model
-            if ev in self.components and "range" in self.components[ev]:
-                ev_range_data = self.components[ev]["range"]
-                # Ensure ev_range_data is indexable (like a pandas Series or list)
-                try:
-                    init_dict = {
-                        t: ev_range_data.iloc[t] for t in range(len(ev_range_data))
-                    }
-                except AttributeError:  # Handle if it's a list/tuple
-                    init_dict = {t: ev_range_data[t] for t in range(len(ev_range_data))}
-                except Exception as e:
-                    raise TypeError(f"Could not process range data for {ev}: {e}")
-
-                # Use add_component to avoid potential conflicts if param already exists
-                param_name = f"{ev}_range"
-                if hasattr(self.model, param_name):
-                    logger.warning(
-                        f"Parameter {param_name} already exists. Re-defining."
-                    )
-                    delattr(self.model, param_name)
-
-                setattr(
-                    self.model,
-                    param_name,
+        self.model.electricity_price_flex = pyo.Param(
+            self.model.time_steps,
+            initialize={
+                t: value for t, value in enumerate(self.electricity_price_flex)
+            },
+        )
+        for ev_key in self.components:
+            if ev_key.startswith("electric_vehicle"):
+                ev_range = self.components[ev_key]["range"]
+                self.model.add_component(
+                    f"{ev_key}_range",
                     pyo.Param(
                         self.model.time_steps,
-                        initialize=init_dict,
-                        doc=f"Range forecast for {ev}",
+                        initialize={t: ev_range.iloc[t] for t in range(len(ev_range))},
                     ),
                 )
-            else:
-                logger.error(
-                    f"Range data missing for EV component {ev} during parameter definition."
-                )
-                # Depending on requirements, you might raise an error here:
-                # raise ValueError(f"Range data missing for EV component {ev}")
-
-        # Default: all compatible
-        self.model.compatible = pyo.Param(
-            self.model.evs,
-            self.model.charging_stations,
-            initialize=1,
-            within=pyo.Binary,
-            mutable=True,
-            doc="Default compatibility: all EVs are compatible with all stations",
-        )  ##comptatible should go to variable
-
-    def define_variables(self):
-        """Defines Pyomo variables for optimization."""
-        self.model.total_power_input = pyo.Var(
-            self.model.time_steps,
-            within=pyo.Reals,
-            doc="Total power drawn from the grid at each time step",
-        )
-        self.model.variable_cost = pyo.Var(
-            self.model.time_steps,
-            within=pyo.Reals,
-            doc="Variable cost incurred at each time step",
-        )
-        self.model.is_assigned = pyo.Var(
-            self.model.evs,
-            self.model.charging_stations,
-            self.model.time_steps,
-            domain=pyo.Binary,
-            doc="1 if EV is assigned to CS at time t",
-        )
-
-        # Binary variable: 1 if EV is waiting (available but not assigned), 0 otherwise
-        self.model.in_queue = pyo.Var(
-            self.model.evs,
-            self.model.time_steps,
-            domain=pyo.Binary,
-            doc="EV is waiting in queue",
-        )
-
-        # Variable representing charge amount assigned from a specific CS to a specific EV at time t
-        # This assumes self.model.evs and self.model.charging_stations are defined in setup_model
-        self.model.charge_assignment = pyo.Var(
-            self.model.evs,
-            self.model.charging_stations,
-            self.model.time_steps,
-            domain=pyo.NonNegativeReals,  # Charge power must be non-negative
-            doc="Power transferred from CS to EV at time t",
-        )
-
-        self.model.cumulative_charged = pyo.Var(
-            self.model.evs, self.model.time_steps, domain=pyo.NonNegativeReals
-        )
-
-        self.model.is_available = pyo.Var(
-            self.model.evs,
-            self.model.time_steps,
-            domain=pyo.Binary,
-            doc="Binary indicator: 1 if EV is available (at depot), 0 otherwise",
-        )
-        self.model.is_fully_charged = pyo.Var(
-            self.model.evs,
-            self.model.time_steps,
-            domain=pyo.Binary,
-            doc="Binary indicator if EV has reached full charge",
-        )
 
     def initialize_process_sequence(self):
-        """Defines constraints linking components, e.g., EV charge and CS discharge."""
-
         for ev in self.model.dsm_blocks:
             if ev.startswith("electric_vehicle"):
-                # Check if dsm_blocks[ev] has a 'charge' attribute
-                if hasattr(self.model.dsm_blocks[ev], "charge"):
-                    constraint_name = f"charge_flow_constraint_{ev}"
-                    # Remove constraint if it exists before adding
-                    if hasattr(self.model, constraint_name):
-                        delattr(self.model, constraint_name)
-                    setattr(
-                        self.model,
-                        constraint_name,
-                        pyo.Constraint(
-                            self.model.time_steps,
-                            rule=lambda m, t, ev=ev: m.dsm_blocks[ev].charge[t] >= 0,
-                            doc=f"Ensures non-negative charge for {ev}",
-                        ),
-                    )
-                else:
-                    logger.warning(
-                        f"DSM block {ev} does not have 'charge' attribute for constraint."
-                    )
+                constraint_name = f"charge_flow_constraint_{ev}"
+                self.model.add_component(
+                    constraint_name,
+                    pyo.Constraint(
+                        self.model.time_steps,
+                        rule=lambda m, t, ev=ev: m.dsm_blocks[ev].charge[t] >= 0,
+                    ),
+                )
 
-        # Constraint: Total charge received by an EV at time t must equal the sum of charge
-        # assigned to it from all charging stations.
-        @self.model.Constraint(
-            self.model.evs,
-            self.model.time_steps,
-            doc="Links EV total charge to assignments from CSs",
-        )
-        def ev_total_charge(m, ev, t):
-            # Ensure the EV exists in dsm_blocks and has 'charge' variable
-            if ev in m.dsm_blocks and hasattr(m.dsm_blocks[ev], "charge"):
-                return m.dsm_blocks[ev].charge[t] == sum(
-                    m.charge_assignment[ev, cs, t] for cs in m.charging_stations
-                )
-            else:
-                logger.warning(
-                    f"Skipping ev_total_charge constraint for {ev} at time {t} due to missing block/variable."
-                )
-                return pyo.Constraint.Skip  # Skip constraint if EV block/var is missing
-            
-        @self.model.Constraint(self.model.charging_stations, self.model.time_steps)
-        def station_capacity_limit(m, cs, t):
-            return (
-                sum(m.charge_assignment[ev, cs, t] for ev in m.evs)
-                <= m.dsm_blocks[cs].discharge[t]
+        # Global constraint: all EV charging must be met by all charging station discharging
+        @self.model.Constraint(self.model.time_steps)
+        def ev_station_power_balance(m, t):
+            total_ev_charge = sum(
+                m.dsm_blocks[ev].charge[t]
+                for ev in m.dsm_blocks
+                if ev.startswith("electric_vehicle")
             )
-
-        # # Constraint: Total discharge from a charging station at time t must equal the sum of charge
-        # # assigned from it to all EVs.
-        # @self.model.Constraint(
-        #     self.model.charging_stations,
-        #     self.model.time_steps,
-        #     doc="Links CS total discharge to assignments to EVs",
-        # )
-        # def station_discharge_balance(m, cs, t):
-        #     # Ensure the CS exists in dsm_blocks and has 'discharge' variable
-        #     if cs in m.dsm_blocks and hasattr(m.dsm_blocks[cs], "discharge"):
-        #         return m.dsm_blocks[cs].discharge[t] == sum(
-        #             m.charge_assignment[ev, cs, t] for ev in m.evs
-        #         )
-        #     else:
-        #         logger.warning(
-        #             f"Skipping station_discharge_balance constraint for {cs} at time {t} due to missing block/variable."
-        #         )
-        #         return pyo.Constraint.Skip  # Skip constraint if CS block/var is missing
+            total_station_discharge = sum(
+                m.dsm_blocks[cs].discharge[t]
+                for cs in m.dsm_blocks
+                if cs.startswith("charging_station")
+            )
+            return total_station_discharge == total_ev_charge
 
     def define_constraints(self):
-        """Defines core operational constraints for the bus depot model."""
-        # Constraint: If not a prosumer, total power input must be non-negative (no grid export).
+        """
+        Defines the optimization constraints for the Pyomo model, ensuring that the Bus Depot's
+        energy consumption, production, and cost calculations adhere to operational rules.
+
+        This function establishes the following constraints:
+
+        1. **Grid Export Constraint (for Non-Prosumers)**:
+        - Ensures that Bus Depots classified as non-prosumers cannot export power to the grid.
+        - This restriction is applied by enforcing a lower bound of zero on the total power
+            input, meaning that the Bus Depot can only draw energy from external sources,
+            but cannot inject excess energy back into the grid.
+
+        2. **Variable Cost Calculation Constraint**:
+        - Computes the variable cost incurred at each time step based on total power input
+            and electricity price.
+        - This constraint ensures that the total variable cost is directly proportional to
+            energy consumption, allowing for accurate cost minimization in the optimization model.
+
+        These constraints help enforce realistic energy system behavior while aligning with
+        market regulations and operational objectives.
+        """
         if not self.is_prosumer:
 
-            @self.model.Constraint(
-                self.model.time_steps, doc="Prevents grid export for non-prosumers"
-            )
+            @self.model.Constraint(self.model.time_steps)
             def grid_export_constraint(m, t):
+                """Restricts non-prosumers from exporting to the grid."""
                 return m.total_power_input[t] >= 0
 
-        @self.model.Constraint(
-            self.model.charging_stations,
-            self.model.time_steps,
-            doc="Max 1 EV per CS at each timestep",
-        )
-        def max_one_ev_per_station(m, cs, t):
-            return sum(m.is_assigned[ev, cs, t] for ev in m.evs) <= 1
-
-        @self.model.Constraint(
-            self.model.evs,
-            self.model.time_steps,
-            doc="Queue logic: EV is in queue if available and not assigned",
-        )
-        def enforce_queue_logic(m, ev, t):
-            return m.in_queue[ev, t] == m.is_available[ev, t] - sum(
-                m.is_assigned[ev, cs, t] for cs in m.charging_stations
-            )
-
-        @self.model.Constraint(
-            self.model.evs,
-            self.model.charging_stations,
-            self.model.time_steps,
-            doc="Link is_assigned with actual charge flow",
-        )
-        def assignment_indicator_constraint(m, ev, cs, t):
-            return m.charge_assignment[ev, cs, t] <= 1e5 * m.is_assigned[ev, cs, t]
-
-        @self.model.Constraint(
-            self.model.evs,
-            self.model.time_steps,
-            doc="Ensures EV cannot charge if it's not available (driving)",
-        )
-        def availability_based_on_charging(m, ev, t):
-            M = 1e5  # A sufficiently large number (e.g., max possible charge rate * number of CS)
-            charge_sum = sum(
-                m.charge_assignment[ev, cs, t] for cs in m.charging_stations
-            )
-
-            # Assuming is_available = 1 means at depot/can charge
-            return charge_sum <= M * m.is_available[ev, t]
-        
-        # # Need to be decided
-        # @self.model.Constraint(self.model.evs, self.model.time_steps)
-        # def link_ev_charge_from_assignment(m, ev, t):
-        #     return m.dsm_blocks[ev].charge[t] == sum(
-        #         m.charge_assignment[ev, cs, t] for cs in m.charging_stations
-        #     )
-        
-
-        @self.model.Constraint(self.model.evs, self.model.time_steps)
-        def cumulative_charging_tracking(m, ev, t):
-            if t == m.time_steps.first():
-                return m.cumulative_charged[ev, t] == m.dsm_blocks[ev].charge[t]
-            else:
-                return (
-                    m.cumulative_charged[ev, t]
-                    == m.cumulative_charged[ev, t - 1] + m.dsm_blocks[ev].charge[t]
-                )
-
-        @self.model.Constraint(
-            self.model.evs, self.model.charging_stations, self.model.time_steps
-        )
-        def release_station_if_queue_waiting(m, ev, cs, t):
-            return (
-                m.is_assigned[ev, cs, t]
-                <= 1 - m.in_queue[ev, t] * m.is_fully_charged[ev, t]
-            )
-
-        @self.model.Constraint(self.model.evs, self.model.time_steps)
-        def enforce_fully_charged_flag(m, ev, t):
-            M = 1e5
-            ε = 1e-3
-            return (
-                m.cumulative_charged[ev, t]
-                >= m.dsm_blocks[ev].max_capacity
-                - ε
-                - (1 - m.is_fully_charged[ev, t]) * M
-            )
-
-        @self.model.Constraint(self.model.evs, self.model.time_steps)
-        def track_cumulative_charge(m, ev, t):
-            if t == m.time_steps.first():
-                return m.cumulative_charged[ev, t] == sum(
-                    m.charge_assignment[ev, cs, t] for cs in m.charging_stations
-                )
-            return m.cumulative_charged[ev, t] == m.cumulative_charged[ev, t - 1] + sum(
-                m.charge_assignment[ev, cs, t] for cs in m.charging_stations
-            )
-
-        @self.model.Constraint(
-            self.model.time_steps,
-            doc="Defines total power input based on component flows",
-        )
+        @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
-            ev_charge_sum = sum(
+            ev_charge = sum(
                 m.dsm_blocks[ev].charge[t]
-                for ev in m.evs
-                if ev in m.dsm_blocks and hasattr(m.dsm_blocks[ev], "charge")
+                for ev in m.dsm_blocks
+                if ev.startswith("electric_vehicle")
             )
-
-            cs_charge_sum = sum(
-                m.dsm_blocks[cs].charge[t]
-                for cs in m.charging_stations
-                if cs in m.dsm_blocks and hasattr(m.dsm_blocks[cs], "charge")
-            )
-
-            cs_discharge_sum = sum(
+            cs_discharge = sum(
                 m.dsm_blocks[cs].discharge[t]
-                for cs in m.charging_stations
-                if cs in m.dsm_blocks and hasattr(m.dsm_blocks[cs], "discharge")
+                for cs in m.dsm_blocks
+                if cs.startswith("charging_station")
             )
-            # return m.total_power_input[t] == ev_charge_sum # Assumes CSs are lossless passthrough
-            return (
-                m.total_power_input[t] == cs_discharge_sum
-            )  # Assumes CS discharge is what's drawn from grid perspective
+            return m.total_power_input[t] == cs_discharge
 
-        # Constraint: Defines the variable cost based on total power input and electricity price.
-        @self.model.Constraint(
-            self.model.time_steps,
-            doc="Calculates variable cost based on power input and price",
-        )
+        @self.model.Constraint(self.model.time_steps)
         def variable_cost_constraint(m, t):
-            # Ensure price parameter exists for the time step
-            if t in m.electricity_price:
-                return (
-                    m.variable_cost[t]
-                    == m.total_power_input[t] * m.electricity_price[t]
-                )
-            else:
-                logger.warning(
-                    f"Skipping variable_cost_constraint at time {t} due to missing electricity price."
-                )
-                return pyo.Constraint.Skip
+            """
+            Calculates the variable cost associated with power usage at each time step.
+
+            This constraint multiplies the total variable power by the corresponding electricity price
+            to determine the variable cost incurred.
+
+            Args:
+                m: Pyomo model reference.
+                t: Current time step.
+
+            Returns:
+                Equality condition defining the variable cost.
+            """
+            return m.variable_cost[t] == m.total_power_input[t] * m.electricity_price[t]
