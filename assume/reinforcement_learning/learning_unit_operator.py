@@ -121,7 +121,6 @@ class RLUnitsOperator(UnitsOperator):
                     output_dict[f"actions_{i}"] = action_tuple[i]
 
                 output_agent_list.append(output_dict)
-                
 
         db_addr = self.context.data.get("learning_output_agent_addr")
 

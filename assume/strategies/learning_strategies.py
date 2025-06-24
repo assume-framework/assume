@@ -13,7 +13,10 @@ from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxC
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
-from assume.reinforcement_learning.learning_utils import NormalActionNoise, encode_time_features
+from assume.reinforcement_learning.learning_utils import (
+    NormalActionNoise,
+    encode_time_features,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -638,7 +641,7 @@ class RLStrategySingleBid(RLStrategy):
 
         # we select 6 to be in line with the storage strategies
         self.foresight = 6
-        
+
     def create_observation(
         self,
         unit: SupportsMinMax,
@@ -748,7 +751,7 @@ class RLStrategySingleBid(RLStrategy):
 
         # marginal cost
         scaled_marginal_cost = current_costs / self.max_bid_price
-        
+
         # get encoded time features
         time_features = encode_time_features(start)
 
@@ -852,7 +855,6 @@ class RLStrategySingleBid(RLStrategy):
         unit.outputs["exploration_noise"].at[start] = noise
 
         return bids
-
 
 
 class StorageRLStrategy(BaseLearningStrategy):
@@ -1168,7 +1170,7 @@ class StorageRLStrategy(BaseLearningStrategy):
                 self.max_bid_price,
             )
 
-        # substract energy_costs so that profit is only positive when we bought energy for less amount of money than we sell it here
+        # subtract energy_costs so that profit is only positive when we bought energy for less amount of money than we sell it here
         profit = order_profit - order_cost - unit.outputs["energy_cost"].at[next_time]
 
         # scaling factor to normalize the reward to the range [-1,1]
@@ -1283,10 +1285,10 @@ class StorageRLStrategy(BaseLearningStrategy):
         # get the current soc value
         soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
         energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
-        
+
         # get encoded time features
         time_features = encode_time_features(start)
-        
+
         # concat all obsverations into one array
         observation = np.concatenate(
             [

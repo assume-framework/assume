@@ -17,7 +17,7 @@ def find_optimal_dispatch(
     big_w=10000,
     time_limit=60,
     print_results=False,
-    K=5, # number of discrete binary steps considered in the linearisation
+    K=5,  # number of discrete binary steps considered in the linearisation
     big_M=10e6,
 ):
     model = pyo.ConcreteModel()
@@ -80,7 +80,6 @@ def find_optimal_dispatch(
     model.M = pyo.Param(initialize=max(gens_df["mc"]) * k_max)
     delta = [gens_df.at[gen, "g_max"] / (pow(2, K) - 1) for gen in gens_df.index]
 
-    
     # ---------------------------------------------------------------------------
     # binary expansion constraints
     def g_binary_rule(model, t):
@@ -129,7 +128,6 @@ def find_optimal_dispatch(
     model.binary_expansion_2_constr_2 = pyo.Constraint(
         model.time, range(K), rule=binary_expansion_2_constr_2_rule
     )
-
 
     # ---------------------------------------------------------------------------
     # objective rules
@@ -347,7 +345,7 @@ def find_optimal_dispatch(
     # KKT conditions
     # Stationarity conditions
     def kkt_gen_rule(model, i, t):
-        #(7ae) – Stationarity (relaxed KKT) w.r.t. the generation variable 𝑔𝑖,𝑡
+        # (7ae) – Stationarity (relaxed KKT) w.r.t. the generation variable 𝑔𝑖,𝑡
         # Conditional parts based on `i` and `t`
         k_term = model.k[t] if i == opt_gen else k_values_df.at[t, i]
         pi_u_hat_next_term = 0 if t == model.time.at(-1) else model.pi_u_hat[i, t + 1]
@@ -446,7 +444,7 @@ def find_optimal_dispatch(
     model.nu_min_hat_binary_constr_3 = pyo.Constraint(
         model.time, rule=nu_min_hat_binary_rule_3
     )
-    
+
     # Complementary slackness conditions
     # for ramp-up and ramp-down residuals
     # (??)–(??), Relaxed or reformulated versions of (7ai)–(7aj), MILP-friendly using binaries + big-M

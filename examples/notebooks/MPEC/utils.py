@@ -343,11 +343,11 @@ def create_gens_df(pp_units, dispatch_df):
     gens_df["g_0"] = 0  # start with no power output
 
     # get average mc from dispatch_df per unit name
-    mc = dispatch_df.groupby("unit")["energy_marginal_costs"].mean()
+    mc = dispatch_df.groupby("unit")["marginal_cost"].mean()
 
     # based on name and unit column join mc into gens_df
     gens_df = gens_df.merge(mc, left_on="name", right_on="unit", how="left")
-    gens_df = gens_df.rename(columns={"energy_marginal_costs": "mc"})
+    gens_df = gens_df.rename(columns={"marginal_cost": "mc"})
     return gens_df
 
 
@@ -440,7 +440,7 @@ def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w):
         main_df=updated_main_df_2, supp_df=updated_supp_df_2, gens_df=gens_df
     )
 
-    return profits_1, profits_2
+    return profits_1, profits_2, updated_main_df_2, updated_supp_df_2
 
 
 def plot_sample_distribution(sample_df, rest_df):

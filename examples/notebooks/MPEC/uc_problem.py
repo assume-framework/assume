@@ -134,7 +134,7 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
     # ---------------------------------------------------------------------------
     # solve
     # Comment: Because duals (shadow prices) are not well-defined for mixed-integer problems — so we solve the second time as a pure LP, after fixing all binaries.
-    
+
     instance = model.create_instance()
 
     solver = SolverFactory("gurobi")
@@ -147,12 +147,11 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
         for t in demand_df.index:
             instance_fixed_u.u[gen, t].fix(instance.u[gen, t].value)
 
-    
     solver.solve(instance_fixed_u, tee=False)
 
     # ---------------------------------------------------------------------------
     # extract results
-    
+
     # get price as dual variable of balance constraint
     prices = pd.DataFrame(columns=["mcp"], index=demand_df.index, data=0.0)
     for t in demand_df.index:
@@ -195,4 +194,3 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
     supp_df = pd.concat([start_up_cost, shut_down_cost], axis=1)
 
     return main_df, supp_df
-
