@@ -170,7 +170,26 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                     == m.thermal_demand[t]
                 )
             else:
-                return total_heat_production == m.thermal_demand[t]
+                return total_heat_production >= m.thermal_demand[t]
+        
+        # @self.model.Constraint()
+        # def total_heat_balance(m):
+        #     total_heat_supplied = 0
+        #     total_demand = 0
+        #     for t in m.time_steps:
+        #         produced = 0
+        #         if self.has_heatpump:
+        #             produced += m.dsm_blocks["heat_pump"].heat_out[t]
+        #         if self.has_boiler:
+        #             produced += m.dsm_blocks["boiler"].heat_out[t]
+        #         if self.has_thermal_storage:
+        #             storage_discharge = m.dsm_blocks["thermal_storage"].discharge[t]
+        #             storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
+        #             total_heat_supplied += produced + storage_discharge - storage_charge
+        #         else:
+        #             total_heat_supplied += produced
+        #         total_demand += m.thermal_demand[t]
+        #     return total_heat_supplied == total_demand
 
     def define_constraints(self):
         """
