@@ -483,10 +483,6 @@ def test_optimal_operation_with_longterm_storage(steam_plant_with_hp_b_longterm_
         if instance.total_power_input[t].value is not None
     )
     assert total_power_input > 0, "Total power input should be greater than zero"
-
-    # Print for diagnostics
-    print("t | HeatPump | Boiler | StorageOut | StorageIn | LHS | RHS (Demand) | DIFF")
-    print("--------------------------------------------------------------")
     for t in instance.time_steps:
         hp = instance.dsm_blocks["heat_pump"].heat_out[t].value
         b = instance.dsm_blocks["boiler"].heat_out[t].value
@@ -527,10 +523,6 @@ def test_all_assets_coordinated(steam_plant_with_hp_b_ts):
     thermal_demand = instance.thermal_demand[t_spike]
     storage_charge = instance.dsm_blocks["thermal_storage"].charge[t_spike].value
     total_supply = heat_pump_output + boiler_output + storage_output - storage_charge
-
-    print(
-        f"Spike: HP={heat_pump_output}, Boiler={boiler_output}, StorageDischarge={storage_output}, StorageCharge={storage_charge}, Demand={thermal_demand}"
-    )
 
     assert total_supply == pytest.approx(thermal_demand, rel=1e-3)
 

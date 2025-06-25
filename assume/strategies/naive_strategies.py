@@ -2,10 +2,12 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from assume.common.base import BaseStrategy, SupportsMinMax
-from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 import matplotlib.pyplot as plt
 import pandas as pd
+
+from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
+
 
 class NaiveSingleBidStrategy(BaseStrategy):
     """
@@ -174,8 +176,8 @@ class NaiveDADSMStrategy(BaseStrategy):
         if unit.optimisation_counter == 0:
             unit.determine_optimal_operation_with_flex()
             self.export_power_requirements_to_csv(
-            unit, "./examples/inputs/example_04/power_requirements_timeseries.csv"
-        )
+                unit, "./examples/inputs/example_04/power_requirements_timeseries.csv"
+            )
             self.plot_power_requirements(unit)
             unit.optimisation_counter = 1
         bids = []
@@ -199,7 +201,7 @@ class NaiveDADSMStrategy(BaseStrategy):
             )
 
         return bids
-    
+
     def plot_power_requirements(self, unit: SupportsMinMax):
         """
         Plots the optimal power requirement and flexibility power requirement for comparison.
@@ -252,6 +254,7 @@ class NaiveDADSMStrategy(BaseStrategy):
         )
         # Save to CSV
         df.to_csv(file_path)
+
 
 class NaiveRedispatchDSMStrategy(BaseStrategy):
     """

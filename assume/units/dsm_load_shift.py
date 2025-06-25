@@ -6,7 +6,6 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 
-import matplotlib.pyplot as plt
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,

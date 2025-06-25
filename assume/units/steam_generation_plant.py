@@ -103,6 +103,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             self.natural_gas_price = self.forecaster["natural_gas_price"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
             self.hydrogen_gas_price = self.forecaster["hydrogen_gas_price"]
+        self.demand = demand
         self.thermal_demand = self.forecaster[f"{self.id}_thermal_demand"]
         self.congestion_signal = self.forecaster[f"{self.id}_congestion_signal"]
         self.congestion_threshold = congestion_threshold
@@ -153,43 +154,49 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         )
 
     def initialize_process_sequence(self):
-        @self.model.Constraint(self.model.time_steps)
-        def direct_heat_balance(m, t):
-            total_heat_production = 0
-            if self.has_heatpump:
-                total_heat_production += self.model.dsm_blocks["heat_pump"].heat_out[t]
-            if self.has_boiler:
-                total_heat_production += self.model.dsm_blocks["boiler"].heat_out[t]
-            if self.has_thermal_storage:
-                storage_discharge = self.model.dsm_blocks["thermal_storage"].discharge[
-                    t
-                ]
-                storage_charge = self.model.dsm_blocks["thermal_storage"].charge[t]
+        # Per-time-step constraint (default)
+        if not self.demand or self.demand == 0:
+
+            @self.model.Constraint(self.model.time_steps)
+            def direct_heat_balance(m, t):
+                total_heat_production = 0
+                if self.has_heatpump:
+                    total_heat_production += m.dsm_blocks["heat_pump"].heat_out[t]
+                if self.has_boiler:
+                    total_heat_production += m.dsm_blocks["boiler"].heat_out[t]
+                if self.has_thermal_storage:
+                    storage_discharge = m.dsm_blocks["thermal_storage"].discharge[t]
+                    storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
+                    return (
+                        total_heat_production + storage_discharge - storage_charge
+                        == m.thermal_demand[t]
+                    )
+                else:
+                    return total_heat_production == m.thermal_demand[t]
+
+        # Cumulative/absolute demand constraint
+        else:
+
+            @self.model.Constraint()
+            def absolute_heat_balance(m):
+                total_heat_supplied = 0
+                for t in m.time_steps:
+                    produced = 0
+                    if self.has_heatpump:
+                        produced += m.dsm_blocks["heat_pump"].heat_out[t]
+                    if self.has_boiler:
+                        produced += m.dsm_blocks["boiler"].heat_out[t]
+                    if self.has_thermal_storage:
+                        storage_discharge = m.dsm_blocks["thermal_storage"].discharge[t]
+                        storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
+                        total_heat_supplied += (
+                            produced + storage_discharge - storage_charge
+                        )
+                    else:
+                        total_heat_supplied += produced
                 return (
-                    total_heat_production + storage_discharge - storage_charge
-                    == m.thermal_demand[t]
-                )
-            else:
-                return total_heat_production >= m.thermal_demand[t]
-        
-        # @self.model.Constraint()
-        # def total_heat_balance(m):
-        #     total_heat_supplied = 0
-        #     total_demand = 0
-        #     for t in m.time_steps:
-        #         produced = 0
-        #         if self.has_heatpump:
-        #             produced += m.dsm_blocks["heat_pump"].heat_out[t]
-        #         if self.has_boiler:
-        #             produced += m.dsm_blocks["boiler"].heat_out[t]
-        #         if self.has_thermal_storage:
-        #             storage_discharge = m.dsm_blocks["thermal_storage"].discharge[t]
-        #             storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
-        #             total_heat_supplied += produced + storage_discharge - storage_charge
-        #         else:
-        #             total_heat_supplied += produced
-        #         total_demand += m.thermal_demand[t]
-        #     return total_heat_supplied == total_demand
+                    total_heat_supplied >= self.demand
+                )  # Use == if strict match is needed
 
     def define_constraints(self):
         """
