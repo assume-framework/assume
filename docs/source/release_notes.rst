@@ -12,14 +12,14 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
-0.5.3 - (23th June 2025)
+0.5.4 - (23th June 2025)
 =========================
 
 **New Features:**
 
 - **ThermalStorage with Scheduling:** Introduced a `ThermalStorage` class that extends `GenericStorage` to support both short-term (freely cycling) and long-term (schedule-driven) storage operation. Long-term mode allows users to define a binary schedule to restrict charging and discharging to specific periods, enabling realistic modeling of industrial or seasonal thermal storage behavior.
   - To use this feature, set `storage_type` to `"long-term"` and provide a `storage_schedule_profile` (0: charging allowed, 1: discharging allowed).
-  - Hydrogen fuel type included for ther Boiler
+  - Hydrogen fuel type included for the Boiler
 
 
 **Improvements:**
@@ -34,6 +34,34 @@ Upcoming Release
 - **Correct Schedule Enforcement in ThermalStorage:** Fixed an error in the schedule constraint logic for long-term storage. The model now strictly enforces that charging and discharging can only occur during their respective scheduled periods.
 - **Initial SOC Bug:** Fixed a bug where the initial SOC could be ignored or set to an unintended value by the solver. The initial SOC is now always fixed at model initialization.
 - **Boiler Upper Bound:** Added a missing upper bound constraint to `natural_gas_in` in the `Boiler` component to ensure that the fuel input never exceeds the specified maximum power. This change prevents the solver from assigning unphysical input values and brings consistency with the handling of other fuel types.
+
+0.5.3 - (13th May 2025)
+=========================
+
+**New Features:**
+
+- **Add single bid RL strategy:** Added a new reinforcement learning strategy that allows agents to submit bids based on one action value only that determines the price at which the full capacity is offered.
+- **Bidding Strategy for Elastic Demand**: The new `ElasticDemandStrategy` enables demand units to submit multiple bids that approximate a marginal utility curve, using
+  either linear or isoelastic price elasticity models. Unlike other strategies, it does **not** rely on predefined volumes—bids are dynamically generated based on the
+  unit’s elasticity configuration. To use this strategy, set `bidding_strategy` to `"elastic_demand"` in the `demand_units.csv` file and specify the following
+  parameters: `elasticity` (must be negative), `elasticity_model` (`"linear"` or `"isoelastic"`), `num_bids`, and `price` (which acts as `max_price`). The `elasticity_model`
+  defines the shape of the demand curve, with `"linear"` producing a straight-line decrease and `"isoelastic"` generating a hyperbolic curve. `num_bids` determines how many
+  bid steps are submitted, allowing control over the granularity of demand flexibility.
+
+
+**Improvements:**
+
+- **Flexible Agent Count in `continue_learning` Mode:** You can now change the number of learning agents between training runs while reusing previously trained critics.
+  This enables flexible workflows like training power plants first and adding storage units later. When the core architectures match, critic weights are partially transferred when possible, ensuring smoother transitions.
+
+**Bug Fixes:**
+
+- **Last policy loading**: Fixed a bug where the last policy loaded after a training run was not the best policy, but rather the last policy.
+- **Negative accepted volume in block bids**: Fixed a bug where accepted volume from block bids was converted to negative.
+- **Grafana Dashboard adjustments**: Fixed a bug where the Grafana dashboard was wrongly summing values due to time bucketing. The dashboard now consistently displays the average per time bucket which does underestimate
+  variance in the data, but a note was added to explain this.
+- **Changed market price in rejected orders**: Fixed a bug where the wrong market price was written in the rejected orders, namely any auction with more than 1 product had the price of the last product written as the
+  market price instead of the price of the respective hour. This was, however, only a mistake for the rejected orders.
 
 0.5.2 - (21st March 2025)
 =========================
