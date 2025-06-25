@@ -1596,108 +1596,79 @@ class HydrogenBufferStorage(GenericStorage):
 
 class SeasonalHydrogenStorage(GenericStorage):
     """
-    A class to represent a seasonal hydrogen storage unit with specific attributes for
-    seasonal operation. This class internally handles conversion of `time_steps`.
+    A flexible hydrogen storage class that extends GenericStorage to support short-term and long-term scheduling.
+
+    This class enables control over when the storage can charge or discharge, based on a binary profile.
+    It is useful in seasonal or scheduled operations like industrial heating cycles.
+
+    - For 'short-term': behaves like GenericStorage without behavioral restrictions.
+    - For 'long-term': follows a storage schedule (0: charge-only, 1: discharge-only).
+
+    Args:
+        storage_type (str): Type of storage behavior: 'short-term' or 'long-term'.
+        storage_schedule_profile (pd.Series, optional): Binary schedule for discharge availability (only required for 'long-term').
+        **kwargs: All other parameters are inherited from GenericStorage.
     """
 
     def __init__(
         self,
-        max_capacity: float,
-        time_steps: list[int],
-        horizon: int = 0,
-        min_capacity: float = 0.0,
-        max_power_charge: float | None = None,
-        max_power_discharge: float | None = None,
-        efficiency_charge: float = 1.0,
-        efficiency_discharge: float = 1.0,
-        initial_soc: float = 1.0,
-        final_soc_target: float = 0.5,
-        ramp_up: float | None = None,
-        ramp_down: float | None = None,
-        storage_loss_rate: float = 0.0,
-        off_season_start: int = 0,
-        off_season_end: int = 0,
-        on_season_start: int = 0,
-        on_season_end: int = 0,
+        storage_type: str = "short-term",
+        storage_schedule_profile: pd.Series | None = None,
         **kwargs,
     ):
-        horizon = int(horizon)
+        """
+        Initializes the hydrogen storage instance.
 
-        super().__init__(
-            max_capacity=max_capacity,
-            time_steps=time_steps,
-            min_capacity=min_capacity,
-            max_power_charge=max_power_charge,
-            max_power_discharge=max_power_discharge,
-            efficiency_charge=efficiency_charge,
-            efficiency_discharge=efficiency_discharge,
-            initial_soc=initial_soc,
-            final_soc_target=final_soc_target,
-            ramp_up=ramp_up,
-            ramp_down=ramp_down,
-            storage_loss_rate=storage_loss_rate,
-            **kwargs,
-        )
+        Raises:
+            ValueError: If `storage_type` is 'long-term' and no schedule is provided.
+            ValueError: If `storage_type` is not one of ['short-term', 'long-term'].
+        """
+        super().__init__(**kwargs)
 
-        # Convert `time_steps` to a list of integers representing each time step
-        self.time_steps = time_steps
-        self.final_soc_target = final_soc_target
+        self.storage_type = storage_type.lower()
+        self.storage_schedule_profile = storage_schedule_profile
 
-        # Check if initial SOC is within the bounds [0, 1]
-        if initial_soc > 1:
-            initial_soc /= max_capacity
-            logger.warning(
-                f"Initial SOC is greater than 1.0. Setting it to {initial_soc}."
+        if self.storage_type == "long-term" and self.storage_schedule_profile is None:
+            raise ValueError(
+                "storage_schedule_profile is required for 'long-term' storage_type."
             )
 
-        # Parse comma-separated season start and end values into lists of integers
-        off_season_start_list = [int(x) for x in off_season_start.split(",")]
-        off_season_end_list = [int(x) for x in off_season_end.split(",")]
-        on_season_start_list = [int(x) for x in on_season_start.split(",")]
-        on_season_end_list = [int(x) for x in on_season_end.split(",")]
-
-        # Generate `off_season` and `on_season` lists based on parsed start and end values
-        self.off_season = []
-        for start, end in zip(off_season_start_list, off_season_end_list):
-            self.off_season.extend(list(range(start, end + 1)))
-
-        self.on_season = []
-        for start, end in zip(on_season_start_list, on_season_end_list):
-            self.on_season.extend(list(range(start, end + 1)))
+        if self.storage_type not in ["short-term", "long-term"]:
+            raise ValueError("storage_type must be either 'short-term' or 'long-term'.")
 
     def add_to_model(
         self, model: pyo.ConcreteModel, model_block: pyo.Block
     ) -> pyo.Block:
         """
-        Adds seasonal storage block to the Pyomo model, defining constraints based on seasonal operation.
+        Adds hydrogen storage constraints to the model based on storage type.
+
+        - If 'long-term', restrict charge/discharge based on the binary schedule profile.
+        - Otherwise, behaves identically to GenericStorage.
+
+        Args:
+            model (pyo.ConcreteModel): The Pyomo optimization model.
+            model_block (pyo.Block): The block to which this storage is added.
+
+        Returns:
+            pyo.Block: Updated model block with hydrogen storage constraints.
         """
         model_block = super().add_to_model(model, model_block)
 
-        # Add final_soc_target as a parameter to model_block
-        model_block.final_soc_target = pyo.Param(initialize=self.final_soc_target)
+        if self.storage_type == "long-term":
 
-        # Seasonal Constraints
-        @model_block.Constraint(self.off_season)
-        def off_season_no_discharge(b, t):
-            """
-            Prevent discharging during the off-season.
-            """
-            return b.discharge[t] == 0
+            @model_block.Constraint(self.time_steps)
+            def availability_charge_constraint(b, t):
+                return (
+                    b.charge[t]
+                    <= (1 - self.storage_schedule_profile.iat[t]) * b.max_power_charge
+                )
 
-        @model_block.Constraint(self.on_season)
-        def on_season_no_charge(b, t):
-            """
-            Prevent charging during the on-season.
-            """
-            return b.charge[t] == 0
-
-        # Final SOC Constraint
-        @model_block.Constraint()
-        def final_soc_constraint(b):
-            """
-            Ensure SOC at the end of the time steps meets the target.
-            """
-            return b.soc[self.time_steps[-1]] >= b.final_soc_target * b.max_capacity
+            @model_block.Constraint(self.time_steps)
+            def availability_discharge_constraint(b, t):
+                return (
+                    b.discharge[t]
+                    <= self.storage_schedule_profile.iat[t] * b.max_power_discharge
+                )
 
         return model_block
 

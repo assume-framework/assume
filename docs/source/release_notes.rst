@@ -20,14 +20,14 @@ Upcoming Release
 - **ThermalStorage with Scheduling:** Introduced a `ThermalStorage` class that extends `GenericStorage` to support both short-term (freely cycling) and long-term (schedule-driven) storage operation. Long-term mode allows users to define a binary schedule to restrict charging and discharging to specific periods, enabling realistic modeling of industrial or seasonal thermal storage behavior.
   - To use this feature, set `storage_type` to `"long-term"` and provide a `storage_schedule_profile` (0: charging allowed, 1: discharging allowed).
   - Hydrogen fuel type included for the Boiler
-
+- **Hydrogen_plant:** The HydrogenPlant master class has been refactored for modularity. Technologies such as the electrolyser and (optionally) the SeasonalHydrogenStorage are now connected in a flexible manner, supporting both per-timestep and cumulative hydrogen demand balancing. The plant model now robustly accommodates both storage and non-storage configurations, ensuring correct mass balances across all scenarios.
 
 **Improvements:**
 
 - **Initial State of Charge (SOC) Enforcement:** The initial SOC is now explicitly enforced as a model constraint for all storage units. This guarantees that simulations always start from the intended state, ensuring scientific reproducibility and correctness.
-- **Robust Time-Step Handling:** All time-step-dependent constraints (e.g., ramping, SOC balance) now use Pyomo's `.at(0)`, `.at(1)`, and `.first()` methods for indexing, providing consistent results regardless of the time index structure (integers, datetimes, or irregular series).
 - **Enhanced Test Suite for Storage Units:** Comprehensive unit tests have been added for both `GenericStorage` and `ThermalStorage`, including short-term and long-term scheduling, efficiency losses, ramping, power limits, schedule adherence, and initial SOC.
   - Tests verify economic cycling (charging at low price, discharging at high price), round-trip efficiency, and no simultaneous charge/discharge.
+- **SeasonalHydrogenStorage:** The framework of SeasonalHydrogenStorage is now consistent with the framework of Thermal storage.
 
 **Bug Fixes:**
 
