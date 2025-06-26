@@ -223,12 +223,14 @@ def test_initial_operational_status(heat_pump_model, heat_pump_config):
     """
     Test that the initial operational status of the heat pump is correctly set.
     """
+    import pytest
+
     model, _ = heat_pump_model
     initial_status = heat_pump_config["initial_operational_status"]
     first_time_step = model.time_steps.first()
     actual_status = pyo.value(model.heat_pump.operational_status[first_time_step])
-    assert (
-        actual_status == initial_status
+    assert actual_status == pytest.approx(
+        initial_status, abs=1e-8
     ), f"Initial operational status is {actual_status}, expected {initial_status}."
 
 
@@ -252,3 +254,7 @@ def test_operating_cost(heat_pump_model, price_profile, heat_pump_config):
         assert (
             abs(actual_cost - expected_cost) < 1e-5
         ), f"Operating cost at time {t} is {actual_cost}, expected {expected_cost}."
+
+
+if __name__ == "__main__":
+    pytest.main(["-s", __file__])
