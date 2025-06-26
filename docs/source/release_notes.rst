@@ -12,9 +12,6 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
-0.5.4 - (23th June 2025)
-=========================
-
 **New Features:**
 
 - **ThermalStorage with Scheduling:** Introduced a `ThermalStorage` class that extends `GenericStorage` to support both short-term (freely cycling) and long-term (schedule-driven) storage operation. Long-term mode allows users to define a binary schedule to restrict charging and discharging to specific periods, enabling realistic modeling of industrial or seasonal thermal storage behavior.
@@ -103,7 +100,6 @@ Upcoming Release
   - Added tests for the ``Building`` class.
   - Refactored variable names for better readability and consistency.
   - Restructured the process sequence for improved efficiency.
-
 
 v0.5.1 - (3rd February 2025)
 ===========================================
