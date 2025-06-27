@@ -56,8 +56,8 @@ def power_plant() -> PowerPlant:
 @pytest.mark.parametrize(
     "strategy_class, obs_dim, act_dim, actor_architecture, expected_bid_count, expected_volumes",
     [
-        (RLStrategy, 50, 2, "mlp", 2, [200, 800]),
-        (RLStrategy, 50, 2, "lstm", 2, [200, 800]),
+        (RLStrategy, 38, 2, "mlp", 2, [200, 800]),
+        (RLStrategy, 38, 2, "lstm", 2, [200, 800]),
         (RLStrategySingleBid, 74, 1, "mlp", 1, [1000]),
     ],
 )
@@ -80,8 +80,8 @@ def test_learning_strategies_parametrized(
 
     # Build learning config dynamically
     learning_config: LearningConfig = {
-        "observation_dimension": obs_dim,
-        "action_dimension": act_dim,
+        "obs_dim": obs_dim,
+        "act_dim": act_dim,
         "algorithm": "matd3",
         "learning_mode": True,
         "training_episodes": 3,
@@ -91,9 +91,19 @@ def test_learning_strategies_parametrized(
         learning_config["actor_architecture"] = actor_architecture
 
     # Override the strategy
-    power_plant.bidding_strategies["EOM"] = strategy_class(**learning_config)
+    power_plant.bidding_strategies[mc.market_id] = strategy_class(**learning_config)
+    strategy = power_plant.bidding_strategies[mc.market_id]
 
-    strategy = power_plant.bidding_strategies["EOM"]
+    # Check if observation dimension is set accordingly and follows current default structure
+    first_observation = strategy.create_observation(
+        power_plant, mc.market_id, product_index[0]
+    )
+    assert len(first_observation) == obs_dim
+    assert (
+        strategy.unique_obs_dim + strategy.foresight * strategy.num_timeseries_obs_dim
+        == obs_dim
+    )
+
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
 
     assert len(bids) == expected_bid_count
