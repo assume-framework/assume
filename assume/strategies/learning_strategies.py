@@ -260,7 +260,7 @@ class BaseLearningStrategy(LearningStrategy):
                 # 2.1 Get Actions and handle exploration
                 # =============================================================================
                 # only use noise as the action to enforce exploration
-                curr_action = noise
+                curr_action = 0
 
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neural net
@@ -514,7 +514,7 @@ class RLStrategy(BaseLearningStrategy):
                     -1
                 ].detach()  # ensure no gradients flow through
                 # Add marginal cost to the action directly for initial random exploration
-                curr_action += marginal_cost
+                curr_action = marginal_cost + noise
 
         return curr_action, noise
 
