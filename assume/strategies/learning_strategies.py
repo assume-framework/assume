@@ -9,7 +9,12 @@ from pathlib import Path
 import numpy as np
 import torch as th
 
-from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxCharge
+from assume.common.base import (
+    BaseUnit,
+    LearningStrategy,
+    SupportsMinMax,
+    SupportsMinMaxCharge,
+)
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
@@ -117,6 +122,105 @@ class BaseLearningStrategy(LearningStrategy):
             lower_scaling_factor_price,
             upper_scaling_factor_price,
         )
+
+    def create_observation(
+        self,
+        unit: BaseUnit,
+        market_id: str,
+        start: datetime,
+    ):
+        """
+        Constructs a scaled observation tensor based on the unit's forecast data and internal state.
+
+        Args
+        ----
+        unit : BaseUnit
+            The unit providing forecast and internal state data.
+        market_id : str
+            Identifier for the specific market.
+        start : datetime
+            Start time for the observation period.
+
+        Returns
+        -------
+        torch.Tensor
+            Observation tensor with data on forecasted residual load, price, and unit-specific values.
+
+        Notes
+        -----
+        Observations are constructed from forecasted residual load and price over the foresight period,
+        scaled by maximum demand and bid price. The last values in the observation vector represent
+        unit-specific values, depending on the strategy and unit-type.
+        """
+
+        # ensure scaled observations are prepared
+        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
+            self, "scaled_prices_obs"
+        ):
+            self.prepare_observations(unit, market_id)
+
+        # =============================================================================
+        # 1.1 Get the Observations, which are the basis of the action decision
+        # =============================================================================
+
+        # --- 1. Forecasted residual load and price (forward-looking) ---
+        scaled_res_load_forecast = self.scaled_res_load_obs.window(
+            start, self.foresight, direction="forward"
+        )
+        scaled_price_forecast = self.scaled_prices_obs.window(
+            start, self.foresight, direction="forward"
+        )
+
+        # --- 2. Historical actual prices (backward-looking) ---
+        scaled_price_history = (
+            unit.outputs["energy_accepted_price"].window(
+                start, self.foresight, direction="backward"
+            )
+            / self.max_bid_price
+        )
+
+        # --- 3. Invidial observations ---
+        individual_observations = self.get_individual_observations(unit, start)
+
+        # concat all observations into one array
+        observation = np.concatenate(
+            [
+                scaled_res_load_forecast,
+                scaled_price_forecast,
+                scaled_price_history,
+                individual_observations,
+            ]
+        )
+
+        # transfer array to GPU for NN processing
+        observation = th.as_tensor(
+            observation, dtype=self.float_type, device=self.device
+        ).flatten()
+
+        return observation
+
+    def get_individual_observations(
+        self,
+        unit: BaseUnit,
+        start: datetime,
+    ):
+        """
+        Retrieves the unit-specific observations.
+
+        Args
+        ----
+        unit : BaseUnit
+            The unit providing forecast and internal state data.
+        start : datetime
+            Start time for the observation period.
+
+        Returns
+        -------
+        individual_observations : np.array
+            Strategy and unit-specific observations.
+        """
+
+        return np.array([])
 
     def get_actions(self, next_observation):
         """
@@ -414,81 +518,44 @@ class RLStrategy(BaseLearningStrategy):
 
         return curr_action, noise
 
-    def create_observation(
+    def get_individual_observations(
         self,
         unit: SupportsMinMax,
-        market_id: str,
         start: datetime,
     ):
         """
-        Constructs a scaled observation tensor based on the unit's forecast data and internal state.
+        Retrieves the unit-specific observations.
 
         Args
         ----
         unit : SupportsMinMax
             The unit providing forecast and internal state data.
-        market_id : str
-            Identifier for the specific market.
-        start : datetime
+        start : datetime.datetime
             Start time for the observation period.
 
         Returns
         -------
-        torch.Tensor
-            Observation tensor with data on forecasted residual load, price, total capacity, and marginal cost.
+        individual_observations : np.array
+            Scaled total capacity and marginal cost.
 
         Notes
         -----
-        Observations are constructed from forecasted residual load and price over the foresight period,
-        scaled by maximum demand and bid price. The last two values in the observation vector represent
-        the total capacity and marginal cost, scaled by maximum power and bid price, respectively.
+            The last two values in the observation vector represent the total capacity
+            and marginal cost, scaled by maximum power and bid price, respectively.
         """
 
-        # ensure scaled observations are prepared
-        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
-            self, "scaled_prices_obs"
-        ):
-            self.prepare_observations(unit, market_id)
-
-        # --- 1. Forecasted residual load and price (forward-looking) ---
-        scaled_res_load_forecast = self.scaled_res_load_obs.window(
-            start, self.foresight, direction="forward"
-        )
-        scaled_price_forecast = self.scaled_prices_obs.window(
-            start, self.foresight, direction="forward"
-        )
-
-        # --- 2. Historical actual prices (backward-looking) ---
-        scaled_price_history = (
-            unit.outputs["energy_accepted_price"].window(
-                start, self.foresight, direction="backward"
-            )
-            / self.max_bid_price
-        )
-
-        # --- 3. Current volume & marginal cost ---
+        # --- Current volume & marginal cost ---
         current_volume = unit.get_output_before(start)
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
         scaled_total_dispatch = current_volume / unit.max_power
         scaled_marginal_cost = current_costs / self.max_bid_price
 
-        # concat all obsverations into one array
-        observation = np.concatenate(
-            [
-                scaled_res_load_forecast,
-                scaled_price_forecast,
-                scaled_price_history,
-                np.array([scaled_total_dispatch, scaled_marginal_cost]),
-            ]
+        individual_observations = np.array(
+            [scaled_total_dispatch, scaled_marginal_cost]
         )
 
-        # transfer array to GPU for NN processing
-        observation = th.as_tensor(
-            observation, dtype=self.float_type, device=self.device
-        ).flatten()
-
-        return observation
+        return individual_observations
 
     def calculate_reward(
         self,
@@ -981,74 +1048,35 @@ class StorageRLStrategy(BaseLearningStrategy):
         unit.outputs["total_costs"].loc[start:end_excl] = order_cost
         unit.outputs["rl_rewards"].append(reward)
 
-    def create_observation(
+    def get_individual_observations(
         self,
         unit: SupportsMinMaxCharge,
-        market_id: str,
         start: datetime,
     ):
         """
-        Creates a scaled observation tensor from the storage unit's state and forecast data.
+        Retrieves the unit-specific observations for storage units.
 
         Args
         ----
         unit : SupportsMinMaxCharge
             Storage unit providing forecasted and current state data.
-        market_id : str
-            Identifier for the relevant market.
-        start : datetime
+        start : datetime.datetime
             Start time for the observation period.
 
         Returns
         -------
-        torch.Tensor
-            Observation tensor containing state of charge, forecasted demand, and energy cost.
+        individual_observations: np.array
+            Array containing state of charge and energy cost.
 
         Notes
         -----
-        Observations are scaled by the unit's max demand and bid price, creating input for
+        Observations are scaled by the unit's max state of charge and bid price, creating input for
         the agent's action selection.
         """
-
-        # ensure scaled observations are prepared
-        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
-            self, "scaled_prices_obs"
-        ):
-            self.prepare_observations(unit, market_id)
-
-        # --- 1. Forecasted residual load and price (forward-looking) ---
-        scaled_res_load_forecast = self.scaled_res_load_obs.window(
-            start, self.foresight, direction="forward"
-        )
-        scaled_price_forecast = self.scaled_prices_obs.window(
-            start, self.foresight, direction="forward"
-        )
-
-        # --- 2. Historical actual prices (backward-looking) ---
-        scaled_price_history = (
-            unit.outputs["energy_accepted_price"].window(
-                start, self.foresight, direction="backward"
-            )
-            / self.max_bid_price
-        )
-
-        # get the current soc value
+        # get the current soc and energy cost value
         soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
         energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
 
-        # concat all obsverations into one array
-        observation = np.concatenate(
-            [
-                scaled_res_load_forecast,
-                scaled_price_forecast,
-                scaled_price_history,
-                np.array([soc_scaled, energy_cost_scaled]),
-            ]
-        )
+        individual_observations = np.array([soc_scaled, energy_cost_scaled])
 
-        # transfer array to GPU for NN processing
-        observation = th.as_tensor(
-            observation, dtype=self.float_type, device=self.device
-        ).flatten()
-
-        return observation
+        return individual_observations
