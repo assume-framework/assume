@@ -45,4 +45,4 @@ base_case_2013:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: pay_as_clear
+      market_mechanism: complex_clearing
