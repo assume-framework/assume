@@ -6,7 +6,7 @@ import pandas as pd
 import pyomo.environ as pyo
 import pytest
 
-from assume.units.dst_components import SeasonalHydrogenStorage
+from assume.units.dst_components import ThermalStorage
 
 use_solver = "appsi_highs"
 
@@ -46,7 +46,7 @@ def short_term_storage_model(storage_config, price_profile):
         model.time_steps, initialize=price_profile.to_dict()
     )
 
-    storage = SeasonalHydrogenStorage(
+    storage = ThermalStorage(
         storage_type="short-term", **storage_config, time_steps=model.time_steps
     )
     model.storage = pyo.Block()
@@ -79,7 +79,7 @@ def long_term_storage_model(storage_config, storage_schedule, price_profile):
         model.time_steps, initialize=price_profile.to_dict()
     )
 
-    storage = SeasonalHydrogenStorage(
+    storage = ThermalStorage(
         storage_type="long-term",
         storage_schedule_profile=storage_schedule,
         **storage_config,

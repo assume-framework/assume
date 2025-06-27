@@ -12,6 +12,26 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+**New Features:**
+
+- **ThermalStorage with Scheduling:** Introduced a `ThermalStorage` class that extends `GenericStorage` to support both short-term (freely cycling) and long-term (schedule-driven) storage operation. Long-term mode allows users to define a binary schedule to restrict charging and discharging to specific periods, enabling realistic modeling of industrial or seasonal thermal storage behavior.
+  - To use this feature, set `storage_type` to `"long-term"` and provide a `storage_schedule_profile` (0: charging allowed, 1: discharging allowed).
+  - Hydrogen fuel type included for the Boiler
+- **Hydrogen_plant:** The HydrogenPlant master class has been refactored for modularity. Technologies such as the electrolyser and (optionally) the SeasonalHydrogenStorage are now connected in a flexible manner, supporting both per-timestep and cumulative hydrogen demand balancing. The plant model now robustly accommodates both storage and non-storage configurations, ensuring correct mass balances across all scenarios.
+
+**Improvements:**
+
+- **Initial State of Charge (SOC) Enforcement:** The initial SOC is now explicitly enforced as a model constraint for all storage units. This guarantees that simulations always start from the intended state, ensuring scientific reproducibility and correctness.
+- **Enhanced Test Suite for Storage Units:** Comprehensive unit tests have been added for both `GenericStorage` and `ThermalStorage`, including short-term and long-term scheduling, efficiency losses, ramping, power limits, schedule adherence, and initial SOC.
+  - Tests verify economic cycling (charging at low price, discharging at high price), round-trip efficiency, and no simultaneous charge/discharge.
+- **SeasonalHydrogenStorage:** The framework of SeasonalHydrogenStorage is now consistent with the framework of Thermal storage.
+
+**Bug Fixes:**
+
+- **Correct Schedule Enforcement in ThermalStorage:** Fixed an error in the schedule constraint logic for long-term storage. The model now strictly enforces that charging and discharging can only occur during their respective scheduled periods.
+- **Initial SOC Bug:** Fixed a bug where the initial SOC could be ignored or set to an unintended value by the solver. The initial SOC is now always fixed at model initialization.
+- **Boiler Upper Bound:** Added a missing upper bound constraint to `natural_gas_in` in the `Boiler` component to ensure that the fuel input never exceeds the specified maximum power. This change prevents the solver from assigning unphysical input values and brings consistency with the handling of other fuel types.
+
 0.5.3 - (13th May 2025)
 =========================
 
@@ -39,7 +59,6 @@ Upcoming Release
   variance in the data, but a note was added to explain this.
 - **Changed market price in rejected orders**: Fixed a bug where the wrong market price was written in the rejected orders, namely any auction with more than 1 product had the price of the last product written as the
   market price instead of the price of the respective hour. This was, however, only a mistake for the rejected orders.
-
 
 0.5.2 - (21st March 2025)
 =========================
@@ -81,7 +100,6 @@ Upcoming Release
   - Added tests for the ``Building`` class.
   - Refactored variable names for better readability and consistency.
   - Restructured the process sequence for improved efficiency.
-
 
 v0.5.1 - (3rd February 2025)
 ===========================================
