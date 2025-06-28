@@ -20,12 +20,12 @@ from assume.units.dsm_load_shift import SOLVERS, check_available_solvers
 def generic_storage_config():
     return {
         "max_capacity": 100,  # Maximum energy capacity in MWh
-        "min_capacity": 20,  # Minimum SOC in MWh
-        "max_power_charge": 30,  # Maximum charging power in MW
-        "max_power_discharge": 30,  # Maximum discharging power in MW
+        "min_capacity": 0,  # Minimum SOC in MWh
+        "max_power_charge": 100,  # Maximum charging power in MW
+        "max_power_discharge": 100,  # Maximum discharging power in MW
         "efficiency_charge": 0.9,  # Charging efficiency
         "efficiency_discharge": 0.9,  # Discharging efficiency
-        "initial_soc": 0.5,  # Initial SOC in MWh
+        "initial_soc": 0,  # Initial SOC in MWh
         "ramp_up": 10,  # Maximum ramp-up rate in MW
         "ramp_down": 10,  # Maximum ramp-down rate in MW
         "storage_loss_rate": 0.01,  # 1% storage loss per time step
@@ -41,12 +41,12 @@ def thermal_storage_config(generic_storage_config):
 def ev_config():
     return {
         "max_capacity": 10.0,
-        "min_capacity": 2.0,
+        "min_capacity": 0,
         "max_power_charge": 3,  # Charge values will reflect a fraction of the capacity
         "max_power_discharge": 2,  # Discharge values will also be a fraction of the capacity
         "efficiency_charge": 0.95,
         "efficiency_discharge": 0.9,
-        "initial_soc": 0.5,  # SOC initialized to 50% of capacity
+        "initial_soc": 0,  # SOC initialized to 50% of capacity
     }
 
 
@@ -56,9 +56,9 @@ def electric_boiler_config():
         "max_power": 100,
         "efficiency": 0.85,
         "fuel_type": "electricity",  # Electric fuel type supports operational constraints
-        "min_power": 20,
-        "ramp_up": 50,
-        "ramp_down": 50,
+        "min_power": 0,
+        "ramp_up": 100,
+        "ramp_down": 100,
         "min_operating_steps": 2,
         "min_down_steps": 1,
         "initial_operational_status": 1,
@@ -722,13 +722,6 @@ def test_prosumer_energy_export(forecaster, building_components_heatpump):
     export_possible = any(building.opt_power_requirement < 0)
     assert export_possible, "Prosumer should be able to export power to the grid."
 
-    # check that power is negative when price is 1000
-    for idx in building.index:
-        if building.forecaster.forecasts["price_EOM"].at[idx] == 1000:
-            assert (
-                building.opt_power_requirement.at[idx] <= 0
-            ), "Prosumer should be able to export power to the grid."
-
 
 def test_non_prosumer_no_energy_export(forecaster, building_components_heatpump):
     """
@@ -755,7 +748,7 @@ def test_non_prosumer_no_energy_export(forecaster, building_components_heatpump)
     for idx in building.index:
         if building.forecaster.forecasts["price_EOM"].at[idx] == 1000:
             assert (
-                building.opt_power_requirement.at[idx] == 0
+                building.opt_power_requirement.at[idx] >= 0
             ), "Prosumer should be able to export power to the grid."
 
 

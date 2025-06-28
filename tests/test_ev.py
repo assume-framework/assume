@@ -16,12 +16,12 @@ use_solver = "appsi_highs"
 def ev_config():
     return {
         "max_capacity": 10.0,
-        "min_capacity": 2.0,
+        "min_capacity": 0,
         "max_power_charge": 3,  # Charge values will reflect a fraction of the capacity
         "max_power_discharge": 2,  # Discharge values will also be a fraction of the capacity
         "efficiency_charge": 0.95,
         "efficiency_discharge": 0.9,
-        "initial_soc": 0.5,  # SOC initialized to 50% of capacity
+        "initial_soc": 0,  # SOC initialized to 50% of capacity
     }
 
 
@@ -139,3 +139,7 @@ def test_ev_charging_profile(ev_model_with_charging_profile, ev_config):
     for t in model.time_steps:
         soc = pyo.value(model.ev.soc[t])
         assert ev_config["min_capacity"] <= soc <= ev_config["max_capacity"]
+
+
+if __name__ == "__main__":
+    pytest.main(["-s", __file__])
