@@ -1,2 +1,0 @@
-name,unit_type,technology,node,bidding_EOM,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,congestion_threshold,demand,fuel_type,storage_type,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,cop,efficiency,start_price,max_capacity,min_capacity,initial_soc,efficiency_charge,efficiency_discharge,storage_loss_rate
-A360,steam_plant,heat_pump,north,naive_da_dsm,,dsm_operator_1,min_variable_cost,congestion_management_flexibility,0,0.9,,,,10,0,10,10,0,0,1,,,,,,,,

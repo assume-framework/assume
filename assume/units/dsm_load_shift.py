@@ -31,6 +31,9 @@ class DSMFlex:
         "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
         "congestion_management_flexibility": lambda self,
         model: self.grid_congestion_management(model),
+        "symmetric_flexible_block": lambda self, model: self.symmetric_flexible_block(
+            model
+        ),
         "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(
             model
         ),
@@ -293,6 +296,90 @@ class DSMFlex:
             )
 
             return maximise_load_shift
+        
+    def symmetric_flexible_block(self, model):
+        """
+        Cost-based CRM flexibility (rolling 4-hour blocks) for steam_generator_plant.
+        Optimizes a feasible operational profile (sum of tech variables), calculates
+        up/down 4-hour CRM blocks, and enforces a total cost limit.
+        Also stores static plant-wide max and min capacity as attributes for later use.
+        """
+        block_length = 4
+        min_bid_MW = 1
+        time_steps = list(sorted(model.time_steps))
+        T = len(time_steps)
+        possible_starts = [time_steps[i] for i in range(T - block_length + 1)]
+
+        # ---- STATIC PLANT-WIDE MAX/MIN CAPACITY ----
+        max_plant_capacity = 0
+        min_plant_capacity = 0
+        if self.has_heatpump:
+            max_plant_capacity += model.dsm_blocks["heat_pump"].max_power
+            min_plant_capacity += model.dsm_blocks["heat_pump"].min_power
+        if self.has_boiler:
+            boiler = self.components["boiler"]
+            if boiler.fuel_type == "electricity":
+                max_plant_capacity += model.dsm_blocks["boiler"].max_power
+                min_plant_capacity += model.dsm_blocks["boiler"].min_power
+
+        # Save as attributes on the unit for use in bidding strategy, etc.
+        self.max_plant_capacity = max_plant_capacity
+        self.min_plant_capacity = min_plant_capacity
+
+        # ---- FLEXIBILITY BLOCK VARIABLES ----
+        model.block_up = pyo.Var(possible_starts, within=pyo.NonNegativeReals)
+        model.block_down = pyo.Var(possible_starts, within=pyo.NonNegativeReals)
+        model.block_is_bid_up = pyo.Var(possible_starts, within=pyo.Binary)
+        model.block_is_bid_down = pyo.Var(possible_starts, within=pyo.Binary)
+
+        # ConstraintLists to hold per-block constraints
+        model.block_up_window = pyo.ConstraintList()
+        model.block_down_window = pyo.ConstraintList()
+
+        for t in possible_starts:
+            for offset in range(block_length):
+                tau = time_steps[time_steps.index(t) + offset]
+                total_power = 0
+                if self.has_heatpump:
+                    total_power += model.dsm_blocks["heat_pump"].power_in[tau]
+                if self.has_boiler:
+                    boiler = self.components["boiler"]
+                    if boiler.fuel_type == "electricity":
+                        total_power += model.dsm_blocks["boiler"].power_in[tau]
+                # Use the stored plant-wide capacities here if you want,
+                # or (if you allow for time-varying max/min in the future) keep the local max/min per tau
+
+                # Block up/down window constraints (use static min/max plant capacity here)
+                model.block_up_window.add(model.block_up[t] <= self.max_plant_capacity - total_power)
+                model.block_down_window.add(model.block_down[t] <= total_power - self.min_plant_capacity)
+
+        @model.Constraint(possible_starts)
+        def block_bid_logic_up(m, t):
+            return m.block_up[t] >= min_bid_MW * m.block_is_bid_up[t]
+
+        @model.Constraint(possible_starts)
+        def block_bid_logic_down(m, t):
+            return m.block_down[t] >= min_bid_MW * m.block_is_bid_down[t]
+
+        @model.Constraint(possible_starts)
+        def symmetric_block(m, t):
+            return m.block_is_bid_up[t] + m.block_is_bid_down[t] <= 1
+
+        # ---- COST TOLERANCE ----
+        model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
+        model.total_cost = pyo.Param(initialize=0.0, mutable=True)
+
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
+
+        # ---- OBJECTIVE: MAXIMIZE CRM UPWARD FLEXIBILITY ----
+        @model.Objective(sense=pyo.maximize)
+        def obj_rule_flex(m):
+            return sum(m.block_up[t] for t in possible_starts)
+
 
     def grid_congestion_management(self, model):
         """
@@ -602,89 +689,6 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
-        # # Plot
-        # time_steps = list(instance.time_steps)
-        # variable_cost_series = [
-        #     pyo.value(instance.variable_cost[t]) for t in time_steps
-        # ]
-        # total_power_input_series = [
-        #     pyo.value(instance.total_power_input[t]) for t in time_steps
-        # ]
-
-        # # Save time series data to attributes
-        # self.opt_power_requirement = FastSeries(
-        #     index=self.index, value=total_power_input_series
-        # )
-        # self.variable_cost_series = FastSeries(
-        #     index=self.index, value=variable_cost_series
-        # )
-
-        # # Setup plotting
-        # time_steps = list(instance.time_steps)
-        # fig, axs = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
-
-        # # Plot 1: Heat Pump power input
-        # if "heat_pump" in instance.dsm_blocks:
-        #     hp_power = [
-        #         pyo.value(instance.dsm_blocks["heat_pump"].power_in[t])
-        #         for t in time_steps
-        #     ]
-        #     axs[0].plot(time_steps, hp_power, label="Heat Pump Power In", color="green")
-        #     axs[0].set_ylabel("Power (kW)")
-        #     axs[0].legend()
-        #     axs[0].grid(True)
-
-        # # Plot 2: Boiler fuel input
-        # if "boiler" in instance.dsm_blocks and hasattr(
-        #     instance.dsm_blocks["boiler"], "hydrogen_gas_in"
-        # ):
-        #     boiler_gas = [
-        #         pyo.value(instance.dsm_blocks["boiler"].hydrogen_gas_in[t])
-        #         for t in time_steps
-        #     ]
-        #     axs[1].plot(
-        #         time_steps, boiler_gas, label="Boiler Hydrogen Gas In", color="orange"
-        #     )
-        #     axs[1].set_ylabel("Fuel Input (kW)")
-        #     axs[1].legend()
-        #     axs[1].grid(True)
-
-        # # Plot 3: Thermal Storage SOC, Charge, Discharge (Discharge in 4th quadrant)
-        # if "thermal_storage" in instance.dsm_blocks:
-        #     soc = [
-        #         pyo.value(instance.dsm_blocks["thermal_storage"].soc[t])
-        #         for t in time_steps
-        #     ]
-        #     charge = [
-        #         pyo.value(instance.dsm_blocks["thermal_storage"].charge[t])
-        #         for t in time_steps
-        #     ]
-        #     discharge = [
-        #         pyo.value(instance.dsm_blocks["thermal_storage"].discharge[t])
-        #         for t in time_steps
-        #     ]
-
-        #     axs[2].fill_between(time_steps, soc, alpha=0.3, label="SOC", color="blue")
-        #     axs[2].plot(
-        #         time_steps, charge, label="Charge", linestyle="--", color="green"
-        #     )
-        #     axs[2].plot(
-        #         time_steps,
-        #         [-x for x in discharge],
-        #         label="Discharge",
-        #         linestyle="--",
-        #         color="red",
-        #     )
-        #     axs[2].axhline(0, color="black", linewidth=0.5)
-        #     axs[2].set_ylabel("Storage (kWh)")
-        #     axs[2].legend()
-        #     axs[2].grid(True)
-
-        # axs[2].set_xlabel("Time Step")
-        # plt.suptitle("Paper & Pulp Plant Inflex")
-        # plt.tight_layout()
-        # plt.show()
-
     def determine_optimal_operation_with_flex(self):
         """
         Determines the optimal operation of the steel plant without considering flexibility.
@@ -722,6 +726,24 @@ class DSMFlex:
             self.flex_power_requirement = FastSeries(
                 index=self.index, value=flex_power_requirement
             )
+        if self.flexibility_measure == "symmetric_flexible_block":
+            adjusted_total_power_input = []
+            for t in instance.time_steps:
+                total_power = 0.0
+                for tech_name, tech_block in instance.dsm_blocks.items():
+                    if hasattr(tech_block, "power_in"):
+                        total_power += pyo.value(tech_block.power_in[t])
+                adjusted_total_power_input.append(total_power)
+
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=adjusted_total_power_input
+            )
+
+            # Now assign to your series
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=adjusted_total_power_input
+            )
+
         else:
             # Compute adjusted total power input with load shift applied
             adjusted_total_power_input = []
@@ -746,72 +768,6 @@ class DSMFlex:
         self.flex_variable_cost_series = FastSeries(
             index=self.index, value=flex_variable_cost
         )
-
-        # # Setup plotting
-        # time_steps = list(instance.time_steps)
-        # fig, axs = plt.subplots(3, 1, figsize=(12, 12), sharex=True)
-
-        # # Plot 1: Heat Pump power input
-        # if "heat_pump" in instance.dsm_blocks:
-        #     hp_power = [
-        #         pyo.value(instance.dsm_blocks["heat_pump"].power_in[t])
-        #         for t in time_steps
-        #     ]
-        #     axs[0].plot(time_steps, hp_power, label="Heat Pump Power In", color="green")
-        #     axs[0].set_ylabel("Power (kW)")
-        #     axs[0].legend()
-        #     axs[0].grid(True)
-
-        # # Plot 2: Boiler fuel input
-        # if "boiler" in instance.dsm_blocks and hasattr(
-        #     instance.dsm_blocks["boiler"], "hydrogen_gas_in"
-        # ):
-        #     boiler_gas = [
-        #         pyo.value(instance.dsm_blocks["boiler"].hydrogen_gas_in[t])
-        #         for t in time_steps
-        #     ]
-        #     axs[1].plot(
-        #         time_steps, boiler_gas, label="Boiler Hydrogen Gas In", color="orange"
-        #     )
-        #     axs[1].set_ylabel("Fuel Input (kW)")
-        #     axs[1].legend()
-        #     axs[1].grid(True)
-
-        # # Plot 3: Thermal Storage SOC, Charge, Discharge (Discharge in 4th quadrant)
-        # if "thermal_storage" in instance.dsm_blocks:
-        #     soc = [
-        #         pyo.value(instance.dsm_blocks["thermal_storage"].soc[t])
-        #         for t in time_steps
-        #     ]
-        #     charge = [
-        #         pyo.value(instance.dsm_blocks["thermal_storage"].charge[t])
-        #         for t in time_steps
-        #     ]
-        #     discharge = [
-        #         pyo.value(instance.dsm_blocks["thermal_storage"].discharge[t])
-        #         for t in time_steps
-        #     ]
-
-        #     axs[2].fill_between(time_steps, soc, alpha=0.3, label="SOC", color="blue")
-        #     axs[2].plot(
-        #         time_steps, charge, label="Charge", linestyle="--", color="green"
-        #     )
-        #     axs[2].plot(
-        #         time_steps,
-        #         [-x for x in discharge],
-        #         label="Discharge",
-        #         linestyle="--",
-        #         color="red",
-        #     )
-        #     axs[2].axhline(0, color="black", linewidth=0.5)
-        #     axs[2].set_ylabel("Storage (kWh)")
-        #     axs[2].legend()
-        #     axs[2].grid(True)
-
-        # axs[2].set_xlabel("Time Step")
-        # plt.suptitle("Paper & Pulp Plant Flex")
-        # plt.tight_layout()
-        # plt.show()
 
     def switch_to_opt(self, instance):
         """

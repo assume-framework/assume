@@ -137,6 +137,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 },
             )
 
+        self.model.absolute_demand = pyo.Param(initialize=self.demand)
         self.model.thermal_demand = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.thermal_demand)},
@@ -146,6 +147,9 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         """
         Defines the decision variables for the optimization model.
         """
+        self.model.cumulative_thermal_output = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
         self.model.total_power_input = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
@@ -169,40 +173,42 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                     storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
                     return (
                         total_heat_production + storage_discharge - storage_charge
-                        == m.thermal_demand[t]
+                        >= m.thermal_demand[t]
                     )
                 else:
-                    return total_heat_production == m.thermal_demand[t]
-
-        # Cumulative/absolute demand constraint
+                    return total_heat_production >= m.thermal_demand[t]
         else:
-
-            @self.model.Constraint()
-            def absolute_heat_balance(m):
-                total_heat_supplied = 0
-                for t in m.time_steps:
-                    produced = 0
-                    if self.has_heatpump:
-                        produced += m.dsm_blocks["heat_pump"].heat_out[t]
-                    if self.has_boiler:
-                        produced += m.dsm_blocks["boiler"].heat_out[t]
-                    if self.has_thermal_storage:
-                        storage_discharge = m.dsm_blocks["thermal_storage"].discharge[t]
-                        storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
-                        total_heat_supplied += (
-                            produced + storage_discharge - storage_charge
-                        )
-                    else:
-                        total_heat_supplied += produced
-                return (
-                    total_heat_supplied >= self.demand
-                )  # Use == if strict match is needed
+            @self.model.Constraint(self.model.time_steps)
+            def direct_heat_balance(m, t):
+                total_heat_production = 0
+                if self.has_heatpump:
+                    total_heat_production += m.dsm_blocks["heat_pump"].heat_out[t]
+                if self.has_boiler:
+                    total_heat_production += m.dsm_blocks["boiler"].heat_out[t]
+                if self.has_thermal_storage:
+                    storage_discharge = m.dsm_blocks["thermal_storage"].discharge[t]
+                    storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
+                    return (
+                        total_heat_production + storage_discharge - storage_charge
+                        == m.cumulative_thermal_output[t]
+                    )
+                else:
+                    return total_heat_production == m.cumulative_thermal_output[t]
 
     def define_constraints(self):
         """
         Defines the constraints for the paper and pulp plant model.
         """
-
+        @self.model.Constraint(self.model.time_steps)
+        def absolute_demand_association_constraint(m, t):
+            """
+            Ensures the thermal output meets the absolute demand.
+            """
+            if not self.demand or self.demand == 0:
+                return pyo.Constraint.Skip
+            else:
+                return sum((m.cumulative_thermal_output[t] )for t in m.time_steps) >= m.absolute_demand
+            
         # Power input constraint
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
