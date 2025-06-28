@@ -254,7 +254,6 @@ class DSMFlex:
 
             elif self.technology == "building":
                 total_power_input = m.inflex_demand[t]
-                # Building components (e.g., heat_pump, boiler, pv_plant, generic_storage)
                 if self.has_heatpump:
                     total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
                 if self.has_boiler:
@@ -271,6 +270,11 @@ class DSMFlex:
                     )
                 if self.has_pv:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
+
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == total_power_input
+                )
 
             elif self.technology == "steam_generator_plant":
                 total_power = 0
