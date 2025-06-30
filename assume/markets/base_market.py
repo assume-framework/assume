@@ -651,13 +651,18 @@ class MarketRole(MarketMechanism, Role):
                     }
                 else:
                     order["accepted_volume"] = 0.0
+                    # TODO entry is generally not needed
+                    # it is of interest to have a reward in RL for rejected bids
+                    # the matching of meta to product by start_time is sufficient in most cases
+                    # but might not be correct if multiple orders with same start (but different end or zone)
+                    # exist - in these cases the rejected_bids should be set in the clearing itself
                     order["accepted_price"] = next(
                         (
                             product["price"]
                             for product in market_meta
                             if product.get("product_start") == order["start_time"]
                         ),
-                        None,
+                        0,
                     )
 
         self.open_auctions - set(market_products)

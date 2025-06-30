@@ -33,8 +33,6 @@ def power_plant() -> PowerPlant:
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
         "algorithm": "matd3",
         "learning_mode": True,
         "training_episodes": 3,
@@ -87,8 +85,6 @@ def test_learning_strategies_parametrized(
 
     # Build learning config dynamically
     learning_config: LearningConfig = {
-        "obs_dim": obs_dim,
-        "act_dim": act_dim,
         "algorithm": "matd3",
         "learning_mode": True,
         "training_episodes": 3,
@@ -128,6 +124,6 @@ def test_learning_strategies_parametrized(
     costs = power_plant.outputs["total_costs"].loc[product_index]
 
     assert reward[0] == 0.01
-    assert profit[0] == 10000.0
+    assert profit[0] == 1000.0
     assert regret[0] == 0.0
     assert costs[0] == 40000.0  # Assumes hot_start_cost = 20000 by default

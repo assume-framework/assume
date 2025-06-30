@@ -120,21 +120,25 @@ def test_electrolyser_power_bounds(electrolyser_model, electrolyser_config):
     """
     Test that power input respects the minimum and maximum power bounds.
     """
+    import pytest
+
     model, _ = electrolyser_model
     min_power = electrolyser_config["min_power"]
     max_power = electrolyser_config["max_power"]
+    tol = 1e-8
 
     for t in model.time_steps:
         power_in = pyo.value(model.electrolyser.power_in[t])
         operational_status = pyo.value(model.electrolyser.operational_status[t])
-        assert (
-            min_power * operational_status
-            <= power_in
-            <= max_power * operational_status + 1e-5
-        ), (
-            f"Power input at time {t} is {power_in}, which is outside the bounds "
-            f"{min_power * operational_status} - {max_power * operational_status}."
-        )
+        if operational_status < 0.5:  # OFF
+            assert power_in == pytest.approx(
+                0, abs=tol
+            ), f"Power input at time {t} is {power_in} but electrolyser is off."
+        else:  # ON
+            assert min_power - tol <= power_in <= max_power + tol, (
+                f"Power input at time {t} is {power_in}, which is outside the bounds "
+                f"{min_power} - {max_power} (with tolerance {tol})."
+            )
 
 
 def test_electrolyser_off_when_high_price(electrolyser_model, price_profile):
@@ -229,3 +233,7 @@ def test_operating_cost(electrolyser_model, price_profile):
         assert (
             abs(actual_cost - expected_cost) < 1e-5
         ), f"Operating cost at time {t} is {actual_cost}, expected {expected_cost}."
+
+
+if __name__ == "__main__":
+    pytest.main(["-s", __file__])
