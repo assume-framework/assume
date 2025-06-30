@@ -118,8 +118,8 @@ if __name__ == "__main__":
 
     # select the example to run from the available examples above
     examples = [
-        "small_learning_1",
-        # "small_learning_1_dam",
+        #"small_learning_1",
+        "small_learning_1_dam",
         # "small_learning_1_lstm",
         # "small_learning_1_lstm_original",
     ]

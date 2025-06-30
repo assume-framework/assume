@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base:
-  start_date: 2019-03-01 00:00
-  end_date: 2019-03-31 00:00
+  start_date: 2019-01-01 00:00
+  end_date: 2019-12-31 00:00
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
@@ -48,10 +48,11 @@ base:
       market_mechanism: pay_as_clear
 
 base_dam:
-  start_date: 2019-03-01 00:00
-  end_date: 2019-03-31 00:00
+  simulation_id: example_02a_base_dam_no_regret
+  start_date: 2019-01-01 00:00
+  end_date: 2019-12-31 23:00
   time_step: 1h
-  learning_mode: false
+  learning_mode: true
   save_frequency_hours: null
 
   learning_config:
@@ -69,7 +70,7 @@ base_dam:
     batch_size: 128
     gamma: 0.99
     device: cpu
-    #action_noise_schedule: linear
+    action_noise_schedule: linear
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
@@ -80,7 +81,7 @@ base_dam:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-03-01 00:00
+      start_date: 2019-01-01 23:00
       products:
         - duration: 1h
           count: 24

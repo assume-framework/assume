@@ -54,11 +54,13 @@ try:
         RLStrategy,
         RLStrategySingleBid,
         StorageRLStrategy,
+        RLStrategyDAM
     )
 
     bidding_strategies["pp_learning"] = RLStrategy
     bidding_strategies["pp_learning_single_bid"] = RLStrategySingleBid
     bidding_strategies["storage_learning"] = StorageRLStrategy
+    bidding_strategies["pp_learning_dam"] = RLStrategyDAM
 
 except ImportError:
     pass
