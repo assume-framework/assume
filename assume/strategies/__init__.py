@@ -19,6 +19,7 @@ from assume.strategies.naive_strategies import (
     NaiveRedispatchStrategyDSM,
     NaiveSingleBidStrategy,
     NaiveExchangeStrategy,
+    ElasticDemandStrategy,
     FixedDispatchStrategy,
     DSM_PosCRM_Strategy,
     DSM_NegCRM_Strategy,
@@ -34,6 +35,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "naive_pos_reserve": NaiveSingleBidStrategy,
     "naive_neg_reserve": NaiveSingleBidStrategy,
     "naive_exchange": NaiveExchangeStrategy,
+    "elastic_demand": ElasticDemandStrategy,
     "otc_strategy": OTCStrategy,
     "flexable_eom": flexableEOM,
     "flexable_eom_block": flexableEOMBlock,
@@ -61,10 +63,12 @@ try:
     )
     from assume.strategies.learning_strategies import (
         RLStrategy,
+        RLStrategySingleBid,
         StorageRLStrategy,
     )
 
     bidding_strategies["pp_learning"] = RLStrategy
+    bidding_strategies["pp_learning_single_bid"] = RLStrategySingleBid
     bidding_strategies["storage_learning"] = StorageRLStrategy
     bidding_strategies["learning_advanced_orders"] = RLAdvancedOrderStrategy
 

@@ -100,11 +100,11 @@ def test_state_of_charge_constraints(generic_storage_model, generic_storage_conf
     storage_loss_rate = generic_storage_config["storage_loss_rate"]
     initial_soc = generic_storage_config["initial_soc"]
 
+    time_steps = sorted(model.time_steps)
     previous_soc = initial_soc * generic_storage_config["max_capacity"]
-    for t in sorted(model.time_steps):
+
+    for i, t in enumerate(time_steps):
         current_soc = pyo.value(model.storage.soc[t])
-        charge = pyo.value(model.storage.charge[t])
-        discharge = pyo.value(model.storage.discharge[t])
 
         # Check SOC bounds
         assert min_soc <= current_soc <= max_soc, (
@@ -112,17 +112,24 @@ def test_state_of_charge_constraints(generic_storage_model, generic_storage_conf
             f"{min_soc} - {max_soc}."
         )
 
-        # Check SOC evolution
-        expected_soc = (
-            previous_soc
-            + (efficiency_charge * charge)
-            - (discharge / efficiency_discharge)
-            - (storage_loss_rate * previous_soc)
-        )
-        # Allow a small tolerance due to floating-point arithmetic
-        assert (
-            abs(current_soc - expected_soc) < 1e-4
-        ), f"SOC at time {t} is {current_soc}, but expected {expected_soc} based on charging, discharging, and losses."
+        if i == 0:
+            # Initial SOC at first time step
+            assert (
+                abs(current_soc - previous_soc) < 1e-4
+            ), f"Initial SOC at time {t} is {current_soc}, expected {previous_soc}."
+        else:
+            prev_t = time_steps[i - 1]
+            prev_charge = pyo.value(model.storage.charge[prev_t])
+            prev_discharge = pyo.value(model.storage.discharge[prev_t])
+            expected_soc = (
+                previous_soc
+                + (efficiency_charge * prev_charge)
+                - (prev_discharge / efficiency_discharge)
+                - (storage_loss_rate * previous_soc)
+            )
+            assert (
+                abs(current_soc - expected_soc) < 1e-4
+            ), f"SOC at time {t} is {current_soc}, but expected {expected_soc} based on charging, discharging, and losses."
 
         previous_soc = current_soc
 
@@ -195,21 +202,29 @@ def test_storage_loss_rate(generic_storage_model, generic_storage_config):
     efficiency_charge = generic_storage_config["efficiency_charge"]
     efficiency_discharge = generic_storage_config["efficiency_discharge"]
 
+    time_steps = sorted(model.time_steps)
     previous_soc = initial_soc * generic_storage_config["max_capacity"]
-    for t in model.time_steps:
-        current_soc = pyo.value(model.storage.soc[t])
-        charge = pyo.value(model.storage.charge[t])
-        discharge = pyo.value(model.storage.discharge[t])
 
-        expected_soc = (
-            previous_soc
-            + (efficiency_charge * charge)
-            - (discharge / efficiency_discharge)
-            - (storage_loss_rate * previous_soc)
-        )
-        assert (
-            abs(current_soc - expected_soc) < 1e-4
-        ), f"SOC at time {t} is {current_soc}, but expected {expected_soc} based on storage losses."
+    for i, t in enumerate(time_steps):
+        current_soc = pyo.value(model.storage.soc[t])
+        if i == 0:
+            # Initial SOC at first time step
+            assert (
+                abs(current_soc - previous_soc) < 1e-4
+            ), f"Initial SOC at time {t} is {current_soc}, expected {previous_soc}."
+        else:
+            prev_t = time_steps[i - 1]
+            prev_charge = pyo.value(model.storage.charge[prev_t])
+            prev_discharge = pyo.value(model.storage.discharge[prev_t])
+            expected_soc = (
+                previous_soc
+                + (efficiency_charge * prev_charge)
+                - (prev_discharge / efficiency_discharge)
+                - (storage_loss_rate * previous_soc)
+            )
+            assert (
+                abs(current_soc - expected_soc) < 1e-4
+            ), f"SOC at time {t} is {current_soc}, but expected {expected_soc} based on storage losses."
         previous_soc = current_soc
 
 
@@ -270,3 +285,7 @@ def test_max_capacity_enforcement(generic_storage_model, generic_storage_config)
         assert (
             soc <= max_capacity + 1e-5
         ), f"SOC at time {t} is {soc}, which exceeds the maximum capacity of {max_capacity}."
+
+
+if __name__ == "__main__":
+    pytest.main(["-s", __file__])

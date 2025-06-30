@@ -7,6 +7,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
+import numpy as np
 import pandas as pd
 import pytest
 from dateutil import rrule as rr
@@ -272,6 +273,78 @@ def test_aggregate_step_amount_long():
         [datetime(2019, 1, 3, 17, 0), 0.0],
     ]
     # this returns the bids in a minimal representation
+
+
+def test_aggregate_step_amount_block_bid():
+    # create a 3-hour block bid from 00:00 to 03:00 with accepted volumes 1, 2, 3
+    index = pd.date_range(start=datetime(2020, 1, 1, 0), periods=3, freq="1h")
+    accepted = {dt: i + 1 for i, dt in enumerate(index)}  # {00:00→1, 01:00→2, 02:00→3}
+    orderbook = [
+        {
+            "start_time": index[0],
+            "end_time": index[-1] + timedelta(hours=1),  # 00:00→03:00
+            "only_hours": None,
+            "accepted_volume": accepted,
+        },
+    ]
+
+    # aggregate over the full interval
+    result = aggregate_step_amount(
+        orderbook,
+        begin=datetime(2020, 1, 1, 0),
+        end=datetime(2020, 1, 1, 4),
+    )
+
+    # we expect:
+    # at 00:00 →  1
+    # at 01:00 →  2 (1 removed, 2 added ⇒ 2)
+    # at 02:00 →  3 (2 removed, 3 added ⇒ 3)
+    # at 03:00 →  0 (3 removed ⇒ 0)
+    expected = [
+        [pd.Timestamp(2020, 1, 1, 0), 1.0],
+        [pd.Timestamp(2020, 1, 1, 1), 2.0],
+        [pd.Timestamp(2020, 1, 1, 2), 3.0],
+        [pd.Timestamp(2020, 1, 1, 3), 0.0],
+    ]
+
+    assert result == expected
+
+
+def test_mixed_block_and_simple_bid():
+    # Block bid 00→02h, volumes 5, 5
+    idx = pd.date_range("2020-01-01 00:00", periods=2, freq="1h")
+    accepted = {ts: 5.0 for ts in idx}
+    bb = {
+        "start_time": idx[0],
+        "end_time": idx[-1] + timedelta(hours=1),
+        "only_hours": None,
+        "accepted_volume": accepted,
+    }
+    # Simple bid 01→03h, volume 3
+    sb = {
+        "start_time": datetime(2020, 1, 1, 1),
+        "end_time": datetime(2020, 1, 1, 3),
+        "only_hours": None,
+        "accepted_volume": 3.0,
+    }
+
+    result = aggregate_step_amount(
+        [bb, sb], begin=datetime(2020, 1, 1, 0), end=datetime(2020, 1, 1, 4)
+    )
+
+    # Expected step-function:
+    # 00:00 →  5.0
+    # 01:00 →  5.0 + 3.0 = 8.0
+    # 02:00 →  0.0 + 3.0 = 3.0  (block bid ends)
+    # 03:00 →  0.0              (simple bid ends)
+    expected = [
+        [pd.Timestamp("2020-01-01 00:00"), 5.0],
+        [pd.Timestamp("2020-01-01 01:00"), 8.0],
+        [pd.Timestamp("2020-01-01 02:00"), 3.0],
+        [pd.Timestamp("2020-01-01 03:00"), 0.0],
+    ]
+
+    assert result == expected
 
 
 def test_initializer():
@@ -649,6 +722,57 @@ def test_slicing_fastseries_uneven():
     series = pd.Series(0, index=pd.date_range(start, end, freq="h"))
     assert list(series[b:e].index) == datelist
     assert len(series[b:e]) == len(fs[b:e])
+
+
+def test_window_edge_cases():
+    # ── setup ────────────────────────────────
+    start = datetime(2020, 1, 1, 0)
+    end = datetime(2020, 1, 1, 4)
+    idx = FastIndex(start, end, freq="1h")
+    fs = FastSeries(idx, value=np.arange(len(idx)))  # data = [0,1,2,3,4]
+
+    # ── 1. forward, no wrap ───────────────────
+    out = fs.window(center=1, length=3, direction="forward")
+    assert np.array_equal(out, np.array([1, 2, 3]))
+
+    # ── 2. forward, wrap ──────────────────────
+    # raw positions = [3,4,5,6] → wrapped = [3,4,0,1]
+    out = fs.window(center=3, length=4, direction="forward")
+    assert np.array_equal(out, np.array([3, 4, 0, 1]))
+
+    # ── 3. backward, no wrap ──────────────────
+    # raw positions = [1,2,3]
+    out = fs.window(center=3, length=3, direction="backward")
+    assert np.array_equal(out, np.array([1, 2, 3]))
+
+    # ── 4. backward, wrap ─────────────────────
+    # raw positions = [-1,0,1] → wrapped = [4,0,1]
+    out = fs.window(center=1, length=3, direction="backward")
+    assert np.array_equal(out, np.array([4, 0, 1]))
+
+    # ── 5. datetime center equivalence ────────
+    dt_center = start + timedelta(hours=2)
+    out_int = fs.window(center=2, length=3, direction="forward")
+    out_dt = fs.window(center=dt_center, length=3, direction="forward")
+    assert np.array_equal(out_int, out_dt)
+
+    # ── 6. invalid direction raises ───────────
+    with pytest.raises(ValueError):
+        fs.window(center=0, length=5, direction="sideways")
+
+    # ── 7. full-cycle rotations ───────────────
+    N = len(fs)
+    # full window from 0 is original array
+    full0 = fs.window(center=0, length=N, direction="forward")
+    assert np.array_equal(full0, fs.data)
+    # full window from 2 is roll by -2
+    full2 = fs.window(center=2, length=N, direction="forward")
+    assert np.array_equal(full2, np.roll(fs.data, -2))
+
+    # ── 8. non-mutation guarantee ─────────────
+    before = fs.data.copy()
+    _ = fs.window(center=1, length=4)
+    assert np.array_equal(fs.data, before)
 
 
 def test_parse_duration():

@@ -317,6 +317,10 @@ class World:
                 freq=self.forecaster.index.freq,
             )
 
+        else:
+            self.learning_role = None
+            self.learning_agent_addr = None
+
     def setup_output_agent(
         self,
         save_frequency_hours: int,

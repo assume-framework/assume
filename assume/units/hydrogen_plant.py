@@ -105,6 +105,15 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         )
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
+        # Inject schedule into long-term seasonal storage if applicable
+        if "hydrogen_seasonal_storage" in self.components:
+            storage_cfg = self.components["hydrogen_seasonal_storage"]
+            storage_type = storage_cfg.get("storage_type", "short-term")
+            if storage_type == "long-term":
+                schedule_key = f"{self.id}_hydrogen_seasonal_storage_schedule"
+                schedule_series = self.forecaster[schedule_key]
+                storage_cfg["storage_schedule_profile"] = schedule_series
+
         # Initialize the model
         self.setup_model()
 
@@ -179,11 +188,13 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         This function includes the following constraints:
 
         1. **Total Power Input Constraint**:
+        1. **Total Power Input Constraint**:
         - Ensures that the power input required by the electrolyser is correctly accounted for
             at each time step.
         - This constraint ensures that energy demand is properly modeled for optimization
             purposes.
 
+        2. **Variable Cost per Time Step Constraint**:
         2. **Variable Cost per Time Step Constraint**:
         - Calculates the operating cost per time step, ensuring that total variable
             costs reflect the electrolyser's energy consumption.
