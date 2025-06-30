@@ -840,7 +840,7 @@ class FastSeries:
         direction : {'forward','backward'}, default 'forward'
             Whether to go from center → center+length or center-length → center.
         """
-        # 1) compute the “raw” center index
+        # 1) compute the "raw" center index
         if isinstance(center, datetime):
             raw_center = self.index._get_idx_from_date(center)
         else:

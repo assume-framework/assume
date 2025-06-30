@@ -179,7 +179,7 @@ class BaseLearningStrategy(LearningStrategy):
             / self.max_bid_price
         )
 
-        # --- 3. Invidial observations ---
+        # --- 3. Individual observations ---
         individual_observations = self.get_individual_observations(unit, start)
 
         # concat all observations into one array
@@ -235,6 +235,8 @@ class BaseLearningStrategy(LearningStrategy):
         -------
         torch.Tensor
             Actions that include bid price and direction.
+        torch.Tensor
+            Noise component which is already added to actions for exploration, if applicable.
 
         Notes
         -----
@@ -260,7 +262,7 @@ class BaseLearningStrategy(LearningStrategy):
                 # 2.1 Get Actions and handle exploration
                 # =============================================================================
                 # only use noise as the action to enforce exploration
-                curr_action = 0
+                curr_action = noise
 
             else:
                 # if we are not in the initial exploration phase we chose the action with the actor neural net
@@ -483,7 +485,7 @@ class RLStrategy(BaseLearningStrategy):
 
     def get_actions(self, next_observation):
         """
-        Compute actions based on the current observation, optionally applying noise for exploration.
+        Compute actions based on the current observation.
 
         Args
         ----
@@ -493,15 +495,11 @@ class RLStrategy(BaseLearningStrategy):
         Returns
         -------
         tuple of torch.Tensor
-            A tuple containing:
-            - Actions to be taken (with or without noise).
-            - The noise component (if any), useful for diagnostics.
+            A tuple containing: Actions to be taken (with or without noise). The noise component (if any), useful for diagnostics.
 
         Notes
         -----
-        - During learning, exploratory noise is applied unless in evaluation mode.
-        - In initial exploration mode, actions are sampled around the marginal cost to explore its vicinity.
-        - Assumes the final element of `next_observation` is the marginal cost.
+        During learning, exploratory noise is applied and already part of the curr_action unless in evaluation mode. In initial exploration mode, actions are sampled around the marginal cost to explore its vicinity. We assume the final element of `next_observation` is the marginal cost.
         """
 
         # Get the base action and associated noise from the parent implementation
@@ -514,7 +512,7 @@ class RLStrategy(BaseLearningStrategy):
                     -1
                 ].detach()  # ensure no gradients flow through
                 # Add marginal cost to the action directly for initial random exploration
-                curr_action = marginal_cost + noise
+                curr_action += marginal_cost
 
         return curr_action, noise
 
@@ -524,7 +522,7 @@ class RLStrategy(BaseLearningStrategy):
         start: datetime,
     ):
         """
-        Retrieves the unit-specific observations.
+        Retrieves the unit-specific observations. For dispatchable units, this includes the last dispatched volume and the current marginal costs.
 
         Args
         ----
@@ -536,7 +534,7 @@ class RLStrategy(BaseLearningStrategy):
         Returns
         -------
         individual_observations : np.array
-            Scaled total capacity and marginal cost.
+            Scaled total dispatched capacity and marginal cost.
 
         Notes
         -----
@@ -578,9 +576,9 @@ class RLStrategy(BaseLearningStrategy):
         Notes
         -----
         The reward is computed by combining the following:
-        - **Profit**: Income from accepted bids minus marginal and start-up costs.
-        - **Opportunity Cost**: Penalty for underutilizing capacity, calculated as potential lost income.
-        - **Regret Term**: A scaled regret term penalizes high opportunity costs to guide effective bidding.
+        **Profit**: Income from accepted bids minus marginal and start-up costs.
+        **Opportunity Cost**: Penalty for underutilizing capacity, calculated as potential lost income.
+        **Regret Term**: A scaled regret term penalizes high opportunity costs to guide effective bidding.
 
         The reward is scaled and stored along with other outputs in the unit’s data to support learning.
         """
@@ -1063,7 +1061,8 @@ class StorageRLStrategy(BaseLearningStrategy):
         start: datetime,
     ):
         """
-        Retrieves the unit-specific observations for storage units.
+        Retrieves the unit-specific observations for storage units. For storages we use the state of charge and energy cost as the individual observations.
+        We define the latter as the average volume weighted procurement costs of the currently stored energy.
 
         Args
         ----
@@ -1079,7 +1078,7 @@ class StorageRLStrategy(BaseLearningStrategy):
 
         Notes
         -----
-        Observations are scaled by the unit's max state of charge and bid price, creating input for
+        Observations are scaled by the unit's max state of charge and energy costs, creating input for
         the agent's action selection.
         """
         # get the current soc and energy cost value
