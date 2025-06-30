@@ -1032,15 +1032,39 @@ class StorageRLStrategy(BaseLearningStrategy):
         next_soc = unit.outputs["soc"].at[next_time]
 
         # Calculate and clip the energy cost for the start time
+        # if next_soc < 1:
+        #     unit.outputs["energy_cost"].at[next_time] = 0
+        # else:
+        #     unit.outputs["energy_cost"].at[next_time] = np.clip(
+        #         (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
+        #         / next_soc,
+        #         -self.max_bid_price,
+        #         self.max_bid_price,
+        #     )
+        # Proposed logic:
+        # Calculate and clip the energy cost for the start time
         if next_soc < 1:
             unit.outputs["energy_cost"].at[next_time] = 0
+        elif accepted_volume < 0:
+            unit.outputs["energy_cost"].at[next_time] = (
+                unit.outputs["energy_cost"].at[start] * current_soc
+                - accepted_price * accepted_volume * duration_hours
+            ) / next_soc
+        elif accepted_volume > 0:
+            unit.outputs["energy_cost"].at[next_time] = (
+                unit.outputs["energy_cost"].at[start]
+                * (current_soc - accepted_volume * duration_hours)
+            ) / next_soc
         else:
-            unit.outputs["energy_cost"].at[next_time] = np.clip(
-                (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
-                / next_soc,
-                -self.max_bid_price,
-                self.max_bid_price,
-            )
+            unit.outputs["energy_cost"].at[next_time] = unit.outputs["energy_cost"].at[
+                start
+            ]
+
+        unit.outputs["energy_cost"].at[next_time] = np.clip(
+            unit.outputs["energy_cost"].at[next_time],
+            -self.max_bid_price,
+            self.max_bid_price,
+        )
 
         profit = order_profit - order_cost
 

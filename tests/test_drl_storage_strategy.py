@@ -256,3 +256,102 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             assert (
                 costs[0] == expected_costs
             ), f"Expected costs {expected_costs}, got {costs[0]}"
+
+
+@pytest.mark.require_learning
+def test_storage_rl_strategy_energy_costs(mock_market_config, storage_unit):
+    """
+    Test the StorageRLStrategy if unique observations are created as expected.
+    """
+    # Define the product index and tuples
+    product_index = pd.date_range("2023-07-01", periods=3, freq="h")
+    mc = mock_market_config
+    product_tuples = [
+        (start, start + pd.Timedelta(hours=1), None) for start in product_index
+    ]
+
+    # Instantiate the StorageRLStrategy
+    strategy = storage_unit.bidding_strategies["EOM"]
+
+    # Define sequence of actions over 3 hours: [charge, sell, sell]
+    # Format: [normalized_price (-1, 1), direction indicated by sign (negative: buy bid, positive: sell bid)]
+    actions = [
+        [-0.3],  # Charge at price 30
+        [0.6],  # Sell at price 60
+        [0.8],  # Sell at price 80
+    ]
+
+    # Patch get_actions to return one action at a time
+    get_actions_patch = patch.object(StorageRLStrategy, "get_actions")
+    calc_cost_patch = patch.object(Storage, "calculate_marginal_cost")
+
+    with get_actions_patch as mock_get_actions, calc_cost_patch as mock_cost:
+        # Set up side effects for each call
+        mock_get_actions.side_effect = [(th.tensor(a), th.tensor(0.0)) for a in actions]
+        mock_cost.side_effect = [5.0, 15.0, 25.0]
+
+        all_bids = []
+
+        for i, product_tuple in enumerate(product_tuples):
+            # Call calculate_bids for a single product_tuple
+            bids = strategy.calculate_bids(
+                storage_unit, mock_market_config, product_tuples=[product_tuple]
+            )
+
+            # Only one bid per call
+            assert len(bids) == 1
+            bid = bids[0]
+
+            # Simulate market clearing
+            bid["accepted_price"] = bid["price"].item()
+            bid["accepted_volume"] = bid["volume"]
+
+            all_bids.append(bid)
+
+            # Set dispatch plan
+            storage_unit.set_dispatch_plan(mc, orderbook=[bid])
+
+            # Apply profit and reward update for this step
+            strategy.calculate_reward(storage_unit, mock_market_config, orderbook=[bid])
+
+        # Get resulting energy costs
+        energy_costs = storage_unit.outputs["energy_cost"].loc[
+            product_index.union([product_index[-1] + product_index.freq])
+        ]
+
+        # TODO: what are the truly expected values?
+        # Validate expected values
+        #
+        # # Currently:
+        # # Initial state: 500 MWh at default energy costs of 0 €/MWh
+        # # 1. Charge 500 MWh at 30 €/MWh): energy_cost_t1 = (0 €/MWh * 500 MWh - (- 500 MW * 30 €/MWh * 1h)) / 950 MWh = 15.79 €/MWh
+        # expected_cost_t1 = (500*30) / 950
+        # assert math.isclose(energy_costs[1], expected_cost_t1, rel_tol=1e-3), f"Expected energy cost at t=1 to be {expected_cost_t1}, got {energy_costs[1]}"
+        # # 2. Discharge 500 MWh at 60 €/MWh: energy_cost_t2 = (15.79 €/MWh *  950 MWh - 500 MW * 60 €/MWh * 1h) / (950 MWh - (500 MWh / 0.9)) = - 38.03 €/MWh
+        # # Meaning: economic value is negative --> profitable discharge bids have been executed (?)
+        # expected_cost_t2 = (expected_cost_t1 * 950 - 500 * 60) / (950-(500/0.9))
+        # assert math.isclose(energy_costs[2], expected_cost_t2, rel_tol=1e-3), f"Expected energy cost at t=2 to be {expected_cost_t2}, got {energy_costs[2]}"
+        # # 3. Discharge remaining 355 MWh at 80 €/Mwh: SoC < 1 --> energy_cost_t3 = 0 €/MWh
+        # expected_cost_t3 = 0
+        # assert math.isclose(energy_costs[3], expected_cost_t3, rel_tol=1e-3), f"Expected energy cost at t=3 to be {expected_cost_t3}, got {energy_costs[3]}"
+
+        # Proposed:
+        # Initial state: 500 MWh at default energy costs of 0 €/MWh
+        # 1. Charge 500 MWh at 30 €/MWh): energy_cost_t1 = (0 €/MWh * 500 MWh - (- 500 MW * 30 €/MWh * 1h)) / 950 MWh = 15.79 €/MWh
+        expected_cost_t1 = (500 * 30) / 950
+        assert math.isclose(
+            energy_costs[1], expected_cost_t1, rel_tol=1e-3
+        ), f"Expected energy cost at t=1 to be {expected_cost_t1}, got {energy_costs[1]}"
+        # 2. Discharge 500 MWh at 60 €/MWh: energy_cost_t2 = (15.79 €/MWh *  (950 MWh - 500 MW  * 1h) / (950 MWh - (500 MWh / 0.9)) = 18.01 €/MWh
+        # Meaning: purchasing cost of remaining stored energy is almost the same, but accounted for discharging losses due to 0.9 efficiency factor
+        expected_cost_t2 = (expected_cost_t1 * (950 - 500)) / (950 - (500 / 0.9))
+        assert math.isclose(
+            energy_costs[2], expected_cost_t2, rel_tol=1e-3
+        ), f"Expected energy cost at t=2 to be {expected_cost_t2}, got {energy_costs[2]}"
+        # 3. Discharge remaining 355 MWh at 80 €/Mwh: SoC < 1 --> energy_cost_t3 = 0 €/MWh
+        expected_cost_t3 = 0
+        assert math.isclose(
+            energy_costs[3], expected_cost_t3, rel_tol=1e-3
+        ), f"Expected energy cost at t=3 to be {expected_cost_t3}, got {energy_costs[3]}"
+
+        print("Energy cost series:\n", energy_costs)
