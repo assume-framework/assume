@@ -255,10 +255,12 @@ class NaiveDADSMStrategy(BaseStrategy):
         # Save to CSV
         df.to_csv(file_path)
 
+
 class DSM_PosCRM_Strategy(BaseStrategy):
     """
     Strategy for Positive CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """
+
     def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
         bids = []
         max_power = unit.max_plant_capacity
@@ -278,21 +280,25 @@ class DSM_PosCRM_Strategy(BaseStrategy):
             # The symmetric bid is the minimum capacity that is possible in *all* timesteps in the block
             symmetric_capacity = min(min(up_caps), min(down_caps))
             if symmetric_capacity > 0:
-                bids.append({
-                    "start_time": start,
-                    "end_time": end,
-                    "only_hours": only_hours,
-                    "price": 0,  # or unit.calculate_marginal_cost(...)
-                    "volume": symmetric_capacity,
-                    "unit_id": unit.id,
-                    "market_id": "CRM_pos",
-                })
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": only_hours,
+                        "price": 0,  # or unit.calculate_marginal_cost(...)
+                        "volume": symmetric_capacity,
+                        "unit_id": unit.id,
+                        "market_id": "CRM_pos",
+                    }
+                )
         return self.remove_empty_bids(bids)
+
 
 class DSM_NegCRM_Strategy(BaseStrategy):
     """
     Strategy for Negative CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """
+
     def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
         # IDENTICAL LOGIC as POS, since symmetric in Germany (volume is symmetric)
         # If you ever want to do *only* neg or pos (asymmetric), just change which cap you use!
@@ -312,17 +318,18 @@ class DSM_NegCRM_Strategy(BaseStrategy):
                 down_caps.append(flex - min_power)
             symmetric_capacity = min(min(up_caps), min(down_caps))
             if symmetric_capacity > 0:
-                bids.append({
-                    "start_time": start,
-                    "end_time": end,
-                    "only_hours": only_hours,
-                    "price": 0,
-                    "volume": symmetric_capacity,
-                    "unit_id": unit.id,
-                    "market_id": "CRM_neg",
-                })
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": only_hours,
+                        "price": 0,
+                        "volume": symmetric_capacity,
+                        "unit_id": unit.id,
+                        "market_id": "CRM_neg",
+                    }
+                )
         return self.remove_empty_bids(bids)
-
 
 
 class NaiveRedispatchDSMStrategy(BaseStrategy):

@@ -296,7 +296,7 @@ class DSMFlex:
             )
 
             return maximise_load_shift
-        
+
     def symmetric_flexible_block(self, model):
         """
         Cost-based CRM flexibility (rolling 4-hour blocks) for steam_generator_plant.
@@ -350,8 +350,12 @@ class DSMFlex:
                 # or (if you allow for time-varying max/min in the future) keep the local max/min per tau
 
                 # Block up/down window constraints (use static min/max plant capacity here)
-                model.block_up_window.add(model.block_up[t] <= self.max_plant_capacity - total_power)
-                model.block_down_window.add(model.block_down[t] <= total_power - self.min_plant_capacity)
+                model.block_up_window.add(
+                    model.block_up[t] <= self.max_plant_capacity - total_power
+                )
+                model.block_down_window.add(
+                    model.block_down[t] <= total_power - self.min_plant_capacity
+                )
 
         @model.Constraint(possible_starts)
         def block_bid_logic_up(m, t):
@@ -379,7 +383,6 @@ class DSMFlex:
         @model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):
             return sum(m.block_up[t] for t in possible_starts)
-
 
     def grid_congestion_management(self, model):
         """

@@ -178,6 +178,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 else:
                     return total_heat_production >= m.thermal_demand[t]
         else:
+
             @self.model.Constraint(self.model.time_steps)
             def direct_heat_balance(m, t):
                 total_heat_production = 0
@@ -199,6 +200,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         """
         Defines the constraints for the paper and pulp plant model.
         """
+
         @self.model.Constraint(self.model.time_steps)
         def absolute_demand_association_constraint(m, t):
             """
@@ -207,8 +209,11 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             if not self.demand or self.demand == 0:
                 return pyo.Constraint.Skip
             else:
-                return sum((m.cumulative_thermal_output[t] )for t in m.time_steps) >= m.absolute_demand
-            
+                return (
+                    sum((m.cumulative_thermal_output[t]) for t in m.time_steps)
+                    >= m.absolute_demand
+                )
+
         # Power input constraint
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
