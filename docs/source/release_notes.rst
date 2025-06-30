@@ -25,6 +25,7 @@ Upcoming Release
 - **Enhanced Test Suite for Storage Units:** Comprehensive unit tests have been added for both `GenericStorage` and `ThermalStorage`, including short-term and long-term scheduling, efficiency losses, ramping, power limits, schedule adherence, and initial SOC.
   - Tests verify economic cycling (charging at low price, discharging at high price), round-trip efficiency, and no simultaneous charge/discharge.
 - **SeasonalHydrogenStorage:** The framework of SeasonalHydrogenStorage is now consistent with the framework of Thermal storage.
+- **Refactored Learning Strategies:** Much of the code for generating observations and actions was redundant across different unit types. This redundancy has been removed by introducing the function in the common base class, making it easier to extend the learning strategies in the future. As a result, new functions such as `get_individual_observations`, which are specific to each unit type, have been added.
 
 **Bug Fixes:**
 
