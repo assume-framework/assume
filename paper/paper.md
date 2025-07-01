@@ -49,7 +49,7 @@ A unique feature of the `ASSUME` toolbox is its integration of **Deep Reinforcem
 Various open-source agent-based models have been developed for studying energy markets, such as PowerACE [@bublitzAgentbasedSimulationGerman2014] and AMIRIS [@schimeczekAMIRISAgentbasedMarket2023].
 Yet, the possible integration of reinforcement learning methods into the behavioral strategies of market agents is currently unique to `ASSUME` and is build upon prior research on multi-agent reinforcement learning [@harderFitPurposeModeling2023].
 Simulations which solely rely on rule-based bidding strategy representation, limit the ability to represent future markets or alternative markets designs, as in reality bidding agents would adapt to the new market design.
-Most notably, `ASSUME` enables the highest number of simultanelously learning market agents in literature [@miskiwExplainableDeepReinforcement2024].
+Most notably, `ASSUME` enables the highest number of simultaneously learning market agents in literature [@miskiwExplainableDeepReinforcement2024].
 This feature allows for the exploration of new market designs and emergent dynamics in energy markets using a common open-source simulation framework.
 Further unique features of `ASSUME` are the extensive market abstraction which allows to define complex multi-market scenarios as shown in [@maurerMarketAbstractionEnergy2023].
 Even redispatch markets and nodal markets are supported, making it possible to represent network constraints and market coupling.
@@ -66,7 +66,7 @@ Additionally, writing the output to CSV files is supported for scenarios in whic
 ![Componental overview of the ASSUME simulation architecture\label{fig:architecture}](../docs/source/img/architecture.svg)
 
 New scenarios can be created by providing CSV files, accessing simulation data from a database or by using the object-oriented API.
-The object-oriented API makes it possible to integrate new classes, maket mechanisms and bidding strategies as well.
+The object-oriented API makes it possible to integrate new classes, market mechanisms and bidding strategies as well.
 
 Less technical users can adjust the examples from the yaml config and csv inputs directly, while new bidding strategies and methods can be implemented using the provided base classes.
 This is possible through the decoupled architecture which separates the declaration of simulation behavior from the input data, while allowing to define either externally without changes to the core.
