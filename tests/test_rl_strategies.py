@@ -28,8 +28,6 @@ def power_plant() -> PowerPlant:
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
     learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
         "algorithm": "matd3",
         "learning_mode": True,
         "training_episodes": 3,
@@ -80,8 +78,6 @@ def test_learning_strategies_parametrized(
 
     # Build learning config dynamically
     learning_config: LearningConfig = {
-        "obs_dim": obs_dim,
-        "act_dim": act_dim,
         "algorithm": "matd3",
         "learning_mode": True,
         "training_episodes": 3,
