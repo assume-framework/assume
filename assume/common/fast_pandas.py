@@ -824,6 +824,41 @@ class FastSeries:
             name=self.name,
         )
 
+    def window(
+        self, center: int | datetime, length: int, direction: str = "forward"
+    ) -> np.ndarray:
+        """
+        Extract a fixed-length window, wrapping around the ends.
+
+        Parameters
+        ----------
+        center : int or datetime
+            If int: treated as position in the array (can be negative or beyond len).
+            If datetime: converted to its integer index.
+        length : int
+            Number of points to return.
+        direction : {'forward','backward'}, default 'forward'
+            Whether to go from center → center+length or center-length → center.
+        """
+        # 1) compute the "raw" center index
+        if isinstance(center, datetime):
+            raw_center = self.index._get_idx_from_date(center)
+        else:
+            raw_center = center
+
+        # 2) build the raw positions (may lie outside [0, len))
+        if direction == "forward":
+            raw_ix = np.arange(raw_center, raw_center + length)
+        elif direction == "backward":
+            raw_ix = np.arange(raw_center - length + 1, raw_center + 1)
+        else:
+            raise ValueError("direction must be 'forward' or 'backward'")
+
+        # 3) wrap them into [0, len) and take
+        wrapped = raw_ix % len(self._data)
+
+        return np.take(self._data, wrapped, mode="wrap")
+
     def as_df(
         self, name: str = None, start: datetime = None, end: datetime = None
     ) -> pd.DataFrame:
