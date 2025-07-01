@@ -108,7 +108,7 @@ class Storage(SupportsMinMaxCharge):
         self.min_power_discharge = abs(min_power_discharge)
 
         self.outputs["soc"] = FastSeries(value=self.initial_soc, index=self.index)
-        self.outputs["energy_cost"] = FastSeries(value=0.0, index=self.index)
+        self.outputs["cost_stored_energy"] = FastSeries(value=0.0, index=self.index)
 
         self.soc_tick = soc_tick
 

@@ -259,7 +259,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
 
 @pytest.mark.require_learning
-def test_storage_rl_strategy_energy_costs(mock_market_config, storage_unit):
+def test_storage_rl_strategy_cost_stored_energy(mock_market_config, storage_unit):
     """
     Test the StorageRLStrategy if unique observations are created as expected.
     """
@@ -315,43 +315,26 @@ def test_storage_rl_strategy_energy_costs(mock_market_config, storage_unit):
             strategy.calculate_reward(storage_unit, mock_market_config, orderbook=[bid])
 
         # Get resulting energy costs
-        energy_costs = storage_unit.outputs["energy_cost"].loc[
+        cost_stored_energy = storage_unit.outputs["cost_stored_energy"].loc[
             product_index.union([product_index[-1] + product_index.freq])
         ]
 
-        # TODO: what are the truly expected values?
-        # Validate expected values
-        #
-        # # Currently:
-        # # Initial state: 500 MWh at default energy costs of 0 €/MWh
-        # # 1. Charge 500 MWh at 30 €/MWh): energy_cost_t1 = (0 €/MWh * 500 MWh - (- 500 MW * 30 €/MWh * 1h)) / 950 MWh = 15.79 €/MWh
-        # expected_cost_t1 = (500*30) / 950
-        # assert math.isclose(energy_costs[1], expected_cost_t1, rel_tol=1e-3), f"Expected energy cost at t=1 to be {expected_cost_t1}, got {energy_costs[1]}"
-        # # 2. Discharge 500 MWh at 60 €/MWh: energy_cost_t2 = (15.79 €/MWh *  950 MWh - 500 MW * 60 €/MWh * 1h) / (950 MWh - (500 MWh / 0.9)) = - 38.03 €/MWh
-        # # Meaning: economic value is negative --> profitable discharge bids have been executed (?)
-        # expected_cost_t2 = (expected_cost_t1 * 950 - 500 * 60) / (950-(500/0.9))
-        # assert math.isclose(energy_costs[2], expected_cost_t2, rel_tol=1e-3), f"Expected energy cost at t=2 to be {expected_cost_t2}, got {energy_costs[2]}"
-        # # 3. Discharge remaining 355 MWh at 80 €/Mwh: SoC < 1 --> energy_cost_t3 = 0 €/MWh
-        # expected_cost_t3 = 0
-        # assert math.isclose(energy_costs[3], expected_cost_t3, rel_tol=1e-3), f"Expected energy cost at t=3 to be {expected_cost_t3}, got {energy_costs[3]}"
-
-        # Proposed:
         # Initial state: 500 MWh at default energy costs of 0 €/MWh
-        # 1. Charge 500 MWh at 30 €/MWh): energy_cost_t1 = (0 €/MWh * 500 MWh - (- 500 MW * 30 €/MWh * 1h)) / 950 MWh = 15.79 €/MWh
+        # 1. Charge 500 MWh at 30 €/MWh): cost_stored_energy_t1 = (0 €/MWh * 500 MWh - (- 500 MW * 30 €/MWh * 1h)) / 950 MWh = 15.79 €/MWh
         expected_cost_t1 = (500 * 30) / 950
         assert math.isclose(
-            energy_costs[1], expected_cost_t1, rel_tol=1e-3
-        ), f"Expected energy cost at t=1 to be {expected_cost_t1}, got {energy_costs[1]}"
-        # 2. Discharge 500 MWh at 60 €/MWh: energy_cost_t2 = (15.79 €/MWh *  (950 MWh - 500 MW  * 1h) / (950 MWh - (500 MWh / 0.9)) = 18.01 €/MWh
+            cost_stored_energy[1], expected_cost_t1, rel_tol=1e-3
+        ), f"Expected energy cost at t=1 to be {expected_cost_t1}, got {cost_stored_energy[1]}"
+        # 2. Discharge 500 MWh at 60 €/MWh: cost_stored_energy_t2 = (15.79 €/MWh *  (950 MWh - 500 MW  * 1h) / (950 MWh - (500 MWh / 0.9)) = 18.01 €/MWh
         # Meaning: purchasing cost of remaining stored energy is almost the same, but accounted for discharging losses due to 0.9 efficiency factor
         expected_cost_t2 = (expected_cost_t1 * (950 - 500)) / (950 - (500 / 0.9))
         assert math.isclose(
-            energy_costs[2], expected_cost_t2, rel_tol=1e-3
-        ), f"Expected energy cost at t=2 to be {expected_cost_t2}, got {energy_costs[2]}"
-        # 3. Discharge remaining 355 MWh at 80 €/Mwh: SoC < 1 --> energy_cost_t3 = 0 €/MWh
+            cost_stored_energy[2], expected_cost_t2, rel_tol=1e-3
+        ), f"Expected energy cost at t=2 to be {expected_cost_t2}, got {cost_stored_energy[2]}"
+        # 3. Discharge remaining 355 MWh at 80 €/Mwh: SoC < 1 --> cost_stored_energy_t3 = 0 €/MWh
         expected_cost_t3 = 0
         assert math.isclose(
-            energy_costs[3], expected_cost_t3, rel_tol=1e-3
-        ), f"Expected energy cost at t=3 to be {expected_cost_t3}, got {energy_costs[3]}"
+            cost_stored_energy[3], expected_cost_t3, rel_tol=1e-3
+        ), f"Expected energy cost at t=3 to be {expected_cost_t3}, got {cost_stored_energy[3]}"
 
-        print("Energy cost series:\n", energy_costs)
+        print("Energy cost series:\n", cost_stored_energy)
