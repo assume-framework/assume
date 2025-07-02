@@ -67,7 +67,7 @@ def mock_market_config():
     """
     mc = MarketConfig()
     mc.market_id = "test_market"
-    mc.product_type = "energy_eom"
+    mc.product_type = "energy"
     return mc
 
 
@@ -320,14 +320,13 @@ def test_storage_rl_strategy_cost_stored_energy(mock_market_config, storage_unit
         ]
 
         # Initial state: 500 MWh at default energy costs of 0 €/MWh
-        # 1. Charge 500 MWh at 30 €/MWh): cost_stored_energy_t1 = (0 €/MWh * 500 MWh - (- 500 MW * 30 €/MWh * 1h)) / 950 MWh = 15.79 €/MWh
-        expected_cost_t1 = (500 * 30) / 950
+        # 1. Charge 500 MWh at 30 €/MWh): cost_stored_energy_t1 = (0 €/MWh * 500 MWh - ((30 €/MWh + 5 €/MWh) * - 500 MW * 1h)) / 950 MWh = 18.41 €/MWh
+        expected_cost_t1 = (500 * 35) / 950
         assert math.isclose(
             cost_stored_energy[1], expected_cost_t1, rel_tol=1e-3
         ), f"Expected energy cost at t=1 to be {expected_cost_t1}, got {cost_stored_energy[1]}"
-        # 2. Discharge 500 MWh at 60 €/MWh: cost_stored_energy_t2 = (15.79 €/MWh *  (950 MWh - 500 MW  * 1h) / (950 MWh - (500 MWh / 0.9)) = 18.01 €/MWh
-        # Meaning: purchasing cost of remaining stored energy is almost the same, but accounted for discharging losses due to 0.9 efficiency factor
-        expected_cost_t2 = (expected_cost_t1 * (950 - 500)) / (950 - (500 / 0.9))
+        # 2. Discharge 500 MWh at 60 €/MWh: cost_stored_energy_t2 = 18.41 €/MWh unchanged
+        expected_cost_t2 = expected_cost_t1
         assert math.isclose(
             cost_stored_energy[2], expected_cost_t2, rel_tol=1e-3
         ), f"Expected energy cost at t=2 to be {expected_cost_t2}, got {cost_stored_energy[2]}"

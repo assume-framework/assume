@@ -161,9 +161,6 @@ class BaseUnit:
                 added_volume = list(order["accepted_volume"].values())
             else:
                 added_volume = order["accepted_volume"]
-            # TODO: if product_type is not exactly called "energy" (in the tests case its "energy_eom")
-            # then volume is not added to the single point of truth regarding the actual dispatched volumes
-            self.outputs["energy"].loc[start:end_excl] += added_volume
             self.outputs[product_type].loc[start:end_excl] += added_volume
 
             # Get the accepted price and store it in the outputs

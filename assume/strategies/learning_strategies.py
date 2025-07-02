@@ -1032,7 +1032,7 @@ class StorageRLStrategy(BaseLearningStrategy):
         next_soc = unit.outputs["soc"].at[next_time]
 
         # Calculate and clip the energy cost for the start time
-        # cost_stored_energy = average volume weighted procurement costs of the currently stored energy
+        # cost_stored_energy = average volume-weighted procurement costs of the currently stored energy
         if next_soc < 1:
             unit.outputs["cost_stored_energy"].at[next_time] = 0
         elif accepted_volume < 0:
@@ -1040,12 +1040,6 @@ class StorageRLStrategy(BaseLearningStrategy):
             unit.outputs["cost_stored_energy"].at[next_time] = (
                 unit.outputs["cost_stored_energy"].at[start] * current_soc
                 - (accepted_price + marginal_cost) * accepted_volume * duration_hours
-            ) / next_soc
-        elif accepted_volume > 0:
-            # just decrease volume do not consider profit from selling energy
-            unit.outputs["cost_stored_energy"].at[next_time] = (
-                unit.outputs["cost_stored_energy"].at[start]
-                * (current_soc - accepted_volume * duration_hours)
             ) / next_soc
         else:
             unit.outputs["cost_stored_energy"].at[next_time] = unit.outputs[
