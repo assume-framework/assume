@@ -1032,15 +1032,26 @@ class StorageRLStrategy(BaseLearningStrategy):
         next_soc = unit.outputs["soc"].at[next_time]
 
         # Calculate and clip the energy cost for the start time
+        # cost_stored_energy = average volume-weighted procurement costs of the currently stored energy
         if next_soc < 1:
-            unit.outputs["energy_cost"].at[next_time] = 0
+            unit.outputs["cost_stored_energy"].at[next_time] = 0
+        elif accepted_volume < 0:
+            # increase costs of current SoC by price for buying energy
+            # not fully representing the true cost per MWh (e.g. omitting discharge efficiency losses), but serving as a proxy for it
+            unit.outputs["cost_stored_energy"].at[next_time] = (
+                unit.outputs["cost_stored_energy"].at[start] * current_soc
+                - (accepted_price + marginal_cost) * accepted_volume * duration_hours
+            ) / next_soc
         else:
-            unit.outputs["energy_cost"].at[next_time] = np.clip(
-                (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
-                / next_soc,
-                -self.max_bid_price,
-                self.max_bid_price,
-            )
+            unit.outputs["cost_stored_energy"].at[next_time] = unit.outputs[
+                "cost_stored_energy"
+            ].at[start]
+
+        unit.outputs["cost_stored_energy"].at[next_time] = np.clip(
+            unit.outputs["cost_stored_energy"].at[next_time],
+            -self.max_bid_price,
+            self.max_bid_price,
+        )
 
         profit = order_profit - order_cost
 
@@ -1061,7 +1072,7 @@ class StorageRLStrategy(BaseLearningStrategy):
         start: datetime,
     ):
         """
-        Retrieves the unit-specific observations for storage units. For storages we use the state of charge and energy cost as the individual observations.
+        Retrieves the unit-specific observations for storage units. For storages we use the state of charge and cost of currently stored energy as the individual observations.
         We define the latter as the average volume weighted procurement costs of the currently stored energy.
 
         Args
@@ -1083,8 +1094,10 @@ class StorageRLStrategy(BaseLearningStrategy):
         """
         # get the current soc and energy cost value
         soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
-        energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
+        cost_stored_energy_scaled = (
+            unit.outputs["cost_stored_energy"].at[start] / self.max_bid_price
+        )
 
-        individual_observations = np.array([soc_scaled, energy_cost_scaled])
+        individual_observations = np.array([soc_scaled, cost_stored_energy_scaled])
 
         return individual_observations
