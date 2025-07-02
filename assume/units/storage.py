@@ -241,12 +241,10 @@ class Storage(SupportsMinMaxCharge):
 
         if power > 0:
             additional_cost = self.additional_cost_discharge
-            efficiency = self.efficiency_discharge
         else:
             additional_cost = self.additional_cost_charge
-            efficiency = self.efficiency_charge
 
-        marginal_cost = additional_cost / efficiency
+        marginal_cost = additional_cost
 
         return marginal_cost
 

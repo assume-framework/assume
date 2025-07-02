@@ -1037,6 +1037,7 @@ class StorageRLStrategy(BaseLearningStrategy):
             unit.outputs["cost_stored_energy"].at[next_time] = 0
         elif accepted_volume < 0:
             # increase costs of current SoC by price for buying energy
+            # not fully representing the true cost per MWh (e.g. omitting discharge efficiency losses), but serving as a proxy for it
             unit.outputs["cost_stored_energy"].at[next_time] = (
                 unit.outputs["cost_stored_energy"].at[start] * current_soc
                 - (accepted_price + marginal_cost) * accepted_volume * duration_hours
