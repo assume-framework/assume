@@ -59,6 +59,9 @@ class BaseLearningStrategy(LearningStrategy):
         # float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float
 
+        # define standard deviation for the initial exploration noise
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
+
         if self.learning_mode or self.evaluation_mode:
             self.collect_initial_experience_mode = bool(
                 kwargs.get("episodes_collecting_initial_experience", True)
@@ -371,9 +374,6 @@ class RLStrategy(BaseLearningStrategy):
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
         self.foresight = 12
-
-        # define standard deviation for the initial exploration noise
-        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -868,9 +868,6 @@ class StorageRLStrategy(BaseLearningStrategy):
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
         self.foresight = 24
-
-        # define standard deviation for the initial exploration noise
-        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
