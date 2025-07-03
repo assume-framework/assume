@@ -69,8 +69,8 @@ class RedispatchMarketRole(MarketRole):
         network=self.network,
         units=self.grid_data["exchange_units"],
         
-    )
-
+        )
+        
         self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
             self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
@@ -152,15 +152,9 @@ class RedispatchMarketRole(MarketRole):
             redispatch_network.lines_t.p0.abs() / redispatch_network.lines.s_nom
         )
 
-        line_loading_df = line_loading.copy()
-        if not isinstance(line_loading_df.index, pd.DatetimeIndex):
-            raise ValueError("Expected line_loading to have a DatetimeIndex.")
-
-        line_loading_df = line_loading_df.rename_axis("snapshot").reset_index()
-
+        line_loading_df = line_loading.reset_index()
         output_file = "outputs/line_loading.csv"
-        # Ensure the directory exists
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
         try:
             existing_df = pd.read_csv(output_file)
             existing_headers = list(existing_df.columns)
@@ -181,6 +175,7 @@ class RedispatchMarketRole(MarketRole):
                     float_format="%.5g",
                 )
         except FileNotFoundError:
+        # If the file doesn't exist, write it with headers
             line_loading_df.to_csv(
                 output_file,
                 mode="w",
