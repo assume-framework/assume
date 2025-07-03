@@ -658,6 +658,18 @@ def setup_world(
             )
 
     learning_config: LearningConfig = config.get("learning_config", {})
+    # Ensure storing complete `rl_params` datasets
+    if (save_frequency_hours is not None) and (
+        save_frequency_hours
+        < (pd.Timedelta(learning_config["train_freq"]) / pd.Timedelta(hours=1))
+    ):
+        logger.info(
+            f"save_frequency_hours ({save_frequency_hours}) will be raised to train_freq ({learning_config['train_freq']}) to ensure storing complete datasets of rl_params."
+        )
+        save_frequency_hours = int(
+            pd.Timedelta(learning_config["train_freq"]) / pd.Timedelta(hours=1)
+        )
+
     bidding_strategy_params = config.get("bidding_strategy_params", {})
 
     learning_config["learning_mode"] = config.get("learning_mode", False)

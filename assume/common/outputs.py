@@ -43,9 +43,9 @@ class WriteOutput(Role):
         simulation_id (str): The ID of the simulation as a unique classifier.
         start (datetime.datetime): The start datetime of the simulation run.
         end (datetime.datetime): The end datetime of the simulation run.
+        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files.
         db_uri: The uri of the database engine. Defaults to ''.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
-        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to 48 hours.
         outputs_buffer_size_mb (int, optional): The maximum storage size (in MB) for storing output data before saving it. Defaults to 300 MB.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
@@ -57,9 +57,9 @@ class WriteOutput(Role):
         simulation_id: str,
         start: datetime,
         end: datetime,
+        save_frequency_hours,
         db_uri="",
         export_csv_path: str = "",
-        save_frequency_hours: int = 48,
         outputs_buffer_size_mb: int = 300,
         learning_mode: bool = False,
         evaluation_mode: bool = False,
