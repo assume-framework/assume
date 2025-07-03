@@ -49,6 +49,20 @@ def gas_boiler_config():
     }
 
 
+# Fixture for boiler configuration (hydrogen_gas fuel type)
+@pytest.fixture
+def hydrogen_boiler_config():
+    return {
+        "max_power": 100,
+        "efficiency": 0.85,
+        "fuel_type": "hydrogen_gas",
+        "min_power": 0,
+        "ramp_up": 50,
+        "ramp_down": 50,
+        "initial_operational_status": 1,
+    }
+
+
 # Fixture for creating and solving a Pyomo model with a boiler component (electric)
 @pytest.fixture
 def electric_boiler_model(electric_boiler_config, price_profile):
@@ -121,6 +135,36 @@ def gas_boiler_model(gas_boiler_config, price_profile):
     solver = pyo.SolverFactory(use_solver)
     results = solver.solve(model, tee=False)
 
+    return model, results
+
+
+# Hydrogen gas boiler model
+@pytest.fixture
+def hydrogen_boiler_model(hydrogen_boiler_config, price_profile):
+    model = pyo.ConcreteModel()
+    model.time_steps = pyo.Set(initialize=range(10))
+
+    model.hydrogen_gas_price = pyo.Param(
+        model.time_steps, initialize=price_profile.to_dict()
+    )
+
+    boiler = Boiler(**hydrogen_boiler_config, time_steps=model.time_steps)
+    model.boiler = pyo.Block()
+    boiler.add_to_model(model, model.boiler)
+
+    total_heat_production = 400
+    model.total_heat_constraint = pyo.Constraint(
+        expr=sum(model.boiler.heat_out[t] for t in model.time_steps)
+        == total_heat_production
+    )
+
+    model.total_cost = pyo.Objective(
+        expr=sum(model.boiler.operating_cost[t] for t in model.time_steps),
+        sense=pyo.minimize,
+    )
+
+    solver = pyo.SolverFactory(use_solver)
+    results = solver.solve(model, tee=False)
     return model, results
 
 
@@ -440,3 +484,58 @@ def test_gas_boiler_min_power_enforcement(gas_boiler_model, gas_boiler_config):
             assert (
                 natural_gas_in == 0
             ), f"Natural Gas Boiler: Natural gas input at time {t} is {natural_gas_in}, but boiler is off."
+
+
+# Hydrogen gas boiler tests
+def test_hydrogen_boiler_model_solves_successfully(hydrogen_boiler_model):
+    model, results = hydrogen_boiler_model
+    assert (results.solver.status == pyo.SolverStatus.ok) and (
+        results.solver.termination_condition == pyo.TerminationCondition.optimal
+    ), (
+        f"Solver did not find an optimal solution for hydrogen gas boiler. Status: {results.solver.status}, "
+        f"Termination Condition: {results.solver.termination_condition}"
+    )
+
+
+def test_total_heat_production_hydrogen(hydrogen_boiler_model):
+    model, _ = hydrogen_boiler_model
+    total_heat = sum(pyo.value(model.boiler.heat_out[t]) for t in model.time_steps)
+    assert total_heat == pytest.approx(
+        400, rel=1e-2
+    ), f"Total heat production for hydrogen gas boiler is {total_heat}, expected 400."
+
+
+def test_hydrogen_boiler_ramping_constraints(
+    hydrogen_boiler_model, hydrogen_boiler_config
+):
+    model, _ = hydrogen_boiler_model
+    ramp_up_limit = hydrogen_boiler_config["ramp_up"]
+    ramp_down_limit = hydrogen_boiler_config["ramp_down"]
+
+    for t in model.time_steps:
+        if t > model.time_steps.first():
+            hydrogen_current = pyo.value(model.boiler.hydrogen_gas_in[t])
+            hydrogen_prev = pyo.value(model.boiler.hydrogen_gas_in[t - 1])
+            ramp_up = hydrogen_current - hydrogen_prev
+            ramp_down = hydrogen_prev - hydrogen_current
+
+            assert (
+                ramp_up <= ramp_up_limit + 1e-5
+            ), f"Hydrogen Boiler: Ramp-up at time {t} is {ramp_up}, exceeds limit of {ramp_up_limit}."
+            assert (
+                ramp_down <= ramp_down_limit + 1e-5
+            ), f"Hydrogen Boiler: Ramp-down at time {t} is {ramp_down}, exceeds limit of {ramp_down_limit}."
+
+
+def test_hydrogen_boiler_max_power(hydrogen_boiler_model, hydrogen_boiler_config):
+    model, _ = hydrogen_boiler_model
+    max_power = hydrogen_boiler_config["max_power"]
+    for t in model.time_steps:
+        hydrogen_val = pyo.value(model.boiler.hydrogen_gas_in[t])
+        assert (
+            hydrogen_val <= max_power + 1e-5
+        ), f"Hydrogen input at {t} exceeds max_power {max_power}"
+
+
+if __name__ == "__main__":
+    pytest.main(["-s", __file__])

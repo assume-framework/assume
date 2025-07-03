@@ -751,7 +751,7 @@ class LearningStrategy(BaseStrategy):
         obs_dim: int,
         act_dim: int,
         unique_obs_dim: int = 0,
-        num_timeseries_obs_dim: int = 2,
+        num_timeseries_obs_dim: int = 3,
         *args,
         **kwargs,
     ):

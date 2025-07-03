@@ -222,6 +222,34 @@ The project is developed by a collaborative team of researchers from INATECH at 
 
 ASSUME is funded by the Federal Ministry for Economic Affairs and Climate Action (BMWK). We are grateful for their support in making this project possible.
 
+## Citing ASSUME
+
+If you use **ASSUME** in your research, we would appreciate it if you cite the following paper:
+
+* Nick Harder, Kim K. Miskiw, Manish Khanra, Florian Maurer, Parag Patil, Ramiz Qussous, Christof Weinhardt, Marian Klobasa, Mario Ragwitz, Anke Weidlich,
+[ASSUME: An agent-based simulation framework for exploring electricity market dynamics with reinforcement learning](https://www.sciencedirect.com/science/article/pii/S2352711025001438),  published in [*SoftwareX*](https://www.sciencedirect.com/journal/softwarex), Volume 30, 2025, Article 102176.
+
+Please use the following BibTeX to cite our work:
+
+```bibtex
+@article{ASSUME,
+  title = {{ASSUME: An agent-based simulation framework for exploring electricity market dynamics with reinforcement learning}},
+  author = {Harder, Nick and Miskiw, Kim K and Khanra, Manish and Maurer, Florian and Patil, Parag and Qussous, Ramiz and Weinhardt, Christof and Klobasa, Marian and Ragwitz, Mario and Weidlich, Anke},
+  journal = {SoftwareX},
+  volume = {30},
+  pages = {102176},
+  year = {2025},
+  issn = {2352-7110},
+  doi = {10.1016/j.softx.2025.102176},
+  url = {https://www.sciencedirect.com/science/article/pii/S2352711025001438},
+  keywords = {Electricity markets, Python, Reinforcement learning, Agent-based modeling}
+}
+```
+
+If you want to cite a specific version of ASSUME, all releases are archived on Zenodo with version-specific DOIs:
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15065164.svg)](https://doi.org/10.5281/zenodo.15065164)
+
 ## License
 
 Copyright 2022-2025 [ASSUME developers](https://assume.readthedocs.io/en/latest/developers.html).

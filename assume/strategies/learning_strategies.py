@@ -9,7 +9,12 @@ from pathlib import Path
 import numpy as np
 import torch as th
 
-from assume.common.base import LearningStrategy, SupportsMinMax, SupportsMinMaxCharge
+from assume.common.base import (
+    BaseUnit,
+    LearningStrategy,
+    SupportsMinMax,
+    SupportsMinMaxCharge,
+)
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
@@ -18,7 +23,62 @@ from assume.reinforcement_learning.learning_utils import NormalActionNoise
 logger = logging.getLogger(__name__)
 
 
-class AbstractLearningStrategy(LearningStrategy):
+class BaseLearningStrategy(LearningStrategy):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.unit_id = kwargs["unit_id"]
+
+        # defines bounds of actions space
+        self.max_bid_price = kwargs.get("max_bid_price", 100)
+
+        # tells us whether we are training the agents or just executing per-learning strategies
+        self.learning_mode = kwargs.get("learning_mode", False)
+        self.evaluation_mode = kwargs.get("evaluation_mode", False)
+
+        # based on learning config
+        self.algorithm = kwargs.get("algorithm", "matd3")
+        self.actor_architecture = kwargs.get("actor_architecture", "mlp")
+
+        if self.actor_architecture in actor_architecture_aliases.keys():
+            self.actor_architecture_class = actor_architecture_aliases[
+                self.actor_architecture
+            ]
+        else:
+            raise ValueError(
+                f"Policy '{self.actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
+            )
+
+        # sets the device of the actor network
+        device = kwargs.get("device", "cpu")
+        self.device = th.device(device if th.cuda.is_available() else "cpu")
+        if not self.learning_mode:
+            self.device = th.device("cpu")
+
+        # future: add option to choose between float16 and float32
+        # float_type = kwargs.get("float_type", "float32")
+        self.float_type = th.float
+
+        if self.learning_mode or self.evaluation_mode:
+            self.collect_initial_experience_mode = bool(
+                kwargs.get("episodes_collecting_initial_experience", True)
+            )
+
+            self.action_noise = NormalActionNoise(
+                mu=0.0,
+                sigma=kwargs.get("noise_sigma", 0.1),
+                action_dimension=self.act_dim,
+                scale=kwargs.get("noise_scale", 1.0),
+                dt=kwargs.get("noise_dt", 1.0),
+            )
+
+        elif Path(kwargs["trained_policies_load_path"]).is_dir():
+            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
+        else:
+            raise FileNotFoundError(
+                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+            )
+
     def load_actor_params(self, load_path):
         """
         Load actor parameters.
@@ -38,18 +98,7 @@ class AbstractLearningStrategy(LearningStrategy):
             num_timeseries_obs_dim=self.num_timeseries_obs_dim,
         ).to(self.device)
         self.actor.load_state_dict(params["actor"])
-
-        if self.learning_mode:
-            self.actor_target = self.actor_architecture_class(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
-                float_type=self.float_type,
-                unique_obs_dim=self.unique_obs_dim,
-                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-            ).to(self.device)
-            self.actor_target.load_state_dict(params["actor_target"])
-            self.actor_target.eval()
-            self.actor.optimizer.load_state_dict(params["actor_optimizer"])
+        self.actor.eval()  # set the actor to evaluation mode
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
@@ -74,8 +123,165 @@ class AbstractLearningStrategy(LearningStrategy):
             upper_scaling_factor_price,
         )
 
+    def create_observation(
+        self,
+        unit: BaseUnit,
+        market_id: str,
+        start: datetime,
+    ):
+        """
+        Constructs a scaled observation tensor based on the unit's forecast data and internal state.
 
-class RLStrategy(AbstractLearningStrategy):
+        Args
+        ----
+        unit : BaseUnit
+            The unit providing forecast and internal state data.
+        market_id : str
+            Identifier for the specific market.
+        start : datetime
+            Start time for the observation period.
+
+        Returns
+        -------
+        torch.Tensor
+            Observation tensor with data on forecasted residual load, price, and unit-specific values.
+
+        Notes
+        -----
+        Observations are constructed from forecasted residual load and price over the foresight period,
+        scaled by maximum demand and bid price. The last values in the observation vector represent
+        unit-specific values, depending on the strategy and unit-type.
+        """
+
+        # ensure scaled observations are prepared
+        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
+            self, "scaled_prices_obs"
+        ):
+            self.prepare_observations(unit, market_id)
+
+        # =============================================================================
+        # 1.1 Get the Observations, which are the basis of the action decision
+        # =============================================================================
+
+        # --- 1. Forecasted residual load and price (forward-looking) ---
+        scaled_res_load_forecast = self.scaled_res_load_obs.window(
+            start, self.foresight, direction="forward"
+        )
+        scaled_price_forecast = self.scaled_prices_obs.window(
+            start, self.foresight, direction="forward"
+        )
+
+        # --- 2. Historical actual prices (backward-looking) ---
+        scaled_price_history = (
+            unit.outputs["energy_accepted_price"].window(
+                start, self.foresight, direction="backward"
+            )
+            / self.max_bid_price
+        )
+
+        # --- 3. Individual observations ---
+        individual_observations = self.get_individual_observations(unit, start)
+
+        # concat all observations into one array
+        observation = np.concatenate(
+            [
+                scaled_res_load_forecast,
+                scaled_price_forecast,
+                scaled_price_history,
+                individual_observations,
+            ]
+        )
+
+        # transfer array to GPU for NN processing
+        observation = th.as_tensor(
+            observation, dtype=self.float_type, device=self.device
+        ).flatten()
+
+        return observation
+
+    def get_individual_observations(
+        self,
+        unit: BaseUnit,
+        start: datetime,
+    ):
+        """
+        Retrieves the unit-specific observations.
+
+        Args
+        ----
+        unit : BaseUnit
+            The unit providing forecast and internal state data.
+        start : datetime
+            Start time for the observation period.
+
+        Returns
+        -------
+        individual_observations : np.array
+            Strategy and unit-specific observations.
+        """
+
+        return np.array([])
+
+    def get_actions(self, next_observation):
+        """
+        Determines actions based on the current observation, applying noise for exploration if in learning mode.
+
+        Args
+        ----
+        next_observation : torch.Tensor
+            Observation data influencing bid price and direction.
+
+        Returns
+        -------
+        torch.Tensor
+            Actions that include bid price and direction.
+        torch.Tensor
+            Noise component which is already added to actions for exploration, if applicable.
+
+        Notes
+        -----
+        In learning mode, actions incorporate noise for exploration. Initial exploration relies
+        solely on noise to cover the action space broadly.
+        """
+
+        # distinction whether we are in learning mode or not to handle exploration realised with noise
+        if self.learning_mode and not self.evaluation_mode:
+            # if we are in learning mode the first x episodes we want to explore the entire action space
+            # to get a good initial experience, in the area around the costs of the agent
+            if self.collect_initial_experience_mode:
+                # define current action as solely noise
+                noise = th.normal(
+                    mean=0.0,
+                    std=self.exploration_noise_std,
+                    size=(self.act_dim,),
+                    dtype=self.float_type,
+                    device=self.device,
+                )
+
+                # =============================================================================
+                # 2.1 Get Actions and handle exploration
+                # =============================================================================
+                # only use noise as the action to enforce exploration
+                curr_action = noise
+
+            else:
+                # if we are not in the initial exploration phase we chose the action with the actor neural net
+                # and add noise to the action
+                curr_action = self.actor(next_observation).detach()
+                noise = self.action_noise.noise(
+                    device=self.device, dtype=self.float_type
+                )
+                curr_action += noise
+        else:
+            # if we are not in learning mode we just use the actor neural net to get the action without adding noise
+            curr_action = self.actor(next_observation).detach()
+            # noise is an tensor with zeros, because we are not in learning mode
+            noise = th.zeros_like(curr_action, dtype=self.float_type)
+
+        return curr_action, noise
+
+
+class RLStrategy(BaseLearningStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -148,39 +354,16 @@ class RLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=38, act_dim=2, unique_obs_dim=2, *args, **kwargs)
-
-        self.unit_id = kwargs["unit_id"]
-
-        # defines bounds of actions space
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
-
-        # tells us whether we are training the agents or just executing per-learning strategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.evaluation_mode = kwargs.get("evaluation_mode", False)
-
-        # based on learning config
-        self.algorithm = kwargs.get("algorithm", "matd3")
-        actor_architecture = kwargs.get("actor_architecture", "mlp")
-
-        if actor_architecture in actor_architecture_aliases.keys():
-            self.actor_architecture_class = actor_architecture_aliases[
-                actor_architecture
-            ]
-        else:
-            raise ValueError(
-                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
-            )
-
-        # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
-
-        # future: add option to choose between float16 and float32
-        # float_type = kwargs.get("float_type", "float32")
-        self.float_type = th.float
+        obs_dim = kwargs.pop("obs_dim", 38)
+        act_dim = kwargs.pop("act_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         # 'foresight' represents the number of time steps into the future that we will consider
         # when constructing the observations. This value is fixed for each strategy, as the
@@ -189,28 +372,11 @@ class RLStrategy(AbstractLearningStrategy):
         # as the observation dimension depends on the foresight value.
         self.foresight = 12
 
+        # define standard deviation for the initial exploration noise
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
+
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
-
-        if self.learning_mode or self.evaluation_mode:
-            self.collect_initial_experience_mode = bool(
-                kwargs.get("episodes_collecting_initial_experience", True)
-            )
-
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
-                action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
-            )
-
-        elif Path(kwargs["trained_policies_load_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
-        else:
-            raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
 
     def calculate_bids(
         self,
@@ -319,193 +485,75 @@ class RLStrategy(AbstractLearningStrategy):
 
     def get_actions(self, next_observation):
         """
-        Determines actions based on the current observation, applying noise for exploration if in learning mode.
+        Compute actions based on the current observation.
 
         Args
         ----
         next_observation : torch.Tensor
-            The current observation data that influences bid prices.
+            The current observation, where the last element is assumed to be the marginal cost.
 
         Returns
         -------
-        torch.Tensor
-            Actions that include bid prices for both inflexible and flexible components.
+        tuple of torch.Tensor
+            A tuple containing: Actions to be taken (with or without noise). The noise component (if any), useful for diagnostics.
 
         Notes
         -----
-        If the agent is in learning mode, noise is added to encourage exploration. In initial exploration,
-        actions are derived from noise and the marginal cost to explore the action space around the marginal cost. When not in learning mode,
-        actions are generated by the actor network without added noise.
+        During learning, exploratory noise is applied and already part of the curr_action unless in evaluation mode. In initial exploration mode, actions are sampled around the marginal cost to explore its vicinity. We assume the final element of `next_observation` is the marginal cost.
         """
 
-        # distinction whether we are in learning mode or not to handle exploration realised with noise
+        # Get the base action and associated noise from the parent implementation
+        curr_action, noise = super().get_actions(next_observation)
+
         if self.learning_mode and not self.evaluation_mode:
-            # if we are in learning mode the first x episodes we want to explore the entire action space
-            # to get a good initial experience, in the area around the costs of the agent
             if self.collect_initial_experience_mode:
-                # define current action as solely noise
-                noise = th.normal(
-                    mean=0.0,
-                    std=0.2,
-                    size=(self.act_dim,),
-                    dtype=self.float_type,
-                    device=self.device,
-                )
-
-                # =============================================================================
-                # 2.1 Get Actions and handle exploration
-                # =============================================================================
-                base_bid = next_observation[-1]
-
-                # add noise to the last dimension of the observation
-                # needs to be adjusted if observation space is changed, because only makes sense
-                # if the last dimension of the observation space are the marginal cost
-                curr_action = noise + base_bid
-
-            else:
-                # if we are not in the initial exploration phase we choose the action with the actor neural net
-                # and add noise to the action
-                curr_action = self.actor(next_observation).detach()
-                noise = self.action_noise.noise(
-                    device=self.device, dtype=self.float_type
-                )
-
-                curr_action += noise
-        else:
-            # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-            curr_action = self.actor(next_observation).detach()
-
-            # noise is an tensor with zeros, because we are not in learning mode
-            noise = th.zeros_like(curr_action, dtype=self.float_type)
+                # Assumes last dimension of the observation corresponds to marginal cost
+                marginal_cost = next_observation[
+                    -1
+                ].detach()  # ensure no gradients flow through
+                # Add marginal cost to the action directly for initial random exploration
+                curr_action += marginal_cost
 
         return curr_action, noise
 
-    def create_observation(
+    def get_individual_observations(
         self,
         unit: SupportsMinMax,
-        market_id: str,
         start: datetime,
     ):
         """
-        Constructs a scaled observation tensor based on the unit's forecast data and internal state.
+        Retrieves the unit-specific observations. For dispatchable units, this includes the last dispatched volume and the current marginal costs.
 
         Args
         ----
         unit : SupportsMinMax
             The unit providing forecast and internal state data.
-        market_id : str
-            Identifier for the specific market.
-        start : datetime
+        start : datetime.datetime
             Start time for the observation period.
-        end : datetime
-            End time for the observation period.
 
         Returns
         -------
-        torch.Tensor
-            Observation tensor with data on forecasted residual load, price, total capacity, and marginal cost.
+        individual_observations : np.array
+            Scaled total dispatched capacity and marginal cost.
 
         Notes
         -----
-        Observations are constructed from forecasted residual load and price over the foresight period,
-        scaled by maximum demand and bid price. The last two values in the observation vector represent
-        the total capacity and marginal cost, scaled by maximum power and bid price, respectively.
+            The last two values in the observation vector represent the total capacity
+            and marginal cost, scaled by maximum power and bid price, respectively.
         """
 
-        # check if scaled observations are already available and if not prepare them
-        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
-            self, "scaled_prices_obs"
-        ):
-            self.prepare_observations(unit, market_id)
-
-        # get the forecast length depending on the tme unit considered in the modelled unit
-        forecast_len = (self.foresight - 1) * unit.index.freq
-
-        # =============================================================================
-        # 1.1 Get the Observations, which are the basis of the action decision
-        # =============================================================================
-
-        # checks if we are at end of simulation horizon, since we need to change the forecast then
-        # for residual load and price forecast and scale them
-        if start + forecast_len > self.scaled_res_load_obs.index[-1]:
-            scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
-
-            scaled_res_load_forecast = np.concatenate(
-                [
-                    scaled_res_load_forecast,
-                    self.scaled_res_load_obs.iloc[
-                        : self.foresight - len(scaled_res_load_forecast)
-                    ],
-                ]
-            )
-
-        else:
-            scaled_res_load_forecast = self.scaled_res_load_obs.loc[
-                start : start + forecast_len
-            ]
-
-        if start + forecast_len > self.scaled_prices_obs.index[-1]:
-            scaled_price_forecast = self.scaled_prices_obs.loc[start:]
-            scaled_price_forecast = np.concatenate(
-                [
-                    scaled_price_forecast,
-                    self.scaled_prices_obs.iloc[
-                        : self.foresight - len(scaled_price_forecast)
-                    ],
-                ]
-            )
-
-        else:
-            scaled_price_forecast = self.scaled_prices_obs.loc[
-                start : start + forecast_len
-            ]
-
-        # collect historical past market clearing prices
-        actual_price = unit.outputs["energy_accepted_price"]
-        if start - forecast_len < actual_price.index[0]:
-            # Not enough historical data, use available actual prices and prepend forecasted values for missing past data
-            actual_price_history = actual_price.loc[:start] / self.max_bid_price
-            missing_values = self.foresight - len(actual_price_history)
-
-            if missing_values > 0:
-                forecasted_prices = self.scaled_prices_obs.iloc[:missing_values]
-                actual_price_history = np.concatenate(
-                    [forecasted_prices, actual_price_history]
-                )
-
-        else:
-            # Sufficient historical data exists, collect past actual prices
-            actual_price_history = (
-                actual_price.loc[start - forecast_len : start] / self.max_bid_price
-            )
-
-        # get last accepted bid volume and the current marginal costs of the unit
+        # --- Current volume & marginal cost ---
         current_volume = unit.get_output_before(start)
         current_costs = unit.calculate_marginal_cost(start, current_volume)
 
-        # scale unit outputs
-        # if unit is not running, total dispatch is 0
         scaled_total_dispatch = current_volume / unit.max_power
-
-        # marginal cost
         scaled_marginal_cost = current_costs / self.max_bid_price
 
-        # concat all obsverations into one array
-        observation = np.concatenate(
-            [
-                scaled_res_load_forecast,
-                scaled_price_forecast,
-                actual_price_history,
-                np.array([scaled_total_dispatch, scaled_marginal_cost]),
-            ]
+        individual_observations = np.array(
+            [scaled_total_dispatch, scaled_marginal_cost]
         )
 
-        # transfer array to GPU for NN processing
-        observation = th.as_tensor(
-            observation, dtype=self.float_type, device=self.device
-        ).flatten()
-
-        return observation
+        return individual_observations
 
     def calculate_reward(
         self,
@@ -528,9 +576,9 @@ class RLStrategy(AbstractLearningStrategy):
         Notes
         -----
         The reward is computed by combining the following:
-        - **Profit**: Income from accepted bids minus marginal and start-up costs.
-        - **Opportunity Cost**: Penalty for underutilizing capacity, calculated as potential lost income.
-        - **Regret Term**: A scaled regret term penalizes high opportunity costs to guide effective bidding.
+        **Profit**: Income from accepted bids minus marginal and start-up costs.
+        **Opportunity Cost**: Penalty for underutilizing capacity, calculated as potential lost income.
+        **Regret Term**: A scaled regret term penalizes high opportunity costs to guide effective bidding.
 
         The reward is scaled and stored along with other outputs in the unit’s data to support learning.
         """
@@ -628,7 +676,116 @@ class RLStrategy(AbstractLearningStrategy):
         unit.outputs["rl_rewards"].append(reward)
 
 
-class StorageRLStrategy(AbstractLearningStrategy):
+class RLStrategySingleBid(RLStrategy):
+    """
+    Reinforcement Learning Strategy with Single-Bid Structure for Energy-Only Markets.
+
+    This strategy is a simplified variant of the standard `RLStrategy`, which typically submits two
+    separate price bids for inflexible (P_min) and flexible (P_max - P_min) components. Instead,
+    `RLStrategySingleBid` submits a single bid that always offers the unit's maximum power,
+    effectively treating the full capacity as inflexible from a bidding perspective.
+
+    The core reinforcement learning mechanics, including the observation structure, actor network
+    architecture, and reward formulation, remain consistent with the two-bid `RLStrategy`. However,
+    this strategy modifies the action space to produce only a single bid price, and omits the
+    decomposition of capacity into flexible and inflexible parts.
+
+    Attributes
+    ----------
+    Inherits all attributes from RLStrategy, with the exception of:
+    - act_dim : int
+        Reduced to 1 to reflect single bid pricing.
+    - foresight : int
+        Set to 24 to match typical storage strategy setups.
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        obs_dim = kwargs.pop("obs_dim", 74)
+        act_dim = kwargs.pop("act_dim", 1)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
+
+        # we select 24 to be in line with the storage strategies
+        self.foresight = 24
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Generates a single price bid for the full available capacity (max_power).
+
+        The method observes market and unit state, derives an action (bid price) from
+        the actor network, and constructs one bid covering the entire capacity, without
+        distinguishing between flexible and inflexible components.
+
+        Returns
+        -------
+        Orderbook
+            A list containing one bid with start/end time, full volume, and calculated price.
+        """
+
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        # get technical bounds for the unit output from the unit
+        _, max_power = unit.calculate_min_max_power(start, end)
+        max_power = max_power[0]
+
+        # =============================================================================
+        # 1. Get the Observations, which are the basis of the action decision
+        # =============================================================================
+        next_observation = self.create_observation(
+            unit=unit,
+            market_id=market_config.market_id,
+            start=start,
+        )
+
+        # =============================================================================
+        # 2. Get the Actions, based on the observations
+        # =============================================================================
+        actions, noise = self.get_actions(next_observation)
+
+        # =============================================================================
+        # 3. Transform Actions into bids
+        # =============================================================================
+        # actions are in the range [-1,1], we need to transform them into actual bids
+        # we can use our domain knowledge to guide the bid formulation
+        bid_price = actions[0] * self.max_bid_price
+
+        # actually formulate bids in orderbook format
+        bids = [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price,
+                "volume": max_power,
+                "node": unit.node,
+            },
+        ]
+
+        # store results in unit outputs as lists to be written to the buffer for learning
+        unit.outputs["rl_observations"].append(next_observation)
+        unit.outputs["rl_actions"].append(actions)
+
+        # store results in unit outputs as series to be written to the database by the unit operator
+        unit.outputs["actions"].at[start] = actions
+        unit.outputs["exploration_noise"].at[start] = noise
+
+        return bids
+
+
+class StorageRLStrategy(BaseLearningStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -694,38 +851,16 @@ class StorageRLStrategy(AbstractLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(obs_dim=74, act_dim=1, unique_obs_dim=2, *args, **kwargs)
-
-        self.unit_id = kwargs["unit_id"]
-        # defines bounds of actions space
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
-
-        # tells us whether we are training the agents or just executing per-learnind strategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.evaluation_mode = kwargs.get("evaluation_mode", False)
-
-        # based on learning config
-        self.algorithm = kwargs.get("algorithm", "matd3")
-        actor_architecture = kwargs.get("actor_architecture", "mlp")
-
-        if actor_architecture in actor_architecture_aliases.keys():
-            self.actor_architecture_class = actor_architecture_aliases[
-                actor_architecture
-            ]
-        else:
-            raise ValueError(
-                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
-            )
-
-        # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
-
-        # future: add option to choose between float16 and float32
-        # float_type = kwargs.get("float_type", "float32")
-        self.float_type = th.float
+        obs_dim = kwargs.pop("obs_dim", 74)
+        act_dim = kwargs.pop("act_dim", 1)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
         # 'foresight' represents the number of time steps into the future that we will consider
         # when constructing the observations. This value is fixed for each strategy, as the
@@ -734,28 +869,11 @@ class StorageRLStrategy(AbstractLearningStrategy):
         # as the observation dimension depends on the foresight value.
         self.foresight = 24
 
+        # define standard deviation for the initial exploration noise
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
+
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
-
-        if self.learning_mode or self.evaluation_mode:
-            self.collect_initial_experience_mode = bool(
-                kwargs.get("episodes_collecting_initial_experience", True)
-            )
-
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
-                action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
-            )
-
-        elif Path(kwargs["trained_policies_load_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
-        else:
-            raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
-            )
 
     def calculate_bids(
         self,
@@ -853,62 +971,6 @@ class StorageRLStrategy(AbstractLearningStrategy):
 
         return bids
 
-    def get_actions(self, next_observation):
-        """
-        Determines one action for the storage bidding based on observations and optionally applies noise for exploration.
-
-        Args
-        ----
-        next_observation : torch.Tensor
-            Observation data influencing bid price and direction.
-
-        Returns
-        -------
-        torch.Tensor
-            Actions that include bid price and direction.
-
-        Notes
-        -----
-        In learning mode, actions incorporate noise for exploration. Initial exploration relies
-        solely on noise to cover the action space broadly.
-        """
-
-        # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.evaluation_mode:
-            # if we are in learning mode the first x episodes we want to explore the entire action space
-            # to get a good initial experience, in the area around the costs of the agent
-            if self.collect_initial_experience_mode:
-                # define current action as solely noise
-                noise = th.normal(
-                    mean=0.0,
-                    std=0.4,
-                    size=(self.act_dim,),
-                    dtype=self.float_type,
-                    device=self.device,
-                )
-
-                # =============================================================================
-                # 2.1 Get Actions and handle exploration
-                # =============================================================================
-                # only use noise as the action to enforce exploration
-                curr_action = noise
-
-            else:
-                # if we are not in the initial exploration phase we chose the action with the actor neural net
-                # and add noise to the action
-                curr_action = self.actor(next_observation).detach()
-                noise = self.action_noise.noise(
-                    device=self.device, dtype=self.float_type
-                )
-                curr_action += noise
-        else:
-            # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-            curr_action = self.actor(next_observation).detach()
-            # noise is an tensor with zeros, because we are not in learning mode
-            noise = th.zeros_like(curr_action, dtype=self.float_type)
-
-        return curr_action, noise
-
     def calculate_reward(
         self,
         unit: SupportsMinMaxCharge,
@@ -970,15 +1032,26 @@ class StorageRLStrategy(AbstractLearningStrategy):
         next_soc = unit.outputs["soc"].at[next_time]
 
         # Calculate and clip the energy cost for the start time
+        # cost_stored_energy = average volume-weighted procurement costs of the currently stored energy
         if next_soc < 1:
-            unit.outputs["energy_cost"].at[next_time] = 0
+            unit.outputs["cost_stored_energy"].at[next_time] = 0
+        elif accepted_volume < 0:
+            # increase costs of current SoC by price for buying energy
+            # not fully representing the true cost per MWh (e.g. omitting discharge efficiency losses), but serving as a proxy for it
+            unit.outputs["cost_stored_energy"].at[next_time] = (
+                unit.outputs["cost_stored_energy"].at[start] * current_soc
+                - (accepted_price + marginal_cost) * accepted_volume * duration_hours
+            ) / next_soc
         else:
-            unit.outputs["energy_cost"].at[next_time] = np.clip(
-                (unit.outputs["energy_cost"].at[start] * current_soc - order_profit)
-                / next_soc,
-                -self.max_bid_price,
-                self.max_bid_price,
-            )
+            unit.outputs["cost_stored_energy"].at[next_time] = unit.outputs[
+                "cost_stored_energy"
+            ].at[start]
+
+        unit.outputs["cost_stored_energy"].at[next_time] = np.clip(
+            unit.outputs["cost_stored_energy"].at[next_time],
+            -self.max_bid_price,
+            self.max_bid_price,
+        )
 
         profit = order_profit - order_cost
 
@@ -993,121 +1066,38 @@ class StorageRLStrategy(AbstractLearningStrategy):
         unit.outputs["total_costs"].loc[start:end_excl] = order_cost
         unit.outputs["rl_rewards"].append(reward)
 
-    def create_observation(
+    def get_individual_observations(
         self,
         unit: SupportsMinMaxCharge,
-        market_id: str,
         start: datetime,
     ):
         """
-        Creates a scaled observation tensor from the storage unit's state and forecast data.
+        Retrieves the unit-specific observations for storage units. For storages we use the state of charge and cost of currently stored energy as the individual observations.
+        We define the latter as the average volume weighted procurement costs of the currently stored energy.
 
         Args
         ----
         unit : SupportsMinMaxCharge
             Storage unit providing forecasted and current state data.
-        market_id : str
-            Identifier for the relevant market.
-        start : datetime
+        start : datetime.datetime
             Start time for the observation period.
-        end : datetime
-            End time for the observation period.
 
         Returns
         -------
-        torch.Tensor
-            Observation tensor containing state of charge, forecasted demand, and energy cost.
+        individual_observations: np.array
+            Array containing state of charge and energy cost.
 
         Notes
         -----
-        Observations are scaled by the unit's max demand and bid price, creating input for
+        Observations are scaled by the unit's max state of charge and energy costs, creating input for
         the agent's action selection.
         """
-
-        # check if scaled observations are already available and if not prepare them
-        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
-            self, "scaled_prices_obs"
-        ):
-            self.prepare_observations(unit, market_id)
-
-        # get the forecast length depending on the tme unit considered in the modelled unit
-        forecast_len = (self.foresight - 1) * unit.index.freq
-
-        # =============================================================================
-        # 1.1 Get the Observations, which are the basis of the action decision
-        # =============================================================================
-
-        # checks if we are at end of simulation horizon, since we need to change the forecast then
-        # for residual load and price forecast and scale them
-        if start + forecast_len > self.scaled_res_load_obs.index[-1]:
-            scaled_res_load_forecast = self.scaled_res_load_obs.loc[start:]
-
-            scaled_res_load_forecast = np.concatenate(
-                [
-                    scaled_res_load_forecast,
-                    self.scaled_res_load_obs.iloc[
-                        : self.foresight - len(scaled_res_load_forecast)
-                    ],
-                ]
-            )
-
-        else:
-            scaled_res_load_forecast = self.scaled_res_load_obs.loc[
-                start : start + forecast_len
-            ]
-
-        if start + forecast_len > self.scaled_prices_obs.index[-1]:
-            scaled_price_forecast = self.scaled_prices_obs.loc[start:]
-            scaled_price_forecast = np.concatenate(
-                [
-                    scaled_price_forecast,
-                    self.scaled_prices_obs.iloc[
-                        : self.foresight - len(scaled_price_forecast)
-                    ],
-                ]
-            )
-
-        else:
-            scaled_price_forecast = self.scaled_prices_obs.loc[
-                start : start + forecast_len
-            ]
-
-        # collect historical past market clearing prices
-        actual_price = unit.outputs["energy_accepted_price"]
-        if start - forecast_len < actual_price.index[0]:
-            # Not enough historical data, use available actual prices and prepend forecasted values for missing past data
-            actual_price_history = actual_price.loc[:start] / self.max_bid_price
-            missing_values = self.foresight - len(actual_price_history)
-
-            if missing_values > 0:
-                forecasted_prices = self.scaled_prices_obs.iloc[:missing_values]
-                actual_price_history = np.concatenate(
-                    [forecasted_prices, actual_price_history]
-                )
-
-        else:
-            # Sufficient historical data exists, collect past actual prices
-            actual_price_history = (
-                actual_price.loc[start - forecast_len : start] / self.max_bid_price
-            )
-
-        # get the current soc value
+        # get the current soc and energy cost value
         soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
-        energy_cost_scaled = unit.outputs["energy_cost"].at[start] / self.max_bid_price
-
-        # concat all obsverations into one array
-        observation = np.concatenate(
-            [
-                scaled_res_load_forecast,
-                scaled_price_forecast,
-                actual_price_history,
-                np.array([soc_scaled, energy_cost_scaled]),
-            ]
+        cost_stored_energy_scaled = (
+            unit.outputs["cost_stored_energy"].at[start] / self.max_bid_price
         )
 
-        # transfer array to GPU for NN processing
-        observation = th.as_tensor(
-            observation, dtype=self.float_type, device=self.device
-        ).flatten()
+        individual_observations = np.array([soc_scaled, cost_stored_energy_scaled])
 
-        return observation
+        return individual_observations

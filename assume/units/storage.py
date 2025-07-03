@@ -108,7 +108,7 @@ class Storage(SupportsMinMaxCharge):
         self.min_power_discharge = abs(min_power_discharge)
 
         self.outputs["soc"] = FastSeries(value=self.initial_soc, index=self.index)
-        self.outputs["energy_cost"] = FastSeries(value=0.0, index=self.index)
+        self.outputs["cost_stored_energy"] = FastSeries(value=0.0, index=self.index)
 
         self.soc_tick = soc_tick
 
@@ -239,12 +239,10 @@ class Storage(SupportsMinMaxCharge):
 
         if power > 0:
             additional_cost = self.additional_cost_discharge
-            efficiency = self.efficiency_discharge
         else:
             additional_cost = self.additional_cost_charge
-            efficiency = self.efficiency_charge
 
-        marginal_cost = additional_cost / efficiency
+        marginal_cost = additional_cost
 
         return marginal_cost
 
