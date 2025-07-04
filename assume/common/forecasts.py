@@ -9,6 +9,9 @@ import pandas as pd
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 
+import warnings
+
+warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 class Forecaster:
     """
