@@ -50,7 +50,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "dmas_powerplant": DmasPowerplantStrategy,
     "dmas_storage": DmasStorageStrategy,
     "steelplant_strategy": NaiveRedispatchSteelplantStrategy,
-    "FixedDispatchStrategy": FixedDispatchStrategy,
+    "fixed_dispatch_strategy": FixedDispatchStrategy,
 }
 
 try:
