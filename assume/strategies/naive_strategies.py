@@ -293,6 +293,165 @@ class NaiveRedispatchStrategy(BaseStrategy):
         return bids
 
 
+class FixedDispatchStrategy(BaseStrategy):
+    """
+    A naive strategy that simply submits all information about the unit and
+    currently dispatched power for the following hours to the redispatch market.
+    Information includes the marginal cost, the ramp up and down values, and the dispatch.
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market
+
+        :param unit: the unit to be dispatched
+        :type unit: SupportsMinMax
+        :param market_config: the market configuration
+        :type market_config: MarketConfig
+        :param product_tuples: list of all products the unit can offer
+        :type product_tuples: list[Product]
+        :return: the bids consisting of the start time, end time, only hours, price and volume.
+        :rtype: Orderbook
+        """
+
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            current_power = unit.outputs["energy"].at[start]
+
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": 0,
+                    "volume": current_power,
+                    "max_power": current_power,
+                    "min_power": current_power,
+                    "node": unit.node,
+                }
+            )
+
+        return bids
+
+
+'''
+class NaiveRedispatchSteelplantStrategy(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        # calculate the optimal operation of the unit according to the objective function
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            #volume = abs(unit.outputs["energy"].at[start])
+            # volume = unit.opt_power_requirement.loc[start]
+            #volume_flex = unit.flex_power_requirement.loc[start]
+            marginal_price = unit.calculate_marginal_cost(start, volume_flex)
+            volume=5,
+            volume_flex=5,
+            marginal_price=30,
+            if volume > volume_flex:
+                bids.append(
+                    {
+                        "start_time": product[0],
+                        "end_time": product[1],
+                        "only_hours": product[2],
+                        "price": marginal_price,
+                        "volume": -volume,
+                        # "max_power": -max(volume, volume_flex),
+                        # "min_power": -min(volume, volume_flex),
+                        "max_power": -volume,
+                        "min_power": -volume_flex,
+                        "node":'west',# unit.node,
+                    }
+                )
+            elif volume < volume_flex:
+                bids.append(
+                    {
+                        "start_time": product[0],
+                        "end_time": product[1],
+                        "only_hours": product[2],
+                        "price": marginal_price,
+                        "volume": -volume,
+                        # "max_power": -max(volume, volume_flex),
+                        # "min_power": -min(volume, volume_flex),
+                        "max_power": -volume_flex,
+                        "min_power": -volume,
+                        "node":'west', #unit.node,
+                    }
+                )
+            else:
+                bids.append(
+                    {
+                        "start_time": product[0],
+                        "end_time": product[1],
+                        "only_hours": product[2],
+                        "price": marginal_price,
+                        "volume": -volume,
+                        "max_power": 5,
+                        "min_power": 0,
+                        "node": 'west', #unit.node,
+                    }
+                )
+
+        return bids
+'''
+
+
+class NaiveRedispatchStrategyDSM(BaseStrategy):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        # calculate the optimal operation of the unit according to the objective function
+        unit.calculate_optimal_operation_if_needed()
+
+        bids = []
+        for product in product_tuples:
+            """
+            for each product, calculate the marginal cost of the unit at the start time of the product
+            and the volume of the product. Dispatch the order to the market.
+            """
+            start = product[0]
+            bids.append(
+                {
+                    "start_time": product[0],
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": 30,
+                    "volume": -5,
+                    "max_power": 5,
+                    "min_power": 0,
+                    "node": "west",  # unit.node,
+                }
+            )
+        return bids
+
+
 class NaiveExchangeStrategy(BaseStrategy):
     """
     A naive strategy for an exchange unit that bids the defined import and export prices on the market.

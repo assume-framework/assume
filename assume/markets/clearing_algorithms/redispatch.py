@@ -9,8 +9,8 @@ import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
+    add_fix_units,
     add_redispatch_generators,
-    add_redispatch_loads,
     calculate_network_meta,
     read_pypsa_grid,
 )
@@ -65,9 +65,19 @@ class RedispatchMarketRole(MarketRole):
                 "backup_marginal_cost", 10e4
             ),
         )
-        add_redispatch_loads(
+        add_fix_units(
             network=self.network,
-            loads=self.grid_data["loads"],
+            units=self.grid_data["loads"],
+        )
+
+        add_fix_units(
+            network=self.network,
+            units=self.grid_data["storage_units"],
+        )
+
+        add_fix_units(
+            network=self.network,
+            units=self.grid_data["exchange_units"],
         )
 
         self.solver = marketconfig.param_dict.get("solver", "highs")
@@ -187,7 +197,40 @@ class RedispatchMarketRole(MarketRole):
             redispatch_network.lines_t.p0.abs() / redispatch_network.lines.s_nom
         )
 
-        # if any line is congested, perform redispatch
+        line_loading_df = line_loading.reset_index()
+        output_file = "outputs/line_loading.csv"
+
+        try:
+            existing_df = pd.read_csv(output_file)
+            existing_headers = list(existing_df.columns)
+            if list(line_loading_df.columns) == existing_headers:
+                line_loading_df.to_csv(
+                    output_file,
+                    mode="a",
+                    header=False,
+                    index=False,
+                    float_format="%.5g",
+                )
+            else:
+                line_loading_df.to_csv(
+                    output_file,
+                    mode="a",
+                    header=True,
+                    index=False,
+                    float_format="%.5g",
+                )
+        except FileNotFoundError:
+        # If the file doesn't exist, write it with headers
+            line_loading_df.to_csv(
+                output_file,
+                mode="w",
+                header=True,
+                index=False,
+                float_format="%.5g",
+            )
+
+        logger.info(f"Line loading data appended to {output_file}")
+
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
 
