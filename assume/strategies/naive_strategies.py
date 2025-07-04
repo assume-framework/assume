@@ -346,7 +346,6 @@ class FixedDispatchStrategy(BaseStrategy):
         return bids
 
 
-'''
 class NaiveRedispatchSteelplantStrategy(BaseStrategy):
     def calculate_bids(
         self,
@@ -416,8 +415,6 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                 )
 
         return bids
-'''
-
 
 class NaiveRedispatchStrategyDSM(BaseStrategy):
     def calculate_bids(
@@ -436,7 +433,6 @@ class NaiveRedispatchStrategyDSM(BaseStrategy):
             for each product, calculate the marginal cost of the unit at the start time of the product
             and the volume of the product. Dispatch the order to the market.
             """
-            start = product[0]
             bids.append(
                 {
                     "start_time": product[0],
