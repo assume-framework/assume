@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 # define the path where the simulation results in form of CSV files will be stored, for example: "examples/outputs"
 # "" means no CSV files will be stored
-csv_path = "outputs"
+csv_path = ""
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -103,7 +103,7 @@ available_examples = {
     },
     "paper_plant_use_case": {
         "scenario": "example_04",
-        "study_case": "base_case_2019",
+        "study_case": "base",
     },
     # redispatch for DSM validation example
     "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
@@ -114,12 +114,6 @@ available_examples = {
         "study_case": "base",
     },
 }
-
-
-
-
-
-
 
 
 # %%
@@ -174,7 +168,6 @@ if __name__ == "__main__":
     # )
 
     if world.learning_config.get("learning_mode", False):
-
         # run learning if learning mode is enabled
         run_learning(world)
 

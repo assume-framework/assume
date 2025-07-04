@@ -2,23 +2,23 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-base_case_2019:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-07 00:00
-  time_step: 15min
-  save_frequency_hours: null
+base:
+  start_date: 2023-01-01 00:00
+  end_date: 2023-01-07 00:00
+  time_step: 1h
+  save_frequency_hours: 24
 
   markets_config:
     EOM:
+      start_date: 2023-01-01 00:00
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 00:00
       products:
         - duration: 1h
-          count: 1
-          first_delivery: 1h
-      opening_frequency: 1h
-      opening_duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 20h
       volume_unit: MWh
       maximum_bid_volume: 100000
       maximum_bid_price: 3000
@@ -26,120 +26,62 @@ base_case_2019:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-# dam_case_2019:
-#   start_date: 2019-01-01 12:00
-#   end_date: 2019-02-01 00:00
-#   time_step: 1h
-#   industrial_dsm_units: null
-#   save_frequency_hours: 720
+    CRM_pos:
+      operator: CRM_operator
+      product_type: capacity_pos
+      start_date: 2023-01-01 03:00
+      products:
+        - duration: 4h
+          count: 1
+          first_delivery: 22h
+      opening_frequency: 4h
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
 
-#   markets_config:
-#     EOM:
-#       operator: EOM_operator
-#       product_type: energy
-#       start_date: 2019-01-01 12:00
-#       products:
-#         - duration: 1h
-#           count: 24
-#           first_delivery: 24h
-#       opening_frequency: 24h
-#       opening_duration: 24h
-#       volume_unit: MWh
-#       maximum_bid_volume: 100000
-#       maximum_bid_price: 3000
-#       minimum_bid_price: -500
-#       price_unit: EUR/MWh
-#       market_mechanism: complex_clearing
-#       param_dict:
-#         solver: highs
-#         pricing_mechanism: pay_as_clear
-#       additional_fields:
-#         - bid_type
+    CRM_neg:
+      operator: CRM_operator
+      product_type: capacity_neg
+      start_date: 2023-01-01 03:00
+      products:
+        - duration: 4h
+          count: 1
+          first_delivery: 22h
+      opening_frequency: 4h
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
 
-
-# eom_crm_case_2019:
-#   start_date: 2019-01-01 00:00
-#   end_date: 2019-12-31 00:00
-#   time_step: 1h
-#   industrial_dsm_units: null
-#   save_frequency_hours: 720
-
-#   bidding_strategy_params:
-#     crm_foresight: 4h
-
-#   markets_config:
-#     EOM:
-#       operator: EOM_operator
-#       product_type: energy
-#       start_date: 2019-01-01 2:00
-#       products:
-#         - duration: 1h
-#           count: 1
-#           first_delivery: 2h
-#       opening_frequency: 1h
-#       opening_duration: 1h
-#       volume_unit: MWh
-#       maximum_bid_volume: 100000
-#       maximum_bid_price: 3000
-#       minimum_bid_price: -500
-#       price_unit: EUR/MWh
-#       market_mechanism: pay_as_clear
-
-#     CRM_pos:
-#       operator: CRM_operator
-#       product_type: capacity_pos
-#       start_date: 2019-01-01 00:00
-#       products:
-#         - duration: 4h
-#           count: 1
-#           first_delivery: 4h
-#       opening_frequency: 4h
-#       opening_duration: 1h
-#       volume_unit: MW
-#       maximum_bid_volume: 100000
-#       maximum_bid_price: 9999
-#       minimum_bid_price: -9999
-#       price_unit: EUR/MW
-#       market_mechanism: pay_as_bid
-
-#     CRM_neg:
-#       operator: CRM_operator
-#       product_type: capacity_neg
-#       start_date: 2019-01-01 00:00
-#       products:
-#         - duration: 4h
-#           count: 1
-#           first_delivery: 4h
-#       opening_frequency: 4h
-#       opening_duration: 1h
-#       volume_unit: MW
-#       maximum_bid_volume: 100000
-#       maximum_bid_price: 9999
-#       minimum_bid_price: -9999
-#       price_unit: EUR/MW
-#       market_mechanism: pay_as_bid
-
-# base_case_2019_with_DSM:
-#   start_date: 2019-01-01 00:00
-#   end_date: 2019-02-01 00:00
-#   time_step: 1h
-#   industrial_dsm_units: industrial_dsm_units.csv
-#   save_frequency_hours: 720
-
-#   markets_config:
-#     EOM:
-#       operator: EOM_operator
-#       product_type: energy
-#       start_date: 2019-01-01 00:00
-#       products:
-#         - duration: 1h
-#           count: 1
-#           first_delivery: 1h
-#       opening_frequency: 1h
-#       opening_duration: 1h
-#       volume_unit: MWh
-#       maximum_bid_volume: 100000
-#       maximum_bid_price: 3000
-#       minimum_bid_price: -500
-#       price_unit: EUR/MWh
-#       market_mechanism: pay_as_clear
+    # redispatch:
+    #   start_date: 2023-01-01 21:00
+    #   operator: network_operator
+    #   product_type: energy
+    #   products:
+    #     - duration: 1h
+    #       count: 24
+    #       first_delivery: 3h
+    #   opening_frequency: 24h
+    #   opening_duration: 2h
+    #   volume_unit: MWh
+    #   maximum_bid_volume: 100000
+    #   maximum_bid_price: 3000
+    #   minimum_bid_price: -500
+    #   price_unit: EUR/MWh
+    #   market_mechanism: redispatch
+    #   additional_fields:
+    #     - node
+    #     - min_power
+    #     - max_power
+    #   param_dict:
+    #     network_path: .
+    #     solver: highs
+    #     payment_mechanism: pay_as_bid
+    #     backup_marginal_cost: 10000

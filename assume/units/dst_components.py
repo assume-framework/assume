@@ -448,12 +448,10 @@ class GenericStorage:
 
         # check if initial_soc is within the bounds [0, 1] and fix it if not
         if initial_soc > 1:
-            initial_soc_frac = initial_soc / max_capacity
+            initial_soc /= max_capacity
             logger.warning(
-                f"Initial SOC is greater than 1.0. Setting it to {initial_soc_frac} (as fraction of max_capacity)."
+                f"Initial SOC is greater than 1.0. Setting it to {initial_soc}."
             )
-        else:
-            initial_soc_frac = initial_soc
 
         self.max_capacity = max_capacity
         self.min_capacity = min_capacity
@@ -466,7 +464,7 @@ class GenericStorage:
         )
         self.efficiency_charge = efficiency_charge
         self.efficiency_discharge = efficiency_discharge
-        self.initial_soc = initial_soc_frac * max_capacity
+        self.initial_soc = initial_soc * max_capacity
         self.ramp_up = max_power_charge if ramp_up is None else ramp_up
         self.ramp_down = max_power_charge if ramp_down is None else ramp_down
         self.storage_loss_rate = storage_loss_rate
@@ -522,6 +520,9 @@ class GenericStorage:
         )
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.initial_soc = pyo.Param(
+            initialize=self.initial_soc * self.max_capacity
+        )
         model_block.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
 
         # Define variables
@@ -544,24 +545,18 @@ class GenericStorage:
             doc="Discharging power at each time step",
         )
 
-        initial_soc_value = self.initial_soc
-
-        @model_block.Constraint()
-        def initial_soc_rule(b):
-            return b.soc[self.time_steps.at(1)] == initial_soc_value
-
+        # Define SOC dynamics with energy loss and efficiency
         @model_block.Constraint(self.time_steps)
         def soc_balance_rule(b, t):
             if t == self.time_steps.at(1):
-                return pyo.Constraint.Skip
-            prev_idx = list(self.time_steps).index(t) - 1
-            prev_t = list(self.time_steps)[prev_idx]
-            return (
-                b.soc[t]
-                == b.soc[prev_t]
-                + b.charge[prev_t] * b.efficiency_charge
-                - b.discharge[prev_t] / b.efficiency_discharge
-                - b.storage_loss_rate * b.soc[prev_t]
+                prev_soc = b.initial_soc
+            else:
+                prev_soc = b.soc[t - 1]
+            return b.soc[t] == (
+                prev_soc
+                + b.efficiency_charge * b.charge[t]
+                - (1 / b.efficiency_discharge) * b.discharge[t]
+                - b.storage_loss_rate * prev_soc
             )
 
         # Apply ramp-up constraints if ramp_up is specified
@@ -1644,110 +1639,20 @@ class SeasonalHydrogenStorage(GenericStorage):
         """
         model_block = super().add_to_model(model, model_block)
 
-        # Add final_soc_target as a parameter to model_block
-        model_block.final_soc_target = pyo.Param(initialize=self.final_soc_target)
-
-        # Seasonal Constraints
-        @model_block.Constraint(self.off_season)
-        def off_season_no_discharge(b, t):
-            """
-            Prevent discharging during the off-season.
-            """
-            return b.discharge[t] == 0
-
-        @model_block.Constraint(self.on_season)
-        def on_season_no_charge(b, t):
-            """
-            Prevent charging during the on-season.
-            """
-            return b.charge[t] == 0
-
-        # Final SOC Constraint
-        @model_block.Constraint()
-        def final_soc_constraint(b):
-            """
-            Ensure SOC at the end of the time steps meets the target.
-            """
-            return b.soc[self.time_steps[-1]] >= b.final_soc_target * b.max_capacity
-
-        return model_block
-
-
-class ThermalStorage(GenericStorage):
-    """
-    A flexible thermal storage class that extends GenericStorage to support short-term and long-term scheduling.
-
-    This class enables control over when the storage can charge or discharge, based on a binary profile.
-    It is useful in seasonal or scheduled operations like industrial heating cycles.
-
-    - For 'short-term': behaves like GenericStorage without behavioral restrictions.
-    - For 'long-term': follows a storage schedule (0: charge-only, 1: discharge-only).
-
-    Args:
-        storage_type (str): Type of storage behavior: 'short-term' or 'long-term'.
-        storage_schedule_profile (pd.Series, optional): Binary schedule for discharge availability (only required for 'long-term').
-        **kwargs: All other parameters are inherited from GenericStorage.
-    """
-
-    def __init__(
-        self,
-        storage_type: str = "short-term",
-        storage_schedule_profile: pd.Series | None = None,
-        **kwargs,
-    ):
-        """
-        Initializes the thermal storage instance.
-
-        Raises:
-            ValueError: If `storage_type` is 'long-term' and no schedule is provided.
-            ValueError: If `storage_type` is not one of ['short-term', 'long-term'].
-        """
-        super().__init__(**kwargs)
-
-        self.storage_type = storage_type.lower()
-        self.storage_schedule_profile = storage_schedule_profile
-
-        if self.storage_type == "long-term" and self.storage_schedule_profile is None:
-            raise ValueError(
-                "storage_schedule_profile is required for 'long-term' storage_type."
-            )
-
-        if self.storage_type not in ["short-term", "long-term"]:
-            raise ValueError("storage_type must be either 'short-term' or 'long-term'.")
-
-    def add_to_model(
-        self, model: pyo.ConcreteModel, model_block: pyo.Block
-    ) -> pyo.Block:
-        """
-        Adds thermal storage constraints to the model based on storage type.
-
-        - If 'long-term', restrict charge/discharge based on the binary schedule profile.
-        - Otherwise, behaves identically to GenericStorage.
-
-        Args:
-            model (pyo.ConcreteModel): The Pyomo optimization model.
-            model_block (pyo.Block): The block to which this storage is added.
-
-        Returns:
-            pyo.Block: Updated model block with thermal storage constraints.
-        """
-        model_block = super().add_to_model(model, model_block)
-
         if self.storage_type == "long-term":
 
             @model_block.Constraint(self.time_steps)
             def availability_charge_constraint(b, t):
                 return (
                     b.charge[t]
-                    <= self.storage_schedule_profile.iat[t] * b.max_power_charge
+                    <= (1 - self.storage_schedule_profile.iat[t]) * b.max_power_charge
                 )
 
             @model_block.Constraint(self.time_steps)
             def availability_discharge_constraint(b, t):
                 return (
                     b.discharge[t]
-                    <= (1 - self.storage_schedule_profile.iat[t])
-                    * b.max_power_discharge
+                    <= self.storage_schedule_profile.iat[t] * b.max_power_discharge
                 )
 
         return model_block
@@ -1843,7 +1748,6 @@ demand_side_technologies: dict = {
     "electric_vehicle": ElectricVehicle,
     "generic_storage": GenericStorage,
     "pv_plant": PVPlant,
-    "thermal_storage": ThermalStorage,
 }
 
 

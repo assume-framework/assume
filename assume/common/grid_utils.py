@@ -194,6 +194,7 @@ def add_loads(
             columns=loads.index,
         )
 
+
 def add_fix_units(
     network: pypsa.Network,
     units: pd.DataFrame,
@@ -203,7 +204,7 @@ def add_fix_units(
     """
     if units is None or units.empty:
         return
-    
+
     units_c = units.copy()
     if "sign" in units_c.columns:
         del units_c["sign"]

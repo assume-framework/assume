@@ -136,55 +136,49 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         )
 
     def initialize_process_sequence(self):
-        # If absolute hydrogen demand is NOT specified or is zero, do per-timestep balancing
+        # Per-time-step constraint (default)
         if not self.demand or self.demand == 0:
 
             @self.model.Constraint(self.model.time_steps)
             def direct_hydrogen_balance(m, t):
-                total_hydrogen_supply = 0
+                total_hydrogen_production = 0
                 if self.has_electrolyser:
-                    total_hydrogen_supply += m.dsm_blocks["electrolyser"].hydrogen_out[
-                        t
-                    ]
-                storage_discharge = 0
-                storage_charge = 0
+                    total_hydrogen_production += m.dsm_blocks[
+                        "electrolyser"
+                    ].hydrogen_out[t]
                 if self.has_h2seasonal_storage:
                     storage_discharge = m.dsm_blocks[
                         "hydrogen_seasonal_storage"
                     ].discharge[t]
                     storage_charge = m.dsm_blocks["hydrogen_seasonal_storage"].charge[t]
-                # Mass balance per time step
-                return (
-                    total_hydrogen_supply + storage_discharge
-                    == m.hydrogen_demand[t] + storage_charge
-                )
-
-        # If absolute hydrogen demand is specified, do cumulative/absolute demand balancing
+                    return (
+                        total_hydrogen_production + storage_discharge - storage_charge
+                        >= m.hydrogen_demand_per_timestep[t]
+                    )
+                else:
+                    return (
+                        total_hydrogen_production >= m.hydrogen_demand_per_timestep[t]
+                    )
         else:
 
-            @self.model.Constraint()
-            def absolute_hydrogen_balance(m):
-                total_hydrogen_supplied = 0
-                for t in m.time_steps:
-                    produced = 0
-                    if self.has_electrolyser:
-                        produced += m.dsm_blocks["electrolyser"].hydrogen_out[t]
-                    storage_discharge = 0
-                    storage_charge = 0
-                    if self.has_h2seasonal_storage:
-                        storage_discharge = m.dsm_blocks[
-                            "hydrogen_seasonal_storage"
-                        ].discharge[t]
-                        storage_charge = m.dsm_blocks[
-                            "hydrogen_seasonal_storage"
-                        ].charge[t]
-                        total_hydrogen_supplied += (
-                            produced + storage_discharge - storage_charge
-                        )
-                    else:
-                        total_hydrogen_supplied += produced
-                # Use == for strict, or >= if overproduction is allowed
-                return total_hydrogen_supplied >= m.absolute_hydrogen_demand
+            @self.model.Constraint(self.model.time_steps)
+            def direct_hydrogen_balance(m, t):
+                total_hydrogen_production = 0
+                if self.has_electrolyser:
+                    total_hydrogen_production += m.dsm_blocks[
+                        "electrolyser"
+                    ].hydrogen_out[t]
+                if self.has_h2seasonal_storage:
+                    storage_discharge = m.dsm_blocks[
+                        "hydrogen_seasonal_storage"
+                    ].discharge[t]
+                    storage_charge = m.dsm_blocks["hydrogen_seasonal_storage"].charge[t]
+                    return (
+                        total_hydrogen_production + storage_discharge - storage_charge
+                        == m.cumulative_hydrogen_output[t]
+                    )
+                else:
+                    return total_hydrogen_production == m.cumulative_hydrogen_output[t]
 
     def define_constraints(self):
         """
@@ -194,11 +188,13 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         This function includes the following constraints:
 
         1. **Total Power Input Constraint**:
+        1. **Total Power Input Constraint**:
         - Ensures that the power input required by the electrolyser is correctly accounted for
             at each time step.
         - This constraint ensures that energy demand is properly modeled for optimization
             purposes.
 
+        2. **Variable Cost per Time Step Constraint**:
         2. **Variable Cost per Time Step Constraint**:
         - Calculates the operating cost per time step, ensuring that total variable
             costs reflect the electrolyser's energy consumption.
@@ -207,6 +203,19 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         These constraints collectively ensure that hydrogen production aligns with energy
         availability, demand fulfillment, and cost efficiency.
         """
+
+        @self.model.Constraint(self.model.time_steps)
+        def absolute_demand_association_constraint(m, t):
+            """
+            Ensures the thermal output meets the absolute demand.
+            """
+            if not self.demand or self.demand == 0:
+                return pyo.Constraint.Skip
+            else:
+                return (
+                    sum((m.cumulative_hydrogen_output[t]) for t in m.time_steps)
+                    >= m.absolute_hydrogen_demand
+                )
 
         # Constraint for total power input
         @self.model.Constraint(self.model.time_steps)
