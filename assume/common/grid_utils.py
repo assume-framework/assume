@@ -195,31 +195,34 @@ def add_loads(
         )
 
 
-def add_redispatch_loads(
+def add_fix_units(
     network: pypsa.Network,
-    loads: pd.DataFrame,
+    units: pd.DataFrame,
 ) -> None:
     """
     This adds loads to the redispatch PyPSA network with respective bus data to which they are connected
     """
-    loads_c = loads.copy()
-    if "sign" in loads_c.columns:
-        del loads_c["sign"]
+    if units is None or units.empty:
+        return
+
+    units_c = units.copy()
+    if "sign" in units_c.columns:
+        del units_c["sign"]
 
     # add loads with opposite sign (default for loads is -1). This is needed to properly model the redispatch
     network.add(
         "Load",
-        name=loads.index,
-        bus=loads["node"],  # bus to which the generator is connected to
+        name=units.index,
+        bus=units["node"],  # bus to which the generator is connected to
         sign=1,
-        **loads_c,
+        **units_c,
     )
 
-    if "p_set" not in loads.columns:
+    if "p_set" not in units.columns:
         network.loads_t["p_set"] = pd.DataFrame(
-            np.zeros((len(network.snapshots), len(loads.index))),
+            np.zeros((len(network.snapshots), len(units.index))),
             index=network.snapshots,
-            columns=loads.index,
+            columns=units.index,
         )
 
 
