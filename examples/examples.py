@@ -100,6 +100,10 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
+    "paper_plant_use_case": {
+        "scenario": "example_04",
+        "study_case": "base",
+    },
     # redispatch for DSM validation example
     "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
     "redisp_storage_3_nodes": {"scenario": "example_05c", "study_case": "base"},

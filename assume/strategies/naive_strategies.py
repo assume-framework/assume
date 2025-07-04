@@ -2,6 +2,9 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import matplotlib.pyplot as plt
+import pandas as pd
+
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
@@ -169,9 +172,14 @@ class NaiveDADSMStrategy(BaseStrategy):
         """
 
         # check if unit has opt_power_requirement attribute
-        if not hasattr(unit, "opt_power_requirement"):
-            unit.determine_optimal_operation_without_flex()
-
+        # if not hasattr(unit, "opt_power_requirement"):
+        if unit.optimisation_counter == 0:
+            unit.determine_optimal_operation_with_flex()
+            self.export_power_requirements_to_csv(
+                unit, "./examples/inputs/example_04/power_requirements_timeseries.csv"
+            )
+            self.plot_power_requirements(unit)
+            unit.optimisation_counter = 1
         bids = []
         for product in product_tuples:
             """
@@ -180,7 +188,7 @@ class NaiveDADSMStrategy(BaseStrategy):
             """
             start = product[0]
 
-            volume = unit.opt_power_requirement.at[start]
+            volume = unit.flex_power_requirement.at[start]
 
             bids.append(
                 {
@@ -193,6 +201,135 @@ class NaiveDADSMStrategy(BaseStrategy):
             )
 
         return bids
+
+    def plot_power_requirements(self, unit: SupportsMinMax):
+        """
+        Plots the optimal power requirement and flexibility power requirement for comparison.
+
+        Args:
+            unit (SupportsMinMax): The unit containing power requirements.
+        """
+        # Retrieve power requirements data
+        opt_power_requirement = unit.opt_power_requirement
+        flex_power_requirement = unit.flex_power_requirement
+
+        # Plotting
+        plt.figure(figsize=(10, 6))
+        plt.plot(
+            opt_power_requirement.index,
+            opt_power_requirement,
+            label="Optimal Power Requirement",
+            color="blue",
+        )
+        plt.plot(
+            flex_power_requirement.index,
+            flex_power_requirement,
+            label="Flex Power Requirement",
+            color="orange",
+            linestyle="--",
+        )
+
+        # Labels and title
+        plt.xlabel("Time")
+        plt.ylabel("Power Requirement (kW)")
+        plt.title("Comparison of Optimal and Flexible Power Requirements")
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+
+    def export_power_requirements_to_csv(self, unit: SupportsMinMax, file_path: str):
+        """
+        Exports the optimal and flexible power requirements time series to a CSV file.
+
+        Args:
+            unit (SupportsMinMax): The unit containing power requirements.
+            file_path (str): The path to save the CSV file.
+        """
+        # Combine the two series into a DataFrame for parallel export
+        df = pd.DataFrame(
+            {
+                "Optimal Power Requirement (kW)": unit.opt_power_requirement,
+                "Flex Power Requirement (kW)": unit.flex_power_requirement,
+            }
+        )
+        # Save to CSV
+        df.to_csv(file_path)
+
+
+class DSM_PosCRM_Strategy(BaseStrategy):
+    """
+    Strategy for Positive CRM Reserve (Demand Side, i.e., up & down, symmetric).
+    """
+
+    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
+        bids = []
+        max_power = unit.max_plant_capacity
+        min_power = unit.min_plant_capacity
+
+        for product in product_tuples:
+            start, end, only_hours = product
+            block_times = [dt for dt in unit.index.get_date_list() if start <= dt < end]
+
+            # For all time steps in block, calculate possible symmetric bid
+            up_caps = []
+            down_caps = []
+            for t in block_times:
+                flex = unit.flex_power_requirement.at[t]
+                up_caps.append(max_power - flex)
+                down_caps.append(flex - min_power)
+            # The symmetric bid is the minimum capacity that is possible in *all* timesteps in the block
+            symmetric_capacity = min(min(up_caps), min(down_caps))
+            if symmetric_capacity > 0:
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": only_hours,
+                        "price": 0,  # or unit.calculate_marginal_cost(...)
+                        "volume": symmetric_capacity,
+                        "unit_id": unit.id,
+                        "market_id": "CRM_pos",
+                    }
+                )
+        return self.remove_empty_bids(bids)
+
+
+class DSM_NegCRM_Strategy(BaseStrategy):
+    """
+    Strategy for Negative CRM Reserve (Demand Side, i.e., up & down, symmetric).
+    """
+
+    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
+        # IDENTICAL LOGIC as POS, since symmetric in Germany (volume is symmetric)
+        # If you ever want to do *only* neg or pos (asymmetric), just change which cap you use!
+        bids = []
+        max_power = unit.max_plant_capacity
+        min_power = unit.min_plant_capacity
+
+        for product in product_tuples:
+            start, end, only_hours = product
+            block_times = [dt for dt in unit.index.get_date_list() if start <= dt < end]
+
+            up_caps = []
+            down_caps = []
+            for t in block_times:
+                flex = unit.flex_power_requirement.at[t]
+                up_caps.append(max_power - flex)
+                down_caps.append(flex - min_power)
+            symmetric_capacity = min(min(up_caps), min(down_caps))
+            if symmetric_capacity > 0:
+                bids.append(
+                    {
+                        "start_time": start,
+                        "end_time": end,
+                        "only_hours": only_hours,
+                        "price": 0,
+                        "volume": symmetric_capacity,
+                        "unit_id": unit.id,
+                        "market_id": "CRM_neg",
+                    }
+                )
+        return self.remove_empty_bids(bids)
 
 
 class NaiveRedispatchDSMStrategy(BaseStrategy):
