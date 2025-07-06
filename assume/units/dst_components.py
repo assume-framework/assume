@@ -448,12 +448,10 @@ class GenericStorage:
 
         # check if initial_soc is within the bounds [0, 1] and fix it if not
         if initial_soc > 1:
-            initial_soc_frac = initial_soc / max_capacity
+            initial_soc /= max_capacity
             logger.warning(
-                f"Initial SOC is greater than 1.0. Setting it to {initial_soc_frac} (as fraction of max_capacity)."
+                f"Initial SOC is greater than 1.0. Setting it to {initial_soc}."
             )
-        else:
-            initial_soc_frac = initial_soc
 
         self.max_capacity = max_capacity
         self.min_capacity = min_capacity
@@ -466,7 +464,7 @@ class GenericStorage:
         )
         self.efficiency_charge = efficiency_charge
         self.efficiency_discharge = efficiency_discharge
-        self.initial_soc = initial_soc_frac * max_capacity
+        self.initial_soc = initial_soc * max_capacity
         self.ramp_up = max_power_charge if ramp_up is None else ramp_up
         self.ramp_down = max_power_charge if ramp_down is None else ramp_down
         self.storage_loss_rate = storage_loss_rate
@@ -522,6 +520,9 @@ class GenericStorage:
         )
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.initial_soc = pyo.Param(
+            initialize=self.initial_soc * self.max_capacity
+        )
         model_block.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
 
         # Define variables
@@ -544,24 +545,18 @@ class GenericStorage:
             doc="Discharging power at each time step",
         )
 
-        initial_soc_value = self.initial_soc
-
-        @model_block.Constraint()
-        def initial_soc_rule(b):
-            return b.soc[self.time_steps.at(1)] == initial_soc_value
-
+        # Define SOC dynamics with energy loss and efficiency
         @model_block.Constraint(self.time_steps)
         def soc_balance_rule(b, t):
             if t == self.time_steps.at(1):
-                return pyo.Constraint.Skip
-            prev_idx = list(self.time_steps).index(t) - 1
-            prev_t = list(self.time_steps)[prev_idx]
-            return (
-                b.soc[t]
-                == b.soc[prev_t]
-                + b.charge[prev_t] * b.efficiency_charge
-                - b.discharge[prev_t] / b.efficiency_discharge
-                - b.storage_loss_rate * b.soc[prev_t]
+                prev_soc = b.initial_soc
+            else:
+                prev_soc = b.soc[t - 1]
+            return b.soc[t] == (
+                prev_soc
+                + b.efficiency_charge * b.charge[t]
+                - (1 / b.efficiency_discharge) * b.discharge[t]
+                - b.storage_loss_rate * prev_soc
             )
 
         # Apply ramp-up constraints if ramp_up is specified
