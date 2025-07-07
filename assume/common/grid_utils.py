@@ -258,6 +258,53 @@ def add_nodal_loads(
         **loads_c,
     )
 
+def add_redispatch_dsm(network: pypsa.Network,
+    industrial_dsm_units: pd.DataFrame) -> None:
+
+    # simply copy the DataFrame straight over
+    dsm_units = industrial_dsm_units.copy()
+
+    # now build p_set exactly as before...
+    p_set = pd.DataFrame(
+        0,
+        index=network.snapshots,
+        columns=dsm_units.index,
+    )
+
+    network.madd(
+        "Load",
+        names=dsm_units.index,
+        bus=dsm_units["node"],
+        p_set=p_set,
+        sign=1,
+    )
+
+    # upward redispatch
+    network.madd(
+        "Generator",
+        names=dsm_units.index,
+        suffix="_up",
+        bus=dsm_units["node"],
+        p_nom=1,
+        p_min_pu=p_set,
+        p_max_pu=p_set,
+        marginal_cost=p_set,
+        sign=-1,
+    )
+
+    # downward redispatch
+    network.madd(
+        "Generator",
+        names=dsm_units.index,
+        suffix="_down",
+        bus=dsm_units["node"],
+        p_nom=1,
+        p_min_pu=p_set,
+        p_max_pu=p_set,
+        marginal_cost=p_set,
+        sign=1,
+    )
+
 
 def read_pypsa_grid(
     network: pypsa.Network,
