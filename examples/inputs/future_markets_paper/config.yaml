@@ -6,7 +6,7 @@ base_case_2013:
   start_date: 2013-01-01 00:00
   end_date: 2013-12-31 00:00
   time_step: 1h
-  learning_mode: False
+  learning_mode: True
   save_frequency_hours: Null
 
   learning_config:
