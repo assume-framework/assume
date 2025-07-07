@@ -93,6 +93,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
 
         # Initialize parameters
         self.electricity_price = self.forecaster["price_EOM"]
+        self.hydrogen_demand = self.forecaster["hydrogen_demand"]
         self.demand = demand
 
         self.objective = objective
@@ -105,6 +106,15 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         )
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
+        # Inject schedule into long-term seasonal storage if applicable
+        if "hydrogen_seasonal_storage" in self.components:
+            storage_cfg = self.components["hydrogen_seasonal_storage"]
+            storage_type = storage_cfg.get("storage_type", "short-term")
+            if storage_type == "long-term":
+                schedule_key = f"{self.id}_hydrogen_seasonal_storage_schedule"
+                schedule_series = self.forecaster[schedule_key]
+                storage_cfg["storage_schedule_profile"] = schedule_series
+
         # Initialize the model
         self.setup_model()
 
@@ -114,6 +124,10 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
         self.model.absolute_hydrogen_demand = pyo.Param(initialize=self.demand)
+        self.model.hydrogen_demand_per_timestep = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.hydrogen_demand)},
+        )
 
     def define_variables(self):
         self.model.total_power_input = pyo.Var(
@@ -122,53 +136,54 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         self.model.variable_cost = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
-        self.model.hydrogen_demand = pyo.Var(
+        self.model.cumulative_hydrogen_output = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
 
     def initialize_process_sequence(self):
-        """
-        Establishes the process sequence and key constraints for the hydrogen plant, ensuring
-        that hydrogen production, storage, and demand are properly managed.
+        # Per-time-step constraint (default)
+        if not self.demand or self.demand == 0:
 
-        This function defines the **hydrogen production distribution constraint**, which regulates
-        the flow of hydrogen from the electrolyser to meet demand and/or be stored:
+            @self.model.Constraint(self.model.time_steps)
+            def direct_hydrogen_balance(m, t):
+                total_hydrogen_production = 0
+                if self.has_electrolyser:
+                    total_hydrogen_production += m.dsm_blocks[
+                        "electrolyser"
+                    ].hydrogen_out[t]
+                if self.has_h2seasonal_storage:
+                    storage_discharge = m.dsm_blocks[
+                        "hydrogen_seasonal_storage"
+                    ].discharge[t]
+                    storage_charge = m.dsm_blocks["hydrogen_seasonal_storage"].charge[t]
+                    return (
+                        total_hydrogen_production + storage_discharge - storage_charge
+                        >= m.hydrogen_demand_per_timestep[t]
+                    )
+                else:
+                    return (
+                        total_hydrogen_production >= m.hydrogen_demand_per_timestep[t]
+                    )
+        else:
 
-        - **With seasonal storage**:
-        - Hydrogen can be supplied directly to demand.
-        - Excess hydrogen can be stored in hydrogen seasonal storage.
-        - Stored hydrogen can be discharged to supplement demand when required.
-
-        - **Without storage**:
-        - The electrolyser must meet all hydrogen demand directly, as no storage buffer is available.
-
-        This constraint ensures an efficient balance between hydrogen supply, demand, and storage,
-        optimizing the usage of available hydrogen resources.
-        """
-
-        @self.model.Constraint(self.model.time_steps)
-        def hydrogen_production_distribution(m, t):
-            """
-            Balances hydrogen produced by the electrolyser to either satisfy the hydrogen demand
-            directly, be stored in hydrogen storage, or both if storage is available.
-            """
-            electrolyser_output = self.model.dsm_blocks["electrolyser"].hydrogen_out[t]
-
-            if self.has_h2seasonal_storage:
-                # With storage: demand can be fulfilled by electrolyser, storage discharge, or both
-                storage_discharge = m.dsm_blocks["hydrogen_seasonal_storage"].discharge[
-                    t
-                ]
-                storage_charge = m.dsm_blocks["hydrogen_seasonal_storage"].charge[t]
-
-                # Hydrogen can be supplied to demand and/or storage, and storage can also discharge to meet demand
-                return (
-                    electrolyser_output + storage_discharge
-                    == m.hydrogen_demand[t] + storage_charge
-                )
-            else:
-                # Without storage: demand is met solely by electrolyser output
-                return electrolyser_output == m.hydrogen_demand[t]
+            @self.model.Constraint(self.model.time_steps)
+            def direct_hydrogen_balance(m, t):
+                total_hydrogen_production = 0
+                if self.has_electrolyser:
+                    total_hydrogen_production += m.dsm_blocks[
+                        "electrolyser"
+                    ].hydrogen_out[t]
+                if self.has_h2seasonal_storage:
+                    storage_discharge = m.dsm_blocks[
+                        "hydrogen_seasonal_storage"
+                    ].discharge[t]
+                    storage_charge = m.dsm_blocks["hydrogen_seasonal_storage"].charge[t]
+                    return (
+                        total_hydrogen_production + storage_discharge - storage_charge
+                        == m.cumulative_hydrogen_output[t]
+                    )
+                else:
+                    return total_hydrogen_production == m.cumulative_hydrogen_output[t]
 
     def define_constraints(self):
         """
@@ -177,20 +192,13 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
 
         This function includes the following constraints:
 
-        1. **Total Hydrogen Demand Constraint**:
-        - Ensures that the total hydrogen output over all time steps satisfies the
-            absolute hydrogen demand.
-        - If seasonal storage is available, the total demand can be met by both
-            electrolyser production and storage discharge.
-        - If no storage is available, the electrolyser must supply the entire demand.
-
-        2. **Total Power Input Constraint**:
+        1. **Total Power Input Constraint**:
         - Ensures that the power input required by the electrolyser is correctly accounted for
             at each time step.
         - This constraint ensures that energy demand is properly modeled for optimization
             purposes.
 
-        3. **Variable Cost per Time Step Constraint**:
+        2. **Variable Cost per Time Step Constraint**:
         - Calculates the operating cost per time step, ensuring that total variable
             costs reflect the electrolyser's energy consumption.
         - This constraint is essential for cost-based optimization of hydrogen production.
@@ -199,31 +207,17 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         availability, demand fulfillment, and cost efficiency.
         """
 
-        @self.model.Constraint()
-        def total_hydrogen_demand_constraint(m):
+        @self.model.Constraint(self.model.time_steps)
+        def absolute_demand_association_constraint(m, t):
             """
-            Ensures that the total hydrogen output over all time steps meets the absolute hydrogen demand.
-            If storage is available, the total demand can be fulfilled by both electrolyser output and storage discharge.
-            If storage is unavailable, the electrolyser output alone must meet the demand.
+            Ensures the thermal output meets the absolute demand.
             """
-            if self.has_h2seasonal_storage:
-                # With storage: sum of electrolyser output and storage discharge must meet the total hydrogen demand
-                return (
-                    pyo.quicksum(
-                        m.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        + m.dsm_blocks["hydrogen_seasonal_storage"].discharge[t]
-                        for t in m.time_steps
-                    )
-                    == m.absolute_hydrogen_demand
-                )
+            if not self.demand or self.demand == 0:
+                return pyo.Constraint.Skip
             else:
-                # Without storage: sum of electrolyser output alone must meet the total hydrogen demand
                 return (
-                    pyo.quicksum(
-                        m.dsm_blocks["electrolyser"].hydrogen_out[t]
-                        for t in m.time_steps
-                    )
-                    == m.absolute_hydrogen_demand
+                    sum((m.cumulative_hydrogen_output[t]) for t in m.time_steps)
+                    >= m.absolute_hydrogen_demand
                 )
 
         # Constraint for total power input
