@@ -1,4 +1,2 @@
-name,unit_type,technology,node,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,congestion_threshold,demand,fuel_type,storage_type,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,cop,efficiency,start_price,max_capacity,min_capacity,initial_soc,efficiency_charge,efficiency_discharge,storage_loss_rate
-A360,steam_plant,heat_pump,north,naive_da_dsm,,,,dsm_operator_1,min_variable_cost,block_cost_based_flexibility,2,0.9,1200,,,10,0,10,10,0,0,1,,,,,,,,
-A360,steam_plant,boiler,north,naive_da_dsm,,,,dsm_operator_2,min_variable_cost,,,,,electricity,,2,0,2,2,0,0,,1,,,,,,,
-A360,steam_plant,thermal_storage,north,naive_da_dsm,,,,dsm_operator_3,min_variable_cost,,,,,,short-term,,,10,10,,,,,,1000,0,0,1,1,0
+name,unit_type,technology,node,bidding_EOM,bidding_redispatch,unit_operator,objective,flexibility_measure,cost_tolerance,demand,fuel_type,storage_type,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,cop,efficiency,start_price,max_capacity,min_capacity,initial_soc,efficiency_charge,efficiency_discharge,storage_loss_rate
+A360,steam_plant,heat_pump,west,naive_da_dsm,steelplant_strategy,dsm_operator_1,min_variable_cost,cost_based_load_shift,100,240,,,5,0,5,5,,,1,,,,,,,,
