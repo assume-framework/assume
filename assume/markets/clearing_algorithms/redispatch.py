@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-
+import os
 import numpy as np
 import pandas as pd
 import pypsa
@@ -199,6 +199,10 @@ class RedispatchMarketRole(MarketRole):
 
         line_loading_df = line_loading.reset_index()
         output_file = "outputs/line_loading.csv"
+        output_dir = os.path.dirname(output_file)
+        
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
 
         try:
             existing_df = pd.read_csv(output_file)
