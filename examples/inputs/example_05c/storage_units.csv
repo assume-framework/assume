@@ -1,4 +1,0 @@
-name,technology,bidding_EOM,bidding_redispatch,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,additional_cost_charge,additional_cost_discharge,node,unit_operator
-store_1,li-ion,flexable_eom_storage,fixed_dispatch_strategy,100,100,1,1,0,100,0,0,north,battery_operator0
-store_2,li-ion,flexable_eom_storage,fixed_dispatch_strategy,100,100,1,1,0,100,0,0,east,battery_operator1
-store_3,li-ion,flexable_eom_storage,fixed_dispatch_strategy,100,100,1,1,0,100,0,0,west,battery_operator2
