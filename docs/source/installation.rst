@@ -67,9 +67,17 @@ To install with learning capabilities::
 
     pip install assume-framework[learning]
 
-To install with optimization capabilities::
+To install with network/grid capabilities::
 
-    pip install assume-framework[optimize]
+    pip install assume-framework[network]
+
+To install with oeds capabilities::
+
+    pip install assume-framework[oeds]
+
+To install with all capabilities::
+
+    pip install assume-framework[all]
 
 To install with testing capabilities::
 
@@ -80,13 +88,13 @@ Install Tab-Completion
 
 ASSUME uses `argcomplete` for argument completion on the CLI.
 
-On Windows, one needs to run:
+On Windows, one needs to run::
 
     register-python-argcomplete --shell powershell assume | Out-String | Invoke-Expression
 
 in the used conda environment, to install tab completions.
 
-On Bash or zsh (Linux and Mac) run the following in the correct conda environment with assume and argcomplete installed:
+On Bash or zsh (Linux and Mac) run the following in the correct conda environment with assume and argcomplete installed::
 
     eval "$(register-python-argcomplete assume)"
 

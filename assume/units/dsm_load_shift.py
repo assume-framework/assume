@@ -25,9 +25,15 @@ logger = logging.getLogger(__name__)
 class DSMFlex:
     # Mapping of flexibility measures to their respective functions
     flexibility_map: dict[str, Callable[[pyo.ConcreteModel], None]] = {
+        "electricity_price_signal": lambda self, model: self.electricity_price_signal(
+            model
+        ),
         "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
         "congestion_management_flexibility": lambda self,
         model: self.grid_congestion_management(model),
+        "symmetric_flexible_block": lambda self, model: self.symmetric_flexible_block(
+            model
+        ),
         "peak_load_shifting": lambda self, model: self.peak_load_shifting_flexibility(
             model
         ),
@@ -105,6 +111,7 @@ class DSMFlex:
         # along with optimal and flexibility constraints
         # and the objective functions
 
+        self.optimisation_counter = 0
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
@@ -159,6 +166,35 @@ class DSMFlex:
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
+
+    def electricity_price_signal(self, model):
+        """
+        Determine the optimal operation using a new electricity price signal.
+        """
+        # Delete the existing electricity_price component
+        model.del_component(model.electricity_price)
+
+        # Add the updated electricity_price component explicitly
+        model.add_component(
+            "electricity_price",
+            pyo.Param(
+                model.time_steps,
+                initialize={
+                    t: value for t, value in enumerate(self.electricity_price_flex)
+                },
+            ),
+        )
+
+        @self.model.Objective(sense=pyo.minimize)
+        def obj_rule_flex(m):
+            """
+            Maximizes the load shift over all time steps.
+            """
+            total_variable_cost = pyo.quicksum(
+                self.model.variable_cost[t] for t in self.model.time_steps
+            )
+
+            return total_variable_cost
 
     def cost_based_flexibility(self, model):
         """
@@ -218,7 +254,6 @@ class DSMFlex:
 
             elif self.technology == "building":
                 total_power_input = m.inflex_demand[t]
-                # Building components (e.g., heat_pump, boiler, pv_plant, generic_storage)
                 if self.has_heatpump:
                     total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
                 if self.has_boiler:
@@ -236,12 +271,22 @@ class DSMFlex:
                 if self.has_pv:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
 
-                # Apply flexibility adjustments
                 return (
-                    m.total_power_input[t]
-                    + m.load_shift_pos[t] * model.shift_indicator[t]
-                    - m.load_shift_neg[t] * (1 - model.shift_indicator[t])
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == total_power_input
+                )
+
+            elif self.technology == "steam_generator_plant":
+                total_power = 0
+                if self.has_heatpump:
+                    total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    boiler = self.components["boiler"]
+                    if boiler.fuel_type == "electricity":
+                        total_power += self.model.dsm_blocks["boiler"].power_in[t]
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == total_power
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -255,6 +300,93 @@ class DSMFlex:
             )
 
             return maximise_load_shift
+
+    def symmetric_flexible_block(self, model):
+        """
+        Cost-based CRM flexibility (rolling 4-hour blocks) for steam_generator_plant.
+        Optimizes a feasible operational profile (sum of tech variables), calculates
+        up/down 4-hour CRM blocks, and enforces a total cost limit.
+        Also stores static plant-wide max and min capacity as attributes for later use.
+        """
+        block_length = 4
+        min_bid_MW = 1
+        time_steps = list(sorted(model.time_steps))
+        T = len(time_steps)
+        possible_starts = [time_steps[i] for i in range(T - block_length + 1)]
+
+        # ---- STATIC PLANT-WIDE MAX/MIN CAPACITY ----
+        max_plant_capacity = 0
+        min_plant_capacity = 0
+        if self.has_heatpump:
+            max_plant_capacity += model.dsm_blocks["heat_pump"].max_power
+            min_plant_capacity += model.dsm_blocks["heat_pump"].min_power
+        if self.has_boiler:
+            boiler = self.components["boiler"]
+            if boiler.fuel_type == "electricity":
+                max_plant_capacity += model.dsm_blocks["boiler"].max_power
+                min_plant_capacity += model.dsm_blocks["boiler"].min_power
+
+        # Save as attributes on the unit for use in bidding strategy, etc.
+        self.max_plant_capacity = max_plant_capacity
+        self.min_plant_capacity = min_plant_capacity
+
+        # ---- FLEXIBILITY BLOCK VARIABLES ----
+        model.block_up = pyo.Var(possible_starts, within=pyo.NonNegativeReals)
+        model.block_down = pyo.Var(possible_starts, within=pyo.NonNegativeReals)
+        model.block_is_bid_up = pyo.Var(possible_starts, within=pyo.Binary)
+        model.block_is_bid_down = pyo.Var(possible_starts, within=pyo.Binary)
+
+        # ConstraintLists to hold per-block constraints
+        model.block_up_window = pyo.ConstraintList()
+        model.block_down_window = pyo.ConstraintList()
+
+        for t in possible_starts:
+            for offset in range(block_length):
+                tau = time_steps[time_steps.index(t) + offset]
+                total_power = 0
+                if self.has_heatpump:
+                    total_power += model.dsm_blocks["heat_pump"].power_in[tau]
+                if self.has_boiler:
+                    boiler = self.components["boiler"]
+                    if boiler.fuel_type == "electricity":
+                        total_power += model.dsm_blocks["boiler"].power_in[tau]
+                # Use the stored plant-wide capacities here if you want,
+                # or (if you allow for time-varying max/min in the future) keep the local max/min per tau
+
+                # Block up/down window constraints (use static min/max plant capacity here)
+                model.block_up_window.add(
+                    model.block_up[t] <= self.max_plant_capacity - total_power
+                )
+                model.block_down_window.add(
+                    model.block_down[t] <= total_power - self.min_plant_capacity
+                )
+
+        @model.Constraint(possible_starts)
+        def block_bid_logic_up(m, t):
+            return m.block_up[t] >= min_bid_MW * m.block_is_bid_up[t]
+
+        @model.Constraint(possible_starts)
+        def block_bid_logic_down(m, t):
+            return m.block_down[t] >= min_bid_MW * m.block_is_bid_down[t]
+
+        @model.Constraint(possible_starts)
+        def symmetric_block(m, t):
+            return m.block_is_bid_up[t] + m.block_is_bid_down[t] <= 1
+
+        # ---- COST TOLERANCE ----
+        model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
+        model.total_cost = pyo.Param(initialize=0.0, mutable=True)
+
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
+
+        # ---- OBJECTIVE: MAXIMIZE CRM UPWARD FLEXIBILITY ----
+        @model.Objective(sense=pyo.maximize)
+        def obj_rule_flex(m):
+            return sum(m.block_up[t] for t in possible_starts)
 
     def grid_congestion_management(self, model):
         """
@@ -302,18 +434,42 @@ class DSMFlex:
         # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_flex(m, t):
-            if self.has_electrolyser:
+            if self.technology == "steel_plant":
+                if self.has_electrolyser:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["electrolyser"].power_in[t]
+                        + self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+                else:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+
+            elif self.technology == "hydrogen_plant":
+                # Hydrogen plant constraint
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == self.model.dsm_blocks["electrolyser"].power_in[t]
-                    + self.model.dsm_blocks["eaf"].power_in[t]
-                    + self.model.dsm_blocks["dri_plant"].power_in[t]
                 )
-            else:
+            elif self.technology == "steam_generator_plant":
+                total_power = 0
+                if self.has_heatpump:
+                    total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    boiler = self.components["boiler"]
+                    if boiler.fuel_type == "electricity":
+                        total_power += self.model.dsm_blocks["boiler"].power_in[t]
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == self.model.dsm_blocks["eaf"].power_in[t]
-                    + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    == total_power
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -577,21 +733,47 @@ class DSMFlex:
                 "Termination Condition: ", results.solver.termination_condition
             )
 
-        # Compute adjusted total power input with load shift applied
-        adjusted_total_power_input = []
-        for t in instance.time_steps:
-            # Calculate the load-shifted value of total_power_input
-            adjusted_power = (
-                instance.total_power_input[t].value
-                + instance.load_shift_pos[t].value
-                - instance.load_shift_neg[t].value
+        if self.flexibility_measure == "electricity_price_signal":
+            flex_power_requirement = [
+                pyo.value(instance.total_power_input[t]) for t in instance.time_steps
+            ]
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=flex_power_requirement
             )
-            adjusted_total_power_input.append(adjusted_power)
+        elif self.flexibility_measure == "symmetric_flexible_block":
+            adjusted_total_power_input = []
+            for t in instance.time_steps:
+                total_power = 0.0
+                for tech_name, tech_block in instance.dsm_blocks.items():
+                    if hasattr(tech_block, "power_in"):
+                        total_power += pyo.value(tech_block.power_in[t])
+                adjusted_total_power_input.append(total_power)
 
-        # Assign this list to flex_power_requirement as a pandas Series
-        self.flex_power_requirement = FastSeries(
-            index=self.index, value=adjusted_total_power_input
-        )
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=adjusted_total_power_input
+            )
+
+            # Now assign to your series
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=adjusted_total_power_input
+            )
+
+        else:
+            # Compute adjusted total power input with load shift applied
+            adjusted_total_power_input = []
+            for t in instance.time_steps:
+                # Calculate the load-shifted value of total_power_input
+                adjusted_power = (
+                    instance.total_power_input[t].value
+                    + instance.load_shift_pos[t].value
+                    - instance.load_shift_neg[t].value
+                )
+                adjusted_total_power_input.append(adjusted_power)
+
+            # Assign this list to flex_power_requirement as a pandas Series
+            self.flex_power_requirement = FastSeries(
+                index=self.index, value=adjusted_total_power_input
+            )
 
         # Variable cost series
         flex_variable_cost = [
@@ -611,8 +793,7 @@ class DSMFlex:
         Returns:
             pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
         """
-        # Deactivate the flexibility objective if it exists
-        # if hasattr(instance, "obj_rule_flex"):
+
         instance.obj_rule_flex.deactivate()
 
         # Deactivate flexibility constraints if they exist

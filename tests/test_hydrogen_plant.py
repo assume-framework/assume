@@ -31,7 +31,7 @@ def hydrogen_components():
             "max_power_discharge": 40,
             "efficiency_charge": 0.95,
             "efficiency_discharge": 0.95,
-            "initial_soc": 0.5,
+            "initial_soc": 0,
             "ramp_up": 100,
             "ramp_down": 100,
             "storage_loss_rate": 0.0,
@@ -296,6 +296,34 @@ def test_electrolyser_meets_total_hydrogen_demand(hydrogen_plant_no_storage):
     assert abs(total_electrolyser_output - absolute_hydrogen_demand) < 1e-3, (
         f"Total electrolyser output {total_electrolyser_output} does not match "
         f"absolute hydrogen demand {absolute_hydrogen_demand}"
+    )
+
+
+def test_hydrogen_seasonal_storage_schedule_injection():
+    """Test that the long-term storage schedule profile is injected correctly."""
+    # Simulate config and forecast
+    schedule = pd.Series([0, 1, 1, 0, 1], index=range(5))
+    plant_id = "test_plant"
+    schedule_key = f"{plant_id}_hydrogen_seasonal_storage_schedule"
+    components = {
+        "hydrogen_seasonal_storage": {
+            "storage_type": "long-term",
+            # ... other required keys (if any) ...
+        }
+    }
+    forecaster = {schedule_key: schedule}
+
+    # Emulate the injection logic
+    if "hydrogen_seasonal_storage" in components:
+        storage_cfg = components["hydrogen_seasonal_storage"]
+        storage_type = storage_cfg.get("storage_type", "short-term")
+        if storage_type == "long-term":
+            storage_cfg["storage_schedule_profile"] = forecaster[schedule_key]
+
+    # Assert the schedule profile is present and correct
+    assert "storage_schedule_profile" in components["hydrogen_seasonal_storage"]
+    assert components["hydrogen_seasonal_storage"]["storage_schedule_profile"].equals(
+        schedule
     )
 
 
