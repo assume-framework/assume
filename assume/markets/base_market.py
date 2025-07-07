@@ -235,6 +235,8 @@ class MarketRole(MarketMechanism, Role):
         """
         # scheduled to be opened now
         market_open = timestamp2datetime(self.context.current_timestamp)
+        # microseconds should always be zero - required for real-time
+        market_open = market_open.replace(microsecond=0)
         market_closing = market_open + self.marketconfig.opening_duration
         products = get_available_products(
             self.marketconfig.market_products, market_open
