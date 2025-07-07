@@ -12,7 +12,7 @@ import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
-from assume.common.utils import datetime2timestamp
+from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
@@ -140,8 +140,7 @@ class Learning(Role):
 
         self.tensor_board_logger = None
         self.db_addr = None
-        self.freq_timedelta = None
-        self.time_steps = None
+        self.update_steps = None
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -446,15 +445,9 @@ class Learning(Role):
 
         self.datetime = pd.to_datetime(train_start)
 
-        self.freq_timedelta = pd.Timedelta(freq)
-        # This is for padding the output list when the gradient steps are not identical to the train frequency
-        self.time_steps = max(
-            1,
-            pd.Timedelta(self.train_freq)
-            // (self.freq_timedelta * self.gradient_steps),
-        )
+        self.update_steps = 0
 
-    def write_rl_critic_params_to_output(
+    def write_rl_grad_params_to_output(
         self, learning_rate: float, unit_params_list: list[dict]
     ) -> None:
         """
@@ -472,21 +465,31 @@ class Learning(Role):
             A list of dictionaries containing critic losses for each time step.
             Each dictionary maps critic names to their corresponding loss values.
         """
+        # gradient steps performed in previous training episodes
+        gradient_steps_done = (
+            max(self.episodes_done - self.episodes_collecting_initial_experience, 0)
+            * int(
+                (timestamp2datetime(self.end) - timestamp2datetime(self.start))
+                / pd.Timedelta(self.train_freq)
+            )
+            * self.gradient_steps
+        )
 
         output_list = [
             {
+                "step": gradient_steps_done
+                + self.update_steps
+                * self.gradient_steps  # gradient steps performed in current training episode
+                + gradient_step,
                 "unit": u_id,
-                "critic_loss": params["loss"],
-                "total_grad_norm": params["total_grad_norm"],
-                "max_grad_norm": params["max_grad_norm"],
+                "actor_loss": params["actor_loss"],
+                "actor_total_grad_norm": params["actor_total_grad_norm"],
+                "actor_max_grad_norm": params["actor_max_grad_norm"],
+                "critic_loss": params["critic_loss"],
+                "critic_total_grad_norm": params["critic_total_grad_norm"],
+                "critic_max_grad_norm": params["critic_max_grad_norm"],
                 "learning_rate": learning_rate,
-                "datetime": self.datetime
-                + (
-                    (time_step * self.gradient_steps + gradient_step)
-                    * self.freq_timedelta
-                ),
             }
-            for time_step in range(self.time_steps)
             for gradient_step in range(self.gradient_steps)
             for u_id, params in unit_params_list[gradient_step].items()
         ]
@@ -496,9 +499,10 @@ class Learning(Role):
                 receiver_addr=self.db_addr,
                 content={
                     "context": "write_results",
-                    "type": "rl_critic_params",
+                    "type": "rl_grad_params",
                     "data": output_list,
                 },
             )
 
-        self.datetime = self.datetime + pd.Timedelta(self.train_freq)
+        # Number of network updates (with `self.gradient_steps`) during this episode
+        self.update_steps += 1
