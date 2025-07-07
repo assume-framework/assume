@@ -12,6 +12,17 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+0.5.6 - (07th July 2025)
+=========================
+
+**New Features:**
+
+**Improvements:**
+
+**Bug Fixes:**
+
+- **Missing init:** Steam generation plant and CRM bidding strategies for dsm was missing in 'init'.
+
 0.5.5 - (29th June 2025)
 =========================
 
