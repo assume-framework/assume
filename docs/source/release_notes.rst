@@ -12,11 +12,41 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+0.5.6 - (07th July 2025)
+=========================
+
 **New Features:**
 
-- **ThermalStorage with Scheduling:** Introduced a `ThermalStorage` class that extends `GenericStorage` to support both short-term (freely cycling) and long-term (schedule-driven) storage operation. Long-term mode allows users to define a binary schedule to restrict charging and discharging to specific periods, enabling realistic modeling of industrial or seasonal thermal storage behavior.
-  - To use this feature, set `storage_type` to `"long-term"` and provide a `storage_schedule_profile` (0: charging allowed, 1: discharging allowed).
-  - Hydrogen fuel type included for the Boiler
+**Improvements:**
+
+**Bug Fixes:**
+
+- **Missing init:** Steam generation plant and CRM bidding strategies for dsm was missing in 'init'.
+
+0.5.5 - (29th June 2025)
+=========================
+
+**New Features:**
+
+**Steam Generation Plant:** Introduced a 'SteamGenerationPlant' class to model steam generation processes. This class supports both electric and thermal inputs, allowing for flexible operation based on available resources. The plant can be configured with various components, such as heat pumps and boilers, to optimize steam production.
+**New Demand Side Flexibility Measure** Implemented 'symmetric_flexible_block' flexibility measure for demand side units. This measure allows users to define a symmetric block of flexibility, enabling to construct a load profile based on which the block bids for CRM amrket can be formulated.
+**Positive and Negative Flexibility for DSM Units** Introduced the bidding strategies 'DSM_PosCRM_Strategy' and 'DSM_PosCRM_Strategy' to define positive and negative flexibility for demand side management (DSM) units. This feature allows users to participate DSM units in a Control Reserve Market (CRM).
+**Electricity price signal based Flexibility Signal for DSM**: Implemented'electricity_price_signal' flexibility measure for demand side units, Thus measure allows to shift the load based on the electricity price signal, enabling users to parform this operation based on a reference load profile.
+
+**Improvements:**
+- **Component connection in hydrogen plant:** Fixed a bug regarding the connection of the components in the hydrogen plant.
+
+**Bug Fixes:**
+
+- **Initial SOC Bug:** Fixed a bug with the the initial SOC and constraint.
+
+
+0.5.4 - (26th June 2025)
+=========================
+
+ **New Features:**
+
+- **ThermalStorage with Scheduling:** Introduced a `ThermalStorage` class that extends `GenericStorage` to support both short-term (freely cycling) and long-term (schedule-driven) storage operation. Long-term mode allows users to define a binary schedule to restrict charging and discharging to specific periods, enabling realistic modeling of industrial or seasonal thermal storage behavior. To use this feature, set `storage_type` to `"long-term"` and provide a `storage_schedule_profile` (0: charging allowed, 1: discharging allowed). Hydrogen fuel type included for the Boiler
 - **Hydrogen_plant:** The HydrogenPlant master class has been refactored for modularity. Technologies such as the electrolyser and (optionally) the SeasonalHydrogenStorage are now connected in a flexible manner, supporting both per-timestep and cumulative hydrogen demand balancing. The plant model now robustly accommodates both storage and non-storage configurations, ensuring correct mass balances across all scenarios.
 
 **Improvements:**
