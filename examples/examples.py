@@ -121,7 +121,7 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "timescale"  # "local_db" or "timescale"
+    data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
     example = "case_study_2013"
