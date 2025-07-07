@@ -16,7 +16,7 @@ base_case_2013:
     algorithm: matd3
     learning_rate: 0.0001
     training_episodes: 100
-    episodes_collecting_initial_experience: 5
+    episodes_collecting_initial_experience: 2
     train_freq: 24h
     gradient_steps: 1
     batch_size: 256
