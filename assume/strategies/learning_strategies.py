@@ -18,7 +18,10 @@ from assume.common.base import (
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
-from assume.reinforcement_learning.learning_utils import NormalActionNoise
+from assume.reinforcement_learning.learning_utils import (
+    NormalActionNoise,
+    encode_time_features,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -185,12 +188,17 @@ class BaseLearningStrategy(LearningStrategy):
         # --- 3. Individual observations ---
         individual_observations = self.get_individual_observations(unit, start)
 
+        # --- 4. Encoded time features
+
+        encoded_time = encode_time_features(start=start)
+
         # concat all observations into one array
         observation = np.concatenate(
             [
                 scaled_res_load_forecast,
                 scaled_price_forecast,
                 scaled_price_history,
+                encoded_time,
                 individual_observations,
             ]
         )
@@ -357,7 +365,7 @@ class RLStrategy(BaseLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 38)
+        obs_dim = kwargs.pop("obs_dim", 44)
         act_dim = kwargs.pop("act_dim", 2)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
@@ -701,7 +709,7 @@ class RLStrategySingleBid(RLStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 74)
+        obs_dim = kwargs.pop("obs_dim", 44)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
@@ -713,7 +721,7 @@ class RLStrategySingleBid(RLStrategy):
         )
 
         # we select 24 to be in line with the storage strategies
-        self.foresight = 24
+        self.foresight = 12
 
     def calculate_bids(
         self,
@@ -851,7 +859,7 @@ class StorageRLStrategy(BaseLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 74)
+        obs_dim = kwargs.pop("obs_dim", 44)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
@@ -867,7 +875,7 @@ class StorageRLStrategy(BaseLearningStrategy):
         # neural network architecture is predefined, and the size of the observations must remain consistent.
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
-        self.foresight = 24
+        self.foresight = 12
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
