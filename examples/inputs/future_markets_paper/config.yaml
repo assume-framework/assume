@@ -12,10 +12,10 @@ base_case_2013:
   learning_config:
     continue_learning: False
     trained_policies_save_path: null
-    max_bid_price: 100
+    max_bid_price: 300
     algorithm: matd3
-    learning_rate: 0.001
-    training_episodes: 10
+    learning_rate: 0.0001
+    training_episodes: 100
     episodes_collecting_initial_experience: 5
     train_freq: 24h
     gradient_steps: 1
@@ -25,6 +25,7 @@ base_case_2013:
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
+    action_noise_schedule: linear
     validation_episodes_interval: 5
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
