@@ -50,6 +50,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         demand: float = 0,
         cost_tolerance: float = 10,
         congestion_threshold: float = 0,
+        peak_load_cap: float = 0,
         node: str = "node0",
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
@@ -106,7 +107,11 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.demand = demand
         self.thermal_demand = self.forecaster[f"{self.id}_thermal_demand"]
         self.congestion_signal = self.forecaster[f"{self.id}_congestion_signal"]
+        self.renewable_utilisation_signal = self.forecaster[
+            f"{node}_renewable_utilisation"
+        ]
         self.congestion_threshold = congestion_threshold
+        self.peak_load_cap = peak_load_cap
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
