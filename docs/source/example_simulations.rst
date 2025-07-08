@@ -222,6 +222,20 @@ Key Features of Example Simulations
    - large_2019_rl and large_2021_rl examples apply reinforcement learning techniques to full-year market simulations, as presented in [1]_. In this examples, the power plant units with a capacity of less then 300 MW were aggregated into larger units to increase the learning speed.
    - Based on comprehensive research presented in [1]_ and [2]_, offering insights into complex market dynamics and the application of advanced learning techniques in different market years.
 
+4. redispatch small scale example (redisp_valid_3_nodes*, redisp_dsm_3_nodes):
+
+   - Showcases 3 node example to demonstrate redispatch mechanism.
+   - Include full demand and renewable generation profiles, major generation units, and storage facilities.
+   - The redisp_valid_3_nodes example focuses on validating the redispatch mechanism, while the redisp_dsm_3_nodes example incorporates Demand Side Management (DSM) capabilities.
+   - These examples are designed to illustrate the redispatch mechanism in a simplified, yet effective manner, allowing users to grasp the complexities of redispatch in energy markets.
+
+5. redispatch large scale example (redisp_large_2023):
+
+   - Based on comprehensive research on dataset for 2023 this example provides a large-scale simulation of the redispatch mechanism
+   - Includes full demand and renewable generation profiles, major generation units, and storage facilities.
+   - This example is designed to illustrate the redispatch mechanism in a more complex, real-world scenario, allowing users to explore the intricacies of redispatch in large-scale energy markets.
+
+
 These examples provide a diverse range of scenarios, allowing users to explore various aspects of energy market simulation, from basic concepts to complex, real-world applications and advanced learning strategies.
 
 References

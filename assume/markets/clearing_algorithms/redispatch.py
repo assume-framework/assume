@@ -3,19 +3,20 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import os
 
 import numpy as np
 import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
+    add_fix_units,
+    add_redispatch_dsm,
     add_redispatch_generators,
-    add_redispatch_loads,
     calculate_network_meta,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import suppress_output
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -65,10 +66,26 @@ class RedispatchMarketRole(MarketRole):
                 "backup_marginal_cost", 10e4
             ),
         )
-        add_redispatch_loads(
+        add_fix_units(
             network=self.network,
-            loads=self.grid_data["loads"],
+            units=self.grid_data["loads"],
         )
+
+        add_fix_units(
+            network=self.network,
+            units=self.grid_data["storage_units"],
+        )
+
+        add_fix_units(
+            network=self.network,
+            units=self.grid_data["exchange_units"],
+        )
+
+        if self.grid_data.get("industrial_dsm_units", None) is not None:
+            add_redispatch_dsm(
+                network=self.network,
+                industrial_dsm_units=self.grid_data["industrial_dsm_units"],
+            )
 
         self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
@@ -187,18 +204,55 @@ class RedispatchMarketRole(MarketRole):
             redispatch_network.lines_t.p0.abs() / redispatch_network.lines.s_nom
         )
 
-        # if any line is congested, perform redispatch
+        line_loading_df = line_loading.reset_index()
+        output_file = "outputs/line_loading.csv"
+        output_dir = os.path.dirname(output_file)
+
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+
+        try:
+            existing_df = pd.read_csv(output_file)
+            existing_headers = list(existing_df.columns)
+            if list(line_loading_df.columns) == existing_headers:
+                line_loading_df.to_csv(
+                    output_file,
+                    mode="a",
+                    header=False,
+                    index=False,
+                    float_format="%.5g",
+                )
+            else:
+                line_loading_df.to_csv(
+                    output_file,
+                    mode="a",
+                    header=True,
+                    index=False,
+                    float_format="%.5g",
+                )
+        except FileNotFoundError:
+            # If the file doesn't exist, write it with headers
+            line_loading_df.to_csv(
+                output_file,
+                mode="w",
+                header=True,
+                index=False,
+                float_format="%.5g",
+            )
+
+        logger.info(f"Line loading data appended to {output_file}")
+
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
 
-            with suppress_output():
-                status, termination_condition = redispatch_network.optimize(
-                    solver_name=self.solver,
-                    solver_options=self.solver_options,
-                    # do not show tqdm progress bars for large grids
-                    # https://github.com/PyPSA/linopy/pull/375
-                    progress=False,
-                )
+            # with suppress_output():
+            status, termination_condition = redispatch_network.optimize(
+                solver_name=self.solver,
+                solver_options=self.solver_options,
+                # do not show tqdm progress bars for large grids
+                # https://github.com/PyPSA/linopy/pull/375
+                progress=False,
+            )
 
             if status != "ok":
                 logger.error(f"Solver exited with {termination_condition}")

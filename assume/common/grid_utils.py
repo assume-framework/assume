@@ -195,31 +195,39 @@ def add_loads(
         )
 
 
-def add_redispatch_loads(
+def add_fix_units(
     network: pypsa.Network,
-    loads: pd.DataFrame,
+    units: pd.DataFrame,
 ) -> None:
     """
-    This adds loads to the redispatch PyPSA network with respective bus data to which they are connected
+    This adds the loads as fix units to the nodal PyPSA network. It also adds storage units & exchange units
+    as fix_units because in the current redispatch market/mechanism these units are not allowed to do redispatch.
+
+    Args:
+        network (pypsa.Network): the pypsa network to which the units are added
+        loads (pandas.DataFrame): the loads dataframe
     """
-    loads_c = loads.copy()
-    if "sign" in loads_c.columns:
-        del loads_c["sign"]
+    if units is None or units.empty:
+        return
+
+    units_c = units.copy()
+    if "sign" in units_c.columns:
+        del units_c["sign"]
 
     # add loads with opposite sign (default for loads is -1). This is needed to properly model the redispatch
     network.add(
         "Load",
-        name=loads.index,
-        bus=loads["node"],  # bus to which the generator is connected to
+        name=units.index,
+        bus=units["node"],  # bus to which the generator is connected to
         sign=1,
-        **loads_c,
+        **units_c,
     )
 
-    if "p_set" not in loads.columns:
+    if "p_set" not in units.columns:
         network.loads_t["p_set"] = pd.DataFrame(
-            np.zeros((len(network.snapshots), len(loads.index))),
+            np.zeros((len(network.snapshots), len(units.index))),
             index=network.snapshots,
-            columns=loads.index,
+            columns=units.index,
         )
 
 
@@ -253,6 +261,63 @@ def add_nodal_loads(
         marginal_cost=p_set,
         sign=-1,
         **loads_c,
+    )
+
+
+def add_redispatch_dsm(
+    network: pypsa.Network, industrial_dsm_units: pd.DataFrame
+) -> None:
+    """
+    This adds the industrial_dsm_units with the sold capacity in the DAM as loads
+    and the flexible capacity to ramp up and ramp down as upward and downward generators
+
+    Args:
+        network (pypsa.Network): the pypsa network to which the units are added
+        industrial_dsm_units (pandas.DataFrame): the industrial_dsm_units dataframe
+    """
+
+    # simply copy the DataFrame straight over
+    dsm_units = industrial_dsm_units.copy()
+
+    # now build p_set exactly as before...
+    p_set = pd.DataFrame(
+        0,
+        index=network.snapshots,
+        columns=dsm_units.index,
+    )
+
+    network.madd(
+        "Load",
+        names=dsm_units.index,
+        bus=dsm_units["node"],
+        p_set=p_set,
+        sign=1,
+    )
+
+    # upward redispatch
+    network.madd(
+        "Generator",
+        names=dsm_units.index,
+        suffix="_up",
+        bus=dsm_units["node"],
+        p_nom=1,
+        p_min_pu=p_set,
+        p_max_pu=p_set,
+        marginal_cost=p_set,
+        sign=-1,
+    )
+
+    # downward redispatch
+    network.madd(
+        "Generator",
+        names=dsm_units.index,
+        suffix="_down",
+        bus=dsm_units["node"],
+        p_nom=1,
+        p_min_pu=p_set,
+        p_max_pu=p_set,
+        marginal_cost=p_set,
+        sign=1,
     )
 
 
