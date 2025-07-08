@@ -3,15 +3,15 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+import warnings
 
 import numpy as np
 import pandas as pd
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 
-import warnings
+warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
-warnings.simplefilter(action='ignore', category=pd.errors.PerformanceWarning)
 
 class Forecaster:
     """

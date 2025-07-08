@@ -383,8 +383,6 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                         "volume": volume,
                         "max_power": -max(volume, volume_flex),
                         "min_power": -min(volume, volume_flex),
-                        "max_power": -volume,
-                        "min_power": -volume_flex,
                         "node": unit.node,
                     }
                 )
@@ -398,9 +396,9 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                         "volume": volume,
                         "max_power": -max(volume, volume_flex),
                         "min_power": -min(volume, volume_flex),
-                        #"max_power": -volume_flex,
-                        #"min_power": -volume,
-                        "node":unit.node,
+                        # "max_power": -volume_flex,
+                        # "min_power": -volume,
+                        "node": unit.node,
                     }
                 )
             else:
@@ -411,13 +409,14 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                         "only_hours": product[2],
                         "price": marginal_price,
                         "volume": volume,
-                        "max_power":0,
+                        "max_power": 0,
                         "min_power": 0,
                         "node": unit.node,
                     }
                 )
 
         return bids
+
 
 class NaiveExchangeStrategy(BaseStrategy):
     """
