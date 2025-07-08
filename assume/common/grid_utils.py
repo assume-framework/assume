@@ -204,8 +204,8 @@ def add_fix_units(
     as fix_units because in the current redispatch market/mechanism these units are not allowed to do redispatch.
 
     Args:
-    network (pypsa.Network): the pypsa network to which the units are added
-    loads (pandas.DataFrame): the loads dataframe
+        network (pypsa.Network): the pypsa network to which the units are added
+        loads (pandas.DataFrame): the loads dataframe
     """
     if units is None or units.empty:
         return
@@ -263,16 +263,17 @@ def add_nodal_loads(
         **loads_c,
     )
 
-def add_redispatch_dsm(network: pypsa.Network,
-    industrial_dsm_units: pd.DataFrame) -> None:
 
+def add_redispatch_dsm(
+    network: pypsa.Network, industrial_dsm_units: pd.DataFrame
+) -> None:
     """
     This adds the industrial_dsm_units with the sold capacity in the DAM as loads
     and the flexible capacity to ramp up and ramp down as upward and downward generators
 
     Args:
-    network (pypsa.Network): the pypsa network to which the units are added
-    industrial_dsm_units (pandas.DataFrame): the industrial_dsm_units dataframe
+        network (pypsa.Network): the pypsa network to which the units are added
+        industrial_dsm_units (pandas.DataFrame): the industrial_dsm_units dataframe
     """
 
     # simply copy the DataFrame straight over

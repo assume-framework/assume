@@ -344,7 +344,9 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
         exchange_units = None
 
     try:
-        industrial_dsm_units = pd.read_csv(network_path / "industrial_dsm_units.csv", index_col=0)
+        industrial_dsm_units = pd.read_csv(
+            network_path / "industrial_dsm_units.csv", index_col=0
+        )
     except FileNotFoundError:
         industrial_dsm_units = None
 

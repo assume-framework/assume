@@ -4,19 +4,19 @@
 
 import logging
 import os
+
 import numpy as np
 import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
     add_fix_units,
-    add_redispatch_generators,
     add_redispatch_dsm,
+    add_redispatch_generators,
     calculate_network_meta,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import suppress_output
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -207,7 +207,7 @@ class RedispatchMarketRole(MarketRole):
         line_loading_df = line_loading.reset_index()
         output_file = "outputs/line_loading.csv"
         output_dir = os.path.dirname(output_file)
-        
+
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
 
@@ -245,7 +245,7 @@ class RedispatchMarketRole(MarketRole):
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
 
-            #with suppress_output():
+            # with suppress_output():
             status, termination_condition = redispatch_network.optimize(
                 solver_name=self.solver,
                 solver_options=self.solver_options,
