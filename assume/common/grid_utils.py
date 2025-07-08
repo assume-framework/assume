@@ -200,7 +200,8 @@ def add_fix_units(
     units: pd.DataFrame,
 ) -> None:
     """
-    This adds loads to the redispatch PyPSA network with respective bus data to which they are connected
+    This adds the loads as fix units to the nodal PyPSA network. It also adds storage units & exchange units
+    as fix_units because in the current redispatch market/mechanism these units are not allowed to do redispatch.
     """
     if units is None or units.empty:
         return
