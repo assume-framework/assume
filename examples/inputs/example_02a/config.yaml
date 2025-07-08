@@ -8,7 +8,6 @@ base:
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
-
   learning_config:
     continue_learning: false
     trained_policies_save_path: null
@@ -28,16 +27,15 @@ base:
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       start_date: 2019-03-01 00:00
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -46,14 +44,12 @@ base:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-
 base_lstm:
   start_date: 2019-03-01 00:00
   end_date: 2019-03-31 00:00
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
-
   learning_config:
     continue_learning: false
     trained_policies_save_path: null
@@ -74,16 +70,15 @@ base_lstm:
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
     actor_architecture: lstm
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       start_date: 2019-03-01 00:00
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -92,14 +87,12 @@ base_lstm:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-
 tiny:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-05 00:00
   time_step: 1h
   learning_mode: true
   save_frequency_hours: null
-
   learning_config:
     continue_learning: false
     trained_policies_save_path: null
@@ -118,16 +111,57 @@ tiny:
     noise_dt: 1
     validation_episodes_interval: 5
     actor_architecture: mlp
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       start_date: 2019-01-01 00:00
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+base_dispatch:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-31 00:00
+  time_step: 1h
+  learning_mode: false
+  save_frequency_hours: null
+  learning_config:
+    continue_learning: false
+    trained_policies_save_path: learned_strategies/base_dispatch/last_policies
+    trained_policies_load_path: learned_strategies/base_dispatch/avg_reward_eval_policies
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 0
+    episodes_collecting_initial_experience: 0
+    train_freq: 100h
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-03-01 00:00
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh

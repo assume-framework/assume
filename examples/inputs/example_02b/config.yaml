@@ -2,13 +2,12 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-base:
+base_sb:
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
   save_frequency_hours: null
-  learning_mode: True
-
+  learning_mode: true
   learning_config:
     continue_learning: false
     trained_policies_save_path: null
@@ -28,15 +27,14 @@ base:
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 5
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -45,16 +43,14 @@ base:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-
 base_lstm:
   start_date: 2019-03-01 00:00
   end_date: 2019-04-01 00:00
   time_step: 1h
   save_frequency_hours: null
-  learning_mode: True
-
+  learning_mode: true
   learning_config:
-    continue_learning: False
+    continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100
     algorithm: matd3
@@ -73,15 +69,96 @@ base_lstm:
     validation_episodes_interval: 5
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+base_dispatch:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-01 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  learning_mode: false
+  learning_config:
+    continue_learning: false
+    trained_policies_save_path: learned_strategies/base_dispatch/last_policies
+    trained_policies_load_path: learned_strategies/base_dispatch/avg_reward_eval_policies
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 0
+    episodes_collecting_initial_experience: 0
+    train_freq: 100h
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+base_sb_dispatch:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-01 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  learning_mode: false
+  learning_config:
+    continue_learning: false
+    trained_policies_save_path: learned_strategies/base_sb_dispatch/last_policies
+    trained_policies_load_path: learned_strategies/base_sb_dispatch/avg_reward_eval_policies
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 0
+    episodes_collecting_initial_experience: 0
+    train_freq: 100h
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh

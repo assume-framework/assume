@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# FILEPATH: /Users/nick/GitHub/bilevel_opt/pyproject.toml
+
+[tool.isort]
+profile = "black"

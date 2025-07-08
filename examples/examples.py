@@ -72,7 +72,7 @@ available_examples = {
     #
     # DRL references case for learning advancement testing
     "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
-    "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
+    "small_learning_2": {"scenario": "example_02b", "study_case": "base_sb"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     # DRL cases with lstm instead of mlp as actor neural network architecture
     "small_learning_1_lstm": {"scenario": "example_02a", "study_case": "base_lstm"},
@@ -113,10 +113,10 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_with_vre_and_storage"
+    example = "small_learning_2"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
