@@ -27,3 +27,4 @@ Here you can find several tutorials on how to use ASSUME framework to get you st
    examples/09_example_Sim_and_xRL.nblink
    examples/10_DSU_and_flexibility.nblink
    examples/11_redispatch.nblink
+   examples/11a_redispatch_dsm.nblink
