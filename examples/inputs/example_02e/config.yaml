@@ -4,7 +4,7 @@
 
 base:
   start_date: 2019-03-01 00:00
-  end_date: 2019-03-31 00:00
+  end_date: 2019-04-30 00:00
   time_step: 1h
   save_frequency_hours: null
   learning_mode: true
@@ -17,7 +17,7 @@ base:
     algorithm: matd3
     actor_architecture: mlp
     learning_rate: 0.0003
-    training_episodes: 50
+    training_episodes: 30
     episodes_collecting_initial_experience: 5
     train_freq: 720h
     gradient_steps: 720
