@@ -128,18 +128,21 @@ The former are helpful if you would like to get an impression of how ASSUME work
 
 The tutorials work completely detached from your own machine on google colab.
 They provide code snippets and task that show you, how you can work with the software package one your own.
-We have two tutorials prepared, one for introducing a new unit and one for getting reinforcement learning ready on ASSUME.
+We have multiple tutorials prepared, e.g. one for introducing a new unit and three for getting reinforcement learning ready on ASSUME.
 
 How to configure a new unit in ASSUME?
+
 [![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/03_custom_unit_example.ipynb)
-
-How to use reinforcement learning for new market participants in ASSUME?
-
-[![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04_reinforcement_learning_example.ipynb)
 
 How to change and adapt reinforcement learning algorithms in ASSUME?
 
-[![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04_reinforcement_learning_algorithm_example.ipynb)
+[![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04a_reinforcement_learning_algorithm_example.ipynb)
+
+How to use reinforcement learning for new market participants in ASSUME?
+
+- Power plant unit: [![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04b_reinforcement_learning_example.ipynb)
+
+- Storage unit: [![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04c_reinforcement_learning_storage_example.ipynb)
 
 
 ### The Examples
