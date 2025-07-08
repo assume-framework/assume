@@ -23,6 +23,17 @@ Upcoming Release
 
 - **Missing init:** Steam generation plant and CRM bidding strategies for dsm was missing in 'init'.
 
+0.5.6 - (07th July 2025)
+=========================
+
+**New Features:**
+- **Documentation**: Fullscale DSM Tutorial
+-
+**Improvements:**
+
+
+**Bug Fixes:**
+
 0.5.5 - (29th June 2025)
 =========================
 
