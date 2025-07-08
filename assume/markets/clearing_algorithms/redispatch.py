@@ -245,14 +245,14 @@ class RedispatchMarketRole(MarketRole):
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
 
-            with suppress_output():
-                status, termination_condition = redispatch_network.optimize(
-                    solver_name=self.solver,
-                    solver_options=self.solver_options,
-                    # do not show tqdm progress bars for large grids
-                    # https://github.com/PyPSA/linopy/pull/375
-                    progress=False,
-                )
+            #with suppress_output():
+            status, termination_condition = redispatch_network.optimize(
+                solver_name=self.solver,
+                solver_options=self.solver_options,
+                # do not show tqdm progress bars for large grids
+                # https://github.com/PyPSA/linopy/pull/375
+                progress=False,
+            )
 
             if status != "ok":
                 logger.error(f"Solver exited with {termination_condition}")
