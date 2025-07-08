@@ -297,6 +297,9 @@ class NaiveRedispatchStrategy(BaseStrategy):
 
 class FixedDispatchStrategy(BaseStrategy):
     """
+    This strategy is used to dispatch demand units & storage units with sold quantities in the DAM
+    and exchange units with fixed import and export quantities while clearing redispatch.
+
     A naive strategy that simply submits all information about the unit and
     currently dispatched power for the following hours to the redispatch market.
     Information includes the marginal cost, the ramp up and down values, and the dispatch.
