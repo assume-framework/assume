@@ -20,8 +20,9 @@ Upcoming Release
 - **Steam Generation Plant:** Introduced a 'SteamGenerationPlant' class to model steam generation processes. This class supports both electric and thermal inputs, allowing for flexible operation based on available resources. The plant can be configured with various components, such as heat pumps and boilers, to optimize steam production.
 - **New Demand Side Flexibility Measure** Implemented 'symmetric_flexible_block' flexibility measure for demand side units. This measure allows users to define a symmetric block of flexibility, enabling to construct a load profile based on which the block bids for CRM amrket can be formulated.
 - **Positive and Negative Flexibility for DSM Units** Introduced the bidding strategies 'DSM_PosCRM_Strategy' and 'DSM_PosCRM_Strategy' to define positive and negative flexibility for demand side management (DSM) units. This feature allows users to participate DSM units in a Control Reserve Market (CRM).
-- **Electricity price signal based Flexibility Signal for DSM**: Implemented'electricity_price_signal' flexibility measure for demand side units, Thus measure allows to shift the load based on the electricity price signal, enabling users to parform this operation based on a reference load profile.
+- **Electricity price signal based Flexibility Signal for DSM**: Implemented'electricity_price_signal' flexibility measure for demand side units, Thus measure allows to shift the load based on the electricity price signal, enabling users to perform this operation based on a reference load profile.
 - **Documentation**: Fullscale DSM Tutorial and adjusted learning tutorials to include new bidding strategy and one particularly for storages.
+- **New Redispatch Tutorial**: Provide a new tutorial referencing ongoing dveelopment on an extra branch.
 
 **Improvements:**
 
