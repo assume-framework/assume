@@ -499,6 +499,8 @@ class WriteOutput(Role):
 
             # check for tensors and convert them to floats
             df = df.apply(convert_tensors)
+            # sort dataframes by column names for consistent CSVs
+            df = df.reindex(sorted(df.columns), axis=1)
 
             # check for any float64 columns and convert them to floats
             df = df.map(lambda x: float(x) if isinstance(x, np.float64) else x)
