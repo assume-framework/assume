@@ -2,9 +2,9 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-#######################
+#############
 Release Notes
-#######################
+#############
 
 Upcoming Release
 ================
@@ -12,6 +12,9 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+
+0.5.4 - (9th July 2025)
+=======================
 
  **New Features:**
 
@@ -44,7 +47,7 @@ Upcoming Release
 - **Missing init:** Steam generation plant and CRM bidding strategies for dsm was missing in 'init'.
 
 0.5.3 - (4th June 2025)
-=========================
+=======================
 
 **New Features:**
 
