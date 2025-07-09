@@ -7,7 +7,11 @@ import pytest
 
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import NaiveForecast
-from assume.strategies.naive_strategies import NaiveDADSMStrategy
+from assume.strategies.naive_strategies import (
+    DSM_NegCRM_Strategy,
+    DSM_PosCRM_Strategy,
+    NaiveDADSMStrategy,
+)
 from assume.units.steam_generation_plant import SteamPlant
 
 
@@ -247,7 +251,7 @@ def steam_plant_components_with_hp_b_ts():
             "max_power_discharge": 50,
             "efficiency_charge": 1,
             "efficiency_discharge": 1,
-            "initial_soc": 0.5,
+            "initial_soc": 0,
             "ramp_up": 50,
             "ramp_down": 50,
             "storage_loss_rate": 0.0,
@@ -378,7 +382,7 @@ def steam_plant_components_with_hp_b_longterm_ts():
             "max_power_discharge": 50,
             "efficiency_charge": 1,
             "efficiency_discharge": 1,
-            "initial_soc": 1.0,  # Fully charged
+            "initial_soc": 0,
             "ramp_up": 50,
             "ramp_down": 50,
             "storage_loss_rate": 0.0,
@@ -525,6 +529,109 @@ def test_all_assets_coordinated(steam_plant_with_hp_b_ts):
     total_supply = heat_pump_output + boiler_output + storage_output - storage_charge
 
     assert total_supply == pytest.approx(thermal_demand, rel=1e-3)
+
+
+@pytest.fixture
+def steam_plant_with_crm_flex(steam_plant_components_with_hp_b):
+    index = pd.date_range("2023-01-01", periods=24, freq="h")
+    forecast = NaiveForecast(
+        index,
+        electricity_price=[60] * 24,
+        hydrogen_gas_price=[55] * 24,
+        A360_thermal_demand=[8] * 24,
+    )
+    bidding_strategy = {
+        "CRM_pos": DSM_PosCRM_Strategy(),
+        "CRM_neg": DSM_NegCRM_Strategy(),
+    }
+    return SteamPlant(
+        id="A360",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="symmetric_flexible_block",
+        cost_tolerance=5,  # Use low tolerance for strict test
+        bidding_strategies=bidding_strategy,
+        components=steam_plant_components_with_hp_b,
+        forecaster=forecast,
+    )
+
+
+def test_crm_block_flexibility_and_bidding(steam_plant_with_crm_flex):
+    # 1. Run optimal operation with flexibility
+    steam_plant_with_crm_flex.determine_optimal_operation_with_flex()
+    assert steam_plant_with_crm_flex.flex_power_requirement is not None
+
+    # 2. Access the plant's CRM block variables after solving
+    instance = steam_plant_with_crm_flex.model.create_instance()
+    instance = steam_plant_with_crm_flex.switch_to_flex(instance)
+    steam_plant_with_crm_flex.solver.solve(instance, tee=False)
+
+    # 3. Test the CRM bidding strategies
+    market_config = {}  # add if you need for your bidding function
+    # Define possible blocks (simulate market product_tuples as (start, end, only_hours))
+    index = steam_plant_with_crm_flex.index
+    product_tuples = []
+    block_length = 4
+    for i in range(len(index) - block_length):
+        product_tuples.append((index[i], index[i + block_length], None))
+
+    # --- POSITIVE CRM ---
+    pos_strategy = DSM_PosCRM_Strategy()
+    pos_bids = pos_strategy.calculate_bids(
+        steam_plant_with_crm_flex, market_config, product_tuples
+    )
+    assert isinstance(pos_bids, list)
+    # --- NEGATIVE CRM ---
+    neg_strategy = DSM_NegCRM_Strategy()
+    neg_bids = neg_strategy.calculate_bids(
+        steam_plant_with_crm_flex, market_config, product_tuples
+    )
+    assert isinstance(neg_bids, list)
+    # Optional: check at least one bid has positive volume if possible
+    assert any(bid["volume"] > 0 for bid in pos_bids + neg_bids)
+
+
+@pytest.fixture
+def steam_plant_with_price_signal_flex(steam_plant_components_with_hp_b):
+    index = pd.date_range("2023-01-01", periods=24, freq="h")
+    # New price signal: simulate low prices at night, high in afternoon
+    price_flex = [30] * 6 + [45] * 6 + [80] * 6 + [50] * 6
+    forecast = NaiveForecast(
+        index,
+        electricity_price=[60] * 24,  # Reference, will be replaced in flex mode
+        hydrogen_gas_price=[55] * 24,
+        A360_thermal_demand=[8] * 24,
+    )
+    bidding_strategy = {}
+    plant = SteamPlant(
+        id="A360",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="electricity_price_signal",
+        cost_tolerance=5,
+        bidding_strategies=bidding_strategy,
+        components=steam_plant_components_with_hp_b,
+        forecaster=forecast,
+    )
+    plant.electricity_price_flex = price_flex
+    return plant
+
+
+def test_electricity_price_signal_flexibility(steam_plant_with_price_signal_flex):
+    # Solve with price signal flexibility
+    steam_plant_with_price_signal_flex.determine_optimal_operation_with_flex()
+    flex_profile = list(steam_plant_with_price_signal_flex.flex_power_requirement)
+
+    # Check the profile is the correct length
+    assert len(flex_profile) == 24
+
+    # Optional: check for non-trivial operation
+    # e.g., did the plant shift operation at low/high prices? (Heuristic)
+    low_price_avg = sum(flex_profile[:6]) / 6
+    high_price_avg = sum(flex_profile[12:18]) / 6
+    print(f"Low price avg: {low_price_avg:.2f}, High price avg: {high_price_avg:.2f}")
+    # Should use more power when price is low than when it's high
+    assert low_price_avg >= high_price_avg - 1e-3
 
 
 if __name__ == "__main__":

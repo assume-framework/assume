@@ -254,7 +254,6 @@ class DSMFlex:
 
             elif self.technology == "building":
                 total_power_input = m.inflex_demand[t]
-                # Building components (e.g., heat_pump, boiler, pv_plant, generic_storage)
                 if self.has_heatpump:
                     total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
                 if self.has_boiler:
@@ -271,6 +270,11 @@ class DSMFlex:
                     )
                 if self.has_pv:
                     total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
+
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == total_power_input
+                )
 
             elif self.technology == "steam_generator_plant":
                 total_power = 0
@@ -448,6 +452,13 @@ class DSMFlex:
                         == self.model.dsm_blocks["eaf"].power_in[t]
                         + self.model.dsm_blocks["dri_plant"].power_in[t]
                     )
+
+            elif self.technology == "hydrogen_plant":
+                # Hydrogen plant constraint
+                return (
+                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
+                    == self.model.dsm_blocks["electrolyser"].power_in[t]
+                )
             elif self.technology == "steam_generator_plant":
                 total_power = 0
                 if self.has_heatpump:
@@ -729,7 +740,7 @@ class DSMFlex:
             self.flex_power_requirement = FastSeries(
                 index=self.index, value=flex_power_requirement
             )
-        if self.flexibility_measure == "symmetric_flexible_block":
+        elif self.flexibility_measure == "symmetric_flexible_block":
             adjusted_total_power_input = []
             for t in instance.time_steps:
                 total_power = 0.0

@@ -93,6 +93,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
 
         # Initialize parameters
         self.electricity_price = self.forecaster["price_EOM"]
+        self.hydrogen_demand = self.forecaster["hydrogen_demand"]
         self.demand = demand
 
         self.objective = objective
@@ -123,6 +124,10 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             initialize={t: value for t, value in enumerate(self.electricity_price)},
         )
         self.model.absolute_hydrogen_demand = pyo.Param(initialize=self.demand)
+        self.model.hydrogen_demand_per_timestep = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.hydrogen_demand)},
+        )
 
     def define_variables(self):
         self.model.total_power_input = pyo.Var(
@@ -131,7 +136,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         self.model.variable_cost = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
-        self.model.hydrogen_demand = pyo.Var(
+        self.model.cumulative_hydrogen_output = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
 
