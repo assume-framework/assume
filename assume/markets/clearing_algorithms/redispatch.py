@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-import os
 
 import numpy as np
 import pandas as pd
@@ -176,7 +175,7 @@ class RedispatchMarketRole(MarketRole):
                     float_format="%.5g",
                 )
         except FileNotFoundError:
-        # If the file doesn't exist, write it with headers
+            # If the file doesn't exist, write it with headers
             line_loading_df.to_csv(
                 output_file,
                 mode="w",

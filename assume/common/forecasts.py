@@ -544,11 +544,15 @@ class CsvForecaster(Forecaster):
 
         # Step 3: Calculate line-specific congestion severity
         line_congestion_severity = pd.DataFrame(index=self.index)
-        
+
         # Ensure that the lines DataFrame has the correct dtype for bus0 and bus1
         try:
-            self.lines["bus0"] = self.lines["bus0"].astype(self.demand_units["node"].dtype)
-            self.lines["bus1"] = self.lines["bus1"].astype(self.demand_units["node"].dtype)
+            self.lines["bus0"] = self.lines["bus0"].astype(
+                self.demand_units["node"].dtype
+            )
+            self.lines["bus1"] = self.lines["bus1"].astype(
+                self.demand_units["node"].dtype
+            )
         except Exception:
             # if dtype conversion fails, we'll still guard below
             pass
@@ -560,12 +564,16 @@ class CsvForecaster(Forecaster):
             # safe lookup: default missing nodes to zero‐series
             load1 = net_load_by_node.get(node1, None)
             if load1 is None:
-                self.logger.warning(f"Missing net-load for node {node1}; assuming zero-series")
+                self.logger.warning(
+                    f"Missing net-load for node {node1}; assuming zero-series"
+                )
                 load1 = pd.Series(0.0, index=self.index)
 
             load2 = net_load_by_node.get(node2, None)
             if load2 is None:
-                self.logger.warning(f"Missing net-load for node {node2}; assuming zero-series")
+                self.logger.warning(
+                    f"Missing net-load for node {node2}; assuming zero-series"
+                )
                 load2 = pd.Series(0.0, index=self.index)
 
             line_net_load = load1 + load2
