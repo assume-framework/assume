@@ -1250,6 +1250,22 @@ class TensorFastSeries(FastSeries):
             self._data = [value.clone() for _ in range(len(index))]
         elif isinstance(value, (int | float)):
             self._data = [th.tensor(value) for _ in range(len(index))]
+        elif isinstance(  # TODO: edit docstring
+            value, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
+        ):
+            # Handle list-like datetime-based inputs
+            dates = self._convert_to_datetime_array(value)
+            delta_seconds = np.array(
+                [(d - self.index.start).total_seconds() for d in dates]
+            )
+            indices = (delta_seconds / self.index.freq_seconds).round().astype(int)
+            remainders = delta_seconds % self.index.freq_seconds
+
+            if not np.all(remainders <= self.index.tolerance_seconds):
+                raise ValueError(
+                    "One or more dates are not aligned with the index frequency."
+                )
+            return self.data[indices]
         else:
             raise TypeError(
                 f"Unsupported value type: {type(value)}. Must be torch.Tensor, float, or int."
@@ -1284,6 +1300,28 @@ class TensorFastSeries(FastSeries):
         elif isinstance(item, datetime):
             idx = self.index._get_idx_from_date(item)
             self._data[idx] = value.clone()
+        elif isinstance(  # TODO: edit docstring
+            item, (list | pd.Index | pd.DatetimeIndex | np.ndarray | pd.Series)
+        ):
+            if (
+                len(item) == len(self.data)
+                and item[0] == self.index.start
+                and item[-1] == self.index.end
+            ):
+                self.data = np.array(value)
+            else:
+                if isinstance(value, pd.Series):
+                    for idx, i in enumerate(item):
+                        start = self.index._get_idx_from_date(i)
+                        self.data[start] = value.iloc[idx]
+                elif isinstance(value, list | np.ndarray):
+                    for idx, i in enumerate(item):
+                        start = self.index._get_idx_from_date(i)
+                        self.data[start] = value[idx]
+                else:
+                    for i in item:
+                        start = self.index._get_idx_from_date(i)
+                        self.data[start] = value
         else:
             raise TypeError(
                 f"Unsupported index type: {type(item)}. Must be int, slice, or datetime."

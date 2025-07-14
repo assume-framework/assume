@@ -659,7 +659,13 @@ class RLStrategy(BaseLearningStrategy):
         # scaling factor to normalize the reward to the range [-1,1]
         scaling = 1 / (self.max_bid_price * unit.max_power)
 
-        reward = scaling * (profit - regret_scale * opportunity_cost)
+        # Stabilizing learning: Limit positive profit to 10% of its absolute value.
+        # This reduces variance in rewards and prevents overfitting to extreme profit-seeking behavior.
+        # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
+        # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
+        # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
+        reward = min(profit, 0.1 * abs(profit))
+        reward = scaling * (reward - regret_scale * opportunity_cost)
 
         # Store results in unit outputs, which are later written to the database by the unit operator.
         unit.outputs["profit"].loc[start:end_excl] += profit
@@ -982,8 +988,10 @@ class RLStrategyDAM(RLStrategy):
         unit.outputs["rl_actions"].append(actions)
 
         # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"].at[first_start] = actions
-        unit.outputs["exploration_noise"].at[first_start] = noise
+        # TODO: if multiple bids per product start
+        products_index = get_products_index(bids)
+        unit.outputs["actions"].loc[products_index] = list(actions)
+        unit.outputs["exploration_noise"].loc[products_index] = list(noise)
 
         bids = self.remove_empty_bids(bids)
 
@@ -1031,6 +1039,7 @@ class RLStrategyDAM(RLStrategy):
         accepted_volume_total = np.zeros(len(products_index))
         market_clearing_price = np.zeros(len(products_index))
         marginal_costs = np.zeros(len(products_index))
+        regret_scale = np.zeros(len(products_index))
 
         # Map products_index to their positions for faster updates
         index_map = {time: i for i, time in enumerate(products_index)}
@@ -1095,9 +1104,10 @@ class RLStrategyDAM(RLStrategy):
         # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
         # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
         # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
-        reward = np.minimum(
-            profit, 0.1 * abs(profit)
-        )  # TODO Marie: This should not alter the profit value, but rather the reward directly? Total profit should be true to the real value for interpretability.
+        reward = profit
+        # reward = np.minimum(
+        #     profit, 0.1 * abs(profit)
+        # )  # TODO Marie: This should not alter the profit value, but rather the reward directly? Total profit should be true to the real value for interpretability.
 
         for i, start in enumerate(products_index):
             # Opportunity cost: The income lost due to not operating at full capacity.
@@ -1113,9 +1123,7 @@ class RLStrategyDAM(RLStrategy):
         # Dynamic regret scaling:
         # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
         # - If no dispatch happens, apply higher regret (0.5) to discourage idle behavior, if it could have been profitable.
-        regret_scale = (
-            0.1 if (accepted_volume_total > unit.min_power).all() else 0.5
-        )  # TODO Marie: Maybe set regret_scale for each timestep individually?
+        regret_scale = np.where(accepted_volume_total > unit.min_power, 0.1, 0.5)
 
         # --------------------
         # 4.1 Calculate Reward

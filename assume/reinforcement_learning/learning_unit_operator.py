@@ -12,7 +12,11 @@ from assume.common.market_objects import (
     MarketConfig,
     Orderbook,
 )
-from assume.common.utils import convert_tensors, create_rrule, get_products_index
+from assume.common.utils import (
+    convert_tensors,
+    create_rrule,
+    get_products_index,
+)
 from assume.strategies import BaseStrategy, LearningStrategy
 from assume.units import BaseUnit
 
@@ -84,7 +88,6 @@ class RLUnitsOperator(UnitsOperator):
             products_index (pandas.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
-
         products_index = get_products_index(orderbook)
 
         # should write learning results if at least one bidding_strategy is a learning strategy
@@ -92,28 +95,18 @@ class RLUnitsOperator(UnitsOperator):
             return
 
         output_agent_list = []
-        start = products_index[0]
 
-        for unit in self.rl_units:
-            strategy = unit.bidding_strategies.get(market_id)
+        for start in products_index:
+            for unit in self.rl_units:
+                strategy = unit.bidding_strategies.get(market_id)
 
-            # rl only for energy market for now!
-            if isinstance(strategy, LearningStrategy):
-                output_dict = {
-                    "datetime": start,
-                    "unit": unit.id,
-                }
+                # rl only for energy market for now!
+                if isinstance(strategy, LearningStrategy):
+                    output_dict = {
+                        "datetime": start,
+                        "unit": unit.id,
+                    }
 
-                if strategy.act_dim > 2:
-                    output_dict.update(
-                        {
-                            "profit": unit.outputs["profit"].loc[products_index].sum(),
-                            "reward": unit.outputs["reward"].loc[products_index].sum()
-                            / len(products_index),
-                            "regret": unit.outputs["regret"].loc[products_index].sum(),
-                        }
-                    )
-                else:
                     output_dict.update(
                         {
                             "profit": unit.outputs["profit"].at[start],
@@ -122,15 +115,17 @@ class RLUnitsOperator(UnitsOperator):
                         }
                     )
 
-                action_tuple = unit.outputs["actions"].at[start]
-                noise_tuple = unit.outputs["exploration_noise"].at[start]
-                action_dim = action_tuple.numel()
+                    action_tuple = unit.outputs["actions"].at[start].reshape(-1)
+                    noise_tuple = (
+                        unit.outputs["exploration_noise"].at[start].reshape(-1)
+                    )
+                    action_dim = action_tuple.numel()
 
-                for i in range(action_dim):
-                    output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
-                    output_dict[f"actions_{i}"] = action_tuple[i]
+                    for i in range(action_dim):
+                        output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+                        output_dict[f"actions_{i}"] = action_tuple[i]
 
-                output_agent_list.append(output_dict)
+                    output_agent_list.append(output_dict)
 
         db_addr = self.context.data.get("learning_output_agent_addr")
 
