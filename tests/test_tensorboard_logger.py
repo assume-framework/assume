@@ -35,22 +35,39 @@ def mock_writer():
 
 @pytest.fixture
 def sample_df():
-    """Fixture for creating sample DataFrame for testing"""
-    return pd.DataFrame(
-        {
-            "dt": ["2024-01-01", "2024-01-02"],
-            "unit": ["pp_6", "pp_7"],
-            "profit": [100, 200],
-            "reward": [0.5, 0.7],
-            "regret": [0.1, 0.2],
-            "loss": [0.01, 0.02],
-            "total_grad_norm": [3, 5],
-            "max_grad_norm": [5, 7],
-            "lr": [0.001, 0.001],
-            "noise_0": [0.1, 0.1],
-            "noise_1": [0.2, 0.2],
-        }
-    )
+    """Returns a factory that produces the DataFrame you ask for."""
+
+    def _make(table: str) -> pd.DataFrame:
+        if table == "rl_params":
+            return pd.DataFrame(
+                {
+                    "dt": ["2024-01-01", "2024-01-02"],
+                    "unit": ["pp_6", "pp_7"],
+                    "profit": [100, 200],
+                    "reward": [0.5, 0.7],
+                    "regret": [0.1, 0.2],
+                    "noise_0": [0.1, 0.1],
+                    "noise_1": [0.2, 0.2],
+                }
+            )
+        elif table == "rl_grad_params":
+            return pd.DataFrame(
+                {
+                    "step": [1, 2],
+                    "unit": ["pp_6", "pp_7"],
+                    "actor_loss": [0.1, 0.2],
+                    "actor_total_grad_norm": [3, 5],
+                    "actor_max_grad_norm": [5, 7],
+                    "critic_loss": [0.2, 0.4],
+                    "critic_total_grad_norm": [4, 6],
+                    "critic_max_grad_norm": [6, 8],
+                    "lr": [0.001, 0.001],
+                }
+            )
+        else:
+            raise ValueError(f"Unknown table '{table}'")
+
+    return _make
 
 
 @pytest.mark.require_learning
@@ -77,8 +94,9 @@ def test_update_tensorboard_training_mode(
     """Test update_tensorboard method in training mode"""
     # Setup
     mock_read_sql.side_effect = [
-        pd.DataFrame({"name": sample_df.columns.tolist()}),
-        sample_df,
+        pd.DataFrame({"name": sample_df("rl_params").columns.tolist()}),
+        sample_df("rl_params"),
+        sample_df("rl_grad_params"),
     ]
 
     logger = TensorBoardLogger(
@@ -98,14 +116,17 @@ def test_update_tensorboard_training_mode(
     calls = mock_writer.add_scalar.call_args_list
     metrics_logged = [call[0][0] for call in calls]
     expected_metrics = [
-        "train/01_episode_reward",
-        "train/02_reward",
-        "train/03_profit",
-        "train/04_regret",
-        "train/05_learning_rate",
-        "train/06_loss",
-        "train/07_total_grad_norm",
-        "train/08_max_grad_norm",
-        "train/09_noise",
+        "02_train/01_episode_reward",
+        "02_train/02_reward",
+        "02_train/03_profit",
+        "02_train/04_regret",
+        "02_train/05_noise",
+        "03_grad/06_learning_rate",
+        "03_grad/07_actor_loss",
+        "03_grad/08_actor_total_grad_norm",
+        "03_grad/09_actor_max_grad_norm",
+        "03_grad/10_critic_loss",
+        "03_grad/11_critic_total_grad_norm",
+        "03_grad/12_critic_max_grad_norm",
     ]
     assert all(metric in metrics_logged for metric in expected_metrics)

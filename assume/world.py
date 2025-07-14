@@ -178,7 +178,7 @@ class World:
         start: datetime,
         end: datetime,
         simulation_id: str,
-        save_frequency_hours: int = 24,
+        save_frequency_hours,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         episode: int = 1,
@@ -195,7 +195,7 @@ class World:
             end (datetime.datetime): The end datetime for the simulation.
             simulation_id (str): The unique identifier for the simulation.
             index (pandas.Series): The index for the simulation.
-            save_frequency_hours (int, optional): The frequency (in hours) at which to save simulation data. Defaults to 24.
+            save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
             learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
             forecaster (Forecaster, optional): The forecaster used for custom unit types. Defaults to None.
