@@ -101,8 +101,12 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
+    # "paper_plant_use_case": {
+    #     "scenario": "example_04",
+    #     "study_case": "base",
+    # },
     "paper_plant_use_case": {
-        "scenario": "example_04",
+        "scenario": "example_thermal_storage_economics",
         "study_case": "base",
     },
     # redispatch for DSM validation example

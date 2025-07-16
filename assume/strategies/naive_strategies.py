@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
+from matplotlib import pyplot as plt
+
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
@@ -172,6 +174,7 @@ class NaiveDADSMStrategy(BaseStrategy):
         # check if unit has opt_power_requirement attribute
         if unit.optimisation_counter == 0:
             unit.determine_optimal_operation_with_flex()
+            self.plot_power_requirements(unit)
             unit.optimisation_counter = 1
 
         bids = []
@@ -212,21 +215,21 @@ class NaiveDADSMStrategy(BaseStrategy):
         plt.plot(
             opt_power_requirement.index,
             opt_power_requirement,
-            label="Optimal Power Requirement",
+            label="Reference profile",
             color="blue",
         )
         plt.plot(
             flex_power_requirement.index,
             flex_power_requirement,
-            label="Flex Power Requirement",
+            label="Flex Profile",
             color="orange",
             linestyle="--",
         )
 
         # Labels and title
         plt.xlabel("Time")
-        plt.ylabel("Power Requirement (kW)")
-        plt.title("Comparison of Optimal and Flexible Power Requirements")
+        plt.ylabel("Power (MW)")
+        plt.title("Comparison of Reference and Flex Power Requirements")
         plt.legend()
         plt.grid(True)
         plt.show()

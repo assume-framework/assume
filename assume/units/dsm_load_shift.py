@@ -6,7 +6,9 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 
+import matplotlib as mpl
 import pyomo.environ as pyo
+from matplotlib import pyplot as plt
 from pyomo.opt import (
     SolverFactory,
     SolverStatus,
@@ -296,7 +298,7 @@ class DSMFlex:
             """
 
             maximise_load_shift = pyo.quicksum(
-                m.load_shift_pos[t] for t in m.time_steps
+                m.load_shift_neg[t] for t in m.time_steps
             )
 
             return maximise_load_shift
@@ -497,6 +499,7 @@ class DSMFlex:
         peak_load_cap_value = max_load * (
             self.peak_load_cap / 100
         )  # E.g., 10% threshold
+        print(peak_load_cap_value)
         # Add peak_threshold_value as a Param on the model so it can be accessed elsewhere
         model.peak_load_cap_value = pyo.Param(initialize=peak_load_cap_value)
 
@@ -536,18 +539,37 @@ class DSMFlex:
         # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_peak_shift(m, t):
-            if self.has_electrolyser:
+            if self.technology == "steel_plant":
+                # Steel plant constraint with conditional electrolyser inclusion
+                if self.has_electrolyser:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["electrolyser"].power_in[t]
+                        + self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+                else:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+
+            elif self.technology == "steam_generator_plant":
+                total_power = 0
+                if self.has_heatpump:
+                    total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    boiler = self.components["boiler"]
+                    if boiler.fuel_type == "electricity":
+                        total_power += self.model.dsm_blocks["boiler"].power_in[t]
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                )
-            else:
-                return (
-                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    == total_power
                 )
 
         @model.Constraint(model.time_steps)
@@ -555,19 +577,30 @@ class DSMFlex:
             """
             Ensures that the power input during peak periods does not exceed the peak threshold value.
             """
-            if self.has_electrolyser:
-                return (
-                    m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_load_cap_value
-                )
-            else:
-                return (
-                    m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_load_cap_value
-                )
+            if self.technology == "steel_plant":
+                if self.has_electrolyser:
+                    return (
+                        m.dsm_blocks["electrolyser"].power_in[t]
+                        + m.dsm_blocks["eaf"].power_in[t]
+                        + m.dsm_blocks["dri_plant"].power_in[t]
+                        <= peak_load_cap_value
+                    )
+                else:
+                    return (
+                        m.dsm_blocks["eaf"].power_in[t]
+                        + m.dsm_blocks["dri_plant"].power_in[t]
+                        <= peak_load_cap_value
+                    )
+
+            elif self.technology == "steam_generator_plant":
+                total_power = 0
+                if self.has_heatpump:
+                    total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    boiler = self.components["boiler"]
+                    if boiler.fuel_type == "electricity":
+                        total_power += self.model.dsm_blocks["boiler"].power_in[t]
+                return total_power <= peak_load_cap_value
 
         @self.model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):
@@ -630,18 +663,36 @@ class DSMFlex:
         # Power input constraint integrating flexibility
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_flex(m, t):
-            if self.has_electrolyser:
+            if self.technology == "steel_plant":
+                # Steel plant constraint with conditional electrolyser inclusion
+                if self.has_electrolyser:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["electrolyser"].power_in[t]
+                        + self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+                else:
+                    return (
+                        m.total_power_input[t]
+                        + m.load_shift_pos[t]
+                        - m.load_shift_neg[t]
+                        == self.model.dsm_blocks["eaf"].power_in[t]
+                        + self.model.dsm_blocks["dri_plant"].power_in[t]
+                    )
+            elif self.technology == "steam_generator_plant":
+                total_power = 0
+                if self.has_heatpump:
+                    total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
+                if self.has_boiler:
+                    boiler = self.components["boiler"]
+                    if boiler.fuel_type == "electricity":
+                        total_power += self.model.dsm_blocks["boiler"].power_in[t]
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                )
-            else:
-                return (
-                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
+                    == total_power
                 )
 
         @self.model.Objective(sense=pyo.maximize)
@@ -686,6 +737,11 @@ class DSMFlex:
                 "Termination Condition: ", results.solver.termination_condition
             )
 
+        self.total_cost = sum(
+            instance.variable_cost[t].value for t in instance.time_steps
+        )
+        print(f"Total variable cost: {self.total_cost:.2f}")
+
         opt_power_requirement = [
             pyo.value(instance.total_power_input[t]) for t in instance.time_steps
         ]
@@ -702,6 +758,195 @@ class DSMFlex:
             pyo.value(instance.variable_cost[t]) for t in instance.time_steps
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
+
+        # PLOT
+
+        # Academic style
+        mpl.rcParams.update(
+            {
+                "font.size": 13,
+                "font.family": "serif",
+                "axes.titlesize": 15,
+                "axes.labelsize": 13,
+                "legend.fontsize": 12,
+                "lines.linewidth": 2,
+                "axes.grid": True,
+                "grid.linestyle": "--",
+                "grid.alpha": 0.7,
+                "figure.dpi": 120,
+            }
+        )
+
+        time_steps = range(len(instance.time_steps))
+        total_cumulative_thermal_output = sum(
+            pyo.value(instance.cumulative_thermal_output[t])
+            for t in instance.time_steps
+        )
+        print(f"Total cumulative thermal output: {total_cumulative_thermal_output:.2f}")
+
+        # Extract data
+        electrical_load = (
+            [
+                pyo.value(instance.dsm_blocks["boiler"].power_in[t])
+                for t in instance.time_steps
+            ]
+            if "boiler" in instance.dsm_blocks
+            else None
+        )
+        # grid = [
+        #     pyo.value(instance.grid_power[t]) for t in instance.time_steps
+        # ]
+
+        # pv_load = (
+        #     [pyo.value(instance.dsm_blocks["pv_plant"].power[t]) for t in instance.time_steps]
+        #     if "pv_plant" in instance.dsm_blocks else None
+        # )
+
+        storage_charge = (
+            [
+                pyo.value(instance.dsm_blocks["thermal_storage"].charge[t])
+                for t in instance.time_steps
+            ]
+            if "thermal_storage" in instance.dsm_blocks
+            else None
+        )
+        storage_discharge = (
+            [
+                pyo.value(instance.dsm_blocks["thermal_storage"].discharge[t])
+                for t in instance.time_steps
+            ]
+            if "thermal_storage" in instance.dsm_blocks
+            else None
+        )
+        storage_soc = (
+            [
+                pyo.value(instance.dsm_blocks["thermal_storage"].soc[t])
+                for t in instance.time_steps
+            ]
+            if "thermal_storage" in instance.dsm_blocks
+            else None
+        )
+
+        # Extract electricity price (assume you have it as a list)
+        # If it's a Pyomo Param or similar, extract like:
+        # electricity_price = [instance.electricity_price[t] for t in instance.time_steps]
+        # or if it's self.electricity_price: use as is
+        electricity_price = (
+            [instance.electricity_price[t] for t in instance.time_steps]
+            if hasattr(self, "electricity_price")
+            else None
+        )
+        fig, axs = plt.subplots(
+            2, 1, figsize=(10, 8), sharex=True, constrained_layout=True
+        )
+
+        # --- Top plot: Boiler Power Input & Electricity Price ---
+        if electrical_load:
+            ln1 = axs[0].plot(
+                time_steps,
+                electrical_load,
+                label="Electric Boiler Power Input",
+                color="C1",
+            )
+            axs[0].set_ylabel("Power [MW]")
+            axs[0].set_title("Heat Generator Power Input & Electricity Price")
+            axs[0].grid(True, which="both", axis="both")
+            # Secondary y-axis for price
+            if electricity_price:
+                ax_price = axs[0].twinx()
+                ln2 = ax_price.plot(
+                    time_steps,
+                    electricity_price,
+                    label="Electricity Price",
+                    color="C4",
+                    linestyle="--",
+                )
+                ax_price.set_ylabel("Electricity Price [€/MWh]", color="C4")
+                ax_price.tick_params(axis="y", labelcolor="C4")
+                # Combine legends
+                lines = ln1 + ln2
+                labels = [l.get_label() for l in lines]
+                axs[0].legend(lines, labels, loc="upper left", frameon=True)
+
+        # --- Bottom plot: Thermal storage with area for SOC ---
+        if storage_charge and storage_discharge and storage_soc:
+            axs[1].plot(
+                time_steps,
+                storage_charge,
+                label="Charge (to storage)",
+                color="C2",
+                linestyle="-",
+            )
+            axs[1].plot(
+                time_steps,
+                storage_discharge,
+                label="Discharge (from storage)",
+                color="C3",
+                linestyle="-",
+            )
+            axs[1].fill_between(
+                time_steps,
+                storage_soc,
+                0,
+                color="C0",
+                alpha=0.25,
+                label="State of Charge (SOC)",
+            )
+            axs[1].set_ylabel("Thermal Power [MW]\n(SOC: [MWh])")
+            axs[1].set_title("Thermal Storage Operation")
+            axs[1].grid(True, which="both", axis="both")
+            axs[1].legend(loc="upper right", frameon=True)
+
+        axs[1].set_xlabel("Time Step")
+        plt.tight_layout()
+        plt.show()
+
+        # fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True, constrained_layout=True)
+
+        # # --- Top plot: Stacked Area for PV+Grid & Electricity Price ---
+        # if pv_load and grid:
+        #     ln1 = axs[0].stackplot(
+        #         time_steps,
+        #         pv_load,
+        #         grid,
+        #         labels=["PV Generation", "Grid Import"],
+        #         colors=["#2ca02c", "#1f77b4"],
+        #         alpha=0.7,
+        #     )
+        # else:
+        #     ln1 = []
+
+        # axs[0].set_ylabel("Power [MW]")
+        # axs[0].set_title("Supply by PV and Grid vs. Electricity Price")
+        # axs[0].grid(True, which="both", axis="both")
+
+        # ln2 = []
+        # if electricity_price:
+        #     ax_price = axs[0].twinx()
+        #     ln2 = ax_price.plot(time_steps, electricity_price, label="Electricity Price", color="C4", linestyle="--")
+        #     ax_price.set_ylabel("Electricity Price [€/MWh]", color="C4")
+        #     ax_price.tick_params(axis='y', labelcolor="C4")
+        #     # Combine legends for both axes
+        #     from itertools import chain
+        #     lines = list(chain.from_iterable([[l] if not isinstance(l, list) else l for l in ln1])) + ln2
+        #     labels = [l.get_label() for l in lines]
+        #     axs[0].legend(lines, labels, loc="upper left", frameon=True)
+        # else:
+        #     axs[0].legend(loc="upper left", frameon=True)
+
+        # # --- Bottom plot: Thermal storage with area for SOC ---
+        # if storage_charge and storage_discharge and storage_soc:
+        #     axs[1].plot(time_steps, storage_charge, label="Charge (to storage)", color="C2", linestyle="-")
+        #     axs[1].plot(time_steps, storage_discharge, label="Discharge (from storage)", color="C3", linestyle="-")
+        #     axs[1].fill_between(time_steps, storage_soc, 0, color="C0", alpha=0.25, label="State of Charge (SOC)")
+        #     axs[1].set_ylabel("Thermal Power [MW]\n(SOC: [MWh])")
+        #     axs[1].set_title("Thermal Storage Operation")
+        #     axs[1].grid(True, which="both", axis="both")
+        #     axs[1].legend(loc="upper right", frameon=True)
+
+        # axs[1].set_xlabel("Time Step")
+        # plt.tight_layout()
+        # plt.show()
 
     def determine_optimal_operation_with_flex(self):
         """
@@ -782,6 +1027,202 @@ class DSMFlex:
         self.flex_variable_cost_series = FastSeries(
             index=self.index, value=flex_variable_cost
         )
+        ###print
+
+        self.total_cost = sum(
+            instance.variable_cost[t].value for t in instance.time_steps
+        )
+        print(f"Total variable cost: {self.total_cost:.2f}")
+        # Extract power input for raw material mill, clinker system, and cement mill
+
+        # PLOT
+
+        # Academic style
+        mpl.rcParams.update(
+            {
+                "font.size": 13,
+                "font.family": "serif",
+                "axes.titlesize": 15,
+                "axes.labelsize": 13,
+                "legend.fontsize": 12,
+                "lines.linewidth": 2,
+                "axes.grid": True,
+                "grid.linestyle": "--",
+                "grid.alpha": 0.7,
+                "figure.dpi": 120,
+            }
+        )
+
+        time_steps = range(len(instance.time_steps))
+        total_cumulative_thermal_output = sum(
+            pyo.value(instance.cumulative_thermal_output[t])
+            for t in instance.time_steps
+        )
+        print(f"Total cumulative thermal output: {total_cumulative_thermal_output:.2f}")
+
+        # Extract data
+        electrical_load = (
+            [
+                pyo.value(instance.dsm_blocks["boiler"].power_in[t])
+                for t in instance.time_steps
+            ]
+            if "boiler" in instance.dsm_blocks
+            else None
+        )
+        # grid = [
+        #     pyo.value(instance.grid_power[t]) for t in instance.time_steps
+        # ]
+
+        # pv_load = (
+        #     [pyo.value(instance.dsm_blocks["pv_plant"].power[t]) for t in instance.time_steps]
+        #     if "pv_plant" in instance.dsm_blocks else None
+        # )
+
+        storage_charge = (
+            [
+                pyo.value(instance.dsm_blocks["thermal_storage"].charge[t])
+                for t in instance.time_steps
+            ]
+            if "thermal_storage" in instance.dsm_blocks
+            else None
+        )
+        storage_discharge = (
+            [
+                pyo.value(instance.dsm_blocks["thermal_storage"].discharge[t])
+                for t in instance.time_steps
+            ]
+            if "thermal_storage" in instance.dsm_blocks
+            else None
+        )
+        storage_soc = (
+            [
+                pyo.value(instance.dsm_blocks["thermal_storage"].soc[t])
+                for t in instance.time_steps
+            ]
+            if "thermal_storage" in instance.dsm_blocks
+            else None
+        )
+
+        # Extract electricity price (assume you have it as a list)
+        # If it's a Pyomo Param or similar, extract like:
+        # electricity_price = [instance.electricity_price[t] for t in instance.time_steps]
+        # or if it's self.electricity_price: use as is
+        electricity_price = (
+            [instance.electricity_price[t] for t in instance.time_steps]
+            if hasattr(self, "electricity_price")
+            else None
+        )
+        fig, axs = plt.subplots(
+            2, 1, figsize=(10, 8), sharex=True, constrained_layout=True
+        )
+
+        # --- Top plot: Boiler Power Input & Electricity Price ---
+        if electrical_load:
+            ln1 = axs[0].plot(
+                time_steps,
+                electrical_load,
+                label="Electric Boiler Power Input",
+                color="C1",
+            )
+            axs[0].set_ylabel("Power [MW]")
+            axs[0].set_title("Heat Generator Power Input & Electricity Price")
+            axs[0].grid(True, which="both", axis="both")
+            # Secondary y-axis for price
+            if electricity_price:
+                ax_price = axs[0].twinx()
+                ln2 = ax_price.plot(
+                    time_steps,
+                    electricity_price,
+                    label="Electricity Price",
+                    color="C4",
+                    linestyle="--",
+                )
+                ax_price.set_ylabel("Electricity Price [€/MWh]", color="C4")
+                ax_price.tick_params(axis="y", labelcolor="C4")
+                # Combine legends
+                lines = ln1 + ln2
+                labels = [l.get_label() for l in lines]
+                axs[0].legend(lines, labels, loc="upper left", frameon=True)
+
+        # --- Bottom plot: Thermal storage with area for SOC ---
+        if storage_charge and storage_discharge and storage_soc:
+            axs[1].plot(
+                time_steps,
+                storage_charge,
+                label="Charge (to storage)",
+                color="C2",
+                linestyle="-",
+            )
+            axs[1].plot(
+                time_steps,
+                storage_discharge,
+                label="Discharge (from storage)",
+                color="C3",
+                linestyle="-",
+            )
+            axs[1].fill_between(
+                time_steps,
+                storage_soc,
+                0,
+                color="C0",
+                alpha=0.25,
+                label="State of Charge (SOC)",
+            )
+            axs[1].set_ylabel("Thermal Power [MW]\n(SOC: [MWh])")
+            axs[1].set_title("Thermal Storage Operation")
+            axs[1].grid(True, which="both", axis="both")
+            axs[1].legend(loc="upper right", frameon=True)
+
+        axs[1].set_xlabel("Time Step")
+        plt.tight_layout()
+        plt.show()
+
+        # fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True, constrained_layout=True)
+
+        # # --- Top plot: Stacked Area for PV+Grid & Electricity Price ---
+        # if pv_load and grid:
+        #     ln1 = axs[0].stackplot(
+        #         time_steps,
+        #         pv_load,
+        #         grid,
+        #         labels=["PV Generation", "Grid Import"],
+        #         colors=["#2ca02c", "#1f77b4"],
+        #         alpha=0.7,
+        #     )
+        # else:
+        #     ln1 = []
+
+        # axs[0].set_ylabel("Power [MW]")
+        # axs[0].set_title("Supply by PV and Grid vs. Electricity Price")
+        # axs[0].grid(True, which="both", axis="both")
+
+        # ln2 = []
+        # if electricity_price:
+        #     ax_price = axs[0].twinx()
+        #     ln2 = ax_price.plot(time_steps, electricity_price, label="Electricity Price", color="C4", linestyle="--")
+        #     ax_price.set_ylabel("Electricity Price [€/MWh]", color="C4")
+        #     ax_price.tick_params(axis='y', labelcolor="C4")
+        #     # Combine legends for both axes
+        #     from itertools import chain
+        #     lines = list(chain.from_iterable([[l] if not isinstance(l, list) else l for l in ln1])) + ln2
+        #     labels = [l.get_label() for l in lines]
+        #     axs[0].legend(lines, labels, loc="upper left", frameon=True)
+        # else:
+        #     axs[0].legend(loc="upper left", frameon=True)
+
+        # # --- Bottom plot: Thermal storage with area for SOC ---
+        # if storage_charge and storage_discharge and storage_soc:
+        #     axs[1].plot(time_steps, storage_charge, label="Charge (to storage)", color="C2", linestyle="-")
+        #     axs[1].plot(time_steps, storage_discharge, label="Discharge (from storage)", color="C3", linestyle="-")
+        #     axs[1].fill_between(time_steps, storage_soc, 0, color="C0", alpha=0.25, label="State of Charge (SOC)")
+        #     axs[1].set_ylabel("Thermal Power [MW]\n(SOC: [MWh])")
+        #     axs[1].set_title("Thermal Storage Operation")
+        #     axs[1].grid(True, which="both", axis="both")
+        #     axs[1].legend(loc="upper right", frameon=True)
+
+        # axs[1].set_xlabel("Time Step")
+        # plt.tight_layout()
+        # plt.show()
 
     def switch_to_opt(self, instance):
         """

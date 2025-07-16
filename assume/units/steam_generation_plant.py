@@ -9,6 +9,7 @@ import pyomo.environ as pyo
 
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import Forecaster
+from assume.common.utils import str_to_bool
 from assume.units.dsm_load_shift import DSMFlex
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
     """
 
     required_technologies = []
-    optional_technologies = ["heat_pump", "boiler", "thermal_storage"]
+    optional_technologies = ["heat_pump", "boiler", "thermal_storage", "pv_plant"]
 
     def __init__(
         self,
@@ -87,6 +88,24 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.has_thermal_storage = "thermal_storage" in self.components.keys()
         self.has_boiler = "boiler" in self.components.keys()
         self.has_heatpump = "heat_pump" in self.components.keys()
+        self.has_pv = "pv_plant" in self.components.keys()
+
+        # Configure PV plant power profile based on availability
+        if self.has_pv:
+            profile_key = (
+                f"{self.id}_pv_power_profile"
+                if not str_to_bool(
+                    self.components["pv_plant"].get("uses_power_profile", "false")
+                )
+                else "availability_solar"
+            )
+            pv_profile = self.forecaster[profile_key]
+            # Assign the aligned profile
+            self.components["pv_plant"][
+                "power_profile"
+                if profile_key.endswith("power_profile")
+                else "availability_profile"
+            ] = pv_profile
 
         # Inject schedule into long-term thermal storage if applicable
         if "thermal_storage" in self.components:
@@ -161,10 +180,21 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.model.variable_cost = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
+        self.model.grid_power = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
 
     def initialize_process_sequence(self):
         # Per-time-step constraint (default)
         if not self.demand or self.demand == 0:
+            # if self.has_pv:
+            #     @self.model.Constraint(self.model.time_steps)
+            #     def pv_connection_balance(m, t):
+            #         pv_power = m.dsm_blocks["pv_plant"].power[t]
+            #         boiler = m.dsm_blocks["boiler"].power_in[t]
+            #         grid_power = m.grid_power[t]
+            #         return (
+            #             boiler == pv_power + grid_power )
 
             @self.model.Constraint(self.model.time_steps)
             def direct_heat_balance(m, t):
@@ -178,11 +208,19 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                     storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
                     return (
                         total_heat_production + storage_discharge - storage_charge
-                        >= m.thermal_demand[t]
+                        == m.cumulative_thermal_output[t]
                     )
                 else:
-                    return total_heat_production >= m.thermal_demand[t]
+                    return total_heat_production == m.cumulative_thermal_output[t]
         else:
+            # if self.has_pv:
+            #     @self.model.Constraint(self.model.time_steps)
+            #     def pv_connection_balance(m, t):
+            #         pv_power = m.dsm_blocks["pv_plant"].power[t]
+            #         boiler = m.dsm_blocks["boiler"].power_in[t]
+            #         grid_power = m.grid_power[t]
+            #         return (
+            #             boiler == pv_power + grid_power )
 
             @self.model.Constraint(self.model.time_steps)
             def direct_heat_balance(m, t):
@@ -212,12 +250,22 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             Ensures the thermal output meets the absolute demand.
             """
             if not self.demand or self.demand == 0:
-                return pyo.Constraint.Skip
+                return m.cumulative_thermal_output[t] >= m.thermal_demand[t]
             else:
                 return (
                     sum((m.cumulative_thermal_output[t]) for t in m.time_steps)
                     >= m.absolute_demand
                 )
+
+        # @self.model.Constraint(self.model.time_steps)
+        # def absolute_demand_association_constraint_per_time(m, t):
+        #     """
+        #     Ensures the thermal output meets the absolute demand.
+        #     """
+        #     if not self.demand or self.demand == 0:
+        #         return sum((m.cumulative_thermal_output[t]) for t in m.time_steps) == 431.3
+        #     else:
+        #         return pyo.Constraint.Skip
 
         # Power input constraint
         @self.model.Constraint(self.model.time_steps)
@@ -250,7 +298,14 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 total_cost += self.model.dsm_blocks["heat_pump"].operating_cost[t]
 
             if self.has_boiler:
-                total_cost += self.model.dsm_blocks["boiler"].operating_cost[t]
+                boiler = self.components["boiler"]
+                if boiler.fuel_type == "electricity":
+                    total_cost += self.model.dsm_blocks["boiler"].operating_cost[t]
+
+            # total_cost += m.grid_power[t] * m.electricity_price[t]
+
+            if self.has_pv:
+                total_cost += self.model.dsm_blocks["pv_plant"].operating_cost[t]
 
             return m.variable_cost[t] == total_cost
 
