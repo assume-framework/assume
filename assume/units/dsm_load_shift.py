@@ -899,7 +899,7 @@ class DSMFlex:
 
         axs[1].set_xlabel("Time Step")
         plt.tight_layout()
-        plt.show()
+        # plt.show()
 
         # fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True, constrained_layout=True)
 
@@ -1175,7 +1175,7 @@ class DSMFlex:
 
         axs[1].set_xlabel("Time Step")
         plt.tight_layout()
-        plt.show()
+        # plt.show()
 
         # fig, axs = plt.subplots(2, 1, figsize=(10, 8), sharex=True, constrained_layout=True)
 
@@ -1244,8 +1244,8 @@ class DSMFlex:
         if hasattr(instance, "peak_load_shift_constraint"):
             instance.peak_load_shift_constraint.deactivate()
 
-        # if hasattr(instance, "total_power_input_constraint_with_flex"):
-        instance.total_power_input_constraint_with_flex.deactivate()
+        if hasattr(instance, "total_power_input_constraint_with_flex"):
+            instance.total_power_input_constraint_with_flex.deactivate()
 
         return instance
 

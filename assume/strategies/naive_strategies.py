@@ -173,8 +173,16 @@ class NaiveDADSMStrategy(BaseStrategy):
 
         # check if unit has opt_power_requirement attribute
         if unit.optimisation_counter == 0:
-            unit.determine_optimal_operation_with_flex()
-            self.plot_power_requirements(unit)
+            unit.determine_optimal_operation_without_flex()
+            # self.plot_power_requirements(unit)
+            # After optimization
+            try:
+                # If already pandas Series
+                unit.opt_power_requirement.to_csv("./examples/outputs/opt_power_requirement.csv", header=True)
+            except AttributeError:
+                # Try FastSeries conversion
+                unit.opt_power_requirement.as_pd_series().to_csv("./examples/outputs/opt_power_requirement.csv", header=True)
+
             unit.optimisation_counter = 1
 
         bids = []
@@ -185,7 +193,7 @@ class NaiveDADSMStrategy(BaseStrategy):
             """
             start = product[0]
 
-            volume = unit.flex_power_requirement.at[start]
+            volume = unit.opt_power_requirement.at[start]
 
             bids.append(
                 {
