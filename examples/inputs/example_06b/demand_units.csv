@@ -470,15 +470,3 @@ demand_96_220kV,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de467,18
 demand_98,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de468,13
 demand_99_220kV,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de469,114
 steel_plant,inflex_demand,naive_eom,naive_redispatch,1000000,0,steel_plant_operator,167
-export,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de470,300
-Netherlands,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de471,301
-Switzerland,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de472,302
-Denmark,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de473,303
-Czech Republic,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de474,304
-Luxembourg,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de475,305
-Sweden,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de476,306
-Austria,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de477,307
-France,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de478,308
-Poland,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de479,309
-Norway,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de480,310
-Belgium,inflex_demand,naive_eom,naive_redispatch,1000000,0,eom_de481,311
