@@ -149,6 +149,144 @@ class HeatPump:
         return model_block
 
 
+class HeatResistor:
+    """
+    A class to represent a generic ptH resistor/ heat resistor unit in an energy system model.
+
+    The class encapsulates the parameters, variables, and constraints necessary to model
+    the behavior of a heat pump, such as power input, heat output, and operational limitations
+    (like ramp rates and minimum operating times).
+
+    Args:
+        max_power (float): Maximum allowable power input to the heat_resistor.
+        efficiency (float): efficiency of the heat_resistor.
+        time_steps (list[int]): A list of time steps over which the heat pump operates.
+        min_power (float, optional): Minimum allowable power input to the heat pump. Defaults to 0.0.
+        ramp_up (float, optional): Maximum allowed increase in power input per time step. Defaults to `max_power` if not provided.
+        ramp_down (float, optional): Maximum allowed decrease in power input per time step. Defaults to `max_power` if not provided.
+        min_operating_steps (int, optional): Minimum number of consecutive time steps the heat pump must operate once it starts. Defaults to 0 (no restriction).
+        min_down_steps (int, optional): Minimum number of consecutive time steps the heat pump must remain off after being shut down. Defaults to 0 (no restriction).
+    """
+
+    def __init__(
+        self,
+        max_power: float,
+        efficiency: float,
+        time_steps: list[int],
+        min_power: float = 0.0,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        **kwargs,
+    ):
+        super().__init__()
+
+        self.max_power = max_power
+        self.efficiency = efficiency
+        self.time_steps = time_steps
+        self.min_power = min_power
+        self.ramp_up = max_power if ramp_up is None else ramp_up
+        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.min_operating_steps = min_operating_steps
+        self.min_down_steps = min_down_steps
+        self.initial_operational_status = initial_operational_status
+        self.kwargs = kwargs
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """
+        Adds a heat pump block to the Pyomo model, defining parameters, variables, and constraints.
+
+        Pyomo Components:
+            - **Parameters**:
+                - `max_power`: The maximum allowable power input.
+                - `min_power`: The minimum allowable power input.
+                - `efficiency`: Efficienbcy of the resistor.
+                - `operating_cost`: Operating cost at each time step per time step.
+                - `ramp_up`: Maximum allowed increase in power per time step.
+                - `ramp_down`: Maximum allowed decrease in power per time step.
+                - `min_operating_steps`: Minimum number of consecutive time steps the heat pump must operate.
+                - `min_down_steps`: Minimum number of consecutive time steps the heat pump must remain off.
+                - `initial_operational_status`: The initial operational status of the heat pump (0 for off, 1 for on).
+
+            - **Variables**:
+                - `power_in[t]`: Power input to the heat pump at each time step `t` (continuous, non-negative).
+                - `heat_out[t]`: Heat output of the heat pump at each time step `t` (continuous, non-negative).
+                - `operational_status[t]` (optional): A binary variable indicating whether the heat pump is operational (1) or off (0) at each time step `t`.
+                - `start_up[t]` (optional): A binary variable indicating whether the heat pump is starting up (1) or not (0) at each time step `t`.
+                - `shut_down[t]` (optional): A binary variable indicating whether the heat pump is shutting down (1) or not (0) at each time step `t`.
+
+            - **Constraints**:
+                - `min_power_constraint[t]`: Ensures that the power input is at least the minimum power input when the heat pump is operational.
+                - `max_power_constraint[t]`: Ensures that the power input does not exceed the maximum power input when the heat pump is operational.
+                - `efficiency_constraint[t]`: Enforces the relationship between power input and heat output based on the efficiency.
+                - `operating_cost_constraint[t]`: Calculates the operating cost based on the power input and electricity price.
+                - `ramp_up_constraint[t]`: Limits the increase in power input from one time step to the next according to the ramp-up rate.
+                - `ramp_down_constraint[t]`: Limits the decrease in power input from one time step to the next according to the ramp-down rate.
+                - `min_operating_time_constraint[t]`: Ensures the heat pump operates for at least the specified minimum number of consecutive time steps.
+                - `min_downtime_constraint[t]`: Ensures the heat pump remains off for at least the specified minimum number of consecutive time steps after shutdown.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the heat pump block will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the p2H resistor with variables and constraints.
+        """
+
+        # Define parameters
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.efficiency = pyo.Param(initialize=self.efficiency)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_operating_steps)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_down_steps)
+        model_block.initial_operational_status = pyo.Param(
+            initialize=self.initial_operational_status
+        )
+
+        # Define variables
+        model_block.power_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+        )
+        model_block.heat_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
+
+        # Coefficient of performance (COP) constraint
+        @model_block.Constraint(self.time_steps)
+        def efficiency_constraint_heat_resistor(b, t):
+            return b.heat_out[t] == b.power_in[t] * b.efficiency
+
+        # Operating costs
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_constraint_rule(b, t):
+            return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+
+        # Ramp-up constraint and ramp-down constraints
+        add_ramping_constraints(
+            model_block=model_block,
+            time_steps=self.time_steps,
+        )
+
+        # Define additional variables and constraints for startup/shutdown and operational status
+        if (
+            self.min_operating_steps > 1
+            or self.min_down_steps > 1
+            or self.min_power > 0
+        ):
+            add_min_up_down_time_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+            )
+
+        return model_block
+    
 class Boiler:
     """
     A class to represent a generic boiler unit in an energy system model.
@@ -1755,6 +1893,7 @@ demand_side_technologies: dict = {
     "dri_storage": DRIStorage,
     "eaf": ElectricArcFurnace,
     "heat_pump": HeatPump,
+    "heat_resistor": HeatResistor,
     "boiler": Boiler,
     "electric_vehicle": ElectricVehicle,
     "generic_storage": GenericStorage,

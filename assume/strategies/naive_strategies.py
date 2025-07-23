@@ -174,16 +174,19 @@ class NaiveDADSMStrategy(BaseStrategy):
         # check if unit has opt_power_requirement attribute
         if unit.optimisation_counter == 0:
             unit.determine_optimal_operation_without_flex()
-            # self.plot_power_requirements(unit)
-            # After optimization
+            # Save opt_power_requirement
             try:
-                # If already pandas Series
                 unit.opt_power_requirement.to_csv("./examples/outputs/opt_power_requirement.csv", header=True)
             except AttributeError:
-                # Try FastSeries conversion
                 unit.opt_power_requirement.as_pd_series().to_csv("./examples/outputs/opt_power_requirement.csv", header=True)
-
+            # Save flex_power_requirement (if it exists)
+            if hasattr(unit, "flex_power_requirement"):
+                try:
+                    unit.flex_power_requirement.to_csv("./examples/outputs/flex_power_requirement.csv", header=True)
+                except AttributeError:
+                    unit.flex_power_requirement.as_pd_series().to_csv("./examples/outputs/flex_power_requirement.csv", header=True)
             unit.optimisation_counter = 1
+
 
         bids = []
         for product in product_tuples:

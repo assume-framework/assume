@@ -36,7 +36,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
     """
 
     required_technologies = []
-    optional_technologies = ["heat_pump", "boiler", "thermal_storage", "pv_plant"]
+    optional_technologies = ["heat_pump", "boiler", "thermal_storage", "heat_resistor", "pv_plant"]
 
     def __init__(
         self,
@@ -86,6 +86,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 )
         # Check for the presence of components first
         self.has_thermal_storage = "thermal_storage" in self.components.keys()
+        self.has_heat_resistor = "heat_resistor" in self.components.keys()
         self.has_boiler = "boiler" in self.components.keys()
         self.has_heatpump = "heat_pump" in self.components.keys()
         self.has_pv = "pv_plant" in self.components.keys()
@@ -174,6 +175,9 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.model.cumulative_thermal_output = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
+        self.model.cumulative_thermal_output_with_boiler = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals
+        )
         self.model.total_power_input = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
@@ -197,21 +201,21 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             #             boiler == pv_power + grid_power )
 
             @self.model.Constraint(self.model.time_steps)
-            def direct_heat_balance(m, t):
-                total_heat_production = 0
-                if self.has_heatpump:
-                    total_heat_production += m.dsm_blocks["heat_pump"].heat_out[t]
-                if self.has_boiler:
-                    total_heat_production += m.dsm_blocks["boiler"].heat_out[t]
+            def heat_balance_with_out_boiler(m, t):
+                heat_production = 0
+                if self.has_heat_resistor:
+                    heat_production += m.dsm_blocks["heat_resistor"].heat_out[t]
                 if self.has_thermal_storage:
                     storage_discharge = m.dsm_blocks["thermal_storage"].discharge[t]
                     storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
                     return (
-                        total_heat_production + storage_discharge - storage_charge
+                        heat_production + storage_discharge - storage_charge
                         == m.cumulative_thermal_output[t]
                     )
                 else:
-                    return total_heat_production == m.cumulative_thermal_output[t]
+                    return heat_production == m.cumulative_thermal_output[t]
+
+                
         else:
             # if self.has_pv:
             #     @self.model.Constraint(self.model.time_steps)
@@ -224,20 +228,22 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
             @self.model.Constraint(self.model.time_steps)
             def direct_heat_balance(m, t):
-                total_heat_production = 0
+                heat_production = 0
                 if self.has_heatpump:
-                    total_heat_production += m.dsm_blocks["heat_pump"].heat_out[t]
+                    heat_production += m.dsm_blocks["heat_pump"].heat_out[t]
+                if self.has_heat_resistor:
+                    heat_production += m.dsm_blocks["heat_resistor"].heat_out[t]
                 if self.has_boiler:
-                    total_heat_production += m.dsm_blocks["boiler"].heat_out[t]
+                    heat_production += m.dsm_blocks["boiler"].heat_out[t]
                 if self.has_thermal_storage:
                     storage_discharge = m.dsm_blocks["thermal_storage"].discharge[t]
                     storage_charge = m.dsm_blocks["thermal_storage"].charge[t]
                     return (
-                        total_heat_production + storage_discharge - storage_charge
+                        heat_production + storage_discharge - storage_charge
                         == m.cumulative_thermal_output[t]
                     )
                 else:
-                    return total_heat_production == m.cumulative_thermal_output[t]
+                    return heat_production == m.cumulative_thermal_output[t]
 
     def define_constraints(self):
         """
@@ -250,7 +256,12 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             Ensures the thermal output meets the absolute demand.
             """
             if not self.demand or self.demand == 0:
-                return m.cumulative_thermal_output[t] >= m.thermal_demand[t]
+                total_heat_production = 0
+                if self.has_boiler:
+                    total_heat_production += m.dsm_blocks["boiler"].heat_out[t]
+                    return m.cumulative_thermal_output[t] + total_heat_production >= m.thermal_demand[t]
+                else:
+                    return m.cumulative_thermal_output[t] >= m.thermal_demand[t]
             else:
                 return (
                     sum((m.cumulative_thermal_output[t]) for t in m.time_steps)
@@ -277,6 +288,8 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
             if self.has_heatpump:
                 total_power += self.model.dsm_blocks["heat_pump"].power_in[t]
+            if self.has_heat_resistor:
+                total_power += self.model.dsm_blocks["heat_resistor"].power_in[t]
 
             if self.has_boiler:
                 # Access the fuel_type attribute of the Boiler instance
@@ -296,6 +309,8 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
             if self.has_heatpump:
                 total_cost += self.model.dsm_blocks["heat_pump"].operating_cost[t]
+            if self.has_heat_resistor:
+                total_cost += self.model.dsm_blocks["heat_resistor"].operating_cost[t]
 
             if self.has_boiler:
                 boiler = self.components["boiler"]
