@@ -30,13 +30,13 @@ class CriticTD3(nn.Module):
         self.act_dim = act_dim * n_agents
 
         # Select proper architecture based on `n_agents`
-        if n_agents <= 20:
-            # hidden_sizes = [256, 128]  # Shallow network for small `n_agents`
-            hidden_sizes = [512, 256, 128]  # Increase it for Highcore run
-        elif n_agents <= 50:
-            hidden_sizes = [512, 256, 128]  # Medium network
-        else:
-            hidden_sizes = [1024, 512, 256, 128]  # Deeper network for large `n_agents`
+        # if n_agents <= 20:
+        #    # hidden_sizes = [256, 128]  # Shallow network for small `n_agents`
+        #    hidden_sizes = [512, 256, 128]  # Increase it for Highcore run
+        # elif n_agents <= 50:
+        #    hidden_sizes = [512, 256, 128]  # Medium network
+        # else:
+        hidden_sizes = [1024, 512, 256, 128]  # Deeper network for large `n_agents`
 
         # First Q-network (Q1)
         self.q1_layers = self._build_q_network(hidden_sizes, float_type)
