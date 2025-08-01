@@ -34,11 +34,15 @@ The following parameters are being tracked and displayed:
 02_reward: The sum of the rewards per day averaged over all units
 03_profit: The sum of the profits per day averaged over all units
 04_regret: The sum of the regrets per day averaged over all units
-05_learning_rate: The daily learning rate
-06_loss: The average of the losses of all units per day
-07_total_grad_norm: The average of the total gradient norm per day
-08_max_grad_norm: The maximum gradient norm per day
-09_noise": The average of the noises of all units per day
+05_noise: The average of the noises of all units per day
+06_learning_rate: The learning rate over gradient steps
+07_actor_loss: The average of the losses of all units per gradient step
+08_actor_total_grad_norm: The average of the total gradient norm per gradient step
+09_actor_max_grad_norm: The maximum gradient norm per gradient step
+10_critic_loss: The average of the losses of all units per gradient step
+11_critic_total_grad_norm: The average of the total gradient norm per gradient step
+12_critic_max_grad_norm: The maximum gradient norm per gradient step
+
 
 For the training metrics, the episode indices are displayed as negative values during the initial exploration phase,
 as the results are random due to the explorative nature of the RL algorithm.
@@ -127,8 +131,11 @@ class TensorBoardLogger:
                 log_dir=os.path.join("tensorboard", self.simulation_id)
             )
 
-        mode = "train" if not self.evaluation_mode else "eval"
+        mode = "02_train" if not self.evaluation_mode else "01_eval"
 
+        ##############################
+        # Values per simulation step #
+        ##############################
         # Dynamically detect noise columns in database
         query_columns = (
             "PRAGMA table_info(rl_params)"
@@ -154,18 +161,6 @@ class TensorBoardLogger:
             else ""
         )
 
-        # Define the SQL query dynamically
-        critic_columns = (
-            """AVG(critic_loss) AS loss,
-            AVG(total_grad_norm) AS total_grad_norm,
-            MAX(max_grad_norm) AS max_grad_norm,
-            AVG(learning_rate) AS lr
-        """
-            if mode == "train"
-            and self.episode > self.episodes_collecting_initial_experience
-            else ""
-        )
-
         date_func = (
             "strftime('%Y-%m-%d', datetime)"
             if self.db.dialect.name == "sqlite"
@@ -184,16 +179,12 @@ class TensorBoardLogger:
         if "regret" in column_names:
             query_parts.append("SUM(regret) AS regret")
 
-        # Add critic-related columns (if any)
-        if critic_columns:
-            query_parts.append(critic_columns)
-
         # Add noise columns (if any)
         if noise_sql:
             query_parts.append(noise_sql)
 
-        # Build the final SQL query
-        query = f"""
+        # Build the final SQL queries
+        query_sim = f"""
             SELECT
                 {", ".join(query_parts)}
             FROM rl_params
@@ -204,99 +195,161 @@ class TensorBoardLogger:
             ORDER BY dt
         """
 
+        ##############################
+        #  Values per gradient step  #
+        ##############################
+
+        # Define the SQL query dynamically
+        rl_grad_columns = """
+            AVG(step) AS step,
+            AVG(actor_loss) AS actor_loss,
+            AVG(actor_total_grad_norm) AS actor_total_grad_norm,
+            MAX(actor_max_grad_norm) AS actor_max_grad_norm,
+            AVG(critic_loss) AS critic_loss,
+            AVG(critic_total_grad_norm) AS critic_total_grad_norm,
+            MAX(critic_max_grad_norm) AS critic_max_grad_norm,
+            AVG(learning_rate) AS lr
+        """
+
+        query_grad = (
+            f"""
+            SELECT {rl_grad_columns}
+            FROM rl_grad_params
+            WHERE episode = '{self.episode}'
+            AND simulation = '{self.simulation_id}'
+            AND evaluation_mode = {self.evaluation_mode}
+            GROUP BY step, unit
+            ORDER BY step
+            """
+            if mode == "02_train"
+            and self.episode > self.episodes_collecting_initial_experience
+            else None
+        )
+
         try:
             # Add TensorBoard introduction text only in the first training episode
-            if self.episode == 1 and mode == "train":
+            if self.episode == 1 and mode == "02_train":
                 self.writer.add_text("TensorBoard Introduction", tensorboard_intro)
 
+            ##############################
+            # Values per simulation step #
+            ##############################
             # Load query results into a DataFrame
-            df = pd.read_sql(query, self.db)
-            df["dt"] = pd.to_datetime(df["dt"])
+            df_sim = pd.read_sql(query_sim, self.db)
+            df_sim["dt"] = pd.to_datetime(df_sim["dt"])
 
             # Drop all columns with only NaN values
-            df.dropna(axis=1, how="all", inplace=True)
+            df_sim.dropna(axis=1, how="all", inplace=True)
 
             # adjust noise columns if some were not present in the database and dropped
-            noise_columns = [col for col in noise_columns if col in df.columns]
+            noise_columns = [col for col in noise_columns if col in df_sim.columns]
 
             # Fill missing numeric values
-            df.fillna(0.0, inplace=True)
+            df_sim.fillna(0.0, inplace=True)
 
             # Calculate x_index
-            datetimes = df["dt"].unique()
+            datetimes = df_sim["dt"].unique()
             x_index = (self.episode - 1) * len(datetimes)
-            if mode == "train":
+            if mode == "02_train":
                 x_index -= self.episodes_collecting_initial_experience * len(datetimes)
 
             # Define metric order explicitly
-            metric_order = {
+            metric_order_sim = {
                 "02_reward": "reward",
                 "03_profit": "profit",
                 "04_regret": "regret",
-                "05_learning_rate": "learning_rate",
-                "06_loss": "loss",
-                "07_total_grad_norm": "total_grad_norm",
-                "08_max_grad_norm": "max_grad_norm",
-                "09_noise": "noise",
+                "05_noise": "noise",
             }
 
             # Group data upfront instead of filtering repeatedly
-            grouped_data = df.groupby("dt")
+            grouped_data_sim = df_sim.groupby("dt")
+
+            # Pre-aggregate noise means if relevant (column-wise mean)
+            if mode == "02_train" and noise_columns:
+                noise_means = df_sim[noise_columns].abs().groupby(df_sim["dt"]).mean()
+                noise_avg_per_dt = noise_means.mean(axis=1)
+            else:
+                noise_avg_per_dt = {}
 
             # Process metrics for each timestamp
-            for i, (_, time_df) in enumerate(grouped_data):
-                metric_dicts = {
+            for i, (dt, time_df) in enumerate(grouped_data_sim):
+                metric_dicts_sim = {
                     "reward": {"avg": time_df["reward"].mean()},
                     "profit": {"avg": time_df["profit"].mean()},
                 }
 
-                if mode == "train":
-                    # Compute noise dynamically
-                    noise_values = [time_df[col].abs().mean() for col in noise_columns]
-                    noise_avg = (
-                        sum(noise_values) / len(noise_values) if noise_values else 0.0
-                    )
-
-                    # Update training-specific metrics
-                    metric_dicts.update(
-                        {
-                            "noise": {"avg": noise_avg},
-                            "regret": {"avg": time_df["regret"].mean()}
-                            if "regret" in time_df
-                            else {"avg": 0.0},
-                            "learning_rate": {"avg": time_df["lr"].iat[0]}
-                            if "lr" in time_df
-                            else {"avg": 0.0},
-                            "loss": {"avg": time_df["loss"].mean()}
-                            if "loss" in time_df
-                            else {"avg": 0.0},
-                            "total_grad_norm": {
-                                "avg": time_df["total_grad_norm"].mean()
-                            }
-                            if "total_grad_norm" in time_df
-                            else {"avg": 0.0},
-                            "max_grad_norm": {"avg": time_df["max_grad_norm"].mean()}
-                            if "max_grad_norm" in time_df
-                            else {"avg": 0.0},
-                        }
+                if mode == "02_train":
+                    metric_dicts_sim["noise"] = {"avg": noise_avg_per_dt.get(dt, 0.0)}
+                    metric_dicts_sim["regret"] = (
+                        {"avg": time_df["regret"].mean()}
+                        if "regret" in df_sim.columns
+                        else {"avg": 0.0}
                     )
 
                 # Log metrics in the specified order using prefixed names
-                for prefixed_name, metric in metric_order.items():
-                    if metric in metric_dicts:
+                for prefixed_name, metric in metric_order_sim.items():
+                    if metric in metric_dicts_sim:
                         self.writer.add_scalar(
                             f"{mode}/{prefixed_name}",
-                            metric_dicts[metric]["avg"],
+                            metric_dicts_sim[metric]["avg"],
                             x_index + i,
                         )
 
+            ##############################
+            #  Values per gradient step  #
+            ##############################
+            # Load query results into a DataFrame
+            if query_grad:
+                df_grad = pd.read_sql(query_grad, self.db)
+
+                # Define metric order explicitly
+                metric_order_grad = {
+                    "06_learning_rate": "learning_rate",
+                    "07_actor_loss": "actor_loss",
+                    "08_actor_total_grad_norm": "actor_total_grad_norm",
+                    "09_actor_max_grad_norm": "actor_max_grad_norm",
+                    "10_critic_loss": "critic_loss",
+                    "11_critic_total_grad_norm": "critic_total_grad_norm",
+                    "12_critic_max_grad_norm": "critic_max_grad_norm",
+                }
+
+                # Group data upfront instead of filtering repeatedly
+                grouped_data_grad = df_grad.groupby("step")
+
+                if mode == "02_train":
+                    # Precompute grouped means only for available columns
+                    columns_to_group = ["step"] + [
+                        col
+                        for col in metric_order_grad.values()
+                        if col in df_grad.columns
+                    ]
+                    grouped_data_grad = df_grad[columns_to_group].groupby("step").mean()
+
+                    # Prepare default value dictionary for missing metrics
+                    default_values = {col: 0.0 for col in metric_order_grad.values()}
+
+                # Process metrics for each timestamp
+                for step, row in grouped_data_grad.iterrows():
+                    for prefixed_name, metric_col in metric_order_grad.items():
+                        value = row.get(metric_col, default_values[metric_col])
+                        self.writer.add_scalar(f"03_grad/{prefixed_name}", value, step)
+
+                # Handle missing steps (i.e., if a column was missing entirely)
+                all_steps = df_grad["step"].unique()
+                logged_steps = grouped_data_grad.index.values
+                missing_steps = set(all_steps) - set(logged_steps)
+
+                for step in missing_steps:
+                    for prefixed_name, metric_col in metric_order_grad.items():
+                        self.writer.add_scalar(f"03_grad/{prefixed_name}", 0.0, step)
+
             episode_index = (
                 self.episode - self.episodes_collecting_initial_experience
-                if mode == "train"
+                if mode == "02_train"
                 else self.episode
             )
             # Log episode-level reward
-            episode_reward_avg = df.groupby("unit")["reward"].sum().mean()
+            episode_reward_avg = df_sim.groupby("unit")["reward"].sum().mean()
             self.writer.add_scalar(
                 f"{mode}/01_episode_reward",
                 episode_reward_avg,

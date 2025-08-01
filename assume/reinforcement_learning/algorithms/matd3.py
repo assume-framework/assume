@@ -477,7 +477,14 @@ class TD3(RLAlgorithm):
 
         unit_params = [
             {
-                u_id: {"loss": None, "total_grad_norm": None, "max_grad_norm": None}
+                u_id: {
+                    "actor_loss": None,
+                    "actor_total_grad_norm": None,
+                    "actor_max_grad_norm": None,
+                    "critic_loss": None,
+                    "critic_total_grad_norm": None,
+                    "critic_max_grad_norm": None,
+                }
                 for u_id in self.learning_role.rl_strats.keys()
             }
             for _ in range(self.gradient_steps)
@@ -606,7 +613,7 @@ class TD3(RLAlgorithm):
                 )
 
                 # Store the critic loss for this unit ID
-                unit_params[step][strategy.unit_id]["loss"] = critic_loss.item()
+                unit_params[step][strategy.unit_id]["critic_loss"] = critic_loss.item()
                 total_critic_loss += critic_loss
 
             # Single backward pass for all agents' critics
@@ -626,8 +633,12 @@ class TD3(RLAlgorithm):
                 strategy.critics.optimizer.step()
 
                 # Store clipping statistics
-                unit_params[step][strategy.unit_id]["total_grad_norm"] = total_norm
-                unit_params[step][strategy.unit_id]["max_grad_norm"] = max_grad_norm
+                unit_params[step][strategy.unit_id]["critic_total_grad_norm"] = (
+                    total_norm
+                )
+                unit_params[step][strategy.unit_id]["critic_max_grad_norm"] = (
+                    max_grad_norm
+                )
 
             ######################################################################
             # ACTOR UPDATE (DELAYED): Accumulate losses for all agents in one pass
@@ -676,6 +687,10 @@ class TD3(RLAlgorithm):
                         all_states_i, all_actions_clone
                     ).mean()
 
+                    # Store the actor loss for this unit ID
+                    unit_params[step][strategy.unit_id]["actor_loss"] = (
+                        actor_loss.item()
+                    )
                     # Accumulate actor losses
                     total_actor_loss += actor_loss
 
@@ -684,10 +699,25 @@ class TD3(RLAlgorithm):
 
                 # Clip and step each actor optimizer
                 for strategy in strategies:
-                    th.nn.utils.clip_grad_norm_(
-                        strategy.actor.parameters(), max_norm=self.grad_clip_norm
+                    parameters = list(strategy.actor.parameters())
+
+                    # Determine clipping statistics
+                    max_grad_norm = max(p.grad.norm() for p in parameters)
+
+                    # Perform clipping
+                    total_norm = th.nn.utils.clip_grad_norm_(
+                        parameters, max_norm=self.grad_clip_norm
                     )
+
                     strategy.actor.optimizer.step()
+
+                    # Store clipping statistics
+                    unit_params[step][strategy.unit_id]["actor_total_grad_norm"] = (
+                        total_norm
+                    )
+                    unit_params[step][strategy.unit_id]["actor_max_grad_norm"] = (
+                        max_grad_norm
+                    )
 
                 # Perform batch-wise Polyak update at the end (instead of inside the loop)
                 all_critic_params = []
@@ -709,4 +739,4 @@ class TD3(RLAlgorithm):
                 polyak_update(all_critic_params, all_target_critic_params, self.tau)
                 polyak_update(all_actor_params, all_target_actor_params, self.tau)
 
-        self.learning_role.write_rl_critic_params_to_output(learning_rate, unit_params)
+        self.learning_role.write_rl_grad_params_to_output(learning_rate, unit_params)
