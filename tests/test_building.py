@@ -5,14 +5,12 @@
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
-from pyomo.opt import SolverFactory
 
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import CsvForecaster
 from assume.common.market_objects import MarketConfig
 from assume.strategies.naive_strategies import NaiveDADSMStrategy
 from assume.units.building import Building
-from assume.units.dsm_load_shift import SOLVERS, check_available_solvers
 
 
 # Fixtures for Component Configurations
@@ -193,15 +191,6 @@ def building_components_boiler(
     }
 
 
-# Fixture for Solver Selection
-@pytest.fixture(scope="module")
-def available_solver():
-    solvers = check_available_solvers(*SOLVERS)
-    if not solvers:
-        pytest.skip(f"No available solvers from the list: {SOLVERS}")
-    return SolverFactory(solvers[0])
-
-
 # Test Cases
 def test_building_initialization_heatpump(
     forecaster,
@@ -282,13 +271,6 @@ def test_building_initialization_invalid_component(
         "Components invalid_component is not a valid component for the building unit."
         in str(exc_info.value)
     )
-
-
-def test_solver_availability():
-    available_solvers = check_available_solvers(*SOLVERS)
-    assert (
-        len(available_solvers) > 0
-    ), f"None of {SOLVERS} are available. Install one of them to proceed."
 
 
 def test_building_optimization_heatpump(
@@ -459,29 +441,6 @@ def test_building_objective_function_invalid(
     assert "Unknown objective: unknown_objective" in str(exc_info.value)
 
 
-def test_building_no_available_solvers(
-    forecaster,
-    building_components_heatpump,
-    monkeypatch,  # Add the monkeypatch fixture
-):
-    # Override the check_available_solvers to return an empty list
-    monkeypatch.setattr(
-        "assume.units.dsm_load_shift.check_available_solvers", lambda *args: []
-    )
-
-    with pytest.raises(Exception) as exc_info:
-        Building(
-            id="building",
-            unit_operator="operator_nosolver",
-            bidding_strategies={},
-            components=building_components_heatpump,
-            forecaster=forecaster,  # Passed via **kwargs
-        )
-    assert f"None of {SOLVERS} are available. Install one of them to proceed." in str(
-        exc_info.value
-    )
-
-
 def test_building_define_constraints_heatpump(
     forecaster,
     building_components_heatpump,
@@ -627,13 +586,6 @@ def test_building_bidding_strategy_execution(
         assert bid["end_time"] == product[1]
         assert bid["volume"] <= 0  # Demand-side bids have non-positive volume
         assert bid["price"] >= 0  # Marginal price should be non-negative
-
-
-def test_building_get_available_solvers():
-    available_solvers = check_available_solvers(*SOLVERS)
-    assert isinstance(available_solvers, list)
-    for solver in available_solvers:
-        assert SolverFactory(solver).available()
 
 
 def test_building_unknown_flexibility_measure(
