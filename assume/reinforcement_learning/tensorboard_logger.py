@@ -264,28 +264,26 @@ class TensorBoardLogger:
             # Group data upfront instead of filtering repeatedly
             grouped_data_sim = df_sim.groupby("dt")
 
+            # Pre-aggregate noise means if relevant (column-wise mean)
+            if mode == "02_train" and noise_columns:
+                noise_means = df_sim[noise_columns].abs().groupby(df_sim["dt"]).mean()
+                noise_avg_per_dt = noise_means.mean(axis=1)
+            else:
+                noise_avg_per_dt = {}
+
             # Process metrics for each timestamp
-            for i, (_, time_df) in enumerate(grouped_data_sim):
+            for i, (dt, time_df) in enumerate(grouped_data_sim):
                 metric_dicts_sim = {
                     "reward": {"avg": time_df["reward"].mean()},
                     "profit": {"avg": time_df["profit"].mean()},
                 }
 
                 if mode == "02_train":
-                    # Compute noise dynamically
-                    noise_values = [time_df[col].abs().mean() for col in noise_columns]
-                    noise_avg = (
-                        sum(noise_values) / len(noise_values) if noise_values else 0.0
-                    )
-
-                    # Update training-specific metrics
-                    metric_dicts_sim.update(
-                        {
-                            "noise": {"avg": noise_avg},
-                            "regret": {"avg": time_df["regret"].mean()}
-                            if "regret" in time_df
-                            else {"avg": 0.0},
-                        }
+                    metric_dicts_sim["noise"] = {"avg": noise_avg_per_dt.get(dt, 0.0)}
+                    metric_dicts_sim["regret"] = (
+                        {"avg": time_df["regret"].mean()}
+                        if "regret" in df_sim.columns
+                        else {"avg": 0.0}
                     )
 
                 # Log metrics in the specified order using prefixed names
@@ -318,53 +316,32 @@ class TensorBoardLogger:
                 # Group data upfront instead of filtering repeatedly
                 grouped_data_grad = df_grad.groupby("step")
 
-                # Process metrics for each timestamp
-                for i, (step, grad_df) in enumerate(grouped_data_grad):
-                    metric_dicts_grad = {}
-                    if mode == "02_train":
-                        # Update training-specific metrics
-                        metric_dicts_grad.update(
-                            {
-                                "learning_rate": {"avg": grad_df["lr"].mean()}
-                                if "lr" in grad_df
-                                else {"avg": 0.0},
-                                "actor_loss": {"avg": grad_df["actor_loss"].mean()}
-                                if "actor_loss" in grad_df
-                                else {"avg": 0.0},
-                                "actor_total_grad_norm": {
-                                    "avg": grad_df["actor_total_grad_norm"].mean()
-                                }
-                                if "actor_total_grad_norm" in grad_df
-                                else {"avg": 0.0},
-                                "actor_max_grad_norm": {
-                                    "avg": grad_df["actor_max_grad_norm"].mean()
-                                }
-                                if "actor_max_grad_norm" in grad_df
-                                else {"avg": 0.0},
-                                "critic_loss": {"avg": grad_df["critic_loss"].mean()}
-                                if "critic_loss" in grad_df
-                                else {"avg": 0.0},
-                                "critic_total_grad_norm": {
-                                    "avg": grad_df["critic_total_grad_norm"].mean()
-                                }
-                                if "critic_total_grad_norm" in grad_df
-                                else {"avg": 0.0},
-                                "critic_max_grad_norm": {
-                                    "avg": grad_df["critic_max_grad_norm"].mean()
-                                }
-                                if "critic_max_grad_norm" in grad_df
-                                else {"avg": 0.0},
-                            }
-                        )
+                if mode == "02_train":
+                    # Precompute grouped means only for available columns
+                    columns_to_group = ["step"] + [
+                        col
+                        for col in metric_order_grad.values()
+                        if col in df_grad.columns
+                    ]
+                    grouped_data_grad = df_grad[columns_to_group].groupby("step").mean()
 
-                    # Log metrics in the specified order using prefixed names
-                    for prefixed_name, metric in metric_order_grad.items():
-                        if metric in metric_dicts_grad:
-                            self.writer.add_scalar(
-                                f"03_grad/{prefixed_name}",
-                                metric_dicts_grad[metric]["avg"],
-                                step,
-                            )
+                    # Prepare default value dictionary for missing metrics
+                    default_values = {col: 0.0 for col in metric_order_grad.values()}
+
+                # Process metrics for each timestamp
+                for step, row in grouped_data_grad.iterrows():
+                    for prefixed_name, metric_col in metric_order_grad.items():
+                        value = row.get(metric_col, default_values[metric_col])
+                        self.writer.add_scalar(f"03_grad/{prefixed_name}", value, step)
+
+                # Handle missing steps (i.e., if a column was missing entirely)
+                all_steps = df_grad["step"].unique()
+                logged_steps = grouped_data_grad.index.values
+                missing_steps = set(all_steps) - set(logged_steps)
+
+                for step in missing_steps:
+                    for prefixed_name, metric_col in metric_order_grad.items():
+                        self.writer.add_scalar(f"03_grad/{prefixed_name}", 0.0, step)
 
             episode_index = (
                 self.episode - self.episodes_collecting_initial_experience
