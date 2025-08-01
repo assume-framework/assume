@@ -19,6 +19,7 @@ import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
 import yaml
+from pyomo.opt import check_available_solvers
 
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.common.market_objects import MarketProduct, Orderbook
@@ -727,3 +728,23 @@ def str_to_bool(val):
         return False
     else:
         raise ValueError(f"Invalid truth value: {val!r}")
+
+
+def get_supported_solver(default_solver: str | None = None):
+    SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
+
+    # Check if the solver is available
+    solvers = check_available_solvers(*SOLVERS)
+    if not solvers:
+        raise RuntimeError(f"None of {SOLVERS} are available")
+
+    if default_solver == "highs":
+        default_solver = "appsi_highs"
+
+    solver = default_solver or solvers[0]
+
+    if solver not in solvers:
+        logger.warning("Solver %s not available, using %s", solver, solvers[0])
+        solver = solvers[0]
+
+    return solver

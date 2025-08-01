@@ -21,6 +21,7 @@ from assume.common.utils import (
     datetime2timestamp,
     get_available_products,
     get_products_index,
+    get_supported_solver,
     initializer,
     parse_duration,
     plot_orderbook,
@@ -787,6 +788,17 @@ def test_parse_duration():
         parse_duration("1")
     with pytest.raises(ValueError):
         parse_duration("100ms")
+
+
+def test_solver_available():
+    assert get_supported_solver() == "appsi_highs"
+    assert get_supported_solver("unknown_solver") == "appsi_highs"
+
+
+def test_solver_unavailable(monkeypatch):
+    monkeypatch.setattr("assume.common.utils.check_available_solvers", lambda *args: [])
+    with pytest.raises(RuntimeError):
+        get_supported_solver()
 
 
 if __name__ == "__main__":
