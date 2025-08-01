@@ -4,13 +4,13 @@
 
 base:
   start_date: 2019-03-01 00:00
-  end_date: 2019-04-30 00:00
+  end_date: 2019-03-03 00:00
   time_step: 1h
   save_frequency_hours: null
   learning_mode: true
 
   learning_config:
-    continue_learning: false
+    continue_learning: Flase
     trained_policies_save_path: null
     trained_policies_load_path: null
     max_bid_price: 100
@@ -18,7 +18,7 @@ base:
     actor_architecture: mlp
     learning_rate: 0.0003
     training_episodes: 30
-    episodes_collecting_initial_experience: 5
+    episodes_collecting_initial_experience: 3
     train_freq: 720h
     gradient_steps: 720
     batch_size: 256
@@ -28,7 +28,7 @@ base:
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
-    validation_episodes_interval: 5
+    validation_episodes_interval: 1
 
   markets_config:
     EOM:
