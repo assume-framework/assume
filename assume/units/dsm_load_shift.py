@@ -142,6 +142,21 @@ class DSMFlex:
         self.model.time_steps = pyo.Set(
             initialize=[idx for idx, _ in enumerate(self.index)]
         )
+        self.model.evs = pyo.Set(
+        initialize=[
+            ev for ev in self.components if ev.startswith("electric_vehicle")
+        ],
+        ordered=True,
+        doc="Set of electric vehicles"
+        )
+
+        self.model.charging_stations = pyo.Set(
+        initialize=[
+            cs for cs in self.components if cs.startswith("charging_station")
+        ],
+        ordered=True,
+        doc="Set of charging stations"
+        )
         # self.model.evs = pyo.Set(initialize=[ev for ev in self.components if ev.startswith("electric_vehicle")])
         # self.model.charging_stations = pyo.Set(initialize=[cs for cs in self.components if cs.startswith("charging_station")])
         # self.model.evs = pyo.Set(
@@ -755,10 +770,200 @@ class DSMFlex:
             pyo.value(instance.variable_cost[t]) for t in instance.time_steps
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
+    # PLOTTING SECTION - Technology specific plots
+        if self.technology == "bus_depot":
+            self._plot_bus_depot_optimization(instance)
+        elif self.technology == "steel_plant":
+            self._plot_steel_plant_optimization(instance)
+        elif self.technology == "building":
+            self._plot_building_optimization(instance)
+        # Add more technology-specific plots as needed
 
+    def _plot_bus_depot_optimization(self, instance):
+        """
+        Bus depot specific plotting logic
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
+        import numpy as np
+        
+        if not (hasattr(instance, 'evs') and hasattr(instance, 'charging_stations')):
+            logger.warning("Bus depot plotting requires EVs and charging stations")
+            return
+        
+        time_steps = list(instance.time_steps)
+        evs = list(instance.evs)
+        charging_stations = list(instance.charging_stations)
+        
+        # Create figure with subplots
+        fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2, figsize=(16, 12))
+        
+        # 1. EV Status Matrix (Idle/Queue/Charging)
+        status_matrix = np.zeros((len(evs), len(time_steps)))
+        
+        for i, ev in enumerate(evs):
+            for j, t in enumerate(time_steps):
+                # Get availability
+                ev_availability = getattr(instance, f"{ev}_availability", None)
+                if ev_availability is None or pyo.value(ev_availability[t]) == 0:
+                    status_matrix[i, j] = 0  # Not available (driving)
+                    continue
+                
+                # Check if charging
+                is_charging = False
+                for cs in charging_stations:
+                    if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5:
+                        status_matrix[i, j] = 2  # Charging
+                        is_charging = True
+                        break
+                
+                # Check if in queue
+                if not is_charging and hasattr(instance, 'in_queue'):
+                    if pyo.value(instance.in_queue[ev, t]) > 0.5:
+                        status_matrix[i, j] = 1  # In queue
+        
+        # Custom colormap: 0=Gray(Driving), 1=Yellow(Queue), 2=Green(Charging)
+        colors = ['lightgray', 'yellow', 'green']
+        cmap = plt.matplotlib.colors.ListedColormap(colors)
+        
+        im = ax1.imshow(status_matrix, aspect='auto', cmap=cmap, vmin=0, vmax=2)
+        ax1.set_yticks(np.arange(len(evs)))
+        ax1.set_yticklabels(evs)
+        ax1.set_xlabel('Time Steps')
+        ax1.set_title('EV Status (Gray=Driving, Yellow=Queue, Green=Charging)')
+        
+        # Add legend
+        legend_elements = [
+            mpatches.Patch(color='lightgray', label='Driving'),
+            mpatches.Patch(color='yellow', label='In Queue'),
+            mpatches.Patch(color='green', label='Charging')
+        ]
+        ax1.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.15, 1))
+        
+        # 2. Charging Station Utilization
+        for cs in charging_stations:
+            cs_discharge = []
+            cs_max_power = pyo.value(instance.dsm_blocks[cs].max_power)
+            
+            for t in time_steps:
+                discharge = pyo.value(instance.dsm_blocks[cs].discharge[t])
+                cs_discharge.append(discharge)
+            
+            ax2.plot(time_steps, cs_discharge, label=f'{cs}', linewidth=2)
+            ax2.axhline(y=cs_max_power, color='gray', linestyle='--', alpha=0.5)
+        
+        ax2.set_xlabel('Time Steps')
+        ax2.set_ylabel('Discharge Power (kW)')
+        ax2.set_title('Charging Station Power Output')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        
+        # 3. EV Charging Power
+        for ev in evs[:5]:  # Limit to first 5 EVs for clarity
+            if ev in instance.dsm_blocks:
+                ev_charge = [pyo.value(instance.dsm_blocks[ev].charge[t]) for t in time_steps]
+                ax3.plot(time_steps, ev_charge, label=ev, alpha=0.8)
+        
+        ax3.set_xlabel('Time Steps')
+        ax3.set_ylabel('Charging Power (kW)')
+        ax3.set_title('EV Charging Power (First 5 EVs)')
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+        
+        # 4. EV State of Charge
+        for ev in evs[:5]:  # Limit to first 5 EVs for clarity
+            if ev in instance.dsm_blocks and hasattr(instance.dsm_blocks[ev], 'soc'):
+                soc = [pyo.value(instance.dsm_blocks[ev].soc[t]) for t in time_steps]
+                max_capacity = pyo.value(instance.dsm_blocks[ev].max_capacity)
+                soc_percentage = [s/max_capacity * 100 for s in soc]
+                ax4.plot(time_steps, soc_percentage, label=ev, marker='o', markersize=3)
+        
+        ax4.set_xlabel('Time Steps')
+        ax4.set_ylabel('State of Charge (%)')
+        ax4.set_title('EV Battery Status (First 5 EVs)')
+        ax4.legend()
+        ax4.grid(True, alpha=0.3)
+        ax4.set_ylim([0, 105])
+        
+        # 5. Queue Length Over Time
+        queue_length = []
+        for t in time_steps:
+            if hasattr(instance, 'in_queue'):
+                count = sum(pyo.value(instance.in_queue[ev, t]) for ev in evs)
+            else:
+                count = 0
+            queue_length.append(count)
+        
+        ax5.bar(time_steps, queue_length, color='orange', alpha=0.7)
+        ax5.set_xlabel('Time Steps')
+        ax5.set_ylabel('Number of EVs Waiting')
+        ax5.set_title('Queue Length Over Time')
+        ax5.grid(True, alpha=0.3, axis='y')
+        
+        # 6. Marginal Cost Analysis
+        electricity_prices = [pyo.value(instance.electricity_price[t]) for t in time_steps]
+        total_power = [pyo.value(instance.total_power_input[t]) for t in time_steps]
+        
+        # Calculate marginal cost (electricity price * power consumption)
+        marginal_costs = [price * power for price, power in zip(electricity_prices, total_power)]
+        
+        # Create dual y-axis plot
+        ax6_twin = ax6.twinx()
+        
+        # Plot electricity price on left axis
+        line1 = ax6.plot(time_steps, electricity_prices, 'b-', label='Electricity Price (€/MWh)', linewidth=2)
+        ax6.set_xlabel('Time Steps')
+        ax6.set_ylabel('Electricity Price (€/MWh)', color='b')
+        ax6.tick_params(axis='y', labelcolor='b')
+        
+        # Plot marginal cost on right axis
+        line2 = ax6_twin.plot(time_steps, marginal_costs, 'r-', label='Marginal Cost (€)', linewidth=2)
+        ax6_twin.set_ylabel('Marginal Cost (€)', color='r')
+        ax6_twin.tick_params(axis='y', labelcolor='r')
+        
+        # Combine legends
+        lines = line1 + line2
+        labels = [l.get_label() for l in lines]
+        ax6.legend(lines, labels, loc='upper left')
+        
+        ax6.set_title('Electricity Price and Marginal Cost')
+        ax6.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.show()
+        
+        # Print summary
+        self._print_bus_depot_summary(instance, evs, charging_stations, time_steps)
+
+    def _print_bus_depot_summary(self, instance, evs, charging_stations, time_steps):
+        """Print optimization summary for bus depot"""
+        print("\n" + "="*60)
+        print("BUS DEPOT OPTIMIZATION SUMMARY")
+        print("="*60)
+        
+        total_cost = sum(pyo.value(instance.variable_cost[t]) for t in time_steps)
+        print(f"Total Cost: ${total_cost:.2f}")
+        
+        ##avg_power = np.mean([pyo.value(instance.total_power_input[t]) for t in time_steps])
+        max_power = max([pyo.value(instance.total_power_input[t]) for t in time_steps])
+        ##print(f"Average Power: {avg_power:.2f} kW")
+        print(f"Peak Power: {max_power:.2f} kW")
+        
+        # CS Utilization
+        print("\nCharging Station Utilization:")
+        for cs in charging_stations:
+            total_energy = sum(
+                pyo.value(instance.dsm_blocks[cs].discharge[t]) for t in time_steps
+            )
+            max_possible = pyo.value(instance.dsm_blocks[cs].max_power) * len(time_steps)
+            utilization = (total_energy / max_possible * 100) if max_possible > 0 else 0
+            print(f"  {cs}: {total_energy:.1f} kWh delivered, {utilization:.1f}% capacity utilization")
+        
+        print("="*60 + "\n")
         """
         Plots the states of electric vehicles (Charging / Queued / Idle) over time.
         """
+        
         # # Plot
         # time_steps = list(instance.time_steps)
 
