@@ -3,10 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import calendar
-import contextlib
 import inspect
 import logging
-import os
 import re
 import sys
 from collections import defaultdict
@@ -632,38 +630,6 @@ def convert_tensors(data):
         pass
 
     return data
-
-
-# Define a context manager to suppress output
-@contextlib.contextmanager
-def suppress_output():
-    # Save the original stdout and stderr file descriptors
-    original_stdout_fd = sys.stdout.fileno()
-    original_stderr_fd = sys.stderr.fileno()
-
-    # Open /dev/null for redirecting output
-    devnull = os.open(os.devnull, os.O_WRONLY)
-
-    # Duplicate the original stdout and stderr file descriptors to restore them later
-    saved_stdout_fd = os.dup(original_stdout_fd)
-    saved_stderr_fd = os.dup(original_stderr_fd)
-
-    try:
-        # Redirect stdout and stderr to /dev/null
-        os.dup2(devnull, original_stdout_fd)
-        os.dup2(devnull, original_stderr_fd)
-
-        yield  # Allow the block of code to execute
-
-    finally:
-        # Restore stdout and stderr from the saved file descriptors
-        os.dup2(saved_stdout_fd, original_stdout_fd)
-        os.dup2(saved_stderr_fd, original_stderr_fd)
-
-        # Close the duplicated file descriptors and /dev/null
-        os.close(saved_stdout_fd)
-        os.close(saved_stderr_fd)
-        os.close(devnull)
 
 
 # Function to parse the duration string

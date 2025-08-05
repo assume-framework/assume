@@ -284,7 +284,7 @@ class ComplexClearingRole(MarketRole):
 
         market_mechanism: complex_clearing
         param_dict:
-            solver: apps_highs
+            solver: appsi_highs
             log_flows: true
             pricing_mechanism: pay_as_clear
             zones_identifier: zone_id
