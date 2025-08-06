@@ -19,7 +19,7 @@ from mango import (
     create_tcp_container,
 )
 from mango.container.core import Container
-from mango.util.clock import ExternalClock
+from mango.util.clock import AsyncioClock, ExternalClock
 from mango.util.distributed_clock import DistributedClockAgent, DistributedClockManager
 from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine, make_url
@@ -70,7 +70,7 @@ class World:
         db (sqlalchemy.engine.base.Engine, optional): The database connection engine.
         container (mango.Container, optional): The container for the world instance.
         loop (asyncio.AbstractEventLoop, optional): The event loop for asynchronous operations.
-        clock (ExternalClock, optional): External clock instance.
+        clock (Clock, optional): ExternalClock or AsyncioClock instance.
         start (datetime.datetime, optional): Start datetime for the simulation.
         end (datetime.datetime, optional): End datetime for the simulation.
         market_operators (dict[str, mango.RoleAgent], optional): Market operators in the world instance.
@@ -185,6 +185,7 @@ class World:
         eval_episode: int = 1,
         forecaster: Forecaster | None = None,
         manager_address=None,
+        real_time=False,
         **kwargs: dict,
     ) -> None:
         """
@@ -206,7 +207,14 @@ class World:
             None
         """
 
-        self.clock = ExternalClock(0)
+        if real_time:
+            if manager_address:
+                raise Exception("Can't have manager when running realtime")
+            if self.distributed_role is not None:
+                raise Exception("Can't have distributed role when running realtime")
+            self.clock = AsyncioClock()
+        else:
+            self.clock = ExternalClock(0)
         self.simulation_id = simulation_id
         self.start = start
         self.end = end
@@ -671,6 +679,17 @@ class World:
         self.markets[f"{market_config.market_id}"] = market_config
 
     async def _step(self, container):
+        """
+        Executes a simulation step for the container.
+        Manages distribution of time using the clock_manager.
+        Waits for completion or sleeping of active tasks before returning the schedule.
+
+        Args:
+            container (mango.Container): the container which should be awaited
+
+        Returns:
+            float: the time delta since the last activity in seconds
+        """
         if self.distributed_role:
             # TODO find better way than sleeping
             # we need to wait, until the last step is executed correctly
@@ -703,25 +722,34 @@ class World:
         async with activate(self.container) as c:
             await tasks_complete_or_sleeping(c)
             logger.debug("all agents up - starting simulation")
+
             pbar = tqdm(total=end_ts - start_ts)
 
-            # allow registration before first opening
-            self.clock.set_time(start_ts - 1)
-            if self.distributed_role is not False:
-                await self.clock_manager.broadcast(self.clock.time)
-            prev_delta = 0
-            while self.clock.time < end_ts:
-                await asyncio.sleep(0)
-                delta = await self._step(c)
-                if delta or prev_delta:
+            if isinstance(self.clock, ExternalClock):
+                # allow registration before first opening
+                self.clock.set_time(start_ts - 1)
+                if self.distributed_role is not False:
+                    await self.clock_manager.broadcast(self.clock.time)
+                prev_delta = 0
+                while self.clock.time < end_ts:
+                    await asyncio.sleep(0)
+                    delta = await self._step(c)
+                    if delta or prev_delta:
+                        pbar.update(delta)
+                        pbar.set_description(
+                            f"{self.simulation_desc} {timestamp2datetime(self.clock.time)}",
+                            refresh=False,
+                        )
+                    else:
+                        self.clock.set_time(end_ts)
+                    prev_delta = delta
+            else:
+                # real-time mode
+                while self.clock.time < end_ts:
+                    time = self.clock.time
+                    await asyncio.sleep(1)
+                    delta = self.clock.time - time
                     pbar.update(delta)
-                    pbar.set_description(
-                        f"{self.simulation_desc} {timestamp2datetime(self.clock.time)}",
-                        refresh=False,
-                    )
-                else:
-                    self.clock.set_time(end_ts)
-                prev_delta = delta
             pbar.close()
 
     def run(self):
