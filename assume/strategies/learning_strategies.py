@@ -643,12 +643,11 @@ class RLStrategy(BaseLearningStrategy):
 
         profit = income - operational_cost
 
-        # Stabilizing learning: Limit positive profit to 10% of its absolute value.
+        # Stabilizing learning: Limit positive profit to 40% of its absolute value.
         # This reduces variance in rewards and prevents overfitting to extreme profit-seeking behavior.
-        # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
-        # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
+        # This discourages exploitation of high profits. Use carefully.
         # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
-        profit = min(profit, 0.1 * abs(profit))
+        profit = min(profit, 0.4 * abs(profit))
 
         # Opportunity cost: The income lost due to not operating at full capacity.
         opportunity_cost = (

@@ -649,7 +649,7 @@ def extract_results(
     supply_volume_dict = {node: {t: 0.0 for t in model.T} for node in model.nodes}
     demand_volume_dict = {node: {t: 0.0 for t in model.T} for node in model.nodes}
 
-    for order in orders + rejected_orders:
+    for order in orders:
         if order["bid_type"] == "SB":
             acceptance = model.xs[order["bid_id"]].value
             acceptance = 0 if acceptance < EPS else acceptance
@@ -701,6 +701,16 @@ def extract_results(
             accepted_orders.append(order)
         else:
             rejected_orders.append(order)
+
+    for order in rejected_orders:
+        # set the accepted volume and price for each rejected order to zero
+        if order["bid_type"] == "SB":
+            order["accepted_volume"] = 0
+            order["accepted_price"] = 0
+
+        elif order["bid_type"] in ["BB", "LB"]:
+            order["accepted_volume"] = {t: 0 for t in order["volume"].keys()}
+            order["accepted_price"] = {t: 0 for t in order["volume"].keys()}
 
     # write the meta information for each hour of the clearing period
     for node in market_clearing_prices.keys():

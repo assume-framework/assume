@@ -108,6 +108,18 @@ available_examples = {
         "scenario": "future_markets_paper",
         "study_case": "base_case_2013",
     },
+    "case_study_2013_pp": {
+        "scenario": "future_markets_paper",
+        "study_case": "base_case_2013_pp",
+    },
+    "case_study_2013_bat": {
+        "scenario": "future_markets_paper",
+        "study_case": "base_case_2013_bat",
+    },
+    "case_study_2013_pp_bat": {
+        "scenario": "future_markets_paper",
+        "study_case": "base_case_2013_pp_bat",
+    },
 }
 
 
@@ -121,10 +133,10 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "case_study_2013"
+    example = "case_study_2013_bat"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
