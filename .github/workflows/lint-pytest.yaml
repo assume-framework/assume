@@ -37,6 +37,7 @@ jobs:
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 01_minimal_manual_example.ipynb
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 02_automated_run_example.ipynb
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 03_custom_unit_example.ipynb
+        jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 10_DSU_and_flexibility.ipynb
   test:
 
     runs-on: ubuntu-latest

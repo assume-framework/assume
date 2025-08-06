@@ -9,10 +9,10 @@ from operator import itemgetter
 import pandas as pd
 import pyomo.environ as pyo
 from mango import AgentAddress
-from pyomo.opt import SolverFactory, TerminationCondition, check_available_solvers
+from pyomo.opt import SolverFactory, TerminationCondition
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import create_incidence_matrix
+from assume.common.utils import create_incidence_matrix, get_supported_solver
 from assume.markets.base_market import MarketRole
 
 # Set the log level to WARNING
@@ -20,7 +20,6 @@ logging.getLogger("pyomo").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
-SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 EPS = 1e-4
 
 
@@ -336,14 +335,7 @@ class ComplexClearingRole(MarketRole):
         )
 
     def define_solver(self, solver: str):
-        # Get the solver from the market configuration
-        if solver == "highs":
-            solver = "appsi_highs"
-
-        # Check if the solver is available and define solver options
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
+        solver = get_supported_solver(solver)
 
         if solver == "gurobi":
             solver_options = {"cutoff": -1.0, "MIPGap": EPS, "LogToConsole": 0}
@@ -351,10 +343,6 @@ class ComplexClearingRole(MarketRole):
             solver_options = {"output_flag": False, "log_to_console": False}
         else:
             solver_options = {}
-
-        if solver not in solvers:
-            logger.warning(f"Solver {solver} not available, using {solvers[0]}")
-            solver = solvers[0]
 
         self.solver = solver
         self.solver_options = solver_options

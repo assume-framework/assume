@@ -20,14 +20,13 @@ from pyomo.environ import (
     quicksum,
 )
 from pyomo.environ import value as get_real_number
-from pyomo.opt import SolverFactory, check_available_solvers
+from pyomo.opt import SolverFactory
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
+from assume.common.utils import get_supported_solver
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
-
-SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 order_types = ["single_ask", "single_bid", "linked_ask", "exclusive_ask"]
 
@@ -82,10 +81,7 @@ class ComplexDmasClearingRole(MarketRole):
         start_block = []
         model = ConcreteModel("dmas_market")
         # Create a solver
-        solvers = check_available_solvers(*SOLVERS)
-        if len(solvers) < 1:
-            raise Exception(f"None of {SOLVERS} are available")
-        opt = SolverFactory(solvers[0])
+        opt = SolverFactory(get_supported_solver())
 
         bid_ids = {}
         agent_addrs = {}

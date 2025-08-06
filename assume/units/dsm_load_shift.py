@@ -11,13 +11,11 @@ from pyomo.opt import (
     SolverFactory,
     SolverStatus,
     TerminationCondition,
-    check_available_solvers,
 )
 
 from assume.common.fast_pandas import FastSeries
+from assume.common.utils import get_supported_solver
 from assume.units.dst_components import demand_side_technologies
-
-SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
@@ -52,15 +50,7 @@ class DSMFlex:
 
     def initialize_solver(self, solver=None):
         # Define a solver
-        solvers = check_available_solvers(*SOLVERS)
-
-        # raise an error if no solver is available
-        if not solvers:
-            raise ValueError(
-                f"None of {SOLVERS} are available. Install one of them to proceed."
-            )
-
-        solver = solver if solver in solvers else solvers[0]
+        solver = get_supported_solver(solver)
         if solver == "gurobi":
             self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
         elif solver == "appsi_highs":

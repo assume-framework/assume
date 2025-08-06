@@ -23,30 +23,13 @@ from pyomo.opt import (
     SolverFactory,
     SolverStatus,
     TerminationCondition,
-    check_available_solvers,
 )
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.utils import get_supported_solver
 
 logger = logging.getLogger(__name__)
-
-
-def get_solver_factory(solvers_str=["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]):
-    """
-    select the first available solver from the list
-
-    Args:
-      solvers_str(list, optional): list of solvers
-
-    Returns:
-      SolverFactory: solver factory
-
-    """
-    solvers = check_available_solvers(*solvers_str)
-    if len(solvers) < 1:
-        raise Exception(f"None of {solvers_str} are available")
-    return SolverFactory(solvers[0])
 
 
 class DmasPowerplantStrategy(BaseStrategy):
@@ -61,7 +44,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         """
         super().__init__(*args, **kwargs)
         self.model = ConcreteModel("powerplant")
-        self.opt = get_solver_factory()
+        self.opt = SolverFactory(get_supported_solver())
         self.steps = steps
         self.T = 24
         self.opt_results = {
