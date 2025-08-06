@@ -1,5 +1,5 @@
 ,max_power_charge,technology,marginal_cost,efficiency_charge,efficiency_discharge,initial_soc,inflow,bidding_EOM,unit_operator,max_power_discharge,min_soc,max_soc,variable_cost_charge,variable_cost_discharge,additional_cost_charge,additional_cost_discharge,natural_inflow
-battery_02,301,battery,0.0,0.9736678327890722,0.9842878519088518,0.0,0.0,storage_learning,storage_eom_operator,289,0,1811,0.0,0.0,,,
+battery_02,301,battery,0.0,0.9736678327890722,0.9842878519088518,0.0,0.0,flexable_eom_storage,storage_eom_operator,289,0,1811,0.0,0.0,,,
 battery_05,351,battery,0.0,0.9753115907932288,0.9817071989725484,0.0,0.0,flexable_eom_storage,storage_eom_operator,336,0,2111,0.0,0.0,,,
 battery_07,660,battery,0.0,0.9831244593434711,0.9798564438129265,0.0,0.0,flexable_eom_storage,storage_eom_operator,636,0,3962,0.0,0.0,,,
 battery_08,221,battery,0.0,0.9806697146548232,0.983287388154792,0.0,0.0,flexable_eom_storage,storage_eom_operator,213,0,1329,0.0,0.0,,,
