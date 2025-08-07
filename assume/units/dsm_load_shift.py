@@ -786,6 +786,8 @@ class DSMFlex:
         import matplotlib.pyplot as plt
         import matplotlib.patches as mpatches
         import numpy as np
+        import pandas as pd
+        import os
         
         if not (hasattr(instance, 'evs') and hasattr(instance, 'charging_stations')):
             logger.warning("Bus depot plotting requires EVs and charging stations")
@@ -932,8 +934,95 @@ class DSMFlex:
         plt.tight_layout()
         plt.show()
         
+        # Export graph data to CSV files
+        self._export_bus_depot_graphs_to_csv(instance, evs, charging_stations, time_steps)
+        
         # Print summary
         self._print_bus_depot_summary(instance, evs, charging_stations, time_steps)
+
+    def _export_bus_depot_graphs_to_csv(self, instance, evs, charging_stations, time_steps):
+        """
+        Export all 3 bus depot graph data to CSV files in C: path
+        """
+        import pandas as pd
+        import numpy as np
+        import os
+        
+        base_path = os.getcwd()
+        
+        # Graph 1: EV Status Matrix (Idle/Queue/Charging)
+        status_matrix = np.zeros((len(evs), len(time_steps)))
+        
+        for i, ev in enumerate(evs):
+            for j, t in enumerate(time_steps):
+                # Get availability
+                ev_availability = getattr(instance, f"{ev}_availability", None)
+                if ev_availability is None or pyo.value(ev_availability[t]) == 0:
+                    status_matrix[i, j] = 0  # Not available (driving)
+                    continue
+                
+                # Check if charging
+                is_charging = False
+                for cs in charging_stations:
+                    if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5:
+                        status_matrix[i, j] = 2  # Charging
+                        is_charging = True
+                        break
+                
+                # Check if in queue
+                if not is_charging and hasattr(instance, 'in_queue'):
+                    if pyo.value(instance.in_queue[ev, t]) > 0.5:
+                        status_matrix[i, j] = 1  # In queue
+        
+        # Create DataFrame for EV Status
+        status_df = pd.DataFrame(status_matrix, index=evs, columns=[f'timestep_{t}' for t in time_steps])
+        csv_path1 = os.path.join(base_path, "ev_status_matrix.csv")
+        status_df.to_csv(csv_path1)
+        print(f"EV Status Matrix exported to: {csv_path1}")
+        
+        # Graph 2: Charging Station Power Output
+        cs_data = {}
+        for cs in charging_stations:
+            cs_discharge = []
+            for t in time_steps:
+                discharge = pyo.value(instance.dsm_blocks[cs].discharge[t])
+                cs_discharge.append(discharge)
+            cs_data[cs] = cs_discharge
+        
+        cs_df = pd.DataFrame(cs_data, index=[f'timestep_{t}' for t in time_steps])
+        csv_path2 = os.path.join(base_path, "charging_station_power.csv")
+        cs_df.to_csv(csv_path2)
+        print(f"Charging Station Power exported to: {csv_path2}")
+        
+        # Graph 3: EV Charging Power
+        ev_charge_data = {}
+        for ev in evs:
+            if ev in instance.dsm_blocks:
+                ev_charge = [pyo.value(instance.dsm_blocks[ev].charge[t]) for t in time_steps]
+                ev_charge_data[ev] = ev_charge
+        
+        if ev_charge_data:
+            ev_charge_df = pd.DataFrame(ev_charge_data, index=[f'timestep_{t}' for t in time_steps])
+            csv_path3 = os.path.join(base_path, "ev_charging_power.csv")
+            ev_charge_df.to_csv(csv_path3)
+            print(f"EV Charging Power exported to: {csv_path3}")
+        
+        # Graph 4: Electricity Price and Marginal Cost
+        electricity_prices = [pyo.value(instance.electricity_price[t]) for t in time_steps]
+        total_power = [pyo.value(instance.total_power_input[t]) for t in time_steps]
+        marginal_costs = [price * power for price, power in zip(electricity_prices, total_power)]
+        
+        price_cost_df = pd.DataFrame({
+            'electricity_price': electricity_prices,
+            'total_power': total_power,
+            'marginal_cost': marginal_costs
+        }, index=[f'timestep_{t}' for t in time_steps])
+        
+        csv_path4 = os.path.join(base_path, "electricity_price_marginal_cost.csv")
+        price_cost_df.to_csv(csv_path4)
+        print(f"Electricity Price and Marginal Cost exported to: {csv_path4}")
+        
+        print(f"\nAll 4 graph datasets exported to CSV files in {base_path}")
 
     def _print_bus_depot_summary(self, instance, evs, charging_stations, time_steps):
         """Print optimization summary for bus depot"""

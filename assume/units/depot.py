@@ -556,229 +556,163 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 )
             return pyo.Constraint.Skip
         
-        #  20: Smart distance-based sufficient charge flag with future availability logic
+        # CONSTRAINT 20: Sufficient charge flag logic (CORRECTED VERSION)
+        # PURPOSE: Determines when an EV has enough charge for the next unavailable period
+        # WHY NEEDED: Prevents EVs from leaving charging station before they have enough energy
+        # for the NEXT usage period (when is_available=0)
         @self.model.Constraint(self.model.evs, self.model.time_steps)
         def enforce_sufficient_charge_for_travel_flag(m, ev, t):
             """
-            Set flag if EV has enough charge considering both travel requirements
-            and other EVs' future availability to prevent excessive switching.
+            Sets the has_sufficient_charge_for_travel binary flag based on current SOC vs 
+            NEXT unavailable period's usage (not all future usage).
             """
-            M = 1e5
-            ε = 1e-3
+            M = 500  # Conservative Big-M value
+            ε = 0.1  # Epsilon for numerical stability
             
             if ev in m.dsm_blocks and hasattr(m.dsm_blocks[ev], "usage"):
-                time_steps_list = sorted(m.time_steps)
+                time_steps_list = list(m.time_steps)  # Already in ascending order
                 
-                # Calculate total future usage requirement for this EV
-                future_usage_total = sum(m.dsm_blocks[ev].usage[t_future] 
-                                       for t_future in time_steps_list if t_future > t)
+                # Calculate energy needed for the NEXT unavailable period only
+                ev_availability = getattr(m, f"{ev}_availability", None)
+                next_usage_total = 0
                 
-                # Current SOC
+                if ev_availability is not None:
+                    # Find the next period where is_available=0
+                    in_unavailable_period = False
+                    
+                    for t_future in time_steps_list:
+                        if t_future > t:
+                            if ev_availability[t_future] == 0:
+                                # Start of unavailable period - collect usage
+                                if not in_unavailable_period:
+                                    in_unavailable_period = True
+                                next_usage_total += m.dsm_blocks[ev].usage[t_future]
+                            else:
+                                # Available again - if we were in unavailable period, stop
+                                if in_unavailable_period:
+                                    break
+                
+                # Current state of charge
                 current_soc = m.dsm_blocks[ev].soc[t] if hasattr(m.dsm_blocks[ev], "soc") else 0
                 
-                # Count other EVs' future available time
-                other_evs_available_time = 0
-                for other_ev in m.evs:
-                    if other_ev != ev:
-                        other_ev_availability = getattr(m, f"{other_ev}_availability", None)
-                        if other_ev_availability is not None:
-                            for t_future in time_steps_list:
-                                if t_future > t:
-                                    other_evs_available_time += other_ev_availability[t_future]
-                
-                # Dynamic threshold based on other EVs' availability
-                if other_evs_available_time > 10:
-                    # If other EVs have plenty of time, require 80% charge before switching
-                    required_charge = 0.8 * m.dsm_blocks[ev].max_capacity
-                else:
-                    # If other EVs have limited time, just satisfy travel requirements
-                    required_charge = future_usage_total
-                
-                # Big-M constraint: if current_soc >= required_charge, flag can be 1
+                # Big-M constraint: current_soc >= next_usage_total - (1-flag)*M
                 return (
-                    current_soc >= required_charge - ε - (1 - m.has_sufficient_charge_for_travel[ev, t]) * M
+                    current_soc >= next_usage_total - ε - (1 - m.has_sufficient_charge_for_travel[ev, t]) * M
                 )
             return pyo.Constraint.Skip
         
-        #  21: Smart distance-based sufficient charge flag - reverse constraint  
-        @self.model.Constraint(self.model.evs, self.model.time_steps)
-        def enforce_sufficient_charge_for_travel_flag_reverse(m, ev, t):
-            """
-            Reverse constraint: if current_soc < required_charge, flag must be 0
-            """
-            M = 1e5
-            ε = 1e-3
-            
-            if ev in m.dsm_blocks and hasattr(m.dsm_blocks[ev], "usage"):
-                time_steps_list = sorted(m.time_steps)
-                
-                # Calculate total future usage requirement
-                future_usage_total = sum(m.dsm_blocks[ev].usage[t_future] 
-                                       for t_future in time_steps_list if t_future > t)
-                
-                # Current SOC
-                current_soc = m.dsm_blocks[ev].soc[t] if hasattr(m.dsm_blocks[ev], "soc") else 0
-                
-                # Count other EVs' future available time
-                other_evs_available_time = 0
-                for other_ev in m.evs:
-                    if other_ev != ev:
-                        other_ev_availability = getattr(m, f"{other_ev}_availability", None)
-                        if other_ev_availability is not None:
-                            for t_future in time_steps_list:
-                                if t_future > t:
-                                    other_evs_available_time += other_ev_availability[t_future]
-                
-                # Same dynamic threshold logic
-                if other_evs_available_time > 10:
-                    required_charge = 0.8 * m.dsm_blocks[ev].max_capacity
-                else:
-                    required_charge = future_usage_total
-                
-                # Big-M constraint: if current_soc < required_charge, flag must be 0
-                return (
-                    current_soc <= required_charge - ε + m.has_sufficient_charge_for_travel[ev, t] * M
-                )
-            return pyo.Constraint.Skip
-        
+        # CONSTRAINT 22: Charging continuity based on travel requirements
+        # PURPOSE: Ensures EVs don't disconnect from charging before meeting travel needs
+        # WHY NEEDED: Prevents inefficient charging patterns and ensures EVs have enough energy
         @self.model.Constraint(
             self.model.evs,
             self.model.charging_stations,
             self.model.time_steps,
-            doc="Distance-based charging continuity: continue charging until travel requirements met"
+            doc="Charging continuity: continue charging until travel requirements met"
         )
-        def distance_based_charging_continuity(m, ev, cs, t):
+        def charging_continuity_for_travel(m, ev, cs, t):
             """
-            Distance-based charging rule: If an EV was charging at t-1 and is still available at t,
-            it must continue charging at the same charging station until it has sufficient charge
-            to satisfy its travel distance requirements.
+            If an EV was charging at t-1 and is still available at t,
+            it must continue charging at the same station unless it has sufficient charge.
             """
             if t == m.time_steps.first():
                 return pyo.Constraint.Skip
             
-            # Get availability parameter
             ev_availability = getattr(m, f"{ev}_availability", None)
             if ev_availability is None:
                 return pyo.Constraint.Skip
             
-            # If not available now or wasn't available before, no constraint
+            # Only apply when EV is available in both time periods
             if ev_availability[t] == 0 or ev_availability[t-1] == 0:
                 return pyo.Constraint.Skip
             
-            # DISTANCE RULE: If was assigned to this CS at t-1 and still available at t,
-            # must stay assigned at t unless has sufficient charge for travel
-            # Linear formulation: assigned[t] >= assigned[t-1] - has_sufficient_charge_for_travel[t-1]
+            # If was assigned to this station at t-1, must stay unless sufficient charge
             return m.is_assigned[ev, cs, t] >= m.is_assigned[ev, cs, t-1] - m.has_sufficient_charge_for_travel[ev, t-1]
         
-        # REMOVED: Redundant strict_ev_priority constraint 
-        # (Replaced by enhanced_first_ev_priority which is more comprehensive)
-        
-        # REMOVED: Redundant mandatory assignment constraint 
-        # (Replaced by optimal_station_utilization which handles all scenarios)
-        # IMPROVED: Multi-station utilization enforcement  
+        # CONSTRAINT 23: Optimal charging station utilization
+        # PURPOSE: Ensures efficient use of available charging infrastructure
+        # WHY NEEDED: Maximizes charging capacity utilization and prevents idle stations
         @self.model.Constraint(
             self.model.time_steps,
-            doc="Ensure charging stations are optimally utilized when EVs are available"
+            doc="Ensure optimal utilization of charging stations"
         )
         def optimal_station_utilization(m, t):
             """
-            Improved rule: Use charging stations optimally based on available EVs.
+            Optimal charging station utilization rule:
             - If available_evs <= charging_stations: all EVs should be assigned
             - If available_evs > charging_stations: all stations should be used
             """
-            evs_list = sorted(m.evs)
+            evs_list = list(m.evs)
             
-            # Count available EVs
+            # Count available EVs at time t
             available_evs = 0
             for ev in evs_list:
                 ev_availability = getattr(m, f"{ev}_availability", None)
                 if ev_availability is not None:
                     available_evs += ev_availability[t]
             
-            # Count total charging stations
-            total_charging_stations = len(m.charging_stations)
+            if available_evs == 0:
+                return pyo.Constraint.Skip
             
-            # Count total assignments across all stations
+            # Total assignments across all EV-station combinations
             total_assignments = sum(
                 m.is_assigned[ev, cs, t] 
                 for ev in evs_list 
                 for cs in m.charging_stations
             )
             
-            if available_evs == 0:
-                # No EVs available - no assignments required
-                return pyo.Constraint.Skip
-            elif available_evs <= total_charging_stations:
-                # More or equal charging stations than EVs - all EVs should be assigned
+            total_charging_stations = len(m.charging_stations)
+            
+            if available_evs <= total_charging_stations:
+                # Enough stations for all EVs - assign all available EVs
                 return total_assignments >= available_evs
             else:
-                # More EVs than charging stations - all stations should be utilized
+                # More EVs than stations - utilize all stations
                 return total_assignments >= total_charging_stations
         
-        # SIMPLIFIED: Basic EV priority constraint
-        @self.model.Constraint(
-            self.model.time_steps,
-            doc="Basic first EV assignment priority when both available"
-        )
-        def basic_first_ev_priority(m, t):
-            """
-            Simple rule: When both EVs are available and need charging,
-            first EV gets priority unless it has sufficient charge.
-            """
-            evs_list = sorted(m.evs)
-            if len(evs_list) < 2:
-                return pyo.Constraint.Skip
-            
-            first_ev = evs_list[0]
-            second_ev = evs_list[1]
-            
-            first_availability = getattr(m, f"{first_ev}_availability", None)
-            second_availability = getattr(m, f"{second_ev}_availability", None)
-            
-            if first_availability is None or second_availability is None:
-                return pyo.Constraint.Skip
-            
-            # Only apply when both are available
-            if first_availability[t] == 0 or second_availability[t] == 0:
-                return pyo.Constraint.Skip
-            
-            # Simple priority: second EV can only be assigned if first EV has sufficient charge
-            second_ev_total = sum(m.is_assigned[second_ev, cs, t] for cs in m.charging_stations)
-            
-            if hasattr(m, 'has_sufficient_charge_for_travel'):
-                return second_ev_total <= m.has_sufficient_charge_for_travel[first_ev, t]
-            else:
-                # Without charge tracking, allow both to compete
-                return pyo.Constraint.Skip
         
-        # NEW: Prevent EV switching once started charging  
+        # CONSTRAINT 24: Prevent premature EV switching
+        # PURPOSE: Prevents EVs from leaving charging before completing their charge cycle
+        # WHY NEEDED: Ensures charging efficiency and prevents incomplete charging sessions
         @self.model.Constraint(
             self.model.evs,
             self.model.time_steps,
-            doc="Once an EV starts charging, it cannot switch to a different EV until sufficient charge"
+            doc="Prevent EV from leaving charging before sufficient charge"
         )
-        def prevent_ev_switching(m, ev, t):
+        def prevent_premature_ev_switching(m, ev, t):
             """
-            If an EV was assigned to any charging station at t-1 and is still available at t,
-            no other EV can take over any charging station unless this EV is sufficiently charged.
+            If an EV was charging at t-1 and is still available at t,
+            it must continue charging unless it has sufficient charge for travel.
             """
             if t == m.time_steps.first():
                 return pyo.Constraint.Skip
             
-            # Get availability parameter
             ev_availability = getattr(m, f"{ev}_availability", None)
             if ev_availability is None:
                 return pyo.Constraint.Skip
             
-            # Skip if not available at current or previous timestep
+            # Only apply when EV is available in both periods
             if ev_availability[t] == 0 or ev_availability[t-1] == 0:
                 return pyo.Constraint.Skip
             
-            # Check if this EV was assigned to any charging station at t-1
+            # Check if this EV was assigned to any station at t-1
             was_assigned_anywhere = sum(m.is_assigned[ev, cs, t-1] for cs in m.charging_stations)
             
-            # If this EV was assigned and does not have sufficient charge for travel, 
-            # it must be assigned to exactly one station at time t
+            # If was assigned and doesn't have sufficient charge, must remain assigned
             return (sum(m.is_assigned[ev, cs, t] for cs in m.charging_stations) >= 
                     was_assigned_anywhere - m.has_sufficient_charge_for_travel[ev, t-1])
+
+        # CONSTRAINT 25: Future improvement placeholder
+        # PURPOSE: Advanced queue priority logic to minimize switching
+        # CHALLENGE: HiGHS solver requires linear constraints only
+        # CURRENT STATUS: Basic switching prevention is handled by constraints 20, 22, and 24
+        # 
+        # FOR FUTURE IMPLEMENTATION: Would require additional binary variables and 
+        # linearization techniques to make it compatible with linear solvers
+        # 
+        # The current constraints already provide:
+        # - Correct future usage calculation (Constraint 20)
+        # - Charging continuity until sufficient charge (Constraint 22) 
+        # - Prevention of premature switching (Constraint 24)
+        # This combination significantly reduces unnecessary switching
         

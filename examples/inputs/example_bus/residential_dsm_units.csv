@@ -1,7 +1,6 @@
 name,unit_type,technology,node,bidding_EOM,fuel_type,unit_operator,objective,flexibility_measure,congestion_threshold,peak_load_cap,power_flow_directionality,mileage,charging_profile,availability_profile,demand,max_power,ramp_up,ramp_down,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,efficiency_charge,efficiency_discharge,is_prosumer
 bangkok_1,bus_depot,electric_vehicle_1,north,naive_da_dsm,,dsm_operator_1,min_variable_cost,congestion_management_flexibility,0.79,0.9,unidirectional,0.0012,,Yes,,0.12,0.03,0.03,0.35,,,,0,0.87,1,No
 bangkok_1,bus_depot,electric_vehicle_2,north,naive_da_dsm,,,,,,,unidirectional,0.0012,,Yes,,0.12,0.03,0.03,0.35,,,,0,0.94,1,No
-bangkok_1,bus_depot,electric_vehicle_3,north,naive_da_dsm,,,,,,,unidirectional,0.0012,,Yes,,0.12,0.03,0.03,0.35,,,,0,0.94,1,No
-bangkok_1,bus_depot,electric_vehicle_4,north,naive_da_dsm,,,,,,,unidirectional,0.0012,,Yes,,0.12,0.03,0.03,0.35,,,,0,0.94,1,No
+bangkok_1,bus_depot,electric_vehicle_3,north,naive_da_dsm,,,,,,,unidirectional,0.0012,,Yes,,0.2,0.03,0.03,0.5,,,,0,0.94,1,No
 bangkok_1,bus_depot,charging_station_1,north,naive_da_dsm,,,,,,,unidirectional,,,Yes,,0.12,0.03,0.03,,,,,,,,No
-bangkok_1,bus_depot,charging_station_2,north,naive_da_dsm,,,,,,,unidirectional,,,Yes,,0.12,0.03,0.03,,,,,,,,No
+bangkok_1,bus_depot,charging_station_2,north,naive_da_dsm,,,,,,,unidirectional,,,Yes,,0.2,0.05,0.05,,,,,,,,No
