@@ -182,7 +182,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             self.model.time_steps, within=pyo.NonNegativeReals
         )
         self.model.variable_cost = pyo.Var(
-            self.model.time_steps, within=pyo.NonNegativeReals
+            self.model.time_steps, within=pyo.Reals
         )
         self.model.grid_power = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
@@ -314,8 +314,8 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
             if self.has_boiler:
                 boiler = self.components["boiler"]
-                if boiler.fuel_type == "electricity":
-                    total_cost += self.model.dsm_blocks["boiler"].operating_cost[t]
+                # if boiler.fuel_type == "electricity":
+                total_cost += self.model.dsm_blocks["boiler"].operating_cost[t]
 
             # total_cost += m.grid_power[t] * m.electricity_price[t]
 

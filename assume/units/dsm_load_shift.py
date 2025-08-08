@@ -20,7 +20,7 @@ from pyomo.opt import (
 from assume.common.fast_pandas import FastSeries
 from assume.units.dst_components import demand_side_technologies
 
-SOLVERS = ["gurobi", "glpk", "cbc", "cplex"]
+SOLVERS = ["gurobi", "appsi_highs", "glpk", "cbc", "cplex"]
 
 logger = logging.getLogger(__name__)
 
@@ -794,14 +794,14 @@ class DSMFlex:
             if "heat_resistor" in instance.dsm_blocks
             else None
         )
-        boiler_load = (
-            [
-                pyo.value(instance.dsm_blocks["boiler"].natural_gas_in[t])
-                for t in instance.time_steps
-            ]
-            if "boiler" in instance.dsm_blocks
-            else None
-        )
+        # boiler_load = (
+        #     [
+        #         pyo.value(instance.dsm_blocks["boiler"].natural_gas_in[t])
+        #         for t in instance.time_steps
+        #     ]
+        #     if "boiler" in instance.dsm_blocks
+        #     else None
+        # )
         # grid = [
         #     pyo.value(instance.grid_power[t]) for t in instance.time_steps
         # ]
@@ -845,11 +845,11 @@ class DSMFlex:
             if hasattr(self, "electricity_price")
             else None
         )
-        natural_gas_price = (
-            [instance.natural_gas_price[t] for t in instance.time_steps]
-            if hasattr(self, "natural_gas_price")
-            else None
-        )
+        # natural_gas_price = (
+        #     [instance.natural_gas_price[t] for t in instance.time_steps]
+        #     if hasattr(self, "natural_gas_price")
+        #     else None
+        # )
         fig, axs = plt.subplots(
             2, 1, figsize=(10, 8), sharex=True, constrained_layout=True
         )
@@ -857,11 +857,11 @@ class DSMFlex:
         # --- Top plot: Boiler and Heat Resistor Input & Electricity Price ---
         ln1 = []
         if any(electrical_load):
-            ln1 += axs[0].plot(time_steps, electrical_load, label="Heat Resistor Power Input", color="C1")
-        if any(boiler_load):
-            ln1 += axs[0].plot(time_steps, boiler_load, label="Boiler Natural gas Input", color="C0")
+            ln1 += axs[0].plot(time_steps, electrical_load, label="E-Boiler: Power Input", color="C1")
+        # if any(boiler_load):
+        #     ln1 += axs[0].plot(time_steps, boiler_load, label="Boiler: Natural gas Input", color="C0")
         axs[0].set_ylabel("Power Input [MW]")
-        axs[0].set_title("Heat Generator Power Input & Electricity Price")
+        axs[0].set_title("Heat Generator Input & Energy Price")
         axs[0].grid(True, which="both", axis="both")
 
         # Secondary y-axis for price
@@ -876,14 +876,14 @@ class DSMFlex:
                     color="C4",
                     linestyle="--",
                 )
-            if natural_gas_price:
-                ln2 += ax_price.plot(
-                    time_steps,
-                    natural_gas_price,
-                    label="Natural Gas Price",
-                    color="C6",
-                    linestyle=":",
-                )
+            # if natural_gas_price:
+            #     ln2 += ax_price.plot(
+            #         time_steps,
+            #         natural_gas_price,
+            #         label="Natural Gas Price",
+            #         color="C6",
+            #         linestyle=":",
+            #     )
             ax_price.set_ylabel("Energy Price [€/MWh]", color="gray")
             ax_price.tick_params(axis="y", labelcolor="gray")
             ax_price.set_ylim(0, None) 
@@ -912,8 +912,8 @@ class DSMFlex:
         # Build DataFrame
         df = pd.DataFrame({
             "Time Step": list(time_steps),
-            "Boiler Power Input [MW]": boiler_load,
-            "Heat Resistor Power Input [MW]": electrical_load,
+            # "Boiler Natural Gas Input [MW]": boiler_load,
+            "E-Boiler Power Input [MW]": electrical_load,
             "Storage SOC [MWh]": storage_soc,
             "Storage Charge [MW]": storage_charge,
             "Storage Discharge [MW]": storage_discharge,
