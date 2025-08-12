@@ -1157,9 +1157,9 @@ class RenewableRLStrategy(RLStrategySingleBid):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 75)
+        obs_dim = kwargs.pop("obs_dim", 44)
         act_dim = kwargs.pop("act_dim", 1)
-        unique_obs_dim = kwargs.pop("unique_obs_dim", 3)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
             obs_dim=obs_dim,
             act_dim=act_dim,
@@ -1173,7 +1173,7 @@ class RenewableRLStrategy(RLStrategySingleBid):
         # neural network architecture is predefined, and the size of the observations must remain consistent.
         # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
         # as the observation dimension depends on the foresight value.
-        self.foresight = 24
+        self.foresight = 12
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -1207,12 +1207,11 @@ class RenewableRLStrategy(RLStrategySingleBid):
         current_costs = unit.calculate_marginal_cost(start, current_volume)
         _, available_power = unit.calculate_min_max_power(start, end)
 
-        scaled_total_dispatch = current_volume / unit.max_power
         scaled_marginal_cost = current_costs / self.max_bid_price
         scaled_available_power = available_power[0] / unit.max_power
 
         individual_observations = np.array(
-            [scaled_total_dispatch, scaled_marginal_cost, scaled_available_power]
+            [scaled_marginal_cost, scaled_available_power]
         )
 
         return individual_observations
