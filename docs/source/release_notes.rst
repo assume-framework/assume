@@ -15,7 +15,7 @@ Upcoming Release
   **Improvements:**
 
 - **Changed Logging for DRL metrics**: TensorBoard logging was restructured to separate metrics collected per gradient step and per simulation time step. This avoids unnecessary padding, ensures consistency, and prevents data loss across different logging frequencies.
-
+- **Actor Output Clamping:** The action outputs of the actor neural network + noise are now always clamped to the valid output range, which is dynamically determined based on the actor architecture and its activation function. This prevents exploration noise from pushing actions outside the achievable output space of the actor, ensuring that bids remain within the intended limits.
 
 0.5.4 - (9th July 2025)
 =======================
