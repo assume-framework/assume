@@ -275,6 +275,11 @@ class BaseLearningStrategy(LearningStrategy):
                     device=self.device, dtype=self.float_type
                 )
                 curr_action += noise
+
+                # make sure that noise adding does not exceed the actual output of the NN as it pushes results in a direction that actor can't even reach
+                curr_action = th.clamp(
+                    curr_action, self.actor.min_output, self.actor.max_output
+                )
         else:
             # if we are not in learning mode we just use the actor neural net to get the action without adding noise
             curr_action = self.actor(next_observation).detach()
@@ -758,7 +763,7 @@ class RLStrategySingleBid(RLStrategy):
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
-        # actions are in the range [-1,1], we need to transform them into actual bids
+        # actions are in the range [-1,1] + noise, we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
         bid_price = actions[0] * self.max_bid_price
 
