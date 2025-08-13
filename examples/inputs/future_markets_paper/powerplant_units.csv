@@ -8,7 +8,7 @@ OCGT_06,combined cycle gas turbine,681,0,natural gas,64.6839512195122,0.55462040
 OCGT_07,combined cycle gas turbine,160,0,natural gas,64.6839512195122,0.3626562525055995,0.0,0.0,7,0.198,naive_eom,eom_operator
 OCGT_08,combined cycle gas turbine,83,0,natural gas,64.6839512195122,0.35571973895385733,0.0,0.0,8,0.198,naive_eom,eom_operator
 OCGT_09,combined cycle gas turbine,1293,0,natural gas,64.6839512195122,0.5869301518110583,0.0,0.0,9,0.198,naive_eom,eom_operator
-solar_00,solar_0,5071,0,renewable,0.01,1.0,0.0,0.0,0,0.0,renewable_learning,eom_operator
+solar_00,solar_0,5071,0,renewable,0.01,1.0,0.0,0.0,0,0.0,naive_eom,eom_operator
 solar_02,solar_2,5296,0,renewable,0.01,1.0,0.0,0.0,2,0.0,naive_eom,eom_operator
 solar_05,solar_5,3415,0,renewable,0.009999999999999998,1.0,0.0,0.0,5,0.0,naive_eom,eom_operator
 solar_08,solar_8,4157,0,renewable,0.01,1.0,0.0,0.0,8,0.0,naive_eom,eom_operator
