@@ -184,7 +184,8 @@ class BusDepot(DSMFlex, SupportsMinMax):
         """
         self.model.total_power_input = pyo.Var(self.model.time_steps, within=pyo.Reals)
         self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.Reals)
-        
+        self.model.variable_rev = pyo.Var(self.model.time_steps, within=pyo.Reals)
+        self.model.net_income = pyo.Var(self.model.time_steps, within=pyo.Reals)
         #  1: EV-CS assignment variables
         # Represents whether an electric vehicle (EV) is assigned to a charging station (CS)
         self.model.is_assigned = pyo.Var(
@@ -403,6 +404,95 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 Equality condition defining the variable cost.
             """
             return m.variable_cost[t] == m.total_power_input[t] * m.electricity_price[t]
+        #  9.1: Revenue calculation constraint
+        # This constraint calculates the revenue generated from the total power input at each time step.
+        # It is similar to the variable cost constraint but uses the flexible electricity price.  
+        
+
+        @self.model.Constraint(self.model.time_steps)
+        def rev_constraint(m, t):
+            """
+            Calculates the total variable revenue from all EVs at each time step.
+
+            This constraint sums discharge power from all bidirectional EVs multiplied by 
+            flexible electricity price and availability.
+
+            Args:
+                m: Pyomo model reference.
+                t: Current time step.
+
+            Returns:
+                Equality condition defining the total variable revenue.
+            """
+            if not self.is_prosumer:
+                return m.variable_rev[t] == 0
+            
+            total_revenue = 0
+            
+            for ev in m.evs:
+                # Check if EV is bidirectional by accessing the EV component
+                ev_component = self.components.get(ev)
+                if ev_component and hasattr(ev_component, 'power_flow_directionality'):
+                    power_flow_directionality = ev_component.power_flow_directionality
+                else:
+                    power_flow_directionality = "unidirectional"
+                
+                # Use depot-level prosumer status for EV
+                ev_is_prosumer = self.is_prosumer
+                
+                # Only include revenue for bidirectional AND prosumer EVs
+                if power_flow_directionality == "bidirectional" and ev_is_prosumer:
+                    # Get the availability profile for this EV
+                    ev_availability = getattr(m, f"{ev}_availability", None)
+                    
+                    if ev_availability is not None:
+                        # Revenue = discharge * flexible_price * availability
+                        total_revenue += (m.dsm_blocks[ev].discharge[t] * 
+                                        m.electricity_price_flex[t] * 
+                                        ev_availability[t])
+                    else:
+                        # If no availability profile, add discharge without availability factor
+                        total_revenue += (m.dsm_blocks[ev].discharge[t] * 
+                                        m.electricity_price_flex[t])
+            
+            return m.variable_rev[t] == total_revenue        
+              
+        
+        @self.model.Constraint(self.model.time_steps)
+        def net_income_constraint(m, t):
+            """
+            Calculates net income as the difference between revenue and variable cost.
+            
+            Args:
+                m: Pyomo model reference.
+                t: Current time step.
+                
+            Returns:
+                Equality condition defining net income = revenue - cost.
+            """
+            if not self.is_prosumer:
+                return m.net_income[t] == 0 - m.variable_cost[t]
+            
+            # Check if any EV is both bidirectional AND prosumer
+            has_bidirectional_prosumer = False
+            for ev in m.evs:
+                ev_component = self.components.get(ev)
+                if ev_component and hasattr(ev_component, 'power_flow_directionality'):
+                    power_flow_directionality = ev_component.power_flow_directionality
+                else:
+                    power_flow_directionality = "unidirectional"
+                
+                # Use depot-level prosumer status for EV
+                ev_is_prosumer = self.is_prosumer
+                    
+                if power_flow_directionality == "bidirectional" and ev_is_prosumer:
+                    has_bidirectional_prosumer = True
+                    break
+            
+            if not has_bidirectional_prosumer:
+                return m.net_income[t] == 0 - m.variable_cost[t]
+                
+            return m.net_income[t] == m.variable_rev[t] - m.variable_cost[t]
         
         #  10: Assignment just if EV is available
         # This constraint ensures that an EV can only be assigned to a charging station if it is

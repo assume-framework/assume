@@ -1,6 +1,6 @@
 datetime,electricity_price,electricity_price_flex,grid_demand,congestion_signal,RE_availability,unidirectional_load,bangkok_1_electric_vehicle_1_availability_profile,bangkok_1_electric_vehicle_2_availability_profile,bangkok_1_electric_vehicle_3_availability_profile,bangkok_1_electric_vehicle_4_availability_profile,bangkok_1_electric_vehicle_5_availability_profile,bangkok_1_electric_vehicle_6_availability_profile,bangkok_1_electric_vehicle_7_availability_profile,bangkok_1_electric_vehicle_8_availability_profile,bangkok_1_electric_vehicle_9_availability_profile,bangkok_1_electric_vehicle_10_availability_profile,bangkok_1_electric_vehicle_1_range,bangkok_1_electric_vehicle_2_range,bangkok_1_electric_vehicle_3_range,bangkok_1_electric_vehicle_4_range,bangkok_1_electric_vehicle_5_range,bangkok_1_electric_vehicle_6_range,bangkok_1_electric_vehicle_7_range,bangkok_1_electric_vehicle_8_range,bangkok_1_electric_vehicle_9_range,bangkok_1_electric_vehicle_10_range
-6/1/2024 0:00,25,25,9288898.36,0.617000682,2.013876218,0,1,1,1,1,1,1,1,1,1,1,5,5,5,5,5,5,5,5,5,5
-6/1/2024 0:15,25,25,9247595.87,0.620307136,2.009404148,0,1,1,1,1,1,1,1,1,1,1,5,5,5,5,5,5,5,5,5,5
+6/1/2024 0:00,25,35,9288898.36,0.617000682,2.013876218,0,1,1,1,1,1,1,1,1,1,1,5,5,5,5,5,5,5,5,5,5
+6/1/2024 0:15,25,35,9247595.87,0.620307136,2.009404148,0,1,1,1,1,1,1,1,1,1,1,5,5,5,5,5,5,5,5,5,5
 6/1/2024 0:30,25,25,9214058.25,0.622991976,2.010326123,0,1,1,1,1,1,1,1,1,1,1,5,5,5,5,5,5,5,5,5,5
 6/1/2024 0:45,25,25,9132681.52,0.629506556,2.01590224,0,1,1,1,1,1,1,1,1,1,1,5,5,5,5,5,5,5,5,5,5
 6/1/2024 1:00,25,25,8797867,0.656309994,1.57761336,0,1,1,1,1,1,1,1,1,1,1,5,5,5,5,5,5,5,5,5,5

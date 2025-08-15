@@ -1349,6 +1349,9 @@ class ElectricVehicle:
             self.time_steps, within=pyo.NonNegativeReals
         )
         model_block.usage = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        
+        # add a binary variable to disallow discharging and charging at the same time
+        model_block.status = pyo.Var(self.time_steps, within=pyo.Binary)
 
         if self.charging_profile is not None:
 
@@ -1367,7 +1370,7 @@ class ElectricVehicle:
             @model_block.Constraint(self.time_steps)
             def charge_availability_constraint(b, t):
                 return (
-                    b.charge[t] <= self.availability_profile.iat[t] * b.max_power_charge
+                    b.charge[t] <= self.availability_profile.iat[t] * b.max_power_charge * b.status[t]
                 )
 
             @model_block.Constraint(self.time_steps)
@@ -1401,7 +1404,7 @@ class ElectricVehicle:
                 def discharge_availability_constraint(b, t):
                     return (
                         b.discharge[t]
-                        <= self.availability_profile.iat[t] * b.max_power_discharge
+                        <= self.availability_profile.iat[t] * b.max_power_discharge*(1-b.status[t])
                     )
 
                 @model_block.Constraint(self.time_steps)
@@ -1419,14 +1422,8 @@ class ElectricVehicle:
         # Operating costs
         @model_block.Constraint(self.time_steps)
         def operating_cost_constraint_rule(b, t):
-            if self.power_flow_directionality == "unidirectional":
                 return b.operating_cost[t] == b.charge[t] * model.electricity_price[t]
-            elif self.power_flow_directionality == "bidirectional":
-                return (
-                    b.operating_cost[t]
-                    == b.charge[t] * model.electricity_price[t]
-                    - b.discharge[t] * model.electricity_price_flex[t]
-                )
+        
 
         return model_block
 

@@ -200,6 +200,20 @@ class DSMFlex:
                 )
 
                 return total_variable_cost
+            
+        if self.objective == "max_net_income":
+
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_opt(m):
+                """
+                Maximizes the total net income over all time steps.
+                """
+                net_income = pyo.quicksum(
+                    self.model.net_income[t] for t in self.model.time_steps
+                )
+
+                return net_income
+
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
@@ -860,17 +874,26 @@ class DSMFlex:
         ax2.legend()
         ax2.grid(True, alpha=0.3)
         
-        # 3. EV Charging Power
+        # 3. EV Charging and Discharging Power
         for ev in evs[:5]:  # Limit to first 5 EVs for clarity
             if ev in instance.dsm_blocks:
                 ev_charge = [pyo.value(instance.dsm_blocks[ev].charge[t]) for t in time_steps]
-                ax3.plot(time_steps, ev_charge, label=ev, alpha=0.8)
+                ev_discharge = [pyo.value(instance.dsm_blocks[ev].discharge[t]) for t in time_steps]
+                ev_usage = [pyo.value(instance.dsm_blocks[ev].usage[t]) for t in time_steps]
+                
+                # Plot charging as positive values (blue)
+                ax3.plot(time_steps, ev_charge, label=f'{ev} Charge', color='blue', alpha=0.8)
+                # Plot discharging as negative values (red)  
+                ax3.plot(time_steps, [-d for d in ev_discharge], label=f'{ev} Discharge', color='red', alpha=0.8, linestyle='--')
+                # Plot usage as negative values (orange)
+                ax3.plot(time_steps, [-u for u in ev_usage], label=f'{ev} Usage', color='orange', alpha=0.8, linestyle=':')
         
         ax3.set_xlabel('Time Steps')
-        ax3.set_ylabel('Charging Power (kW)')
-        ax3.set_title('EV Charging Power (First 5 EVs)')
-        ax3.legend()
+        ax3.set_ylabel('Power (kW)')
+        ax3.set_title('EV Power: Charge (Blue), Discharge (Red), Usage (Orange)')
+        ax3.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         ax3.grid(True, alpha=0.3)
+        ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
         
         # 4. EV State of Charge
         for ev in evs[:5]:  # Limit to first 5 EVs for clarity
@@ -902,9 +925,12 @@ class DSMFlex:
         ax5.set_title('Queue Length Over Time')
         ax5.grid(True, alpha=0.3, axis='y')
         
-        # 6. Marginal Cost Analysis
+        # 6. Financial Analysis: Cost, Revenue, and Net Income
         electricity_prices = [pyo.value(instance.electricity_price[t]) for t in time_steps]
         total_power = [pyo.value(instance.total_power_input[t]) for t in time_steps]
+        variable_costs = [pyo.value(instance.variable_cost[t]) for t in time_steps]
+        variable_revenues = [pyo.value(instance.variable_rev[t]) for t in time_steps]
+        net_incomes = [pyo.value(instance.net_income[t]) for t in time_steps]
         
         # Calculate marginal cost (electricity price * power consumption)
         marginal_costs = [price * power for price, power in zip(electricity_prices, total_power)]
@@ -912,30 +938,36 @@ class DSMFlex:
         # Create dual y-axis plot
         ax6_twin = ax6.twinx()
         
-        # Plot electricity price on left axis
-        line1 = ax6.plot(time_steps, electricity_prices, 'b-', label='Electricity Price (€/MWh)', linewidth=2)
-        ax6.set_xlabel('Time Steps')
-        ax6.set_ylabel('Electricity Price (€/MWh)', color='b')
-        ax6.tick_params(axis='y', labelcolor='b')
+        # Plot financial metrics on left axis
+        line1 = ax6.plot(time_steps, variable_costs, 'r-', label='Variable Cost (€)', linewidth=2)
+        line2 = ax6.plot(time_steps, variable_revenues, 'g-', label='Variable Revenue (€)', linewidth=2)
+        line3 = ax6.plot(time_steps, net_incomes, 'purple', label='Net Income (€)', linewidth=2, linestyle='--')
         
-        # Plot marginal cost on right axis
-        line2 = ax6_twin.plot(time_steps, marginal_costs, 'r-', label='Marginal Cost (€)', linewidth=2)
-        ax6_twin.set_ylabel('Marginal Cost (€)', color='r')
-        ax6_twin.tick_params(axis='y', labelcolor='r')
+        ax6.set_xlabel('Time Steps')
+        ax6.set_ylabel('Financial Metrics (€)', color='black')
+        ax6.tick_params(axis='y', labelcolor='black')
+        
+        # Plot electricity price on right axis
+        line4 = ax6_twin.plot(time_steps, electricity_prices, 'b-', label='Electricity Price (€/MWh)', linewidth=1, alpha=0.7)
+        ax6_twin.set_ylabel('Electricity Price (€/MWh)', color='b')
+        ax6_twin.tick_params(axis='y', labelcolor='b')
         
         # Combine legends
-        lines = line1 + line2
+        lines = line1 + line2 + line3 + line4
         labels = [l.get_label() for l in lines]
         ax6.legend(lines, labels, loc='upper left')
         
-        ax6.set_title('Electricity Price and Marginal Cost')
+        ax6.set_title('Financial Analysis: Cost, Revenue, Net Income & Price')
         ax6.grid(True, alpha=0.3)
         
         plt.tight_layout()
         plt.show()
         
         # Export graph data to CSV files
-        self._export_bus_depot_graphs_to_csv(instance, evs, charging_stations, time_steps)
+        try:
+            self._export_bus_depot_graphs_to_csv(instance, evs, charging_stations, time_steps)
+        except PermissionError:
+            print("CSV files are open in another program. Close them and run again to export data.")
         
         # Print summary
         self._print_bus_depot_summary(instance, evs, charging_stations, time_steps)
@@ -994,33 +1026,47 @@ class DSMFlex:
         cs_df.to_csv(csv_path2)
         print(f"Charging Station Power exported to: {csv_path2}")
         
-        # Graph 3: EV Charging Power
+        # Graph 3: EV Charging and Discharging Power
         ev_charge_data = {}
+        ev_discharge_data = {}
+        ev_usage_data = {}
         for ev in evs:
             if ev in instance.dsm_blocks:
                 ev_charge = [pyo.value(instance.dsm_blocks[ev].charge[t]) for t in time_steps]
-                ev_charge_data[ev] = ev_charge
+                ev_discharge = [pyo.value(instance.dsm_blocks[ev].discharge[t]) for t in time_steps]
+                ev_usage = [pyo.value(instance.dsm_blocks[ev].usage[t]) for t in time_steps]
+                ev_charge_data[f'{ev}_charge'] = ev_charge
+                ev_discharge_data[f'{ev}_discharge'] = ev_discharge
+                ev_usage_data[f'{ev}_usage'] = ev_usage
         
-        if ev_charge_data:
-            ev_charge_df = pd.DataFrame(ev_charge_data, index=[f'timestep_{t}' for t in time_steps])
+        if ev_charge_data or ev_discharge_data or ev_usage_data:
+            # Combine charge, discharge, and usage data
+            ev_power_data = {**ev_charge_data, **ev_discharge_data, **ev_usage_data}
+            ev_power_df = pd.DataFrame(ev_power_data, index=[f'timestep_{t}' for t in time_steps])
             csv_path3 = os.path.join(base_path, "ev_charging_power.csv")
-            ev_charge_df.to_csv(csv_path3)
-            print(f"EV Charging Power exported to: {csv_path3}")
+            ev_power_df.to_csv(csv_path3)
+            print(f"EV Charging and Discharging Power exported to: {csv_path3}")
         
-        # Graph 4: Electricity Price and Marginal Cost
+        # Graph 4: Financial Analysis Data
         electricity_prices = [pyo.value(instance.electricity_price[t]) for t in time_steps]
         total_power = [pyo.value(instance.total_power_input[t]) for t in time_steps]
+        variable_costs = [pyo.value(instance.variable_cost[t]) for t in time_steps]
+        variable_revenues = [pyo.value(instance.variable_rev[t]) for t in time_steps]
+        net_incomes = [pyo.value(instance.net_income[t]) for t in time_steps]
         marginal_costs = [price * power for price, power in zip(electricity_prices, total_power)]
         
-        price_cost_df = pd.DataFrame({
+        financial_df = pd.DataFrame({
             'electricity_price': electricity_prices,
             'total_power': total_power,
+            'variable_cost': variable_costs,
+            'variable_revenue': variable_revenues,
+            'net_income': net_incomes,
             'marginal_cost': marginal_costs
         }, index=[f'timestep_{t}' for t in time_steps])
         
-        csv_path4 = os.path.join(base_path, "electricity_price_marginal_cost.csv")
-        price_cost_df.to_csv(csv_path4)
-        print(f"Electricity Price and Marginal Cost exported to: {csv_path4}")
+        csv_path4 = os.path.join(base_path, "financial_analysis.csv")
+        financial_df.to_csv(csv_path4)
+        print(f"Financial Analysis (Cost, Revenue, Net Income, Price) exported to: {csv_path4}")
         
         print(f"\nAll 4 graph datasets exported to CSV files in {base_path}")
 
