@@ -105,6 +105,10 @@ available_examples = {
         "scenario": "example_thermal_storage_economics",
         "study_case": "base",
     },
+    "cement_plant_use_case": {
+        "scenario": "example_cement_plant_economics",
+        "study_case": "base",
+    },
     # redispatch for DSM validation example
     "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
     "redisp_storage_3_nodes": {"scenario": "example_05c", "study_case": "base"},
@@ -113,7 +117,6 @@ available_examples = {
         "scenario": "example_05f",
         "study_case": "base",
     },
-    "steel_plant": {"scenario": "optimisation", "study_case": "base"},
 }
 
 
@@ -130,7 +133,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "paper_plant_use_case"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
+    example = "cement_plant_use_case"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
