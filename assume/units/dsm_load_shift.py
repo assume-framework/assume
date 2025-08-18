@@ -201,7 +201,7 @@ class DSMFlex:
 
                 return total_variable_cost
             
-        if self.objective == "max_net_income":
+        elif self.objective == "max_net_income":
 
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule_opt(m):
@@ -717,8 +717,8 @@ class DSMFlex:
 
             elif self.technology == "bus_depot":
                 cs_discharge = sum(
-                    m.dsm_blocks[cs].discharge[t]
-                    for cs in m.dsm_blocks
+                    self.model.dsm_blocks[cs].discharge[t]
+                    for cs in self.model.dsm_blocks
                     if cs.startswith("charging_station")
                 )
                 return (
@@ -1170,6 +1170,7 @@ class DSMFlex:
             # Display the Objective Function Value
             objective_value = instance.obj_rule_flex()
             logger.debug("The value of the objective function is %s.", objective_value)
+            print("Flex objective value:", objective_value)
 
         elif results.solver.termination_condition == TerminationCondition.infeasible:
             logger.debug("The model is infeasible.")
