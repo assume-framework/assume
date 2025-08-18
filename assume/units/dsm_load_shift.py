@@ -717,8 +717,8 @@ class DSMFlex:
 
             elif self.technology == "bus_depot":
                 cs_discharge = sum(
-                    self.model.dsm_blocks[cs].discharge[t]
-                    for cs in self.model.dsm_blocks
+                    m.dsm_blocks[cs].discharge[t]
+                    for cs in m.dsm_blocks
                     if cs.startswith("charging_station")
                 )
                 return (
