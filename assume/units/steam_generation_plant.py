@@ -36,7 +36,13 @@ class SteamPlant(DSMFlex, SupportsMinMax):
     """
 
     required_technologies = []
-    optional_technologies = ["heat_pump", "boiler", "thermal_storage", "heat_resistor", "pv_plant"]
+    optional_technologies = [
+        "heat_pump",
+        "boiler",
+        "thermal_storage",
+        "heat_resistor",
+        "pv_plant",
+    ]
 
     def __init__(
         self,
@@ -127,9 +133,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.demand = demand
         self.thermal_demand = self.forecaster[f"{self.id}_thermal_demand"]
         self.congestion_signal = self.forecaster[f"{self.id}_congestion_signal"]
-        self.renewable_utilisation_signal = self.forecaster[
-            f"{node}_renewable_utilisation"
-        ]
+        self.renewable_utilisation_signal = self.forecaster["availability_solar"]
         self.congestion_threshold = congestion_threshold
         self.peak_load_cap = peak_load_cap
         self.objective = objective
@@ -181,9 +185,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.model.total_power_input = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
-        self.model.variable_cost = pyo.Var(
-            self.model.time_steps, within=pyo.Reals
-        )
+        self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.Reals)
         self.model.grid_power = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
@@ -215,7 +217,6 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 else:
                     return heat_production == m.cumulative_thermal_output[t]
 
-                
         else:
             # if self.has_pv:
             #     @self.model.Constraint(self.model.time_steps)
@@ -259,7 +260,10 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 total_heat_production = 0
                 if self.has_boiler:
                     total_heat_production += m.dsm_blocks["boiler"].heat_out[t]
-                    return m.cumulative_thermal_output[t] + total_heat_production >= m.thermal_demand[t]
+                    return (
+                        m.cumulative_thermal_output[t] + total_heat_production
+                        >= m.thermal_demand[t]
+                    )
                 else:
                     return m.cumulative_thermal_output[t] >= m.thermal_demand[t]
             else:

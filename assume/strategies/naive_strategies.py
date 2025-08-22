@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-from matplotlib import pyplot as plt
 import pandas as pd
+from matplotlib import pyplot as plt
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
@@ -175,6 +175,7 @@ class NaiveDADSMStrategy(BaseStrategy):
         # check if unit has opt_power_requirement attribute
         if unit.optimisation_counter == 0:
             unit.determine_optimal_operation_without_flex()
+            # self.plot_power_requirements(unit)
             # # Save opt_power_requirement
             # try:
             #     unit.opt_power_requirement.to_csv("./examples/outputs/opt_power_requirement.csv", header=True)
@@ -187,7 +188,6 @@ class NaiveDADSMStrategy(BaseStrategy):
             #     except AttributeError:
             #         unit.flex_power_requirement.as_pd_series().to_csv("./examples/outputs/flex_power_requirement.csv", header=True)
             unit.optimisation_counter = 1
-
 
         bids = []
         for product in product_tuples:

@@ -5,9 +5,9 @@
 import logging
 from collections.abc import Callable
 from datetime import datetime
-import pandas as pd
 
 import matplotlib as mpl
+import pandas as pd
 import pyomo.environ as pyo
 from matplotlib import pyplot as plt
 from pyomo.opt import (
@@ -306,75 +306,99 @@ class DSMFlex:
 
     def symmetric_flexible_block(self, model):
         """
-        Cost-based CRM flexibility (rolling 4-hour blocks) for steam_generator_plant.
-        Optimizes a feasible operational profile (sum of tech variables), calculates
-        up/down 4-hour CRM blocks, and enforces a total cost limit.
-        Also stores static plant-wide max and min capacity as attributes for later use.
+        Cost-based CRM flexibility (rolling 4-hour blocks).
+        Bids must be in integer multiples of `min_bid_MW` (e.g., 1 MW).
+        Feasibility is enforced hour-by-hour via headroom/footroom constraints.
         """
         block_length = 4
-        min_bid_MW = 1
+        min_bid_MW = 1.0
         time_steps = list(sorted(model.time_steps))
         T = len(time_steps)
         possible_starts = [time_steps[i] for i in range(T - block_length + 1)]
 
         # ---- STATIC PLANT-WIDE MAX/MIN CAPACITY ----
-        max_plant_capacity = 0
-        min_plant_capacity = 0
+        max_plant_capacity = 0.0
+        min_plant_capacity = 0.0
         if self.has_heatpump:
             max_plant_capacity += model.dsm_blocks["heat_pump"].max_power
             min_plant_capacity += model.dsm_blocks["heat_pump"].min_power
+        if self.has_heat_resistor:
+            max_plant_capacity += model.dsm_blocks["heat_resistor"].max_power
+            min_plant_capacity += model.dsm_blocks["heat_resistor"].min_power
         if self.has_boiler:
             boiler = self.components["boiler"]
             if boiler.fuel_type == "electricity":
                 max_plant_capacity += model.dsm_blocks["boiler"].max_power
                 min_plant_capacity += model.dsm_blocks["boiler"].min_power
 
-        # Save as attributes on the unit for use in bidding strategy, etc.
         self.max_plant_capacity = max_plant_capacity
         self.min_plant_capacity = min_plant_capacity
 
-        # ---- FLEXIBILITY BLOCK VARIABLES ----
+        # Conservative big-M for integer counts
+        M_blocks = int(pyo.ceil(max_plant_capacity / min_bid_MW))
+
+        # ---- VARIABLES ----
+        # integer number of min-bid units; enforces 1‑MW step size automatically
+        model.n_blocks_up = pyo.Var(possible_starts, within=pyo.NonNegativeIntegers)
+        model.n_blocks_down = pyo.Var(possible_starts, within=pyo.NonNegativeIntegers)
+
+        # actual continuous volumes linked to the integer counts
         model.block_up = pyo.Var(possible_starts, within=pyo.NonNegativeReals)
         model.block_down = pyo.Var(possible_starts, within=pyo.NonNegativeReals)
+
+        # direction binaries (only to enforce “up or down, not both”)
         model.block_is_bid_up = pyo.Var(possible_starts, within=pyo.Binary)
         model.block_is_bid_down = pyo.Var(possible_starts, within=pyo.Binary)
 
-        # ConstraintLists to hold per-block constraints
+        # link to 1‑MW increments
+        @model.Constraint(possible_starts)
+        def block_up_step(m, t):
+            return m.block_up[t] == min_bid_MW * m.n_blocks_up[t]
+
+        @model.Constraint(possible_starts)
+        def block_down_step(m, t):
+            return m.block_down[t] == min_bid_MW * m.n_blocks_down[t]
+
+        # activate counts only if that direction is chosen
+        @model.Constraint(possible_starts)
+        def up_count_active(m, t):
+            return m.n_blocks_up[t] <= M_blocks * m.block_is_bid_up[t]
+
+        @model.Constraint(possible_starts)
+        def down_count_active(m, t):
+            return m.n_blocks_down[t] <= M_blocks * m.block_is_bid_down[t]
+
+        # only one direction per 4h block
+        @model.Constraint(possible_starts)
+        def symmetric_block(m, t):
+            return m.block_is_bid_up[t] + m.block_is_bid_down[t] <= 1
+
+        # ---- PER‑HOUR FEASIBILITY OVER THE 4‑H WINDOW ----
         model.block_up_window = pyo.ConstraintList()
         model.block_down_window = pyo.ConstraintList()
 
-        for t in possible_starts:
-            for offset in range(block_length):
-                tau = time_steps[time_steps.index(t) + offset]
-                total_power = 0
+        for t0 in possible_starts:
+            i0 = time_steps.index(t0)
+            for k in range(block_length):
+                tau = time_steps[i0 + k]
+
+                total_power = 0.0
                 if self.has_heatpump:
                     total_power += model.dsm_blocks["heat_pump"].power_in[tau]
+                if self.has_heat_resistor:
+                    total_power += model.dsm_blocks["heat_resistor"].power_in[tau]
                 if self.has_boiler:
                     boiler = self.components["boiler"]
                     if boiler.fuel_type == "electricity":
                         total_power += model.dsm_blocks["boiler"].power_in[tau]
-                # Use the stored plant-wide capacities here if you want,
-                # or (if you allow for time-varying max/min in the future) keep the local max/min per tau
 
-                # Block up/down window constraints (use static min/max plant capacity here)
+                # headroom / footroom in each hour limit the 4‑h block volume
                 model.block_up_window.add(
-                    model.block_up[t] <= self.max_plant_capacity - total_power
+                    model.block_up[t0] <= self.max_plant_capacity - total_power
                 )
                 model.block_down_window.add(
-                    model.block_down[t] <= total_power - self.min_plant_capacity
+                    model.block_down[t0] <= total_power - self.min_plant_capacity
                 )
-
-        @model.Constraint(possible_starts)
-        def block_bid_logic_up(m, t):
-            return m.block_up[t] >= min_bid_MW * m.block_is_bid_up[t]
-
-        @model.Constraint(possible_starts)
-        def block_bid_logic_down(m, t):
-            return m.block_down[t] >= min_bid_MW * m.block_is_bid_down[t]
-
-        @model.Constraint(possible_starts)
-        def symmetric_block(m, t):
-            return m.block_is_bid_up[t] + m.block_is_bid_down[t] <= 1
 
         # ---- COST TOLERANCE ----
         model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
@@ -384,9 +408,9 @@ class DSMFlex:
         def total_cost_upper_limit(m):
             return pyo.quicksum(
                 m.variable_cost[t] for t in m.time_steps
-            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100.0))
 
-        # ---- OBJECTIVE: MAXIMIZE CRM UPWARD FLEXIBILITY ----
+        # ---- OBJECTIVE (example: maximize upward flexibility) ----
         @model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):
             return sum(m.block_up[t] for t in possible_starts)
@@ -642,8 +666,8 @@ class DSMFlex:
         model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
         # Variables for load flexibility based on renewable intensity
-        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
-        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeIntegers)
+        model.load_shift_pos = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
+        model.load_shift_neg = pyo.Var(model.time_steps, within=pyo.NonNegativeReals)
         model.shift_indicator = pyo.Var(model.time_steps, within=pyo.Binary)
 
         # Constraint to manage total cost upper limit with cost tolerance
@@ -691,6 +715,8 @@ class DSMFlex:
                     boiler = self.components["boiler"]
                     if boiler.fuel_type == "electricity":
                         total_power += self.model.dsm_blocks["boiler"].power_in[t]
+                if self.has_heat_resistor:
+                    total_power += self.model.dsm_blocks["heat_resistor"].power_in[t]
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
                     == total_power
@@ -760,9 +786,7 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
-        # PLOT
-
-        # Academic style
+        # ------------------- PLOT (preheater + calciner + kiln + TES + H2 routing) -------------------
         mpl.rcParams.update(
             {
                 "font.size": 13,
@@ -778,141 +802,355 @@ class DSMFlex:
             }
         )
 
-        time_steps = range(len(instance.time_steps))
+        time_steps = list(instance.time_steps)
+
+        # helper: pyo.value() -> 0.0 if var is uninitialized (common when that fuel path isn't used)
+        def safe_value(v):
+            try:
+                return pyo.value(v)
+            except Exception:
+                return 0.0
+
+        def series_or_none(var_block_attr):
+            # returns list of values if attribute exists on the block, else None
+            if not var_block_attr:
+                return None
+            return [safe_value(var_block_attr[t]) for t in instance.time_steps]
+
         total_cumulative_thermal_output = sum(
-            pyo.value(instance.cumulative_thermal_output[t])
+            safe_value(instance.cumulative_thermal_output[t])
             for t in instance.time_steps
         )
         print(f"Total cumulative thermal output: {total_cumulative_thermal_output:.2f}")
 
-        # Extract data
-        fuel_load = (
-            [
-                pyo.value(instance.dsm_blocks["preheater"].clinker[t])
-                for t in instance.time_steps
-            ]
-            if "heat_resistor" in instance.dsm_blocks
-            else None
-        )
-        thermal_load = (
-            [
-                pyo.value(instance.dsm_blocks["preheater"].heat_need[t])
-                for t in instance.time_steps
-            ]
+        # --- grab blocks if present
+        ph = (
+            instance.dsm_blocks["preheater"]
             if "preheater" in instance.dsm_blocks
             else None
         )
-
-        storage_charge = (
-            [
-                pyo.value(instance.dsm_blocks["thermal_storage"].charge[t])
-                for t in instance.time_steps
-            ]
-            if "thermal_storage" in instance.dsm_blocks
+        cc = (
+            instance.dsm_blocks["calciner"]
+            if "calciner" in instance.dsm_blocks
             else None
         )
-        storage_discharge = (
-            [
-                pyo.value(instance.dsm_blocks["thermal_storage"].discharge[t])
-                for t in instance.time_steps
-            ]
-            if "thermal_storage" in instance.dsm_blocks
+        rk = instance.dsm_blocks["kiln"] if "kiln" in instance.dsm_blocks else None
+        el = (
+            instance.dsm_blocks["electrolyser"]
+            if "electrolyser" in instance.dsm_blocks
             else None
         )
-        storage_soc = (
-            [
-                pyo.value(instance.dsm_blocks["thermal_storage"].soc[t])
-                for t in instance.time_steps
-            ]
+        ts = (
+            instance.dsm_blocks["thermal_storage"]
             if "thermal_storage" in instance.dsm_blocks
             else None
         )
 
-        # Extract electricity price (assume you have it as a list)
-        # If it's a Pyomo Param or similar, extract like:
-        # electricity_price = [instance.electricity_price[t] for t in instance.time_steps]
-        # or if it's self.electricity_price: use as is
+        # --- inputs/outputs (safe to read regardless of mode)
+        preheater_power_in = (
+            series_or_none(getattr(ph, "power_in", None)) if ph else None
+        )
+        preheater_ng_in = (
+            series_or_none(getattr(ph, "natural_gas_in", None)) if ph else None
+        )
+        preheater_coal_in = series_or_none(getattr(ph, "coal_in", None)) if ph else None
+        preheater_heat_out = (
+            series_or_none(getattr(ph, "heat_out", None)) if ph else None
+        )
+        preheater_wh_in = (
+            series_or_none(getattr(ph, "external_heat_in", None)) if ph else None
+        )
+
+        calciner_power_in = (
+            series_or_none(getattr(cc, "power_in", None)) if cc else None
+        )
+        calciner_ng_in = (
+            series_or_none(getattr(cc, "natural_gas_in", None)) if cc else None
+        )
+        calciner_coal_in = series_or_none(getattr(cc, "coal_in", None)) if cc else None
+        calciner_h2_in = (
+            series_or_none(getattr(cc, "hydrogen_in", None)) if cc else None
+        )
+        calciner_heat_out = (
+            series_or_none(getattr(cc, "heat_out", None)) if cc else None
+        )
+        # NEW: effective heat into the calciner (after TES charge/discharge)
+        calciner_eff_in = (
+            series_or_none(getattr(cc, "effective_heat_in", None)) if cc else None
+        )
+
+        kiln_power_in = series_or_none(getattr(rk, "power_in", None)) if rk else None
+        kiln_ng_in = series_or_none(getattr(rk, "natural_gas_in", None)) if rk else None
+        kiln_coal_in = series_or_none(getattr(rk, "coal_in", None)) if rk else None
+        kiln_h2_in = series_or_none(getattr(rk, "hydrogen_in", None)) if rk else None
+        kiln_heat_out = series_or_none(getattr(rk, "heat_out", None)) if rk else None
+
+        # Electrolyser
+        el_power = series_or_none(getattr(el, "power_in", None)) if el else None
+        el_h2 = series_or_none(getattr(el, "hydrogen_out", None)) if el else None
+
+        # Thermal Storage (TES)
+        ts_charge = (
+            series_or_none(getattr(ts, "charge", None)) if ts else None
+        )  # [MWth]
+        ts_discharge = (
+            series_or_none(getattr(ts, "discharge", None)) if ts else None
+        )  # [MWth]
+        ts_soc = series_or_none(getattr(ts, "soc", None)) if ts else None  # [MWhth]
+        ts_power_in = (
+            series_or_none(getattr(ts, "power_in", None)) if ts else None
+        )  # [MWe]
+
+        # demand (per-step) if available (material demand; used in CSV, optional to plot elsewhere)
+        demand_series = (
+            [
+                safe_value(instance.clinker_demand_per_time_step[t])
+                for t in instance.time_steps
+            ]
+            if hasattr(instance, "clinker_demand_per_time_step")
+            else None
+        )
+
+        # H2 routing (from electrolyser to units)
+        h2_to_cc = (
+            [safe_value(instance.h2_to_calciner[t]) for t in instance.time_steps]
+            if hasattr(instance, "h2_to_calciner")
+            else None
+        )
+        h2_to_rk = (
+            [safe_value(instance.h2_to_kiln[t]) for t in instance.time_steps]
+            if hasattr(instance, "h2_to_kiln")
+            else None
+        )
+
+        # prices
         electricity_price = (
-            [instance.electricity_price[t] for t in instance.time_steps]
-            if hasattr(self, "electricity_price")
+            [safe_value(instance.electricity_price[t]) for t in instance.time_steps]
+            if hasattr(instance, "electricity_price")
             else None
         )
         natural_gas_price = (
-            [instance.natural_gas_price[t] for t in instance.time_steps]
-            if hasattr(self, "natural_gas_price")
+            [safe_value(instance.natural_gas_price[t]) for t in instance.time_steps]
+            if hasattr(instance, "natural_gas_price")
             else None
         )
+        coal_price = (
+            [safe_value(instance.coal_price[t]) for t in instance.time_steps]
+            if hasattr(instance, "coal_price")
+            else None
+        )
+        hydrogen_price = (
+            [safe_value(instance.hydrogen_price[t]) for t in instance.time_steps]
+            if hasattr(instance, "hydrogen_price")
+            else None
+        )
+
         fig, axs = plt.subplots(
             2, 1, figsize=(10, 8), sharex=True, constrained_layout=True
         )
 
-        # --- Top plot: Boiler and Heat Resistor Input & Electricity Price ---
-        ln1 = []
-        if any(fuel_load):
-            ln1 += axs[0].plot(time_steps, fuel_load, label="E-Boiler: Power Input", color="C1")
-        if any(thermal_load):
-            ln1 += axs[0].plot(time_steps, thermal_load, label="Boiler: Natural gas Input", color="C0")
-        axs[0].set_ylabel("Power Input [MW]")
-        axs[0].set_title("Heat Generator Input & Energy Price")
+        # ---------- Top: Unit Inputs & Energy Prices ----------
+        def plot_if_nonzero(ax, x, y, label, color, style="-", eps=1e-9):
+            if y is None:
+                return None
+            if any(abs(v) > eps for v in y):
+                return ax.plot(x, y, label=label, color=color, linestyle=style)[0]
+            return None
+
+        # Preheater inputs
+        h1 = plot_if_nonzero(
+            axs[0], time_steps, preheater_power_in, "Preheater Power [MWₑ]", "C1"
+        )
+        h2 = plot_if_nonzero(
+            axs[0], time_steps, preheater_ng_in, "Preheater NG [MWₜₕ]", "C0"
+        )
+        h3 = plot_if_nonzero(
+            axs[0], time_steps, preheater_coal_in, "Preheater Coal [MWₜₕ]", "C7"
+        )
+        # Waste heat to preheater
+        h8 = plot_if_nonzero(
+            axs[0], time_steps, preheater_wh_in, "WH → Preheater [MWₜₕ]", "C15", ":"
+        )
+
+        # Calciner inputs
+        h4 = plot_if_nonzero(
+            axs[0], time_steps, calciner_power_in, "Calciner Power [MWₑ]", "C5"
+        )
+        h5 = plot_if_nonzero(
+            axs[0], time_steps, calciner_ng_in, "Calciner NG [MWₜₕ]", "C6"
+        )
+        h6 = plot_if_nonzero(
+            axs[0], time_steps, calciner_coal_in, "Calciner Coal [MWₜₕ]", "C8"
+        )
+        h7 = plot_if_nonzero(
+            axs[0], time_steps, calciner_h2_in, "Calciner H₂ [MWₕ₂]", "C9"
+        )
+
+        # Kiln inputs
+        h9 = plot_if_nonzero(
+            axs[0], time_steps, kiln_power_in, "Kiln Power [MWₑ]", "C11"
+        )
+        h10 = plot_if_nonzero(axs[0], time_steps, kiln_ng_in, "Kiln NG [MWₜₕ]", "C12")
+        h11 = plot_if_nonzero(
+            axs[0], time_steps, kiln_coal_in, "Kiln Coal [MWₜₕ]", "C13"
+        )
+        h12 = plot_if_nonzero(axs[0], time_steps, kiln_h2_in, "Kiln H₂ [MWₕ₂]", "C14")
+
+        # Electrolyser + H2 routing
+        h_elP = plot_if_nonzero(
+            axs[0], time_steps, el_power, "Electrolyser Power [MWₑ]", "C4", "--"
+        )
+        h_elH = plot_if_nonzero(
+            axs[0], time_steps, el_h2, "Electrolyser H₂ [MWₕ₂]", "C10", "--"
+        )
+        h_rtC = plot_if_nonzero(
+            axs[0], time_steps, h2_to_cc, "H₂ → Calciner [MWₕ₂]", "C17", ":"
+        )
+        h_rtK = plot_if_nonzero(
+            axs[0], time_steps, h2_to_rk, "H₂ → Kiln [MWₕ₂]", "C18", ":"
+        )
+
+        # TES electric heater
+        h_tsp = plot_if_nonzero(
+            axs[0], time_steps, ts_power_in, "TES Heater Power [MWₑ]", "C19", "-."
+        )
+
+        axs[0].set_ylabel("Inputs")
+        axs[0].set_title("Unit Inputs, H₂ Routing & Prices")
         axs[0].grid(True, which="both", axis="both")
 
-        # Secondary y-axis for price
+        # secondary axis for prices
         ln2 = []
-        if electricity_price or natural_gas_price:
-            ax_price = axs[0].twinx()
-            if electricity_price:
-                ln2 += ax_price.plot(
-                    time_steps,
-                    electricity_price,
-                    label="Electricity Price",
-                    color="C4",
-                    linestyle="--",
-                )
-            if natural_gas_price:
-                ln2 += ax_price.plot(
-                    time_steps,
-                    natural_gas_price,
-                    label="Natural Gas Price",
-                    color="C6",
-                    linestyle=":",
-                )
-            ax_price.set_ylabel("Energy Price [€/MWh]", color="gray")
-            ax_price.tick_params(axis="y", labelcolor="gray")
-            ax_price.set_ylim(0, None) 
+        axp = axs[0].twinx()
+        if electricity_price:
+            ln2 += axp.plot(
+                time_steps,
+                electricity_price,
+                label="Elec Price [€/MWhₑ]",
+                color="C2",
+                linestyle="--",
+            )
+        if natural_gas_price:
+            ln2 += axp.plot(
+                time_steps,
+                natural_gas_price,
+                label="NG Price [€/MWhₜₕ]",
+                color="C3",
+                linestyle="--",
+            )
+        if coal_price:
+            ln2 += axp.plot(
+                time_steps,
+                coal_price,
+                label="Coal Price [€/MWhₜₕ]",
+                color="C6",
+                linestyle="-.",
+            )
+        if hydrogen_price:
+            ln2 += axp.plot(
+                time_steps,
+                hydrogen_price,
+                label="H₂ Price [€/MWhₜₕ]",
+                color="C8",
+                linestyle=":",
+            )
+        axp.set_ylabel("Energy Price", color="gray")
+        axp.tick_params(axis="y", labelcolor="gray")
 
-            # Combine legends
-            lines = ln1 + ln2
-            labels = [l.get_label() for l in lines]
+        # extend legend lines
+        lines = [
+            l
+            for l in [
+                h1,
+                h2,
+                h3,
+                h4,
+                h5,
+                h6,
+                h7,
+                h8,
+                h9,
+                h10,
+                h11,
+                h12,
+                h_elP,
+                h_elH,
+                h_rtC,
+                h_rtK,
+                h_tsp,
+            ]
+            if l is not None
+        ] + ln2
+        labels = [l.get_label() for l in lines]
+        if lines:
             axs[0].legend(lines, labels, loc="upper left", frameon=True)
-        else:
-            axs[0].legend(loc="upper left", frameon=True)
 
-        # # --- Bottom plot: Thermal storage operation ---
-        # axs[1].plot(time_steps, storage_charge, label="Storage Charge", color="C2", linestyle="-")
-        # axs[1].plot(time_steps, storage_discharge, label="Storage Discharge", color="C3", linestyle="--")
-        # axs[1].fill_between(time_steps, storage_soc, 0, color="C0", alpha=0.25, label="Storage SOC")
-        # axs[1].set_ylabel("Thermal Power [MW] / SOC [MWh]")
-        # axs[1].set_title("Thermal Storage Operation")
-        # axs[1].grid(True, which="both", axis="both")
-        # axs[1].legend(loc="upper right", frameon=True)
-        # axs[1].set_xlabel("Time Step")
+        # ---------- Bottom: Thermal Storage Operation ----------
+        axs[1].clear()
+        pl0 = plot_if_nonzero(
+            axs[1], time_steps, ts_charge, "Storage Charge [MWₜₕ]", "C2", "-"
+        )
+        pl1 = plot_if_nonzero(
+            axs[1], time_steps, ts_discharge, "Storage Discharge [MWₜₕ]", "C3", "--"
+        )
+
+        # SOC as filled area if available
+        if ts_soc and any(abs(v) > 1e-9 for v in ts_soc):
+            axs[1].fill_between(
+                time_steps, ts_soc, 0, alpha=0.25, label="Storage SOC [MWhₜₕ]"
+            )
+
+        axs[1].set_ylabel("MWₜₕ / MWhₜₕ")
+        axs[1].set_title("Thermal Storage Operation")
+        axs[1].grid(True, which="both", axis="both")
+        # Build legend items that exist
+        bottom_lines = [l for l in [pl0, pl1] if l is not None]
+        if bottom_lines:
+            axs[1].legend(loc="upper right", frameon=True)
+
+        axs[1].set_xlabel("Time Step")
 
         plt.tight_layout()
-        # plt.show()
-        # plt.savefig("./examples/outputs/opt_plant_operation.png", dpi=300, bbox_inches="tight")  # or .pdf
+        plt.show()
+        # plt.savefig("./examples/outputs/opt_cement_operation.png", dpi=300, bbox_inches="tight")
 
-        # Build DataFrame
-        df = pd.DataFrame({
-            "Time Step": list(time_steps),
-            "electrical [MW]": fuel_load,
-            "natural gas [MW]": thermal_load,
-            # "Storage SOC [MWh]": storage_soc,
-            # "Storage Charge [MW]": storage_charge,
-            # "Storage Discharge [MW]": storage_discharge,
-        })
+        # ------------- CSV dataframe -------------
+        def nz_or_none(s):
+            return s if (s and any(abs(v) > 1e-9 for v in s)) else None
 
-        # Save to CSV
-        # df.to_csv("./examples/outputs/opt_plant_timeseries.csv", index=False)
+        df = pd.DataFrame(
+            {
+                "Time Step": time_steps,
+                "PH Power [MW_e]": nz_or_none(preheater_power_in),
+                "PH NG [MW_th]": nz_or_none(preheater_ng_in),
+                "PH Coal [MW_th]": nz_or_none(preheater_coal_in),
+                "PH Heat Out [MW_th]": nz_or_none(preheater_heat_out),
+                "PH WH In [MW_th]": nz_or_none(preheater_wh_in),
+                "CC Power [MW_e]": nz_or_none(calciner_power_in),
+                "CC NG [MW_th]": nz_or_none(calciner_ng_in),
+                "CC Coal [MW_th]": nz_or_none(calciner_coal_in),
+                "CC H2 [MW_th]": nz_or_none(calciner_h2_in),
+                "CC Heat Out [MW_th]": nz_or_none(calciner_heat_out),
+                "CC Effective Heat In [MW_th]": nz_or_none(
+                    calciner_eff_in
+                ),  # NEW (post‑TES)
+                "Kiln Power [MW_e]": nz_or_none(kiln_power_in),
+                "Kiln NG [MW_th]": nz_or_none(kiln_ng_in),
+                "Kiln Coal [MW_th]": nz_or_none(kiln_coal_in),
+                "Kiln H2 [MW_th]": nz_or_none(kiln_h2_in),
+                "Kiln Heat Out [MW_th]": nz_or_none(kiln_heat_out),
+                "Electrolyser Power [MW_e]": nz_or_none(el_power),
+                "Electrolyser Hydrogen [MW_h2]": nz_or_none(el_h2),
+                "H2 to Calciner [MW_h2]": nz_or_none(h2_to_cc),
+                "H2 to Kiln [MW_h2]": nz_or_none(h2_to_rk),
+                "TES Charge [MW_th]": nz_or_none(ts_charge),
+                "TES Discharge [MW_th]": nz_or_none(ts_discharge),
+                "TES SOC [MWh_th]": nz_or_none(ts_soc),
+                "TES Heater Power [MW_e]": nz_or_none(ts_power_in),
+                "Clinker Demand [t/h]": demand_series if demand_series else None,
+            }
+        )
+        df.to_csv("./examples/outputs/opt_cement_timeseries.csv", index=False)
 
     def determine_optimal_operation_with_flex(self):
         """
