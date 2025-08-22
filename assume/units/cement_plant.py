@@ -335,7 +335,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
                         # TES buffers calciner: usable calciner heat = burner heat + TES discharge - TES charge
                         return (
                             cc.effective_heat_in[t] == cc.heat_out[t] + ts.discharge[t]
-                        )  # - ts.charge[t]
+                        )
                 else:
                     # No TES present → bind effective heat directly to burner heat (zero-config behavior)
                     @self.model.Constraint(self.model.time_steps)
