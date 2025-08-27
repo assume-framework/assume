@@ -1,15 +1,14 @@
-# SPDX-FileCopyrightText: ASSUME Developers
-#
-# SPDX-License-Identifier: AGPL-3.0-or-later
-
 # -*- coding: utf-8 -*-
 """
-ENTSO-E Transparency Platform 
+ENTSO-E Transparency Platform – Sweden 2024 (FCR, aFRR, mFRR)
 Fetches:
-- A81 Amounts under contract (17.1.B)
-- A89 Prices of procured reserves (17.1.C)
+- A81 Amounts under contract (TR 17.1.B)
+- A89 Prices of procured reserves (TR 17.1.C)
 
-Works around API document-limit (Reason 999) by querying month-by-month.
+Robustness:
+- Month-by-month to avoid "requested data exceeds limit" (Reason 999)
+- Tries multiple Type_MarketAgreement.Type: A01 (Daily), A02 (Weekly), A03 (Monthly)
+- Merges amounts & prices on [time_utc, direction]
 """
 
 import os
@@ -19,71 +18,23 @@ import xmltodict
 import pandas as pd
 
 # ================== CONFIG ==================
-ENTSOE_TOKEN = "49e549fc-a751-48a2-bae3-4d30c0a68e59"  # consider moving to $Env:ENTSOE_TOKEN and regenerating
-CONTROL_AREA_FR = "10YFR-RTE------C"                   # France (RTE) control area EIC
-# German TSOs – use as Scheduling Areas (SCA)
-CONTROL_AREAS_DE = {
-    "50Hertz":   "10YDE-VE-------2",
-    "Amprion":   "10YDE-RWENET---I",
-    "TenneTDE":  "10YDE-EON------1",
-    "TransnetBW":"10YDE-ENBW-----N",
-}
-# Continental Europe Synchronous Area (for FCR fallback)
-SYNCH_AREA_CE = "10YEU-CONT-SYNC0"
+# 1) Use environment variable (recommended) or paste the token string here
+ENTSOE_TOKEN = os.getenv("ENTSOE_TOKEN", "49e549fc-a751-48a2-bae3-4d30c0a68e59")
+
+# Sweden control area (Svenska kraftnät)
+CONTROL_AREA_SE = "10YSE-1--------K"
 
 YEAR = 2024
 PRODUCTS = {"FCR": "A95", "aFRR": "A96", "mFRR": "A97"}
 BASE = "https://web-api.tp.entsoe.eu/api"
-TYPE_MARKET_AGREEMENT = "A01"  # daily (robust across TSOs)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# We will cycle through these if a month returns no data
+TMA_CANDIDATES = ["A01", "A02", "A03"]  # Daily, Weekly, Monthly
 
 # =============== HELPERS ====================
-def _try_domain_keys(params_base, domain_eic, domain_keys=("schedulingArea_Domain","controlArea_Domain")):
-    """
-    Try the given EIC with several domain parameter names (SCA first, then ControlArea).
-    Returns: xml text of the first successful (HTTP 200) call.
-    Raises HTTPError if none succeed.
-    """
-    last_err = None
-    for key in domain_keys:
-        params = dict(params_base)
-        params[key] = domain_eic
-        try:
-            return _api_get(params)
-        except requests.HTTPError as e:
-            last_err = e
-            continue
-    if last_err:
-        raise last_err
-
-def _ensure_cols(df):
-    for c in ["time_utc", "direction", "quantity_MW", "price_EUR_per_MW_h"]:
-        if c not in df.columns:
-            df[c] = None
-    return df
-
-def _merge_amt_prc(df_amt, df_prc):
-    df_amt = _ensure_cols(df_amt)
-    df_prc = _ensure_cols(df_prc)
-    if df_amt.empty and df_prc.empty:
-        return pd.DataFrame(columns=["time_utc","direction","quantity_MW","price_EUR_per_MW_h"])
-    if df_amt.empty:
-        df = df_prc.copy()
-        if "quantity_MW" not in df.columns: df["quantity_MW"] = None
-        return df
-    if df_prc.empty:
-        df = df_amt.copy()
-        if "price_EUR_per_MW_h" not in df.columns: df["price_EUR_per_MW_h"] = None
-        return df
-    return pd.merge(
-        df_amt[["time_utc","direction","quantity_MW"]],
-        df_prc[["time_utc","direction","price_EUR_per_MW_h"]],
-        on=["time_utc","direction"], how="outer"
-    )
-
 def _api_get(params, max_retries=3, sleep_s=1.0):
-    if not ENTSOE_TOKEN:
-        raise SystemExit("No ENTSOE_TOKEN found. Set environment variable ENTSOE_TOKEN with your API key.")
+    if not ENTSOE_TOKEN or ENTSOE_TOKEN == "PUT_YOUR_TOKEN_HERE":
+        raise SystemExit("Missing ENTSOE_TOKEN. Set $Env:ENTSOE_TOKEN or paste it into the script.")
     params["securityToken"] = ENTSOE_TOKEN
     last = None
     for attempt in range(1, max_retries + 1):
@@ -100,6 +51,9 @@ def _api_get(params, max_retries=3, sleep_s=1.0):
     raise requests.HTTPError(f"{last.status_code} for {last.url}\nResponse:\n{txt}", response=last)
 
 def _parse_balancing_xml_to_df(xml_text):
+    """Parse Balancing_MarketDocument into DataFrame with columns:
+       time_utc, quantity_MW, price_EUR_per_MW_h, direction (UP/DOWN/NA)
+    """
     doc = xmltodict.parse(xml_text, dict_constructor=dict)
     root = doc.get("Balancing_MarketDocument")
     if not root:
@@ -112,8 +66,8 @@ def _parse_balancing_xml_to_df(xml_text):
 
     rows = []
     for ts in series:
-        dir_code = ts.get("flowDirection.direction") or "A03"
-        direction = {"A01": "UP", "A02": "DOWN", "A03": "NA"}.get(dir_code, "NA")
+        dcode = ts.get("flowDirection.direction") or "A03"
+        direction = {"A01": "UP", "A02": "DOWN", "A03": "NA"}.get(dcode, "NA")
 
         periods = ts.get("Period")
         if not periods:
@@ -143,6 +97,7 @@ def _parse_balancing_xml_to_df(xml_text):
 
                 ts_utc = pd.Timestamp(start) if start else None
                 if t0 is not None and res.startswith("PT"):
+                    # Position stepping for PT1H / PT60M etc.
                     hours = 1.0
                     try:
                         if "H" in res:
@@ -156,22 +111,20 @@ def _parse_balancing_xml_to_df(xml_text):
                         hours = 1.0
                     ts_utc = t0 + pd.to_timedelta((pos - 1) * hours, unit="h")
 
-                rows.append(
-                    {
-                        "time_utc": ts_utc,
-                        "quantity_MW": float(qty) if qty is not None else None,
-                        "price_EUR_per_MW_h": float(price) if price is not None else None,
-                        "direction": direction,
-                    }
-                )
+                rows.append({
+                    "time_utc": ts_utc,
+                    "quantity_MW": float(qty) if qty is not None else None,
+                    "price_EUR_per_MW_h": float(price) if price is not None else None,
+                    "direction": direction,
+                })
 
     df = pd.DataFrame(rows)
     if df.empty:
         return pd.DataFrame(columns=["time_utc", "quantity_MW", "price_EUR_per_MW_h", "direction"])
-    df = df.dropna(subset=["time_utc"]).sort_values("time_utc").reset_index(drop=True)
-    return df
+    return df.dropna(subset=["time_utc"]).sort_values("time_utc").reset_index(drop=True)
 
 def _month_ranges(year):
+    """Return [(periodStart, periodEnd)] per month in UTC, as yyyymmddHHMM."""
     ranges = []
     for m in range(1, 13):
         start = pd.Timestamp(year=year, month=m, day=1, hour=0, minute=0, tz="UTC")
@@ -179,128 +132,127 @@ def _month_ranges(year):
         ranges.append((start.strftime("%Y%m%d%H%M"), end.strftime("%Y%m%d%H%M")))
     return ranges
 
+def _ensure_cols(df):
+    for c in ["time_utc", "direction", "quantity_MW", "price_EUR_per_MW_h"]:
+        if c not in df.columns:
+            df[c] = None
+    return df
+
+def _merge_amt_prc(df_amt, df_prc):
+    df_amt = _ensure_cols(df_amt)
+    df_prc = _ensure_cols(df_prc)
+    if df_amt.empty and df_prc.empty:
+        return pd.DataFrame(columns=["time_utc","direction","quantity_MW","price_EUR_per_MW_h"])
+    if df_amt.empty:
+        df = df_prc.copy()
+        if "quantity_MW" not in df.columns: df["quantity_MW"] = None
+        return df
+    if df_prc.empty:
+        df = df_amt.copy()
+        if "price_EUR_per_MW_h" not in df.columns: df["price_EUR_per_MW_h"] = None
+        return df
+    return pd.merge(
+        df_amt[["time_utc","direction","quantity_MW"]],
+        df_prc[["time_utc","direction","price_EUR_per_MW_h"]],
+        on=["time_utc","direction"], how="outer"
+    )
+
 # ========== API WRAPPERS (chunked) ==========
-def fetch_amounts_chunked(domain_eic, business_type, year, type_market="A01", is_fcr=False):
+def fetch_amounts_SE_chunked(control_area_eic, business_type, year):
+    """A81 amounts. Try product-specific AND combined B&C, over Daily/Weekly/Monthly."""
     all_parts = []
     for (ps, pe) in _month_ranges(year):
-        base = {
-            "documentType": "A81",
-            "type_MarketAgreement.Type": type_market,
-            "periodStart": ps,
-            "periodEnd": pe,
-        }
-        base_bt = dict(base)
-        base_bt["businessType"] = business_type
-        try:
-            xml = _try_domain_keys(base_bt, domain_eic)
-            df = _parse_balancing_xml_to_df(xml)
-            if not df.empty:
-                all_parts.append(df)
-        except requests.HTTPError as e:
-            if is_fcr:
-                try:
-                    base_fcr = dict(base_bt)  # keep businessType=A95
-                    xml = _try_domain_keys(base_fcr, SYNCH_AREA_CE, domain_keys=("synchronousArea_Domain",))
-                    df = _parse_balancing_xml_to_df(xml)
-                    if not df.empty:
-                        all_parts.append(df)
-                        continue
-                except requests.HTTPError:
-                    pass
-            print(f"  [warn] A81 {business_type} {ps[:6]}: {e}")
+        got_any = False
+        # try Daily, then Weekly, then Monthly
+        for tma in TMA_CANDIDATES:
+            # --- V1: product-specific (A95/A96/A97) ---
+            params_v1 = {
+                "documentType": "A81",
+                "type_MarketAgreement.Type": tma,
+                "businessType": business_type,  # A95/A96/A97
+                "controlArea_Domain": control_area_eic,
+                "periodStart": ps,
+                "periodEnd": pe,
+            }
+            try:
+                xml = _api_get(params_v1)
+                df = _parse_balancing_xml_to_df(xml)
+                if not df.empty:
+                    all_parts.append(df); got_any = True; break
+            except requests.HTTPError:
+                pass
+
+            # --- V2: combined B&C view (common for some TSOs) ---
+            params_v2 = {
+                "documentType": "A81",
+                "type_MarketAgreement.Type": tma,
+                "businessType": "B95",   # procured capacity
+                "processType": "A52",    # procurement
+                "controlArea_Domain": control_area_eic,
+                "periodStart": ps,
+                "periodEnd": pe,
+            }
+            try:
+                xml = _api_get(params_v2)
+                df = _parse_balancing_xml_to_df(xml)
+                if not df.empty:
+                    all_parts.append(df); got_any = True; break
+            except requests.HTTPError:
+                pass
+
+        if not got_any:
+            print(f"  [warn] A81 {business_type} {ps[:6]}: no data (TMA tried: {TMA_CANDIDATES})")
     return pd.concat(all_parts, ignore_index=True) if all_parts else pd.DataFrame()
 
-def fetch_prices_chunked(domain_eic, business_type, year, type_market="A01", is_fcr=False):
+
+def fetch_prices_SE_chunked(control_area_eic, business_type, year):
+    """A89 prices. Try without businessType, then with A95/A96/A97, over Daily/Weekly/Monthly."""
     all_parts = []
     for (ps, pe) in _month_ranges(year):
-        base = {
-            "documentType": "A89",
-            "type_MarketAgreement.Type": type_market,
-            "periodStart": ps,
-            "periodEnd": pe,
-        }
-        try:
-            xml = _try_domain_keys(base, domain_eic)  # SCA then controlArea
-            df = _parse_balancing_xml_to_df(xml)
-            if not df.empty:
-                all_parts.append(df)
-                continue
-        except requests.HTTPError:
+        got_any = False
+        for tma in TMA_CANDIDATES:
+            base = {
+                "documentType": "A89",
+                "type_MarketAgreement.Type": tma,
+                "controlArea_Domain": control_area_eic,
+                "periodStart": ps,
+                "periodEnd": pe,
+            }
+            # P1: broad (no businessType)
+            try:
+                xml = _api_get(base)
+                df = _parse_balancing_xml_to_df(xml)
+                if not df.empty:
+                    all_parts.append(df); got_any = True; break
+            except requests.HTTPError:
+                pass
+            # P2: with product-specific businessType
             try:
                 base_bt = dict(base)
                 base_bt["businessType"] = business_type
-                xml = _try_domain_keys(base_bt, domain_eic)
+                xml = _api_get(base_bt)
                 df = _parse_balancing_xml_to_df(xml)
                 if not df.empty:
-                    all_parts.append(df)
-                    continue
-            except requests.HTTPError as e2:
-                if is_fcr:
-                    try:
-                        xml = _try_domain_keys(base, SYNCH_AREA_CE, domain_keys=("synchronousArea_Domain",))
-                        df = _parse_balancing_xml_to_df(xml)
-                        if not df.empty:
-                            all_parts.append(df)
-                            continue
-                    except requests.HTTPError:
-                        pass
-                print(f"  [warn] A89 {business_type} {ps[:6]}: {e2}")
+                    all_parts.append(df); got_any = True; break
+            except requests.HTTPError:
+                pass
+
+        if not got_any:
+            print(f"  [warn] A89 {business_type} {ps[:6]}: no data (TMA tried: {TMA_CANDIDATES})")
     return pd.concat(all_parts, ignore_index=True) if all_parts else pd.DataFrame()
 
-# ================== MAIN (DE) ==================
-def get_DE_balancing_for_2024():
+
+# ================== MAIN (SE) ==================
+def get_SE_balancing_for_2024():
     results = {}
     for name, bt in PRODUCTS.items():
-        is_fcr = (name == "FCR")
-        all_tso_frames = []
-        print(f"\n=== Fetching {name} ({bt}) DE 2024 per Scheduling Area ===")
-        for tso, eic in CONTROL_AREAS_DE.items():
-            print(f"  - {tso} (SCA EIC {eic})")
-            df_amt = fetch_amounts_chunked(eic, bt, YEAR, TYPE_MARKET_AGREEMENT, is_fcr=is_fcr)
-            if df_amt.empty: print(f"    [warn] No amount data for {tso}.")
-            df_prc = fetch_prices_chunked(eic, bt, YEAR, TYPE_MARKET_AGREEMENT, is_fcr=is_fcr)
-            if df_prc.empty: print(f"    [warn] No price data for {tso}.")
-            df = _merge_amt_prc(df_amt, df_prc)
-            if not df.empty:
-                df = df.sort_values("time_utc").reset_index(drop=True)
-                df["product"] = name
-                df["tso"] = tso
-                df = df[["time_utc","product","tso","direction","quantity_MW","price_EUR_per_MW_h"]]
-            out_path = os.path.join(SCRIPT_DIR, f"entsoe_DE_{YEAR}_{name}_{tso}.csv")
-            df.to_csv(out_path, index=False)
-            print(f"    ✅ Saved: {out_path} (rows={len(df)})")
-            all_tso_frames.append(df)
+        print(f"\n=== Fetching {name} ({bt}) SE 2024 month-by-month ===")
 
-        # Optional DE aggregate
-        if any(not d.empty for d in all_tso_frames):
-            big = pd.concat(all_tso_frames, ignore_index=True)
-            agg_q = big.groupby(["time_utc","direction"], as_index=False)["quantity_MW"].sum(min_count=1)
-            def _agg_price(g):
-                vals = g["price_EUR_per_MW_h"].dropna().unique()
-                return vals[0] if len(vals) == 1 else float("nan")
-            agg_p = big.groupby(["time_utc","direction"]).apply(_agg_price).reset_index(name="price_EUR_per_MW_h")
-            de_all = pd.merge(agg_q, agg_p, on=["time_utc","direction"], how="outer").sort_values("time_utc")
-            de_all["product"] = name
-            de_all["tso"] = "ALL"
-            de_all = de_all[["time_utc","product","tso","direction","quantity_MW","price_EUR_per_MW_h"]]
-        else:
-            de_all = pd.DataFrame(columns=["time_utc","product","tso","direction","quantity_MW","price_EUR_per_MW_h"])
-
-        out_path = os.path.join(SCRIPT_DIR, f"entsoe_DE_{YEAR}_{name}_ALL.csv")
-        de_all.to_csv(out_path, index=False)
-        print(f"  ✅ Saved aggregate: {out_path} (rows={len(de_all)})")
-        results[name] = {"TSO": all_tso_frames, "ALL": de_all}
-    return results
-
-# ================== MAIN (FR) ==================
-def get_FR_balancing_for_2024():
-    results = {}
-    for name, bt in PRODUCTS.items():
-        print(f"\n=== Fetching {name} ({bt}) FR 2024 month-by-month ===")
-        df_amt = fetch_amounts_chunked(CONTROL_AREA_FR, bt, YEAR, TYPE_MARKET_AGREEMENT, is_fcr=(name=="FCR"))
+        df_amt = fetch_amounts_SE_chunked(CONTROL_AREA_SE, bt, YEAR)
         if df_amt.empty:
             print(f"  [warn] No amount data returned for {name} across 2024.")
-        df_prc = fetch_prices_chunked(CONTROL_AREA_FR, bt, YEAR, TYPE_MARKET_AGREEMENT, is_fcr=(name=="FCR"))
+
+        df_prc = fetch_prices_SE_chunked(CONTROL_AREA_SE, bt, YEAR)
         if df_prc.empty:
             print(f"  [warn] No price data returned for {name} across 2024.")
 
@@ -308,9 +260,9 @@ def get_FR_balancing_for_2024():
         if not df.empty and "time_utc" in df.columns:
             df = df.sort_values("time_utc").reset_index(drop=True)
         df["product"] = name
-        df = df[["time_utc", "product", "direction", "quantity_MW", "price_EUR_per_MW_h"]]
+        df = df[["time_utc","product","direction","quantity_MW","price_EUR_per_MW_h"]]
 
-        out_path = os.path.join(SCRIPT_DIR, f"entsoe_FR_{YEAR}_{name}.csv")
+        out_path = os.path.join(SCRIPT_DIR, f"entsoe_SE_{YEAR}_{name}.csv")
         df.to_csv(out_path, index=False)
         print(f"  ✅ Saved: {out_path}  (rows={len(df)})")
         results[name] = df
@@ -318,7 +270,7 @@ def get_FR_balancing_for_2024():
 
 # ================== DRIVER =====================
 if __name__ == "__main__":
-    data = get_DE_balancing_for_2024()
-    for product, content in data.items():
-        print(f"\nPreview {product} – DE aggregate:")
-        print(content["ALL"].head(5).to_string(index=False))
+    data = get_SE_balancing_for_2024()
+    for product, df in data.items():
+        print(f"\nPreview {product} – Sweden:")
+        print(df.head(5).to_string(index=False))

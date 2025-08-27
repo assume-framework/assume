@@ -836,7 +836,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         print(f"Emissions analytics saved to: {html_path}")
 
 
-    def render_sankey_timeseries(self, instance, html_path="./outputs/sankey_timeseries.html",
+    def render_sankey_timeseries_1(self, instance, html_path="./outputs/sankey_timeseries_!.html",
                                 step_stride=1, # use >1 to downsample frames if you have many timesteps
                                 min_flow=1e-6  # hide tiny links for readability
                                 ):
@@ -975,7 +975,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         print(f"Sankey timeseries saved to: {html_path}")
 
 
-    def render_cement_dashboard(self, instance, html_path="cement_dashboard.html"):
+    def render_cement_dashboard(self, instance, html_path="./outputs/cement_dashboard.html"):
         # ---- helpers
         def safe_value(v):
             try:
@@ -1354,7 +1354,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         fig.write_html(html_path)
         print(f"Sankey timeseries saved to: {html_path}")
 
-    def animated_tes_sankey(instance, html_path="cement_tes_playback.html"):
+    def animated_tes_sankey(self, instance, html_path="./outputs/cement_tes_playback.html"):
         def safe_value(v):
             try:
                 return float(pyo.value(v))

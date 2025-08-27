@@ -791,6 +791,19 @@ class DSMFlex:
                                 step_stride=1, # use >1 to downsample frames if you have many timesteps
                                 min_flow=1e-6  # hide tiny links for readability
                                 )
+        self.render_emissions_analytics(instance,
+        baseline_instance=None,                     # optional: pass a "no-TES" or BAU instance for comparison
+        html_path="./outputs/emissions_analytics.html",
+        elec_ef_param_name="electricity_emission_factor"  # tCO2/MWh_e on the model (optional)
+    )
+        self.render_sankey_timeseries_1(instance, html_path="./outputs/sankey_timeseries_!.html",
+                                step_stride=1, # use >1 to downsample frames if you have many timesteps
+                                min_flow=1e-6  # hide tiny links for readability
+                                )
+        self.render_cement_dashboard(instance, html_path="./outputs/cement_dashboard.html")
+        self.animated_tes_sankey(instance, html_path="./outputs/cement_tes_playback.html")
+        self.render_storage_analytics(instance, html_path="./outputs/storage_analytics.html")
+
         # # ------------------- PLOT (preheater + calciner + kiln + TES + H2 routing) -------------------
         # mpl.rcParams.update(
         #     {
