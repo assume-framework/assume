@@ -83,6 +83,7 @@ Documentation
 * :doc:`support_policies`
 * :doc:`distributed_simulation`
 * :doc:`manual_simulation`
+* :doc:`realtime_simulation`
 * :doc:`command_line_interface`
 * :doc:`assume`
 
@@ -102,6 +103,7 @@ Documentation
    support_policies
    distributed_simulation
    manual_simulation
+   realtime_simulation
    command_line_interface
    assume
 

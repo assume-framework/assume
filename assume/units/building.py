@@ -11,8 +11,6 @@ from assume.common.forecasts import Forecaster
 from assume.common.utils import str_to_bool
 from assume.units.dsm_load_shift import DSMFlex
 
-SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
-
 logger = logging.getLogger(__name__)
 
 # Set the log level to ERROR for Pyomo to reduce verbosity
