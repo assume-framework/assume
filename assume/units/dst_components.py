@@ -825,6 +825,10 @@ class ThermalStorage(GenericStorage):
         # --- Params for generator mode
         model_block.eta_electric = pyo.Param(initialize=self.eta_electric)
         model_block.max_Pelec = pyo.Param(initialize=self.max_power)
+        model_block.is_generator_mode = pyo.Param(
+            initialize=(self.storage_type == "short-term_with_generator"),
+            within=pyo.Boolean,
+        )
 
         # --- Vars for generator & cost
         # Always define for plotting/aggregation; bind to 0 if not in generator mode
