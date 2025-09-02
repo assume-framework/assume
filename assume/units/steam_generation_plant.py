@@ -152,7 +152,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             # ---- Built-in FCR configuration (hardcoded German FCR) ----
             # Active only if self.is_prosumer is True
             self.fcr_enabled = bool(self.is_prosumer)
-            self.fcr_symmetric = True          # set True if you want symmetric product by default
+            self.fcr_symmetric = False          # set True if you want symmetric product by default
             self._FCR_BLOCK_LENGTH = 4          # hours, fixed TSO blocks
             self._FCR_MIN_BID_MW   = 1.0        # minimum capacity per block
             self._FCR_STEP_MW      = 1.0        # increment: bids in integer MW
@@ -860,107 +860,76 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         if any([p0, p1]):
             axs[1].legend(loc="upper right", frameon=True)
 
-        # ---------- BOTTOM: FCR bids & impact ----------
-        # Draw only if the instance has the FCR constructs (prosumer mode)
+        # ---------- BOTTOM: FCR bids & impact (clarified) ----------
         fcr_present = hasattr(instance, "fcr_blocks")
         fcr_len = getattr(self, "_FCR_BLOCK_LENGTH", 4)
 
-        fcr_cap_up_stairs = fcr_cap_dn_stairs = fcr_price_stairs = None
-        fcr_blocks_list = []
-        block_price_map = {}
-        cap_up_map = {}
-        cap_dn_map = {}
-        y_up_map = {}
-        y_dn_map = {}
+        def zero_or_list(x, n):
+            return [0.0]*n if x is None else x
 
-        if fcr_present:
-            try:
-                fcr_blocks_list = list(instance.fcr_blocks)
-            except Exception:
-                fcr_blocks_list = []
+        fcr_blocks_list = list(getattr(instance, "fcr_blocks", [])) if fcr_present else []
+        cap_up_map, cap_dn_map, block_price_map = {}, {}, {}
 
         if fcr_present and fcr_blocks_list:
-            # Build dicts of per-block values from instance
             for b in fcr_blocks_list:
-                # capacities
-                if hasattr(instance, "cap_up"):
-                    cap_up_map[b] = safe_value(instance.cap_up[b])
-                if hasattr(instance, "cap_dn"):
-                    cap_dn_map[b] = safe_value(instance.cap_dn[b])
-                # on/off binaries (if present)
-                if hasattr(instance, "bid_up"):
-                    y_up_map[b] = int(round(safe_value(instance.bid_up[b])))
-                if hasattr(instance, "bid_dn"):
-                    y_dn_map[b] = int(round(safe_value(instance.bid_dn[b])))
-                # price per block
-                if hasattr(instance, "fcr_block_price"):
-                    block_price_map[b] = safe_value(instance.fcr_block_price[b])
+                if hasattr(instance, "cap_up"):         cap_up_map[b] = safe_value(instance.cap_up[b])
+                if hasattr(instance, "cap_dn"):         cap_dn_map[b] = safe_value(instance.cap_dn[b])
+                if hasattr(instance, "fcr_block_price"): block_price_map[b] = safe_value(instance.fcr_block_price[b])
 
-            # expand to hourly stairs for plotting
             H = len(T)
-            fcr_cap_up_stairs = stairs_from_blocks(fcr_blocks_list, cap_up_map, fcr_len, H) if cap_up_map else None
-            fcr_cap_dn_stairs = stairs_from_blocks(fcr_blocks_list, cap_dn_map, fcr_len, H) if cap_dn_map else None
-            fcr_price_stairs  = stairs_from_blocks(fcr_blocks_list, block_price_map, fcr_len, H) if block_price_map else None
+            cap_up_stairs = stairs_from_blocks(fcr_blocks_list, cap_up_map, fcr_len, H) if cap_up_map else [0.0]*H
+            cap_dn_stairs = stairs_from_blocks(fcr_blocks_list, cap_dn_map, fcr_len, H) if cap_dn_map else [0.0]*H
+            price_stairs  = stairs_from_blocks(fcr_blocks_list, block_price_map, fcr_len, H) if block_price_map else [0.0]*H
 
-            # baseline & envelope on same axis to see feasibility/impact
-            l_base = plot_if_nonzero(axs[2], T, total_elec, "Baseline Elec Load [MWₑ]", "C1", "-")
+            # Baseline & capability envelope
+            base = zero_or_list(total_elec, len(T))
+            axs[2].plot(T, base, color="0.3", lw=2.0, label="Baseline Elec Load [MWₑ]")
             if max_cap is not None:
-                axs[2].plot(T, [max_cap]*len(T), label="Max Elec Capability [MWₑ]", color="C7", linestyle=":")
+                axs[2].plot(T, [max_cap]*len(T), color="0.7", ls=":", label="Max Capability [MWₑ]")
             if min_cap is not None:
-                axs[2].plot(T, [min_cap]*len(T), label="Min Elec Capability [MWₑ]", color="C7", linestyle="--")
+                axs[2].plot(T, [min_cap]*len(T), color="0.7", ls="--", label="Min Capability [MWₑ]")
 
-            # FCR capacities as step-like curves (hourly stairs)
-            l_cu = plot_if_nonzero(axs[2], T, fcr_cap_up_stairs, "FCR Up Capacity [MW]", "C10", "-")
-            l_cd = plot_if_nonzero(axs[2], T, fcr_cap_dn_stairs, "FCR Down Capacity [MW]", "C12", "--")
+            # CAPACITY BANDS around the baseline
+            # UP = we can reduce load: show a red band between (base - up) and base
+            lower_up = [max(min_cap if min_cap is not None else -1e9, base[i] - cap_up_stairs[i]) for i in range(len(T))]
+            axs[2].fill_between(T, lower_up, base, color="#d62728", alpha=0.25, step="pre", label="FCR Up Capacity [MW]")
 
-            axs[2].set_ylabel("MW / MWₑ")
-            axs[2].set_title("FCR Bids (4h Blocks) & Operational Impact")
-            axs[2].grid(True, which="both", axis="both")
+            # DOWN = we can increase load: show a green band between base and (base + down)
+            upper_dn = [min(max_cap if max_cap is not None else 1e9, base[i] + cap_dn_stairs[i]) for i in range(len(T))]
+            axs[2].fill_between(T, base, upper_dn, color="#2ca02c", alpha=0.25, step="pre", label="FCR Down Capacity [MW]")
 
-            # Block prices on twin axis
+            # FCR block price on twin axis
             axp2 = axs[2].twinx()
-            lp2 = None
-            if fcr_price_stairs and any(abs(v) > 1e-9 for v in fcr_price_stairs):
-                lp2 = axp2.plot(T, fcr_price_stairs, label="FCR Block Price [€/MW per 4h]", color="C4", linestyle="-.")
-
+            axp2.plot(T, price_stairs, color="#9467bd", ls="--", lw=2, label="FCR Block Price [€/MW per 4h]")
             axp2.set_ylabel("FCR Price", color="gray")
             axp2.tick_params(axis="y", labelcolor="gray")
 
-            # Shade active blocks (if binaries exist), else shade nonzero capacity blocks
+            # Shade active blocks (any capacity)
             for b in fcr_blocks_list:
-                active = False
-                if y_up_map or y_dn_map:
-                    active = (y_up_map.get(b, 0) + y_dn_map.get(b, 0)) > 0
-                else:
-                    active = (cap_up_map.get(b, 0.0) > 0.0) or (cap_dn_map.get(b, 0.0) > 0.0)
-
+                active = (cap_up_map.get(b, 0.0) > 0.0) or (cap_dn_map.get(b, 0.0) > 0.0)
                 if active:
-                    axs[2].axvspan(b, min(b + fcr_len, len(T)-1), color="k", alpha=0.05)
+                    axs[2].axvspan(b, min(b + fcr_len, len(T)), color="k", alpha=0.04)
 
-            # legend
-            h2 = []
-            for h in [l_base, l_cu, l_cd]:
-                if h is not None:
-                    h2.append(h)
-            if max_cap is not None or min_cap is not None:
-                # add dummy handles from plotted lines already present
-                pass
-            if lp2:
-                h2.append(lp2[0])
-            if h2:
-                axs[2].legend([h.get_label() for h in h2], loc="upper left", frameon=True)
+            # Clean legend: pull handles from both axes
+            h1, l1 = axs[2].get_legend_handles_labels()
+            h2, l2 = axp2.get_legend_handles_labels()
+            axs[2].legend(h1 + h2, l1 + l2, loc="upper left", frameon=True)
+
+            axs[2].set_ylabel("MW / MWₑ")
+            axs[2].set_title("FCR Bids (4h blocks) — Red = Up, Green = Down (bands around baseline)")
+            axs[2].grid(True, which="both", axis="both")
 
         else:
-            # If no FCR present, show baseline anyway (useful sanity check)
             _ = plot_if_nonzero(axs[2], T, total_elec, "Baseline Elec Load [MWₑ]", "C1", "-")
             if max_cap is not None:
-                axs[2].plot(T, [max_cap]*len(T), label="Max Elec Capability [MWₑ]", color="C7", linestyle=":")
+                axs[2].plot(T, [max_cap]*len(T), color="0.7", ls=":", label="Max Capability [MWₑ]")
             if min_cap is not None:
-                axs[2].plot(T, [min_cap]*len(T), label="Min Elec Capability [MWₑ]", color="C7", linestyle="--")
+                axs[2].plot(T, [min_cap]*len(T), color="0.7", ls="--", label="Min Capability [MWₑ]")
             axs[2].set_ylabel("MW / MWₑ")
-            axs[2].set_title("Operational Baseline (No FCR structures on instance)")
+            axs[2].set_title("Operational Baseline (no FCR on instance)")
             axs[2].grid(True, which="both", axis="both")
             axs[2].legend(loc="upper left", frameon=True)
+
 
         axs[-1].set_xlabel("Time step")
         fig.autofmt_xdate()  # if your time steps are datetime-indexed
@@ -995,12 +964,12 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
         # Add FCR hourly stairs if present
         if fcr_present and fcr_blocks_list:
-            if fcr_cap_up_stairs:
-                df["FCR Up Cap [MW]"] = fcr_cap_up_stairs
-            if fcr_cap_dn_stairs:
-                df["FCR Down Cap [MW]"] = fcr_cap_dn_stairs
-            if fcr_price_stairs:
-                df["FCR Block Price [€/MW per 4h]"] = fcr_price_stairs
+            if cap_up_stairs:
+                df["FCR Up Cap [MW]"] = cap_up_stairs
+            if cap_dn_stairs:
+                df["FCR Down Cap [MW]"] = cap_dn_stairs
+            if price_stairs:
+                df["FCR Block Price [€/MW per 4h]"] = price_stairs
 
         if save_path:
             csv_path = save_path.rsplit(".", 1)[0] + ".csv"
