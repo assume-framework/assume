@@ -781,13 +781,13 @@ class DSMFlex:
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
         # Dashboard & Plot
-        # self.dashboard(
-        #     instance,
-        #     baseline_instance=None,  # optional: BAU/no-TES run for comparison
-        #     html_path="./outputs/dashboard.html",
-        #     sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
-        # )
-        self.plot_2(instance, save_path=None, show=True)
+        self.dashboard(
+            instance,
+            baseline_instance=None,  # optional: BAU/no-TES run for comparison
+            html_path="./outputs/dashboard.html",
+            sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
+        )
+        # self.plot_2(instance, save_path=None, show=True)
         # After solve:
         blocks = list(instance.fcr_blocks)
         print("Block  Start  Up[MW]  Down[MW]  Price[€/MW per 4h]")

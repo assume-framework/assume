@@ -2064,6 +2064,156 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             fig_b.update_layout(title="Baseline Comparison (Economy & CO₂)")
             figs_cmp.append(fig_b)
 
+                    # ------------------------- PROSUMER / FCR ANALYTICS -------------------------
+        figs_fcr = []
+        if getattr(self, "is_prosumer", False) and hasattr(instance, "time_steps"):
+            # Guard against missing FCR constructs
+            fcr_blocks = list(getattr(instance, "fcr_blocks", []))
+            cap_up = getattr(instance, "cap_up", None)
+            cap_dn = getattr(instance, "cap_dn", None)
+            fcr_block_price = getattr(instance, "fcr_block_price", None)
+            bid_up = getattr(instance, "bid_up", None)
+            bid_dn = getattr(instance, "bid_dn", None)
+
+            if fcr_blocks and (cap_up or cap_dn):
+                # --- parameters (hardcoded per your plant’s prosumer-mode) ---
+                blk_len = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))
+                step_mw = float(getattr(self, "_FCR_STEP_MW", 1.0))
+                min_bid = float(getattr(self, "_FCR_MIN_BID_MW", 1.0))
+
+                # helpers
+                def s(v):
+                    try: return float(pyo.value(v))
+                    except Exception: return float(v) if v is not None else 0.0
+
+                def get_block_map(pyomo_param):
+                    d = {}
+                    if pyomo_param is None: return d
+                    for b in fcr_blocks:
+                        d[b] = s(pyomo_param[b])
+                    return d
+
+                def stairs_from_blocks(block_starts, per_block_values, block_len, horizon_len):
+                    y = [0.0] * horizon_len
+                    for b in block_starts:
+                        val = per_block_values.get(b, 0.0)
+                        for k in range(block_len):
+                            i = b + k
+                            if 0 <= i < horizon_len:
+                                y[i] = val
+                    return y
+
+                # --- per-block dicts & hourly stairs ---
+                up_map  = get_block_map(cap_up)
+                dn_map  = get_block_map(cap_dn)
+                pr_map  = get_block_map(fcr_block_price)
+                H = len(T)
+                up_stairs = stairs_from_blocks(fcr_blocks, up_map, blk_len, H) if up_map else [0.0]*H
+                dn_stairs = stairs_from_blocks(fcr_blocks, dn_map, blk_len, H) if dn_map else [0.0]*H
+                pr_stairs = stairs_from_blocks(fcr_blocks, pr_map, blk_len, H) if pr_map else [0.0]*H
+
+                # ---------------- Block ladder (Up/Down) + price ----------------
+                x_blk = fcr_blocks
+                y_up  = [up_map.get(b, 0.0) for b in x_blk]
+                y_dn  = [dn_map.get(b, 0.0) for b in x_blk]
+                y_pr  = [pr_map.get(b, 0.0) for b in x_blk]
+
+                fig_blk = ps.make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
+                fig_blk.add_trace(go.Bar(x=x_blk, y=y_up,  name="Up capacity [MW]", marker_color="#d62728"), secondary_y=False)
+                fig_blk.add_trace(go.Bar(x=x_blk, y=y_dn,  name="Down capacity [MW]", marker_color="#2ca02c"), secondary_y=False)
+                fig_blk.add_trace(go.Scatter(x=x_blk, y=y_pr, name="Block price [€/MW per 4h]", line=dict(color="#9467bd", dash="dash")), secondary_y=True)
+                fig_blk.update_layout(barmode="stack", title="FCR Blocks: Up/Down Capacity & Price", height=420)
+                fig_blk.update_yaxes(title_text="MW", secondary_y=False)
+                fig_blk.update_yaxes(title_text="€/MW per 4h", secondary_y=True)
+                figs_fcr.append(fig_blk)
+
+                # ---------------- Operational impact (hourly bands) ----------------
+                base = [safe(instance.total_power_input[t]) for t in T] if hasattr(instance, "total_power_input") else [0.0]*H
+                max_cap = float(getattr(self, "max_plant_capacity", np.nan))
+                min_cap = float(getattr(self, "min_plant_capacity", 0.0))
+
+                upper_dn = [min(max_cap if not np.isnan(max_cap) else 1e9, base[i] + dn_stairs[i]) for i in range(H)]
+                lower_up = [max(min_cap, base[i] - up_stairs[i]) for i in range(H)]
+
+                fig_imp = ps.make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
+                fig_imp.add_trace(go.Scatter(x=T, y=base, name="Baseline load [MWₑ]", line=dict(color="grey")), secondary_y=False)
+                fig_imp.add_trace(go.Scatter(x=T, y=lower_up, name="Baseline−Up", line=dict(color="#d62728", width=0), showlegend=False), secondary_y=False)
+                fig_imp.add_trace(go.Scatter(x=T, y=base,     name="Up capacity band", fill="tonexty", mode="lines", line=dict(color="#d62728"), fillcolor="rgba(214,39,40,0.25)"), secondary_y=False)
+                fig_imp.add_trace(go.Scatter(x=T, y=upper_dn, name="Down capacity band", fill=None, mode="lines", line=dict(color="#2ca02c")), secondary_y=False)
+                fig_imp.add_trace(go.Scatter(x=T, y=pr_stairs, name="Block price [€/MW per 4h]", line=dict(color="#9467bd", dash="dot")), secondary_y=True)
+                fig_imp.update_layout(title="FCR Impact: Capacity Bands around Baseline (red=UP, green=DOWN)", height=460)
+                fig_imp.update_yaxes(title_text="MW / MWₑ", secondary_y=False)
+                fig_imp.update_yaxes(title_text="€/MW per 4h", secondary_y=True)
+                figs_fcr.append(fig_imp)
+
+                # ---------------- Revenue analytics ----------------
+                # Revenue per block = price * (up + down)
+                rev_up = [y_pr[i] * y_up[i] for i in range(len(x_blk))]
+                rev_dn = [y_pr[i] * y_dn[i] for i in range(len(x_blk))]
+                rev_tot = [rev_up[i] + rev_dn[i] for i in range(len(x_blk))]
+                rev_cum = np.cumsum(rev_tot).tolist()
+                MW_weighted_price = (sum([y_pr[i]*(y_up[i]+y_dn[i]) for i in range(len(x_blk))]) /
+                                     max(sum([y_up[i]+y_dn[i] for i in range(len(x_blk))]), 1e-9))
+
+                fig_rev = ps.make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
+                fig_rev.add_trace(go.Bar(x=x_blk, y=rev_up, name="Revenue: UP [€]", marker_color="#d62728"), secondary_y=False)
+                fig_rev.add_trace(go.Bar(x=x_blk, y=rev_dn, name="Revenue: DOWN [€]", marker_color="#2ca02c"), secondary_y=False)
+                fig_rev.add_trace(go.Scatter(x=x_blk, y=rev_cum, name="Cumulative revenue [€]", line=dict(color="#1f77b4", width=2)), secondary_y=True)
+                fig_rev.update_layout(barmode="stack", title="FCR Revenue by Block (and cumulative)", height=420)
+                fig_rev.update_yaxes(title_text="€/block", secondary_y=False)
+                fig_rev.update_yaxes(title_text="€ cumulative", secondary_y=True)
+                figs_fcr.append(fig_rev)
+
+                # KPIs table
+                kpi_rows = [
+                    ("Blocks with any bid", f"{sum(1 for b in x_blk if (y_up[x_blk.index(b)] + y_dn[x_blk.index(b)]) > 0):d} / {len(x_blk)}"),
+                    ("Total UP capacity [MW·blocks]", f"{sum(y_up):,.0f}"),
+                    ("Total DOWN capacity [MW·blocks]", f"{sum(y_dn):,.0f}"),
+                    ("Total FCR revenue [€]", f"{sum(rev_tot):,.0f}"),
+                    ("MW-weighted price [€/MW per 4h]", f"{MW_weighted_price:,.1f}"),
+                    ("Avg UP share [% of MW]", f"{(sum(y_up)/max(sum(y_up)+sum(y_dn),1e-9))*100:,.1f}%"),
+                ]
+                fig_fcr_kpi = go.Figure(go.Table(
+                    header=dict(values=["FCR KPI","Value"], align="left"),
+                    cells=dict(values=[[r[0] for r in kpi_rows],[r[1] for r in kpi_rows]], align="left")
+                ))
+                fig_fcr_kpi.update_layout(title="FCR Key Indicators")
+                figs_fcr.append(fig_fcr_kpi)
+
+                # ---------------- Calendar heatmap (hourly sum of up+down) ----------------
+                cap_hour = (np.array(up_stairs) + np.array(dn_stairs)).tolist()
+                # Build a rectangular heatmap by week x hour-of-day (simple, no tz handling)
+                # If T are datetimes, we map weekday/hour; else fall back to index.
+                try:
+                    import pandas as _pd
+                    idx = _pd.to_datetime(T)
+                    dfh = _pd.DataFrame({"cap": cap_hour}, index=idx)
+                    dfh["wd"] = dfh.index.weekday
+                    dfh["h"]  = dfh.index.hour
+                    mat = dfh.pivot_table(index="wd", columns="h", values="cap", aggfunc="sum").reindex(index=[0,1,2,3,4,5,6])
+                    fig_cal = go.Figure(data=go.Heatmap(z=mat.values, x=mat.columns, y=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], coloraxis="coloraxis"))
+                    fig_cal.update_layout(title="FCR Capacity Heatmap (sum of Up+Down)", height=420, coloraxis_colorscale="YlGnBu")
+                    figs_fcr.append(fig_cal)
+                except Exception:
+                    pass  # if T aren’t datetimes, skip heatmap
+
+                # ---------------- Bid compliance table (min bid & step) ----------------
+                viol = []
+                for i,b in enumerate(x_blk):
+                    if (y_up[i] > 1e-9) and ((y_up[i] < min_bid) or (abs(y_up[i]/step_mw - round(y_up[i]/step_mw)) > 1e-9)):
+                        viol.append((b, "UP", y_up[i]))
+                    if (y_dn[i] > 1e-9) and ((y_dn[i] < min_bid) or (abs(y_dn[i]/step_mw - round(y_dn[i]/step_mw)) > 1e-9)):
+                        viol.append((b, "DOWN", y_dn[i]))
+
+                if viol:
+                    fig_v = go.Figure(go.Table(
+                        header=dict(values=["Block start","Side","Capacity [MW] (violates min/step)"], align="left"),
+                        cells=dict(values=[ [v[0] for v in viol], [v[1] for v in viol], [f"{v[2]:.1f}" for v in viol] ], align="left")
+                    ))
+                    fig_v.update_layout(title=f"Bid Compliance Issues (min={min_bid:g} MW, step={step_mw:g} MW)")
+                    figs_fcr.append(fig_v)
+
+
         # ------------------------- WRITE SINGLE HTML -------------------------
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(
@@ -2087,4 +2237,10 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 for g in figs_cmp:
                     f.write(g.to_html(full_html=False, include_plotlyjs=False))
             f.write("</body></html>")
+            if figs_fcr:
+                f.write("<hr><h3>FCR / Ancillary Services (Prosumer) Analytics</h3>")
+                for g in figs_fcr:
+                    f.write(g.to_html(full_html=False, include_plotlyjs=False))
+
         print(f"Full dashboard saved to: {html_path}")
+
