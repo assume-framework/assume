@@ -153,6 +153,13 @@ class DSMFlex:
                 )
 
                 return total_variable_cost
+        
+        elif self.objective == "max_net_income":
+            @self.model.Objective(sense=pyo.maximize)
+            def obj_rule_opt(m):
+                net_income = self.model.fcr_revenue - sum(self.model.variable_cost[t] for t in self.model.time_steps)
+                return net_income
+
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
@@ -773,13 +780,23 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
-        # Dashboard
-        self.dashboard(
-            instance,
-            baseline_instance=None,  # optional: BAU/no-TES run for comparison
-            html_path="./outputs/dashboard.html",
-            sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
-        )
+        # Dashboard & Plot
+        # self.dashboard(
+        #     instance,
+        #     baseline_instance=None,  # optional: BAU/no-TES run for comparison
+        #     html_path="./outputs/dashboard.html",
+        #     sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
+        # )
+        self.plot_2(instance, save_path=None, show=True)
+        # After solve:
+        blocks = list(instance.fcr_blocks)
+        print("Block  Start  Up[MW]  Down[MW]  Price[€/MW per 4h]")
+        for b in blocks:
+            up   = float(pyo.value(instance.cap_up[b]))   if hasattr(instance, "cap_up") else 0.0
+            down = float(pyo.value(instance.cap_dn[b]))   if hasattr(instance, "cap_dn") else 0.0
+            price = float(pyo.value(instance.fcr_block_price[b])) if hasattr(instance, "fcr_block_price") else 0.0
+            print(f"{int(b):>5}  {int(b):>5}  {up:>6.1f}  {down:>7.1f}  {price:>10.1f}")
+
 
     def determine_optimal_operation_with_flex(self):
         """

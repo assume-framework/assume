@@ -60,6 +60,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         technology: str = "steam_generator_plant",
         objective: str = "min_variable_cost",
         flexibility_measure: str = "max_load_shift",
+        is_prosumer: str = "No",
         demand: float = 0,
         cost_tolerance: float = 10,
         congestion_threshold: float = 0,
@@ -145,6 +146,18 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.objective = objective
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
+        self.is_prosumer = str_to_bool(is_prosumer)
+
+        if self.is_prosumer:
+            # ---- Built-in FCR configuration (hardcoded German FCR) ----
+            # Active only if self.is_prosumer is True
+            self.fcr_enabled = bool(self.is_prosumer)
+            self.fcr_symmetric = True          # set True if you want symmetric product by default
+            self._FCR_BLOCK_LENGTH = 4          # hours, fixed TSO blocks
+            self._FCR_MIN_BID_MW   = 1.0        # minimum capacity per block
+            self._FCR_STEP_MW      = 1.0        # increment: bids in integer MW
+            # expected FCR value (€/MW/h) as hourly series; if not provided, assume zeros
+            self.fcr_price_eur_per_mw_h = self.forecaster["fcr_price"]
 
         # Initialize the model
         self.setup_model()
@@ -300,6 +313,9 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         """
         Defines the constraints for the steam generation plant model.
         """
+        # Only attach FCR if this plant is a prosumer
+        if self.is_prosumer:
+            self._add_fcr_capacity_market(self.model)
 
         @self.model.Constraint(self.model.time_steps)
         def meet_demand(m, t):
@@ -370,6 +386,134 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             )
 
         return marginal_cost
+    
+    def _add_fcr_capacity_market(self, model):
+        """
+        Hardcoded German FCR: fixed 4h blocks at 00,04,08,12,16,20.
+        Bids in integer MW with 1 MW minimum. Profit objective replaces cost objective.
+        Activates only when self.is_prosumer is True.
+        """
+        if not self.is_prosumer:
+            return
+
+        import math
+        m = model
+        L = self._FCR_BLOCK_LENGTH
+        step = self._FCR_STEP_MW
+        min_bid = self._FCR_MIN_BID_MW
+
+        # ---- Build fixed 4h blocks aligned to wall-clock hours ----
+        # Use actual timestamps to pick starts at hours % 4 == 0 (TSO fixed windows)
+        ts = self.index  # DatetimeIndex aligned with time_steps (0..T-1)
+        starts_idx = [i for i, t in enumerate(ts[:-L+1]) if (t.hour % 4 == 0 and t.minute == 0)]
+        # keep only starts that have all L hours inside horizon
+        starts_idx = [i for i in starts_idx if i + L <= len(ts)]
+
+        # map to model's time step ids
+        m.fcr_blocks = pyo.Set(initialize=starts_idx, ordered=True)
+
+        # ---- Block prices: sum of hourly €/MW/h inside each 4h block ----
+        if self.fcr_price_eur_per_mw_h is None:
+            price_hourly = [0.0] * len(ts)
+        else:
+            # ensure list of floats length == horizon
+            price_hourly = [float(x) for x in self.fcr_price_eur_per_mw_h]
+
+        block_price = {b: sum(price_hourly[b + k] for k in range(L)) for b in starts_idx}
+        m.fcr_block_price = pyo.Param(m.fcr_blocks, initialize=block_price, mutable=False)
+
+        # ---- Static plant-wide min/max electric power envelope (headroom/footroom) ----
+        max_cap = 0.0
+        min_cap = 0.0
+        if self.has_heatpump:
+            max_cap += float(m.dsm_blocks["heat_pump"].max_power)
+            min_cap += float(m.dsm_blocks["heat_pump"].min_power)
+        if self.has_heat_resistor:
+            max_cap += float(m.dsm_blocks["heat_resistor"].max_power)
+            min_cap += float(m.dsm_blocks["heat_resistor"].min_power)
+        if self.has_boiler:
+            boiler = self.components["boiler"]
+            if getattr(boiler, "fuel_type", None) == "electricity":
+                max_cap += float(m.dsm_blocks["boiler"].max_power)
+                min_cap += float(m.dsm_blocks["boiler"].min_power)
+        if self.has_thermal_storage:
+            max_cap += float(m.dsm_blocks["thermal_storage"].max_Pelec)
+            min_cap += 0.0
+            # st_comp = self.components["thermal_storage"]
+            # if getattr(st_comp, "storage_type", "").lower() == "short-term_with_generator":
+                # ts_blk = m.dsm_blocks["thermal_storage"]
+                # # max electric input capability of the storage’s generator
+                # if hasattr(ts_blk, "max_power"):
+                #     max_cap += float(ts_blk.max_power)
+                # # if you modeled a minimum electric input, include it (else assume 0)
+                # if hasattr(ts_blk, "min_power"):
+                #     min_cap += float(ts_blk.min_power)
+                # else:
+                #     min_cap += 0.0
+
+        self.max_plant_capacity = max_cap
+        self.min_plant_capacity = min_cap
+
+        # ---- Variables: integerized capacities with 1 MW steps ----
+        M_blocks = int(math.ceil(max(1.0, max_cap) / step))  # conservative big-M
+        m.k_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.k_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.cap_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.cap_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.energy_cost = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.bid_up = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+        m.bid_dn = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+
+        @m.Constraint(m.fcr_blocks)
+        def cap_up_is_steps(mm, b):  return mm.cap_up[b] == step * mm.k_up[b]
+        @m.Constraint(m.fcr_blocks)
+        def cap_dn_is_steps(mm, b):  return mm.cap_dn[b] == step * mm.k_dn[b]
+
+        # activate counts only if bid is active; enforce min bid if active
+        @m.Constraint(m.fcr_blocks)
+        def up_count_active(mm, b):  return mm.k_up[b] <= M_blocks * mm.bid_up[b]
+        @m.Constraint(m.fcr_blocks)
+        def dn_count_active(mm, b):  return mm.k_dn[b] <= M_blocks * mm.bid_dn[b]
+        @m.Constraint(m.fcr_blocks)
+        def up_min_bid(mm, b):       return mm.cap_up[b] >= min_bid * mm.bid_up[b]
+        @m.Constraint(m.fcr_blocks)
+        def dn_min_bid(mm, b):       return mm.cap_dn[b] >= min_bid * mm.bid_dn[b]
+
+        # symmetric option (both directions equal & jointly on/off)
+        if self.fcr_symmetric:
+            @m.Constraint(m.fcr_blocks)
+            def sym_cap(mm, b):   return mm.cap_up[b] == mm.cap_dn[b]
+            @m.Constraint(m.fcr_blocks)
+            def sym_onoff(mm, b): return mm.bid_up[b] == mm.bid_dn[b]
+
+        # at most one direction per block for asymmetric product (relax/remove if market allows both)
+        if not self.fcr_symmetric:
+            @m.Constraint(m.fcr_blocks)
+            def one_dir(mm, b): return mm.bid_up[b] + mm.bid_dn[b] <= 1
+
+        # ---- Feasibility across all hours inside each 4h block ----
+        m.fcr_up_feas   = pyo.ConstraintList()
+        m.fcr_down_feas = pyo.ConstraintList()
+        for b in starts_idx:
+            for k in range(L):
+                t = b + k
+                # up: need headroom; down: need footroom
+                m.fcr_up_feas.add(   m.cap_up[b]   <= self.max_plant_capacity - m.total_power_input[t] )
+                m.fcr_down_feas.add( m.cap_dn[b]   <= m.total_power_input[t] - self.min_plant_capacity )
+
+
+        @ m.Expression()
+        def fcr_revenue(mm):
+            if self.fcr_symmetric:
+                # up==down enforced elsewhere; pay once per MW of symmetric capacity
+                return sum(mm.fcr_block_price[b] * mm.cap_up[b] for b in mm.fcr_blocks)
+            else:
+                # asymmetric: sum the two capacities, constraints will force one to zero if needed
+                return (
+                    sum(mm.fcr_block_price[b] * mm.cap_up[b]   for b in mm.fcr_blocks) +
+                    sum(mm.fcr_block_price[b] * mm.cap_dn[b]   for b in mm.fcr_blocks)
+                )
+
 
     ################### PLOT #######################
     def plot(self, instance, save_path=None, show=True):
@@ -572,6 +716,297 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         if save_path:
             csv_path = save_path.rsplit(".", 1)[0] + ".csv"
             df.to_csv(csv_path, index=False)
+
+
+    def plot_2(self, instance, save_path=None, show=True):
+        """
+        Three-panel figure:
+        1) Unit inputs (electric & fossil) + energy prices (twin y-axis)
+        2) TES operation (charge, discharge, SOC)
+        3) FCR market view (per 4h block): capacities (up/down or symmetric), block price,
+            and operational baseline & headroom/footroom for feasibility context
+
+        Presence-aware: draws only what exists in `instance`.
+        Also writes a CSV next to the figure if `save_path` is given.
+        """
+
+        # ------- style -------
+        mpl.rcParams.update({
+            "font.size": 13, "font.family": "serif",
+            "axes.titlesize": 15, "axes.labelsize": 13,
+            "legend.fontsize": 12, "lines.linewidth": 2,
+            "axes.grid": True, "grid.linestyle": "--",
+            "grid.alpha": 0.7, "figure.dpi": 120
+        })
+
+        T = list(instance.time_steps)
+
+        # ------- helpers -------
+        def safe_value(v):
+            try:
+                return float(pyo.value(v))
+            except Exception:
+                return float(v) if v is not None else 0.0
+
+        def series_or_none(block, name):
+            if block is None or not hasattr(block, name):
+                return None
+            return [safe_value(getattr(block, name)[t]) for t in instance.time_steps]
+
+        def plot_if_nonzero(ax, x, y, label, color, style="-", eps=1e-9):
+            if y is None:
+                return None
+            if any(abs(v) > eps for v in y):
+                return ax.plot(x, y, label=label, color=color, linestyle=style)[0]
+            return None
+
+        def stairs_from_blocks(block_starts, per_block_values, block_len, horizon_len):
+            """
+            Expand block-level value (constant over 4h) to hourly stair array (len=horizon_len).
+            block_starts: iterable of integer start indices
+            per_block_values: dict {b -> value}
+            Returns: list[float] of length horizon_len
+            """
+            y = [0.0] * horizon_len
+            for b in block_starts:
+                val = safe_value(per_block_values.get(b, 0.0))
+                for k in range(block_len):
+                    idx = b + k
+                    if 0 <= idx < horizon_len:
+                        y[idx] = val
+            return y
+
+        # ------- blocks -------
+        B = instance.dsm_blocks
+        hp = B["heat_pump"] if "heat_pump" in B else None
+        hr = B["heat_resistor"] if "heat_resistor" in B else None
+        br = B["boiler"] if "boiler" in B else None
+        ts = B["thermal_storage"] if "thermal_storage" in B else None
+        pv = B["pv_plant"] if "pv_plant" in B else None
+
+        # ------- unit inputs -------
+        hp_P = series_or_none(hp, "power_in")    # MW_e
+        hr_P = series_or_none(hr, "power_in")    # MW_e
+        eb_P = series_or_none(br, "power_in")    # MW_e (if e-boiler)
+        br_Q = series_or_none(br, "heat_out")    # MW_th (boiler heat)
+        br_NG = series_or_none(br, "natural_gas_in")
+        br_H2 = series_or_none(br, "hydrogen_in")
+        br_CO = series_or_none(br, "coal_in")
+
+        pv_P = series_or_none(pv, "power")       # MW_e
+        grid = [safe_value(instance.grid_power[t]) for t in T] if hasattr(instance, "grid_power") else None
+
+        # TES
+        ts_ch  = series_or_none(ts, "charge")    # MW_th
+        ts_ds  = series_or_none(ts, "discharge") # MW_th
+        ts_soc = series_or_none(ts, "soc")       # MWh_th
+        ts_P   = series_or_none(ts, "power_in")  # MW_e (if generator mode)
+
+        # prices
+        elec_price = [safe_value(instance.electricity_price[t]) for t in T] if hasattr(instance, "electricity_price") else None
+        ng_price   = [safe_value(instance.natural_gas_price[t]) for t in T] if hasattr(instance, "natural_gas_price") else None
+        h2_price   = [safe_value(instance.hydrogen_price[t]) for t in T] if hasattr(instance, "hydrogen_price") else None
+
+        # baseline load and envelope (for FCR feasibility/impact visualization)
+        total_elec = [safe_value(instance.total_power_input[t]) for t in T] if hasattr(instance, "total_power_input") else None
+        max_cap = getattr(self, "max_plant_capacity", None)  # float or None
+        min_cap = getattr(self, "min_plant_capacity", 0.0)
+
+        # ------- figure -------
+        nrows = 3
+        fig, axs = plt.subplots(nrows, 1, figsize=(12, 10), sharex=True, constrained_layout=True)
+
+        # ---------- TOP: inputs + prices ----------
+        l_hpP = plot_if_nonzero(axs[0], T, hp_P, "Heat Pump Power [MWₑ]", "C1")
+        l_hrP = plot_if_nonzero(axs[0], T, hr_P, "Heat Resistor Power [MWₑ]", "C5")
+        l_ebP = plot_if_nonzero(axs[0], T, eb_P, "E-Boiler Power [MWₑ]", "C11")
+        l_tsP = plot_if_nonzero(axs[0], T, ts_P, "TES Heater Power [MWₑ]", "C19", "-.")
+
+        l_ng  = plot_if_nonzero(axs[0], T, br_NG, "Boiler NG [MWₜₕ]", "C2")
+        l_h2  = plot_if_nonzero(axs[0], T, br_H2, "Boiler H₂ [MWₜₕ]", "C3", "--")
+        l_co  = plot_if_nonzero(axs[0], T, br_CO, "Boiler Coal [MWₜₕ]", "C7", "-.")
+
+        l_pv  = plot_if_nonzero(axs[0], T, pv_P, "PV [MWₑ]", "C4")
+        l_gr  = plot_if_nonzero(axs[0], T, grid, "Grid Import [MWₑ]", "C0", ":")
+
+        axs[0].set_ylabel("Inputs")
+        axs[0].set_title("Unit Inputs & Energy Prices")
+        axs[0].grid(True, which="both", axis="both")
+
+        axp = axs[0].twinx()
+        lp = []
+        if elec_price:
+            lp += axp.plot(T, elec_price, label="Elec Price [€/MWhₑ]", color="C6", linestyle="--")
+        if ng_price:
+            lp += axp.plot(T, ng_price, label="NG Price [€/MWhₜₕ]", color="C8", linestyle=":")
+        if h2_price:
+            lp += axp.plot(T, h2_price, label="H₂ Price [€/MWhₜₕ]", color="C9", linestyle="-.")
+        axp.set_ylabel("Energy Price", color="gray")
+        axp.tick_params(axis="y", labelcolor="gray")
+
+        handles = [h for h in [l_hpP, l_hrP, l_ebP, l_tsP, l_ng, l_h2, l_co, l_pv, l_gr] if h is not None] + lp
+        if handles:
+            axs[0].legend(handles, [h.get_label() for h in handles], loc="upper left", frameon=True)
+
+        # ---------- MIDDLE: TES operation ----------
+        p0 = plot_if_nonzero(axs[1], T, ts_ch, "TES Charge [MWₜₕ]", "C2", "-")
+        p1 = plot_if_nonzero(axs[1], T, ts_ds, "TES Discharge [MWₜₕ]", "C3", "--")
+        if ts_soc and any(abs(v) > 1e-9 for v in ts_soc):
+            axs[1].fill_between(T, ts_soc, 0, color="C0", alpha=0.25, label="TES SOC [MWhₜₕ]")
+
+        axs[1].set_ylabel("MWₜₕ / MWhₜₕ")
+        axs[1].set_title("Thermal Storage Operation")
+        axs[1].grid(True, which="both", axis="both")
+        if any([p0, p1]):
+            axs[1].legend(loc="upper right", frameon=True)
+
+        # ---------- BOTTOM: FCR bids & impact ----------
+        # Draw only if the instance has the FCR constructs (prosumer mode)
+        fcr_present = hasattr(instance, "fcr_blocks")
+        fcr_len = getattr(self, "_FCR_BLOCK_LENGTH", 4)
+
+        fcr_cap_up_stairs = fcr_cap_dn_stairs = fcr_price_stairs = None
+        fcr_blocks_list = []
+        block_price_map = {}
+        cap_up_map = {}
+        cap_dn_map = {}
+        y_up_map = {}
+        y_dn_map = {}
+
+        if fcr_present:
+            try:
+                fcr_blocks_list = list(instance.fcr_blocks)
+            except Exception:
+                fcr_blocks_list = []
+
+        if fcr_present and fcr_blocks_list:
+            # Build dicts of per-block values from instance
+            for b in fcr_blocks_list:
+                # capacities
+                if hasattr(instance, "cap_up"):
+                    cap_up_map[b] = safe_value(instance.cap_up[b])
+                if hasattr(instance, "cap_dn"):
+                    cap_dn_map[b] = safe_value(instance.cap_dn[b])
+                # on/off binaries (if present)
+                if hasattr(instance, "bid_up"):
+                    y_up_map[b] = int(round(safe_value(instance.bid_up[b])))
+                if hasattr(instance, "bid_dn"):
+                    y_dn_map[b] = int(round(safe_value(instance.bid_dn[b])))
+                # price per block
+                if hasattr(instance, "fcr_block_price"):
+                    block_price_map[b] = safe_value(instance.fcr_block_price[b])
+
+            # expand to hourly stairs for plotting
+            H = len(T)
+            fcr_cap_up_stairs = stairs_from_blocks(fcr_blocks_list, cap_up_map, fcr_len, H) if cap_up_map else None
+            fcr_cap_dn_stairs = stairs_from_blocks(fcr_blocks_list, cap_dn_map, fcr_len, H) if cap_dn_map else None
+            fcr_price_stairs  = stairs_from_blocks(fcr_blocks_list, block_price_map, fcr_len, H) if block_price_map else None
+
+            # baseline & envelope on same axis to see feasibility/impact
+            l_base = plot_if_nonzero(axs[2], T, total_elec, "Baseline Elec Load [MWₑ]", "C1", "-")
+            if max_cap is not None:
+                axs[2].plot(T, [max_cap]*len(T), label="Max Elec Capability [MWₑ]", color="C7", linestyle=":")
+            if min_cap is not None:
+                axs[2].plot(T, [min_cap]*len(T), label="Min Elec Capability [MWₑ]", color="C7", linestyle="--")
+
+            # FCR capacities as step-like curves (hourly stairs)
+            l_cu = plot_if_nonzero(axs[2], T, fcr_cap_up_stairs, "FCR Up Capacity [MW]", "C10", "-")
+            l_cd = plot_if_nonzero(axs[2], T, fcr_cap_dn_stairs, "FCR Down Capacity [MW]", "C12", "--")
+
+            axs[2].set_ylabel("MW / MWₑ")
+            axs[2].set_title("FCR Bids (4h Blocks) & Operational Impact")
+            axs[2].grid(True, which="both", axis="both")
+
+            # Block prices on twin axis
+            axp2 = axs[2].twinx()
+            lp2 = None
+            if fcr_price_stairs and any(abs(v) > 1e-9 for v in fcr_price_stairs):
+                lp2 = axp2.plot(T, fcr_price_stairs, label="FCR Block Price [€/MW per 4h]", color="C4", linestyle="-.")
+
+            axp2.set_ylabel("FCR Price", color="gray")
+            axp2.tick_params(axis="y", labelcolor="gray")
+
+            # Shade active blocks (if binaries exist), else shade nonzero capacity blocks
+            for b in fcr_blocks_list:
+                active = False
+                if y_up_map or y_dn_map:
+                    active = (y_up_map.get(b, 0) + y_dn_map.get(b, 0)) > 0
+                else:
+                    active = (cap_up_map.get(b, 0.0) > 0.0) or (cap_dn_map.get(b, 0.0) > 0.0)
+
+                if active:
+                    axs[2].axvspan(b, min(b + fcr_len, len(T)-1), color="k", alpha=0.05)
+
+            # legend
+            h2 = []
+            for h in [l_base, l_cu, l_cd]:
+                if h is not None:
+                    h2.append(h)
+            if max_cap is not None or min_cap is not None:
+                # add dummy handles from plotted lines already present
+                pass
+            if lp2:
+                h2.append(lp2[0])
+            if h2:
+                axs[2].legend([h.get_label() for h in h2], loc="upper left", frameon=True)
+
+        else:
+            # If no FCR present, show baseline anyway (useful sanity check)
+            _ = plot_if_nonzero(axs[2], T, total_elec, "Baseline Elec Load [MWₑ]", "C1", "-")
+            if max_cap is not None:
+                axs[2].plot(T, [max_cap]*len(T), label="Max Elec Capability [MWₑ]", color="C7", linestyle=":")
+            if min_cap is not None:
+                axs[2].plot(T, [min_cap]*len(T), label="Min Elec Capability [MWₑ]", color="C7", linestyle="--")
+            axs[2].set_ylabel("MW / MWₑ")
+            axs[2].set_title("Operational Baseline (No FCR structures on instance)")
+            axs[2].grid(True, which="both", axis="both")
+            axs[2].legend(loc="upper left", frameon=True)
+
+        axs[-1].set_xlabel("Time step")
+        fig.autofmt_xdate()  # if your time steps are datetime-indexed
+
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        if show:
+            plt.show()
+        plt.close(fig)
+
+        # -------- CSV export (includes FCR columns if present) --------
+        df = pd.DataFrame({
+            "t": T,
+            "HP Power [MW_e]": hp_P if hp_P else None,
+            "Resistor Power [MW_e]": hr_P if hr_P else None,
+            "E-Boiler Power [MW_e]": eb_P if eb_P else None,
+            "TES Heater Power [MW_e]": ts_P if ts_P else None,
+            "Boiler NG [MW_th]": br_NG if br_NG else None,
+            "Boiler H2 [MW_th]": br_H2 if br_H2 else None,
+            "Boiler Coal [MW_th]": br_CO if br_CO else None,
+            "PV [MW_e]": pv_P if pv_P else None,
+            "Grid Import [MW_e]": grid if grid else None,
+            "TES Charge [MW_th]": ts_ch if ts_ch else None,
+            "TES Discharge [MW_th]": ts_ds if ts_ds else None,
+            "TES SOC [MWh_th]": ts_soc if ts_soc else None,
+            "Elec Price [€/MWh_e]": elec_price if elec_price else None,
+            "NG Price [€/MWh_th]": ng_price if ng_price else None,
+            "H2 Price [€/MWh_th]": h2_price if h2_price else None,
+            "Total Elec Load [MW_e]": total_elec if total_elec else None,
+        })
+
+        # Add FCR hourly stairs if present
+        if fcr_present and fcr_blocks_list:
+            if fcr_cap_up_stairs:
+                df["FCR Up Cap [MW]"] = fcr_cap_up_stairs
+            if fcr_cap_dn_stairs:
+                df["FCR Down Cap [MW]"] = fcr_cap_dn_stairs
+            if fcr_price_stairs:
+                df["FCR Block Price [€/MW per 4h]"] = fcr_price_stairs
+
+        if save_path:
+            csv_path = save_path.rsplit(".", 1)[0] + ".csv"
+            df.to_csv(csv_path, index=False)
+
+
 
     def dashboard(
         self,
