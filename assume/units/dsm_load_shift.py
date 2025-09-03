@@ -787,7 +787,9 @@ class DSMFlex:
             html_path="./outputs/dashboard.html",
             sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
         )
-        # self.plot_2(instance, save_path=None, show=True)
+        self.plot(instance, save_path="./outputs/plot_1.png", show=False)
+        self.plot_2(instance, save_path="./outputs/plot_2.png", show=False)
+
         # After solve:
         blocks = list(instance.fcr_blocks)
         print("Block  Start  Up[MW]  Down[MW]  Price[€/MW per 4h]")

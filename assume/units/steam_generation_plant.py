@@ -152,7 +152,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             # ---- Built-in FCR configuration (hardcoded German FCR) ----
             # Active only if self.is_prosumer is True
             self.fcr_enabled = bool(self.is_prosumer)
-            self.fcr_symmetric = False          # set True if you want symmetric product by default
+            self.fcr_symmetric = True          # set True if you want symmetric product by default
             self._FCR_BLOCK_LENGTH = 4          # hours, fixed TSO blocks
             self._FCR_MIN_BID_MW   = 1.0        # minimum capacity per block
             self._FCR_STEP_MW      = 1.0        # increment: bids in integer MW
@@ -439,17 +439,6 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         if self.has_thermal_storage:
             max_cap += float(m.dsm_blocks["thermal_storage"].max_Pelec)
             min_cap += 0.0
-            # st_comp = self.components["thermal_storage"]
-            # if getattr(st_comp, "storage_type", "").lower() == "short-term_with_generator":
-                # ts_blk = m.dsm_blocks["thermal_storage"]
-                # # max electric input capability of the storage’s generator
-                # if hasattr(ts_blk, "max_power"):
-                #     max_cap += float(ts_blk.max_power)
-                # # if you modeled a minimum electric input, include it (else assume 0)
-                # if hasattr(ts_blk, "min_power"):
-                #     min_cap += float(ts_blk.min_power)
-                # else:
-                #     min_cap += 0.0
 
         self.max_plant_capacity = max_cap
         self.min_plant_capacity = min_cap
@@ -2064,7 +2053,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             fig_b.update_layout(title="Baseline Comparison (Economy & CO₂)")
             figs_cmp.append(fig_b)
 
-                    # ------------------------- PROSUMER / FCR ANALYTICS -------------------------
+        # ------------------------- PROSUMER / FCR ANALYTICS -------------------------
         figs_fcr = []
         if getattr(self, "is_prosumer", False) and hasattr(instance, "time_steps"):
             # Guard against missing FCR constructs
@@ -2139,7 +2128,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 fig_imp.add_trace(go.Scatter(x=T, y=base, name="Baseline load [MWₑ]", line=dict(color="grey")), secondary_y=False)
                 fig_imp.add_trace(go.Scatter(x=T, y=lower_up, name="Baseline−Up", line=dict(color="#d62728", width=0), showlegend=False), secondary_y=False)
                 fig_imp.add_trace(go.Scatter(x=T, y=base,     name="Up capacity band", fill="tonexty", mode="lines", line=dict(color="#d62728"), fillcolor="rgba(214,39,40,0.25)"), secondary_y=False)
-                fig_imp.add_trace(go.Scatter(x=T, y=upper_dn, name="Down capacity band", fill=None, mode="lines", line=dict(color="#2ca02c")), secondary_y=False)
+                fig_imp.add_trace(go.Scatter(x=T, y=upper_dn, name="Down capacity band", fill="tonexty", mode="lines", line=dict(color="#2ca02c")), secondary_y=False)
                 fig_imp.add_trace(go.Scatter(x=T, y=pr_stairs, name="Block price [€/MW per 4h]", line=dict(color="#9467bd", dash="dot")), secondary_y=True)
                 fig_imp.update_layout(title="FCR Impact: Capacity Bands around Baseline (red=UP, green=DOWN)", height=460)
                 fig_imp.update_yaxes(title_text="MW / MWₑ", secondary_y=False)

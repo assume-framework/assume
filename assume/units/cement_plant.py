@@ -150,7 +150,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 self.model.time_steps,
                 initialize={t: value for t, value in enumerate(self.hydrogen_price)},
             )
-        self.model.raw_meal_to_clinker_ratio = pyo.Param(initialize=1.55)
+        self.model.raw_meal_to_clinker_ratio = pyo.Param(initialize=1.6)
         self.model.co2_price = pyo.Param(
             self.model.time_steps,
             initialize={t: value for t, value in enumerate(self.co2_price)},
@@ -252,7 +252,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 # default WH params if not set externally
                 if not hasattr(self.model, "wh_per_t_clinker"):
                     self.model.wh_per_t_clinker = pyo.Param(
-                        initialize=0.22
+                        initialize=0.75
                     )  # [MWh_th/t]
                 if not hasattr(self.model, "wh_util_eff"):
                     self.model.wh_util_eff = pyo.Param(initialize=0.90)
