@@ -787,17 +787,8 @@ class DSMFlex:
             html_path="./outputs/dashboard.html",
             sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
         )
-        self.plot(instance, save_path="./outputs/plot_1.png", show=False)
-        self.plot_2(instance, save_path="./outputs/plot_2.png", show=False)
-
-        # After solve:
-        blocks = list(instance.fcr_blocks)
-        print("Block  Start  Up[MW]  Down[MW]  Price[€/MW per 4h]")
-        for b in blocks:
-            up   = float(pyo.value(instance.cap_up[b]))   if hasattr(instance, "cap_up") else 0.0
-            down = float(pyo.value(instance.cap_dn[b]))   if hasattr(instance, "cap_dn") else 0.0
-            price = float(pyo.value(instance.fcr_block_price[b])) if hasattr(instance, "fcr_block_price") else 0.0
-            print(f"{int(b):>5}  {int(b):>5}  {up:>6.1f}  {down:>7.1f}  {price:>10.1f}")
+        self.plot_1(instance, save_path="./outputs/plot_1.png", show=False)
+        # self.plot_2(instance, save_path="./outputs/plot_2.png", show=False)
 
 
     def determine_optimal_operation_with_flex(self):

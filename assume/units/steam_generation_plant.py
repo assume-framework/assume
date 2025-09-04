@@ -505,7 +505,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
 
     ################### PLOT #######################
-    def plot(self, instance, save_path=None, show=True):
+    def plot_1(self, instance, save_path=None, show=True):
         """
         Two-panel matplotlib figure:
         Top: unit inputs (electric & fossil) + energy prices (twin y-axis)
