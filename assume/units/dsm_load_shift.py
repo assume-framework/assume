@@ -770,10 +770,6 @@ class DSMFlex:
             index=self.index, value=opt_power_requirement
         )
 
-        self.total_cost = sum(
-            instance.variable_cost[t].value for t in instance.time_steps
-        )
-
         # Variable cost series
         variable_cost = [
             pyo.value(instance.variable_cost[t]) for t in instance.time_steps
@@ -787,8 +783,8 @@ class DSMFlex:
             html_path="./outputs/dashboard.html",
             sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
         )
-        self.plot_1(instance, save_path="./outputs/plot_1.png", show=False)
-        # self.plot_2(instance, save_path="./outputs/plot_2.png", show=False)
+        self.plot_1(instance, save_path="./outputs/plot_1.png", show=True)
+        self.plot_2(instance, save_path="./outputs/plot_2.png", show=False)
 
 
     def determine_optimal_operation_with_flex(self):
@@ -875,8 +871,6 @@ class DSMFlex:
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
         )
-        print(f"Total variable cost: {self.total_cost:.2f}")
-        # Extract power input for raw material mill, clinker system, and cement mill
 
     def switch_to_opt(self, instance):
         """

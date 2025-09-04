@@ -131,8 +131,8 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 storage_cfg["storage_schedule_profile"] = schedule_series
 
         # Add price forecasts
-        self.electricity_price = self.forecaster["electricity_price"]
-        self.electricity_price_flex = self.forecaster["electricity_price_flex"]
+        self.electricity_price = self.forecaster["DE_EHV_HV_1"]
+        self.electricity_price_flex = self.forecaster["SE1"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
             self.natural_gas_price = self.forecaster["natural_gas_price"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
@@ -358,6 +358,8 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 total_cost += m.dsm_blocks["heat_resistor"].operating_cost[t]
             if self.has_boiler:
                 total_cost += m.dsm_blocks["boiler"].operating_cost[t]
+            if self.has_thermal_storage:
+                total_cost += m.dsm_blocks["thermal_storage"].operating_cost[t]
             if self.has_pv and hasattr(m.dsm_blocks["pv_plant"], "operating_cost"):
                 total_cost += m.dsm_blocks["pv_plant"].operating_cost[
                     t
@@ -965,7 +967,6 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             df.to_csv(csv_path, index=False)
 
 
-
     def dashboard(
         self,
         instance,
@@ -1527,6 +1528,42 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 )
             fig_ts.update_layout(title="TES Operation", height=520)
             figs_tes.append(fig_ts)
+
+                    # ---------------- TES scatter analytics vs electricity price ----------------
+            if elec_price and ts_ch and ts_ds:
+                # Charge scatter (MW_th on x, €/MWh on y)
+                fig_chg_price = go.Figure()
+                fig_chg_price.add_trace(go.Scatter(
+                    x=ts_ch, y=elec_price,
+                    mode="markers",
+                    marker=dict(color="blue", size=6, opacity=0.6),
+                    name="Charge"
+                ))
+                fig_chg_price.update_layout(
+                    title="TES Charge vs. Electricity Price",
+                    xaxis_title="Charge Power [MWₜₕ]",
+                    yaxis_title="Electricity Price [€/MWhₑ]",
+                    height=400
+                )
+
+                # Discharge scatter (MW_th on x, €/MWh on y)
+                fig_dis_price = go.Figure()
+                fig_dis_price.add_trace(go.Scatter(
+                    x=ts_ds, y=elec_price,
+                    mode="markers",
+                    marker=dict(color="red", size=6, opacity=0.6),
+                    name="Discharge"
+                ))
+                fig_dis_price.update_layout(
+                    title="TES Discharge vs. Electricity Price",
+                    xaxis_title="Discharge Power [MWₜₕ]",
+                    yaxis_title="Electricity Price [€/MWhₑ]",
+                    height=400
+                )
+
+                # Add to figs for export
+                figs_tes.append(fig_chg_price)
+                figs_tes.append(fig_dis_price)
 
             # ---------------- TES EXTENDED KPIs & CO2 AVOIDANCE ----------------
             # Energy integrals

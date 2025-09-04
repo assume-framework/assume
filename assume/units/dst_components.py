@@ -838,7 +838,7 @@ class ThermalStorage(GenericStorage):
             bounds=(0, model_block.max_Pelec),
         )
         model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps, within=pyo.Reals
         )
 
         # --- Coupling & cost
@@ -1120,7 +1120,7 @@ class Electrolyser:
         )
         model_block.hydrogen_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps, within=pyo.Reals
         )
 
         # Efficiency constraint
@@ -1321,7 +1321,7 @@ class DRIPlant:
         model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.dri_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps, within=pyo.Reals
         )
 
         # Fuel consumption constraint
@@ -1544,7 +1544,7 @@ class ElectricArcFurnace:
         model_block.dri_input = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.steel_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps, within=pyo.Reals
         )
         model_block.co2_emission = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.lime_demand = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
@@ -1690,7 +1690,7 @@ class GrindingMill:
         )
         model_block.operating_hours = pyo.Var(self.time_steps, within=pyo.Binary)
         model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps, within=pyo.Reals
         )
 
         # Constraints
@@ -1884,7 +1884,7 @@ class Preheater:
         )
 
         model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps, within=pyo.Reals
         )
         model_block.co2_emission = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
@@ -2130,7 +2130,7 @@ class Calciner:
         model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
         model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps, within=pyo.Reals
         )
         model_block.co2_proc = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.co2_energy = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
@@ -2413,7 +2413,7 @@ class Kiln:
         model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
         model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.NonNegativeReals
+            self.time_steps, within=pyo.Reals
         )
         model_block.co2_energy = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
