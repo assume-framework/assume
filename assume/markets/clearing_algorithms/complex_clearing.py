@@ -200,7 +200,8 @@ def market_clearing_opt(
             for line in model.lines:
                 incidence_value = incidence_matrix.loc[node, line]
                 if incidence_value != 0:
-                    balance_expr += incidence_value * model.flows[t, line]
+                    # line exiting the node is subtracted, line entering the node is added
+                    balance_expr -= incidence_value * model.flows[t, line]
 
         return balance_expr == 0
 
