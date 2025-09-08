@@ -102,7 +102,7 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
-    "paper_plant_use_case": {
+    "steam_plant_use_case": {
         "scenario": "example_thermal_storage_economics",
         "study_case": "base",
     },
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "paper_plant_use_case"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
+    example = "steam_plant_use_case"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
