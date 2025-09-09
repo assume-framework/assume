@@ -29,12 +29,12 @@ potential for simulated electricity market agents to develop bidding strategies 
 before their introduction into real-world systems.
 
 In the current implementation of ASSUME, we model the electricity market as a partially observable Markov game,
-which is an extension of MDPs for multi-agent setups. Multi-agent DRL is understood as the simultaneous learning of multiple agents
+which is an extension of the Markov Decision Process for multi-agent setups. Multi-agent DRL is understood as the simultaneous learning of multiple agents
 interacting in the same environment. The Markov game for :math:`N` agents consists of a set of states :math:`S`, a set of actions :math:`A_1, \ldots, A_N`,
 a set of observations :math:`O_1, \ldots, O_N`, and a state transition function :math:`P: S \times A_1 \times \ldots \times A_N \rightarrow \mathcal{P}(S)` dependent on the state and actions of all agents.
 After taking action :math:`a_i \in A_i` in state :math:`s_i \in S` according to a policy :math:`\pi_i: O_i \rightarrow A_i`, every agent :math:`i` is transitioned into the new state :math:`s'_i \in S`.
 Each agent receives a reward :math:`r_i` according to the individual reward function :math:`R_i` and a private observation correlated with the state :math:`o_i: S \rightarrow O_i`.
-Like MDP, each agent :math:`i` learns an optimal policy :math:`\pi_i^*(s)` that maximizes its expected reward.
+Like in a Markov Decision Process, each agent :math:`i` learns an optimal policy :math:`\pi_i^*(s)` that maximizes its expected reward.
 
 To enable multi-agent learning some adjustments are needed within the learning algorithm to get from the TD3 to an MATD3 algorithm.
 Other authors used similar tweaks to improve the MADDPG algorithm and derive the MA-TD3 algorithm.
@@ -126,7 +126,8 @@ The actor policy of each agent is updated using the deterministic policy gradien
 The actor is updated similarly using only one critic network :math:`Q_{θ1}`. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the foregoing section.
 Please note that the actor and critics are updated by sampling experience from the buffer where all interactions of the agents are stored, namely the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :ref:`replay-buffer`.
 
-.. _learning_implemenation:
+.. _learning_implementation:
+
 The Learning Implementation in ASSUME
 =====================================
 

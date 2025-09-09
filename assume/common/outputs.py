@@ -43,9 +43,9 @@ class WriteOutput(Role):
         simulation_id (str): The ID of the simulation as a unique classifier.
         start (datetime.datetime): The start datetime of the simulation run.
         end (datetime.datetime): The end datetime of the simulation run.
+        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files.
         db_uri: The uri of the database engine. Defaults to ''.
         export_csv_path (str, optional): The path for exporting CSV files, no path results in not writing the csv. Defaults to "".
-        save_frequency_hours (int): The frequency in hours for storing data in the db and/or csv files. Defaults to 48 hours.
         outputs_buffer_size_mb (int, optional): The maximum storage size (in MB) for storing output data before saving it. Defaults to 300 MB.
         learning_mode (bool, optional): Indicates if the simulation is in learning mode. Defaults to False.
         evaluation_mode (bool, optional): Indicates if the simulation is in evaluation mode. Defaults to False.
@@ -57,9 +57,9 @@ class WriteOutput(Role):
         simulation_id: str,
         start: datetime,
         end: datetime,
+        save_frequency_hours,
         db_uri="",
         export_csv_path: str = "",
-        save_frequency_hours: int = 48,
         outputs_buffer_size_mb: int = 300,
         learning_mode: bool = False,
         evaluation_mode: bool = False,
@@ -154,7 +154,7 @@ class WriteOutput(Role):
             if table_name == "spatial_ref_sys":
                 continue
             # only delete rl_params and rl_meta during the first episode of learning
-            if table_name in ["rl_params", "rl_meta"] and not (
+            if table_name in ["rl_params", "rl_grad_params", "rl_meta"] and not (
                 self.learning_mode and self.episode == 1
             ):
                 continue
@@ -231,7 +231,7 @@ class WriteOutput(Role):
             "market_dispatch",
             "unit_dispatch",
             "rl_params",
-            "rl_critic_params",
+            "rl_grad_params",
         ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
@@ -265,16 +265,21 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
-        # Add missing rl_critic_params columns in case of initial_exploration
-        required_columns = [
-            "critic_loss",
-            "total_grad_norm",
-            "max_grad_norm",
-            "learning_rate",
-        ]
-        for col in required_columns:
-            if col not in df.columns:
-                df[col] = np.nan
+
+        return df
+
+    def convert_rl_grad_params(self, rl_grad_params: list[dict]):
+        """
+        Convert the RL (actor-critic) parameters for each gradient step to a dataframe.
+
+        Args:
+            rl_grad_params (dict): The RL parameters per gradient step.
+        """
+
+        df = pd.DataFrame.from_records(rl_grad_params, index="step")
+        df["simulation"] = self.simulation_id
+        df["evaluation_mode"] = self.evaluation_mode
+        df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
 
         return df
 
@@ -443,22 +448,6 @@ class WriteOutput(Role):
         if not self.db and not self.export_csv_path:
             return
 
-        # If both rl_critic_params and rl_params exist, merge them before uploading to db
-        if (
-            "rl_params" in self.write_buffers
-            and "rl_critic_params" in self.write_buffers
-        ):
-            df1 = pd.DataFrame(self.write_buffers["rl_params"])
-            df2 = pd.DataFrame(self.write_buffers["rl_critic_params"])
-            merged_df = pd.merge(df1, df2, how="outer")
-            merged_list = merged_df.to_dict("records")
-            self.write_buffers["rl_params"] = merged_list
-            del self.write_buffers["rl_critic_params"]
-        # elif only rl_critic_params exist, rename them to rl_params
-        elif "rl_critic_params" in self.write_buffers:
-            self.write_buffers["rl_params"] = self.write_buffers["rl_critic_params"]
-            del self.write_buffers["rl_critic_params"]
-
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:
                 continue
@@ -479,6 +468,8 @@ class WriteOutput(Role):
                         df = self.convert_unit_dispatch(data_list)
                     case "rl_params":
                         df = self.convert_rl_params(data_list)
+                    case "rl_grad_params":
+                        df = self.convert_rl_grad_params(data_list)
                     case "rl_meta":
                         df = pd.DataFrame(data_list)
                     case "grid_flows":
@@ -508,6 +499,8 @@ class WriteOutput(Role):
 
             # check for tensors and convert them to floats
             df = df.apply(convert_tensors)
+            # sort dataframes by column names for consistent CSVs
+            df = df.reindex(sorted(df.columns), axis=1)
 
             # check for any float64 columns and convert them to floats
             df = df.map(lambda x: float(x) if isinstance(x, np.float64) else x)

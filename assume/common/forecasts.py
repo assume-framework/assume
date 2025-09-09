@@ -822,7 +822,9 @@ class NaiveForecast(Forecaster):
 
         """
 
-        if "availability" in column:
+        if column in self.data_dict.keys():
+            return self.data_dict[column]
+        elif "availability" in column:
             return self.availability
         elif column == "fuel_price_co2":
             return self.co2_price
@@ -832,7 +834,5 @@ class NaiveForecast(Forecaster):
             return self.demand
         elif column == "price_EOM":
             return self.price_forecast
-        elif column in self.data_dict.keys():
-            return self.data_dict[column]
         else:
             return FastSeries(value=0.0, index=self.index)

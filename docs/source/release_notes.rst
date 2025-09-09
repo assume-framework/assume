@@ -2,9 +2,9 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-#######################
+#############
 Release Notes
-#######################
+#############
 
 Upcoming Release
 ================
@@ -12,12 +12,37 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+0.5.5 - (13th August 2025)
+=======================
+
 **New Features:**
 
-- **ThermalStorage with Scheduling:** Introduced a `ThermalStorage` class that extends `GenericStorage` to support both short-term (freely cycling) and long-term (schedule-driven) storage operation. Long-term mode allows users to define a binary schedule to restrict charging and discharging to specific periods, enabling realistic modeling of industrial or seasonal thermal storage behavior.
-  - To use this feature, set `storage_type` to `"long-term"` and provide a `storage_schedule_profile` (0: charging allowed, 1: discharging allowed).
-  - Hydrogen fuel type included for the Boiler
+- **Realtime simulation**: A simulation which runs in real-time instead of simulation time can be created and used for hardware-in-the-loop with real assets. Manual configuration of the agents is required for this.
+
+**Improvements:**
+
+- **Changed Logging for DRL metrics**: TensorBoard logging was restructured to separate metrics collected per gradient step and per simulation time step. This avoids unnecessary padding, ensures consistency, and prevents data loss across different logging frequencies.
+- **Improve checking for available solvers**: Defines the list of available solvers only once
+- **More notebooks in CI**: add notebook 10 to CI for functional validation of Demand-Side-Units (DSU).
+- **Correctly suppress highs output for linopy**: this fixes an error when running the redispatch market clearing on Google collab
+- **Add JOSS paper**
+- **Pin pip-tools to fix the docker build**
+- **Additional learning strategy for renewables**: Introduced a new learning strategy specifically designed for renewable energy sources. Most of the functionalities can just be inherited, we chose to add the availability of the unit into the individual observations and calculate the opportunity costs based on the available generation as well.
+- **Actor Output Clamping:** The action outputs of the actor neural network + noise are now always clamped to the valid output range, which is dynamically determined based on the actor architecture and its activation function. This prevents exploration noise from pushing actions outside the achievable output space of the actor, ensuring that bids remain within the intended limits.
+
+0.5.4 - (9th July 2025)
+=======================
+
+**New Features:**
+
+- **ThermalStorage with Scheduling:** Introduced a `ThermalStorage` class that extends `GenericStorage` to support both short-term (freely cycling) and long-term (schedule-driven) storage operation. Long-term mode allows users to define a binary schedule to restrict charging and discharging to specific periods, enabling realistic modeling of industrial or seasonal thermal storage behavior. To use this feature, set `storage_type` to `"long-term"` and provide a `storage_schedule_profile` (0: charging allowed, 1: discharging allowed). Hydrogen fuel type included for the Boiler
 - **Hydrogen_plant:** The HydrogenPlant master class has been refactored for modularity. Technologies such as the electrolyser and (optionally) the SeasonalHydrogenStorage are now connected in a flexible manner, supporting both per-timestep and cumulative hydrogen demand balancing. The plant model now robustly accommodates both storage and non-storage configurations, ensuring correct mass balances across all scenarios.
+- **Steam Generation Plant:** Introduced a 'SteamGenerationPlant' class to model steam generation processes. This class supports both electric and thermal inputs, allowing for flexible operation based on available resources. The plant can be configured with various components, such as heat pumps and boilers, to optimize steam production.
+- **New Demand Side Flexibility Measure** Implemented 'symmetric_flexible_block' flexibility measure for demand side units. This measure allows users to define a symmetric block of flexibility, enabling to construct a load profile based on which the block bids for CRM amrket can be formulated.
+- **Positive and Negative Flexibility for DSM Units** Introduced the bidding strategies 'DSM_PosCRM_Strategy' and 'DSM_PosCRM_Strategy' to define positive and negative flexibility for demand side management (DSM) units. This feature allows users to participate DSM units in a Control Reserve Market (CRM).
+- **Electricity price signal based Flexibility Signal for DSM**: Implemented'electricity_price_signal' flexibility measure for demand side units, Thus measure allows to shift the load based on the electricity price signal, enabling users to perform this operation based on a reference load profile.
+- **Documentation**: Fullscale DSM Tutorial and adjusted learning tutorials to include new bidding strategy and one particularly for storages.
+- **New Redispatch Tutorial**: Provide a new tutorial referencing ongoing dveelopment on an extra branch.
 
 **Improvements:**
 
@@ -26,15 +51,20 @@ Upcoming Release
   - Tests verify economic cycling (charging at low price, discharging at high price), round-trip efficiency, and no simultaneous charge/discharge.
 - **SeasonalHydrogenStorage:** The framework of SeasonalHydrogenStorage is now consistent with the framework of Thermal storage.
 - **Refactored Learning Strategies:** Much of the code for generating observations and actions was redundant across different unit types. This redundancy has been removed by introducing the function in the common base class, making it easier to extend the learning strategies in the future. As a result, new functions such as `get_individual_observations`, which are specific to each unit type, have been added.
+- **Change energy_cost Observation in Storage Learning:**  The cost of stored energy for the learning storage is now tracked solely based on acquisition cost while charging, independent of discharging revenues. This change prevents negative cost values, ensures a consistent economic interpretation of stored energy, and improves the guiding properties of the observations of reinforcement learning according to shap value experiments.
+    Marginal costs are now included as well. Storage marginal costs currently only consist of additional charge or discharge costs, e.g. to include fixed volumetric grid fees. Revising and comparing the mc logic to the Powerplant implementation resulted in removing the efficiency correction factor of the additional costs for consistency.
+- **Component connection in hydrogen plant:** Fixed a bug regarding the connection of the components in the hydrogen plant.
+
 
 **Bug Fixes:**
 
 - **Correct Schedule Enforcement in ThermalStorage:** Fixed an error in the schedule constraint logic for long-term storage. The model now strictly enforces that charging and discharging can only occur during their respective scheduled periods.
 - **Initial SOC Bug:** Fixed a bug where the initial SOC could be ignored or set to an unintended value by the solver. The initial SOC is now always fixed at model initialization.
 - **Boiler Upper Bound:** Added a missing upper bound constraint to `natural_gas_in` in the `Boiler` component to ensure that the fuel input never exceeds the specified maximum power. This change prevents the solver from assigning unphysical input values and brings consistency with the handling of other fuel types.
+- **Missing init:** Steam generation plant and CRM bidding strategies for dsm was missing in 'init'.
 
-0.5.3 - (13th May 2025)
-=========================
+0.5.3 - (4th June 2025)
+=======================
 
 **New Features:**
 

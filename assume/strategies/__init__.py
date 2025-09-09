@@ -19,6 +19,8 @@ from assume.strategies.naive_strategies import (
     NaiveSingleBidStrategy,
     NaiveExchangeStrategy,
     ElasticDemandStrategy,
+    DSM_PosCRM_Strategy,
+    DSM_NegCRM_Strategy,
 )
 from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
@@ -41,6 +43,8 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "flexable_eom_storage": flexableEOMStorage,
     "flexable_neg_crm_storage": flexableNegCRMStorage,
     "flexable_pos_crm_storage": flexablePosCRMStorage,
+    "pos_crm_dsm": DSM_PosCRM_Strategy,
+    "neg_crm_dsm": DSM_NegCRM_Strategy,
     "naive_redispatch": NaiveRedispatchStrategy,
     "naive_da_dsm": NaiveDADSMStrategy,
     "naive_redispatch_dsm": NaiveRedispatchDSMStrategy,
@@ -54,12 +58,14 @@ try:
         RLStrategy,
         RLStrategySingleBid,
         StorageRLStrategy,
-        RLStrategyDAM
+        RenewableRLStrategy,
+        RLStrategyDAM,
     )
 
     bidding_strategies["pp_learning"] = RLStrategy
     bidding_strategies["pp_learning_single_bid"] = RLStrategySingleBid
     bidding_strategies["storage_learning"] = StorageRLStrategy
+    bidding_strategies["renewable_eom_learning"] = RenewableRLStrategy
     bidding_strategies["pp_learning_dam"] = RLStrategyDAM
 
 except ImportError:

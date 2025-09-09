@@ -99,7 +99,10 @@ def test_learning_strategies_parametrized(
 
     # Check if observation dimension is set accordingly and follows current default structure
     first_observation = strategy.create_observation(
-        power_plant, mc.market_id, product_index[0]
+        power_plant,
+        mc.market_id,
+        product_index[0],
+        product_index[0] + pd.Timedelta(hours=1),
     )
     assert len(first_observation) == obs_dim
     assert (

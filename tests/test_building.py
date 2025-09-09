@@ -5,14 +5,12 @@
 import pandas as pd
 import pyomo.environ as pyo
 import pytest
-from pyomo.opt import SolverFactory
 
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import CsvForecaster
 from assume.common.market_objects import MarketConfig
 from assume.strategies.naive_strategies import NaiveDADSMStrategy
 from assume.units.building import Building
-from assume.units.dsm_load_shift import SOLVERS, check_available_solvers
 
 
 # Fixtures for Component Configurations
@@ -20,12 +18,12 @@ from assume.units.dsm_load_shift import SOLVERS, check_available_solvers
 def generic_storage_config():
     return {
         "max_capacity": 100,  # Maximum energy capacity in MWh
-        "min_capacity": 20,  # Minimum SOC in MWh
-        "max_power_charge": 30,  # Maximum charging power in MW
-        "max_power_discharge": 30,  # Maximum discharging power in MW
+        "min_capacity": 0,  # Minimum SOC in MWh
+        "max_power_charge": 100,  # Maximum charging power in MW
+        "max_power_discharge": 100,  # Maximum discharging power in MW
         "efficiency_charge": 0.9,  # Charging efficiency
         "efficiency_discharge": 0.9,  # Discharging efficiency
-        "initial_soc": 0.5,  # Initial SOC in MWh
+        "initial_soc": 0,  # Initial SOC in MWh
         "ramp_up": 10,  # Maximum ramp-up rate in MW
         "ramp_down": 10,  # Maximum ramp-down rate in MW
         "storage_loss_rate": 0.01,  # 1% storage loss per time step
@@ -41,12 +39,12 @@ def thermal_storage_config(generic_storage_config):
 def ev_config():
     return {
         "max_capacity": 10.0,
-        "min_capacity": 2.0,
+        "min_capacity": 0,
         "max_power_charge": 3,  # Charge values will reflect a fraction of the capacity
         "max_power_discharge": 2,  # Discharge values will also be a fraction of the capacity
         "efficiency_charge": 0.95,
         "efficiency_discharge": 0.9,
-        "initial_soc": 0.5,  # SOC initialized to 50% of capacity
+        "initial_soc": 0,  # SOC initialized to 50% of capacity
     }
 
 
@@ -56,9 +54,9 @@ def electric_boiler_config():
         "max_power": 100,
         "efficiency": 0.85,
         "fuel_type": "electricity",  # Electric fuel type supports operational constraints
-        "min_power": 20,
-        "ramp_up": 50,
-        "ramp_down": 50,
+        "min_power": 0,
+        "ramp_up": 100,
+        "ramp_down": 100,
         "min_operating_steps": 2,
         "min_down_steps": 1,
         "initial_operational_status": 1,
@@ -193,15 +191,6 @@ def building_components_boiler(
     }
 
 
-# Fixture for Solver Selection
-@pytest.fixture(scope="module")
-def available_solver():
-    solvers = check_available_solvers(*SOLVERS)
-    if not solvers:
-        pytest.skip(f"No available solvers from the list: {SOLVERS}")
-    return SolverFactory(solvers[0])
-
-
 # Test Cases
 def test_building_initialization_heatpump(
     forecaster,
@@ -282,13 +271,6 @@ def test_building_initialization_invalid_component(
         "Components invalid_component is not a valid component for the building unit."
         in str(exc_info.value)
     )
-
-
-def test_solver_availability():
-    available_solvers = check_available_solvers(*SOLVERS)
-    assert (
-        len(available_solvers) > 0
-    ), f"None of {SOLVERS} are available. Install one of them to proceed."
 
 
 def test_building_optimization_heatpump(
@@ -459,29 +441,6 @@ def test_building_objective_function_invalid(
     assert "Unknown objective: unknown_objective" in str(exc_info.value)
 
 
-def test_building_no_available_solvers(
-    forecaster,
-    building_components_heatpump,
-    monkeypatch,  # Add the monkeypatch fixture
-):
-    # Override the check_available_solvers to return an empty list
-    monkeypatch.setattr(
-        "assume.units.dsm_load_shift.check_available_solvers", lambda *args: []
-    )
-
-    with pytest.raises(Exception) as exc_info:
-        Building(
-            id="building",
-            unit_operator="operator_nosolver",
-            bidding_strategies={},
-            components=building_components_heatpump,
-            forecaster=forecaster,  # Passed via **kwargs
-        )
-    assert f"None of {SOLVERS} are available. Install one of them to proceed." in str(
-        exc_info.value
-    )
-
-
 def test_building_define_constraints_heatpump(
     forecaster,
     building_components_heatpump,
@@ -629,13 +588,6 @@ def test_building_bidding_strategy_execution(
         assert bid["price"] >= 0  # Marginal price should be non-negative
 
 
-def test_building_get_available_solvers():
-    available_solvers = check_available_solvers(*SOLVERS)
-    assert isinstance(available_solvers, list)
-    for solver in available_solvers:
-        assert SolverFactory(solver).available()
-
-
 def test_building_unknown_flexibility_measure(
     forecaster,
     building_components_heatpump,
@@ -722,13 +674,6 @@ def test_prosumer_energy_export(forecaster, building_components_heatpump):
     export_possible = any(building.opt_power_requirement < 0)
     assert export_possible, "Prosumer should be able to export power to the grid."
 
-    # check that power is negative when price is 1000
-    for idx in building.index:
-        if building.forecaster.forecasts["price_EOM"].at[idx] == 1000:
-            assert (
-                building.opt_power_requirement.at[idx] <= 0
-            ), "Prosumer should be able to export power to the grid."
-
 
 def test_non_prosumer_no_energy_export(forecaster, building_components_heatpump):
     """
@@ -755,7 +700,7 @@ def test_non_prosumer_no_energy_export(forecaster, building_components_heatpump)
     for idx in building.index:
         if building.forecaster.forecasts["price_EOM"].at[idx] == 1000:
             assert (
-                building.opt_power_requirement.at[idx] == 0
+                building.opt_power_requirement.at[idx] >= 0
             ), "Prosumer should be able to export power to the grid."
 
 

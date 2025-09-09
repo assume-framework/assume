@@ -130,6 +130,10 @@ class MLPActor(Actor):
         # Initialize weights
         self._init_weights()
 
+        # call forward pass with high obs value array to get max value of output layer
+        self.max_output = self.forward(th.ones(obs_dim, dtype=float_type) * 1000)
+        self.min_output = self.forward(th.ones(obs_dim, dtype=float_type) * -1000)
+
     def _init_weights(self):
         """Apply Xavier initialization to all layers."""
 
@@ -222,6 +226,10 @@ class LSTMActor(Actor):
                 self.timeseries_len * 16 + unique_obs_dim, 128, dtype=float_type
             )
             self.FC2 = nn.Linear(128, act_dim, dtype=float_type)
+
+        # call forward pass with high obs value array to get max value of output layer
+        self.max_output = self.forward(th.ones(obs_dim, dtype=float_type) * 1000)
+        self.min_output = self.forward(th.ones(obs_dim, dtype=float_type) * -1000)
 
     def forward(self, obs):
         if obs.dim() not in (1, 2):
