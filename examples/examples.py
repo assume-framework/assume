@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 # define the path where the simulation results in form of CSV files will be stored, for example: "examples/outputs"
 # "" means no CSV files will be stored
-csv_path = ""
+csv_path = "examples/outputs"
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "steam_plant_use_case"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
+    example = "use_case_O45strom"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
