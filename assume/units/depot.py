@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 
 
 class BusDepot(DSMFlex, SupportsMinMax):
+    # Unified Big-M and epsilon values for consistency
+    BIG_M = 1e6
+    EPSILON = 1e-3
     """
     Represents a bus depot managing multiple electric vehicle (EV) buses and charging stations.
     This agent optimizes bus charging schedules based on electricity price, grid demand, and available flexibility.
@@ -106,6 +109,23 @@ class BusDepot(DSMFlex, SupportsMinMax):
         self.cost_tolerance = cost_tolerance
         self.flexibility_measure = flexibility_measure
 
+        if self.is_prosumer:
+            # ---- Built-in FCR configuration (hardcoded German FCR) ----
+            # Active only if self.is_prosumer is True
+            self.fcr_enabled = bool(self.is_prosumer)
+            self.fcr_symmetric = False          # set True if you want symmetric product by default
+            self._FCR_BLOCK_LENGTH = 1         # hours, fixed TSO blocks
+            self._FCR_MIN_BID_MW   = 0.01        # minimum capacity per block
+            self._FCR_STEP_MW      = 0.01        # increment: bids in integer MW
+            # expected FCR value (€/MW/h) as hourly series; if not provided, assume zeros
+            try:
+                self.fcr_price_eur_per_mw_h = self.forecaster["fcr_price"]
+            except KeyError:
+                self.fcr_price_eur_per_mw_h = None
+        
+        # Helper method for safe EV property access
+        self._ev_cache = {}
+
         # Fetch electricity price forecast
         try:
             self.electricity_price = self.forecaster["electricity_price"]
@@ -116,6 +136,16 @@ class BusDepot(DSMFlex, SupportsMinMax):
         self.congestion_signal = self.forecaster["congestion_signal"]
         self.renewable_utilisation_signal = self.forecaster["RE_availability"]
         self.unidirectional_load = self.forecaster["unidirectional_load"]
+        
+        # Emergency signal and incentive for objective function calculation
+        try:
+            self.emergency_signal = self.forecaster["emergency_signal"]
+            self.incentive = self.forecaster["incentive"]
+        except KeyError:
+            # Default values if not provided in forecaster
+            self.emergency_signal = [0] * len(self.electricity_price)
+            self.incentive = [50] * len(self.electricity_price)
+        
         self.congestion_threshold = congestion_threshold
         self.peak_load_cap = peak_load_cap
 
@@ -170,8 +200,75 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 cs_config.pop("availability_profile", None)
                 cs_config.pop("charging_profile", None)  # Just in case
 
+        # Build EV property cache for efficient access
+        self._build_ev_cache()
+        self.is_prosumer = str_to_bool(is_prosumer)
+
+        if self.is_prosumer:
+            # ---- Built-in FCR configuration (hardcoded German FCR) ----
+            # Active only if self.is_prosumer is True
+            self.fcr_enabled = bool(self.is_prosumer)
+            self.fcr_symmetric = False          # set True if you want symmetric product by default
+            self._FCR_BLOCK_LENGTH = 1          # hours, fixed TSO blocks
+            self._FCR_MIN_BID_MW   = 0.01        # minimum capacity per block
+            self._FCR_STEP_MW      = 0.01        # increment: bids in integer MW
+            # expected FCR value (€/MW/h) as hourly series; if not provided, assume zeros
+            self.fcr_price_eur_per_mw_h = self.forecaster["fcr_price"]
+        
         # Setup the Pyomo model after configuration is complete
         self.setup_model(presolve=True)
+    
+    def _build_ev_cache(self):
+        """Build cache of EV properties for efficient access"""
+        for ev_key in self.components:
+            if ev_key.startswith("electric_vehicle"):
+                ev_config = self.components[ev_key]
+                self._ev_cache[ev_key] = {
+                    'power_flow_directionality': ev_config.get('power_flow_directionality', 'unidirectional'),
+                    'is_prosumer_capable': self.is_prosumer  # Use depot-level prosumer status
+                }
+    
+    def get_ev_property(self, ev_key: str, property_name: str, default_value=None):
+        """Helper function to safely get EV properties from cache"""
+        if ev_key in self._ev_cache:
+            return self._ev_cache[ev_key].get(property_name, default_value)
+        return default_value
+    
+    def _build_compatibility_matrix(self):
+        """
+        Build compatibility matrix based on power flow directionality.
+        Rules:
+        - Bidirectional EV can ONLY connect to bidirectional CS
+        - Unidirectional EV can ONLY connect to unidirectional CS
+        """
+        compatibility_init = {}
+        
+        for ev in self.model.evs:
+            ev_directionality = self.get_ev_property(ev, 'power_flow_directionality', 'unidirectional')
+            
+            for cs in self.model.charging_stations:
+                cs_component = self.components.get(cs, {})
+                
+                # Handle both dict and object cases
+                if isinstance(cs_component, dict):
+                    cs_directionality = cs_component.get('power_flow_directionality', 'unidirectional')
+                elif hasattr(cs_component, 'power_flow_directionality'):
+                    cs_directionality = cs_component.power_flow_directionality
+                else:
+                    cs_directionality = 'unidirectional'
+                
+                # Compatibility rule: EV and CS must have same directionality
+                is_compatible = 1 if ev_directionality == cs_directionality else 0
+                compatibility_init[(ev, cs)] = is_compatible
+        
+        # Add compatibility parameter to model
+        self.model.compatible = pyo.Param(
+            self.model.evs,
+            self.model.charging_stations,
+            initialize=compatibility_init,
+            within=pyo.Binary,
+            doc="Power flow directionality compatibility: 1 if EV-CS compatible, 0 otherwise",
+        )
 
     def define_variables(self):
         """
@@ -183,6 +280,7 @@ class BusDepot(DSMFlex, SupportsMinMax):
         Both variables are defined over the `time_steps` set and are continuous real numbers.
         """
         self.model.total_power_input = pyo.Var(self.model.time_steps, within=pyo.Reals)
+        self.model.total_power_output = pyo.Var(self.model.time_steps, within=pyo.Reals)
         self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.Reals)
         self.model.variable_rev = pyo.Var(self.model.time_steps, within=pyo.Reals)
         self.model.net_income = pyo.Var(self.model.time_steps, within=pyo.Reals)
@@ -253,6 +351,20 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 t: value for t, value in enumerate(self.electricity_price_flex)
             },
         )
+
+        # Emergency signal and incentive parameters for objective function calculation
+        self.model.emergency_signal = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.emergency_signal)},
+            doc="Emergency signal for demand response"
+        )
+        
+        self.model.incentive = pyo.Param(
+            self.model.time_steps,
+            initialize={t: value for t, value in enumerate(self.incentive)},
+            doc="Incentive parameter for objective function calculations"
+        )
+
         
         #  EV range and availability parameters
         for ev_key in self.components:
@@ -302,15 +414,9 @@ class BusDepot(DSMFlex, SupportsMinMax):
                     )
                 )
         
-        # Compatibility matrix parametresi(no needed for this, but added for completeness)
-        self.model.compatible = pyo.Param(
-            self.model.evs,
-            self.model.charging_stations,
-            initialize=1,
-            within=pyo.Binary,
-            mutable=True,
-            doc="Compatibility matrix: 1 if EV can use CS, 0 otherwise",
-        )
+        # EV-CS Compatibility based on power flow directionality
+        self._build_compatibility_matrix()
+        
     def initialize_process_sequence(self):
         for ev in self.model.dsm_blocks:
             if ev.startswith("electric_vehicle"):
@@ -350,6 +456,40 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 )
             else:
                 return pyo.Constraint.Skip
+        
+        # NEW: CS charge balance for bidirectional charging stations
+        @self.model.Constraint(
+            self.model.charging_stations,
+            self.model.time_steps,
+            doc="Charging station charge balance for bidirectional stations"
+        )
+        def station_charge_balance(m, cs, t):
+            if cs in m.dsm_blocks and hasattr(m.dsm_blocks[cs], "charge"):
+                # For bidirectional charging stations, CS charge should equal sum of EV discharges
+                cs_component = self.components.get(cs, {})
+                
+                # Handle both dict and object cases
+                if isinstance(cs_component, dict):
+                    is_bidirectional_cs = cs_component.get('power_flow_directionality', 'unidirectional') == 'bidirectional'
+                elif hasattr(cs_component, 'power_flow_directionality'):
+                    is_bidirectional_cs = cs_component.power_flow_directionality == 'bidirectional'
+                else:
+                    is_bidirectional_cs = False
+                
+                if is_bidirectional_cs:
+                    # For bidirectional charging stations, charge equals total discharge from bidirectional prosumer EVs
+                    total_ev_discharge = sum(
+                        m.dsm_blocks[ev].discharge[t]
+                        for ev in m.evs
+                        if self.get_ev_property(ev, 'power_flow_directionality', 'unidirectional') == 'bidirectional'
+                        and self.get_ev_property(ev, 'is_prosumer_capable', False)
+                    )
+                    return m.dsm_blocks[cs].charge[t] == total_ev_discharge
+                else:
+                    # Unidirectional charging stations cannot charge from EVs
+                    return m.dsm_blocks[cs].charge[t] == 0
+            else:
+                return pyo.Constraint.Skip
 
     def define_constraints(self):
         """
@@ -387,14 +527,22 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 if cs.startswith("charging_station")
             )
             return m.total_power_input[t] == cs_discharge
+        
+        @self.model.Constraint(self.model.time_steps)
+        def total_power_output_constraint(m, t):
+            cs_charge = sum(
+                m.dsm_blocks[cs].charge[t]
+                for cs in m.dsm_blocks
+                if cs.startswith("charging_station")
+            )
+            return m.total_power_output[t] == cs_charge        
 
         @self.model.Constraint(self.model.time_steps)
         def variable_cost_constraint(m, t):
             """
             Calculates the variable cost associated with power usage at each time step.
 
-            This constraint multiplies the total variable power by the corresponding electricity price
-            to determine the variable cost incurred.
+            This constraint multiplies the total variable power by the corresponding electricity price.
 
             Args:
                 m: Pyomo model reference.
@@ -413,9 +561,9 @@ class BusDepot(DSMFlex, SupportsMinMax):
         def rev_constraint(m, t):
             """
             Calculates the total variable revenue from all EVs at each time step.
-
-            This constraint sums discharge power from all bidirectional EVs multiplied by 
-            flexible electricity price and availability.
+            
+            Revenue is generated when bidirectional prosumer-capable EVs discharge
+            energy back to the grid through charging stations.
 
             Args:
                 m: Pyomo model reference.
@@ -430,30 +578,15 @@ class BusDepot(DSMFlex, SupportsMinMax):
             total_revenue = 0
             
             for ev in m.evs:
-                # Check if EV is bidirectional by accessing the EV component
-                ev_component = self.components.get(ev)
-                if ev_component and hasattr(ev_component, 'power_flow_directionality'):
-                    power_flow_directionality = ev_component.power_flow_directionality
-                else:
-                    power_flow_directionality = "unidirectional"
+                # Use helper method for safe property access
+                is_bidirectional = self.get_ev_property(ev, 'power_flow_directionality', 'unidirectional') == 'bidirectional'
+                is_prosumer_capable = self.get_ev_property(ev, 'is_prosumer_capable', False)
                 
-                # Use depot-level prosumer status for EV
-                ev_is_prosumer = self.is_prosumer
-                
-                # Only include revenue for bidirectional AND prosumer EVs
-                if power_flow_directionality == "bidirectional" and ev_is_prosumer:
-                    # Get the availability profile for this EV
-                    ev_availability = getattr(m, f"{ev}_availability", None)
-                    
-                    if ev_availability is not None:
-                        # Revenue = discharge * flexible_price * availability
-                        total_revenue += (m.dsm_blocks[ev].discharge[t] * 
-                                        m.electricity_price_flex[t] * 
-                                        ev_availability[t])
-                    else:
-                        # If no availability profile, add discharge without availability factor
-                        total_revenue += (m.dsm_blocks[ev].discharge[t] * 
-                                        m.electricity_price_flex[t])
+                # Only generate revenue for bidirectional prosumer-capable EVs
+                if is_bidirectional and is_prosumer_capable:
+                    # Revenue = EV discharge * flexible electricity price
+                    # No need for availability factor - if EV is not available, it cannot discharge
+                    total_revenue += (m.dsm_blocks[ev].discharge[t] * m.electricity_price_flex[t])
             
             return m.variable_rev[t] == total_revenue        
               
@@ -470,28 +603,8 @@ class BusDepot(DSMFlex, SupportsMinMax):
             Returns:
                 Equality condition defining net income = revenue - cost.
             """
-            if not self.is_prosumer:
-                return m.net_income[t] == 0 - m.variable_cost[t]
-            
-            # Check if any EV is both bidirectional AND prosumer
-            has_bidirectional_prosumer = False
-            for ev in m.evs:
-                ev_component = self.components.get(ev)
-                if ev_component and hasattr(ev_component, 'power_flow_directionality'):
-                    power_flow_directionality = ev_component.power_flow_directionality
-                else:
-                    power_flow_directionality = "unidirectional"
-                
-                # Use depot-level prosumer status for EV
-                ev_is_prosumer = self.is_prosumer
-                    
-                if power_flow_directionality == "bidirectional" and ev_is_prosumer:
-                    has_bidirectional_prosumer = True
-                    break
-            
-            if not has_bidirectional_prosumer:
-                return m.net_income[t] == 0 - m.variable_cost[t]
-                
+            # Simplified logic: always use revenue - cost
+            # Revenue will be 0 if no prosumer capability exists
             return m.net_income[t] == m.variable_rev[t] - m.variable_cost[t]
         
         #  10: Assignment just if EV is available
@@ -577,8 +690,7 @@ class BusDepot(DSMFlex, SupportsMinMax):
             doc="Link is_assigned with actual charge flow",
         )
         def assignment_indicator_constraint(m, ev, cs, t):
-            M = 1e5  # Big-M value
-            return m.charge_assignment[ev, cs, t] <= M * m.is_assigned[ev, cs, t]
+            return m.charge_assignment[ev, cs, t] <= self.BIG_M * m.is_assigned[ev, cs, t]
         
         #  15: EV only charges when available
         # This constraint ensures that an EV can only charge if it is available (not driving).
@@ -590,21 +702,25 @@ class BusDepot(DSMFlex, SupportsMinMax):
         def availability_based_on_charging(m, ev, t):
             ev_availability = getattr(m, f"{ev}_availability", None)
             if ev_availability is not None:
-                M = 1e5  # Big-M value
                 charge_sum = sum(
                     m.charge_assignment[ev, cs, t] for cs in m.charging_stations
                 )
-                return charge_sum <= M * ev_availability[t]
+                return charge_sum <= self.BIG_M * ev_availability[t]
             return pyo.Constraint.Skip
         
-        #  16: Compatibility constraint
+        #  16: Power flow directionality compatibility constraint
         @self.model.Constraint(
             self.model.evs,
             self.model.charging_stations,
             self.model.time_steps,
-            doc="EV can only be assigned to compatible CS"
+            doc="EV can only be assigned to compatible CS based on power flow directionality"
         )
-        def compatibility_constraint(m, ev, cs, t):
+        def directionality_compatibility_constraint(m, ev, cs, t):
+            """
+            Ensures that:
+            - Bidirectional EVs can ONLY use bidirectional charging stations
+            - Unidirectional EVs can ONLY use unidirectional charging stations
+            """
             return m.is_assigned[ev, cs, t] <= m.compatible[ev, cs]
         
         #  17: Cumulative charging tracking
@@ -621,28 +737,24 @@ class BusDepot(DSMFlex, SupportsMinMax):
         #  18: Fully charged flag
         @self.model.Constraint(self.model.evs, self.model.time_steps)
         def enforce_fully_charged_flag(m, ev, t):
-            M = 1e5
-            ε = 1e-3
             if ev in m.dsm_blocks and hasattr(m.dsm_blocks[ev], "max_capacity"):
                 # If cumulative charge reaches max capacity, set fully charged flag
                 return (
                     m.cumulative_charged[ev, t]
-                    >= m.dsm_blocks[ev].max_capacity - ε
-                    - (1 - m.is_fully_charged[ev, t]) * M
+                    >= m.dsm_blocks[ev].max_capacity - self.EPSILON
+                    - (1 - m.is_fully_charged[ev, t]) * self.BIG_M
                 )
             return pyo.Constraint.Skip
         
         #  19: Fully charged flag - reverse constraint
         @self.model.Constraint(self.model.evs, self.model.time_steps)
         def enforce_fully_charged_flag_reverse(m, ev, t):
-            M = 1e5
-            ε = 1e-3
             if ev in m.dsm_blocks and hasattr(m.dsm_blocks[ev], "max_capacity"):
                 # If cumulative charge is less than max capacity, fully charged flag should be 0
                 return (
                     m.cumulative_charged[ev, t]
-                    <= m.dsm_blocks[ev].max_capacity - ε
-                    + m.is_fully_charged[ev, t] * M
+                    <= m.dsm_blocks[ev].max_capacity - self.EPSILON
+                    + m.is_fully_charged[ev, t] * self.BIG_M
                 )
             return pyo.Constraint.Skip
         
@@ -656,8 +768,6 @@ class BusDepot(DSMFlex, SupportsMinMax):
             Sets the has_sufficient_charge_for_travel binary flag based on current SOC vs 
             NEXT unavailable period's usage (not all future usage).
             """
-            M = 500  # Conservative Big-M value
-            ε = 0.1  # Epsilon for numerical stability
             
             if ev in m.dsm_blocks and hasattr(m.dsm_blocks[ev], "usage"):
                 time_steps_list = list(m.time_steps)  # Already in ascending order
@@ -687,23 +797,22 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 
                 # Big-M constraint: current_soc >= next_usage_total - (1-flag)*M
                 return (
-                    current_soc >= next_usage_total - ε - (1 - m.has_sufficient_charge_for_travel[ev, t]) * M
+                    current_soc >= next_usage_total - self.EPSILON - (1 - m.has_sufficient_charge_for_travel[ev, t]) * self.BIG_M
                 )
             return pyo.Constraint.Skip
         
-        # CONSTRAINT 22: Charging continuity based on travel requirements
-        # PURPOSE: Ensures EVs don't disconnect from charging before meeting travel needs
-        # WHY NEEDED: Prevents inefficient charging patterns and ensures EVs have enough energy
+        # SIMPLIFIED CHARGING CONTINUITY CONSTRAINT
+        # Consolidates previous constraints 22 and 24 into one unified constraint
         @self.model.Constraint(
             self.model.evs,
-            self.model.charging_stations,
             self.model.time_steps,
-            doc="Charging continuity: continue charging until travel requirements met"
+            doc="Unified charging continuity: EVs continue charging until sufficient charge or unavailable"
         )
-        def charging_continuity_for_travel(m, ev, cs, t):
+        def unified_charging_continuity(m, ev, t):
             """
-            If an EV was charging at t-1 and is still available at t,
-            it must continue charging at the same station unless it has sufficient charge.
+            Simplified charging continuity logic:
+            - If EV was charging at t-1 and is still available at t
+            - It must continue to be assigned (somewhere) unless it has sufficient charge for travel
             """
             if t == m.time_steps.first():
                 return pyo.Constraint.Skip
@@ -716,21 +825,22 @@ class BusDepot(DSMFlex, SupportsMinMax):
             if ev_availability[t] == 0 or ev_availability[t-1] == 0:
                 return pyo.Constraint.Skip
             
-            # If was assigned to this station at t-1, must stay unless sufficient charge
-            return m.is_assigned[ev, cs, t] >= m.is_assigned[ev, cs, t-1] - m.has_sufficient_charge_for_travel[ev, t-1]
+            # Check if EV was assigned to any station at t-1
+            was_assigned_prev = sum(m.is_assigned[ev, cs, t-1] for cs in m.charging_stations)
+            # Check if EV is assigned to any station at t
+            is_assigned_current = sum(m.is_assigned[ev, cs, t] for cs in m.charging_stations)
+            
+            # If was charging and doesn't have sufficient charge, must remain assigned
+            return is_assigned_current >= was_assigned_prev - m.has_sufficient_charge_for_travel[ev, t-1]
         
-        # CONSTRAINT 23: Optimal charging station utilization
-        # PURPOSE: Ensures efficient use of available charging infrastructure
-        # WHY NEEDED: Maximizes charging capacity utilization and prevents idle stations
+        # CONSTRAINT: Optimal charging station utilization
         @self.model.Constraint(
             self.model.time_steps,
-            doc="Ensure optimal utilization of charging stations"
+            doc="Ensure efficient utilization of charging stations"
         )
         def optimal_station_utilization(m, t):
             """
-            Optimal charging station utilization rule:
-            - If available_evs <= charging_stations: all EVs should be assigned
-            - If available_evs > charging_stations: all stations should be used
+            Optimal utilization: use available capacity efficiently
             """
             evs_list = list(m.evs)
             
@@ -744,7 +854,7 @@ class BusDepot(DSMFlex, SupportsMinMax):
             if available_evs == 0:
                 return pyo.Constraint.Skip
             
-            # Total assignments across all EV-station combinations
+            # Total assignments
             total_assignments = sum(
                 m.is_assigned[ev, cs, t] 
                 for ev in evs_list 
@@ -753,46 +863,33 @@ class BusDepot(DSMFlex, SupportsMinMax):
             
             total_charging_stations = len(m.charging_stations)
             
+            # Utilize stations efficiently
             if available_evs <= total_charging_stations:
-                # Enough stations for all EVs - assign all available EVs
                 return total_assignments >= available_evs
             else:
-                # More EVs than stations - utilize all stations
                 return total_assignments >= total_charging_stations
-        
-        
-        # CONSTRAINT 24: Prevent premature EV switching
-        # PURPOSE: Prevents EVs from leaving charging before completing their charge cycle
-        # WHY NEEDED: Ensures charging efficiency and prevents incomplete charging sessions
-        @self.model.Constraint(
-            self.model.evs,
-            self.model.time_steps,
-            doc="Prevent EV from leaving charging before sufficient charge"
-        )
-        def prevent_premature_ev_switching(m, ev, t):
-            """
-            If an EV was charging at t-1 and is still available at t,
-            it must continue charging unless it has sufficient charge for travel.
-            """
-            if t == m.time_steps.first():
-                return pyo.Constraint.Skip
-            
-            ev_availability = getattr(m, f"{ev}_availability", None)
-            if ev_availability is None:
-                return pyo.Constraint.Skip
-            
-            # Only apply when EV is available in both periods
-            if ev_availability[t] == 0 or ev_availability[t-1] == 0:
-                return pyo.Constraint.Skip
-            
-            # Check if this EV was assigned to any station at t-1
-            was_assigned_anywhere = sum(m.is_assigned[ev, cs, t-1] for cs in m.charging_stations)
-            
-            # If was assigned and doesn't have sufficient charge, must remain assigned
-            return (sum(m.is_assigned[ev, cs, t] for cs in m.charging_stations) >= 
-                    was_assigned_anywhere - m.has_sufficient_charge_for_travel[ev, t-1])
 
-        # CONSTRAINT 25: Future improvement placeholder
+        # CONSTRAINT 25: Prosumer discharge restriction for bidirectional EVs
+        # PURPOSE: Bidirectional EVs can only discharge if depot is_prosumer=Yes
+        # LOGIC: bidirectional + is_prosumer=No -> discharge = 0
+        if not self.is_prosumer:
+            @self.model.Constraint(self.model.evs, self.model.time_steps)
+            def non_prosumer_discharge_restriction(m, ev, t):
+                """
+                Non-prosumer bidirectional EVs cannot discharge energy.
+                Only prosumer-enabled depots allow bidirectional EVs to discharge.
+                """
+                # Check if EV is bidirectional
+                is_bidirectional = self.get_ev_property(ev, 'power_flow_directionality', 'unidirectional') == 'bidirectional'
+                
+                if is_bidirectional and ev in m.dsm_blocks:
+                    # Force discharge to 0 for bidirectional EVs in non-prosumer depots
+                    return m.dsm_blocks[ev].discharge[t] == 0
+                else:
+                    # Skip constraint for unidirectional EVs (already handled in dst_components.py)
+                    return pyo.Constraint.Skip
+        
+        # CONSTRAINT 26: Future improvement placeholder
         # PURPOSE: Advanced queue priority logic to minimize switching
         # CHALLENGE: HiGHS solver requires linear constraints only
         # CURRENT STATUS: Basic switching prevention is handled by constraints 20, 22, and 24
@@ -805,4 +902,370 @@ class BusDepot(DSMFlex, SupportsMinMax):
         # - Charging continuity until sufficient charge (Constraint 22) 
         # - Prevention of premature switching (Constraint 24)
         # This combination significantly reduces unnecessary switching
+
+        # Add FCR capacity market if prosumer is enabled
+        if self.is_prosumer:
+            self._add_fcr_capacity_market(self.model)
         
+    def _add_fcr_capacity_market(self, model):
+        """
+        Hardcoded German FCR: fixed 4h blocks at 00,04,08,12,16,20.
+        Bids in integer MW with 1 MW minimum. Profit objective replaces cost objective.
+        Activates only when self.is_prosumer is True.
+        """
+        if not self.is_prosumer:
+            return
+
+        import math
+        m = model
+        L = self._FCR_BLOCK_LENGTH
+        step = self._FCR_STEP_MW
+        min_bid = self._FCR_MIN_BID_MW
+
+        # ---- Build fixed 4h blocks aligned to wall-clock hours ----
+        # Use actual timestamps to pick starts at hours % 4 == 0 (TSO fixed windows)
+        ts = self.index  # DatetimeIndex aligned with time_steps (0..T-1)
+        starts_idx = [i for i, t in enumerate(ts[:-L+1]) if (t.hour % 4 == 0 and t.minute == 0)]
+        # keep only starts that have all L hours inside horizon
+        starts_idx = [i for i in starts_idx if i + L <= len(ts)]
+
+        # map to model's time step ids
+        m.fcr_blocks = pyo.Set(initialize=starts_idx, ordered=True)
+
+        # ---- Block prices: sum of hourly €/MW/h inside each 4h block ----
+        if self.fcr_price_eur_per_mw_h is None:
+            price_hourly = [0.0] * len(ts)
+        else:
+            # ensure list of floats length == horizon
+            price_hourly = [float(x) for x in self.fcr_price_eur_per_mw_h]
+
+        block_price = {b: sum(price_hourly[b + k] for k in range(L)) for b in starts_idx}
+        m.fcr_block_price = pyo.Param(m.fcr_blocks, initialize=block_price, mutable=False)
+
+        # ---- Static plant-wide min/max electric power envelope (headroom/footroom) ----
+        # For bus depot: use charging station capacities from DSM blocks (like heat pump example)
+        max_cap = 0.0
+        min_cap = 0.0
+        
+        # Sum all charging station capacities from DSM blocks (following orjinal pattern)
+        for tech_key in self.components:
+            if tech_key.startswith("charging_station"):
+                if hasattr(m.dsm_blocks[tech_key], 'max_power'):
+                    max_cap += float(m.dsm_blocks[tech_key].max_power)
+                if hasattr(m.dsm_blocks[tech_key], 'min_power'):
+                    min_cap += float(m.dsm_blocks[tech_key].min_power)
+
+        self.max_plant_capacity = max_cap
+        self.min_plant_capacity = min_cap
+
+        # ---- Variables: integerized capacities with 1 MW steps ----
+        M_blocks = int(math.ceil(max(1.0, max_cap) / step))  # conservative big-M
+        m.k_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.k_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.cap_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.cap_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.energy_cost = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.bid_up = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+        m.bid_dn = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+
+        @m.Constraint(m.fcr_blocks)
+        def cap_up_is_steps(mm, b):  return mm.cap_up[b] == step * mm.k_up[b]
+        @m.Constraint(m.fcr_blocks)
+        def cap_dn_is_steps(mm, b):  return mm.cap_dn[b] == step * mm.k_dn[b]
+
+        # activate counts only if bid is active; enforce min bid if active
+        @m.Constraint(m.fcr_blocks)
+        def up_count_active(mm, b):  return mm.k_up[b] <= M_blocks * mm.bid_up[b]
+        @m.Constraint(m.fcr_blocks)
+        def dn_count_active(mm, b):  return mm.k_dn[b] <= M_blocks * mm.bid_dn[b]
+        @m.Constraint(m.fcr_blocks)
+        def up_min_bid(mm, b):       return mm.cap_up[b] >= min_bid * mm.bid_up[b]
+        @m.Constraint(m.fcr_blocks)
+        def dn_min_bid(mm, b):       return mm.cap_dn[b] >= min_bid * mm.bid_dn[b]
+
+        # symmetric option (both directions equal & jointly on/off)
+        if self.fcr_symmetric:
+            @m.Constraint(m.fcr_blocks)
+            def sym_cap(mm, b):   return mm.cap_up[b] == mm.cap_dn[b]
+            @m.Constraint(m.fcr_blocks)
+            def sym_onoff(mm, b): return mm.bid_up[b] == mm.bid_dn[b]
+
+        # at most one direction per block for asymmetric product (relax/remove if market allows both)
+        if not self.fcr_symmetric:
+            @m.Constraint(m.fcr_blocks)
+            def one_dir(mm, b): return mm.bid_up[b] + mm.bid_dn[b] <= 1
+
+        # ---- Feasibility across all hours inside each 4h block ----
+        m.fcr_up_feas   = pyo.ConstraintList()
+        m.fcr_down_feas = pyo.ConstraintList()
+        for b in starts_idx:
+            for k in range(L):
+                t = b + k
+                # Calculate charging station power at time t (like orjinal total_power_input)
+                
+                # up: need headroom; down: need footroom (orjinal pattern)
+                m.fcr_up_feas.add(   m.cap_up[b]   <= self.max_plant_capacity - m.total_power_output[t] )
+                m.fcr_down_feas.add( m.cap_dn[b]   <=  m.total_power_output[t] - self.min_plant_capacity )
+
+        @ m.Expression()
+        def fcr_revenue(mm):
+            if self.fcr_symmetric:
+                # up==down enforced elsewhere; pay once per MW of symmetric capacity
+                return sum(mm.fcr_block_price[b] * mm.cap_up[b] for b in mm.fcr_blocks)
+            else:
+                # asymmetric: sum the two capacities, constraints will force one to zero if needed
+                return (
+                    sum(mm.fcr_block_price[b] * mm.cap_up[b]   for b in mm.fcr_blocks) +
+                    sum(mm.fcr_block_price[b] * mm.cap_dn[b]   for b in mm.fcr_blocks)
+                )
+
+    def plot_bus_depot_fcr(self, instance, save_path=None, show=True):
+        """
+        Three-panel figure for bus depot with FCR integration:
+        1) EV charging/discharging + electricity prices (twin y-axis) 
+        2) Charging station power output + EV status
+        3) FCR market view (per 4h block): capacities (up/down), block price,
+           and operational baseline for feasibility context
+
+        Designed for bus depot with electric_vehicle and charging_station technologies.
+        """
+        
+        import matplotlib as mpl
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        # ------- style -------
+        mpl.rcParams.update({
+            "font.size": 13, "font.family": "serif",
+            "axes.titlesize": 15, "axes.labelsize": 13,
+            "legend.fontsize": 12, "lines.linewidth": 2,
+            "axes.grid": True, "grid.linestyle": "--",
+            "grid.alpha": 0.7, "figure.dpi": 120
+        })
+
+        T = list(instance.time_steps)
+
+        # ------- helpers -------
+        def safe_value(v):
+            try:
+                return float(pyo.value(v))
+            except Exception:
+                return float(v) if v is not None else 0.0
+
+        def series_or_none(block, name):
+            if block is None or not hasattr(block, name):
+                return None
+            return [safe_value(getattr(block, name)[t]) for t in instance.time_steps]
+
+        def plot_if_nonzero(ax, x, y, label, color, style="-", eps=1e-9):
+            if y is None:
+                return None
+            if any(abs(v) > eps for v in y):
+                return ax.plot(x, y, label=label, color=color, linestyle=style)[0]
+            return None
+
+        def stairs_from_blocks(block_starts, per_block_values, block_len, horizon_len):
+            """
+            Expand block-level value (constant over 4h) to hourly stair array.
+            """
+            y = [0.0] * horizon_len
+            for b in block_starts:
+                val = safe_value(per_block_values.get(b, 0.0))
+                for k in range(block_len):
+                    idx = b + k
+                    if 0 <= idx < horizon_len:
+                        y[idx] = val
+            return y
+
+        # ------- Bus Depot Components -------
+        B = instance.dsm_blocks
+        
+        # Electric vehicles
+        evs = [key for key in B.keys() if key.startswith("electric_vehicle")]
+        ev_charge_data = {}
+        ev_discharge_data = {}
+        ev_usage_data = {}
+        
+        for ev in evs:
+            ev_block = B[ev]
+            ev_charge_data[ev] = series_or_none(ev_block, "charge")
+            ev_discharge_data[ev] = series_or_none(ev_block, "discharge") 
+            ev_usage_data[ev] = series_or_none(ev_block, "usage")
+        
+        # Charging stations
+        charging_stations = [key for key in B.keys() if key.startswith("charging_station")]
+        cs_discharge_data = {}
+        
+        for cs in charging_stations:
+            cs_block = B[cs]
+            cs_discharge_data[cs] = series_or_none(cs_block, "discharge")
+
+        # prices
+        elec_price = [safe_value(instance.electricity_price[t]) for t in T] if hasattr(instance, "electricity_price") else None
+        
+        # baseline load and envelope (for FCR feasibility visualization)
+        total_elec = [safe_value(instance.total_power_input[t]) for t in T] if hasattr(instance, "total_power_output") else None
+        max_cap = getattr(self, "max_plant_capacity", None)
+        min_cap = getattr(self, "min_plant_capacity", 0.0)
+
+        # ------- figure -------
+        nrows = 3
+        fig, axs = plt.subplots(nrows, 1, figsize=(14, 12), sharex=True, constrained_layout=True)
+
+        # ---------- TOP: EV operations + prices ----------
+        colors = plt.cm.Set1(range(len(evs)))
+        handles = []
+        
+        for i, ev in enumerate(evs):
+            color = colors[i]
+            h1 = plot_if_nonzero(axs[0], T, ev_charge_data[ev], f"{ev} Charge [kW]", color, "-")
+            h2 = plot_if_nonzero(axs[0], T, ev_discharge_data[ev], f"{ev} Discharge [kW]", color, "--")
+            h3 = plot_if_nonzero(axs[0], T, ev_usage_data[ev], f"{ev} Usage [kW]", color, ":")
+            
+            for h in [h1, h2, h3]:
+                if h: handles.append(h)
+
+        axs[0].set_ylabel("EV Power [kW]")
+        axs[0].set_title("Electric Vehicle Operations & Electricity Price")
+        axs[0].grid(True, which="both", axis="both")
+
+        # Price on twin axis
+        if elec_price:
+            axp = axs[0].twinx()
+            price_line = axp.plot(T, elec_price, label="Electricity Price [€/MWh]", color="red", linestyle="--", alpha=0.7)
+            axp.set_ylabel("Price [€/MWh]", color="red")
+            axp.tick_params(axis="y", labelcolor="red")
+            handles.extend(price_line)
+
+        if handles:
+            axs[0].legend(handles, [h.get_label() for h in handles], loc="upper left", frameon=True)
+
+        # ---------- MIDDLE: Charging Station Power ----------
+        cs_colors = plt.cm.Set2(range(len(charging_stations)))
+        cs_handles = []
+        
+        for i, cs in enumerate(charging_stations):
+            color = cs_colors[i]
+            h = plot_if_nonzero(axs[1], T, cs_discharge_data[cs], f"{cs} Power [kW]", color, "-")
+            if h: cs_handles.append(h)
+
+        axs[1].set_ylabel("Charging Station Power [kW]")
+        axs[1].set_title("Charging Station Power Output")
+        axs[1].grid(True, which="both", axis="both")
+        
+        if cs_handles:
+            axs[1].legend(cs_handles, [h.get_label() for h in cs_handles], loc="upper right", frameon=True)
+
+        # ---------- BOTTOM: FCR bids & impact ----------
+        fcr_present = hasattr(instance, "fcr_blocks")
+        fcr_len = getattr(self, "_FCR_BLOCK_LENGTH", 1)
+
+        def zero_or_list(x, n):
+            return [0.0]*n if x is None else x
+
+        fcr_blocks_list = list(getattr(instance, "fcr_blocks", [])) if fcr_present else []
+        cap_up_map, cap_dn_map, block_price_map = {}, {}, {}
+
+        if fcr_present and fcr_blocks_list:
+            for b in fcr_blocks_list:
+                if hasattr(instance, "cap_up"): cap_up_map[b] = safe_value(instance.cap_up[b])
+                if hasattr(instance, "cap_dn"): cap_dn_map[b] = safe_value(instance.cap_dn[b])
+                if hasattr(instance, "fcr_block_price"): block_price_map[b] = safe_value(instance.fcr_block_price[b])
+
+            H = len(T)
+            cap_up_stairs = stairs_from_blocks(fcr_blocks_list, cap_up_map, fcr_len, H) if cap_up_map else [0.0]*H
+            cap_dn_stairs = stairs_from_blocks(fcr_blocks_list, cap_dn_map, fcr_len, H) if cap_dn_map else [0.0]*H
+            price_stairs = stairs_from_blocks(fcr_blocks_list, block_price_map, fcr_len, H) if block_price_map else [0.0]*H
+
+            # Baseline & capability envelope
+            base = zero_or_list(total_elec, len(T))
+            axs[2].plot(T, base, color="0.3", lw=2.0, label="Baseline Power Demand [kW]")
+            if max_cap is not None:
+                axs[2].plot(T, [max_cap]*len(T), color="0.7", ls=":", label="Max Charging Capacity [kW]")
+            if min_cap is not None:
+                axs[2].plot(T, [min_cap]*len(T), color="0.7", ls="--", label="Min Capacity [kW]")
+
+            # CAPACITY BANDS around the baseline
+            # UP = can reduce load: red band between (base - up) and base
+            lower_up = [max(min_cap if min_cap is not None else -1e9, base[i] - cap_up_stairs[i]) for i in range(len(T))]
+            axs[2].fill_between(T, lower_up, base, color="#d62728", alpha=0.25, step="pre", label="FCR Up Capacity [kW]")
+
+            # DOWN = can increase load: green band between base and (base + down) 
+            upper_dn = [min(max_cap if max_cap is not None else 1e9, base[i] + cap_dn_stairs[i]) for i in range(len(T))]
+            axs[2].fill_between(T, base, upper_dn, color="#2ca02c", alpha=0.25, step="pre", label="FCR Down Capacity [kW]")
+
+            # FCR block price on twin axis
+            axp2 = axs[2].twinx()
+            axp2.plot(T, price_stairs, color="#9467bd", ls="--", lw=2, label="FCR Block Price [€/MW per 4h]")
+            axp2.set_ylabel("FCR Price [€/MW per 4h]", color="purple")
+            axp2.tick_params(axis="y", labelcolor="purple")
+
+            # Shade active FCR blocks
+            for b in fcr_blocks_list:
+                active = (cap_up_map.get(b, 0.0) > 0.0) or (cap_dn_map.get(b, 0.0) > 0.0)
+                if active:
+                    axs[2].axvspan(b, min(b + fcr_len, len(T)), color="purple", alpha=0.1)
+
+            # Legend
+            h1, l1 = axs[2].get_legend_handles_labels()
+            h2, l2 = axp2.get_legend_handles_labels()
+            axs[2].legend(h1 + h2, l1 + l2, loc="upper left", frameon=True)
+
+            axs[2].set_ylabel("Power [kW]")
+            axs[2].set_title("FCR Capacity Bids (4h blocks) — Red = Up regulation, Green = Down regulation")
+            axs[2].grid(True, which="both", axis="both")
+
+        else:
+            # No FCR - just show baseline
+            _ = plot_if_nonzero(axs[2], T, total_elec, "Baseline Power Demand [kW]", "C1", "-")
+            if max_cap is not None:
+                axs[2].plot(T, [max_cap]*len(T), color="0.7", ls=":", label="Max Charging Capacity [kW]")
+            if min_cap is not None:
+                axs[2].plot(T, [min_cap]*len(T), color="0.7", ls="--", label="Min Capacity [kW]")
+            axs[2].set_ylabel("Power [kW]")
+            axs[2].set_title("Operational Baseline (FCR not active)")
+            axs[2].grid(True, which="both", axis="both")
+            axs[2].legend(loc="upper left", frameon=True)
+
+        axs[-1].set_xlabel("Time Step")
+        fig.autofmt_xdate()
+
+        plt.tight_layout()
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        if show:
+            plt.show()
+        plt.close(fig)
+
+        # -------- CSV export (bus depot specific) --------
+        df_dict = {"time_step": T}
+        
+        # EV data
+        for ev in evs:
+            if ev_charge_data[ev]: df_dict[f"{ev}_charge_kW"] = ev_charge_data[ev]
+            if ev_discharge_data[ev]: df_dict[f"{ev}_discharge_kW"] = ev_discharge_data[ev]
+            if ev_usage_data[ev]: df_dict[f"{ev}_usage_kW"] = ev_usage_data[ev]
+        
+        # Charging station data
+        for cs in charging_stations:
+            if cs_discharge_data[cs]: df_dict[f"{cs}_power_kW"] = cs_discharge_data[cs]
+        
+        # General data
+        if elec_price: df_dict["electricity_price_EUR_MWh"] = elec_price
+        if total_elec: df_dict["total_power_demand_kW"] = total_elec
+        
+        # FCR data
+        if fcr_present and fcr_blocks_list:
+            if cap_up_stairs: df_dict["FCR_up_capacity_kW"] = [x for x in cap_up_stairs]
+            if cap_dn_stairs: df_dict["FCR_down_capacity_kW"] = [x for x in cap_dn_stairs]
+            if price_stairs: df_dict["FCR_block_price_EUR_MW_4h"] = price_stairs
+
+        df = pd.DataFrame(df_dict)
+
+        if save_path:
+            csv_path = save_path.rsplit(".", 1)[0] + "_bus_depot_fcr.csv"
+            df.to_csv(csv_path, index=False)
+            print(f"Bus depot FCR data exported to: {csv_path}")
+
+        return df
+

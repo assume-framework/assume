@@ -1418,6 +1418,11 @@ class ElectricVehicle:
                     if t == self.time_steps.first():
                         return pyo.Constraint.Skip
                     return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
+            
+            else:  # unidirectional power flow
+                @model_block.Constraint(self.time_steps)
+                def unidirectional_discharge_constraint(b, t):
+                    return b.discharge[t] == 0
 
         # Operating costs
         @model_block.Constraint(self.time_steps)
@@ -1470,6 +1475,8 @@ class ChargingStation:
                 within=pyo.NonNegativeReals,
                 bounds=(self.min_power, self.max_power),
             )
+            # Add binary variable to prevent simultaneous charge and discharge
+            model_block.charging_mode = pyo.Var(self.time_steps, within=pyo.Binary)
 
         # Optional constraint: Discharge profile
         if self.availability_profile is not None:
@@ -1491,6 +1498,17 @@ class ChargingStation:
             return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
 
         if self.power_flow_directionality == "bidirectional":
+            
+            # Prevent simultaneous charging and discharging
+            @model_block.Constraint(self.time_steps)
+            def prevent_simultaneous_charge_discharge(b, t):
+                """Charging station cannot charge and discharge simultaneously"""
+                return b.discharge[t] <= b.max_power * (1 - b.charging_mode[t])
+            
+            @model_block.Constraint(self.time_steps)
+            def charge_only_when_charging_mode(b, t):
+                """Charging station can only charge when in charging mode"""
+                return b.charge[t] <= b.max_power * b.charging_mode[t]
 
             @model_block.Constraint(self.time_steps)
             def charge_ramp_up(b, t):
