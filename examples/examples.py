@@ -118,6 +118,14 @@ available_examples = {
         "scenario": "example_05f",
         "study_case": "base",
     },
+    # Use case examples for Cement plant
+    "use_case_O45strom": {
+        "scenario": "example_06a", 
+        "study_case": "base"},
+    "use_case_O45H2": {
+        "scenario": "example_06b",
+        "study_case": "base",
+    },
 }
 
 
