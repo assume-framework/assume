@@ -492,7 +492,6 @@ class FixedDispatchStrategy(BaseStrategy):
         return bids
 
 
-'''
 class NaiveRedispatchSteelplantStrategy(BaseStrategy):
     def calculate_bids(
         self,
@@ -510,13 +509,10 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
             and the volume of the product. Dispatch the order to the market.
             """
             start = product[0]
-            #volume = abs(unit.outputs["energy"].at[start])
-            # volume = unit.opt_power_requirement.loc[start]
-            #volume_flex = unit.flex_power_requirement.loc[start]
+            volume = abs(unit.outputs["energy"].at[start])
+            volume = unit.opt_power_requirement.loc[start]
+            volume_flex = unit.flex_power_requirement.loc[start]
             marginal_price = unit.calculate_marginal_cost(start, volume_flex)
-            volume=5,
-            volume_flex=5,
-            marginal_price=30,
             if volume > volume_flex:
                 bids.append(
                     {
@@ -525,11 +521,9 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                         "only_hours": product[2],
                         "price": marginal_price,
                         "volume": -volume,
-                        # "max_power": -max(volume, volume_flex),
-                        # "min_power": -min(volume, volume_flex),
-                        "max_power": -volume,
-                        "min_power": -volume_flex,
-                        "node":'west',# unit.node,
+                        "max_power": -max(volume, volume_flex),
+                        "min_power": -min(volume, volume_flex),
+                        "node":unit.node,
                     }
                 )
             elif volume < volume_flex:
@@ -540,11 +534,9 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                         "only_hours": product[2],
                         "price": marginal_price,
                         "volume": -volume,
-                        # "max_power": -max(volume, volume_flex),
-                        # "min_power": -min(volume, volume_flex),
-                        "max_power": -volume_flex,
-                        "min_power": -volume,
-                        "node":'west', #unit.node,
+                        "max_power": -max(volume, volume_flex),
+                        "min_power": -min(volume, volume_flex),
+                        "node":unit.node,
                     }
                 )
             else:
@@ -555,15 +547,13 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                         "only_hours": product[2],
                         "price": marginal_price,
                         "volume": -volume,
-                        "max_power": 5,
+                        "max_power": 0,
                         "min_power": 0,
-                        "node": 'west', #unit.node,
+                        "node":unit.node,
                     }
                 )
 
         return bids
-'''
-
 
 class NaiveRedispatchStrategyDSM(BaseStrategy):
     def calculate_bids(
