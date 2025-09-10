@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-
+import os
 import numpy as np
 import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
     add_fix_units,
+    add_redispatch_dsm,
     add_redispatch_generators,
     calculate_network_meta,
     read_pypsa_grid,
@@ -67,6 +68,12 @@ class RedispatchMarketRole(MarketRole):
             network=self.network,
             units=self.grid_data["exchange_units"],
         )
+
+        if self.grid_data.get("industrial_dsm_units", None) is not None:
+            add_redispatch_dsm(
+                network=self.network,
+                industrial_dsm_units=self.grid_data["industrial_dsm_units"],
+            )
 
         self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
@@ -153,6 +160,10 @@ class RedispatchMarketRole(MarketRole):
 
         line_loading_df = line_loading.reset_index()
         output_file = "outputs/line_loading.csv"
+        output_dir = os.path.dirname(output_file)
+
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
 
         try:
             existing_df = pd.read_csv(output_file)

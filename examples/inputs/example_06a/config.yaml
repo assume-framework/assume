@@ -4,7 +4,7 @@
 
 base:
   start_date: 2035-01-01 00:00
-  end_date: 2035-01-02 23:00
+  end_date: 2035-01-03 23:00
   time_step: 1h
   save_frequency_hours: 24
 
@@ -52,10 +52,9 @@ base:
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
 
-
 nodal_case:
   start_date: 2035-01-01 00:00
-  end_date: 2035-01-02 23:00
+  end_date: 2035-01-03 23:00
   time_step: 1h
   save_frequency_hours: 24
 
@@ -87,7 +86,7 @@ nodal_case:
 
 zonal_case:
   start_date: 2035-01-01 00:00
-  end_date: 2035-01-02 23:00
+  end_date: 2035-01-03 23:00
   time_step: 1h
   save_frequency_hours: 24
 
