@@ -7,7 +7,6 @@ DE104-380,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,DE104
 DE105-220,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,DE105-220
 DE106-220,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,DE106-220
 DE107-380,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,DE107-380
-DE108-220,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,DE108-220
 DE109-220,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,DE109-220
 DE11-380,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,DE11-380
 DE110-380,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,DE110-380
