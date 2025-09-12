@@ -1,4 +1,4 @@
-name,capacity,technology,bidding_energy,bidding_redispatch,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,variable_cost_charge,variable_cost_discharge,additional_cost_charge,additional_cost_discharge,natural_inflow,unit_operator,node
+name,capacity,technology,bidding_EOM,bidding_redispatch,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,variable_cost_charge,variable_cost_discharge,additional_cost_charge,additional_cost_discharge,natural_inflow,unit_operator,node
 SEE938534551104,1.82,li_ion_battery,flexable_eom_storage,fixed_dispatch_strategy,1.82,1.638,0.95,0.95,0,1,30,30,0.28,0.28,0,battery_operator_0,DE62-380
 SEE911836897996,5,li_ion_battery,flexable_eom_storage,fixed_dispatch_strategy,5,4.5,0.95,0.95,0,1,30,30,0.28,0.28,0,battery_operator_1,DE96-220
 SEE966091400436,18.149,li_ion_battery,flexable_eom_storage,fixed_dispatch_strategy,18.149,16.3341,0.95,0.95,0,1,30,30,0.28,0.28,0,battery_operator_2,way/83916207-220
