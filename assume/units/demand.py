@@ -65,6 +65,10 @@ class Demand(SupportsMinMax):
         self.ramp_up = self.ramp_down
 
         self.volume = -abs(self.forecaster[self.id])  # demand is negative
+        # if sum of volume is zero, try to fetch with demand_ prefix
+        if self.volume.sum() == 0 and "demand" not in self.id:
+            self.volume = -abs(self.forecaster[f"demand_{self.id}"])
+
         self.price = FastSeries(index=self.index, value=price)
 
         # Elastic demand parameters
