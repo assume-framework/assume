@@ -132,7 +132,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
         # Add price forecasts
         self.electricity_price = self.forecaster["DE_EHV_HV_1"]
-        self.electricity_price_flex = self.forecaster["SE1"]
+        self.electricity_price_flex = self.forecaster["DE_EHV_HV_1"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
             self.natural_gas_price = self.forecaster["natural_gas_price"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
@@ -157,7 +157,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             self._FCR_MIN_BID_MW   = 1.0        # minimum capacity per block
             self._FCR_STEP_MW      = 1.0        # increment: bids in integer MW
             # expected FCR value (€/MW/h) as hourly series; if not provided, assume zeros
-            self.fcr_price_eur_per_mw_h = self.forecaster["fcr_price"]
+            self.fcr_price_eur_per_mw_h = self.forecaster["DE_fcr_price"]
 
         # Initialize the model
         self.setup_model()
@@ -352,18 +352,18 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         @self.model.Constraint(self.model.time_steps)
         def cost_per_time_step(m, t):
             total_cost = 0
-            if self.has_heatpump:
-                total_cost += m.dsm_blocks["heat_pump"].operating_cost[t]
-            if self.has_heat_resistor:
-                total_cost += m.dsm_blocks["heat_resistor"].operating_cost[t]
-            if self.has_boiler:
-                total_cost += m.dsm_blocks["boiler"].operating_cost[t]
-            if self.has_thermal_storage:
-                total_cost += m.dsm_blocks["thermal_storage"].operating_cost[t]
-            if self.has_pv and hasattr(m.dsm_blocks["pv_plant"], "operating_cost"):
-                total_cost += m.dsm_blocks["pv_plant"].operating_cost[
-                    t
-                ]  # typically zero
+            # if self.has_heatpump:
+            #     total_cost += m.dsm_blocks["heat_pump"].operating_cost[t]
+            # if self.has_heat_resistor:
+            #     total_cost += m.dsm_blocks["heat_resistor"].operating_cost[t]
+            # if self.has_boiler:
+            #     total_cost += m.dsm_blocks["boiler"].operating_cost[t]
+            # if self.has_thermal_storage:
+            #     total_cost += m.dsm_blocks["thermal_storage"].operating_cost[t]
+            # if self.has_pv and hasattr(m.dsm_blocks["pv_plant"], "operating_cost"):
+            #     total_cost += m.dsm_blocks["pv_plant"].operating_cost[
+            #         t
+            #     ]  # typically zero
             # pay for grid imports
             total_cost += m.grid_power[t] * m.electricity_price[t]
             return m.variable_cost[t] == total_cost
@@ -604,6 +604,11 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             if hasattr(instance, "hydrogen_price")
             else None
         )
+        variable_cost = (
+            [safe_value(instance.variable_cost[t]) for t in T]
+            if hasattr(instance, "variable_cost")
+            else None
+        )
 
         # ------- figure -------
         fig, axs = plt.subplots(
@@ -682,6 +687,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             plt.show()
         plt.close(fig)
 
+
         # -------- optional CSV export (same columns as plotted) --------
         df = pd.DataFrame(
             {
@@ -701,6 +707,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 "Elec Price [€/MWh_e]": elec_price if elec_price else None,
                 "NG Price [€/MWh_th]": ng_price if ng_price else None,
                 "H2 Price [€/MWh_th]": h2_price if h2_price else None,
+                "Total Variable Cost [€]": variable_cost if variable_cost else None,
             }
         )
         # example: write next to figure if save_path is given
