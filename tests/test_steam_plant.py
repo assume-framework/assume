@@ -60,7 +60,7 @@ def steam_plant_with_hp(steam_plant_components_with_hp) -> SteamPlant:
             60,
             60,
         ],
-        A360_thermal_demand=[8] * 24,  # Constant thermal demand
+        A360_thermal_demand=[100] * 24,  # Constant thermal demand
     )
 
     # Define a bidding strategy for the hydrogen plant
@@ -169,7 +169,7 @@ def steam_plant_with_hp_b(steam_plant_components_with_hp_b) -> SteamPlant:
             60,
         ],
         hydrogen_gas_price=[55] * 24,
-        A360_thermal_demand=[8] * 24,  # Constant thermal demand
+        A360_thermal_demand=[100] * 24,  # Constant thermal demand
         # test_steam_plant_congestion_signal=[0] * 24,  # No congestion
     )
 
@@ -293,7 +293,7 @@ def steam_plant_with_hp_b_ts(steam_plant_components_with_hp_b_ts) -> SteamPlant:
             60,
         ],
         natural_gas_price=[55] * 24,
-        A360_thermal_demand=[8] * 24,  # Constant thermal demand
+        A360_thermal_demand=[100] * 24,  # Constant thermal demand
         # test_steam_plant_congestion_signal=[0] * 24,  # No congestion
     )
 
@@ -454,7 +454,7 @@ def steam_plant_with_hp_b_longterm_ts(
             55,
             60,
         ],
-        A360_thermal_demand=[8] * 24,
+        A360_thermal_demand=[100] * 24,
         # add schedule if your forecaster expects it, but for thermal demand it's enough
     )
     bidding_strategy = {"EOM": NaiveDADSMStrategy()}
@@ -538,7 +538,7 @@ def steam_plant_with_crm_flex(steam_plant_components_with_hp_b):
         index,
         electricity_price=[60] * 24,
         hydrogen_gas_price=[55] * 24,
-        A360_thermal_demand=[8] * 24,
+        A360_thermal_demand=[100] * 24,
     )
     bidding_strategy = {
         "CRM_pos": DSM_PosCRM_Strategy(),
@@ -600,7 +600,7 @@ def steam_plant_with_price_signal_flex(steam_plant_components_with_hp_b):
         index,
         electricity_price=[60] * 24,  # Reference, will be replaced in flex mode
         hydrogen_gas_price=[55] * 24,
-        A360_thermal_demand=[8] * 24,
+        A360_thermal_demand=[100] * 24,
     )
     bidding_strategy = {}
     plant = SteamPlant(

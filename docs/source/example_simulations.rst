@@ -41,13 +41,13 @@ Overview of Example Simulations
    * - small_with_crm
      - example_01c
      - Includes Control Reserve Market (CRM).
-   * - small_with_redispatch
+   * - small_with_redispatch‡
      - example_01d
      - Demonstrates redispatch scenarios.
-   * - small_with_nodal_clearing
+   * - small_with_nodal_clearing‡
      - example_01d
      - Features nodal market clearing.
-   * - small_with_zonal_clearing
+   * - small_with_zonal_clearing‡
      - example_01d
      - Implements zonal market clearing.
    * - market_study_eom
@@ -59,10 +59,10 @@ Overview of Example Simulations
    * - small_learning_1
      - example_02a
      - 7 power plants, 1 with learning bidding strategy. Case 1 in [1]_
-   * - small_learning_2
+   * - small_learning_2†
      - example_02b
      - 11 power plants, 5 with learning bidding strategy. Case 2 in [1]_
-   * - small_learning_3
+   * - small_learning_3†
      - example_02c
      - 16 power plants, 10 with learning bidding strategy. Case 3 in [1]_
    * - large_2019_eom
@@ -77,12 +77,22 @@ Overview of Example Simulations
    * - large_2019_with_DSM
      - example_03
      - Full-year German market simulation with Demand Side Management. [2]_
-   * - large_2019_rl
+   * - large_2019_rl†
      - example_03a
      - Full-year 2021 German market simulation with reinforcement learning with modified power plants list. [1]_
-   * - large_2021_rl
+   * - large_2021_rl†
      - example_03b
      - Full-year 2021 German market simulation with reinforcement learning with modified power plants list. [1]_
+
+.. list-table::
+   :widths: 5 95
+
+   * - Symbol
+     - Requirement
+   * - †
+     - Requires learning components (see below)
+   * - ‡
+     - Requires network/grid components (see below)
 
 Detailed Features of Example Simulations
 ----------------------------------------
@@ -103,7 +113,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - Bidding Strategy
      - Grid
      - Further Info
-   * - small_learning_1
+   * - small_learning_1†
      - Germany
      - Conventional
      - 12,500 MW
@@ -113,7 +123,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - Learning, Naive
      - No
      - Case 1 from [1]_
-   * - small_learning_2
+   * - small_learning_2†
      - Germany
      - Conventional
      - 12,500 MW
@@ -123,7 +133,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - Learning, Naive
      - No
      - Case 2 from [1]_
-   * - small_learning_3
+   * - small_learning_3†
      - Germany
      - Conventional
      - 12,500 MW
@@ -183,7 +193,7 @@ The following table provides a more in-depth look at key examples, highlighting 
      - RL, Various
      - No
      - Based on [1]_
-   * - large_2021_rl
+   * - large_2021_rl†
      - Germany
      - Conv., VRE
      - Full 2021 data
@@ -193,6 +203,36 @@ The following table provides a more in-depth look at key examples, highlighting 
      - RL, Various
      - No
      - Based on [1]_
+   * - small_with_redispatch‡
+     - Germany
+     - Conventional, VRE
+     - Example data
+     - Fixed inflexible
+     - Example data
+     - EOM, Redispatch
+     - Various
+     - Yes
+     - Requires network install
+   * - small_with_nodal_clearing‡
+     - Germany
+     - Conventional, VRE
+     - Example data
+     - Fixed inflexible
+     - Example data
+     - Nodal
+     - Various
+     - Yes
+     - Requires network install
+   * - small_with_zonal_clearing‡
+     - Germany
+     - Conventional, VRE
+     - Example data
+     - Fixed inflexible
+     - Example data
+     - Zonal
+     - Various
+     - Yes
+     - Requires network install
 
 .. note::
   Conv. = Conventional, VRE = Variable Renewable Energy, EOM = Energy-Only Market, CRM = Control Reserve Market, DAM = Day-Ahead Market, RL = Reinforcement Learning, DSM = Demand Side Management
@@ -223,6 +263,19 @@ Key Features of Example Simulations
    - Based on comprehensive research presented in [1]_ and [2]_, offering insights into complex market dynamics and the application of advanced learning techniques in different market years.
 
 These examples provide a diverse range of scenarios, allowing users to explore various aspects of energy market simulation, from basic concepts to complex, real-world applications and advanced learning strategies.
+
+Requirements for Special Examples
+---------------------------------
+
+Some examples require additional installation options for ASSUME:
+
+† Learning examples require the learning components. Install with::
+
+    pip install assume-framework[learning]
+
+‡ Network/grid examples require the network components. Install with::
+
+    pip install assume-framework[network]
 
 References
 ----------
