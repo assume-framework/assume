@@ -15,7 +15,6 @@ from assume.common.grid_utils import (
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import suppress_output
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -73,7 +72,7 @@ class RedispatchMarketRole(MarketRole):
         self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
             self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
-        elif self.solver == "appsi_highs":
+        elif self.solver == "highs":
             self.solver_options = {"output_flag": False, "log_to_console": False}
         else:
             self.solver_options = {}
@@ -191,14 +190,13 @@ class RedispatchMarketRole(MarketRole):
         if line_loading.max().max() > 1:
             logger.debug("Congestion detected")
 
-            with suppress_output():
-                status, termination_condition = redispatch_network.optimize(
-                    solver_name=self.solver,
-                    solver_options=self.solver_options,
-                    # do not show tqdm progress bars for large grids
-                    # https://github.com/PyPSA/linopy/pull/375
-                    progress=False,
-                )
+            status, termination_condition = redispatch_network.optimize(
+                solver_name=self.solver,
+                solver_options=self.solver_options,
+                # do not show tqdm progress bars for large grids
+                # https://github.com/PyPSA/linopy/pull/375
+                progress=False,
+            )
 
             if status != "ok":
                 logger.error(f"Solver exited with {termination_condition}")

@@ -11,7 +11,9 @@ import yaml
 from matplotlib import pyplot as plt
 from pyomo.opt import SolverFactory
 
-from examples.notebooks.MPEC.bilevel_opt import find_optimal_dispatch
+from examples.notebooks.MPEC.bilevel_opt import (
+    find_optimal_dispatch_quadratic,
+)
 from examples.notebooks.MPEC.uc_problem import solve_uc_problem
 
 
@@ -375,6 +377,9 @@ def obtain_k_values(k_df, gens_df):
     # replace inf with 0
     k_df["k"] = k_df["k"].replace(np.inf, 0)
 
+    # delete rows where unit_id is none
+    k_df = k_df[k_df["unit_id"].notna()]
+
     k_values_df = k_df.pivot(index="time", columns="unit_id", values="k")
     # k_values_df.reset_index(inplace=True)
 
@@ -413,7 +418,7 @@ def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w):
 
     gens_df = gens_df.copy(deep=True)
 
-    main_df, supp_df, k_values = find_optimal_dispatch(
+    main_df, supp_df, k_values = find_optimal_dispatch_quadratic(
         gens_df=gens_df,
         k_values_df=k_values_df,
         demand_df=demand_df,

@@ -12,15 +12,28 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
-  **Improvements:**
+0.5.5 - (13th August 2025)
+=======================
+
+**New Features:**
+
+- **Realtime simulation**: A simulation which runs in real-time instead of simulation time can be created and used for hardware-in-the-loop with real assets. Manual configuration of the agents is required for this.
+
+**Improvements:**
 
 - **Changed Logging for DRL metrics**: TensorBoard logging was restructured to separate metrics collected per gradient step and per simulation time step. This avoids unnecessary padding, ensures consistency, and prevents data loss across different logging frequencies.
+- **Improve checking for available solvers**: Defines the list of available solvers only once
+- **More notebooks in CI**: add notebook 10 to CI for functional validation of Demand-Side-Units (DSU).
+- **Correctly suppress highs output for linopy**: this fixes an error when running the redispatch market clearing on Google collab
+- **Add JOSS paper**
+- **Pin pip-tools to fix the docker build**
 - **Additional learning strategy for renewables**: Introduced a new learning strategy specifically designed for renewable energy sources. Most of the functionalities can just be inherited, we chose to add the availability of the unit into the individual observations and calculate the opportunity costs based on the available generation as well.
+- **Actor Output Clamping:** The action outputs of the actor neural network + noise are now always clamped to the valid output range, which is dynamically determined based on the actor architecture and its activation function. This prevents exploration noise from pushing actions outside the achievable output space of the actor, ensuring that bids remain within the intended limits.
 
 0.5.4 - (9th July 2025)
 =======================
 
- **New Features:**
+**New Features:**
 
 - **ThermalStorage with Scheduling:** Introduced a `ThermalStorage` class that extends `GenericStorage` to support both short-term (freely cycling) and long-term (schedule-driven) storage operation. Long-term mode allows users to define a binary schedule to restrict charging and discharging to specific periods, enabling realistic modeling of industrial or seasonal thermal storage behavior. To use this feature, set `storage_type` to `"long-term"` and provide a `storage_schedule_profile` (0: charging allowed, 1: discharging allowed). Hydrogen fuel type included for the Boiler
 - **Hydrogen_plant:** The HydrogenPlant master class has been refactored for modularity. Technologies such as the electrolyser and (optionally) the SeasonalHydrogenStorage are now connected in a flexible manner, supporting both per-timestep and cumulative hydrogen demand balancing. The plant model now robustly accommodates both storage and non-storage configurations, ensuring correct mass balances across all scenarios.
