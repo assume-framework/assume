@@ -1309,7 +1309,7 @@ class RenewableRLStrategy(RLStrategySingleBid):
         # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
         # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
         # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
-        profit = min(profit, 0.5 * abs(profit))
+        profit = min(profit, 0.8 * abs(profit))
 
         # Opportunity cost: The income lost due to not operating at full capacity.
         opportunity_cost = (
@@ -1324,15 +1324,18 @@ class RenewableRLStrategy(RLStrategySingleBid):
         # Dynamic regret scaling:
         # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
         # - If no dispatch happens, apply higher regret (0.5) to discourage idle behavior, if it could have been profitable.
-        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 0.5
+        regret_scale = 0.01 if accepted_volume_total > unit.min_power else 0.05
 
         # --------------------
         # 4.1 Calculate Reward
         # Instead of directly setting reward = profit, we incorporate a regret term (opportunity cost penalty).
         # This guides the agent toward strategies that maximize accepted bids while minimizing lost opportunities.
 
-        # scaling factor to normalize the reward to the range [-1,1]
-        scaling = 1 / (self.max_bid_price * unit.max_power)
+        # scaling factor to normalize the reward to the range [-10,10]
+        if available_power[0] == 0:
+            scaling = 0
+        else:
+            scaling = 1 / (self.max_bid_price * available_power[0] * 0.1)
 
         reward = scaling * (profit - regret_scale * opportunity_cost)
 

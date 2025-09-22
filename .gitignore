@@ -143,6 +143,8 @@ learned_strategies
 examples/outputs
 assume-repo
 tensorboard
+logs/
+
 
 examples/notebooks/inputs
 examples/notebooks/outputs
