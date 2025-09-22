@@ -1331,8 +1331,11 @@ class RenewableRLStrategy(RLStrategySingleBid):
         # Instead of directly setting reward = profit, we incorporate a regret term (opportunity cost penalty).
         # This guides the agent toward strategies that maximize accepted bids while minimizing lost opportunities.
 
-        # scaling factor to normalize the reward to the range [-1,1]
-        scaling = 1 / (self.max_bid_price * unit.max_power)
+        # scaling factor to normalize the reward to the range [-10,10]
+        if available_power[0] == 0:
+            scaling = 0
+        else:
+            scaling = 1 / (self.max_bid_price * available_power[0] * 0.1)
 
         reward = scaling * (profit - regret_scale * opportunity_cost)
 

@@ -111,7 +111,7 @@ available_examples = {
     },
     "case_study_2013_pp": {
         "scenario": "future_markets_paper",
-        "study_case": "base_case_2013_pp",
+        "study_case": "base_case_2013_pp_single",
     },
     "case_study_2013_bat": {
         "scenario": "future_markets_paper",
