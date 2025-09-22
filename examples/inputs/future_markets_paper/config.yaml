@@ -96,7 +96,7 @@ base_case_2013_pp_bat:
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
 
-base_case_2013_pp:
+base_case_2013_pp_single:
   start_date: 2013-01-01 00:00
   end_date: 2013-01-08 00:00
   time_step: 1h
@@ -106,14 +106,14 @@ base_case_2013_pp:
   learning_config:
     continue_learning: False
     trained_policies_save_path: null
-    trained_policies_load_path: null
-    max_bid_price: 300
+    trained_policies_load_path:  null
+    max_bid_price: 500
     algorithm: matd3
     learning_rate: 0.0001
-    training_episodes: 100
-    episodes_collecting_initial_experience: 3
+    training_episodes: 300
+    episodes_collecting_initial_experience: 20
     train_freq: 24h
-    gradient_steps: 1
+    gradient_steps: 10
     batch_size: 256
     gamma: 0.999
     device: cpu
