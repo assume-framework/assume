@@ -176,7 +176,8 @@ class MLPActor(Actor):
         """Forward pass for action prediction."""
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
-        x = self.activation_function(self.FC3(x))
+        x = F.relu(self.FC3(x))
+        x = self.activation_function(self.FC4(x))
 
         return x
 

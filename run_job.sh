@@ -1,4 +1,9 @@
 #!/bin/bash
+
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 #SBATCH --job-name=learn_bat         # Name of your job
 #SBATCH --output=logs/output_%j.txt   # Output log file (%j = job ID)
 #SBATCH --error=logs/error_%j.txt     # Error log file

@@ -104,7 +104,7 @@ base_case_2013_pp_single:
   save_frequency_hours: Null
 
   learning_config:
-    continue_learning: True
+    continue_learning: False
     trained_policies_save_path: null
     trained_policies_load_path:  null
     max_bid_price: 500
