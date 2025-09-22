@@ -146,6 +146,7 @@ tensorboard
 
 examples/notebooks/inputs
 examples/notebooks/outputs
+logs
 **/scenario/*.csv
 *.pb
 *.jar
