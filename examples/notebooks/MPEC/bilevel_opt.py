@@ -609,7 +609,7 @@ def find_optimal_dispatch_quadratic(
     )  # Power output of producer 𝑖 at period 𝑡 (MW) — lower-level primal variable
     model.d = pyo.Var(
         model.time, model.demand_bids, within=pyo.NonNegativeReals
-    )  # satisfied demand at period 𝑡 (MW)
+    )  # satisfied demand at period 𝑡, from the multiple demand-bids n (MW)
     model.c_up = pyo.Var(
         model.gens, model.time, within=pyo.NonNegativeReals
     )  # Start-up cost of producer 𝑖 at period 𝑡 (€)
@@ -640,6 +640,7 @@ def find_optimal_dispatch_quadratic(
     model.psi_max = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
 
     # duals of LP relaxation
+    # Note: ohne Hut = die „echten“ KKT-Duals, mit Komplementarität, evtl. nichtlinear.; mit Hut = linearisierte / relaxierte Variablen, die dieselben Bedingungen abbilden, aber in einem LP/MILP-freundlichen Format.
     model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(0, 200))
     model.mu_max_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.mu_min_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)

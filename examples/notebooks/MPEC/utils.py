@@ -395,7 +395,9 @@ def join_demand_market_orders(demand_df, market_orders_df):
         price_col = f"price_{bid_num}"
         volume_col = f"volume_{bid_num}"
         merged[price_col] = demand_bids.loc[bid_mask, "price"].values
-        merged[volume_col] = demand_bids.loc[bid_mask, "volume"].values
+        merged[volume_col] = (
+            demand_bids.loc[bid_mask, "volume"].values * -1
+        )  # make volume positive
 
     merged["date"] = merged.index.date
     return merged
@@ -471,7 +473,7 @@ def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w, demand_bids
     k_values_df_2[opt_gen] = k_values
 
     updated_main_df_2, updated_supp_df_2 = solve_uc_problem(
-        gens_df, demand_df, k_values_df_2
+        gens_df, demand_df, k_values_df_2, demand_bids=demand_bids
     )
 
     # Calculate profits

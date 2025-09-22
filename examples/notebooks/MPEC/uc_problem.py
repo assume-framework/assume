@@ -9,6 +9,7 @@ Created on August, 21th, 2023
 
 """
 
+import numpy as np
 import pandas as pd
 
 # %%
@@ -18,20 +19,21 @@ from pyomo.opt import SolverFactory
 
 
 # %%
-def solve_uc_problem(gens_df, demand_df, k_values_df):
+def solve_uc_problem(gens_df, demand_df, k_values_df, demand_bids=1):
     model = pyo.ConcreteModel()
 
     # sets
     model.time = pyo.Set(initialize=demand_df.index)
     model.gens = pyo.Set(initialize=gens_df.index)
+    model.demand_bids = pyo.Set(initialize=np.arange(1, demand_bids + 1))
 
     # primary problem variables
     model.g = pyo.Var(
         model.gens, model.time, within=pyo.NonNegativeReals
     )  # Power output of producer 𝑖 at period 𝑡 (MW)
     model.d = pyo.Var(
-        model.time, within=pyo.NonNegativeReals
-    )  # satisfied demand at period 𝑡 (MW)
+        model.time, model.demand_bids, within=pyo.NonNegativeReals
+    )  # satisfied demand at period 𝑡, from the multiple demand-bids n (MW)
     model.c_up = pyo.Var(
         model.gens, model.time, within=pyo.NonNegativeReals
     )  # Start-up cost of producer 𝑖 at period 𝑡 (€)
@@ -54,7 +56,8 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
                 )
 
         for t in model.time:
-            expr -= demand_df.at[t, "price"] * model.d[t]
+            for n in model.demand_bids:
+                expr -= demand_df.at[t, f"price_{n}"] * model.d[t, n]
 
         return expr
 
@@ -62,7 +65,11 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
 
     # energy balance constraint
     def balance_rule(model, t):
-        return model.d[t] - sum(model.g[i, t] for i in model.gens) == 0
+        return (
+            sum(model.d[t, n] for n in model.demand_bids)
+            - sum(model.g[i, t] for i in model.gens)
+            == 0
+        )
 
     model.balance = pyo.Constraint(model.time, rule=balance_rule)
 
@@ -73,11 +80,10 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
     model.g_max = pyo.Constraint(model.gens, model.time, rule=g_max_rule)
 
     # max demand constraint
-    # TODO: Wieso erlauben wir hier demand kleiner als der input demand?
-    def d_max_rule(model, t):
-        return model.d[t] <= demand_df.at[t, "volume"]
+    def d_max_rule(model, t, n):
+        return model.d[t, n] <= demand_df.at[t, f"volume_{n}"]
 
-    model.d_max = pyo.Constraint(model.time, rule=d_max_rule)
+    model.d_max = pyo.Constraint(model.time, model.demand_bids, rule=d_max_rule)
 
     # ramp up constraint
     def ramp_up_rule(model, i, t):
@@ -171,7 +177,9 @@ def solve_uc_problem(gens_df, demand_df, k_values_df):
             generation.loc[t, f"gen_{gen}"] = instance_fixed_u.g[gen, t].value
 
     for t in demand_df.index:
-        demand.loc[t, "demand"] = instance_fixed_u.d[t].value
+        demand.loc[t, "demand"] = sum(
+            instance_fixed_u.d[t, n].value for n in instance_fixed_u.demand_bids
+        )
 
     main_df = pd.concat([generation, demand, prices], axis=1)
 
