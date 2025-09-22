@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # %%
+import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
@@ -593,19 +594,21 @@ def find_optimal_dispatch_quadratic(
     print_results=False,
     K=5,  # number of discrete binary steps considered in the linearisation
     big_M=10e6,
+    demand_bids=1,
 ):
     model = pyo.ConcreteModel()
 
     # sets
     model.time = pyo.Set(initialize=demand_df.index)
     model.gens = pyo.Set(initialize=gens_df.index)
+    model.demand_bids = pyo.Set(initialize=np.arange(1, demand_bids + 1))
 
     # primary variables
     model.g = pyo.Var(
         model.gens, model.time, within=pyo.NonNegativeReals
     )  # Power output of producer 𝑖 at period 𝑡 (MW) — lower-level primal variable
     model.d = pyo.Var(
-        model.time, within=pyo.NonNegativeReals
+        model.time, model.demand_bids, within=pyo.NonNegativeReals
     )  # satisfied demand at period 𝑡 (MW)
     model.c_up = pyo.Var(
         model.gens, model.time, within=pyo.NonNegativeReals
@@ -626,7 +629,7 @@ def find_optimal_dispatch_quadratic(
     # secondary variables
     model.mu_max = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.mu_min = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-    model.nu_max = pyo.Var(model.time, within=pyo.NonNegativeReals)
+    model.nu_max = pyo.Var(model.time, model.demand_bids, within=pyo.NonNegativeReals)
 
     model.pi_u = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.pi_d = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
@@ -640,8 +643,12 @@ def find_optimal_dispatch_quadratic(
     model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(0, 200))
     model.mu_max_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.mu_min_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-    model.nu_max_hat = pyo.Var(model.time, within=pyo.NonNegativeReals)
-    model.nu_min_hat = pyo.Var(model.time, within=pyo.NonNegativeReals)
+    model.nu_max_hat = pyo.Var(
+        model.time, model.demand_bids, within=pyo.NonNegativeReals
+    )
+    model.nu_min_hat = pyo.Var(
+        model.time, model.demand_bids, within=pyo.NonNegativeReals
+    )
     model.pi_u_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.pi_d_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
 
@@ -681,13 +688,21 @@ def find_optimal_dispatch_quadratic(
             for gen in model.gens
             for t in model.time
         )
-        expr -= sum(demand_df.at[t, "price"] * model.d[t] for t in model.time)
+        expr -= sum(
+            demand_df.at[t, f"price_{n}"] * model.d[t, n]
+            for t in model.time
+            for n in model.demand_bids
+        )
         return expr
 
     def duality_gap_part_2_rule(model):
         # (7a) (3rd line)
         # objective value of the dual problem, using the current values of the dual variables
-        expr = -sum(model.nu_max[t] * demand_df.at[t, "volume"] for t in model.time)
+        expr = -sum(
+            model.nu_max[t, n] * demand_df.at[t, f"volume_{n}"]
+            for t in model.time
+            for n in model.demand_bids
+        )
 
         expr -= sum(
             model.pi_u[i, t] * gens_df.at[i, "r_up"]
@@ -733,7 +748,11 @@ def find_optimal_dispatch_quadratic(
     # energy balance constraint
     def balance_rule(model, t):
         # (7d)
-        return model.d[t] - sum(model.g[i, t] for i in model.gens) == 0
+        return (
+            sum(model.d[t, n] for n in model.demand_bids)
+            - sum(model.g[i, t] for i in model.gens)
+            == 0
+        )
 
     model.balance = pyo.Constraint(model.time, rule=balance_rule)
 
@@ -745,11 +764,11 @@ def find_optimal_dispatch_quadratic(
     model.g_max = pyo.Constraint(model.gens, model.time, rule=g_max_rule)
 
     # max demand constraint
-    def d_max_rule(model, t):
+    def d_max_rule(model, t, n):
         # (7f)
-        return model.d[t] <= demand_df.at[t, "volume"]
+        return model.d[t, n] <= demand_df.at[t, f"volume_{n}"]
 
-    model.d_max = pyo.Constraint(model.time, rule=d_max_rule)
+    model.d_max = pyo.Constraint(model.time, model.demand_bids, rule=d_max_rule)
 
     # max ramp up constraint
     def ru_max_rule(model, i, t):
@@ -853,11 +872,15 @@ def find_optimal_dispatch_quadratic(
 
     model.status_dual = pyo.Constraint(model.gens, model.time, rule=status_dual_rule)
 
-    def demand_dual_rule(model, t):
+    def demand_dual_rule(model, t, n):
         # (7ac) – Stationarity w.r.t. demand variable 𝑑𝑡
-        return -demand_df.at[t, "price"] + model.lambda_[t] + model.nu_max[t] >= 0
+        return (
+            -demand_df.at[t, f"price_{n}"] + model.lambda_[t] + model.nu_max[t, n] >= 0
+        )
 
-    model.demand_dual = pyo.Constraint(model.time, rule=demand_dual_rule)
+    model.demand_dual = pyo.Constraint(
+        model.time, model.demand_bids, rule=demand_dual_rule
+    )
 
     # KKT conditions
     # Stationarity conditions
@@ -883,17 +906,19 @@ def find_optimal_dispatch_quadratic(
 
     model.kkt_gen = pyo.Constraint(model.gens, model.time, rule=kkt_gen_rule)
 
-    def kkt_demand_rule(model, t):
+    def kkt_demand_rule(model, t, n):
         # (7af) – Stationarity (relaxed KKT) w.r.t. the demand variable 𝑑𝑡
         return (
-            -demand_df.at[t, "price"]
+            -demand_df.at[t, f"price_{n}"]
             + model.lambda_hat[t]
-            + model.nu_max_hat[t]
-            - model.nu_min_hat[t]
+            + model.nu_max_hat[t, n]
+            - model.nu_min_hat[t, n]
             == 0
         )
 
-    model.kkt_demand = pyo.Constraint(model.time, rule=kkt_demand_rule)
+    model.kkt_demand = pyo.Constraint(
+        model.time, model.demand_bids, rule=kkt_demand_rule
+    )
 
     # Complementary slackness conditions
     # for generation and demand upper bounds
@@ -921,45 +946,45 @@ def find_optimal_dispatch_quadratic(
         model.gens, model.time, rule=mu_max_hat_binary_rule_3
     )
 
-    model.nu_max_hat_binary = pyo.Var(model.time, within=pyo.Binary)
+    model.nu_max_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
 
-    def nu_max_hat_binary_rule_1(model, t):
-        return model.d[t] - demand_df.at[t, "volume"] <= max(demand_df["volume"]) * (
-            1 - model.nu_max_hat_binary[t]
-        )
+    def nu_max_hat_binary_rule_1(model, t, n):
+        return model.d[t, n] - demand_df.at[t, f"volume_{n}"] <= max(
+            demand_df[f"volume_{n}"]
+        ) * (1 - model.nu_max_hat_binary[t, n])
 
-    def nu_max_hat_binary_rule_2(model, t):
-        return model.d[t] - demand_df.at[t, "volume"] >= -max(demand_df["volume"]) * (
-            1 - model.nu_max_hat_binary[t]
-        )
+    def nu_max_hat_binary_rule_2(model, t, n):
+        return model.d[t, n] - demand_df.at[t, f"volume_{n}"] >= -max(
+            demand_df[f"volume_{n}"]
+        ) * (1 - model.nu_max_hat_binary[t, n])
 
-    def nu_max_hat_binary_rule_3(model, t):
-        return model.nu_max_hat[t] <= big_M * model.nu_max_hat_binary[t]
+    def nu_max_hat_binary_rule_3(model, t, n):
+        return model.nu_max_hat[t, n] <= big_M * model.nu_max_hat_binary[t, n]
 
     model.nu_max_hat_binary_constr_1 = pyo.Constraint(
-        model.time, rule=nu_max_hat_binary_rule_1
+        model.time, model.demand_bids, rule=nu_max_hat_binary_rule_1
     )
     model.nu_max_hat_binary_constr_2 = pyo.Constraint(
-        model.time, rule=nu_max_hat_binary_rule_2
+        model.time, model.demand_bids, rule=nu_max_hat_binary_rule_2
     )
     model.nu_max_hat_binary_constr_3 = pyo.Constraint(
-        model.time, rule=nu_max_hat_binary_rule_3
+        model.time, model.demand_bids, rule=nu_max_hat_binary_rule_3
     )
 
-    model.nu_min_hat_binary = pyo.Var(model.time, within=pyo.Binary)
+    model.nu_min_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
 
-    def nu_min_hat_binary_rule_1(model, t):
-        return model.d[t] <= big_M * (1 - model.nu_min_hat_binary[t])
+    def nu_min_hat_binary_rule_1(model, t, n):
+        return model.d[t, n] <= big_M * (1 - model.nu_min_hat_binary[t, n])
 
-    def nu_min_hat_binary_rule_3(model, t):
-        return model.nu_min_hat[t] <= big_M * model.nu_min_hat_binary[t]
+    def nu_min_hat_binary_rule_3(model, t, n):
+        return model.nu_min_hat[t, n] <= big_M * model.nu_min_hat_binary[t, n]
 
     model.nu_min_hat_binary_constr_1 = pyo.Constraint(
-        model.time, rule=nu_min_hat_binary_rule_1
+        model.time, model.demand_bids, rule=nu_min_hat_binary_rule_1
     )
 
     model.nu_min_hat_binary_constr_3 = pyo.Constraint(
-        model.time, rule=nu_min_hat_binary_rule_3
+        model.time, model.demand_bids, rule=nu_min_hat_binary_rule_3
     )
 
     # Complementary slackness conditions
@@ -1065,7 +1090,9 @@ def find_optimal_dispatch_quadratic(
 
     demand_df = pd.DataFrame(index=demand_df.index, columns=["demand"])
     for t in demand_df.index:
-        demand_df.at[t, "demand"] = instance.d[t].value
+        demand_df.at[t, "demand"] = sum(
+            instance.d[t, n].value for n in instance.demand_bids
+        )
 
     mcp = pd.DataFrame(index=demand_df.index, columns=["mcp"])
     for t in demand_df.index:

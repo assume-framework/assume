@@ -354,17 +354,51 @@ def create_gens_df(pp_units, dispatch_df):
 
 
 def join_demand_market_orders(demand_df, market_orders_df):
-    # join demand df and market orders where unit id is demand_EOM based on index
+    """
+    Join demand_df and market_orders_df, handling multiple demand_EOM bid_ids if present.
+    If only demand_EOM_1 (or demand_EOM) is present, keep old behavior.
+    If multiple demand_EOM_X exist (e.g., demand_EOM_1, demand_EOM_2), merge all corresponding price/volume pairs.
+
+    Returns:
+        demand_df with columns ["volume", "price"] (single or multi-bid as appropriate)
+    """
     demand_df = demand_df.copy()
-    demand_df["price"] = market_orders_df[market_orders_df["unit_id"] == "demand_EOM"][
-        "price"
-    ]
-    demand_df = demand_df.drop(columns=["date"])
-    demand_df.index.name = "datetime"
-    demand_df.columns = ["volume", "price"]
-    demand_df.index = pd.to_datetime(demand_df.index)
-    demand_df["date"] = demand_df.index.date
-    return demand_df
+    # Find all demand_EOM bid_ids
+    demand_bids = market_orders_df[market_orders_df["unit_id"] == "demand_EOM"]
+    unique_bids = demand_bids["bid_id"].unique()
+
+    # If only demand_EOM or demand_EOM_1, keep old behavior
+    if len(unique_bids) == 1 and (unique_bids[0] in ["demand_EOM", "demand_EOM_1"]):
+        demand_df["price"] = demand_bids["price"].values
+        demand_df = demand_df.drop(columns=["date"])
+        demand_df.index.name = "datetime"
+        demand_df.columns = ["volume_1", "price_1"]
+        demand_df.index = pd.to_datetime(demand_df.index)
+        demand_df["date"] = demand_df.index.date
+        return demand_df
+
+    # If multiple demand_EOM_X bids, merge all
+    # Pivot market_orders_df to get all demand_EOM_X price/volume columns
+    demand_bids = demand_bids.copy()
+    demand_bids["bid_num"] = demand_bids["bid_id"].str.extract(r"(\d+)$").fillna("1")
+    demand_bids["bid_num"] = demand_bids["bid_num"].astype(int)
+    demand_bids = demand_bids.sort_values("bid_num")
+
+    # For each bid, create price_X and volume_X columns
+    merged = demand_df.copy()
+    merged = merged.drop(columns=["date"])
+    merged.index.name = "datetime"
+    merged.index = pd.to_datetime(merged.index)
+
+    for bid_num in sorted(demand_bids["bid_num"].unique()):
+        bid_mask = demand_bids["bid_num"] == bid_num
+        price_col = f"price_{bid_num}"
+        volume_col = f"volume_{bid_num}"
+        merged[price_col] = demand_bids.loc[bid_mask, "price"].values
+        merged[volume_col] = demand_bids.loc[bid_mask, "volume"].values
+
+    merged["date"] = merged.index.date
+    return merged
 
 
 def obtain_k_values(k_df, gens_df):
@@ -389,7 +423,7 @@ def obtain_k_values(k_df, gens_df):
     return k_values_df
 
 
-def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w):
+def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w, demand_bids=1):
     """
     Run the MPEC optimization for the given unit and return the profits before and after the optimization.
 
@@ -429,6 +463,7 @@ def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w):
         print_results=True,
         K=5,
         big_M=10e6,
+        demand_bids=demand_bids,
     )
 
     # calculate actual market clearing prices
