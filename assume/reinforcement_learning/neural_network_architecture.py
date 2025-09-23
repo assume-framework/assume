@@ -111,8 +111,38 @@ class Actor(nn.Module):
     Parent class for actor networks.
     """
 
+    activation_function_limit = {
+        "softsign": (-1, 1),
+        "tanh": (-1, 1),
+        "sigmoid": (0, 1),
+        "relu": (0, float("inf")),
+    }
+
+    activation_function_map = {
+        "softsign": F.softsign,
+        "tanh": th.tanh,
+        "sigmoid": th.sigmoid,
+        "relu": F.relu,
+    }
+
     def __init__(self):
         super().__init__()
+
+        self.activation = "softsign"  # or "tanh", "sigmoid", "relu"
+
+        if self.activation not in self.activation_function_limit:
+            raise ValueError(
+                f"Activation '{self.activation}' not supported! Supported: {list(self.activation_function_limit.keys())}"
+            )
+        self.min_output, self.max_output = self.activation_function_limit[
+            self.activation
+        ]
+
+        self.activation_function = self.activation_function_map.get(self.activation)
+        if self.activation_function is None:
+            raise ValueError(
+                f"Activation '{self.activation}' not implemented in forward pass!"
+            )
 
 
 class MLPActor(Actor):
@@ -130,10 +160,6 @@ class MLPActor(Actor):
         # Initialize weights
         self._init_weights()
 
-        # call forward pass with high obs value array to get max value of output layer
-        self.max_output = self.forward(th.ones(obs_dim, dtype=float_type) * 1000)
-        self.min_output = self.forward(th.ones(obs_dim, dtype=float_type) * -1000)
-
     def _init_weights(self):
         """Apply Xavier initialization to all layers."""
 
@@ -148,7 +174,7 @@ class MLPActor(Actor):
         """Forward pass for action prediction."""
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
-        x = F.softsign(self.FC3(x))
+        x = self.activation_function(self.FC3(x))
 
         return x
 
@@ -227,10 +253,6 @@ class LSTMActor(Actor):
             )
             self.FC2 = nn.Linear(128, act_dim, dtype=float_type)
 
-        # call forward pass with high obs value array to get max value of output layer
-        self.max_output = self.forward(th.ones(obs_dim, dtype=float_type) * 1000)
-        self.min_output = self.forward(th.ones(obs_dim, dtype=float_type) * -1000)
-
     def forward(self, obs):
         if obs.dim() not in (1, 2):
             raise ValueError(
@@ -291,9 +313,8 @@ class LSTMActor(Actor):
             outputs = th.cat(outputs, dim=1)
             x = th.cat((outputs, x2), dim=1)
 
-            x = F.relu(self.FC1(x))
-            x = F.softsign(self.FC2(x))
-            # x = th.tanh(self.FC3(x))
+        x = F.relu(self.FC1(x))
+        x = self.activation_function(self.FC2(x))
 
         if not is_batched:
             x = x.squeeze(0)
