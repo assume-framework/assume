@@ -15,6 +15,7 @@ from assume.common.base import (
     SupportsMinMax,
     SupportsMinMaxCharge,
 )
+from assume.common.exceptions import AssumeException
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index, min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
@@ -878,7 +879,10 @@ class RLStrategyDAM(RLStrategy):
         # 1. Get the Observations, which are the basis of the action decision
         # =============================================================================
         next_observation = self.create_observation(
-            unit=unit, market_id=market_config.market_id, start=first_start
+            unit=unit,
+            market_id=market_config.market_id,
+            start=first_start,
+            end=final_end,
         )
 
         # =============================================================================
@@ -897,8 +901,12 @@ class RLStrategyDAM(RLStrategy):
         if self.original_implementation or len(actions) == len(product_tuples):
             bid_prices = bid_prices.reshape(-1, 1)
         # reshape for multi-step bidding with flex and inflex
-        else:
+        elif len(actions) == 2 * len(product_tuples):
             bid_prices = bid_prices.reshape(-1, 2)
+        else:
+            raise AssumeException(
+                f"The action dimension cannot be matched to the chosen market products. It can be either one or two bids per product, but act_dim is {len(actions)} and {len(product_tuples)} market products are expected. Adjust the action dimension, for DAM bidding to 24 or 48 accordingly."
+            )
 
         # 3.1 formulate the bids for Pmin
         # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
@@ -1132,8 +1140,8 @@ class RLStrategyDAM(RLStrategy):
         # Instead of directly setting reward = profit, we incorporate a regret term (opportunity cost penalty).
         # This guides the agent toward strategies that maximize accepted bids while minimizing lost opportunities.
 
-        # scaling factor to normalize the reward to the range [-1,1]
-        scaling = 1 / (self.max_bid_price * unit.max_power)
+        # scaling factor to normalize the reward to the range [-10,10]
+        scaling = 10 / (self.max_bid_price * unit.max_power)
 
         reward = scaling * (reward - regret_scale * opportunity_cost)
 

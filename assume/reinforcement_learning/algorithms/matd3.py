@@ -616,6 +616,9 @@ class TD3(RLAlgorithm):
                 unit_params[step][strategy.unit_id]["critic_loss"] = critic_loss.item()
                 total_critic_loss += critic_loss
 
+            # Normalize loss to make it independent of number of agents
+            total_critic_loss = total_critic_loss / n_rl_agents
+
             # Single backward pass for all agents' critics
             total_critic_loss.backward()
 
@@ -693,6 +696,13 @@ class TD3(RLAlgorithm):
                     )
                     # Accumulate actor losses
                     total_actor_loss += actor_loss
+
+                    # TODO: losses should be normalized to number of agents,
+                    # otherwise gradients accumulate with increasing agent numbers
+                    # and learning rate increases
+
+                # Normalize loss to make it independent of number of agents
+                total_actor_loss = total_actor_loss / n_rl_agents
 
                 # Single backward pass for all actors
                 total_actor_loss.backward()
