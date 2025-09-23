@@ -131,8 +131,8 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 storage_cfg["storage_schedule_profile"] = schedule_series
 
         # Add price forecasts
-        self.electricity_price = self.forecaster["DE_EHV_HV_1"]
-        self.electricity_price_flex = self.forecaster["DE_EHV_HV_1"]
+        self.electricity_price = self.forecaster["PL_B"]
+        self.electricity_price_flex = self.forecaster["PL_B"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
             self.natural_gas_price = self.forecaster["natural_gas_price"]
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
@@ -366,6 +366,14 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             #     total_cost += m.dsm_blocks["pv_plant"].operating_cost[
             #         t
             #     ]  # typically zero
+            if self.has_boiler:
+                boiler = self.components.get("boiler", None)
+                fuel = getattr(boiler, "fuel_type", None) if boiler else None
+
+                if fuel in {"natural_gas", "hydrogen"}:
+                    # Only add if the block/var exists (guards against missing attrs)
+                        total_cost += m.dsm_blocks["boiler"].operating_cost[t]
+
             # pay for grid imports
             total_cost += m.grid_power[t] * m.electricity_price[t]
             return m.variable_cost[t] == total_cost
@@ -415,6 +423,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
         # map to model's time step ids
         m.fcr_blocks = pyo.Set(initialize=starts_idx, ordered=True)
+        N = len(ts)  # number of time steps in the horizon
 
         # ---- Block prices: sum of hourly €/MW/h inside each 4h block ----
         price_hourly_fcr      = [0.0]*N if self.fcr_price is None      else [float(x) for x in self.fcr_price]
