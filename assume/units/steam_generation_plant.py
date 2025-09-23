@@ -152,12 +152,14 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             # ---- Built-in FCR configuration (hardcoded German FCR) ----
             # Active only if self.is_prosumer is True
             self.fcr_enabled = bool(self.is_prosumer)
-            self.fcr_symmetric = True          # set True if you want symmetric product by default
+            self.fcr_symmetric = False          # set True if you want symmetric product by default
             self._FCR_BLOCK_LENGTH = 4          # hours, fixed TSO blocks
             self._FCR_MIN_BID_MW   = 1.0        # minimum capacity per block
             self._FCR_STEP_MW      = 1.0        # increment: bids in integer MW
-            # expected FCR value (€/MW/h) as hourly series; if not provided, assume zeros
-            self.fcr_price_eur_per_mw_h = self.forecaster["DE_fcr_price"]
+            # expected FCR/aFRR value (€/MW/h) as hourly series; if not provided, assume zeros
+            self.fcr_price = self.forecaster["DE_fcr_price"]
+            self.afrr_price_pos = self.forecaster["DE_pos_price"]
+            self.afrr_price_neg = self.forecaster["DE_neg_price"]
 
         # Initialize the model
         self.setup_model()
@@ -415,14 +417,19 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         m.fcr_blocks = pyo.Set(initialize=starts_idx, ordered=True)
 
         # ---- Block prices: sum of hourly €/MW/h inside each 4h block ----
-        if self.fcr_price_eur_per_mw_h is None:
-            price_hourly = [0.0] * len(ts)
-        else:
-            # ensure list of floats length == horizon
-            price_hourly = [float(x) for x in self.fcr_price_eur_per_mw_h]
+        price_hourly_fcr      = [0.0]*N if self.fcr_price is None      else [float(x) for x in self.fcr_price]
+        price_hourly_afrr_pos = [0.0]*N if self.afrr_price_pos is None else [float(x) for x in self.afrr_price_pos]
+        price_hourly_afrr_neg = [0.0]*N if self.afrr_price_neg is None else [float(x) for x in self.afrr_price_neg]
 
-        block_price = {b: sum(price_hourly[b + k] for k in range(L)) for b in starts_idx}
-        m.fcr_block_price = pyo.Param(m.fcr_blocks, initialize=block_price, mutable=False)
+        def _block(v):
+            ps = [0.0]
+            for x in v: ps.append(ps[-1] + x)
+            return {b: ps[b + L] - ps[b] for b in starts_idx}
+
+        m.fcr_block_price       = pyo.Param(m.fcr_blocks, initialize=_block(price_hourly_fcr),      mutable=False)
+        m.afrr_block_price_pos  = pyo.Param(m.fcr_blocks, initialize=_block(price_hourly_afrr_pos), mutable=False)
+        m.afrr_block_price_neg  = pyo.Param(m.fcr_blocks, initialize=_block(price_hourly_afrr_neg), mutable=False)
+
 
         # ---- Static plant-wide min/max electric power envelope (headroom/footroom) ----
         max_cap = 0.0
@@ -501,8 +508,8 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             else:
                 # asymmetric: sum the two capacities, constraints will force one to zero if needed
                 return (
-                    sum(mm.fcr_block_price[b] * mm.cap_up[b]   for b in mm.fcr_blocks) +
-                    sum(mm.fcr_block_price[b] * mm.cap_dn[b]   for b in mm.fcr_blocks)
+                    sum(mm.afrr_block_price_pos[b] * mm.cap_up[b]   for b in mm.fcr_blocks) +
+                    sum(mm.afrr_block_price_neg[b] * mm.cap_dn[b]   for b in mm.fcr_blocks)
                 )
 
 
@@ -858,26 +865,48 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         if any([p0, p1]):
             axs[1].legend(loc="upper right", frameon=True)
 
-        # ---------- BOTTOM: FCR bids & impact (clarified) ----------
+        # ---------- BOTTOM: Reserve bids & operational impact ----------
         fcr_present = hasattr(instance, "fcr_blocks")
         fcr_len = getattr(self, "_FCR_BLOCK_LENGTH", 4)
+        is_symmetric = bool(getattr(self, "fcr_symmetric", False))
 
         def zero_or_list(x, n):
-            return [0.0]*n if x is None else x
+            return [0.0] * n if x is None else x
 
         fcr_blocks_list = list(getattr(instance, "fcr_blocks", [])) if fcr_present else []
-        cap_up_map, cap_dn_map, block_price_map = {}, {}, {}
+        cap_up_map, cap_dn_map = {}, {}
+        # price maps (one for symmetric FCR; two for asymmetric aFRR)
+        price_map_sym = {}
+        price_map_pos = {}
+        price_map_neg = {}
 
         if fcr_present and fcr_blocks_list:
+            # capacities
             for b in fcr_blocks_list:
-                if hasattr(instance, "cap_up"):         cap_up_map[b] = safe_value(instance.cap_up[b])
-                if hasattr(instance, "cap_dn"):         cap_dn_map[b] = safe_value(instance.cap_dn[b])
-                if hasattr(instance, "fcr_block_price"): block_price_map[b] = safe_value(instance.fcr_block_price[b])
+                if hasattr(instance, "cap_up"):
+                    cap_up_map[b] = safe_value(instance.cap_up[b])
+                if hasattr(instance, "cap_dn"):
+                    cap_dn_map[b] = safe_value(instance.cap_dn[b])
 
+            # prices
+            if is_symmetric:
+                for b in fcr_blocks_list:
+                    if hasattr(instance, "fcr_block_price"):
+                        price_map_sym[b] = safe_value(instance.fcr_block_price[b])
+            else:
+                for b in fcr_blocks_list:
+                    if hasattr(instance, "afrr_block_price_pos"):
+                        price_map_pos[b] = safe_value(instance.afrr_block_price_pos[b])
+                    if hasattr(instance, "afrr_block_price_neg"):
+                        price_map_neg[b] = safe_value(instance.afrr_block_price_neg[b])
+
+            # expand to hourly 'stairs'
             H = len(T)
             cap_up_stairs = stairs_from_blocks(fcr_blocks_list, cap_up_map, fcr_len, H) if cap_up_map else [0.0]*H
             cap_dn_stairs = stairs_from_blocks(fcr_blocks_list, cap_dn_map, fcr_len, H) if cap_dn_map else [0.0]*H
-            price_stairs  = stairs_from_blocks(fcr_blocks_list, block_price_map, fcr_len, H) if block_price_map else [0.0]*H
+            price_stairs_sym = stairs_from_blocks(fcr_blocks_list, price_map_sym, fcr_len, H) if price_map_sym else None
+            price_stairs_pos = stairs_from_blocks(fcr_blocks_list, price_map_pos, fcr_len, H) if price_map_pos else None
+            price_stairs_neg = stairs_from_blocks(fcr_blocks_list, price_map_neg, fcr_len, H) if price_map_neg else None
 
             # Baseline & capability envelope
             base = zero_or_list(total_elec, len(T))
@@ -887,34 +916,46 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             if min_cap is not None:
                 axs[2].plot(T, [min_cap]*len(T), color="0.7", ls="--", label="Min Capability [MWₑ]")
 
-            # CAPACITY BANDS around the baseline
-            # UP = we can reduce load: show a red band between (base - up) and base
+            # Capacity bands
             lower_up = [max(min_cap if min_cap is not None else -1e9, base[i] - cap_up_stairs[i]) for i in range(len(T))]
-            axs[2].fill_between(T, lower_up, base, color="#d62728", alpha=0.25, step="pre", label="FCR Up Capacity [MW]")
+            axs[2].fill_between(T, lower_up, base, color="#d62728", alpha=0.25, step="pre", label="UP Capacity [MW]")
 
-            # DOWN = we can increase load: show a green band between base and (base + down)
             upper_dn = [min(max_cap if max_cap is not None else 1e9, base[i] + cap_dn_stairs[i]) for i in range(len(T))]
-            axs[2].fill_between(T, base, upper_dn, color="#2ca02c", alpha=0.25, step="pre", label="FCR Down Capacity [MW]")
+            axs[2].fill_between(T, base, upper_dn, color="#2ca02c", alpha=0.25, step="pre", label="DOWN Capacity [MW]")
 
-            # FCR block price on twin axis
+            # Prices on twin axis
             axp2 = axs[2].twinx()
-            axp2.plot(T, price_stairs, color="#9467bd", ls="--", lw=2, label="FCR Block Price [€/MW per 4h]")
-            axp2.set_ylabel("FCR Price", color="gray")
+            if is_symmetric and price_stairs_sym is not None:
+                axp2.plot(T, price_stairs_sym, color="#9467bd", ls="--", lw=2,
+                          label="FCR Block Price [€/MW·4h]")
+            else:
+                if price_stairs_pos is not None:
+                    axp2.plot(T, price_stairs_pos, color="#1f77b4", ls="--", lw=2,
+                              label="aFRR+ Price [€/MW·4h]")
+                if price_stairs_neg is not None:
+                    axp2.plot(T, price_stairs_neg, color="#ff7f0e", ls="--", lw=2,
+                              label="aFRR− Price [€/MW·4h]")
+
+            axp2.set_ylabel("Reserve Price", color="gray")
             axp2.tick_params(axis="y", labelcolor="gray")
 
-            # Shade active blocks (any capacity)
+            # Shade active blocks
             for b in fcr_blocks_list:
                 active = (cap_up_map.get(b, 0.0) > 0.0) or (cap_dn_map.get(b, 0.0) > 0.0)
                 if active:
                     axs[2].axvspan(b, min(b + fcr_len, len(T)), color="k", alpha=0.04)
 
-            # Clean legend: pull handles from both axes
+            # Legend from both axes
             h1, l1 = axs[2].get_legend_handles_labels()
             h2, l2 = axp2.get_legend_handles_labels()
             axs[2].legend(h1 + h2, l1 + l2, loc="upper left", frameon=True)
 
             axs[2].set_ylabel("MW / MWₑ")
-            axs[2].set_title("FCR Bids (4h blocks) — Red = Up, Green = Down (bands around baseline)")
+            axs[2].set_title(
+                "Reserve Bids (4h blocks) — Red=UP, Green=DOWN; prices on right axis"
+                if not is_symmetric else
+                "FCR Bids (4h blocks) — Red=UP, Green=DOWN; FCR price on right axis"
+            )
             axs[2].grid(True, which="both", axis="both")
 
         else:
@@ -924,7 +965,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             if min_cap is not None:
                 axs[2].plot(T, [min_cap]*len(T), color="0.7", ls="--", label="Min Capability [MWₑ]")
             axs[2].set_ylabel("MW / MWₑ")
-            axs[2].set_title("Operational Baseline (no FCR on instance)")
+            axs[2].set_title("Operational Baseline (no reserve structures on instance)")
             axs[2].grid(True, which="both", axis="both")
             axs[2].legend(loc="upper left", frameon=True)
 
@@ -960,14 +1001,29 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             "Total Elec Load [MW_e]": total_elec if total_elec else None,
         })
 
-        # Add FCR hourly stairs if present
+                # --- CSV export additions for reserve prices ---
         if fcr_present and fcr_blocks_list:
-            if cap_up_stairs:
-                df["FCR Up Cap [MW]"] = cap_up_stairs
-            if cap_dn_stairs:
-                df["FCR Down Cap [MW]"] = cap_dn_stairs
-            if price_stairs:
-                df["FCR Block Price [€/MW per 4h]"] = price_stairs
+            # ensure these names exist if you want them in the CSV scope
+            try:
+                df["Reserve UP Cap [MW]"] = cap_up_stairs
+                df["Reserve DOWN Cap [MW]"] = cap_dn_stairs
+            except NameError:
+                pass
+
+            if is_symmetric:
+                try:
+                    df["FCR Block Price [€/MW·4h]"] = price_stairs_sym
+                except NameError:
+                    pass
+            else:
+                try:
+                    if price_stairs_pos is not None:
+                        df["aFRR+ Price [€/MW·4h]"] = price_stairs_pos
+                    if price_stairs_neg is not None:
+                        df["aFRR− Price [€/MW·4h]"] = price_stairs_neg
+                except NameError:
+                    pass
+
 
         if save_path:
             csv_path = save_path.rsplit(".", 1)[0] + ".csv"
@@ -2097,183 +2153,233 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             fig_b.update_layout(title="Baseline Comparison (Economy & CO₂)")
             figs_cmp.append(fig_b)
 
-        # ------------------------- PROSUMER / FCR ANALYTICS -------------------------
-        figs_fcr = []
-        if getattr(self, "is_prosumer", False) and hasattr(instance, "time_steps"):
-            # Guard against missing FCR constructs
-            fcr_blocks = list(getattr(instance, "fcr_blocks", []))
-            cap_up = getattr(instance, "cap_up", None)
-            cap_dn = getattr(instance, "cap_dn", None)
-            fcr_block_price = getattr(instance, "fcr_block_price", None)
-            bid_up = getattr(instance, "bid_up", None)
-            bid_dn = getattr(instance, "bid_dn", None)
+                # ------------------------- PROSUMER / RESERVE (FCR / aFRR) ANALYTICS -------------------------
+        figs_res = []
+        is_prosumer = bool(getattr(self, "is_prosumer", False))
+        if is_prosumer and hasattr(instance, "time_steps"):
+            blk_len   = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))
+            step_mw   = float(getattr(self, "_FCR_STEP_MW", 1.0))
+            min_bid   = float(getattr(self, "_FCR_MIN_BID_MW", 1.0))
+            symmetric = bool(getattr(self, "fcr_symmetric", True))   # True → FCR; False → aFRR (+/−)
 
-            if fcr_blocks and (cap_up or cap_dn):
-                # --- parameters (hardcoded per your plant’s prosumer-mode) ---
-                blk_len = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))
-                step_mw = float(getattr(self, "_FCR_STEP_MW", 1.0))
-                min_bid = float(getattr(self, "_FCR_MIN_BID_MW", 1.0))
+            # Handles exposed by your model
+            fcr_blocks   = list(getattr(instance, "fcr_blocks", []))
+            cap_up_v     = getattr(instance, "cap_up", None)           # per-block capacity [MW]
+            cap_dn_v     = getattr(instance, "cap_dn", None)
+            price_fcr_v  = getattr(instance, "fcr_block_price", None)  # €/MW per 4h (symmetric)
+            price_pos_v  = getattr(instance, "afrr_block_price_pos", None)  # €/MW per 4h (asymmetric +)
+            price_neg_v  = getattr(instance, "afrr_block_price_neg", None)  # €/MW per 4h (asymmetric −)
 
+            if fcr_blocks and (cap_up_v or cap_dn_v):
                 # helpers
                 def s(v):
                     try: return float(pyo.value(v))
                     except Exception: return float(v) if v is not None else 0.0
 
-                def get_block_map(pyomo_param):
+                def pull_map(pyobj):
                     d = {}
-                    if pyomo_param is None: return d
-                    for b in fcr_blocks:
-                        d[b] = s(pyomo_param[b])
+                    if pyobj is None: return d
+                    for b in fcr_blocks: d[b] = s(pyobj[b])
                     return d
 
-                def stairs_from_blocks(block_starts, per_block_values, block_len, horizon_len):
-                    y = [0.0] * horizon_len
-                    for b in block_starts:
-                        val = per_block_values.get(b, 0.0)
-                        for k in range(block_len):
+                def stairs(blocks, block_map, L, H):
+                    y = [0.0]*H
+                    for b in blocks:
+                        val = float(block_map.get(b, 0.0))
+                        for k in range(L):
                             i = b + k
-                            if 0 <= i < horizon_len:
-                                y[i] = val
+                            if 0 <= i < H: y[i] = val
                     return y
 
-                # --- per-block dicts & hourly stairs ---
-                up_map  = get_block_map(cap_up)
-                dn_map  = get_block_map(cap_dn)
-                pr_map  = get_block_map(fcr_block_price)
-                H = len(T)
-                up_stairs = stairs_from_blocks(fcr_blocks, up_map, blk_len, H) if up_map else [0.0]*H
-                dn_stairs = stairs_from_blocks(fcr_blocks, dn_map, blk_len, H) if dn_map else [0.0]*H
-                pr_stairs = stairs_from_blocks(fcr_blocks, pr_map, blk_len, H) if pr_map else [0.0]*H
+                up_map  = pull_map(cap_up_v)
+                dn_map  = pull_map(cap_dn_v)
+                H       = len(T)
 
-                # ---------------- Block ladder (Up/Down) + price ----------------
+                # ---- prices (symmetric or asymmetric) ----
+                pr_map_sym = pull_map(price_fcr_v) if symmetric else {}
+                pr_map_pos = pull_map(price_pos_v) if not symmetric else {}
+                pr_map_neg = pull_map(price_neg_v) if not symmetric else {}
+
+                up_stairs = stairs(fcr_blocks, up_map, blk_len, H) if up_map else [0.0]*H
+                dn_stairs = stairs(fcr_blocks, dn_map, blk_len, H) if dn_map else [0.0]*H
+                pr_sym    = stairs(fcr_blocks, pr_map_sym, blk_len, H) if pr_map_sym else None
+                pr_pos    = stairs(fcr_blocks, pr_map_pos, blk_len, H) if pr_map_pos else None
+                pr_neg    = stairs(fcr_blocks, pr_map_neg, blk_len, H) if pr_map_neg else None
+
+                # ---- Block ladder (bars) + price line(s) ----
                 x_blk = fcr_blocks
                 y_up  = [up_map.get(b, 0.0) for b in x_blk]
                 y_dn  = [dn_map.get(b, 0.0) for b in x_blk]
-                y_pr  = [pr_map.get(b, 0.0) for b in x_blk]
 
                 fig_blk = ps.make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
-                fig_blk.add_trace(go.Bar(x=x_blk, y=y_up,  name="Up capacity [MW]", marker_color="#d62728"), secondary_y=False)
-                fig_blk.add_trace(go.Bar(x=x_blk, y=y_dn,  name="Down capacity [MW]", marker_color="#2ca02c"), secondary_y=False)
-                fig_blk.add_trace(go.Scatter(x=x_blk, y=y_pr, name="Block price [€/MW per 4h]", line=dict(color="#9467bd", dash="dash")), secondary_y=True)
-                fig_blk.update_layout(barmode="stack", title="FCR Blocks: Up/Down Capacity & Price", height=420)
-                fig_blk.update_yaxes(title_text="MW", secondary_y=False)
-                fig_blk.update_yaxes(title_text="€/MW per 4h", secondary_y=True)
-                figs_fcr.append(fig_blk)
+                fig_blk.add_trace(go.Bar(x=x_blk, y=y_up, name="UP capacity [MW]",   marker_color="#d62728"), secondary_y=False)
+                fig_blk.add_trace(go.Bar(x=x_blk, y=y_dn, name="DOWN capacity [MW]", marker_color="#2ca02c"), secondary_y=False)
 
-                # ---------------- Operational impact (hourly bands) ----------------
-                base = [safe(instance.total_power_input[t]) for t in T] if hasattr(instance, "total_power_input") else [0.0]*H
+                if symmetric:
+                    y_pr = [pr_map_sym.get(b, 0.0) for b in x_blk]
+                    fig_blk.add_trace(
+                        go.Scatter(x=x_blk, y=y_pr, name="FCR price [€/MW·4h]",
+                                   line=dict(color="#9467bd", dash="dash")),
+                        secondary_y=True
+                    )
+                    fig_blk.update_layout(title="FCR Blocks: Capacity & Price", barmode="stack", height=420)
+                else:
+                    y_pr_pos = [pr_map_pos.get(b, 0.0) for b in x_blk]
+                    y_pr_neg = [pr_map_neg.get(b, 0.0) for b in x_blk]
+                    fig_blk.add_trace(
+                        go.Scatter(x=x_blk, y=y_pr_pos, name="aFRR+ price [€/MW·4h]",
+                                   line=dict(color="#1f77b4", dash="dash")),
+                        secondary_y=True
+                    )
+                    fig_blk.add_trace(
+                        go.Scatter(x=x_blk, y=y_pr_neg, name="aFRR− price [€/MW·4h]",
+                                   line=dict(color="#ff7f0e", dash="dot")),
+                        secondary_y=True
+                    )
+                    fig_blk.update_layout(title="aFRR Blocks: Capacity & Price (+/−)", barmode="stack", height=420)
+
+                fig_blk.update_yaxes(title_text="MW", secondary_y=False)
+                fig_blk.update_yaxes(title_text="€/MW·4h", secondary_y=True)
+                figs_res.append(fig_blk)
+
+                # ---- Hourly impact: bands around baseline + price line(s) on right axis ----
+                base    = [safe(instance.total_power_input[t]) for t in T] if hasattr(instance, "total_power_input") else [0.0]*H
                 max_cap = float(getattr(self, "max_plant_capacity", np.nan))
                 min_cap = float(getattr(self, "min_plant_capacity", 0.0))
 
-                upper_dn = [min(max_cap if not np.isnan(max_cap) else 1e9, base[i] + dn_stairs[i]) for i in range(H)]
                 lower_up = [max(min_cap, base[i] - up_stairs[i]) for i in range(H)]
+                upper_dn = [min(max_cap if not np.isnan(max_cap) else 1e9, base[i] + dn_stairs[i]) for i in range(H)]
 
                 fig_imp = ps.make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
                 fig_imp.add_trace(go.Scatter(x=T, y=base, name="Baseline load [MWₑ]", line=dict(color="grey")), secondary_y=False)
-                fig_imp.add_trace(go.Scatter(x=T, y=lower_up, name="Baseline−Up", line=dict(color="#d62728", width=0), showlegend=False), secondary_y=False)
-                fig_imp.add_trace(go.Scatter(x=T, y=base,     name="Up capacity band", fill="tonexty", mode="lines", line=dict(color="#d62728"), fillcolor="rgba(214,39,40,0.25)"), secondary_y=False)
-                fig_imp.add_trace(go.Scatter(x=T, y=upper_dn, name="Down capacity band", fill="tonexty", mode="lines", line=dict(color="#2ca02c")), secondary_y=False)
-                fig_imp.add_trace(go.Scatter(x=T, y=pr_stairs, name="Block price [€/MW per 4h]", line=dict(color="#9467bd", dash="dot")), secondary_y=True)
-                fig_imp.update_layout(title="FCR Impact: Capacity Bands around Baseline (red=UP, green=DOWN)", height=460)
-                fig_imp.update_yaxes(title_text="MW / MWₑ", secondary_y=False)
-                fig_imp.update_yaxes(title_text="€/MW per 4h", secondary_y=True)
-                figs_fcr.append(fig_imp)
+                fig_imp.add_trace(go.Scatter(x=T, y=lower_up, name="Baseline−UP", line=dict(color="#d62728", width=0), showlegend=False), secondary_y=False)
+                fig_imp.add_trace(go.Scatter(x=T, y=base,     name="UP capacity band",   fill="tonexty", mode="lines",
+                                             line=dict(color="#d62728"), fillcolor="rgba(214,39,40,0.25)"), secondary_y=False)
+                fig_imp.add_trace(go.Scatter(x=T, y=upper_dn, name="DOWN capacity band", fill="tonexty", mode="lines",
+                                             line=dict(color="#2ca02c"), fillcolor="rgba(44,160,44,0.25)"), secondary_y=False)
 
-                # ---------------- Revenue analytics ----------------
-                # Revenue per block = price * (up + down)
-                rev_up = [y_pr[i] * y_up[i] for i in range(len(x_blk))]
-                rev_dn = [y_pr[i] * y_dn[i] for i in range(len(x_blk))]
+                if symmetric and pr_sym is not None:
+                    fig_imp.add_trace(go.Scatter(x=T, y=pr_sym, name="FCR price [€/MW·4h]",
+                                                 line=dict(color="#9467bd", dash="dot")), secondary_y=True)
+                else:
+                    if pr_pos is not None:
+                        fig_imp.add_trace(go.Scatter(x=T, y=pr_pos, name="aFRR+ price [€/MW·4h]",
+                                                     line=dict(color="#1f77b4", dash="dot")), secondary_y=True)
+                    if pr_neg is not None:
+                        fig_imp.add_trace(go.Scatter(x=T, y=pr_neg, name="aFRR− price [€/MW·4h]",
+                                                     line=dict(color="#ff7f0e", dash="dot")), secondary_y=True)
+
+                fig_imp.update_layout(title="Reserve Impact: Capacity Bands (red=UP, green=DOWN)", height=460)
+                fig_imp.update_yaxes(title_text="MW / MWₑ", secondary_y=False)
+                fig_imp.update_yaxes(title_text="Price [€/MW·4h]", secondary_y=True)
+                figs_res.append(fig_imp)
+
+                # ---- Revenue (this matches your model payout) ----
+                # model: if symmetric → cap_up == cap_dn and paid ONCE: revenue = price_fcr * cap_up
+                #        if asymmetric → revenue = price_pos*cap_up + price_neg*cap_dn
+                if symmetric:
+                    y_pr = [pr_map_sym.get(b, 0.0) for b in x_blk]
+                    rev_blk = [y_pr[i] * y_up[i] for i in range(len(x_blk))]
+                    rev_up  = rev_blk
+                    rev_dn  = [0.0]*len(x_blk)
+                else:
+                    y_pr_pos = [pr_map_pos.get(b, 0.0) for b in x_blk]
+                    y_pr_neg = [pr_map_neg.get(b, 0.0) for b in x_blk]
+                    rev_up   = [y_pr_pos[i] * y_up[i] for i in range(len(x_blk))]
+                    rev_dn   = [y_pr_neg[i] * y_dn[i] for i in range(len(x_blk))]
                 rev_tot = [rev_up[i] + rev_dn[i] for i in range(len(x_blk))]
                 rev_cum = np.cumsum(rev_tot).tolist()
-                MW_weighted_price = (sum([y_pr[i]*(y_up[i]+y_dn[i]) for i in range(len(x_blk))]) /
-                                     max(sum([y_up[i]+y_dn[i] for i in range(len(x_blk))]), 1e-9))
+
+                # MW-weighted price (uses what you’re actually paid on each side)
+                denom = sum(y_up) + sum(y_dn)
+                if symmetric:
+                    numer = sum([y_pr[i] * y_up[i] for i in range(len(x_blk))])
+                else:
+                    numer = sum([y_pr_pos[i]*y_up[i] for i in range(len(x_blk))]) + \
+                            sum([y_pr_neg[i]*y_dn[i] for i in range(len(x_blk))])
+                mw_w_price = numer / max(denom, 1e-9)
 
                 fig_rev = ps.make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
-                fig_rev.add_trace(go.Bar(x=x_blk, y=rev_up, name="Revenue: UP [€]", marker_color="#d62728"), secondary_y=False)
-                fig_rev.add_trace(go.Bar(x=x_blk, y=rev_dn, name="Revenue: DOWN [€]", marker_color="#2ca02c"), secondary_y=False)
-                fig_rev.add_trace(go.Scatter(x=x_blk, y=rev_cum, name="Cumulative revenue [€]", line=dict(color="#1f77b4", width=2)), secondary_y=True)
-                fig_rev.update_layout(barmode="stack", title="FCR Revenue by Block (and cumulative)", height=420)
+                fig_rev.add_trace(go.Bar(x=x_blk, y=rev_up, name=("Revenue UP [€]" if not symmetric else "Revenue [€]"),
+                                         marker_color="#d62728"), secondary_y=False)
+                if not symmetric:
+                    fig_rev.add_trace(go.Bar(x=x_blk, y=rev_dn, name="Revenue DOWN [€]",
+                                             marker_color="#2ca02c"), secondary_y=False)
+                fig_rev.add_trace(go.Scatter(x=x_blk, y=rev_cum, name="Cumulative revenue [€]",
+                                             line=dict(color="#1f77b4", width=2)), secondary_y=True)
+                fig_rev.update_layout(barmode=("overlay" if symmetric else "stack"),
+                                      title="Reserve Revenue by Block (and cumulative)", height=420)
                 fig_rev.update_yaxes(title_text="€/block", secondary_y=False)
                 fig_rev.update_yaxes(title_text="€ cumulative", secondary_y=True)
-                figs_fcr.append(fig_rev)
+                figs_res.append(fig_rev)
 
-                # KPIs table
+                # KPIs table (names adapt to symmetric/asymmetric)
                 kpi_rows = [
-                    ("Blocks with any bid", f"{sum(1 for b in x_blk if (y_up[x_blk.index(b)] + y_dn[x_blk.index(b)]) > 0):d} / {len(x_blk)}"),
-                    ("Total UP capacity [MW·blocks]", f"{sum(y_up):,.0f}"),
+                    ("Blocks with any bid", f"{sum(1 for i in range(len(x_blk)) if (y_up[i]+y_dn[i])>0)} / {len(x_blk)}"),
+                    ("Total UP capacity [MW·blocks]",   f"{sum(y_up):,.0f}"),
                     ("Total DOWN capacity [MW·blocks]", f"{sum(y_dn):,.0f}"),
-                    ("Total FCR revenue [€]", f"{sum(rev_tot):,.0f}"),
-                    ("MW-weighted price [€/MW per 4h]", f"{MW_weighted_price:,.1f}"),
-                    ("Avg UP share [% of MW]", f"{(sum(y_up)/max(sum(y_up)+sum(y_dn),1e-9))*100:,.1f}%"),
+                    ("Total reserve revenue [€]",       f"{sum(rev_tot):,.0f}"),
+                    ("MW-weighted price [€/MW·4h]",     f"{mw_w_price:,.1f}"),
+                    ("Min bid [MW] / Step [MW]",        f"{min_bid:g} / {step_mw:g}"),
+                    ("Symmetric product",               "Yes" if symmetric else "No (aFRR +/−)")
                 ]
-                fig_fcr_kpi = go.Figure(go.Table(
-                    header=dict(values=["FCR KPI","Value"], align="left"),
+                fig_res_kpi = go.Figure(go.Table(
+                    header=dict(values=["Reserve KPI","Value"], align="left"),
                     cells=dict(values=[[r[0] for r in kpi_rows],[r[1] for r in kpi_rows]], align="left")
                 ))
-                fig_fcr_kpi.update_layout(title="FCR Key Indicators")
-                figs_fcr.append(fig_fcr_kpi)
+                fig_res_kpi.update_layout(title="Reserve Market KPIs")
+                figs_res.append(fig_res_kpi)
 
-                # ---------------- Calendar heatmap (hourly sum of up+down) ----------------
-                cap_hour = (np.array(up_stairs) + np.array(dn_stairs)).tolist()
-                # Build a rectangular heatmap by week x hour-of-day (simple, no tz handling)
-                # If T are datetimes, we map weekday/hour; else fall back to index.
-                try:
-                    import pandas as _pd
-                    idx = _pd.to_datetime(T)
-                    dfh = _pd.DataFrame({"cap": cap_hour}, index=idx)
-                    dfh["wd"] = dfh.index.weekday
-                    dfh["h"]  = dfh.index.hour
-                    mat = dfh.pivot_table(index="wd", columns="h", values="cap", aggfunc="sum").reindex(index=[0,1,2,3,4,5,6])
-                    fig_cal = go.Figure(data=go.Heatmap(z=mat.values, x=mat.columns, y=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], coloraxis="coloraxis"))
-                    fig_cal.update_layout(title="FCR Capacity Heatmap (sum of Up+Down)", height=420, coloraxis_colorscale="YlGnBu")
-                    figs_fcr.append(fig_cal)
-                except Exception:
-                    pass  # if T aren’t datetimes, skip heatmap
-
-                # ---------------- Bid compliance table (min bid & step) ----------------
+                # ---- Compliance check: min bid & step ----
                 viol = []
                 for i,b in enumerate(x_blk):
                     if (y_up[i] > 1e-9) and ((y_up[i] < min_bid) or (abs(y_up[i]/step_mw - round(y_up[i]/step_mw)) > 1e-9)):
                         viol.append((b, "UP", y_up[i]))
                     if (y_dn[i] > 1e-9) and ((y_dn[i] < min_bid) or (abs(y_dn[i]/step_mw - round(y_dn[i]/step_mw)) > 1e-9)):
                         viol.append((b, "DOWN", y_dn[i]))
-
                 if viol:
                     fig_v = go.Figure(go.Table(
                         header=dict(values=["Block start","Side","Capacity [MW] (violates min/step)"], align="left"),
-                        cells=dict(values=[ [v[0] for v in viol], [v[1] for v in viol], [f"{v[2]:.1f}" for v in viol] ], align="left")
+                        cells=dict(values=[[v[0] for v in viol],[v[1] for v in viol],[f"{v[2]:.1f}" for v in viol]], align="left")
                     ))
-                    fig_v.update_layout(title=f"Bid Compliance Issues (min={min_bid:g} MW, step={step_mw:g} MW)")
-                    figs_fcr.append(fig_v)
+                    fig_v.update_layout(title="Bid Compliance Issues")
+                    figs_res.append(fig_v)
 
 
         # ------------------------- WRITE SINGLE HTML -------------------------
         with open(html_path, "w", encoding="utf-8") as f:
-            f.write(
-                "<html><head><meta charset='utf-8'><title>Steam Plant – Full Dashboard</title></head><body>"
-            )
+            f.write("<html><head><meta charset='utf-8'><title>Steam Plant – Full Dashboard</title></head><body>")
             f.write("<h2>Steam Generation Plant – Full Dashboard</h2>")
+
             f.write("<h3>Dynamic Operation</h3>")
             f.write(fig_op.to_html(full_html=False, include_plotlyjs="cdn"))
+
             f.write("<hr><h3>Time-slider Sankey</h3>")
             f.write(fig_sk.to_html(full_html=False, include_plotlyjs=False))
+
             if figs_tes:
                 f.write("<hr><h3>Thermal Storage Analytics</h3>")
                 for g in figs_tes:
                     f.write(g.to_html(full_html=False, include_plotlyjs=False))
+
             f.write("<hr><h3>Emissions Analytics</h3>")
             f.write(fig_em.to_html(full_html=False, include_plotlyjs=False))
+
             f.write("<hr><h3>Economics</h3>")
             f.write(fig_ec.to_html(full_html=False, include_plotlyjs=False))
+
             if figs_cmp:
                 f.write("<hr><h3>Baseline Comparison</h3>")
                 for g in figs_cmp:
                     f.write(g.to_html(full_html=False, include_plotlyjs=False))
-            f.write("</body></html>")
-            if figs_fcr:
-                f.write("<hr><h3>FCR / Ancillary Services (Prosumer) Analytics</h3>")
-                for g in figs_fcr:
+
+            # NEW: reserve analytics section
+            if figs_res:
+                f.write("<hr><h3>Reserve Market (FCR / aFRR) Analytics</h3>")
+                for g in figs_res:
                     f.write(g.to_html(full_html=False, include_plotlyjs=False))
 
+            f.write("</body></html>")
         print(f"Full dashboard saved to: {html_path}")
+
 
