@@ -19,7 +19,7 @@ from pyomo.opt import SolverFactory
 
 
 # %%
-def solve_uc_problem(gens_df, demand_df, k_values_df, demand_bids=1):
+def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_bids=1):
     model = pyo.ConcreteModel()
 
     # sets
@@ -75,7 +75,10 @@ def solve_uc_problem(gens_df, demand_df, k_values_df, demand_bids=1):
 
     # max generation constraint
     def g_max_rule(model, i, t):
-        return model.g[i, t] <= gens_df.at[i, "g_max"] * model.u[i, t]
+        return (
+            model.g[i, t]
+            <= gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
+        )
 
     model.g_max = pyo.Constraint(model.gens, model.time, rule=g_max_rule)
 

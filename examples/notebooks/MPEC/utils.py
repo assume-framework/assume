@@ -353,6 +353,30 @@ def create_gens_df(pp_units, dispatch_df):
     return gens_df
 
 
+def create_storage_df(storage_units, dispatch_df):
+    storage_df = storage_units.copy()
+
+    # check if max_power_charge and max_power_discharge columns are the same value otherwise throw error that this wont work
+    assert all(
+        storage_df["max_power_charge"] == storage_df["max_power_discharge"]
+    ), "max_power_charge and max_power_discharge must be the same value for this to work"
+    storage_df["g_max"] = storage_df["max_power_discharge"]
+    storage_df["u_0"] = 0  # storage units always can produce power
+    storage_df["g_0"] = 0  # start with no power output
+    storage_df["r_up"] = storage_df["g_max"]  # ramping up constraints
+    storage_df["r_down"] = storage_df["g_max"]  # ramping down constraints
+    storage_df["k_up"] = 0  # start up costs
+    storage_df["k_down"] = 0  # shut down costs
+
+    # get average mc from dispatch_df per unit name
+    mc = dispatch_df.groupby("unit")["marginal_cost"].mean()
+
+    # based on name and unit column join mc into storage_df
+    storage_df = storage_df.merge(mc, left_on="name", right_on="unit", how="left")
+    storage_df = storage_df.rename(columns={"marginal_cost": "mc"})
+    return storage_df
+
+
 def join_demand_market_orders(demand_df, market_orders_df):
     """
     Join demand_df and market_orders_df, handling multiple demand_EOM bid_ids if present.
@@ -425,7 +449,16 @@ def obtain_k_values(k_df, gens_df):
     return k_values_df
 
 
-def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w, demand_bids=1):
+def run_MPEC(
+    opt_gen,
+    gens_df,
+    demand_df,
+    k_values_df,
+    availability_df,
+    k_max,
+    big_w,
+    demand_bids=1,
+):
     """
     Run the MPEC optimization for the given unit and return the profits before and after the optimization.
 
@@ -435,6 +468,7 @@ def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w, demand_bids
         gens_df (pd.DataFrame): The generator data.
         demand_df (pd.DataFrame): The demand data.
         k_values_df (pd.DataFrame): The k-values data.
+        availability_df (pd.DataFrame): The availability data [0,1].
         k_max (float): The maximum k-value.
         big_w (float): The big W value.
 
@@ -452,11 +486,16 @@ def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w, demand_bids
     k_values_df.columns = gens_df.index
     k_values_df.reset_index(inplace=True)
 
+    availability_df = availability_df.copy(deep=True)
+    availability_df.columns = gens_df.index
+    availability_df.reset_index(inplace=True)
+
     gens_df = gens_df.copy(deep=True)
 
     main_df, supp_df, k_values = find_optimal_dispatch_quadratic(
         gens_df=gens_df,
         k_values_df=k_values_df,
+        availabilities_df=availability_df,
         demand_df=demand_df,
         k_max=k_max,
         opt_gen=opt_gen,
@@ -473,7 +512,7 @@ def run_MPEC(opt_gen, gens_df, demand_df, k_values_df, k_max, big_w, demand_bids
     k_values_df_2[opt_gen] = k_values
 
     updated_main_df_2, updated_supp_df_2 = solve_uc_problem(
-        gens_df, demand_df, k_values_df_2, demand_bids=demand_bids
+        gens_df, demand_df, k_values_df_2, availability_df, demand_bids=demand_bids
     )
 
     # Calculate profits

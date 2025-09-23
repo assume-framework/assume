@@ -586,6 +586,7 @@ def find_optimal_dispatch_linearized(
 def find_optimal_dispatch_quadratic(
     gens_df,
     k_values_df,
+    availabilities_df,
     demand_df,
     k_max,
     opt_gen,
@@ -760,7 +761,10 @@ def find_optimal_dispatch_quadratic(
     # max generation constraint
     def g_max_rule(model, i, t):
         # (7e)
-        return model.g[i, t] <= gens_df.at[i, "g_max"] * model.u[i, t]
+        return (
+            model.g[i, t]
+            <= gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
+        )
 
     model.g_max = pyo.Constraint(model.gens, model.time, rule=g_max_rule)
 
@@ -854,7 +858,9 @@ def find_optimal_dispatch_quadratic(
         # (7ab) – Stationarity w.r.t. the binary unit commitment variable
         if t != model.time.at(-1):
             return (
-                -model.mu_max[i, t] * gens_df.at[i, "g_max"]
+                -model.mu_max[i, t]
+                * gens_df.at[i, "g_max"]
+                * availabilities_df.at[t, i]
                 + (model.sigma_u[i, t] - model.sigma_u[i, t + 1])
                 * gens_df.at[i, "k_up"]
                 - (model.sigma_d[i, t] - model.sigma_d[i, t + 1])
@@ -864,7 +870,9 @@ def find_optimal_dispatch_quadratic(
             )
         else:
             return (
-                -model.mu_max[i, t] * gens_df.at[i, "g_max"]
+                -model.mu_max[i, t]
+                * gens_df.at[i, "g_max"]
+                * availabilities_df.at[t, i]
                 + model.sigma_u[i, t] * gens_df.at[i, "k_up"]
                 - model.sigma_d[i, t] * gens_df.at[i, "k_down"]
                 + model.psi_max[i, t]
@@ -925,14 +933,20 @@ def find_optimal_dispatch_quadratic(
     # for generation and demand upper bounds
     # (7t)–(7y), Relaxed or reformulated versions of (7ad)–(7ah), MILP-friendly using binaries + big-M
     def mu_max_hat_binary_rule_1(model, i, t):
-        return (model.g[i, t] - gens_df.at[i, "g_max"] * model.u[i, t]) <= max(
-            gens_df["g_max"]
-        ) * (1 - model.mu_max_hat_binary[i, t])
+        return (
+            model.g[i, t]
+            - gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
+        ) <= max(gens_df["g_max"] * availabilities_df.at[t, i]) * (
+            1 - model.mu_max_hat_binary[i, t]
+        )
 
     def mu_max_hat_binary_rule_2(model, i, t):
-        return (model.g[i, t] - gens_df.at[i, "g_max"] * model.u[i, t]) >= -max(
-            gens_df["g_max"]
-        ) * (1 - model.mu_max_hat_binary[i, t])
+        return (
+            model.g[i, t]
+            - gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
+        ) >= -max(gens_df["g_max"] * availabilities_df.at[t, i]) * (
+            1 - model.mu_max_hat_binary[i, t]
+        )
 
     def mu_max_hat_binary_rule_3(model, i, t):
         return model.mu_max_hat[i, t] <= big_M * model.mu_max_hat_binary[i, t]
