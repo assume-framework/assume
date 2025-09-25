@@ -783,7 +783,7 @@ class DSMFlex:
             html_path="./outputs/dashboard.html",
             sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
         )
-        self.plot_1(instance, save_path="./outputs/DE_FCR_operation.png", show=False)
+        # self.plot_1(instance, save_path="./outputs/PL_B", show=True)
         self.plot_2(instance, save_path="./outputs/DE_FCR_products.png", show=True)
 
 

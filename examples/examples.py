@@ -170,72 +170,72 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "use_case_O45H2"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
+    example = "steam_plant_use_case"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-    # list of examples you want to run
-    examples_to_run = ["use_case_O45H2_HS7", "use_case_O45H2_HS10", "use_case_O45H2_HS13",
-                       "use_case_O45H2_HS16", "use_case_O45H2_HS19", "use_case_O45H2_HS22", "use_case_O45H2_HS25"]
-    # examples_to_run = [example]
+    # # list of examples you want to run
+    # examples_to_run = ["use_case_O45H2_HS7", "use_case_O45H2_HS10", "use_case_O45H2_HS13",
+    #                    "use_case_O45H2_HS16", "use_case_O45H2_HS19", "use_case_O45H2_HS22", "use_case_O45H2_HS25"]
+    # # examples_to_run = [example]
 
-    for example in examples_to_run:
-        print(f"\n--- Running example: {example} ---")
+    # for example in examples_to_run:
+    #     print(f"\n--- Running example: {example} ---")
 
-        # create a new world for each run
-        world = World(database_uri=db_uri, export_csv_path=csv_path)
+    #     # create a new world for each run
+    #     world = World(database_uri=db_uri, export_csv_path=csv_path)
 
-        # load the scenario
-        load_scenario_folder(
-            world,
-            inputs_path="examples/inputs",
-            scenario=available_examples[example]["scenario"],
-            study_case=available_examples[example]["study_case"],
-        )
+    #     # load the scenario
+    #     load_scenario_folder(
+    #         world,
+    #         inputs_path="examples/inputs",
+    #         scenario=available_examples[example]["scenario"],
+    #         study_case=available_examples[example]["study_case"],
+    #     )
 
-        # check if learning mode is active
-        if world.learning_config.get("learning_mode", False):
-            run_learning(world)
+    #     # check if learning mode is active
+    #     if world.learning_config.get("learning_mode", False):
+    #         run_learning(world)
 
-        # run the simulation
-        world.run()
+    #     # run the simulation
+    #     world.run()
 
-    # # create world
-    # world = World(database_uri=db_uri, export_csv_path=csv_path)
+    # create world
+    world = World(database_uri=db_uri, export_csv_path=csv_path)
 
-    # # load scenario
-    # load_scenario_folder(
+    # load scenario
+    load_scenario_folder(
+        world,
+        inputs_path="examples/inputs",
+        scenario=available_examples[example]["scenario"],
+        study_case=available_examples[example]["study_case"],
+    )
+
+    # to add custom bidding strategies, you need to import them
+    # and add them to the world as follows:
+    # from custom_bidding_strategy import CustomBiddingStrategy
+    # world.bidding_strategies["custom_bidding_strategy"] = CustomBiddingStrategy
+
+    # to add a custom unit type, you need to import it
+    # and add it to the world as follows:
+    # from custom_unit import CustomUnit
+    # world.unit_types["custom_unit"] = CustomUnit
+
+    # next you need to load and add the custom units to the scenario
+    # from assume import load_custom_units
+    # load_custom_units(
     #     world,
     #     inputs_path="examples/inputs",
-    #     scenario=available_examples[example]["scenario"],
-    #     study_case=available_examples[example]["study_case"],
+    #     scenario=availabe_examples[example]["scenario"],
+    #     file_name="custom_units",
+    #     unit_type="custom_unit",
     # )
 
-    # # to add custom bidding strategies, you need to import them
-    # # and add them to the world as follows:
-    # # from custom_bidding_strategy import CustomBiddingStrategy
-    # # world.bidding_strategies["custom_bidding_strategy"] = CustomBiddingStrategy
+    if world.learning_config.get("learning_mode", False):
+        # run learning if learning mode is enabled
+        run_learning(world)
 
-    # # to add a custom unit type, you need to import it
-    # # and add it to the world as follows:
-    # # from custom_unit import CustomUnit
-    # # world.unit_types["custom_unit"] = CustomUnit
-
-    # # next you need to load and add the custom units to the scenario
-    # # from assume import load_custom_units
-    # # load_custom_units(
-    # #     world,
-    # #     inputs_path="examples/inputs",
-    # #     scenario=availabe_examples[example]["scenario"],
-    # #     file_name="custom_units",
-    # #     unit_type="custom_unit",
-    # # )
-
-    # if world.learning_config.get("learning_mode", False):
-    #     # run learning if learning mode is enabled
-    #     run_learning(world)
-
-    # world.run()
+    world.run()
