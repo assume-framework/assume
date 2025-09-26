@@ -2,12 +2,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from assume.common.market_objects import MarketConfig, Orderbook, Product
 
-from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from assume.common.units_operator import UnitsOperator
 
 class BasePortfolioStrategy:
     """
@@ -17,9 +13,12 @@ class BasePortfolioStrategy:
     -------
     """
 
+    def __init__(self, *args, **kwargs):
+        pass
+
     def calculate_bids(
         self,
-        operator, # type: UnitsOperator
+        operator,  # type: UnitsOperator
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
@@ -40,6 +39,7 @@ class BasePortfolioStrategy:
         """
         return []
 
+
 class SimplePortfolioStrategy(BasePortfolioStrategy):
     """
     A naive strategy that bids the marginal cost of the unit on the market.
@@ -50,7 +50,7 @@ class SimplePortfolioStrategy(BasePortfolioStrategy):
 
     def calculate_bids(
         self,
-        unit, # type: UnitsOperator
+        operator,  # type: UnitsOperator
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
