@@ -605,7 +605,6 @@ def setup_world(
 
     Args:
         world (World): An instance of the World class representing the simulation environment.
-        scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
         evaluation_mode (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 1.

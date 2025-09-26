@@ -397,7 +397,7 @@ class World:
             )
             output_agent.suspendable_tasks = False
 
-    def add_unit_operator(self, id: str) -> None:
+    def add_unit_operator(self, id: str, strategy: str=None) -> None:
         """
         Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
         The unit operator is then added to the list of existing operators. Unit operator receives the output agent address
@@ -552,7 +552,7 @@ class World:
 
         Args:
             unit_id (str): The identifier for the unit.
-            bidding_strategies (dict[str, BaseStrategy]): The bidding strategies for the unit.
+            bidding_strategies (dict[str, BaseStrategy | BasePortfolioStrategy]): The bidding strategies for the unit.
         """
         for unit in self.unit_operators["Operator-RL"].rl_units:
             for strategy in unit.bidding_strategies.values():
@@ -569,7 +569,7 @@ class World:
             unit_id (str): The identifier for the unit.
 
         Returns:
-            dict[str, BaseStrategy]: The bidding strategies for the unit.
+            dict[str, BaseStrategy | BasePortfolioStrategy]: The bidding strategies for the unit.
         """
         bidding_strategies = {}
         strategy_instances = {}  # Cache to store created instances
