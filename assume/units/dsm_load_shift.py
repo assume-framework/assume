@@ -157,9 +157,45 @@ class DSMFlex:
         elif self.objective == "max_net_income":
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule_opt(m):
-                net_income = self.model.fcr_revenue - sum(self.model.variable_cost[t] for t in self.model.time_steps)
+                net_income = self.model.reserve_revenue - sum(self.model.variable_cost[t] for t in self.model.time_steps)
                 return net_income
+            
+        # elif self.objective == "max_net_income":
+        #     m = self.model
 
+        #     # ---- Reserve revenue (linear; no binary multipliers) ----
+        #     def _reserve_rev_expr(mm):
+        #         rev = 0.0
+        #         if hasattr(mm, "fcr_blocks"):
+        #             # FCR symmetric capacity variable (preferred)
+        #             if hasattr(mm, "cap_sym") and hasattr(mm, "fcr_block_price"):
+        #                 rev += sum(mm.fcr_block_price[b] * mm.cap_sym[b] for b in mm.fcr_blocks)
+        #             else:
+        #                 # Fallback: if symmetry ties cap_up == cap_dn for FCR,
+        #                 # you can pay on cap_up when using symmetric product.
+        #                 if hasattr(mm, "fcr_block_price") and hasattr(mm, "cap_up"):
+        #                     rev += sum(mm.fcr_block_price[b] * mm.cap_up[b] for b in mm.fcr_blocks)
+
+        #             # aFRR Up / Down
+        #             if hasattr(mm, "afrr_block_price_pos") and hasattr(mm, "cap_up"):
+        #                 rev += sum(mm.afrr_block_price_pos[b] * mm.cap_up[b] for b in mm.fcr_blocks)
+        #             if hasattr(mm, "afrr_block_price_neg") and hasattr(mm, "cap_dn"):
+        #                 rev += sum(mm.afrr_block_price_neg[b] * mm.cap_dn[b] for b in mm.fcr_blocks)
+        #         return rev
+
+        #     m.reserve_revenue = pyo.Expression(rule=_reserve_rev_expr)
+
+        #     # ---- Variable cost (linear) ----
+        #     def _var_cost_expr(mm):
+        #         if hasattr(mm, "variable_cost") and hasattr(mm, "time_steps"):
+        #             return sum(mm.variable_cost[t] for t in mm.time_steps)
+        #         return 0.0
+
+        #     m.total_variable_cost = pyo.Expression(rule=_var_cost_expr)
+
+        #     @m.Objective(sense=pyo.maximize)
+        #     def obj_rule_opt(mm):
+        #         return mm.reserve_revenue - mm.total_variable_cost
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
@@ -783,7 +819,7 @@ class DSMFlex:
             html_path="./outputs/dashboard.html",
             sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
         )
-        # self.plot_1(instance, save_path="./outputs/PL_B", show=True)
+        self.plot_1(instance, save_path="./outputs/PL_B", show=True)
         self.plot_2(instance, save_path="./outputs/DE_FCR_products.png", show=True)
 
 
