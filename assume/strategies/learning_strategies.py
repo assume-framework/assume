@@ -1324,7 +1324,10 @@ class RenewableRLStrategy(RLStrategySingleBid):
         # Dynamic regret scaling:
         # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
         # - If no dispatch happens, apply higher regret (0.5) to discourage idle behavior, if it could have been profitable.
-        regret_scale = 0.01 if accepted_volume_total > unit.min_power else 0.05
+        # regret_scale = 0.01 if accepted_volume_total > unit.min_power else 0.05
+        
+        # Static regret scaling
+        regret_scale = 1
 
         # --------------------
         # 4.1 Calculate Reward

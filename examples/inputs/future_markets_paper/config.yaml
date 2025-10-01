@@ -96,6 +96,53 @@ base_case_2013_pp_bat:
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
 
+base_case_2013_pp_all:
+  start_date: 2013-01-01 00:00
+  end_date: 2013-02-28 00:00
+  time_step: 1h
+  learning_mode: True
+  save_frequency_hours: Null
+
+  learning_config:
+    continue_learning: True
+    trained_policies_save_path: null
+    trained_policies_load_path:  examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_all/last_policies
+    max_bid_price: 300
+    algorithm: matd3
+    learning_rate: 0.0001
+    training_episodes: 300
+    episodes_collecting_initial_experience: 2
+    train_freq: 24h
+    gradient_steps: 1
+    batch_size: 256
+    gamma: 0
+    device: cpu
+    noise_sigma: 0.4
+    noise_scale: 1
+    noise_dt: 1
+    action_noise_schedule: linear
+    validation_episodes_interval: 5
+    early_stopping_steps: 20
+    early_stopping_threshold: 0.05
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2013-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: complex_clearing
+
 base_case_2013_pp_single:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
@@ -107,11 +154,11 @@ base_case_2013_pp_single:
     continue_learning: False
     trained_policies_save_path: null
     trained_policies_load_path:  null
-    max_bid_price: 500
+    max_bid_price: 300
     algorithm: matd3
-    learning_rate: 0.0001
-    training_episodes: 300
-    episodes_collecting_initial_experience: 20
+    learning_rate: 0.001
+    training_episodes: 500
+    episodes_collecting_initial_experience: 10
     train_freq: 24h
     gradient_steps: 10
     batch_size: 256
@@ -142,6 +189,7 @@ base_case_2013_pp_single:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
+
 
 base_case_2013_bat:
   start_date: 2013-01-01 00:00
