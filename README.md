@@ -102,7 +102,7 @@ cd assume
 2. Start the database and Grafana using the following command:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 This will launch a container for TimescaleDB and Grafana with preconfigured dashboards for analysis.
