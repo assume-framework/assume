@@ -314,12 +314,10 @@ class World:
                 self.learning_config, start=self.start, end=self.end
             )
 
-            # separate process does not support buffer and learning
-            self.learning_agent_addr = addr(self.addr, "learning_agent")
             rl_agent = agent_composed_of(
                 self.learning_role,
                 register_in=self.container,
-                suggested_aid=self.learning_agent_addr.aid,
+                suggested_aid="learning_agent",
             )
             rl_agent.suspendable_tasks = False
 
@@ -335,7 +333,6 @@ class World:
 
         else:
             self.learning_role = None
-            self.learning_agent_addr = None
 
     def setup_output_agent(
         self,
@@ -482,7 +479,7 @@ class World:
         if self.learning_mode:
             unit_operator_agent._role_context.data.update(
                 {
-                    "learning_agent_addr": self.learning_agent_addr,
+                    "learning_role": self.learning_role,
                     "train_start": self.start,
                     "train_end": self.end,
                     "train_freq": self.learning_config.get("train_freq", "24h"),

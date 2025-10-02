@@ -202,24 +202,6 @@ class Learning(Role):
                 lambda content, meta: content.get("context") == "rl_training",
             )
 
-    def save_buffer_and_update(self, content: dict, meta: dict) -> None:
-        """
-        Handles the incoming messages and performs corresponding actions.
-
-        Args:
-            content (dict): The content of the message.
-            meta (dict): The metadata associated with the message. (not needed yet)
-        """
-
-        if content.get("type") == "save_buffer_and_update":
-            data = content["data"]
-            self.buffer.add(
-                obs=data[0],
-                actions=data[1],
-                reward=data[2],
-            )
-
-        self.update_policy()
 
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """

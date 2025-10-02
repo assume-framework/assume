@@ -198,19 +198,15 @@ class RLUnitsOperator(UnitsOperator):
 
         all_rewards = np.array(all_rewards).T
 
-        rl_agent_data = (all_observations, all_actions, all_rewards)
+        learning_role = self.context.data.get("learning_role")
 
-        learning_role_addr = self.context.data.get("learning_agent_addr")
-
-        if learning_role_addr:
-            self.context.schedule_instant_message(
-                content={
-                    "context": "rl_training",
-                    "type": "save_buffer_and_update",
-                    "data": rl_agent_data,
-                },
-                receiver_addr=learning_role_addr,
+        if learning_role and not learning_role.evaluation_mode:
+            learning_role.buffer.add(
+                obs=all_observations,
+                actions=all_actions,
+                reward=all_rewards,
             )
+            learning_role.update_policy()
 
     async def formulate_bids(
         self, market: MarketConfig, products: list[tuple]
