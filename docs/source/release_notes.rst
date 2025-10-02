@@ -15,7 +15,7 @@ Upcoming Release
   **Bug Fixes:**
 
 - **Changed action clamping**: The action clamping was changed to extreme values defined by dicts. Instead of using the min and max of a forward pass in the NN, the clamping is now based on the activation function of the actor network. Previously, the output range was incorrectly assumed based only on the input, which failed when weights were negative due to Xavier initialization.
-
+- **Adjusted reward scaling**: Reward scaling now considers current available power instead of the unit’s max_power, reducing reward distortion when availability limits capacity. Available power is now derived from offered_order_volume instead of unit.calculate_min_max_power. Because dispatch is set before reward calculation, the previous method left available power at 0 whenever the unit was dispatched.
 
 0.5.5 - (13th August 2025)
 =======================
