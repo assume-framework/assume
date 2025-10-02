@@ -25,7 +25,7 @@ from assume.common.utils import (
     aggregate_step_amount,
     timestamp2datetime,
 )
-from assume.strategies import BaseStrategy
+from assume.strategies import DirectUnitOperatorStrategy, UnitOperatorStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ class UnitsOperator(Role):
         available_markets (list[MarketConfig]): The available markets.
         registered_markets (dict[str, MarketConfig]): The registered markets.
         last_sent_dispatch (int): The last sent dispatch.
-        portfolio_strategies (BaseStrategy): The portfolio strategy.
+        portfolio_strategies (UnitOperatorStrategy): The portfolio strategy.
         valid_orders (defaultdict): The valid orders.
         units (dict[str, BaseUnit]): The units.
         id (str): The id of the agent.
@@ -48,13 +48,13 @@ class UnitsOperator(Role):
 
     Args:
         available_markets (list[MarketConfig]): The available markets.
-        portfolio_strategies (dict[str, BaseStrategy], optional): Optimized portfolio strategy. Defaults to an mpty dict.
+        portfolio_strategies (dict[str, UnitOperatorStrategy], optional): Optimized portfolio strategy. Defaults to an mpty dict.
     """
 
     def __init__(
         self,
         available_markets: list[MarketConfig],
-        portfolio_strategies: dict[str, BaseStrategy] = {},
+        portfolio_strategies: dict[str, UnitOperatorStrategy] = {},
     ):
         super().__init__()
 
@@ -63,6 +63,11 @@ class UnitsOperator(Role):
         self.last_sent_dispatch = defaultdict(lambda: 0)
 
         self.portfolio_strategies = portfolio_strategies
+        for market in self.available_markets:
+            if market.market_id not in self.portfolio_strategies.keys():
+                self.portfolio_strategies[market.market_id] = (
+                    DirectUnitOperatorStrategy()
+                )
 
         # valid_orders per product_type
         self.valid_orders = defaultdict(list)
@@ -449,19 +454,14 @@ class UnitsOperator(Role):
         # [whole_next_hour, quarter1, quarter2, quarter3, quarter4]
         # algorithm should buy as much baseload as possible, then add up with quarters
         products.sort(key=lambda p: (p[0] - p[1], p[0]))
-        if self.portfolio_strategies.get(opening["market_id"]):
-            market = self.registered_markets[opening["market_id"]]
-            strategy = self.portfolio_strategies.get(opening["market_id"])
-            orderbook = strategy.calculate_bids(
-                operator=self,
-                market_config=market,
-                product_tuples=products,
-            )
-        else:
-            orderbook = await self.formulate_bids(
-                market=market,
-                products=products,
-            )
+        strategy = self.portfolio_strategies.get(
+            opening["market_id"],
+        )
+        orderbook = strategy.calculate_bids(
+            operator=self,
+            market_config=market,
+            product_tuples=products,
+        )
         if not market.addr:
             logger.error("Market %s has no address", market.market_id)
             return
@@ -482,37 +482,3 @@ class UnitsOperator(Role):
             ),
             receiver_addr=market.addr,
         )
-
-    async def formulate_bids(
-        self, market: MarketConfig, products: list[tuple]
-    ) -> Orderbook:
-        """
-        Formulates the bid to the market according to the bidding strategy of the each unit individually.
-
-        Args:
-            market (MarketConfig): The market to formulate bids for.
-            products (list[tuple]): The products to formulate bids for.
-
-        Returns:
-            OrderBook: The orderbook that is submitted as a bid to the market.
-        """
-
-        orderbook: Orderbook = []
-
-        for unit_id, unit in self.units.items():
-            product_bids = unit.calculate_bids(
-                market_config=market,
-                product_tuples=products,
-            )
-            for i, order in enumerate(product_bids):
-                order["agent_addr"] = self.context.addr
-                if market.volume_tick:
-                    order["volume"] = round(order["volume"] / market.volume_tick)
-                if market.price_tick:
-                    order["price"] = round(order["price"] / market.price_tick)
-                if "bid_id" not in order.keys() or order["bid_id"] is None:
-                    order["bid_id"] = f"{unit_id}_{i+1}"
-                order["unit_id"] = unit_id
-                orderbook.append(order)
-
-        return orderbook

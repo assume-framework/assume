@@ -19,6 +19,7 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.common.utils import datetime2timestamp
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
+from assume.strategies.portfolio_strategies import DirectUnitOperatorStrategy
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
 
@@ -150,12 +151,13 @@ async def test_write_actual_dispatch(units_operator: UnitsOperator):
     assert units_operator.last_sent_dispatch["test"] > 0
 
 
-async def test_formulate_bids(units_operator: UnitsOperator):
+async def test_independent_bids_portfolio(units_operator: UnitsOperator):
     marketconfig = units_operator.available_markets[0]
     from assume.common.utils import get_available_products
 
     products = get_available_products(marketconfig.market_products, start)
-    orderbook = await units_operator.formulate_bids(marketconfig, products)
+    strategy = DirectUnitOperatorStrategy()
+    orderbook = strategy.calculate_bids(units_operator, marketconfig, products)
     assert len(orderbook) == 1
 
     assert orderbook[0]["volume"] == -1000
