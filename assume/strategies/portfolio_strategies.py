@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 
 
 class UnitOperatorStrategy:
@@ -38,6 +39,30 @@ class UnitOperatorStrategy:
             Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
         """
         return []
+
+    def total_capacity(
+        self,
+        units_operator,  # type: UnitsOperator
+    ) -> dict[str, dict[str, float]]:
+        """
+        Computes the total capacity of the units owned by a unit operator by market and technology.
+
+        Args:
+            units_operator (UnitsOperator): The operator that bids on the market(s).
+        Returns:
+            dict: a nested dictionary indexed by market and by technology.
+        """
+
+        tot_capacity = {}
+
+        for unit in units_operator.units.values():
+            for market_id in unit.bidding_strategies.keys():
+                tot_capacity[market_id] = tot_capacity.get(market_id, {})
+                tot_capacity[market_id][unit.technology] = (
+                    tot_capacity[market_id].get(unit.technology, 0) + unit.max_power
+                )
+
+        return tot_capacity
 
 
 class DirectUnitOperatorStrategy(UnitOperatorStrategy):
@@ -79,13 +104,16 @@ class DirectUnitOperatorStrategy(UnitOperatorStrategy):
         return bids
 
 
-class PortfolioBiddingStrategy(UnitOperatorStrategy):
+class CournotPortfolioStrategy(UnitOperatorStrategy):
     """
-    A naive strategy that bids the marginal cost of the unit on the market.
+    A Cournot strategy that adds a markup to the marginal cost of each unit of
+    the units operator. The marginal cost is computed with NaiveSingleBidStrategy,
+    and the markup depends on the total capacity of the unit operator.
+    """
 
-    Methods
-    -------
-    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.markup = kwargs.get("markup", 0)
 
     def calculate_bids(
         self,
@@ -94,10 +122,38 @@ class PortfolioBiddingStrategy(UnitOperatorStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        # TODO this should be adjusted
+        """
+        Takes information from a unit that the unit operator manages and
+        defines how it is dispatched to the market.
+
+        Args:
+            operator (UnitsOperator): The operator that bids on the market.
+            market_config (MarketConfig): The configuration of the market.
+            product_tuples (list[Product]): The list of all products the unit can offer.
+
+        Returns:
+            Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
+        """
+
+        max_power_by_technology = self.total_capacity(operator)[market_config.market_id]
+        max_power = sum(
+            max_power_by_technology
+        )  # TODO: divide by total available capacity in the market
+
+        ## Compute marginal costs ###
+        operator_bids = Orderbook()
 
         for unit_id, unit in operator.units.items():
-            pass
+            bids = NaiveSingleBidStrategy().calculate_bids(
+                unit,
+                market_config,
+                product_tuples,
+            )
+            ### Apply Cournot mark-up ###
+            for bid in bids:
+                bid["price"] += self.markup * max_power
+                bid["unit_id"] = unit_id
 
-        bids = []
-        return bids
+            operator_bids.extend(bids)
+
+        return operator_bids

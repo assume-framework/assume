@@ -28,7 +28,7 @@ from assume.strategies.dmas_storage import DmasStorageStrategy
 from assume.strategies.portfolio_strategies import (
     UnitOperatorStrategy,
     DirectUnitOperatorStrategy,
-    PortfolioBiddingStrategy,
+    CournotPortfolioStrategy,
 )
 
 bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
@@ -55,7 +55,7 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "manual_strategy": SimpleManualTerminalStrategy,
     "dmas_powerplant": DmasPowerplantStrategy,
     "dmas_storage": DmasStorageStrategy,
-    "simple_portfolio": PortfolioBiddingStrategy,
+    "cournot_portfolio": CournotPortfolioStrategy,
 }
 
 try:
@@ -65,11 +65,13 @@ try:
         StorageRLStrategy,
         RenewableRLStrategy,
     )
+    from assume.strategies.portfolio_strategies import PortfolioRLStrategy
 
     bidding_strategies["pp_learning"] = RLStrategy
     bidding_strategies["pp_learning_single_bid"] = RLStrategySingleBid
     bidding_strategies["storage_learning"] = StorageRLStrategy
     bidding_strategies["renewable_eom_learning"] = RenewableRLStrategy
+    bidding_strategies["portfolio_learning"] = PortfolioRLStrategy
 
 except ImportError:
     pass

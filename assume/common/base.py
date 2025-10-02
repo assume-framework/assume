@@ -813,6 +813,7 @@ class LearningConfig(TypedDict):
     """
 
     continue_learning: bool
+    min_bid_price: float
     max_bid_price: float
     learning_mode: bool
     algorithm: str
