@@ -4,13 +4,13 @@
 
 import logging
 
-import pyomo.environ as pyo
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-import plotly.subplots as ps
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
+import plotly.subplots as ps
+import pyomo.environ as pyo
 
 from assume.common.base import SupportsMinMax
 from assume.common.forecasts import Forecaster
@@ -358,8 +358,6 @@ class Building(DSMFlex, SupportsMinMax):
                 Equality condition defining the variable cost.
             """
             return m.variable_cost[t] == m.total_power_input[t] * m.electricity_price[t]
-    
-
 
     def plot_1(self, instance, save_path=None, show=True):
         """
@@ -540,7 +538,6 @@ class Building(DSMFlex, SupportsMinMax):
         if show:
             plt.show()
         plt.close(fig)
-
 
         # -------- optional CSV export (same columns as plotted) --------
         df = pd.DataFrame(
@@ -1131,36 +1128,42 @@ class Building(DSMFlex, SupportsMinMax):
             fig_ts.update_layout(title="TES Operation", height=520)
             figs_tes.append(fig_ts)
 
-                    # ---------------- TES scatter analytics vs electricity price ----------------
+            # ---------------- TES scatter analytics vs electricity price ----------------
             if elec_price and ts_ch and ts_ds:
                 # Charge scatter (MW_th on x, €/MWh on y)
                 fig_chg_price = go.Figure()
-                fig_chg_price.add_trace(go.Scatter(
-                    x=ts_ch, y=elec_price,
-                    mode="markers",
-                    marker=dict(color="blue", size=6, opacity=0.6),
-                    name="Charge"
-                ))
+                fig_chg_price.add_trace(
+                    go.Scatter(
+                        x=ts_ch,
+                        y=elec_price,
+                        mode="markers",
+                        marker=dict(color="blue", size=6, opacity=0.6),
+                        name="Charge",
+                    )
+                )
                 fig_chg_price.update_layout(
                     title="TES Charge vs. Electricity Price",
                     xaxis_title="Charge Power [MWₜₕ]",
                     yaxis_title="Electricity Price [€/MWhₑ]",
-                    height=400
+                    height=400,
                 )
 
                 # Discharge scatter (MW_th on x, €/MWh on y)
                 fig_dis_price = go.Figure()
-                fig_dis_price.add_trace(go.Scatter(
-                    x=ts_ds, y=elec_price,
-                    mode="markers",
-                    marker=dict(color="red", size=6, opacity=0.6),
-                    name="Discharge"
-                ))
+                fig_dis_price.add_trace(
+                    go.Scatter(
+                        x=ts_ds,
+                        y=elec_price,
+                        mode="markers",
+                        marker=dict(color="red", size=6, opacity=0.6),
+                        name="Discharge",
+                    )
+                )
                 fig_dis_price.update_layout(
                     title="TES Discharge vs. Electricity Price",
                     xaxis_title="Discharge Power [MWₜₕ]",
                     yaxis_title="Electricity Price [€/MWhₑ]",
-                    height=400
+                    height=400,
                 )
 
                 # Add to figs for export
@@ -1692,123 +1695,251 @@ class Building(DSMFlex, SupportsMinMax):
             fig_b.update_layout(title="Baseline Comparison (Economy & CO₂)")
             figs_cmp.append(fig_b)
 
-                # ------------------------- PROSUMER / RESERVE (FCR / aFRR) ANALYTICS -------------------------
+            # ------------------------- PROSUMER / RESERVE (FCR / aFRR) ANALYTICS -------------------------
         figs_res = []
         is_prosumer = bool(getattr(self, "is_prosumer", False))
         if is_prosumer and hasattr(instance, "time_steps"):
-            blk_len   = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))
-            step_mw   = float(getattr(self, "_FCR_STEP_MW", 1.0))
-            min_bid   = float(getattr(self, "_FCR_MIN_BID_MW", 1.0))
-            symmetric = bool(getattr(self, "fcr_symmetric", True))   # True → FCR; False → aFRR (+/−)
+            blk_len = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))
+            step_mw = float(getattr(self, "_FCR_STEP_MW", 1.0))
+            min_bid = float(getattr(self, "_FCR_MIN_BID_MW", 1.0))
+            symmetric = bool(
+                getattr(self, "fcr_symmetric", True)
+            )  # True → FCR; False → aFRR (+/−)
 
             # Handles exposed by your model
-            fcr_blocks   = list(getattr(instance, "fcr_blocks", []))
-            cap_up_v     = getattr(instance, "cap_up", None)           # per-block capacity [MW]
-            cap_dn_v     = getattr(instance, "cap_dn", None)
-            price_fcr_v  = getattr(instance, "fcr_block_price", None)  # €/MW per 4h (symmetric)
-            price_pos_v  = getattr(instance, "afrr_block_price_pos", None)  # €/MW per 4h (asymmetric +)
-            price_neg_v  = getattr(instance, "afrr_block_price_neg", None)  # €/MW per 4h (asymmetric −)
+            fcr_blocks = list(getattr(instance, "fcr_blocks", []))
+            cap_up_v = getattr(instance, "cap_up", None)  # per-block capacity [MW]
+            cap_dn_v = getattr(instance, "cap_dn", None)
+            price_fcr_v = getattr(
+                instance, "fcr_block_price", None
+            )  # €/MW per 4h (symmetric)
+            price_pos_v = getattr(
+                instance, "afrr_block_price_pos", None
+            )  # €/MW per 4h (asymmetric +)
+            price_neg_v = getattr(
+                instance, "afrr_block_price_neg", None
+            )  # €/MW per 4h (asymmetric −)
 
             if fcr_blocks and (cap_up_v or cap_dn_v):
                 # helpers
                 def s(v):
-                    try: return float(pyo.value(v))
-                    except Exception: return float(v) if v is not None else 0.0
+                    try:
+                        return float(pyo.value(v))
+                    except Exception:
+                        return float(v) if v is not None else 0.0
 
                 def pull_map(pyobj):
                     d = {}
-                    if pyobj is None: return d
-                    for b in fcr_blocks: d[b] = s(pyobj[b])
+                    if pyobj is None:
+                        return d
+                    for b in fcr_blocks:
+                        d[b] = s(pyobj[b])
                     return d
 
                 def stairs(blocks, block_map, L, H):
-                    y = [0.0]*H
+                    y = [0.0] * H
                     for b in blocks:
                         val = float(block_map.get(b, 0.0))
                         for k in range(L):
                             i = b + k
-                            if 0 <= i < H: y[i] = val
+                            if 0 <= i < H:
+                                y[i] = val
                     return y
 
-                up_map  = pull_map(cap_up_v)
-                dn_map  = pull_map(cap_dn_v)
-                H       = len(T)
+                up_map = pull_map(cap_up_v)
+                dn_map = pull_map(cap_dn_v)
+                H = len(T)
 
                 # ---- prices (symmetric or asymmetric) ----
                 pr_map_sym = pull_map(price_fcr_v) if symmetric else {}
                 pr_map_pos = pull_map(price_pos_v) if not symmetric else {}
                 pr_map_neg = pull_map(price_neg_v) if not symmetric else {}
 
-                up_stairs = stairs(fcr_blocks, up_map, blk_len, H) if up_map else [0.0]*H
-                dn_stairs = stairs(fcr_blocks, dn_map, blk_len, H) if dn_map else [0.0]*H
-                pr_sym    = stairs(fcr_blocks, pr_map_sym, blk_len, H) if pr_map_sym else None
-                pr_pos    = stairs(fcr_blocks, pr_map_pos, blk_len, H) if pr_map_pos else None
-                pr_neg    = stairs(fcr_blocks, pr_map_neg, blk_len, H) if pr_map_neg else None
+                up_stairs = (
+                    stairs(fcr_blocks, up_map, blk_len, H) if up_map else [0.0] * H
+                )
+                dn_stairs = (
+                    stairs(fcr_blocks, dn_map, blk_len, H) if dn_map else [0.0] * H
+                )
+                pr_sym = (
+                    stairs(fcr_blocks, pr_map_sym, blk_len, H) if pr_map_sym else None
+                )
+                pr_pos = (
+                    stairs(fcr_blocks, pr_map_pos, blk_len, H) if pr_map_pos else None
+                )
+                pr_neg = (
+                    stairs(fcr_blocks, pr_map_neg, blk_len, H) if pr_map_neg else None
+                )
 
                 # ---- Block ladder (bars) + price line(s) ----
                 x_blk = fcr_blocks
-                y_up  = [up_map.get(b, 0.0) for b in x_blk]
-                y_dn  = [dn_map.get(b, 0.0) for b in x_blk]
+                y_up = [up_map.get(b, 0.0) for b in x_blk]
+                y_dn = [dn_map.get(b, 0.0) for b in x_blk]
 
-                fig_blk = ps.make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
-                fig_blk.add_trace(go.Bar(x=x_blk, y=y_up, name="UP capacity [MW]",   marker_color="#d62728"), secondary_y=False)
-                fig_blk.add_trace(go.Bar(x=x_blk, y=y_dn, name="DOWN capacity [MW]", marker_color="#2ca02c"), secondary_y=False)
+                fig_blk = ps.make_subplots(
+                    rows=1, cols=1, specs=[[{"secondary_y": True}]]
+                )
+                fig_blk.add_trace(
+                    go.Bar(
+                        x=x_blk, y=y_up, name="UP capacity [MW]", marker_color="#d62728"
+                    ),
+                    secondary_y=False,
+                )
+                fig_blk.add_trace(
+                    go.Bar(
+                        x=x_blk,
+                        y=y_dn,
+                        name="DOWN capacity [MW]",
+                        marker_color="#2ca02c",
+                    ),
+                    secondary_y=False,
+                )
 
                 if symmetric:
                     y_pr = [pr_map_sym.get(b, 0.0) for b in x_blk]
                     fig_blk.add_trace(
-                        go.Scatter(x=x_blk, y=y_pr, name="FCR price [€/MW·4h]",
-                                   line=dict(color="#9467bd", dash="dash")),
-                        secondary_y=True
+                        go.Scatter(
+                            x=x_blk,
+                            y=y_pr,
+                            name="FCR price [€/MW·4h]",
+                            line=dict(color="#9467bd", dash="dash"),
+                        ),
+                        secondary_y=True,
                     )
-                    fig_blk.update_layout(title="FCR Blocks: Capacity & Price", barmode="stack", height=420)
+                    fig_blk.update_layout(
+                        title="FCR Blocks: Capacity & Price",
+                        barmode="stack",
+                        height=420,
+                    )
                 else:
                     y_pr_pos = [pr_map_pos.get(b, 0.0) for b in x_blk]
                     y_pr_neg = [pr_map_neg.get(b, 0.0) for b in x_blk]
                     fig_blk.add_trace(
-                        go.Scatter(x=x_blk, y=y_pr_pos, name="aFRR+ price [€/MW·4h]",
-                                   line=dict(color="#1f77b4", dash="dash")),
-                        secondary_y=True
+                        go.Scatter(
+                            x=x_blk,
+                            y=y_pr_pos,
+                            name="aFRR+ price [€/MW·4h]",
+                            line=dict(color="#1f77b4", dash="dash"),
+                        ),
+                        secondary_y=True,
                     )
                     fig_blk.add_trace(
-                        go.Scatter(x=x_blk, y=y_pr_neg, name="aFRR− price [€/MW·4h]",
-                                   line=dict(color="#ff7f0e", dash="dot")),
-                        secondary_y=True
+                        go.Scatter(
+                            x=x_blk,
+                            y=y_pr_neg,
+                            name="aFRR− price [€/MW·4h]",
+                            line=dict(color="#ff7f0e", dash="dot"),
+                        ),
+                        secondary_y=True,
                     )
-                    fig_blk.update_layout(title="aFRR Blocks: Capacity & Price (+/−)", barmode="stack", height=420)
+                    fig_blk.update_layout(
+                        title="aFRR Blocks: Capacity & Price (+/−)",
+                        barmode="stack",
+                        height=420,
+                    )
 
                 fig_blk.update_yaxes(title_text="MW", secondary_y=False)
                 fig_blk.update_yaxes(title_text="€/MW·4h", secondary_y=True)
                 figs_res.append(fig_blk)
 
                 # ---- Hourly impact: bands around baseline + price line(s) on right axis ----
-                base    = [safe(instance.total_power_input[t]) for t in T] if hasattr(instance, "total_power_input") else [0.0]*H
+                base = (
+                    [safe(instance.total_power_input[t]) for t in T]
+                    if hasattr(instance, "total_power_input")
+                    else [0.0] * H
+                )
                 max_cap = float(getattr(self, "max_plant_capacity", np.nan))
                 min_cap = float(getattr(self, "min_plant_capacity", 0.0))
 
                 lower_up = [max(min_cap, base[i] - up_stairs[i]) for i in range(H)]
-                upper_dn = [min(max_cap if not np.isnan(max_cap) else 1e9, base[i] + dn_stairs[i]) for i in range(H)]
+                upper_dn = [
+                    min(
+                        max_cap if not np.isnan(max_cap) else 1e9,
+                        base[i] + dn_stairs[i],
+                    )
+                    for i in range(H)
+                ]
 
-                fig_imp = ps.make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
-                fig_imp.add_trace(go.Scatter(x=T, y=base, name="Baseline load [MWₑ]", line=dict(color="grey")), secondary_y=False)
-                fig_imp.add_trace(go.Scatter(x=T, y=lower_up, name="Baseline−UP", line=dict(color="#d62728", width=0), showlegend=False), secondary_y=False)
-                fig_imp.add_trace(go.Scatter(x=T, y=base,     name="UP capacity band",   fill="tonexty", mode="lines",
-                                             line=dict(color="#d62728"), fillcolor="rgba(214,39,40,0.25)"), secondary_y=False)
-                fig_imp.add_trace(go.Scatter(x=T, y=upper_dn, name="DOWN capacity band", fill="tonexty", mode="lines",
-                                             line=dict(color="#2ca02c"), fillcolor="rgba(44,160,44,0.25)"), secondary_y=False)
+                fig_imp = ps.make_subplots(
+                    rows=1, cols=1, specs=[[{"secondary_y": True}]]
+                )
+                fig_imp.add_trace(
+                    go.Scatter(
+                        x=T, y=base, name="Baseline load [MWₑ]", line=dict(color="grey")
+                    ),
+                    secondary_y=False,
+                )
+                fig_imp.add_trace(
+                    go.Scatter(
+                        x=T,
+                        y=lower_up,
+                        name="Baseline−UP",
+                        line=dict(color="#d62728", width=0),
+                        showlegend=False,
+                    ),
+                    secondary_y=False,
+                )
+                fig_imp.add_trace(
+                    go.Scatter(
+                        x=T,
+                        y=base,
+                        name="UP capacity band",
+                        fill="tonexty",
+                        mode="lines",
+                        line=dict(color="#d62728"),
+                        fillcolor="rgba(214,39,40,0.25)",
+                    ),
+                    secondary_y=False,
+                )
+                fig_imp.add_trace(
+                    go.Scatter(
+                        x=T,
+                        y=upper_dn,
+                        name="DOWN capacity band",
+                        fill="tonexty",
+                        mode="lines",
+                        line=dict(color="#2ca02c"),
+                        fillcolor="rgba(44,160,44,0.25)",
+                    ),
+                    secondary_y=False,
+                )
 
                 if symmetric and pr_sym is not None:
-                    fig_imp.add_trace(go.Scatter(x=T, y=pr_sym, name="FCR price [€/MW·4h]",
-                                                 line=dict(color="#9467bd", dash="dot")), secondary_y=True)
+                    fig_imp.add_trace(
+                        go.Scatter(
+                            x=T,
+                            y=pr_sym,
+                            name="FCR price [€/MW·4h]",
+                            line=dict(color="#9467bd", dash="dot"),
+                        ),
+                        secondary_y=True,
+                    )
                 else:
                     if pr_pos is not None:
-                        fig_imp.add_trace(go.Scatter(x=T, y=pr_pos, name="aFRR+ price [€/MW·4h]",
-                                                     line=dict(color="#1f77b4", dash="dot")), secondary_y=True)
+                        fig_imp.add_trace(
+                            go.Scatter(
+                                x=T,
+                                y=pr_pos,
+                                name="aFRR+ price [€/MW·4h]",
+                                line=dict(color="#1f77b4", dash="dot"),
+                            ),
+                            secondary_y=True,
+                        )
                     if pr_neg is not None:
-                        fig_imp.add_trace(go.Scatter(x=T, y=pr_neg, name="aFRR− price [€/MW·4h]",
-                                                     line=dict(color="#ff7f0e", dash="dot")), secondary_y=True)
+                        fig_imp.add_trace(
+                            go.Scatter(
+                                x=T,
+                                y=pr_neg,
+                                name="aFRR− price [€/MW·4h]",
+                                line=dict(color="#ff7f0e", dash="dot"),
+                            ),
+                            secondary_y=True,
+                        )
 
-                fig_imp.update_layout(title="Reserve Impact: Capacity Bands (red=UP, green=DOWN)", height=460)
+                fig_imp.update_layout(
+                    title="Reserve Impact: Capacity Bands (red=UP, green=DOWN)",
+                    height=460,
+                )
                 fig_imp.update_yaxes(title_text="MW / MWₑ", secondary_y=False)
                 fig_imp.update_yaxes(title_text="Price [€/MW·4h]", secondary_y=True)
                 figs_res.append(fig_imp)
@@ -1819,13 +1950,13 @@ class Building(DSMFlex, SupportsMinMax):
                 if symmetric:
                     y_pr = [pr_map_sym.get(b, 0.0) for b in x_blk]
                     rev_blk = [y_pr[i] * y_up[i] for i in range(len(x_blk))]
-                    rev_up  = rev_blk
-                    rev_dn  = [0.0]*len(x_blk)
+                    rev_up = rev_blk
+                    rev_dn = [0.0] * len(x_blk)
                 else:
                     y_pr_pos = [pr_map_pos.get(b, 0.0) for b in x_blk]
                     y_pr_neg = [pr_map_neg.get(b, 0.0) for b in x_blk]
-                    rev_up   = [y_pr_pos[i] * y_up[i] for i in range(len(x_blk))]
-                    rev_dn   = [y_pr_neg[i] * y_dn[i] for i in range(len(x_blk))]
+                    rev_up = [y_pr_pos[i] * y_up[i] for i in range(len(x_blk))]
+                    rev_dn = [y_pr_neg[i] * y_dn[i] for i in range(len(x_blk))]
                 rev_tot = [rev_up[i] + rev_dn[i] for i in range(len(x_blk))]
                 rev_cum = np.cumsum(rev_tot).tolist()
 
@@ -1834,60 +1965,118 @@ class Building(DSMFlex, SupportsMinMax):
                 if symmetric:
                     numer = sum([y_pr[i] * y_up[i] for i in range(len(x_blk))])
                 else:
-                    numer = sum([y_pr_pos[i]*y_up[i] for i in range(len(x_blk))]) + \
-                            sum([y_pr_neg[i]*y_dn[i] for i in range(len(x_blk))])
+                    numer = sum(
+                        [y_pr_pos[i] * y_up[i] for i in range(len(x_blk))]
+                    ) + sum([y_pr_neg[i] * y_dn[i] for i in range(len(x_blk))])
                 mw_w_price = numer / max(denom, 1e-9)
 
-                fig_rev = ps.make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
-                fig_rev.add_trace(go.Bar(x=x_blk, y=rev_up, name=("Revenue UP [€]" if not symmetric else "Revenue [€]"),
-                                         marker_color="#d62728"), secondary_y=False)
+                fig_rev = ps.make_subplots(
+                    rows=1, cols=1, specs=[[{"secondary_y": True}]]
+                )
+                fig_rev.add_trace(
+                    go.Bar(
+                        x=x_blk,
+                        y=rev_up,
+                        name=("Revenue UP [€]" if not symmetric else "Revenue [€]"),
+                        marker_color="#d62728",
+                    ),
+                    secondary_y=False,
+                )
                 if not symmetric:
-                    fig_rev.add_trace(go.Bar(x=x_blk, y=rev_dn, name="Revenue DOWN [€]",
-                                             marker_color="#2ca02c"), secondary_y=False)
-                fig_rev.add_trace(go.Scatter(x=x_blk, y=rev_cum, name="Cumulative revenue [€]",
-                                             line=dict(color="#1f77b4", width=2)), secondary_y=True)
-                fig_rev.update_layout(barmode=("overlay" if symmetric else "stack"),
-                                      title="Reserve Revenue by Block (and cumulative)", height=420)
+                    fig_rev.add_trace(
+                        go.Bar(
+                            x=x_blk,
+                            y=rev_dn,
+                            name="Revenue DOWN [€]",
+                            marker_color="#2ca02c",
+                        ),
+                        secondary_y=False,
+                    )
+                fig_rev.add_trace(
+                    go.Scatter(
+                        x=x_blk,
+                        y=rev_cum,
+                        name="Cumulative revenue [€]",
+                        line=dict(color="#1f77b4", width=2),
+                    ),
+                    secondary_y=True,
+                )
+                fig_rev.update_layout(
+                    barmode=("overlay" if symmetric else "stack"),
+                    title="Reserve Revenue by Block (and cumulative)",
+                    height=420,
+                )
                 fig_rev.update_yaxes(title_text="€/block", secondary_y=False)
                 fig_rev.update_yaxes(title_text="€ cumulative", secondary_y=True)
                 figs_res.append(fig_rev)
 
                 # KPIs table (names adapt to symmetric/asymmetric)
                 kpi_rows = [
-                    ("Blocks with any bid", f"{sum(1 for i in range(len(x_blk)) if (y_up[i]+y_dn[i])>0)} / {len(x_blk)}"),
-                    ("Total UP capacity [MW·blocks]",   f"{sum(y_up):,.0f}"),
+                    (
+                        "Blocks with any bid",
+                        f"{sum(1 for i in range(len(x_blk)) if (y_up[i]+y_dn[i])>0)} / {len(x_blk)}",
+                    ),
+                    ("Total UP capacity [MW·blocks]", f"{sum(y_up):,.0f}"),
                     ("Total DOWN capacity [MW·blocks]", f"{sum(y_dn):,.0f}"),
-                    ("Total reserve revenue [€]",       f"{sum(rev_tot):,.0f}"),
-                    ("MW-weighted price [€/MW·4h]",     f"{mw_w_price:,.1f}"),
-                    ("Min bid [MW] / Step [MW]",        f"{min_bid:g} / {step_mw:g}"),
-                    ("Symmetric product",               "Yes" if symmetric else "No (aFRR +/−)")
+                    ("Total reserve revenue [€]", f"{sum(rev_tot):,.0f}"),
+                    ("MW-weighted price [€/MW·4h]", f"{mw_w_price:,.1f}"),
+                    ("Min bid [MW] / Step [MW]", f"{min_bid:g} / {step_mw:g}"),
+                    ("Symmetric product", "Yes" if symmetric else "No (aFRR +/−)"),
                 ]
-                fig_res_kpi = go.Figure(go.Table(
-                    header=dict(values=["Reserve KPI","Value"], align="left"),
-                    cells=dict(values=[[r[0] for r in kpi_rows],[r[1] for r in kpi_rows]], align="left")
-                ))
+                fig_res_kpi = go.Figure(
+                    go.Table(
+                        header=dict(values=["Reserve KPI", "Value"], align="left"),
+                        cells=dict(
+                            values=[[r[0] for r in kpi_rows], [r[1] for r in kpi_rows]],
+                            align="left",
+                        ),
+                    )
+                )
                 fig_res_kpi.update_layout(title="Reserve Market KPIs")
                 figs_res.append(fig_res_kpi)
 
                 # ---- Compliance check: min bid & step ----
                 viol = []
-                for i,b in enumerate(x_blk):
-                    if (y_up[i] > 1e-9) and ((y_up[i] < min_bid) or (abs(y_up[i]/step_mw - round(y_up[i]/step_mw)) > 1e-9)):
+                for i, b in enumerate(x_blk):
+                    if (y_up[i] > 1e-9) and (
+                        (y_up[i] < min_bid)
+                        or (abs(y_up[i] / step_mw - round(y_up[i] / step_mw)) > 1e-9)
+                    ):
                         viol.append((b, "UP", y_up[i]))
-                    if (y_dn[i] > 1e-9) and ((y_dn[i] < min_bid) or (abs(y_dn[i]/step_mw - round(y_dn[i]/step_mw)) > 1e-9)):
+                    if (y_dn[i] > 1e-9) and (
+                        (y_dn[i] < min_bid)
+                        or (abs(y_dn[i] / step_mw - round(y_dn[i] / step_mw)) > 1e-9)
+                    ):
                         viol.append((b, "DOWN", y_dn[i]))
                 if viol:
-                    fig_v = go.Figure(go.Table(
-                        header=dict(values=["Block start","Side","Capacity [MW] (violates min/step)"], align="left"),
-                        cells=dict(values=[[v[0] for v in viol],[v[1] for v in viol],[f"{v[2]:.1f}" for v in viol]], align="left")
-                    ))
+                    fig_v = go.Figure(
+                        go.Table(
+                            header=dict(
+                                values=[
+                                    "Block start",
+                                    "Side",
+                                    "Capacity [MW] (violates min/step)",
+                                ],
+                                align="left",
+                            ),
+                            cells=dict(
+                                values=[
+                                    [v[0] for v in viol],
+                                    [v[1] for v in viol],
+                                    [f"{v[2]:.1f}" for v in viol],
+                                ],
+                                align="left",
+                            ),
+                        )
+                    )
                     fig_v.update_layout(title="Bid Compliance Issues")
                     figs_res.append(fig_v)
 
-
         # ------------------------- WRITE SINGLE HTML -------------------------
         with open(html_path, "w", encoding="utf-8") as f:
-            f.write("<html><head><meta charset='utf-8'><title>Steam Plant – Full Dashboard</title></head><body>")
+            f.write(
+                "<html><head><meta charset='utf-8'><title>Steam Plant – Full Dashboard</title></head><body>"
+            )
             f.write("<h2>Steam Generation Plant – Full Dashboard</h2>")
 
             f.write("<h3>Dynamic Operation</h3>")
@@ -1920,4 +2109,3 @@ class Building(DSMFlex, SupportsMinMax):
 
             f.write("</body></html>")
         print(f"Full dashboard saved to: {html_path}")
-

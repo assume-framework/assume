@@ -626,3 +626,11 @@ way/957746797-380,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_
 way/97825259-380,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,way/97825259-380
 way/97857512-220,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,way/97857512-220
 way/979801144-380,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,eom_de,way/979801144-380
+P100000124212,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,Dyckerhoff GmbH,way/953757608-380
+P100000124839,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,CEMEX Deutschland AG,way/95434457-380
+P100000125777,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,Holcim (Deutschland) GmbH,way/954971276-220
+P100000125790,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,SCHWENK Zement GmbH & Co KG,way/955268863-380
+P100000125763,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,Heidelberg Materials AG,way/957746797-380
+P100000125764,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,Portlandzementwerk Wittekind Hugo Miebach Soehne KG,way/97825259-380
+P100000125776,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,Spenner GmbH & Co KG,way/97857512-220
+P100000125770,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,Heidelberg Materials AG,way/979801144-380

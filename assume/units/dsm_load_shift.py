@@ -153,13 +153,16 @@ class DSMFlex:
                 )
 
                 return total_variable_cost
-        
+
         elif self.objective == "max_net_income":
+
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule_opt(m):
-                net_income = self.model.reserve_revenue - sum(self.model.variable_cost[t] for t in self.model.time_steps)
+                net_income = self.model.reserve_revenue - sum(
+                    self.model.variable_cost[t] for t in self.model.time_steps
+                )
                 return net_income
-            
+
         # elif self.objective == "max_net_income":
         #     m = self.model
 
@@ -812,16 +815,15 @@ class DSMFlex:
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
 
-        # Dashboard & Plot
-        self.dashboard(
-            instance,
-            baseline_instance=None,  # optional: BAU/no-TES run for comparison
-            html_path="./outputs/dashboard.html",
-            sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
-        )
-        self.plot_1(instance, save_path="./outputs/PL_B", show=True)
-        self.plot_2(instance, save_path="./outputs/DE_FCR_products.png", show=True)
-
+        # # Dashboard & Plot
+        # self.dashboard(
+        #     instance,
+        #     baseline_instance=None,  # optional: BAU/no-TES run for comparison
+        #     html_path="./outputs/dashboard.html",
+        #     sankey_max_steps=168,  # limit time-slider sankey to avoid huge HTML; set None for all
+        # )
+        # self.plot_1(instance, save_path="./outputs/PL_B", show=True)
+        # self.plot_2(instance, save_path="./outputs/DE_FCR_products.png", show=True)
 
     def determine_optimal_operation_with_flex(self):
         """

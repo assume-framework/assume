@@ -263,6 +263,7 @@ def add_nodal_loads(
         **loads_c,
     )
 
+
 def add_redispatch_dsm(
     network: pypsa.Network, industrial_dsm_units: pd.DataFrame
 ) -> None:
@@ -318,6 +319,7 @@ def add_redispatch_dsm(
         marginal_cost=p_set,
         sign=1,
     )
+
 
 def read_pypsa_grid(
     network: pypsa.Network,
