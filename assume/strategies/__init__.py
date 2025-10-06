@@ -56,6 +56,7 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "dmas_powerplant": DmasPowerplantStrategy,
     "dmas_storage": DmasStorageStrategy,
     "cournot_portfolio": CournotPortfolioStrategy,
+    "default_portfolio": DirectUnitOperatorStrategy,
 }
 
 try:
@@ -65,13 +66,12 @@ try:
         StorageRLStrategy,
         RenewableRLStrategy,
     )
-    from assume.strategies.portfolio_strategies import PortfolioRLStrategy
 
     bidding_strategies["pp_learning"] = RLStrategy
     bidding_strategies["pp_learning_single_bid"] = RLStrategySingleBid
     bidding_strategies["storage_learning"] = StorageRLStrategy
     bidding_strategies["renewable_eom_learning"] = RenewableRLStrategy
-    bidding_strategies["portfolio_learning"] = PortfolioRLStrategy
+
 
 except ImportError:
     pass
