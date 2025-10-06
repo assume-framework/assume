@@ -37,7 +37,11 @@ from assume.common import (
 from assume.common.base import LearningConfig
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import LearningStrategy, bidding_strategies
+from assume.strategies import (
+    LearningStrategy,
+    UnitOperatorStrategy,
+    bidding_strategies,
+)
 from assume.units import BaseUnit, demand_side_technologies, unit_types
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -397,7 +401,9 @@ class World:
             )
             output_agent.suspendable_tasks = False
 
-    def add_unit_operator(self, id: str) -> None:
+    def add_unit_operator(
+        self, id: str, strategies: dict[str, UnitOperatorStrategy] = {}
+    ) -> None:
         """
         Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
         The unit operator is then added to the list of existing operators. Unit operator receives the output agent address
@@ -410,7 +416,14 @@ class World:
         if self.unit_operators.get(id):
             raise ValueError(f"Unit operator {id} already exists")
 
-        units_operator = UnitsOperator(available_markets=list(self.markets.values()))
+        bidding_strategies = self._prepare_bidding_strategies(
+            {"bidding_strategies": strategies}, id
+        )
+
+        units_operator = UnitsOperator(
+            available_markets=list(self.markets.values()),
+            portfolio_strategies=bidding_strategies,
+        )
 
         # creating a new role agent and apply the role of a units operator
         unit_operator_agent = RoleAgent()
@@ -483,7 +496,9 @@ class World:
                 }
             )
 
-    def add_units_with_operator_subprocess(self, id: str, units: list[dict]):
+    def add_units_with_operator_subprocess(
+        self, id: str, units: list[dict], strategies: dict[str, UnitOperatorStrategy]
+    ):
         """
         Adds a units operator with given ID in a separate process
         and creates and adds the given list of unit dictionaries to it
@@ -502,7 +517,9 @@ class World:
                 market.opening_hours._cache_complete = False
                 market.opening_hours._cache_gen = None
         self.addresses.append(addr(self.addr, clock_agent_name))
-        units_operator = UnitsOperator(available_markets=markets)
+        units_operator = UnitsOperator(
+            available_markets=markets, portfolio_strategies=strategies
+        )
 
         for unit in units:
             units_operator.add_unit(self.create_unit(**unit))
@@ -552,7 +569,7 @@ class World:
 
         Args:
             unit_id (str): The identifier for the unit.
-            bidding_strategies (dict[str, BaseStrategy]): The bidding strategies for the unit.
+            bidding_strategies (dict[str, BaseStrategy | UnitOperatorStrategy]): The bidding strategies for the unit.
         """
         for unit in self.unit_operators["Operator-RL"].rl_units:
             for strategy in unit.bidding_strategies.values():
@@ -569,7 +586,7 @@ class World:
             unit_id (str): The identifier for the unit.
 
         Returns:
-            dict[str, BaseStrategy]: The bidding strategies for the unit.
+            dict[str, BaseStrategy | UnitOperatorStrategy]: The bidding strategies for the unit.
         """
         bidding_strategies = {}
         strategy_instances = {}  # Cache to store created instances

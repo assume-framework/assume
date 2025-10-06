@@ -48,7 +48,7 @@ class PayAsClearRole(MarketRole):
 
     def clear(
         self, orderbook: Orderbook, market_products
-    ) -> (Orderbook, Orderbook, list[dict]):
+    ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Performs electricity market clearing using a pay-as-clear mechanism. This means that the clearing price is the
         highest price that is still accepted. The clearing price is the same for all accepted orders.
@@ -193,7 +193,7 @@ class PayAsBidRole(MarketRole):
 
     def clear(
         self, orderbook: Orderbook, market_products: list[MarketProduct]
-    ) -> (Orderbook, Orderbook, list[dict]):
+    ) -> tuple[Orderbook, Orderbook, list[dict]]:
         """
         Simulates electricity market clearing using a pay-as-bid mechanism.
 

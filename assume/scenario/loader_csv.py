@@ -31,6 +31,14 @@ from assume.world import World
 logger = logging.getLogger(__name__)
 
 
+def bidding_strategies_from_param_dict(param_dict: dict):
+    return {
+        ident.split("bidding_")[1]: strategy
+        for ident, strategy in param_dict.items()
+        if ident.startswith("bidding_")
+    }
+
+
 def load_file(
     path: str,
     config: dict,
@@ -365,11 +373,7 @@ def add_units(
 
     units_df = units_df.fillna(0)
     for unit_name, unit_params in units_df.iterrows():
-        bidding_strategies = {
-            key.split("bidding_")[1]: unit_params[key]
-            for key in unit_params.keys()
-            if key.startswith("bidding_")
-        }
+        bidding_strategies = bidding_strategies_from_param_dict(unit_params)
         unit_params["bidding_strategies"] = bidding_strategies
         operator_id = unit_params["unit_operator"]
         del unit_params["unit_operator"]
@@ -479,6 +483,7 @@ def load_config_and_create_forecaster(
         freq=config["time_step"],
     )
 
+    unit_operators = load_file(path=path, config=config, file_name="unit_operators")
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
@@ -582,6 +587,7 @@ def load_config_and_create_forecaster(
         "path": path,
         "start": start,
         "end": end,
+        "unit_operators": unit_operators,
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
@@ -605,7 +611,6 @@ def setup_world(
 
     Args:
         world (World): An instance of the World class representing the simulation environment.
-        scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
         evaluation_mode (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 1.
@@ -622,6 +627,7 @@ def setup_world(
     config = scenario_data["config"]
     start = scenario_data["start"]
     end = scenario_data["end"]
+    unit_operators = scenario_data["unit_operators"]
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
@@ -716,7 +722,7 @@ def setup_world(
         )
 
     # create list of units from dataframes before adding actual operators
-    logger.info("Read units from file")
+    logger.info("Read units from dataframe")
 
     units = defaultdict(list)
     powerplant_units = read_units(
@@ -771,19 +777,32 @@ def setup_world(
     for op, op_units in exchange_units.items():
         units[op].extend(op_units)
 
+    if unit_operators is not None:
+        logger.info("Create unit_operators for portfolio strategies")
+        unit_operators_strategies = unit_operators.to_dict("index")
+        # remove starting "bidding_" string from market names
+        for operator in unit_operators_strategies.keys():
+            raw_strategies = unit_operators_strategies[operator]
+            converted_strategies = bidding_strategies_from_param_dict(raw_strategies)
+            unit_operators_strategies[operator] = converted_strategies
+    else:
+        unit_operators_strategies = {}
+
     # if distributed_role is true - there is a manager available
     # and we can add each units_operator as a separate process
     if world.distributed_role is True:
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
-            world.add_units_with_operator_subprocess(op, op_units)
+            strategies = unit_operators_strategies.get(op, {})
+            world.add_units_with_operator_subprocess(op, op_units, strategies)
     else:
         logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
             if company_name == "Operator-RL" and world.learning_mode:
                 world.add_rl_unit_operator(id="Operator-RL")
             else:
-                world.add_unit_operator(id=str(company_name))
+                strategies = unit_operators_strategies.get(company_name, {})
+                world.add_unit_operator(id=str(company_name), strategies=strategies)
 
         # add the units to corresponding unit operators
         for op, op_units in units.items():
