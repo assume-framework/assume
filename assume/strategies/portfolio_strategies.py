@@ -51,16 +51,16 @@ class UnitOperatorStrategy:
             dict: a nested dictionary indexed by market and by technology.
         """
 
-        tot_capacity = {}
+        total_capacity = {}
 
         for unit in units_operator.units.values():
             for market_id in unit.bidding_strategies.keys():
-                tot_capacity[market_id] = tot_capacity.get(market_id, {})
-                tot_capacity[market_id][unit.technology] = (
-                    tot_capacity[market_id].get(unit.technology, 0) + unit.max_power
+                total_capacity[market_id] = total_capacity.get(market_id, {})
+                total_capacity[market_id][unit.technology] = (
+                    total_capacity[market_id].get(unit.technology, 0) + unit.max_power
                 )
 
-        return tot_capacity
+        return total_capacity
 
 
 class DirectUnitOperatorStrategy(UnitOperatorStrategy):
