@@ -8,10 +8,8 @@ from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 
 class UnitOperatorStrategy:
     """
-    The base portfolio strategy
-
-    Methods
-    -------
+    The UnitOperatorStrategy is similar to the UnitStrategy.
+    A UnitOperatorStrategy calculates the bids for all units of a units operator.
     """
 
     def __init__(self, *args, **kwargs):
@@ -19,7 +17,7 @@ class UnitOperatorStrategy:
 
     def calculate_bids(
         self,
-        operator,  # type: UnitsOperator
+        units_operator,  # type: UnitsOperator
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
@@ -31,7 +29,7 @@ class UnitOperatorStrategy:
         This gives a lot of flexibility to the market bids.
 
         Args:
-            operator (UnitsOperator): The operator handling the units.
+            units_operator (UnitsOperator): The operator handling the units.
             market_config (MarketConfig): The market configuration.
             product_tuples (list[Product]): The list of all products the unit can offer.
 
@@ -68,15 +66,17 @@ class UnitOperatorStrategy:
 class DirectUnitOperatorStrategy(UnitOperatorStrategy):
     def calculate_bids(
         self,
-        operator,  # type: UnitsOperator
+        units_operator,  # type: UnitsOperator
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
         """
-        Formulates the bid to the market according to the bidding strategy of the each unit individually.
+        Formulates the bids to the market according to the bidding strategy of the each unit individually.
+        This calls calculate_bids of each unit and returns the aggregated list of all individual bids of all units.
 
         Args:
+            units_operator: The units operator whose units are queried
             market_config (MarketConfig): The market to formulate bids for.
             product_tuples (list[tuple]): The products to formulate bids for.
 
@@ -85,13 +85,13 @@ class DirectUnitOperatorStrategy(UnitOperatorStrategy):
         """
         bids: Orderbook = []
 
-        for unit_id, unit in operator.units.items():
+        for unit_id, unit in units_operator.units.items():
             product_bids = unit.calculate_bids(
                 market_config=market_config,
                 product_tuples=product_tuples,
             )
             for i, order in enumerate(product_bids):
-                order["agent_addr"] = operator.context.addr
+                order["agent_addr"] = units_operator.context.addr
                 if market_config.volume_tick:
                     order["volume"] = round(order["volume"] / market_config.volume_tick)
                 if market_config.price_tick:
@@ -117,7 +117,7 @@ class CournotPortfolioStrategy(UnitOperatorStrategy):
 
     def calculate_bids(
         self,
-        operator,  # type: UnitsOperator
+        units_operator,  # type: UnitsOperator
         market_config: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
@@ -127,29 +127,31 @@ class CournotPortfolioStrategy(UnitOperatorStrategy):
         defines how it is dispatched to the market.
 
         Args:
-            operator (UnitsOperator): The operator that bids on the market.
+            units_operator (UnitsOperator): The units operator that bids on the market.
             market_config (MarketConfig): The configuration of the market.
-            product_tuples (list[Product]): The list of all products the unit can offer.
+            product_tuples (list[Product]): The list of all products open for bidding.
 
         Returns:
-            Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
+            Orderbook: The bids consisting of the start time, end time, price and volume.
         """
 
-        max_power_by_technology = self.total_capacity(operator)[market_config.market_id]
+        max_power_by_technology = self.total_capacity(units_operator)[
+            market_config.market_id
+        ]
         max_power = sum(
             max_power_by_technology
         )  # TODO: divide by total available capacity in the market
 
-        ## Compute marginal costs ###
         operator_bids = Orderbook()
 
-        for unit_id, unit in operator.units.items():
+        for unit_id, unit in units_operator.units.items():
+            # Compute bids from marginal costs of a unit
             bids = NaiveSingleBidStrategy().calculate_bids(
                 unit,
                 market_config,
                 product_tuples,
             )
-            ### Apply Cournot mark-up ###
+            # Apply Cournot mark-up
             for bid in bids:
                 bid["price"] += self.markup * max_power
                 bid["unit_id"] = unit_id

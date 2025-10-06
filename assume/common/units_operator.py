@@ -48,7 +48,7 @@ class UnitsOperator(Role):
 
     Args:
         available_markets (list[MarketConfig]): The available markets.
-        portfolio_strategies (dict[str, UnitOperatorStrategy], optional): Optimized portfolio strategy. Defaults to an mpty dict.
+        portfolio_strategies (dict[str, UnitOperatorStrategy], optional): Optimized portfolio strategy. Defaults to an empty dict.
     """
 
     def __init__(
@@ -458,7 +458,7 @@ class UnitsOperator(Role):
             opening["market_id"],
         )
         orderbook = strategy.calculate_bids(
-            operator=self,
+            units_operator=self,
             market_config=market,
             product_tuples=products,
         )

@@ -81,6 +81,7 @@ User Guide
 * :doc:`outputs`
 * :doc:`unit_operator`
 * :doc:`units`
+* :doc:`bidding_strategies`
 * :doc:`learning`
 * :doc:`learning_algorithm`
 * :doc:`support_policies`
@@ -101,6 +102,7 @@ User Guide
    outputs
    unit_operator
    units
+   bidding_strategies
    learning
    learning_algorithm
    support_policies

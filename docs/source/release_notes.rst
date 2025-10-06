@@ -18,7 +18,7 @@ Upcoming Release
 - **Adjusted reward scaling**: Reward scaling now considers current available power instead of the unit’s max_power, reducing reward distortion when availability limits capacity. Available power is now derived from offered_order_volume instead of unit.calculate_min_max_power. Because dispatch is set before reward calculation, the previous method left available power at 0 whenever the unit was dispatched.
 
 0.5.5 - (13th August 2025)
-=======================
+==========================
 
 **New Features:**
 
