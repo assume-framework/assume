@@ -19,6 +19,8 @@ from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import linear_schedule_func
 from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
+from assume.common.utils import convert_tensors, create_rrule
+
 logger = logging.getLogger(__name__)
 
 
@@ -141,6 +143,18 @@ class Learning(Role):
         self.tensor_board_logger = None
         self.db_addr = None
         self.update_steps = None
+
+        # todo
+        recurrency_task = create_rrule(
+            start=self.context.data["train_start"],
+            end=self.context.data["train_end"],
+            freq=self.context.data.get("train_freq", "24h"),
+        )
+
+        self.context.schedule_recurrent_task(
+            self.write_to_learning_role, recurrency_task
+        )
+
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -427,6 +441,68 @@ class Learning(Role):
         self.datetime = pd.to_datetime(train_start)
 
         self.update_steps = 0
+
+    def write_rl_params_to_output(
+        self, learning_rate: float, unit_params_list: list[dict]
+    ) -> None:
+
+                """
+        Sends the current rl_strategy update to the output agent.
+
+        Args:
+            products_index (pandas.DatetimeIndex): The index of all products.
+            marketconfig (MarketConfig): The market configuration.
+        """
+        # TODO makes this from data of startegies instead from units
+        products_index = get_products_index(orderbook)
+
+        # should write learning results if at least one bidding_strategy is a learning strategy
+        if not (len(self.rl_units) and orderbook):
+            return
+
+        output_agent_list = []
+        start = products_index[0]
+
+        for unit in self.rl_units:
+            strategy = unit.bidding_strategies.get(market_id)
+
+            # rl only for energy market for now!
+            if isinstance(strategy, LearningStrategy):
+                output_dict = {
+                    "datetime": start,
+                    "unit": unit.id,
+                }
+
+                output_dict.update(
+                    {
+                        "profit": unit.outputs["profit"].at[start],
+                        "reward": unit.outputs["reward"].at[start],
+                        "regret": unit.outputs["regret"].at[start],
+                    }
+                )
+
+                action_tuple = unit.outputs["actions"].at[start]
+                noise_tuple = unit.outputs["exploration_noise"].at[start]
+                action_dim = action_tuple.numel()
+
+                for i in range(action_dim):
+                    output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+                    output_dict[f"actions_{i}"] = action_tuple[i]
+
+                output_agent_list.append(output_dict)
+
+        db_addr = self.context.data.get("learning_output_agent_addr")
+
+        if db_addr and output_agent_list:
+            self.context.schedule_instant_message(
+                receiver_addr=db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "rl_params",
+                    "data": output_agent_list,
+                },
+            )
+
 
     def write_rl_grad_params_to_output(
         self, learning_rate: float, unit_params_list: list[dict]

@@ -787,6 +787,7 @@ class LearningStrategy(BaseStrategy):
         act_dim: int,
         unique_obs_dim: int = 0,
         num_timeseries_obs_dim: int = 3,
+        learning_role=None,
         *args,
         **kwargs,
     ):
@@ -805,6 +806,9 @@ class LearningStrategy(BaseStrategy):
         # defines the number of provided timeseries, this is necessary for correctly splitting
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
+
+        # access to the learning_role that orchestrates learning
+        self.learning_role = learning_role
 
 
 class LearningConfig(TypedDict):
