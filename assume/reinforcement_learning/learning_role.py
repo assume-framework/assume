@@ -202,7 +202,6 @@ class Learning(Role):
                 lambda content, meta: content.get("context") == "rl_training",
             )
 
-
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """
         Disable initial exploration mode.
