@@ -1216,7 +1216,7 @@ class RenewableRLStrategy(RLStrategySingleBid):
         scaled_available_power = available_power[0] / unit.max_power
 
         individual_observations = np.array(
-            [scaled_marginal_cost, scaled_available_power]
+            [scaled_available_power, scaled_marginal_cost]
         )
 
         return individual_observations
@@ -1340,7 +1340,7 @@ class RenewableRLStrategy(RLStrategySingleBid):
         if available_power == 0:
             scaling = 0
         else:
-            scaling = 1 / (self.max_bid_price * available_power * 0.1)
+            scaling = 1 / (self.max_bid_price * available_power)
 
         reward = scaling * (profit - regret_scale * opportunity_cost)
 
