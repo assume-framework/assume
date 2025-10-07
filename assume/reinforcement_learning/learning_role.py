@@ -12,14 +12,12 @@ import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
-from assume.common.utils import datetime2timestamp, timestamp2datetime
+from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import linear_schedule_func
 from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
-
-from assume.common.utils import convert_tensors, create_rrule
 
 logger = logging.getLogger(__name__)
 
@@ -146,15 +144,94 @@ class Learning(Role):
 
         # todo
         recurrency_task = create_rrule(
-            start=self.context.data["train_start"],
-            end=self.context.data["train_end"],
-            freq=self.context.data.get("train_freq", "24h"),
+            start=self.start,
+            end=self.end,
+            freq=self.train_freq,
         )
 
         self.context.schedule_recurrent_task(
-            self.write_to_learning_role, recurrency_task
+            self.store_to_buffer_and_update, recurrency_task
         )
 
+        # init dictionaries for all learning instances in this role
+        self.all_obs = defaultdict(list)
+        self.all_actions = defaultdict(list)
+        self.all_rewards = defaultdict(list)
+
+    def store_to_buffer_and_update(self) -> None:
+        """
+        This function takes all the information that the strategies wrote into the learning_role dicts and post_processes them to fit into the buffer.
+        Further triggers the next policy update
+
+        """
+        # check if all entries for the buffers have the same number of unit_ids as rl_strats
+        for name, buffer in [
+            ("observations", self.all_obs),
+            ("actions", self.all_actions),
+            ("rewards", self.all_rewards),
+        ]:
+            if len(buffer) != len(self.rl_strats):
+                logger.error(
+                    f"Number of unit_ids with {name} in learning role {len(buffer)} does not match number of rl_strats {len(self.rl_strats)}. "
+                    "It seems like some learning_instances are not reporting experience. Cannot store to buffer and update policy!"
+                )
+                return
+
+        # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
+        self.buffer.add(
+            obs=[self.all_obs[key] for key in sorted(self.all_obs.keys())],
+            actions=[self.all_actions[key] for key in sorted(self.all_actions.keys())],
+            reward=[self.all_rewards[key] for key in sorted(self.all_rewards.keys())],
+        )
+
+        # write data to output agent before resetting it
+        self.write_rl_params_to_output()
+
+        # reset dicts as all experience is now in buffer
+        self.all_obs = defaultdict(list)
+        self.all_actions = defaultdict(list)
+        self.all_rewards = defaultdict(list)
+
+        self.update_policy()
+
+    def add_observation_to_buffer(self, unit_id, start, observation) -> None:
+        """
+        Add the observation to the buffer dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            observation (torch.Tensor): The observation to be added.
+
+        """
+        self.all_obs[unit_id][start].append(observation)
+
+    def add_actions_to_buffer(self, unit_id, action, noise) -> None:
+        """
+        Add the action and noise to the buffer dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            action (torch.Tensor): The action to be added.
+            noise (torch.Tensor): The noise to be added.
+
+        """
+        self.all_actions[unit_id].append((action, noise))
+
+    def add_reward_to_buffer(
+        self, unit_id, reward, regret, profit, total_costs
+    ) -> None:
+        """
+        Add the reward to the buffer dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            reward (float): The reward to be added.
+
+        """
+        self.all_rewards[unit_id].append(reward)
+        self.all_regrets[unit_id].append(regret)
+        self.all_profits[unit_id].append(profit)
+        self.all_total_costs[unit_id].append(total_costs)
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -208,13 +285,14 @@ class Learning(Role):
             for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
 
+        # TODO not needed anymore, can I get rid of setup then?
         # subscribe to messages for handling the training process
-        if not self.evaluation_mode:
-            self.context.subscribe_message(
-                self,
-                self.save_buffer_and_update,
-                lambda content, meta: content.get("context") == "rl_training",
-            )
+        # if not self.evaluation_mode:
+        #    self.context.subscribe_message(
+        #        self,
+        #        self.save_buffer_and_update,
+        #        lambda content, meta: content.get("context") == "rl_training",
+        #    )
 
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """
@@ -443,55 +521,56 @@ class Learning(Role):
         self.update_steps = 0
 
     def write_rl_params_to_output(
-        self, learning_rate: float, unit_params_list: list[dict]
-    ) -> None:
-
-                """
+        self,
+    ):
+        """
         Sends the current rl_strategy update to the output agent.
 
         Args:
             products_index (pandas.DatetimeIndex): The index of all products.
             marketconfig (MarketConfig): The market configuration.
         """
-        # TODO makes this from data of startegies instead from units
-        products_index = get_products_index(orderbook)
-
-        # should write learning results if at least one bidding_strategy is a learning strategy
-        if not (len(self.rl_units) and orderbook):
-            return
-
         output_agent_list = []
-        start = products_index[0]
 
-        for unit in self.rl_units:
-            strategy = unit.bidding_strategies.get(market_id)
-
-            # rl only for energy market for now!
-            if isinstance(strategy, LearningStrategy):
+        for unit_id in sorted(self.all_obs.keys()):
+            starts = self.all_obs[unit_id].keys()
+            for idx, start in enumerate(starts):
                 output_dict = {
                     "datetime": start,
-                    "unit": unit.id,
+                    "unit": unit_id,
+                    "reward": self.all_rewards[unit_id][idx]
+                    if idx < len(self.all_rewards[unit_id])
+                    else None,
+                    "regret": self.all_regrets[unit_id][idx]
+                    if idx < len(self.all_regrets[unit_id])
+                    else None,
+                    "profit": self.all_profits[unit_id][idx]
+                    if idx < len(self.all_profits[unit_id])
+                    else None,
                 }
 
-                output_dict.update(
-                    {
-                        "profit": unit.outputs["profit"].at[start],
-                        "reward": unit.outputs["reward"].at[start],
-                        "regret": unit.outputs["regret"].at[start],
-                    }
+                action_tuple = (
+                    self.all_actions[unit_id][idx]
+                    if idx < len(self.all_actions[unit_id])
+                    else None
+                )
+                noise_tuple = (
+                    self.all_noises[unit_id][idx]
+                    if idx < len(self.all_noises[unit_id])
+                    else None
                 )
 
-                action_tuple = unit.outputs["actions"].at[start]
-                noise_tuple = unit.outputs["exploration_noise"].at[start]
-                action_dim = action_tuple.numel()
-
-                for i in range(action_dim):
-                    output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
-                    output_dict[f"actions_{i}"] = action_tuple[i]
+                if action_tuple is not None:
+                    action_dim = len(action_tuple)
+                    for i in range(action_dim):
+                        output_dict[f"actions_{i}"] = action_tuple[i]
+                if noise_tuple is not None:
+                    for i in range(len(noise_tuple)):
+                        output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
 
                 output_agent_list.append(output_dict)
 
-        db_addr = self.context.data.get("learning_output_agent_addr")
+        db_addr = self.output_agent_addr
 
         if db_addr and output_agent_list:
             self.context.schedule_instant_message(
@@ -502,7 +581,6 @@ class Learning(Role):
                     "data": output_agent_list,
                 },
             )
-
 
     def write_rl_grad_params_to_output(
         self, learning_rate: float, unit_params_list: list[dict]

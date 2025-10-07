@@ -471,27 +471,9 @@ class World:
 
         unit_operator_agent._role_context.data.update(
             {
-                "learning_output_agent_addr": self.output_agent_addr,
+                "output_agent_addr": self.output_agent_addr,
             }
         )
-
-        # after creation of an agent - we set additional context params
-        if self.learning_mode:
-            unit_operator_agent._role_context.data.update(
-                {
-                    "learning_role": self.learning_role,
-                    "train_start": self.start,
-                    "train_end": self.end,
-                    "train_freq": self.learning_config.get("train_freq", "24h"),
-                }
-            )
-
-        else:
-            unit_operator_agent._role_context.data.update(
-                {
-                    "output_agent_addr": self.output_agent_addr,
-                }
-            )
 
     def add_units_with_operator_subprocess(
         self, id: str, units: list[dict], strategies: dict[str, UnitOperatorStrategy]
@@ -522,7 +504,6 @@ class World:
             units_operator.add_unit(self.create_unit(**unit))
         data_update_dict = {
             "output_agent_addr": self.output_agent_addr,
-            "learning_output_agent_addr": self.output_agent_addr,
         }
 
         def creator(container):
@@ -610,7 +591,10 @@ class World:
                 # Create and cache the strategy instance if not already created
 
                 # Check if the strategy is a LearningStrategy and we are in learning_mode for which the strategy needs access to the learnin_role
-                if isinstance(strategy_instances[strategy], LearningStrategy):
+                if (
+                    isinstance(strategy_instances[strategy], LearningStrategy)
+                    and self.learning_mode
+                ):
                     strategy_instances[strategy] = self.bidding_strategies[strategy](
                         unit_id=unit_id,
                         learning_role=self.learning_role,
