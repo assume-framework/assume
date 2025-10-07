@@ -1,0 +1,4 @@
+name,bus0,bus1,p_nom,carrier,efficiency
+Line_N_W,north,west,14,DC,1
+Line_N_E,north,east,14,DC,1
+Line_W_E,west,east,14,DC,1

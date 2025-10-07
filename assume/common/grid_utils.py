@@ -336,12 +336,28 @@ def read_pypsa_grid(
         network.add("Bus", buses.index, **buses)
 
     def add_lines(network: pypsa.Network, lines: pd.DataFrame) -> None:
-        network.add("Line", lines.index, **lines)
+        if lines is not None and not lines.empty:
+            network.add("Line", lines.index, **lines)
+
+    def add_links(network: pypsa.Network, links: pd.DataFrame) -> None:
+        if links is not None and not links.empty:
+            network.add(
+                "Link",
+                links.index,
+                p_max_pu=1,
+                p_min_pu=-1,
+                **links,
+                )
 
     # setup the network
     add_buses(network, grid_dict["buses"])
-    add_lines(network, grid_dict["lines"])
-    network.add("Carrier", "AC")
+
+    if "lines" in grid_dict:
+        add_lines(network, grid_dict["lines"])
+
+    if "links" in grid_dict:
+        add_links(network, grid_dict["links"])
+
     return network
 
 

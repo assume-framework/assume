@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 # define the path where the simulation results in form of CSV files will be stored, for example: "examples/outputs"
 # "" means no CSV files will be stored
-csv_path = ""  #examples/outputs
+csv_path = "examples/outputs"  #
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -111,7 +111,8 @@ available_examples = {
         "study_case": "base",
     },
     # redispatch for DSM validation example
-    "redisp_valid_3_nodes": {"scenario": "example_05b", "study_case": "base"},
+    "redisp_valid_3_nodes_AC": {"scenario": "example_05a", "study_case": "base"},
+    "redisp_valid_3_nodes_DC": {"scenario": "example_05b", "study_case": "base"},
     "redisp_storage_3_nodes": {"scenario": "example_05c", "study_case": "base"},
     "redisp_dsm_3_nodes": {"scenario": "example_05e", "study_case": "base"},
     "redisp_valid_2023": {
@@ -142,7 +143,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "steam_plant_use_case"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
+    example = "redisp_valid_3_nodes_DC"  # e.g. "small", "large_2019_eom", "learning_with_complex_bids", etc.
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

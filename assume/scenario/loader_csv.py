@@ -330,9 +330,19 @@ def make_market_config(
 def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
     network_path = Path(network_path)
     buses = pd.read_csv(network_path / "buses.csv", index_col=0)
-    lines = pd.read_csv(network_path / "lines.csv", index_col=0)
     generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
     loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
+
+    try:
+        lines = pd.read_csv(network_path / "lines.csv", index_col=0)
+    except FileNotFoundError:
+        lines = None
+    
+    try:
+        links = pd.read_csv(network_path / "links.csv", index_col=0)
+    except FileNotFoundError:
+        links = None
+
     try:
         storage_units = pd.read_csv(network_path / "storage_units.csv", index_col=0)
     except FileNotFoundError:
@@ -350,6 +360,7 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
         "loads": loads,
         "storage_units": storage_units,
         "exchange_units": exchange_units,
+        "links": links,
     }
 
 
@@ -541,7 +552,12 @@ def load_config_and_create_forecaster(
     )
 
     buses = load_file(path=path, config=config, file_name="buses")
-    lines = load_file(path=path, config=config, file_name="lines")
+    
+    try:
+        lines = load_file(path=path, config=config, file_name="lines")
+
+    except :
+        links = load_file(path=path, config=config, file_name="links")
 
     learning_config: LearningConfig = config.get("learning_config", {})
 
