@@ -12,7 +12,7 @@ import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
-from assume.common.utils import datetime2timestamp, timestamp2datetime
+from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
@@ -142,6 +142,97 @@ class Learning(Role):
         self.db_addr = None
         self.update_steps = None
 
+        # todo
+        recurrency_task = create_rrule(
+            start=self.start,
+            end=self.end,
+            freq=self.train_freq,
+        )
+
+        self.context.schedule_recurrent_task(
+            self.store_to_buffer_and_update, recurrency_task
+        )
+
+        # init dictionaries for all learning instances in this role
+        self.all_obs = defaultdict(list)
+        self.all_actions = defaultdict(list)
+        self.all_rewards = defaultdict(list)
+
+    def store_to_buffer_and_update(self) -> None:
+        """
+        This function takes all the information that the strategies wrote into the learning_role dicts and post_processes them to fit into the buffer.
+        Further triggers the next policy update
+
+        """
+        # check if all entries for the buffers have the same number of unit_ids as rl_strats
+        for name, buffer in [
+            ("observations", self.all_obs),
+            ("actions", self.all_actions),
+            ("rewards", self.all_rewards),
+        ]:
+            if len(buffer) != len(self.rl_strats):
+                logger.error(
+                    f"Number of unit_ids with {name} in learning role {len(buffer)} does not match number of rl_strats {len(self.rl_strats)}. "
+                    "It seems like some learning_instances are not reporting experience. Cannot store to buffer and update policy!"
+                )
+                return
+
+        # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
+        self.buffer.add(
+            obs=[self.all_obs[key] for key in sorted(self.all_obs.keys())],
+            actions=[self.all_actions[key] for key in sorted(self.all_actions.keys())],
+            reward=[self.all_rewards[key] for key in sorted(self.all_rewards.keys())],
+        )
+
+        # write data to output agent before resetting it
+        self.write_rl_params_to_output()
+
+        # reset dicts as all experience is now in buffer
+        self.all_obs = defaultdict(list)
+        self.all_actions = defaultdict(list)
+        self.all_rewards = defaultdict(list)
+
+        self.update_policy()
+
+    def add_observation_to_buffer(self, unit_id, start, observation) -> None:
+        """
+        Add the observation to the buffer dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            observation (torch.Tensor): The observation to be added.
+
+        """
+        self.all_obs[unit_id][start].append(observation)
+
+    def add_actions_to_buffer(self, unit_id, action, noise) -> None:
+        """
+        Add the action and noise to the buffer dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            action (torch.Tensor): The action to be added.
+            noise (torch.Tensor): The noise to be added.
+
+        """
+        self.all_actions[unit_id].append((action, noise))
+
+    def add_reward_to_buffer(
+        self, unit_id, reward, regret, profit, total_costs
+    ) -> None:
+        """
+        Add the reward to the buffer dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            reward (float): The reward to be added.
+
+        """
+        self.all_rewards[unit_id].append(reward)
+        self.all_regrets[unit_id].append(regret)
+        self.all_profits[unit_id].append(profit)
+        self.all_total_costs[unit_id].append(total_costs)
+
     def load_inter_episodic_data(self, inter_episodic_data):
         """
         Load the inter-episodic data from the dict stored across simulation runs.
@@ -194,32 +285,14 @@ class Learning(Role):
             for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
 
+        # TODO not needed anymore, can I get rid of setup then?
         # subscribe to messages for handling the training process
-        if not self.evaluation_mode:
-            self.context.subscribe_message(
-                self,
-                self.save_buffer_and_update,
-                lambda content, meta: content.get("context") == "rl_training",
-            )
-
-    def save_buffer_and_update(self, content: dict, meta: dict) -> None:
-        """
-        Handles the incoming messages and performs corresponding actions.
-
-        Args:
-            content (dict): The content of the message.
-            meta (dict): The metadata associated with the message. (not needed yet)
-        """
-
-        if content.get("type") == "save_buffer_and_update":
-            data = content["data"]
-            self.buffer.add(
-                obs=data[0],
-                actions=data[1],
-                reward=data[2],
-            )
-
-        self.update_policy()
+        # if not self.evaluation_mode:
+        #    self.context.subscribe_message(
+        #        self,
+        #        self.save_buffer_and_update,
+        #        lambda content, meta: content.get("context") == "rl_training",
+        #    )
 
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """
@@ -446,6 +519,68 @@ class Learning(Role):
         self.datetime = pd.to_datetime(train_start)
 
         self.update_steps = 0
+
+    def write_rl_params_to_output(
+        self,
+    ):
+        """
+        Sends the current rl_strategy update to the output agent.
+
+        Args:
+            products_index (pandas.DatetimeIndex): The index of all products.
+            marketconfig (MarketConfig): The market configuration.
+        """
+        output_agent_list = []
+
+        for unit_id in sorted(self.all_obs.keys()):
+            starts = self.all_obs[unit_id].keys()
+            for idx, start in enumerate(starts):
+                output_dict = {
+                    "datetime": start,
+                    "unit": unit_id,
+                    "reward": self.all_rewards[unit_id][idx]
+                    if idx < len(self.all_rewards[unit_id])
+                    else None,
+                    "regret": self.all_regrets[unit_id][idx]
+                    if idx < len(self.all_regrets[unit_id])
+                    else None,
+                    "profit": self.all_profits[unit_id][idx]
+                    if idx < len(self.all_profits[unit_id])
+                    else None,
+                }
+
+                action_tuple = (
+                    self.all_actions[unit_id][idx]
+                    if idx < len(self.all_actions[unit_id])
+                    else None
+                )
+                noise_tuple = (
+                    self.all_noises[unit_id][idx]
+                    if idx < len(self.all_noises[unit_id])
+                    else None
+                )
+
+                if action_tuple is not None:
+                    action_dim = len(action_tuple)
+                    for i in range(action_dim):
+                        output_dict[f"actions_{i}"] = action_tuple[i]
+                if noise_tuple is not None:
+                    for i in range(len(noise_tuple)):
+                        output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+
+                output_agent_list.append(output_dict)
+
+        db_addr = self.output_agent_addr
+
+        if db_addr and output_agent_list:
+            self.context.schedule_instant_message(
+                receiver_addr=db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "rl_params",
+                    "data": output_agent_list,
+                },
+            )
 
     def write_rl_grad_params_to_output(
         self, learning_rate: float, unit_params_list: list[dict]

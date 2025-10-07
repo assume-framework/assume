@@ -51,7 +51,8 @@ class BaseLearningStrategy(LearningStrategy):
             )
 
         # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
+        # TODO learning role only exists if we are in learning_mode, I think, how do we do this if we evaluate learned strategies
+        device = self.learning_role.device  # kwargs.get("device", "cpu")
         self.device = th.device(device if th.cuda.is_available() else "cpu")
         if not self.learning_mode:
             self.device = th.device("cpu")
@@ -200,6 +201,11 @@ class BaseLearningStrategy(LearningStrategy):
             observation, dtype=self.float_type, device=self.device
         ).flatten()
 
+        if self.learning_mode:
+            self.learning_role.add_observation_to_buffer(
+                self.unit_id, start, observation
+            )
+
         return observation
 
     def get_individual_observations(
@@ -283,6 +289,9 @@ class BaseLearningStrategy(LearningStrategy):
             curr_action = self.actor(next_observation).detach()
             # noise is an tensor with zeros, because we are not in learning mode
             noise = th.zeros_like(curr_action, dtype=self.float_type)
+
+        if self.learning_mode:
+            self.learning_role.add_actions_to_buffer(self.unit_id, curr_action, noise)
 
         return curr_action, noise
 
@@ -591,8 +600,6 @@ class RLStrategy(BaseLearningStrategy):
 
         start = orderbook[0]["start_time"]
         end = orderbook[0]["end_time"]
-        # `end_excl` marks the last product's start time by subtracting one frequency interval.
-        end_excl = end - unit.index.freq
 
         # Depending on how the unit calculates marginal costs, retrieve cost values.
         marginal_cost = unit.calculate_marginal_cost(
@@ -670,12 +677,15 @@ class RLStrategy(BaseLearningStrategy):
         reward = scaling * (profit - regret_scale * opportunity_cost)
 
         # Store results in unit outputs, which are later written to the database by the unit operator.
-        unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
-        unit.outputs["total_costs"].loc[start:end_excl] = operational_cost
+        profit += profit
+        regret = regret_scale * opportunity_cost
+        total_costs = operational_cost
 
-        unit.outputs["rl_rewards"].append(reward)
+        # write rl-rewards to buffer
+        if self.learning_mode:
+            self.learning_role.add_reward_to_buffer(
+                unit.id, reward, regret, profit, total_costs
+            )
 
 
 class RLStrategySingleBid(RLStrategy):
@@ -703,8 +713,8 @@ class RLStrategySingleBid(RLStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 74)
-        act_dim = kwargs.pop("act_dim", 1)
+        obs_dim = self.learning_role.obs_dim  # kwargs.pop("obs_dim", 74)
+        act_dim = self.learning_role.act_dim  # kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
             obs_dim=obs_dim,
