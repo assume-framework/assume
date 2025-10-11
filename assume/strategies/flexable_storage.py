@@ -31,7 +31,7 @@ class flexableEOMStorage(BaseStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "24h"))
 
     def calculate_bids(
         self,

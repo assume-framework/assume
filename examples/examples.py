@@ -124,34 +124,9 @@ available_examples = {
         "scenario": "example_06b",
         "study_case": "base",
     },
-    "use_case_O45strom_ES1": {"scenario": "example_06a_ES1", "study_case": "base"},
-    "use_case_O45strom_ES7": {"scenario": "example_06a_ES7", "study_case": "base"},
     "use_case_O45strom_ES10": {"scenario": "example_06a_ES10", "study_case": "base"},
-    "use_case_O45strom_ES16": {"scenario": "example_06a_ES16", "study_case": "base"},
-    "use_case_O45strom_ES19": {"scenario": "example_06a_ES19", "study_case": "base"},
-    "use_case_O45strom_ES25": {"scenario": "example_06a_ES25", "study_case": "base"},
-    "use_case_O45H2_HS1": {
-        "scenario": "example_06b_HS1",
-        "study_case": "base",
-    },
-    "use_case_O45H2_HS7": {
-        "scenario": "example_06b_HS7",
-        "study_case": "base",
-    },
     "use_case_O45H2_HS10": {
         "scenario": "example_06b_HS10",
-        "study_case": "base",
-    },
-    "use_case_O45H2_HS16": {
-        "scenario": "example_06b_HS16",
-        "study_case": "base",
-    },
-    "use_case_O45H2_HS19": {
-        "scenario": "example_06b_HS19",
-        "study_case": "base",
-    },
-    "use_case_O45H2_HS25": {
-        "scenario": "example_06b_HS25",
         "study_case": "base",
     },
 }
@@ -179,14 +154,14 @@ if __name__ == "__main__":
 
     # list of examples you want to run
     examples_to_run = [
-        "use_case_O45strom_ES1",
-        "use_case_O45strom_ES7",
-        "use_case_O45strom_ES10",
-        "use_case_O45strom_ES16",
-        # "use_case_O45strom_ES19",
-        # "use_case_O45strom_ES25",
-        # "use_case_O45H2_HS1",
-        # "use_case_O45H2_HS7",
+        # "use_case_O45strom_ES1",
+        # "use_case_O45strom_ES7",
+        # "use_case_O45strom_ES10",
+        # "use_case_O45strom_ES16",
+        "use_case_O45strom_ES19",
+        "use_case_O45strom_ES25",
+        "use_case_O45H2_HS1",
+        "use_case_O45H2_HS7",
         # "use_case_O45H2_HS10",
         # "use_case_O45H2_HS16",
         # "use_case_O45H2_HS19",
