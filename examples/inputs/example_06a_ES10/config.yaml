@@ -10,22 +10,22 @@ base:
 
   markets_config:
     EOM:
-      start_date: 2035-01-01 00:00
       operator: EOM_operator
       product_type: energy
+      start_date: 2035-01-01 2:00
       products:
         - duration: 1h
-          count: 24
-          first_delivery: 24h
-      opening_frequency: 24h
-      opening_duration: 20h
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 1h
+      opening_duration: 1h
       volume_unit: MWh
       maximum_bid_volume: 100000
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-    
+
     CRM_pos:
       operator: CRM_operator
       product_type: capacity_pos
