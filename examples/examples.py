@@ -119,6 +119,7 @@ available_examples = {
         "study_case": "base",
     },
     # Use case examples for Cement plant
+    "use_case_2023": {"scenario": "example_05d", "study_case": "base"},
     "use_case_O45strom": {"scenario": "example_06a", "study_case": "base"},
     "use_case_O45H2": {
         "scenario": "example_06b",
@@ -154,8 +155,8 @@ if __name__ == "__main__":
 
     # list of examples you want to run
     examples_to_run = [
-        # "use_case_O45strom_ES10",
-        "use_case_O45H2_HS10",
+        "use_case_2023",
+        # "use_case_O45H2_HS10",
     ]
     # examples_to_run = [example]
 

@@ -577,3 +577,4 @@ Wehr,PSPP,flexable_eom_storage,fixed_dispatch_strategy,flexable_pos_crm_storage,
 Markersbach,PSPP,flexable_eom_storage,fixed_dispatch_strategy,flexable_pos_crm_storage,flexable_neg_crm_storage,1140,1050,0.84,0.89,1,4018,0.28,0.28,0,PSPP_operator_23,way/166604822-380
 Goldisthal,PSPP,flexable_eom_storage,fixed_dispatch_strategy,flexable_pos_crm_storage,flexable_neg_crm_storage,1140,1060,0.88,0.92,1,8480,0.28,0.28,0,PSPP_operator_24,way/25746125-380
 compressed_air0,compressed_air_storage,flexable_eom_storage,fixed_dispatch_strategy,flexable_pos_crm_storage,flexable_neg_crm_storage,321,321,0.95,0.95,1,1680,0.28,0.28,0,compressed_air_0,way/42872354-220
+Additional storage,li_ion_battery,flexable_eom_storage,fixed_dispatch_strategy,flexable_pos_crm_storage,flexable_neg_crm_storage,27800,27800,0.95,0.95,0,27800,0,0,0,battery_operator_extra,DE1-220
