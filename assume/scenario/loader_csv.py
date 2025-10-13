@@ -334,6 +334,11 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
     loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
 
     try:
+        carriers = pd.read_csv(network_path / "carriers.csv", index_col=0)
+    except FileNotFoundError:
+        carriers = None
+
+    try:
         lines = pd.read_csv(network_path / "lines.csv", index_col=0)
     except FileNotFoundError:
         lines = None
@@ -353,9 +358,12 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
     except FileNotFoundError:
         exchange_units = None
 
+
+
     return {
         "buses": buses,
         "lines": lines,
+        "carriers":carriers,
         "generators": generators,
         "loads": loads,
         "storage_units": storage_units,

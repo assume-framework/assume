@@ -1,4 +1,4 @@
-name,bus0,bus1,s_nom,x,r
-Line_N_W,north,west,14,0.01,0.00001
-Line_N_E,north,east,14,0.01,0.00001
-Line_W_E,west,east,14,0.01,0.00001
+name,bus0,bus1,s_nom,x,r,carrier
+Line_N_W,north,west,14,0.01,0.00001,AC
+Line_N_E,north,east,14,0.01,0.00001,AC
+Line_W_E,west,east,14,0.01,0.00001,AC

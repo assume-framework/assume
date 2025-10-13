@@ -332,6 +332,12 @@ def read_pypsa_grid(
         grid_dict (dict[str, pd.DataFrame]): the dictionary containing dataframes for generators, loads, buses and links
     """
 
+    def add_carriers(network: pypsa.Network, carriers: pd.DataFrame) -> None:
+        if carriers is not None and not carriers.empty:
+            if "name" in carriers.columns:
+                carriers = carriers.set_index("name", drop=False)
+            network.add("Carrier", carriers.index, **carriers)
+
     def add_buses(network: pypsa.Network, buses: pd.DataFrame) -> None:
         network.add("Bus", buses.index, **buses)
 
@@ -340,14 +346,54 @@ def read_pypsa_grid(
             network.add("Line", lines.index, **lines)
 
     def add_links(network: pypsa.Network, links: pd.DataFrame) -> None:
-        if links is not None and not links.empty:
-            network.add(
-                "Link",
-                links.index,
-                p_max_pu=1,
-                p_min_pu=-1,
-                **links,
-                )
+        if links is None or links.empty:
+            return
+
+        # Ensure 'name' is index so those become component names
+        if "name" in links.columns:
+            links = links.set_index("name", drop=False)
+
+        # Required columns
+        need = ["bus0", "bus1", "p_nom"]
+        miss = [c for c in need if c not in links.columns]
+        if miss:
+            raise ValueError(f"links.csv missing columns: {miss}")
+
+        # Strong typing
+        links = links.copy()
+        links["bus0"] = links["bus0"].astype(str)
+        links["bus1"] = links["bus1"].astype(str)
+        links["p_nom"] = pd.to_numeric(links["p_nom"], errors="coerce").astype(float)
+        if "efficiency" in links.columns:
+            links["efficiency"] = pd.to_numeric(links["efficiency"], errors="coerce").astype(float)
+        else:
+            links["efficiency"] = 1.0
+        if "carrier" not in links.columns:
+            links["carrier"] = "DC"
+        links["carrier"] = links["carrier"].astype(str)
+
+        # Add all links at once (names + arrays). This is a safe drop-in replacing madd.
+        network.add(
+            "Link",
+            name=links.index.astype(str).to_list(),
+            bus0=links["bus0"].to_list(),
+            bus1=links["bus1"].to_list(),
+            p_nom=links["p_nom"].to_list(),
+            efficiency=links["efficiency"].to_list(),
+            carrier=links["carrier"].to_list(),
+            p_max_pu=1.0,
+            p_min_pu=-1.0,
+        )
+
+        # Optional: assert sanity right here
+        bad = links.index[network.links.loc[links.index, "p_nom"].isna() | (network.links.loc[links.index, "p_nom"] == 0)]
+        if len(bad):
+            raise ValueError(f"Some links have zero/NaN p_nom after add: {list(bad)}")
+
+
+    # Add carriers first (so buses/lines reference existing carriers)
+    if "carriers" in grid_dict:
+        add_carriers(network, grid_dict["carriers"])
 
     # setup the network
     add_buses(network, grid_dict["buses"])
