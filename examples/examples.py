@@ -155,8 +155,8 @@ if __name__ == "__main__":
 
     # list of examples you want to run
     examples_to_run = [
-        "use_case_O45strom_ES10",
-        "use_case_O45H2_HS10",
+        "use_case_2023",
+        # "use_case_O45H2_HS10",
     ]
     # examples_to_run = [example]
 
