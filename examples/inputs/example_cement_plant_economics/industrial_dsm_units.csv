@@ -1,5 +1,3 @@
 name,unit_type,technology,node,bidding_EOM,unit_operator,objective,flexibility_measure,peak_load_cap,cost_tolerance,demand,fuel_type,max_heat_out,max_power,min_power,ramp_up,ramp_down,min_operating_steps,min_down_steps,specific_heat_demand,specific_electricity_aux,efficiency,eta_electric,eta_fossil,fossil_ng_share,ng_co2_factor,coal_co2_factor,calcination_emission_factor,storage_type,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge
-A360,cement_plant,preheater,south,naive_da_dsm,dsm_operator,min_variable_cost,electricity_price_signal,,0,,fossil,10,,,10,10,,,0.3,0.0015,,0.98,0.9,1,0.202,0.341,,,,,,,,,,
-A360,cement_plant,calciner,south,,,,,,,,fossil,5,,,5,5,0,0,0.7,0.0015,,0.98,0.9,0.7,0.202,0.341,0.525,,,,,,,,,
-A360,cement_plant,kiln,south,,,,,,,,fossil,20,,,20,20,,,1.7,0.0015,,0.95,0.9,1,0.202,0.341,,,,,,,,,,
-A360,cement_plant,thermal_storage,south,,,,,,,,,,10,,10,10,,,,,,1,,,,,,short-term_with_generator,20,0,10,20,0,0.001,1,0.99
+A360,cement_plant,calciner,south,naive_da_dsm,dsm_operator,min_variable_cost,electricity_price_signal,,0,,fossil,133,0,,133,133,0,0,0.5528,0,,,0.9,0,0.202,0.341,0.525,,,,,,,,,
+A360,cement_plant,kiln,south,,,,,,,,fossil,81,0,,81,81,0,0,0.3361,0.0166,,,0.9,0,0.202,0.341,,,,,,,,,,

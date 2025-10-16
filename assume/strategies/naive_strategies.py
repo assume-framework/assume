@@ -523,7 +523,7 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                         "volume": -volume,
                         "max_power": -max(volume, volume_flex),
                         "min_power": -min(volume, volume_flex),
-                        "node":unit.node,
+                        "node": unit.node,
                     }
                 )
             elif volume < volume_flex:
@@ -536,7 +536,7 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                         "volume": -volume,
                         "max_power": -max(volume, volume_flex),
                         "min_power": -min(volume, volume_flex),
-                        "node":unit.node,
+                        "node": unit.node,
                     }
                 )
             else:
@@ -549,11 +549,12 @@ class NaiveRedispatchSteelplantStrategy(BaseStrategy):
                         "volume": -volume,
                         "max_power": 0,
                         "min_power": 0,
-                        "node":unit.node,
+                        "node": unit.node,
                     }
                 )
 
         return bids
+
 
 class NaiveRedispatchStrategyDSM(BaseStrategy):
     def calculate_bids(

@@ -27,7 +27,7 @@ class flexableEOM(BaseStrategy):
         super().__init__(*args, **kwargs)
 
         # check if kwargs contains eom_foresight argument
-        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "24h"))
 
     def calculate_bids(
         self,

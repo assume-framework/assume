@@ -837,9 +837,7 @@ class ThermalStorage(GenericStorage):
             within=pyo.NonNegativeReals,
             bounds=(0, model_block.max_Pelec),
         )
-        model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.Reals
-        )
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
 
         # --- Coupling & cost
         if self.storage_type == "short-term_with_generator":
@@ -1119,9 +1117,7 @@ class Electrolyser:
             self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
         )
         model_block.hydrogen_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.Reals
-        )
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
 
         # Efficiency constraint
         @model_block.Constraint(self.time_steps)
@@ -1320,9 +1316,7 @@ class DRIPlant:
         model_block.co2_emission = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.dri_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.Reals
-        )
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
 
         # Fuel consumption constraint
         @model_block.Constraint(self.time_steps)
@@ -1543,9 +1537,7 @@ class ElectricArcFurnace:
         )
         model_block.dri_input = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.steel_output = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
-        model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.Reals
-        )
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
         model_block.co2_emission = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.lime_demand = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
@@ -1689,9 +1681,7 @@ class GrindingMill:
             self.time_steps, within=pyo.NonNegativeReals
         )
         model_block.operating_hours = pyo.Var(self.time_steps, within=pyo.Binary)
-        model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.Reals
-        )
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
 
         # Constraints
 
@@ -1883,9 +1873,7 @@ class Preheater:
             self.time_steps, within=pyo.NonNegativeReals
         )
 
-        model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.Reals
-        )
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
         model_block.co2_emission = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
         # Optional on/off status for heat_out (simple, analogous spirit to helpers)
@@ -2014,7 +2002,7 @@ class Calciner:
         max_heat_out: float,  # [MW_th] cap
         specific_heat_demand: float,  # [MWh_th per t_clinker] calcination heat
         time_steps: list[int],
-        specific_electricity_aux: float = 0.0,  # [kWh_el per t_clinker] (ID fan etc.), optional
+        specific_electricity_aux: float = 0.0,  # [MWh_el per t_clinker] (ID fan etc.), optional
         # operations
         fuel_type: str = "electricity",  # "electricity" | "fossil" | "both" | "hydrogen"
         eta_electric: float = 0.95,
@@ -2129,9 +2117,7 @@ class Calciner:
         model_block.coal_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
-        model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.Reals
-        )
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
         model_block.co2_proc = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.co2_energy = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
@@ -2301,7 +2287,7 @@ class Kiln:
         max_heat_out: float,  # [MW_th] cap
         specific_heat_demand: float,  # [MWh_th per t_clinker]
         time_steps: list[int],
-        specific_electricity_aux: float = 0.0,  # [kWh_el per t_clinker], ID fans etc.
+        specific_electricity_aux: float = 0.0,  # [MWh_el per t_clinker], ID fans etc.
         fuel_type: str = "fossil",  # "electricity" | "fossil" | "both" | "hydrogen"
         eta_electric: float = 0.95,
         eta_fossil: float = 0.90,
@@ -2412,9 +2398,7 @@ class Kiln:
         model_block.coal_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
 
-        model_block.operating_cost = pyo.Var(
-            self.time_steps, within=pyo.Reals
-        )
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
         model_block.co2_energy = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
         model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
 
