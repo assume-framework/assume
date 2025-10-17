@@ -226,7 +226,7 @@ class BaseUnit:
         self,
         start: datetime,
         end: datetime,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Checks if the total dispatch plan is feasible.
 
@@ -346,7 +346,7 @@ class SupportsMinMax(BaseUnit):
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type: str = "energy"
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the min and max power for the given time period.
 
@@ -356,7 +356,7 @@ class SupportsMinMax(BaseUnit):
             product_type (str): The product type of the unit.
 
         Returns:
-            tuple[np.array, np.array]: The min and max power for the given time period.
+            tuple[np.ndarray, np.ndarray]: The min and max power for the given time period.
         """
 
     def calculate_ramp(
@@ -514,7 +514,7 @@ class SupportsMinMaxCharge(BaseUnit):
 
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, soc: float = None
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the min and max charging power for the given time period.
 
@@ -524,12 +524,12 @@ class SupportsMinMaxCharge(BaseUnit):
             soc (float, optional): The current state-of-charge. Defaults to None.
 
         Returns:
-            tuple[np.array, np.array]: The min and max charging power for the given time period.
+            tuple[np.ndarray, np.ndarray]: The min and max charging power for the given time period.
         """
 
     def calculate_min_max_discharge(
         self, start: datetime, end: datetime, soc: float = None
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the min and max discharging power for the given time period.
 
@@ -539,7 +539,7 @@ class SupportsMinMaxCharge(BaseUnit):
             soc (float, optional): The current state-of-charge. Defaults to None.
 
         Returns:
-            tuple[np.array, np.array]: The min and max discharging power for the given time period.
+            tuple[np.ndarray, np.ndarray]: The min and max discharging power for the given time period.
         """
 
     def calculate_ramp_discharge(

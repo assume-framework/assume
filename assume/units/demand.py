@@ -101,7 +101,7 @@ class Demand(SupportsMinMax):
         self,
         start: datetime,
         end: datetime,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Execute the current dispatch of the unit.
         Returns the volume of the unit within the given time range.
@@ -111,14 +111,14 @@ class Demand(SupportsMinMax):
             end (datetime.datetime): The end time of the dispatch.
 
         Returns:
-            np.array: The volume of the unit for the given time range.
+            np.ndarray: The volume of the unit for the given time range.
         """
 
         return self.outputs["energy"].loc[start:end]
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the minimum and maximum power output of the unit and returns the bid volume as both the minimum and maximum power output of the unit.
 

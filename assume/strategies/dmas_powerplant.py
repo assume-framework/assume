@@ -74,7 +74,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         power_prices,
         runtime: int = None,
         p0: float = None,
-    ) -> None:
+    ) -> np.ndarray:
         """
         Builds the optimization model and returns the cashflow.
 
@@ -89,7 +89,7 @@ class DmasPowerplantStrategy(BaseStrategy):
             p0 (float, optional): Initial power. Defaults to None.
 
         Returns:
-            np.array: Cashflow.
+            np.ndarray: Cashflow.
         """
         runtime = runtime or unit.get_operation_time(start)
         p0 = p0 or unit.get_output_before(start)
@@ -270,7 +270,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         hour_count: int,
         prices: pd.DataFrame = None,
         steps: tuple = None,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         optimizes the unit
 
@@ -282,7 +282,7 @@ class DmasPowerplantStrategy(BaseStrategy):
           steps(tuple): steps to optimize
 
         Returns:
-          np.array: generation
+          np.ndarray: generation
 
         """
         base_price = prices.copy()

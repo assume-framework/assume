@@ -127,7 +127,7 @@ class PowerPlant(SupportsMinMax):
         self,
         start: datetime,
         end: datetime,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Executes the current dispatch of the unit based on the provided timestamps.
 
@@ -139,7 +139,7 @@ class PowerPlant(SupportsMinMax):
             end (pandas.Timestamp): The end time of the dispatch.
 
         Returns:
-            np.array: The volume of the unit within the given time range.
+            np.ndarray: The volume of the unit within the given time range.
         """
         start = max(start, self.index[0])
 
@@ -164,7 +164,7 @@ class PowerPlant(SupportsMinMax):
 
     def calc_simple_marginal_cost(
         self,
-    ):
+    ) -> float:
         """
         Calculates the marginal cost of the unit (simple method) and returns the marginal cost of the unit.
 
@@ -245,7 +245,7 @@ class PowerPlant(SupportsMinMax):
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the minimum and maximum power output of the unit and returns it,
         while considering heat demand and positive capacity reserve power.
@@ -289,7 +289,7 @@ class PowerPlant(SupportsMinMax):
 
         return min_power, max_power
 
-    def calculate_marginal_cost(self, start: datetime, power: float):
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculates the marginal cost of the unit based on the provided start time and power output and returns it.
         Returns the marginal cost of the unit.
