@@ -13,6 +13,7 @@ from assume.common.grid_utils import (
     add_fix_units,
     add_redispatch_dsm,
     add_redispatch_generators,
+    add_redispatch_storage_units,
     calculate_network_meta,
     read_pypsa_grid,
 )
@@ -60,9 +61,9 @@ class RedispatchMarketRole(MarketRole):
             units=self.grid_data["loads"],
         )
 
-        add_fix_units(
+        add_redispatch_storage_units(
             network=self.network,
-            units=self.grid_data["storage_units"],
+            storage_units=self.grid_data["storage_units"],
         )
 
         add_fix_units(

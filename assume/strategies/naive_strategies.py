@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
+from assume.common.utils import parse_duration
 
 
 class NaiveSingleBidStrategy(BaseStrategy):

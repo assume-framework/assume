@@ -10,6 +10,7 @@ from assume.strategies.flexable_storage import (
     flexableEOMStorage,
     flexableNegCRMStorage,
     flexablePosCRMStorage,
+    flexableRedispatchStorage,
 )
 from assume.strategies.naive_strategies import (
     NaiveDADSMStrategy,
@@ -57,6 +58,7 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "fixed_dispatch_strategy": FixedDispatchStrategy,
     "dsm_pos_crm_strategy": DSM_PosCRM_Strategy,
     "dsm_neg_crm_strategy": DSM_NegCRM_Strategy,
+    "flexible_storage_redispatch_strategy": flexableRedispatchStorage,
 }
 
 try:

@@ -4,11 +4,45 @@
 
 base:
   start_date: 2023-01-01 00:00
-  end_date: 2023-01-02 23:00
+  end_date: 2023-01-07 23:00
   time_step: 1h
   save_frequency_hours: 24
 
   markets_config:
+    # CRM_pos:
+    #   operator: regelleistung_de-lu
+    #   product_type: capacity_pos
+    #   start_date: 2023-01-01 00:00
+    #   products:
+    #     - duration: 4h
+    #       count: 1
+    #       first_delivery: 22h            # from 08:00 D-1 → 00:00 D
+    #   opening_frequency: 4h
+    #   opening_duration: 1h
+    #   volume_unit: MW
+    #   maximum_bid_volume: 100000
+    #   maximum_bid_price: 9999
+    #   minimum_bid_price: -9999
+    #   price_unit: EUR/MW
+    #   market_mechanism: pay_as_bid
+
+    # CRM_neg:
+    #   operator: regelleistung_de-lu
+    #   product_type: capacity_neg
+    #   start_date: 2023-01-01 00:00
+    #   products:
+    #     - duration: 4h
+    #       count: 1
+    #       first_delivery: 22h
+    #   opening_frequency: 4h
+    #   opening_duration: 1h
+    #   volume_unit: MW
+    #   maximum_bid_volume: 100000
+    #   maximum_bid_price: 9999
+    #   minimum_bid_price: -9999
+    #   price_unit: EUR/MW
+    #   market_mechanism: pay_as_bid
+
     EOM:
       start_date: 2023-01-01 00:00
       operator: EOM_operator
