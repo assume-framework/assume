@@ -700,7 +700,7 @@ class WriteOutput(Role):
         Retrieves the total reward for each learning unit.
 
         Returns:
-            np.array: The total reward for each learning unit.
+            np.ndarray: The total reward for each learning unit.
         """
         query = text(
             f"SELECT unit, SUM(reward) FROM rl_params "

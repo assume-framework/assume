@@ -122,9 +122,9 @@ class ReplayBuffer:
 
     def add(
         self,
-        obs: np.array,
-        actions: np.array,
-        reward: np.array,
+        obs: np.ndarray,
+        actions: np.ndarray,
+        reward: np.ndarray,
     ):
         """
         Adds an observation, action, and reward of all agents to the replay buffer.

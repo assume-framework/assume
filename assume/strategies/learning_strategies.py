@@ -217,7 +217,7 @@ class BaseLearningStrategy(LearningStrategy):
 
         Returns
         -------
-        individual_observations : np.array
+        individual_observations : np.ndarray
             Strategy and unit-specific observations.
         """
 
@@ -535,7 +535,7 @@ class RLStrategy(BaseLearningStrategy):
 
         Returns
         -------
-        individual_observations : np.array
+        individual_observations : np.ndarray
             Scaled total dispatched capacity and marginal cost.
 
         Notes
@@ -891,7 +891,7 @@ class StorageRLStrategy(BaseLearningStrategy):
 
         Returns
         -------
-        individual_observations: np.array
+        individual_observations: np.ndarray
             Array containing state of charge and energy cost.
 
         Notes
@@ -1193,7 +1193,7 @@ class RenewableRLStrategy(RLStrategySingleBid):
 
         Returns
         -------
-        individual_observations: np.array
+        individual_observations: np.ndarray
             Array containing state of charge and energy cost.
 
         Notes

@@ -159,7 +159,7 @@ class Storage(SupportsMinMaxCharge):
         self.warm_start_cost = warm_start_cost * max_power_discharge
         self.cold_start_cost = cold_start_cost * max_power_discharge
 
-    def execute_current_dispatch(self, start: datetime, end: datetime) -> np.array:
+    def execute_current_dispatch(self, start: datetime, end: datetime) -> np.ndarray:
         """
         Executes the current dispatch of the unit based on the provided timestamps.
 
@@ -171,7 +171,7 @@ class Storage(SupportsMinMaxCharge):
             end (datetime.datetime): The end time of the dispatch.
 
         Returns:
-            np.array: The volume of the unit within the given time range.
+            np.ndarray: The volume of the unit within the given time range.
         """
         start = max(start, self.index[0])
         time_delta = self.index.freq / timedelta(hours=1)
@@ -287,7 +287,7 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, soc: float = None
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the min and max charging power for the given time period.
         This is relative to the already sold output on other markets for the same period.
@@ -299,7 +299,7 @@ class Storage(SupportsMinMaxCharge):
             soc (float): The current state-of-charge. Defaults to None, then using soc at given start time.
 
         Returns:
-            tuple[np.array, np.array]: The minimum and maximum charge power levels of the storage unit in MW.
+            tuple[np.ndarray, np.ndarray]: The minimum and maximum charge power levels of the storage unit in MW.
         """
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
@@ -329,7 +329,7 @@ class Storage(SupportsMinMaxCharge):
 
     def calculate_min_max_discharge(
         self, start: datetime, end: datetime, soc: float = None
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the min and max discharging power for the given time period.
         This is relative to the already sold output on other markets for the same period.
@@ -341,7 +341,7 @@ class Storage(SupportsMinMaxCharge):
             soc (float): The current state-of-charge. Defaults to None, then using soc at given start time.
 
         Returns:
-            tuple[np.array, np.array]: The minimum and maximum discharge power levels of the storage unit in MW.
+            tuple[np.ndarray, np.ndarray]: The minimum and maximum discharge power levels of the storage unit in MW.
         """
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
