@@ -632,14 +632,24 @@ class World:
             unit_operator_id (str): The identifier of the unit operator.
         """
 
-        if unit_operator_id not in self.unit_operators:
-            raise ValueError(f"Invalid unit operator: {unit_operator_id}")
+        self._validate_unit_operator(unit_operator_id)
 
         if unit_type not in self.unit_types:
             raise ValueError(f"Invalid unit type: {unit_type}")
 
         if self.unit_operators[unit_operator_id].units.get(id):
             raise ValueError(f"Unit {id} already exists")
+
+    def _validate_unit_operator(self, unit_operator_id: str):
+        """
+        Validate the existence of a unit operator in the simulation.
+
+        Args:
+            unit_operator_id (str): The identifier for the unit operator.
+        """
+
+        if unit_operator_id not in self.unit_operators.keys():
+            raise ValueError(f"Invalid unit operator: {unit_operator_id}")
 
     def add_market_operator(self, id: str) -> None:
         """
@@ -812,7 +822,7 @@ class World:
         forecaster: Forecaster,
     ) -> None:
         """
-        Add a unit to the World instance.
+        Creates a unit and adds it to the World instance.
 
         This method checks if the unit operator exists, verifies the unit type, and ensures that the unit operator
         does not already have a unit with the same id. It then creates bidding strategies for the unit and creates
@@ -834,3 +844,16 @@ class World:
         )
 
         self.unit_operators[unit_operator_id].add_unit(unit)
+
+    def add_unit_instance(self, operator_id: str, unit: BaseUnit):
+        """
+        Add an existing unit to the World instance.
+
+        This method checks if the unit operator exists and then assigns the provided unit instance to it.
+
+        Args:
+            operator_id (str): The identifier of the unit operator.
+            unit (BaseUnit): The unit instance to be added.
+        """
+        self._validate_unit_operator(operator_id)
+        self.unit_operators[operator_id].add_unit(unit)
