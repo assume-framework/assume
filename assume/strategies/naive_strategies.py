@@ -5,6 +5,8 @@
 
 import pandas as pd
 from matplotlib import pyplot as plt
+import numpy as np
+import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
@@ -492,6 +494,124 @@ class FixedDispatchStrategy(BaseStrategy):
 
         return bids
 
+class FlexableRedispatchDSM(BaseStrategy):
+    """
+    Redispatch bidding for DSM (cement plant) with pay-as-bid *shading*.
+
+    For each hour:
+      - Price source: forecaster["price_redispatch"] (fallback to price_{market_id})
+      - Bid price = forecast_price - shade_abs    (no clamping to marginal cost)
+      - Volumes:
+          * DownCap  -> +MW (reduce consumption)
+          * UpCap    -> -MW (increase consumption)
+      - Total power is base schedule only; not bid as a volume.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # absolute markdown (€/MW) applied to the forecast price (pay-as-bid)
+        self.shade_abs = float(kwargs.get("shade_abs", 5.0))
+
+        # forecaster keys (override via kwargs if your columns differ)
+        self.key_price       = kwargs.get("key_price", "price_redispatch")
+        self.key_upcap       = kwargs.get("key_up_cap", "up_cap")
+        self.key_downcap     = kwargs.get("key_down_cap", "down_cap")
+        self.key_total_power = kwargs.get("key_total_power", "total_power")
+
+    # --- helpers -------------------------------------------------------------
+
+    def _get_series(self, unit, market_config, *candidates):
+        """
+        Try a list of forecaster keys; if none work, fall back to price_{market_id}.
+        Returns a pandas Series aligned to unit.index.
+        """
+        for key in candidates:
+            if not key:
+                continue
+            if key in unit.forecaster:
+                ser = unit.forecaster[key]
+                if isinstance(ser, (pd.Series, pd.DataFrame)):
+                    return ser.squeeze()
+                try:
+                    return pd.Series(ser, index=unit.index)
+                except Exception:
+                    pass  # try next
+
+        # fallback: price_{market_id}
+        market_key = f"price_{market_config.market_id}"
+        if market_key in unit.forecaster:
+            ser = unit.forecaster[market_key]
+            return ser.squeeze() if isinstance(ser, (pd.Series, pd.DataFrame)) \
+                 else pd.Series(ser, index=unit.index)
+
+        # last resort: zeros
+        return pd.Series(np.zeros(len(unit.index)), index=unit.index)
+
+    # --- main ---------------------------------------------------------------
+
+    def calculate_bids(
+        self,
+        unit,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+
+        # pull required series
+        price_series   = self._get_series(unit, market_config, self.key_price)
+        upcap_series   = self._get_series(unit, market_config, self.key_upcap)
+        downcap_series = self._get_series(unit, market_config, self.key_downcap)
+        _total_power   = self._get_series(unit, market_config, self.key_total_power)  # informational
+
+        bids: list[dict] = []
+
+        for prod in product_tuples:
+            t0 = prod[0]
+            t1 = prod[1]
+            only_hours = prod[2] if len(prod) > 2 else None
+
+            # values for this hour
+            try:
+                f_price = float(price_series.at[t0])
+            except Exception:
+                f_price = float(price_series.loc[t0])
+
+            try:
+                up_cap = float(upcap_series.at[t0])      # MW to INCREASE consumption
+            except Exception:
+                up_cap = float(upcap_series.loc[t0])
+
+            try:
+                down_cap = float(downcap_series.at[t0])  # MW to DECREASE consumption
+            except Exception:
+                down_cap = float(downcap_series.loc[t0])
+
+            # pay-as-bid price shading (no floor / no clamping)
+            bid_price = f_price - self.shade_abs
+
+            # DOWN bid (reduce consumption): +MW
+            if down_cap > 0.0:
+                bids.append({
+                    "start_time": t0,
+                    "end_time": t1,
+                    "only_hours": only_hours,
+                    "price": bid_price,
+                    "volume": +down_cap,
+                    "node": unit.node,
+                })
+
+            # UP bid (increase consumption): -MW
+            if up_cap > 0.0:
+                bids.append({
+                    "start_time": t0,
+                    "end_time": t1,
+                    "only_hours": only_hours,
+                    "price": bid_price,
+                    "volume": -up_cap,
+                    "node": unit.node,
+                })
+
+        return self.remove_empty_bids(bids)
 
 class NaiveRedispatchSteelplantStrategy(BaseStrategy):
     def calculate_bids(

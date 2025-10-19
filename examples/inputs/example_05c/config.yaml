@@ -9,39 +9,39 @@ base:
   save_frequency_hours: 24
 
   markets_config:
-    # CRM_pos:
-    #   operator: regelleistung_de-lu
-    #   product_type: capacity_pos
-    #   start_date: 2023-01-01 00:00
-    #   products:
-    #     - duration: 4h
-    #       count: 1
-    #       first_delivery: 22h            # from 08:00 D-1 → 00:00 D
-    #   opening_frequency: 4h
-    #   opening_duration: 1h
-    #   volume_unit: MW
-    #   maximum_bid_volume: 100000
-    #   maximum_bid_price: 9999
-    #   minimum_bid_price: -9999
-    #   price_unit: EUR/MW
-    #   market_mechanism: pay_as_bid
+    CRM_pos:
+      operator: regelleistung_de-lu
+      product_type: capacity_pos
+      start_date: 2023-01-01 00:00
+      products:
+        - duration: 4h
+          count: 1
+          first_delivery: 22h            # from 08:00 D-1 → 00:00 D
+      opening_frequency: 4h
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
 
-    # CRM_neg:
-    #   operator: regelleistung_de-lu
-    #   product_type: capacity_neg
-    #   start_date: 2023-01-01 00:00
-    #   products:
-    #     - duration: 4h
-    #       count: 1
-    #       first_delivery: 22h
-    #   opening_frequency: 4h
-    #   opening_duration: 1h
-    #   volume_unit: MW
-    #   maximum_bid_volume: 100000
-    #   maximum_bid_price: 9999
-    #   minimum_bid_price: -9999
-    #   price_unit: EUR/MW
-    #   market_mechanism: pay_as_bid
+    CRM_neg:
+      operator: regelleistung_de-lu
+      product_type: capacity_neg
+      start_date: 2023-01-01 00:00
+      products:
+        - duration: 4h
+          count: 1
+          first_delivery: 22h
+      opening_frequency: 4h
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
 
     EOM:
       start_date: 2023-01-01 00:00
@@ -85,66 +85,3 @@ base:
         solver: highs
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
-
-
-nodal_case:
-  start_date: 2023-01-01 00:00
-  end_date: 2023-01-06 00:00
-  time_step: 1h
-  save_frequency_hours: 24
-
-  markets_config:
-    DAM:
-      operator: EOM_operator
-      product_type: energy
-      products:
-        - duration: 1h
-          count: 24
-          first_delivery: 24h
-      opening_frequency: 24h
-      opening_duration: 20h
-      volume_unit: MWh
-      maximum_bid_volume: 100000
-      maximum_bid_price: 3000
-      minimum_bid_price: -500
-      price_unit: EUR/MWh
-      market_mechanism: nodal
-      additional_fields:
-        - node
-        - min_power
-        - max_power
-      param_dict:
-        network_path: .
-        solver: highs
-        payment_mechanism: pay_as_clear
-        backup_marginal_cost: 10000
-
-zonal_case:
-  start_date: 2023-01-01 00:00
-  end_date: 2023-01-06 00:00
-  time_step: 1h
-  save_frequency_hours: 24
-
-  markets_config:
-    DAM:
-      operator: EOM_operator
-      product_type: energy
-      products:
-        - duration: 1h
-          count: 24
-          first_delivery: 24h
-      opening_frequency: 24h
-      opening_duration: 24h
-      volume_unit: MWh
-      maximum_bid_volume: 100000
-      maximum_bid_price: 3000
-      minimum_bid_price: -500
-      price_unit: EUR/MWh
-      market_mechanism: pay_as_clear_complex
-      additional_fields:
-        - bid_type
-        - node
-      param_dict:
-        network_path: .
-        solver: glpk
-        zones_identifier: zone_id
