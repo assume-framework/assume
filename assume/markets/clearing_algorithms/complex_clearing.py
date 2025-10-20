@@ -47,7 +47,7 @@ def market_clearing_opt(
     Returns:
         tuple[pyomo.core.base.PyomoModel.ConcreteModel, pyomo.opt.results.SolverResults]: The solved pyomo model and the solver results
 
-    Notes:
+    Note:
         The problem is formulated as a mixed-integer linear program (MILP) and solved using the pyomo package.
         The objective function is to maximize the social welfare and defined as the sum of the product of the price, volume, and acceptance ratio of each order.
         The decision variables are given by the acceptance ratio of each order bounded by 0 and 1 and the acceptance as a binary variable.
@@ -428,7 +428,7 @@ class ComplexClearingRole(MarketRole):
             meta (list[dict]): The market clearing results.
             flows (dict): The power flows on the lines.
 
-        Notes:
+        Note:
             First the market clearing is solved using the cost minimization with the pyomo model market_clearing_opt.
             Then the market clearing prices are extracted from the solved model as dual variables of the energy balance constraint.
             Next the surplus of each order and its children is calculated and orders with negative surplus are removed from the orderbook.

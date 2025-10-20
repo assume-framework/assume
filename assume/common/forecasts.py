@@ -96,7 +96,7 @@ class CsvForecaster(Forecaster):
     Methods are included to retrieve forecasts for specific columns, availability of units,
     and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
-    Notes:
+    Note:
     - Some built-in forecasts are calculated at the beginning of the simulation, such as price forecast and residual load forecast.
     - Price forecast is calculated for energy-only markets using a merit order approach.
     - Residual load forecast is calculated by subtracting the total available power from variable renewable energy power plants from the overall demand forecast. Only power plants containing 'wind' or 'solar' in their technology column are considered VRE power plants.
@@ -313,7 +313,7 @@ class CsvForecaster(Forecaster):
         Returns:
             pd.Series: The residual demand forecast.
 
-        Notes:
+        Note:
             1. Selects VRE power plants from the powerplants_units DataFrame based on the technology column (wind or solar).
             2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
             3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
@@ -383,7 +383,7 @@ class CsvForecaster(Forecaster):
                 - Sets the price based on the marginal cost of the unit that meets demand.
                 - Assigns a default price of 1000 if supply is insufficient.
 
-        Notes:
+        Note:
             - Extending the price forecast to additional markets beyond the DAM is planned.
             - Future enhancements may include storage integration in the price forecast.
 
@@ -476,7 +476,7 @@ class CsvForecaster(Forecaster):
         Returns:
             pandas.Series: The marginal cost of the power plant.
 
-        Notes:
+        Note:
             1. Determines the fuel price based on the fuel type of the power plant.
             2. Calculates the fuel cost by dividing the fuel price by the efficiency of the power plant.
             3. Calculates the emissions cost based on the CO2 price and emission factor, adjusted by the efficiency of the power plant.
