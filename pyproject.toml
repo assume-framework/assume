@@ -11,7 +11,7 @@ name = "assume-framework"
 version = "0.5.5"
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = [{ name = "ASSUME Developers", email = "contact@assume-project.de"}]
-license = {text = "AGPL-3.0-or-later"}
+license = "AGPL-3.0-or-later"
 readme = "README.md"
 keywords = ["agent based simulation", "energy market", "reinforcement learning", "market simulation", "simulation"]
 
@@ -83,8 +83,9 @@ Changelog = "https://assume.readthedocs.io/en/latest/release_notes.html"
 [project.scripts]
 assume = "assume_cli.cli:cli"
 
-[tool.setuptools]
-packages = {find = {}}
+[tool.setuptools.packages.find]
+include = ["assume*", "assume_cli*"]
+exclude = ["assume-db*"]
 
 [tool.ruff]
 
