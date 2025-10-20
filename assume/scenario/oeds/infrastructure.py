@@ -48,7 +48,6 @@ class InfrastructureInterface:
         structure_databases=(
             "mastr",
             "oep",
-            "windmodel",
             "nuts",
             "scigrid",
             "weather",
