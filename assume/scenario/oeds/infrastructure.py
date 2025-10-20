@@ -125,6 +125,8 @@ class InfrastructureInterface:
         if not area.startswith("DE"):
             return self.get_lat_lon(area)
         plz_codes = self.get_plz_codes(area)
+        if not plz_codes:
+            raise ValueError(f"invalid area selected: {area}")
         lat_lons = [self.get_lat_lon(plz) for plz in plz_codes]
         lat, lon = np.array(lat_lons).mean(axis=0)
         return lat, lon
@@ -542,7 +544,7 @@ class InfrastructureInterface:
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
-            f'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
+            f'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate", '
             f'"Nettonennleistung" as "maxPower", '
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
@@ -583,7 +585,7 @@ class InfrastructureInterface:
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
-            'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
+            'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate", '
             f'"Nettonennleistung" as "maxPower", '
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
