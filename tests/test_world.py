@@ -35,11 +35,11 @@ def test_world_operators_default():
         unit_operator_id="test_operator",
         unit_params={
             "min_power": 0,
-            "max_power": 1000,
+            "max_power": -1000,
             "technology": "demand",
             "bidding_strategies": {},
         },
-        forecaster=NaiveForecast(index, demand=100),
+        forecaster=NaiveForecast(index, demand=-100),
     )
     assert "test_operator" in world.unit_operators
     assert len(world.unit_operators["test_operator"].units) == 1
@@ -54,10 +54,10 @@ def test_world_operators_by_instance():
             id="test_unit",
             unit_operator="test_operator",
             min_power=0,
-            max_power=1000,
+            max_power=-1000,
             technology="demand",
             bidding_strategies={},
-            forecaster=NaiveForecast(index, demand=100),
+            forecaster=NaiveForecast(index, demand=-100),
         ),
     )
     assert "test_operator" in world.unit_operators

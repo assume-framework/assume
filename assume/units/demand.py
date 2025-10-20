@@ -21,8 +21,8 @@ class Demand(SupportsMinMax):
         technology (str): The technology of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
         index (pandas.DatetimeIndex): The index of the unit.
-        max_power (float): The maximum power output capacity of the power plant in MW.
-        min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
+        max_power (float): The maximum power input (negative) capacity of the power plant in MW.
+        min_power (float, optional): The minimum power input (negative) capacity of the power plant in MW. Defaults to 0.0 MW.
         node (str, optional): The node of the unit. Defaults to "node0".
         price (float): The price of the unit.
         location (tuple[float, float]): Geographical location.
@@ -54,15 +54,19 @@ class Demand(SupportsMinMax):
             **kwargs,
         )
 
+        if max_power > 0:
+            raise ValueError(
+                f"max_power must be < 0 but is {max_power} for unit {self.id}"
+            )
+        if min_power > 0:
+            raise ValueError(
+                f"min_power must be < 0 but is {min_power} for unit {self.id}"
+            )
+        if max_power > min_power:
+            raise ValueError(f"{max_power=} must be <= {min_power=} for unit {self.id}")
+
         self.max_power = max_power
         self.min_power = min_power
-
-        if max_power > 0 and min_power <= 0:
-            self.max_power = min_power
-            self.min_power = -max_power
-
-        self.ramp_down = max(abs(self.min_power), abs(self.max_power))
-        self.ramp_up = self.ramp_down
 
         self.volume = -abs(self.forecaster[self.id])  # demand is negative
         self.price = FastSeries(index=self.index, value=price)

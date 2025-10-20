@@ -27,13 +27,13 @@ def test_demand():
         datetime(2023, 7, 1, hour=2),
         None,
     )
-    forecaster = NaiveForecast(index, demand=150)
+    forecaster = NaiveForecast(index, demand=-150)
     dem = Demand(
         id="demand",
         unit_operator="UO1",
         technology="energy",
         bidding_strategies=strategies,
-        max_power=150,
+        max_power=-150,
         min_power=0,
         forecaster=forecaster,
         price=2000,
@@ -77,8 +77,8 @@ def test_demand_series():
         None,
     )
 
-    demand = pd.Series(100, index=index)
-    demand.iloc[1] = 80
+    demand = pd.Series(-100, index=index)
+    demand.iloc[1] = -80
     price = pd.Series(1000, index=index)
     price.iloc[1] = 0
 
@@ -88,7 +88,7 @@ def test_demand_series():
         unit_operator="UO1",
         technology="energy",
         bidding_strategies=strategies,
-        max_power=150,
+        max_power=-150,
         min_power=0,
         forecaster=forecaster,
         price=price,
@@ -136,7 +136,7 @@ def test_elastic_demand_config_and_errors():
         datetime(2023, 7, 1, hour=2),
         None,
     )
-    forecaster = NaiveForecast(index, demand=100)
+    forecaster = NaiveForecast(index, demand=-100)
 
     # Valid elastic demand (isoelastic model)
     dem = Demand(
@@ -144,7 +144,7 @@ def test_elastic_demand_config_and_errors():
         unit_operator="UO1",
         technology="energy",
         bidding_strategies=strategies,
-        max_power=100,
+        max_power=-100,
         min_power=0,
         forecaster=forecaster,
         price=1000,
@@ -172,7 +172,7 @@ def test_elastic_demand_config_and_errors():
         unit_operator="UO1",
         technology="energy",
         bidding_strategies=strategies,
-        max_power=100,
+        max_power=-100,
         min_power=0,
         forecaster=forecaster,
         price=1000,
@@ -193,6 +193,60 @@ def test_elastic_demand_config_and_errors():
     for bid in bids:
         assert "price" in bid and "volume" in bid and bid["price"] > 0
 
+    with pytest.raises(
+        ValueError,
+        match="max_power must be < 0 but is 100 for unit bad_maxpower",
+    ):
+        Demand(
+            id="bad_maxpower",
+            unit_operator="UO1",
+            technology="energy",
+            bidding_strategies=strategies,
+            max_power=100,
+            min_power=0,
+            forecaster=forecaster,
+            price=1000,
+            elasticity=0.3,
+            elasticity_model="isoelastic",
+            num_bids=3,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="min_power must be < 0 but is 100 for unit bad_minpower",
+    ):
+        Demand(
+            id="bad_minpower",
+            unit_operator="UO1",
+            technology="energy",
+            bidding_strategies=strategies,
+            max_power=-100,
+            min_power=100,
+            forecaster=forecaster,
+            price=1000,
+            elasticity=0.3,
+            elasticity_model="isoelastic",
+            num_bids=3,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="max_power=-100 must be <= min_power=-200 for unit bad_power_diff",
+    ):
+        Demand(
+            id="bad_power_diff",
+            unit_operator="UO1",
+            technology="energy",
+            bidding_strategies=strategies,
+            max_power=-100,
+            min_power=-200,
+            forecaster=forecaster,
+            price=1000,
+            elasticity=0.3,
+            elasticity_model="isoelastic",
+            num_bids=3,
+        )
+
     # Invalid: elasticity is positive (isoelastic model)
     with pytest.raises(
         ValueError,
@@ -203,7 +257,7 @@ def test_elastic_demand_config_and_errors():
             unit_operator="UO1",
             technology="energy",
             bidding_strategies=strategies,
-            max_power=100,
+            max_power=-100,
             min_power=0,
             forecaster=forecaster,
             price=1000,
@@ -219,7 +273,7 @@ def test_elastic_demand_config_and_errors():
             unit_operator="UO1",
             technology="energy",
             bidding_strategies=strategies,
-            max_power=100,
+            max_power=-100,
             min_power=0,
             forecaster=forecaster,
             price=-1000,
@@ -234,7 +288,7 @@ def test_elastic_demand_config_and_errors():
             unit_operator="UO1",
             technology="energy",
             bidding_strategies=strategies,
-            max_power=100,
+            max_power=-100,
             min_power=0,
             forecaster=forecaster,
             price=1000,
@@ -249,7 +303,7 @@ def test_elastic_demand_config_and_errors():
             unit_operator="UO1",
             technology="energy",
             bidding_strategies=strategies,
-            max_power=100,
+            max_power=-100,
             min_power=0,
             forecaster=forecaster,
             price=1000,

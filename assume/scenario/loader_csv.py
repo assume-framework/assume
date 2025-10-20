@@ -489,6 +489,18 @@ def load_config_and_create_forecaster(
     demand_units = load_file(path=path, config=config, file_name="demand_units")
     exchange_units = load_file(path=path, config=config, file_name="exchange_units")
 
+    if powerplant_units is None or demand_units is None:
+        raise ValueError("No power plant or no demand units were provided!")
+
+    if ((demand_units["min_power"] < 0) & (demand_units["max_power"] > 0)).any() or (
+        (demand_units["min_power"] > 0) & (demand_units["max_power"] < 0)
+    ).any():
+        raise ValueError(
+            "min_power and max_power must both be either negative or positive"
+        )
+    demand_units["min_power"] = -abs(demand_units["min_power"])
+    demand_units["max_power"] = -abs(demand_units["max_power"])
+
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
     for unit_type in ["industrial_dsm_units", "residential_dsm_units"]:
@@ -499,9 +511,6 @@ def load_config_and_create_forecaster(
         )
         if units is not None:
             dsm_units.update(units)
-
-    if powerplant_units is None or demand_units is None:
-        raise ValueError("No power plant or no demand units were provided!")
 
     forecasts_df = load_file(
         path=path, config=config, file_name="forecasts_df", index=index
