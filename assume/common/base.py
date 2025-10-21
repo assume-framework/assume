@@ -344,6 +344,13 @@ class SupportsMinMax(BaseUnit):
     min_operating_time: int = 0
     min_down_time: int = 0
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        bidding_strategies: dict[str, BaseStrategy] = kwargs["bidding_strategies"]
+        for strategy in bidding_strategies.values():
+            if not isinstance(strategy, MinMaxStrategy):
+                raise ValueError(f"strategy {strategy} is not a MinMaxStrategy!")
+
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type: str = "energy"
     ) -> tuple[np.ndarray, np.ndarray]:
@@ -511,6 +518,13 @@ class SupportsMinMaxCharge(BaseUnit):
     max_soc: float
     efficiency_charge: float
     efficiency_discharge: float
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        bidding_strategies: dict[str, BaseStrategy] = kwargs["bidding_strategies"]
+        for strategy in bidding_strategies.values():
+            if not isinstance(strategy, MinMaxChargeStrategy):
+                raise ValueError(f"strategy {strategy} is not a MinMaxChargeStrategy!")
 
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, soc: float = None
@@ -803,6 +817,18 @@ class LearningStrategy(BaseStrategy):
         # defines the number of provided timeseries, this is necessary for correctly splitting
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
+
+
+class MinMaxStrategy(BaseStrategy):
+    pass
+
+
+class MinMaxChargeStrategy(BaseStrategy):
+    pass
+
+
+class ExchangeStrategy(BaseStrategy):
+    pass
 
 
 class LearningConfig(TypedDict):

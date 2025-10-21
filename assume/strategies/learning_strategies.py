@@ -12,6 +12,8 @@ import torch as th
 from assume.common.base import (
     BaseUnit,
     LearningStrategy,
+    MinMaxChargeStrategy,
+    MinMaxStrategy,
     SupportsMinMax,
     SupportsMinMaxCharge,
 )
@@ -23,7 +25,11 @@ from assume.reinforcement_learning.learning_utils import NormalActionNoise
 logger = logging.getLogger(__name__)
 
 
-class BaseLearningStrategy(LearningStrategy):
+class TorchLearningStrategy(LearningStrategy):
+    """
+    A strategy to enable machine learning with pytorch.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -287,7 +293,7 @@ class BaseLearningStrategy(LearningStrategy):
         return curr_action, noise
 
 
-class RLStrategy(BaseLearningStrategy):
+class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -678,7 +684,7 @@ class RLStrategy(BaseLearningStrategy):
         unit.outputs["rl_rewards"].append(reward)
 
 
-class RLStrategySingleBid(RLStrategy):
+class RLStrategySingleBid(RLStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy with Single-Bid Structure for Energy-Only Markets.
 
@@ -788,7 +794,7 @@ class RLStrategySingleBid(RLStrategy):
         return bids
 
 
-class StorageRLStrategy(BaseLearningStrategy):
+class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.

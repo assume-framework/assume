@@ -9,7 +9,7 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.base import MinMaxChargeStrategy, SupportsMinMax
 from assume.common.forecasts import Forecaster
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class PowerPlant(SupportsMinMax):
         id (str): The ID of the storage unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
-        bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
+        bidding_strategies (dict[str, MinMaxChargeStrategy]): The bidding strategies of the unit.
         forecaster (Forecaster): A forecaster used to get key variables such as fuel or electricity prices.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
@@ -53,7 +53,7 @@ class PowerPlant(SupportsMinMax):
         id: str,
         unit_operator: str,
         technology: str,
-        bidding_strategies: dict[str, BaseStrategy],
+        bidding_strategies: dict[str, MinMaxChargeStrategy],
         forecaster: Forecaster,
         max_power: float,
         min_power: float = 0.0,

@@ -4,12 +4,12 @@
 
 import dateutil.rrule as rr
 
-from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 
 
-class OTCStrategy(BaseStrategy):
+class OTCStrategy(MinMaxStrategy):
     """
     Strategy for OTC (over the counter trading) markets
     """
@@ -172,7 +172,7 @@ class SupportStrategy(NaiveSingleBidStrategy):
         return bids
 
 
-class MarkupStrategy(BaseStrategy):
+class MarkupStrategy(MinMaxStrategy):
     """
     Strategy for Markup (over the counter trading) markets
     """
