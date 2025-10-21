@@ -70,10 +70,10 @@ class Storage(SupportsMinMaxCharge):
         efficiency_discharge: float = 1,
         additional_cost_charge: float = 0.0,
         additional_cost_discharge: float = 0.0,
-        ramp_up_charge: float = None,
-        ramp_down_charge: float = None,
-        ramp_up_discharge: float = None,
-        ramp_down_discharge: float = None,
+        ramp_up_charge: float | None = None,
+        ramp_down_charge: float | None = None,
+        ramp_up_discharge: float | None = None,
+        ramp_down_discharge: float | None = None,
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
@@ -143,33 +143,18 @@ class Storage(SupportsMinMaxCharge):
         # The ramp up/down rate of charging/discharging the storage unit.
         # if ramp_up_charge == 0, the ramp_up_charge is set to enable ramping between full charge and discharge power
         # else the ramp_up_charge is set to the negative value of the ramp_up_charge
-        if ramp_up_charge is None:
-            self.ramp_up_charge = self.max_power_charge - self.max_power_discharge
-        elif ramp_up_charge > 0:
+        if ramp_up_charge is not None and ramp_up_charge > 0:
             raise ValueError(f"{ramp_up_charge=} must be <= 0 for unit {self.id}")
-        else:
-            self.ramp_up_charge = ramp_up_charge
-
-        if ramp_down_charge is None:
-            self.ramp_down_charge = self.max_power_charge - self.max_power_discharge
-        elif ramp_down_charge > 0:
+        if ramp_down_charge is not None and ramp_down_charge > 0:
             raise ValueError(f"{ramp_down_charge=} must be <= 0 for unit {self.id}")
-        else:
-            self.ramp_down_charge = ramp_down_charge
-
-        if ramp_up_discharge is None:
-            self.ramp_up_discharge = self.max_power_discharge - self.max_power_charge
-        elif ramp_up_discharge < 0:
+        if ramp_up_discharge is not None and ramp_up_discharge < 0:
             raise ValueError(f"{ramp_up_discharge=} must be >= 0 for unit {self.id}")
-        else:
-            self.ramp_up_discharge = ramp_up_discharge
-
-        if ramp_down_discharge is None:
-            self.ramp_down_discharge = self.max_power_discharge - self.max_power_charge
-        elif ramp_down_discharge < 0:
+        if ramp_down_discharge is not None and ramp_down_discharge < 0:
             raise ValueError(f"{ramp_down_discharge=} must be >= 0 for unit {self.id}")
-        else:
-            self.ramp_down_discharge = ramp_down_discharge
+        self.ramp_up_charge = ramp_up_charge
+        self.ramp_down_charge = ramp_down_charge
+        self.ramp_up_discharge = ramp_up_discharge
+        self.ramp_down_discharge = ramp_down_discharge
 
         # How long the storage unit has to be in operation before it can be shut down.
         if min_operating_time < 0:
