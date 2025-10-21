@@ -64,7 +64,7 @@ class Storage(SupportsMinMaxCharge):
         min_power_charge: float = 0.0,
         min_power_discharge: float = 0.0,
         min_soc: float = 0.0,
-        initial_soc: float = 0.0,
+        initial_soc: float | None = 0.0,
         soc_tick: float = 0.01,
         efficiency_charge: float = 1,
         efficiency_discharge: float = 1,
@@ -129,9 +129,13 @@ class Storage(SupportsMinMaxCharge):
         self.soc_tick = soc_tick
 
         if not 0 <= efficiency_charge <= 1:
-            raise ValueError(f"{efficiency_charge=} must be between 0 and 1")
+            raise ValueError(
+                f"{efficiency_charge=} must be between 0 and 1 for unit {self.id}"
+            )
         if not 0 <= efficiency_discharge <= 1:
-            raise ValueError(f"{efficiency_discharge=} must be between 0 and 1")
+            raise ValueError(
+                f"{efficiency_discharge=} must be between 0 and 1 for unit {self.id}"
+            )
         # The efficiency of the storage unit while charging.
         self.efficiency_charge = efficiency_charge
         self.efficiency_discharge = efficiency_discharge
