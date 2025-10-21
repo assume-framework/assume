@@ -88,8 +88,8 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert power_plant_1.additional_cost == 10
     assert power_plant_1.fuel_type == "lignite"
     assert power_plant_1.emission_factor == 0.5
-    assert power_plant_1.ramp_up == 1000
-    assert power_plant_1.ramp_down == 1000
+    assert power_plant_1.ramp_up is None
+    assert power_plant_1.ramp_down is None
 
     index = pd.date_range("2022-01-01", periods=4, freq="h")
     assert (

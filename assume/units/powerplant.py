@@ -66,8 +66,8 @@ class PowerPlant(SupportsMinMax):
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
-        min_operating_time: float = 0,
-        min_down_time: float = 0,
+        min_operating_time: int = 1,  # hours
+        min_down_time: int = 1,  # hours
         downtime_hot_start: int = 0,  # hours
         downtime_warm_start: int = 0,  # hours
         heat_extraction: bool = False,
@@ -86,7 +86,12 @@ class PowerPlant(SupportsMinMax):
             location=location,
             **kwargs,
         )
-
+        if min_power < 0:
+            raise ValueError(f"{min_power=} must be >= 0 for unit {self.id}")
+        if max_power < 0:
+            raise ValueError(f"{max_power=} must be >= 0 for unit {self.id}")
+        if min_power > max_power:
+            raise ValueError(f"{min_power=} must be <= {max_power=} for unit {self.id}")
         self.max_power = max_power
         self.min_power = min_power
         self.efficiency = efficiency
@@ -101,11 +106,15 @@ class PowerPlant(SupportsMinMax):
         self.cold_start_cost = cold_start_cost * max_power
 
         # check ramping enabled
-        self.ramp_down = max_power if ramp_down == 0 or ramp_down is None else ramp_down
-        self.ramp_up = max_power if ramp_up == 0 or ramp_up is None else ramp_up
+        self.ramp_down = None if ramp_down == 0 else ramp_down
+        self.ramp_up = None if ramp_up == 0 else ramp_up
 
-        self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
-        self.min_down_time = min_down_time if min_down_time > 0 else 1
+        if min_operating_time <= 0:
+            raise ValueError(f"{min_operating_time=} must be > 0 for unit {self.id}")
+        self.min_operating_time = min_operating_time
+        if min_down_time <= 0:
+            raise ValueError(f"{min_down_time=} must be > 0 for unit {self.id}")
+        self.min_down_time = min_down_time
         self.downtime_hot_start = downtime_hot_start / (
             self.index.freq / timedelta(hours=1)
         )
@@ -303,6 +312,7 @@ class PowerPlant(SupportsMinMax):
         """
         # if marginal costs already exists, return it
         if self.marginal_cost is not None:
+            # FIXME self.marginal_cost is a float and cannot be indexed
             return (
                 self.marginal_cost[start]
                 if len(self.marginal_cost) > 1

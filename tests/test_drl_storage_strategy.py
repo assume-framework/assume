@@ -47,7 +47,7 @@ def storage_unit() -> Storage:
         unit_operator="test_operator",
         technology="storage",
         bidding_strategies={"EOM": StorageRLStrategy(**learning_config)},
-        max_power_charge=500,  # Negative for charging
+        max_power_charge=-500,  # Negative for charging
         max_power_discharge=500,
         max_soc=1000,
         min_soc=0,
