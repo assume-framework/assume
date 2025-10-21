@@ -88,8 +88,8 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     assert power_plant_1.additional_cost == 10
     assert power_plant_1.fuel_type == "lignite"
     assert power_plant_1.emission_factor == 0.5
-    assert power_plant_1.ramp_up == 1000
-    assert power_plant_1.ramp_down == 1000
+    assert power_plant_1.ramp_up is None
+    assert power_plant_1.ramp_down is None
 
     index = pd.date_range("2022-01-01", periods=4, freq="h")
     assert (
@@ -592,6 +592,47 @@ def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
     # now we can bid max_power and need min_power again
     assert min_power[0] == 200
     assert max_power[0] == 1000
+
+
+def test_initialising_invalid_powerplants():
+    index = pd.date_range(
+        start=datetime(2023, 7, 1),
+        end=datetime(2023, 7, 2),
+        freq="1h",
+    )
+    param_dict = {
+        "id": "id",
+        "unit_operator": "operator",
+        "technology": "technology",
+        "bidding_strategies": {},
+        "forecaster": NaiveForecast(index=index),
+        "max_power": 0.0,
+    }
+    with pytest.raises(ValueError, match="max_power=-10 must be >= 0 for unit id"):
+        d = param_dict.copy()
+        d["max_power"] = -10
+        PowerPlant(**d)
+    with pytest.raises(ValueError, match="min_power=-10 must be >= 0 for unit id"):
+        d = param_dict.copy()
+        d["min_power"] = -10
+        PowerPlant(**d)
+    with pytest.raises(
+        ValueError, match="min_power=20 must be <= max_power=10 for unit id"
+    ):
+        d = param_dict.copy()
+        d["max_power"] = 10
+        d["min_power"] = 20
+        PowerPlant(**d)
+    with pytest.raises(
+        ValueError, match="min_operating_time=-10 must be > 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["min_operating_time"] = -10
+        PowerPlant(**d)
+    with pytest.raises(ValueError, match="min_down_time=-10 must be > 0 for unit id"):
+        d = param_dict.copy()
+        d["min_down_time"] = -10
+        PowerPlant(**d)
 
 
 if __name__ == "__main__":

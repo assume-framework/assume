@@ -139,21 +139,25 @@ class DmasPowerplantStrategy(BaseStrategy):
             self.model.model_max.add(self.model.z[t] * delta >= self.model.p_model[t])
             # ramping (gradients)
             if t == 0:
-                self.model.ramping_up_0 = Constraint(
-                    expr=self.model.p_out[0] <= p0 + unit.ramp_up
-                )
-                self.model.ramping_down_0 = Constraint(
-                    expr=self.model.p_out[0] >= p0 - unit.ramp_down
-                )
+                if unit.ramp_up is not None:
+                    self.model.ramping_up_0 = Constraint(
+                        expr=self.model.p_out[0] <= p0 + unit.ramp_up
+                    )
+                if unit.ramp_down is not None:
+                    self.model.ramping_down_0 = Constraint(
+                        expr=self.model.p_out[0] >= p0 - unit.ramp_down
+                    )
             else:
-                self.model.ramping_up.add(
-                    self.model.p_model[t] - self.model.p_model[t - 1]
-                    <= unit.ramp_up * self.model.z[t - 1]
-                )
-                self.model.ramping_down.add(
-                    self.model.p_model[t - 1] - self.model.p_model[t]
-                    <= unit.ramp_down * self.model.z[t]
-                )
+                if unit.ramp_up is not None:
+                    self.model.ramping_up.add(
+                        self.model.p_model[t] - self.model.p_model[t - 1]
+                        <= unit.ramp_up * self.model.z[t - 1]
+                    )
+                if unit.ramp_down is not None:
+                    self.model.ramping_down.add(
+                        self.model.p_model[t - 1] - self.model.p_model[t]
+                        <= unit.ramp_down * self.model.z[t]
+                    )
             # minimal run and stop time
             if t > unit.min_down_time:
                 self.model.stop_time.add(
