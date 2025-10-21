@@ -825,6 +825,14 @@ class DSMFlex:
         # self.plot_1(instance, save_path="./outputs/PL_B", show=True)
         # self.plot_2(instance, save_path="./outputs/DE_FCR_products.png", show=True)
 
+        #Cement Plot plots
+        self.plot_1(instance, save_name="cement_BAU_week42", out_dir="./outputs", show=True)
+        # self.plot_capacity_products(instance, save_name="cement_BAU_capacity_week42", out_dir="./outputs", show=True) 
+        # self.dashboard_cement(instance,
+        #                     baseline_instance=instance,   # or None
+        #                     html_path="./outputs/cement_full_dashboard.html",
+        #                     sankey_max_steps=168)
+
     def determine_optimal_operation_with_flex(self):
         """
         Determines the optimal operation of the steel plant without considering flexibility.

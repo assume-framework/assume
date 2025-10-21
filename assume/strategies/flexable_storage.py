@@ -5,6 +5,7 @@
 from datetime import timedelta
 
 import numpy as np
+import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
@@ -463,6 +464,199 @@ class flexableNegCRMStorage(BaseStrategy):
 
         return bids
 
+class flexableRedispatchStorage(BaseStrategy):
+    """
+    Redispatch for storage, flexABLE-style but robust to forecast/index shapes.
+
+    - Aligns all time series to unit.outputs.index (a pandas DatetimeIndex).
+    - Two bids per hour if feasible:
+        * UP   (discharge, +MW) at price ≈ avg_price / efficiency_discharge
+        * DOWN (charge,    −MW) at price ≈ avg_price * efficiency_charge
+    - Respects SoC, limits, and ramps; advances a theoretical SoC only by the base profile.
+    - Sign convention: +MW = discharge (supply), −MW = charge (demand).
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "3h"))
+        self.lookahead = parse_duration(kwargs.get("lookahead", "0h"))
+
+    # ---------- helpers ----------
+
+    def _unit_dt_index(self, unit):
+        """
+        Always use a pandas.DatetimeIndex.
+        Prefer unit.outputs.index (flexABLE style); fall back sensibly.
+        """
+        try:
+            idx = unit.outputs.index
+            if isinstance(idx, pd.DatetimeIndex):
+                return idx
+        except Exception:
+            pass
+
+        # Try to coerce other index-like attributes
+        for candidate in (getattr(unit, "index", None),
+                          getattr(unit, "snapshots", None)):
+            if candidate is None:
+                continue
+            try:
+                idx = pd.DatetimeIndex(candidate)
+                return idx
+            except Exception:
+                continue
+
+        # Last resort: try the energy series index
+        try:
+            return pd.DatetimeIndex(unit.outputs["energy"].index)
+        except Exception:
+            # Absolute fallback to avoid crashing (empty index)
+            return pd.DatetimeIndex([])
+
+    def _as_series(self, unit, price_like):
+        """
+        Coerce any forecast (Series/list/ndarray/scalar) to a float Series
+        on the unit's DatetimeIndex.
+        """
+        idx = self._unit_dt_index(unit)
+        if price_like is None:
+            return pd.Series(0.0, index=idx)
+
+        # If it's already a pandas object, reindex onto our idx
+        if hasattr(price_like, "reindex"):
+            try:
+                ser = price_like.reindex(idx)
+            except Exception:
+                ser = pd.Series(price_like, index=idx)
+        else:
+            # list/ndarray/scalar → Series; if length mismatch, fall back to zeros
+            try:
+                ser = pd.Series(price_like, index=idx)
+            except Exception:
+                ser = pd.Series(0.0, index=idx)
+
+        # Ensure floats, no NaNs
+        ser = pd.to_numeric(ser, errors="coerce").fillna(0.0)
+        return ser
+
+    def _select_forecast(self, unit, market_config):
+        """
+        Prefer price_{market_id}; fall back to price_EOM. Always return a Series on unit index.
+        """
+        raw = None
+        try:
+            raw = unit.forecaster[f"price_{market_config.market_id}"]
+        except Exception:
+            try:
+                raw = unit.forecaster["price_EOM"]
+            except Exception:
+                raw = None
+        return self._as_series(unit, raw)
+
+    def _avg_price(self, series, t, window):
+        """
+        Mean of `series` over [t - window, t + window], clipped to index.
+        """
+        if series is None or series.empty:
+            return 0.0
+        left = max(t - window, series.index[0])
+        right = min(t + window, series.index[-1])
+        if left > right:
+            return float(series.get(t, 0.0))
+        return float(series.loc[left:right].mean())
+
+    # ---------- main ----------
+
+    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
+        bids = []
+
+        # Proper aligned index
+        idx = self._unit_dt_index(unit)
+
+        # Seeds (flexABLE-style)
+        start0 = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
+        previous_power = unit.get_output_before(start0)
+        soc_theory = unit.get_soc_before(start0)
+
+        # Envelopes over horizon
+        min_ch, max_ch = unit.calculate_min_max_charge(start0, end_all)
+        min_dis, max_dis = unit.calculate_min_max_discharge(start0, end_all, soc=soc_theory)
+
+        # Forecast series on our DatetimeIndex
+        price_series = self._select_forecast(unit, market_config)
+
+        for (product, max_dis_i, min_dis_i, max_ch_i, min_ch_i) in zip(
+            product_tuples, max_dis, min_dis, max_ch, min_ch
+        ):
+            t0 = product[0]
+            t1 = product[1]
+            only_hours = product[2] if len(product) > 2 else None
+
+            # base profile (+discharge, −charge)
+            base_p = float(unit.outputs["energy"].at[t0])
+
+            # ramp-feasible headroom (discharge, ≥0)
+            feas_up = unit.calculate_ramp_discharge(
+                soc_theory,
+                previous_power,
+                power_discharge=max(0.0, float(max_dis_i)),
+                current_power=max(base_p, 0.0),
+                min_power_discharge=float(min_dis_i),
+            )
+            feas_up = max(0.0, float(feas_up))
+
+            # ramp-feasible headroom (charge, ≤0)
+            feas_down = unit.calculate_ramp_charge(
+                soc_theory,
+                previous_power,
+                power_charge=float(max_ch_i),
+                current_power=min(base_p, 0.0),
+                min_power_charge=float(min_ch_i),
+            )
+            feas_down = min(0.0, float(feas_down))
+
+            # Average price around t0
+            avg_p = self._avg_price(price_series, t0, self.foresight)
+
+            # Prices consistent with flexABLE storage logic
+            ask_up = max(0.0, avg_p / max(unit.efficiency_discharge, 1e-9))  # discharge
+            bid_down = max(0.0, avg_p * unit.efficiency_charge)               # charge
+
+            # Create bids only if feasible non-zero
+            if feas_up > 0.0:
+                bids.append({
+                    "start_time": t0,
+                    "end_time": t1,
+                    "only_hours": only_hours,
+                    "price": float(ask_up),
+                    "volume": float(feas_up),   # +MW (discharge)
+                    "node": unit.node,
+                })
+
+            if feas_down < 0.0:
+                bids.append({
+                    "start_time": t0,
+                    "end_time": t1,
+                    "only_hours": only_hours,
+                    "price": float(bid_down),
+                    "volume": float(feas_down), # −MW (charge)
+                    "node": unit.node,
+                })
+
+            # advance theoretical SoC by base profile only
+            dt_h = (t1 - t0) / timedelta(hours=1)
+            if base_p > 0.0:   # discharging
+                d_soc = -(base_p * dt_h) / max(unit.efficiency_discharge, 1e-9)
+            elif base_p < 0.0: # charging
+                d_soc = -(base_p * dt_h) * unit.efficiency_charge
+            else:
+                d_soc = 0.0
+
+            soc_theory += float(d_soc)
+            previous_power = base_p
+
+        return self.remove_empty_bids(bids)
 
 def calculate_price_average(current_time, foresight, price_forecast):
     """
