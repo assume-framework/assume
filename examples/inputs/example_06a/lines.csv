@@ -1072,3 +1072,55 @@ way/91655776-220,DE173-220,way/145680894-220,983.112,0.590302,0.117668
 way/92877623-220,DE106-220,way/92877635-220,983.112,0.23464,0.046772
 way/93258454-220,DE169-220,way/24765111-220,1474.668,0.319171,0.063622
 way/98382716-380,DE121-380,way/41232144-380,3396.205,2.865023,0.349393
+planned_HVDC _Osterath_Emden,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Osterath_Rommerskirchen,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Rommerskirchen_Weissenthurm ,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Weissenthurm _Pfungstadt,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Pfungstadt_Buerstadt,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Buerstadt_Osterath,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Philippsburg_Buerstadt,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Dollern-Wilster_Brokdorf-Wilster,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Hagermarsch_Niederrhein,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Wehrendorf_Hagermarsch,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Westerkappeln_Hagermarsch,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Garrel_Hagermarsch,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Niederrhein_Hagermarsch,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Buerstadt_Marxheim,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Marxheim_Hagermarsch,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Grossgartach_Schweinfurt,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Schweinfurt_Hagermarsch,DE206-220,DE206-220,2000,0.5,0.001
+planned_HVDC _Hilgenberg_Emden,DE206-220,DE206-220,4000,0.5,0.001
+planned_AC_Niederstedem_Neuwied,way/151967290-380,DE206-220,2000,0.5,0.001
+planned_AC_Koepchenwerk_Kelsterbach,way/698870101-220,DE206-220,2000,0.5,0.001
+planned_AC_Osterath_Wesel/Niederrhein,way/24799890-380,DE206-220,2000,0.5,0.001
+planned_AC_Urberach_Weinheim,way/23284340-380,DE206-220,2000,0.5,0.001
+planned_AC_Weinheim_FGHMannheim,way/160929097-220,DE206-220,2000,0.5,0.001
+planned_AC_GrosskraftwerkMannheim_FGHMannheim,relation/17591073-220,DE206-220,2000,0.5,0.001
+planned_AC_Altlussheim_FGHMannheim,way/409305507-220,DE206-220,2000,0.5,0.001
+planned_AC_Altlussheim_Daxlanden,way/409305507-220,DE206-220,2000,0.5,0.001
+planned_AC_Daxlanden_Kuehmoos,way/152261133-220,DE206-220,1000,0.5,0.001
+planned_AC_Daxlanden_Kuppenheim,way/152261133-220,DE206-220,1000,0.5,0.001
+planned_AC_Kuppenheim_Buehl,way/32151621-220,DE206-220,2000,0.5,0.001
+planned_AC_Buehl_Weier,way/39011884-220,DE206-220,2000,0.5,0.001
+planned_AC_Weier_Eichstetten,way/933248930-220,DE206-220,2000,0.5,0.001
+planned_AC_Eichstetten_Vogelgruen,way/87653464-400,DE206-220,2000,0.5,0.001
+planned_AC_Herbertingen_Tiengen,way/25306752-380,DE206-220,1000,0.5,0.001
+planned_AC_Dellmensingen_Obermoorweiler,way/41389594-220,DE206-220,1000,0.5,0.001
+planned_AC_Kupferzell_Grossgartach,way/143854536-380,DE206-220,1000,0.5,0.001
+planned_AC_Luestringen_Hesseln,way/37764852-220,DE206-220,2000,0.5,0.001
+planned_AC_Luestringen_Wehrendorf,way/37764852-220,DE206-220,2000,0.5,0.001
+planned_AC_Urberach_Pfungstadt,way/23284340-380,DE206-220,3000,0.5,0.001
+planned_AC_Buerstadt_BASF_W210,way/149987048-380,DE206-220,2000,0.5,0.001
+planned_AC_St.ToenisToenisvorst_Osterath,DE113-220,DE206-220,2000,0.5,0.001
+planned_AC_Wolkramshausen_Vieselbach,way/157164284-220,DE206-220,2000,0.5,0.001
+planned_AC_Querfurt_Wolkramshausen,way/32690742-380,DE206-220,2000,0.5,0.001
+planned_AC_Vieselbach_Pulgar,way/143882655-220,DE206-220,2000,0.5,0.001
+planned_AC_Thyrow_Berlin/Suedost,way/29331499-220,DE206-220,2000,0.5,0.001
+planned_AC_Wolmirstedt_Perleberg,way/26472665-220,DE206-220,2000,0.5,0.001
+planned_AC_Parchim/Sued_Guestrow,way/517421342-220,DE206-220,2000,0.5,0.001
+planned_AC_Bentwisch_Guestrow,way/32063539-380,DE206-220,2000,0.5,0.001
+planned_AC_Bentwisch_Gnewitz,way/32063539-380,DE206-220,2000,0.5,0.001
+planned_AC_Siedenbruenzow_Pasewalk,way/941453716-380,DE206-220,2000,0.5,0.001
+planned_AC_Pasewalk_Bertikow,way/1222597066-220,DE206-220,2000,0.5,0.001
+planned_AC_Bertikow_Vierraden,way/30039908-380,DE206-220,2000,0.5,0.001
+planned_AC_Roehrsdorf_Weida,way/943135226-220,DE206-220,2000,0.5,0.001
