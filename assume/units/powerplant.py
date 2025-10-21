@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 import numpy as np
+import pandas as pd
 
 from assume.common.base import BaseStrategy, SupportsMinMax
 from assume.common.forecasts import Forecaster
@@ -122,14 +123,6 @@ class PowerPlant(SupportsMinMax):
             self.index.freq / timedelta(hours=1)
         )
 
-        self.init_marginal_cost()
-
-    def init_marginal_cost(self):
-        """
-        Initializes the marginal cost of the unit using calc_cimple_marginal_cost().
-
-        Args:
-        """
         self.marginal_cost = self.calc_simple_marginal_cost()
 
     def execute_current_dispatch(
@@ -173,12 +166,12 @@ class PowerPlant(SupportsMinMax):
 
     def calc_simple_marginal_cost(
         self,
-    ) -> float:
+    ) -> pd.Series:
         """
         Calculates the marginal cost of the unit (simple method) and returns the marginal cost of the unit.
 
         Returns:
-            float: The marginal cost of the unit.
+            pandas.Series: The marginal cost of the unit.
         """
         fuel_price = self.forecaster.get_price(self.fuel_type)
         co2_price = self.forecaster.get_price("co2")
@@ -312,7 +305,6 @@ class PowerPlant(SupportsMinMax):
         """
         # if marginal costs already exists, return it
         if self.marginal_cost is not None:
-            # FIXME self.marginal_cost is a float and cannot be indexed
             return (
                 self.marginal_cost[start]
                 if len(self.marginal_cost) > 1
