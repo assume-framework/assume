@@ -25,14 +25,14 @@ from pyomo.opt import (
     TerminationCondition,
 )
 
-from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_supported_solver
 
 logger = logging.getLogger(__name__)
 
 
-class DmasPowerplantStrategy(BaseStrategy):
+class DmasPowerplantStrategy(MinMaxStrategy):
     def __init__(self, steps=[-10, -1, 0, 1, 10], *args, **kwargs):
         """
         Initializes the strategy

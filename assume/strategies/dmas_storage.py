@@ -10,7 +10,7 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, check_available_solvers
 from pyomo.opt.base.solvers import SolverFactoryClass
 
-from assume.common.base import BaseStrategy, SupportsMinMaxCharge
+from assume.common.base import MinMaxChargeStrategy, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
@@ -105,7 +105,7 @@ def get_solver_factory(
     return SolverFactory(solvers[0])
 
 
-class DmasStorageStrategy(BaseStrategy):
+class DmasStorageStrategy(MinMaxChargeStrategy):
     """Strategy for a storage unit that uses DMAS to optimize its operation"""
 
     def __init__(self, *args, **kwargs):
