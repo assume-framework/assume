@@ -101,6 +101,7 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
+    "learning_redispatch": {"scenario": "example_01d", "study_case": "learning_case"},
 }
 
 
@@ -114,10 +115,10 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_with_vre_and_storage"
+    example = "learning_redispatch"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

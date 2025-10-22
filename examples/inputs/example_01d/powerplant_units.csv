@@ -34,7 +34,7 @@ Unit 32,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,
 Unit 33,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,37,south,Operator 4
 Unit 34,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,38,south,Operator 4
 Unit 35,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,39,south,Operator 4
-Unit 36,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,40,south,Operator 4
+Unit 36,nuclear,redispatch_learning,redispatch_learning,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,40,south,Operator RL
 Unit 37,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,41,south,Operator 4
 Unit 38,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,42,south,Operator 4
 Unit 39,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,43,south,Operator 4

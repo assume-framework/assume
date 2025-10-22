@@ -27,6 +27,19 @@ class BaseLearningStrategy(LearningStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # check if kwargs contains arguments on obs_dim, act_dim, unique_obs_dim
+        obs_dim = kwargs.pop("obs_dim", 38)
+        act_dim = kwargs.pop("act_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+
+        super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
+        
         self.unit_id = kwargs["unit_id"]
 
         # defines bounds of actions space
@@ -1361,18 +1374,18 @@ class RedispatchRLStrategy(RLStrategy):
         **kwargs,
     ) -> Orderbook:
         start = product_tuples[0][0]
-        # end_all = product_tuples[-1][1]
-        # previous_power = unit.get_output_before(start)
+        end_all = product_tuples[-1][1]
+        previous_power = unit.get_output_before(start)
         min_power, max_power = unit.min_power, unit.max_power
 
         bids = []
         for product in product_tuples:
             start = product[0]
             current_power = unit.outputs["energy"].at[start]
-            # marginal_cost = unit.calculate_marginal_cost(
-            #     start, previous_power
-            # )  # calculation of the marginal costs
-            price = unit.outputs["eom_bids"].at[start]
+            marginal_cost = unit.calculate_marginal_cost(
+                 start, previous_power
+            )  # calculation of the marginal costs
+            price = unit.outputs["eom_bids"].at[start][0]
             bids.append(
                 {
                     "start_time": product[0],
@@ -1410,6 +1423,7 @@ class RedispatchRLStrategy(RLStrategy):
             unit=unit,
             market_id=market_config.market_id,
             start=start,
+            end=end,
         )
 
         # =============================================================================
@@ -1422,7 +1436,7 @@ class RedispatchRLStrategy(RLStrategy):
         # =============================================================================
         # actions are in the range [-1,1], we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
-        bid_price = actions * self.max_bid_price
+        bid_price = (actions * self.max_bid_price)[0]
 
         # actually formulate bids in orderbook format
         bids = [
