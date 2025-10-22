@@ -189,7 +189,7 @@ class Learning(Role):
         """
         Set up the learning role for reinforcement learning training.
 
-        Notes:
+        Note:
             This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
             for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
         """
@@ -315,7 +315,7 @@ class Learning(Role):
         the number of episodes completed is greater than the number of episodes required for initial experience collection. If so,
         it triggers the policy update process by calling the `update_policy` method of the associated reinforcement learning algorithm.
 
-        Notes:
+        Note:
             This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
         if self.episodes_done >= self.episodes_collecting_initial_experience:
@@ -337,7 +337,7 @@ class Learning(Role):
         Returns:
             bool: True if early stopping criteria is triggered.
 
-        Notes:
+        Note:
             This method is typically used during the evaluation phase to save policies that achieve superior performance.
             Currently the best evaluation metric is still assessed by the development team and preliminary we use the average rewards.
         """

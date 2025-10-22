@@ -13,7 +13,6 @@ import pandas as pd
 from dateutil import rrule as rr
 
 from assume import World
-from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
@@ -32,7 +31,8 @@ def load_oeds(
     bidding_strategies: dict[str, str],
     nuts_config: list[str] = [],
     random=True,
-    entsoe_demand=True,
+    entsoe_demand=False,
+    use_offshore=False,
 ):
     """
     This initializes a scenario using the open-energy-data-server
@@ -97,29 +97,30 @@ def load_oeds(
                 fuel_prices[name].reindex(index, method="nearest").values
             )
 
-    offshore_wind = infra_interface.get_offshore_wind_series(start, end)
-    if offshore_wind.max() > 0:
-        world.add_unit_operator("renewables_offshore")
-        world.add_unit(
-            "renewables_off_wind",
-            "power_plant",
-            "renewables_offshore",
-            # the unit_params have no hints
-            {
-                "min_power": 0,
-                "max_power": offshore_wind.max(),
-                "bidding_strategies": bidding_strategies["wind"],
-                "technology": "wind_offshore",
-                "location": (8.18, 54.4),
-                "node": "DEF",
-            },
-            NaiveForecast(
-                index,
-                availability=offshore_wind / offshore_wind.max(),
-                fuel_price=0.2,
-                co2_price=0,
-            ),
-        )
+    if use_offshore:
+        offshore_wind = infra_interface.get_offshore_wind_series(start, end)
+        if offshore_wind.max() > 0:
+            world.add_unit_operator("renewables_offshore")
+            world.add_unit(
+                "renewables_off_wind",
+                "power_plant",
+                "renewables_offshore",
+                # the unit_params have no hints
+                {
+                    "min_power": 0,
+                    "max_power": offshore_wind.max(),
+                    "bidding_strategies": bidding_strategies["wind"],
+                    "technology": "wind_offshore",
+                    "location": (8.18, 54.4),
+                    "node": "DEF",
+                },
+                NaiveForecast(
+                    index,
+                    availability=offshore_wind / offshore_wind.max(),
+                    fuel_price=0.2,
+                    co2_price=0,
+                ),
+            )
 
     # total german demand if area is not set
     if entsoe_demand:
@@ -329,7 +330,7 @@ def load_oeds(
 
                 availability = 1
                 if plant["endDate"] < end:
-                    availability = FastSeries(index, 1)
+                    availability = pd.Series(index=index, data=1)
                     availability[availability.index > end] = 0
 
                 world.add_unit(
@@ -371,14 +372,21 @@ if __name__ == "__main__":
 
     # default_nuts_config = "DE1"
     default_nuts_config = "DE1, DEA, DEB, DEC, DED, DEE, DEF"
-    nuts_config = os.getenv("NUTS_CONFIG", default_nuts_config).split(",")
-    nuts_config = [n.strip() for n in nuts_config]
-    nuts_config = "nuts3"
+    default_nuts_config = "nuts3"
+
+    nuts_config = os.getenv("NUTS_CONFIG", default_nuts_config)
+    if "nuts" not in nuts_config:
+        nuts_config = [n.strip() for n in nuts_config.split(",")]
+
     year = 2024
-    random = True
+    random = False
+    entsoe = False
     type = "random" if random else "static"
     if isinstance(nuts_config, str):
         study_case = f"{nuts_config}_{type}_{year}"
+        entsoe = True
+    elif len(nuts_config) == 1:
+        study_case = f"{nuts_config[0]}_{type}_{year}"
     else:
         study_case = f"custom_{type}_{year}"
     start = datetime(year, 1, 1)
@@ -422,6 +430,8 @@ if __name__ == "__main__":
         marketdesign,
         bidding_strategies,
         nuts_config,
+        entsoe_demand=entsoe,
+        use_offshore=entsoe,
     )
 
     world.run()

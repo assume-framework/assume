@@ -153,7 +153,7 @@ def load_dsm_units(
     handle different technologies, and organizes the data into a structured DataFrame. It then splits the DataFrame
     based on unique unit_types.
 
-    Parameters:
+    Args:
         path (str): The directory path where the CSV file is located.
         config (dict): Configuration dictionary, potentially used for specifying additional options or behaviors
                        (not used in the current implementation but provides flexibility for future enhancements).
@@ -163,7 +163,7 @@ def load_dsm_units(
         dict: A dictionary where each key is a unique unit_type and the value is a DataFrame containing
               the corresponding DSM units of that type.
 
-    Notes:
+    Note:
         - The CSV file is expected to have columns such as 'name', 'technology', 'unit_type', and other operational parameters.
         - The function assumes that the first non-null value in common and bidding columns is representative if multiple
           entries exist for the same plant.
@@ -852,7 +852,7 @@ def load_scenario_folder(
     Raises:
         ValueError: If the specified scenario or study case is not found in the provided inputs.
 
-    Notes:
+    Note:
         - The function sets up the world environment based on the provided inputs and configuration files.
         - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
         - After calling this function, the world environment is prepared for further simulation and analysis.
@@ -894,7 +894,7 @@ def load_custom_units(
             unit_type="custom_type"
         )
 
-    Notes:
+    Note:
         - The function loads custom units from the specified file within the given scenario and adds them to the world environment for simulation.
         - If the specified custom units file is not found, a warning is logged.
         - Each unique unit operator in the custom units is added to the world's unit operators.
