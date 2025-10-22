@@ -1083,6 +1083,9 @@ def run_learning(
 
             world.learning_role.tensor_board_logger.update_tensorboard()
 
+            if not world.db_uri:
+                raise AssumeException("No learning rewards as no database was given")
+
             total_rewards = world.output_role.get_sum_reward(episode=eval_episode)
 
             if len(total_rewards) == 0:
