@@ -633,5 +633,5 @@ P100000125763,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,,,Heidel
 P100000125764,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,,,Portlandzementwerk Wittekind Hugo Miebach Soehne KG,way/97825259-380
 P100000125776,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,,,Spenner GmbH & Co KG,way/97857512-220
 P100000125770,inflex_demand,naive_eom,fixed_dispatch_strategy,1000000,0,,,Heidelberg Materials AG,way/979801144-380
-demand_CRM_pos,reserve_capacity,,,1000000,0,naive_eom,,crm_de,way/97857512-220
-demand_CRM_neg,reserve_capacity,,,1000000,0,,naive_eom,crm_de,way/979801144-380
+demand_CRM_pos,reserve_capacity,,,1000000,0,naive_eom,,crm_de,
+demand_CRM_neg,reserve_capacity,,,1000000,0,,naive_eom,crm_de,
