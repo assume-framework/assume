@@ -459,449 +459,6 @@ class CementPlant(DSMFlex, SupportsMinMax):
 
         return marginal_cost
     
-    def _add_reserve_capacity_market_threshold_guardrail(self, model):
-        """
-        Reserve capacity market with threshold/guardrail strategy (cement variant).
-        Mirrors steam plant logic but builds headroom/footroom from cement blocks:
-        - calciner, kiln (only if electrically heated in the chosen config),
-            electrolyser, cement mill, TES heater (power_in).
-        One 4h-block product per block: FCR (symmetric) OR aFRR (up XOR down).
-        Block is ineligible if ANY hour in it has el-price <= threshold.
-
-        Revenue (block-based) is added as Expression: m.reserve_revenue.
-        If self.objective == 'max_net_income', your objective should already
-        be using reserve_revenue - sum(variable_cost[t]).
-        """
-        import math
-
-        m = model
-
-        # ---------------- helpers ----------------
-        def _as_float_list(x, N):
-            if x is None: return [0.0] * N
-            v = [float(xx) for xx in x]
-            if len(v) < N: v = v + [v[-1]] * (N - len(v))
-            elif len(v) > N: v = v[:N]
-            return v
-
-        def _hourly_to_block_sum(hourly, starts, L):
-            ps = [0.0]
-            for x in hourly: ps.append(ps[-1] + x)
-            return {b: ps[b + L] - ps[b] for b in starts}
-
-        def _safe_getattr(obj, name, default=None):
-            return getattr(obj, name) if hasattr(obj, name) else default
-
-        enable_fcr  = bool(getattr(self, "enable_fcr", True))
-        enable_afrr = bool(getattr(self, "enable_afrr", True))
-
-        L       = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))   # hours per block
-        step    = float(getattr(self, "_FCR_STEP_MW", 1.0))    # MW granularity
-        min_bid = float(getattr(self, "_FCR_MIN_BID_MW", 1.0)) # MW minimum bid
-
-        price_threshold = float(getattr(self, "reserve_price_threshold", 0.0))  # €/MWh_e
-
-        # ---------------- time base & 4h blocks ----------------
-        ts = self.index                       # pandas.DatetimeIndex aligned to m.time_steps
-        Tn = len(ts)
-        starts = [i for i, t in enumerate(ts[: -L + 1]) if (t.hour % 4 == 0 and t.minute == 0)]
-        starts = [i for i in starts if i + L <= Tn]
-        m.fcr_blocks = pyo.Set(initialize=starts, ordered=True)
-
-        # ---------------- price series (hourly) ----------------
-        if hasattr(m, "electricity_price"):
-            el_price_hour = [float(m.electricity_price[t]) for t in m.time_steps]
-        else:
-            el_price_hour = _as_float_list(_safe_getattr(self, "electricity_price", None), Tn)
-
-        price_fcr_hour = _as_float_list(_safe_getattr(self, "fcr_price", None), Tn)         # €/MW/h
-        price_pos_hour = _as_float_list(_safe_getattr(self, "afrr_price_pos", None), Tn)    # €/MW/h
-        price_neg_hour = _as_float_list(_safe_getattr(self, "afrr_price_neg", None), Tn)    # €/MW/h
-
-        # block-summed (€/MW per 4h block)
-        fcr_block_price = (_hourly_to_block_sum(price_fcr_hour, starts, L) if enable_fcr else {b:0.0 for b in starts})
-        pos_block_price = (_hourly_to_block_sum(price_pos_hour, starts, L) if enable_afrr else {b:0.0 for b in starts})
-        neg_block_price = (_hourly_to_block_sum(price_neg_hour, starts, L) if enable_afrr else {b:0.0 for b in starts})
-
-        m.fcr_block_price       = pyo.Param(m.fcr_blocks, initialize=fcr_block_price, mutable=False)
-        m.afrr_block_price_pos  = pyo.Param(m.fcr_blocks, initialize=pos_block_price, mutable=False)
-        m.afrr_block_price_neg  = pyo.Param(m.fcr_blocks, initialize=neg_block_price, mutable=False)
-
-        # ---------------- eligibility (guardrail) ----------------
-        eligible = {}
-        for b in starts:
-            ok = all(el_price_hour[t] > price_threshold for t in range(b, b + L))
-            eligible[b] = 1 if ok else 0
-        m.block_eligible = pyo.Param(m.fcr_blocks, initialize=eligible, within=pyo.Boolean, mutable=False)
-
-        # ---------------- capacity envelope (cement electric head/foot room) ----------------
-        # If not provided by user, compute from present electric blocks and their caps.
-        max_cap = float(getattr(self, "max_plant_capacity", 0.0))
-        min_cap = float(getattr(self, "min_plant_capacity", 0.0))
-
-        if (max_cap <= 0.0) and hasattr(m, "dsm_blocks"):
-            B = m.dsm_blocks  # IndexedBlock
-            # helper to add caps if block exists and is electrically driven
-            def _add_block(name):
-                nonlocal max_cap, min_cap
-                if name in B:
-                    blk = B[name]
-                    # Treat as electric if it has a 'max_power' attribute;
-                    # for kiln/calciner we check fuel_type on the component if present.
-                    is_electric = True
-                    if name in ("calciner", "kiln") and hasattr(self, "components") and name in self.components:
-                        is_electric = (getattr(self.components[name], "fuel_type", None) == "electricity")
-                    if hasattr(blk, "max_power") and is_electric:
-                        max_cap += float(blk.max_power)
-                        if hasattr(blk, "min_power"):
-                            min_cap += float(blk.min_power)
-
-            _add_block("calciner")
-            _add_block("kiln")
-            _add_block("electrolyser")
-            _add_block("cement_mill")
-            _add_block("thermal_storage")   # heater capacity if your TES supports electric charging
-
-        # Persist for transparency
-        self.max_plant_capacity = max_cap
-        self.min_plant_capacity = min_cap
-
-        # ---------------- total electric load per hour (for feasibility) ----------------
-        # If user/model already defined it, reuse. Else build an Expression that sums 'power_in'
-        # of relevant electric blocks + optional grid import.
-        if not hasattr(m, "total_power_input"):
-            def _total_P_rule(mm, t):
-                P = 0.0
-                if hasattr(mm, "dsm_blocks"):
-                    B = mm.dsm_blocks
-                    # sum electric 'power_in' if block present AND electric in current config
-                    if "calciner" in B and getattr(self.components.get("calciner", object()), "fuel_type", None) == "electricity":
-                        P += B["calciner"].power_in[t]
-                    if "kiln" in B and getattr(self.components.get("kiln", object()), "fuel_type", None) == "electricity":
-                        P += B["kiln"].power_in[t]
-                    if "electrolyser" in B and hasattr(B["electrolyser"], "power_in"):
-                        P += B["electrolyser"].power_in[t]
-                    if "cement_mill" in B and hasattr(B["cement_mill"], "power_in"):
-                        P += B["cement_mill"].power_in[t]
-                    if "thermal_storage" in B and hasattr(B["thermal_storage"], "power_in"):
-                        P += B["thermal_storage"].power_in[t]
-                # Add grid import if modeled explicitly (kept positive as import)
-                if hasattr(mm, "grid_power"):
-                    P += mm.grid_power[t]
-                return P
-            m.total_power_input = pyo.Expression(m.time_steps, rule=_total_P_rule)
-
-        # ---------------- decision variables (integerized steps + binaries) ----------------
-        M_blocks = int(math.ceil(max(1.0, max_cap) / step)) if step > 0 else 0
-
-        # FCR symmetric
-        m.k_sym  = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
-        m.cap_sym= pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
-        m.bid_sym= pyo.Var(m.fcr_blocks, within=pyo.Binary)
-
-        # aFRR up/down (asymmetric)
-        m.k_up   = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
-        m.k_dn   = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
-        m.cap_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
-        m.cap_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
-        m.bid_up = pyo.Var(m.fcr_blocks, within=pyo.Binary)
-        m.bid_dn = pyo.Var(m.fcr_blocks, within=pyo.Binary)
-
-        # step mapping and min-bid
-        @m.Constraint(m.fcr_blocks)
-        def step_sym(mm, b): return mm.cap_sym[b] == step * mm.k_sym[b]
-        @m.Constraint(m.fcr_blocks)
-        def step_up(mm, b):  return mm.cap_up[b] == step * mm.k_up[b]
-        @m.Constraint(m.fcr_blocks)
-        def step_dn(mm, b):  return mm.cap_dn[b] == step * mm.k_dn[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def min_sym(mm, b):  return mm.cap_sym[b] >= min_bid * mm.bid_sym[b]
-        @m.Constraint(m.fcr_blocks)
-        def min_up(mm, b):   return mm.cap_up[b]  >= min_bid * mm.bid_up[b]
-        @m.Constraint(m.fcr_blocks)
-        def min_dn(mm, b):   return mm.cap_dn[b]  >= min_bid * mm.bid_dn[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def act_sym(mm, b):  return mm.k_sym[b] <= M_blocks * mm.bid_sym[b]
-        @m.Constraint(m.fcr_blocks)
-        def act_up(mm, b):   return mm.k_up[b]  <= M_blocks * mm.bid_up[b]
-        @m.Constraint(m.fcr_blocks)
-        def act_dn(mm, b):   return mm.k_dn[b]  <= M_blocks * mm.bid_dn[b]
-
-        # mutual exclusivity (one product per block; aFRR only one side)
-        @m.Constraint(m.fcr_blocks)
-        def one_product(mm, b):   return mm.bid_sym[b] + mm.bid_up[b] + mm.bid_dn[b] <= 1
-        @m.Constraint(m.fcr_blocks)
-        def afrr_one_side(mm, b): return mm.bid_up[b] + mm.bid_dn[b] <= 1
-
-        # disable by flags
-        if not enable_fcr:
-            @m.Constraint(m.fcr_blocks)
-            def no_fcr(mm, b): return mm.bid_sym[b] == 0
-        if not enable_afrr:
-            @m.Constraint(m.fcr_blocks)
-            def no_afrr_up(mm, b): return mm.bid_up[b] == 0
-            @m.Constraint(m.fcr_blocks)
-            def no_afrr_dn(mm, b): return mm.bid_dn[b] == 0
-
-        # block eligibility via threshold guardrail
-        @m.Constraint(m.fcr_blocks)
-        def eligible_sym(mm, b): return mm.cap_sym[b] <= max_cap * m.block_eligible[b]
-        @m.Constraint(m.fcr_blocks)
-        def eligible_up(mm, b):  return mm.cap_up[b]  <= max_cap * m.block_eligible[b]
-        @m.Constraint(m.fcr_blocks)
-        def eligible_dn(mm, b):  return mm.cap_dn[b]  <= max_cap * m.block_eligible[b]
-
-        # feasibility inside each block hour (headroom/footroom)
-        m.fcr_up_feas  = pyo.ConstraintList()
-        m.fcr_down_feas= pyo.ConstraintList()
-        m.fcr_sym_feas = pyo.ConstraintList()
-        for b in starts:
-            for k in range(L):
-                t = b + k
-                m.fcr_up_feas.add(  m.cap_up[b]  <= (max_cap - m.total_power_input[t]) )
-                m.fcr_down_feas.add(m.cap_dn[b]  <= (m.total_power_input[t] - min_cap) )
-                # symmetric must satisfy both
-                m.fcr_sym_feas.add(m.cap_sym[b] <= (max_cap - m.total_power_input[t]))
-                m.fcr_sym_feas.add(m.cap_sym[b] <= (m.total_power_input[t] - min_cap))
-
-        # ---------------- revenue expression (block-based) ----------------
-        @m.Expression()
-        def reserve_revenue(mm):
-            return (
-                sum(mm.fcr_block_price[b]      * mm.cap_sym[b] for b in mm.fcr_blocks)
-            + sum(mm.afrr_block_price_pos[b] * mm.cap_up[b]  for b in mm.fcr_blocks)
-            + sum(mm.afrr_block_price_neg[b] * mm.cap_dn[b]  for b in mm.fcr_blocks)
-            )
-
-        # ---------------- hourly variable cost (linear Expression) ----------------
-        # Reuse if it already exists; otherwise build a minimal one.
-        if not hasattr(m, "variable_cost"):
-            def _pE(mm, t):
-                return mm.electricity_price[t] if hasattr(mm, "electricity_price") else el_price_hour[int(t)]
-            def _vc_rule(mm, t):
-                cost = 0.0
-                if hasattr(mm, "grid_power"): cost += _pE(mm, t) * mm.grid_power[t]
-                if hasattr(mm, "dsm_blocks"):
-                    B = mm.dsm_blocks
-                    for name in ("calciner","kiln","electrolyser","cement_mill","thermal_storage"):
-                        if name in B and hasattr(B[name], "operating_cost"):
-                            cost += B[name].operating_cost[t]
-                return cost
-            m.variable_cost = pyo.Expression(m.time_steps, rule=_vc_rule)
-
-        # Optional: block-sum variable cost (handy for diagnostics)
-        def _blk_cost(mm, b):
-            return sum(mm.variable_cost[t] for t in mm.time_steps if (t >= b and t < b + L))
-        m.block_var_cost = pyo.Expression(m.fcr_blocks, rule=_blk_cost)
-
-    def _reserve_series(self, instance, T, block_len):
-        """
-        Build a compact, strategy-agnostic data bundle for reserve analytics.
-
-        Returns a dict with:
-        blocks               : list[int] block starts (model indices)
-        cap_sym/cap_up/cap_dn: per-block capacities [MW] aligned to `blocks`
-        price_sym/pos/neg    : per-block prices [€/MW·block] aligned to `blocks`
-        chosen               : dict {block_start -> "FCR" | "UP" | "DN" | "NONE"}
-        sym_stairs/up_stairs/dn_stairs : hourly capacity stairs (raw, not masked)
-        stairs_price_sym/pos/neg       : hourly price stairs (or None)
-        mask_sym/mask_up/mask_dn       : hourly stairs masked by awarded product only
-        """
-
-        # ---------- helpers ----------
-        def s(v):
-            try:
-                return float(pyo.value(v))
-            except Exception:
-                return float(v) if v is not None else 0.0
-
-        def pull_map(pyobj, keys):
-            """Read a Pyomo Var/Param into a {key -> float} dict for given keys."""
-            if pyobj is None:
-                return {}
-            d = {}
-            for k in keys:
-                d[k] = s(pyobj[k])
-            return d
-
-        def stairs(blocks, block_map, L, H):
-            """Expand per-block constant value into an hourly stair vector of length H."""
-            if not block_map:
-                return [0.0] * H
-            y = [0.0] * H
-            for b in blocks:
-                val = float(block_map.get(b, 0.0))
-                for k in range(L):
-                    t = b + k
-                    if 0 <= t < H:
-                        y[t] = val
-            return y
-
-        # ---------- inputs from model / instance ----------
-        H = len(T)
-        # Block index set
-        blocks = list(getattr(instance, "fcr_blocks", []))
-        if not blocks:
-            # Nothing to show
-            zero = [0.0] * H
-            return {
-                "blocks": [],
-                "cap_sym": [],
-                "cap_up": [],
-                "cap_dn": [],
-                "price_sym": [],
-                "price_pos": [],
-                "price_neg": [],
-                "chosen": {},
-                "sym_stairs": zero,
-                "up_stairs": zero,
-                "dn_stairs": zero,
-                "stairs_price_sym": None,
-                "stairs_price_pos": None,
-                "stairs_price_neg": None,
-                "mask_sym": zero,
-                "mask_up": zero,
-                "mask_dn": zero,
-            }
-
-        # Per-block capacities (your model uses cap_up, cap_dn; symmetric product is represented by cap_up==cap_dn)
-        cap_up_map = pull_map(getattr(instance, "cap_up", None), blocks)
-        cap_dn_map = pull_map(getattr(instance, "cap_dn", None), blocks)
-        # For convenience, define "sym" per block as min(up, dn) — that’s the feasible symmetric MW
-        # If you have a dedicated symmetric var, you could switch to that; this is robust.
-        cap_sym_map = {
-            b: min(cap_up_map.get(b, 0.0), cap_dn_map.get(b, 0.0)) for b in blocks
-        }
-
-        # Per-block prices (€/MW·block = sum of hourly €/MW/h over the block)
-        price_sym_map = pull_map(
-            getattr(instance, "fcr_block_price", None), blocks
-        )  # FCR
-        price_pos_map = pull_map(
-            getattr(instance, "afrr_block_price_pos", None), blocks
-        )  # aFRR+
-        price_neg_map = pull_map(
-            getattr(instance, "afrr_block_price_neg", None), blocks
-        )  # aFRR−
-
-        # Optional: bid-award binaries for clarity of "chosen" product if present
-        bid_sym_v = getattr(instance, "bid_sym", None)
-        bid_up_v = getattr(instance, "bid_up", None)
-        bid_dn_v = getattr(instance, "bid_dn", None)
-
-        # ---------- chosen product per block ----------
-        chosen = {}
-        for b in blocks:
-            # Prefer explicit binaries if available
-            y_sym = int(round(s(bid_sym_v[b]))) if bid_sym_v is not None else None
-            y_up = int(round(s(bid_up_v[b]))) if bid_up_v is not None else None
-            y_dn = int(round(s(bid_dn_v[b]))) if bid_dn_v is not None else None
-
-            if y_sym is not None or y_up is not None or y_dn is not None:
-                if y_sym == 1:
-                    chosen[b] = "FCR"
-                elif y_up == 1:
-                    chosen[b] = "UP"
-                elif y_dn == 1:
-                    chosen[b] = "DN"
-                else:
-                    chosen[b] = "NONE"
-            else:
-                # Fallback: infer from capacities/prices (award only one side if multiple > 0)
-                cu, cd, cs = (
-                    cap_up_map.get(b, 0.0),
-                    cap_dn_map.get(b, 0.0),
-                    cap_sym_map.get(b, 0.0),
-                )
-                pu, pn, ps = (
-                    price_pos_map.get(b, 0.0),
-                    price_neg_map.get(b, 0.0),
-                    price_sym_map.get(b, 0.0),
-                )
-
-                # Use the revenue contributions to decide the single awarded product
-                rev_candidates = [
-                    ("FCR", cs * ps),
-                    ("UP", cu * pu),
-                    ("DN", cd * pn),
-                ]
-                # Pick the product with largest revenue; break ties toward NONE if all zero
-                best = max(rev_candidates, key=lambda x: x[1])
-                chosen[b] = best[0] if best[1] > 1e-9 else "NONE"
-
-        # ---------- per-block arrays (aligned with `blocks`) ----------
-        cap_sym = [cap_sym_map.get(b, 0.0) for b in blocks]
-        cap_up = [cap_up_map.get(b, 0.0) for b in blocks]
-        cap_dn = [cap_dn_map.get(b, 0.0) for b in blocks]
-
-        price_sym = [price_sym_map.get(b, 0.0) for b in blocks]
-        price_pos = [price_pos_map.get(b, 0.0) for b in blocks]
-        price_neg = [price_neg_map.get(b, 0.0) for b in blocks]
-
-        # ---------- hourly stairs (raw totals, not masked) ----------
-        sym_stairs = stairs(blocks, cap_sym_map, block_len, H)
-        up_stairs = stairs(blocks, cap_up_map, block_len, H)
-        dn_stairs = stairs(blocks, cap_dn_map, block_len, H)
-
-        # Hourly price stairs (these are the same price repeated over each hour inside the block)
-        stairs_price_sym = (
-            stairs(blocks, price_sym_map, block_len, H)
-            if any(abs(v) > 1e-12 for v in price_sym)
-            else None
-        )
-        stairs_price_pos = (
-            stairs(blocks, price_pos_map, block_len, H)
-            if any(abs(v) > 1e-12 for v in price_pos)
-            else None
-        )
-        stairs_price_neg = (
-            stairs(blocks, price_neg_map, block_len, H)
-            if any(abs(v) > 1e-12 for v in price_neg)
-            else None
-        )
-
-        # ---------- hourly masks (only the awarded product per hour is kept) ----------
-        mask_sym = [0.0] * H
-        mask_up = [0.0] * H
-        mask_dn = [0.0] * H
-        for b in blocks:
-            lab = chosen.get(b, "NONE")
-            cS = cap_sym_map.get(b, 0.0)
-            cU = cap_up_map.get(b, 0.0)
-            cD = cap_dn_map.get(b, 0.0)
-            for k in range(block_len):
-                t = b + k
-                if 0 <= t < H:
-                    if lab == "FCR":
-                        mask_sym[t] = cS
-                    elif lab == "UP":
-                        mask_up[t] = cU
-                    elif lab == "DN":
-                        mask_dn[t] = cD
-                    # "NONE": leave zeros
-
-        return {
-            "blocks": blocks,
-            "cap_sym": cap_sym,
-            "cap_up": cap_up,
-            "cap_dn": cap_dn,
-            "price_sym": price_sym,
-            "price_pos": price_pos,
-            "price_neg": price_neg,
-            "chosen": chosen,
-            "sym_stairs": sym_stairs,
-            "up_stairs": up_stairs,
-            "dn_stairs": dn_stairs,
-            "stairs_price_sym": stairs_price_sym,
-            "stairs_price_pos": stairs_price_pos,
-            "stairs_price_neg": stairs_price_neg,
-            "mask_sym": mask_sym,
-            "mask_up": mask_up,
-            "mask_dn": mask_dn,
-        }
-    
     def dashboard_cement(
             self,
             instance,
@@ -2068,3 +1625,636 @@ class CementPlant(DSMFlex, SupportsMinMax):
         if show:
             plt.show()
         plt.close(fig)
+
+    ###### additional fucntions ######
+
+    def _add_reserve_capacity_market_threshold_guardrail(self, model):
+        """
+        Reserve capacity market with threshold/guardrail strategy (cement variant).
+        Mirrors steam plant logic but builds headroom/footroom from cement blocks:
+        - calciner, kiln (only if electrically heated in the chosen config),
+            electrolyser, cement mill, TES heater (power_in).
+        One 4h-block product per block: FCR (symmetric) OR aFRR (up XOR down).
+        Block is ineligible if ANY hour in it has el-price <= threshold.
+
+        Revenue (block-based) is added as Expression: m.reserve_revenue.
+        If self.objective == 'max_net_income', your objective should already
+        be using reserve_revenue - sum(variable_cost[t]).
+        """
+        import math
+
+        m = model
+
+        # ---------------- helpers ----------------
+        def _as_float_list(x, N):
+            if x is None: return [0.0] * N
+            v = [float(xx) for xx in x]
+            if len(v) < N: v = v + [v[-1]] * (N - len(v))
+            elif len(v) > N: v = v[:N]
+            return v
+
+        def _hourly_to_block_sum(hourly, starts, L):
+            ps = [0.0]
+            for x in hourly: ps.append(ps[-1] + x)
+            return {b: ps[b + L] - ps[b] for b in starts}
+
+        def _safe_getattr(obj, name, default=None):
+            return getattr(obj, name) if hasattr(obj, name) else default
+
+        enable_fcr  = bool(getattr(self, "enable_fcr", True))
+        enable_afrr = bool(getattr(self, "enable_afrr", True))
+
+        L       = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))   # hours per block
+        step    = float(getattr(self, "_FCR_STEP_MW", 1.0))    # MW granularity
+        min_bid = float(getattr(self, "_FCR_MIN_BID_MW", 1.0)) # MW minimum bid
+
+        price_threshold = float(getattr(self, "reserve_price_threshold", 0.0))  # €/MWh_e
+
+        # ---------------- time base & 4h blocks ----------------
+        ts = self.index                       # pandas.DatetimeIndex aligned to m.time_steps
+        Tn = len(ts)
+        starts = [i for i, t in enumerate(ts[: -L + 1]) if (t.hour % 4 == 0 and t.minute == 0)]
+        starts = [i for i in starts if i + L <= Tn]
+        m.fcr_blocks = pyo.Set(initialize=starts, ordered=True)
+
+        # ---------------- price series (hourly) ----------------
+        if hasattr(m, "electricity_price"):
+            el_price_hour = [float(m.electricity_price[t]) for t in m.time_steps]
+        else:
+            el_price_hour = _as_float_list(_safe_getattr(self, "electricity_price", None), Tn)
+
+        price_fcr_hour = _as_float_list(_safe_getattr(self, "fcr_price", None), Tn)         # €/MW/h
+        price_pos_hour = _as_float_list(_safe_getattr(self, "afrr_price_pos", None), Tn)    # €/MW/h
+        price_neg_hour = _as_float_list(_safe_getattr(self, "afrr_price_neg", None), Tn)    # €/MW/h
+
+        # block-summed (€/MW per 4h block)
+        fcr_block_price = (_hourly_to_block_sum(price_fcr_hour, starts, L) if enable_fcr else {b:0.0 for b in starts})
+        pos_block_price = (_hourly_to_block_sum(price_pos_hour, starts, L) if enable_afrr else {b:0.0 for b in starts})
+        neg_block_price = (_hourly_to_block_sum(price_neg_hour, starts, L) if enable_afrr else {b:0.0 for b in starts})
+
+        m.fcr_block_price       = pyo.Param(m.fcr_blocks, initialize=fcr_block_price, mutable=False)
+        m.afrr_block_price_pos  = pyo.Param(m.fcr_blocks, initialize=pos_block_price, mutable=False)
+        m.afrr_block_price_neg  = pyo.Param(m.fcr_blocks, initialize=neg_block_price, mutable=False)
+
+        # ---------------- eligibility (guardrail) ----------------
+        eligible = {}
+        for b in starts:
+            ok = all(el_price_hour[t] > price_threshold for t in range(b, b + L))
+            eligible[b] = 1 if ok else 0
+        m.block_eligible = pyo.Param(m.fcr_blocks, initialize=eligible, within=pyo.Boolean, mutable=False)
+
+        # ---------------- capacity envelope (cement electric head/foot room) ----------------
+        # If not provided by user, compute from present electric blocks and their caps.
+        max_cap = float(getattr(self, "max_plant_capacity", 0.0))
+        min_cap = float(getattr(self, "min_plant_capacity", 0.0))
+
+        if (max_cap <= 0.0) and hasattr(m, "dsm_blocks"):
+            B = m.dsm_blocks  # IndexedBlock
+            # helper to add caps if block exists and is electrically driven
+            def _add_block(name):
+                nonlocal max_cap, min_cap
+                if name in B:
+                    blk = B[name]
+                    # Treat as electric if it has a 'max_power' attribute;
+                    # for kiln/calciner we check fuel_type on the component if present.
+                    is_electric = True
+                    if name in ("calciner", "kiln") and hasattr(self, "components") and name in self.components:
+                        is_electric = (getattr(self.components[name], "fuel_type", None) == "electricity")
+                    if hasattr(blk, "max_power") and is_electric:
+                        max_cap += float(blk.max_power)
+                        if hasattr(blk, "min_power"):
+                            min_cap += float(blk.min_power)
+
+            _add_block("calciner")
+            _add_block("kiln")
+            _add_block("electrolyser")
+            _add_block("cement_mill")
+            _add_block("thermal_storage")   # heater capacity if your TES supports electric charging
+
+        # Persist for transparency
+        self.max_plant_capacity = max_cap
+        self.min_plant_capacity = min_cap
+
+        # ---------------- total electric load per hour (for feasibility) ----------------
+        # If user/model already defined it, reuse. Else build an Expression that sums 'power_in'
+        # of relevant electric blocks + optional grid import.
+        if not hasattr(m, "total_power_input"):
+            def _total_P_rule(mm, t):
+                P = 0.0
+                if hasattr(mm, "dsm_blocks"):
+                    B = mm.dsm_blocks
+                    # sum electric 'power_in' if block present AND electric in current config
+                    if "calciner" in B and getattr(self.components.get("calciner", object()), "fuel_type", None) == "electricity":
+                        P += B["calciner"].power_in[t]
+                    if "kiln" in B and getattr(self.components.get("kiln", object()), "fuel_type", None) == "electricity":
+                        P += B["kiln"].power_in[t]
+                    if "electrolyser" in B and hasattr(B["electrolyser"], "power_in"):
+                        P += B["electrolyser"].power_in[t]
+                    if "cement_mill" in B and hasattr(B["cement_mill"], "power_in"):
+                        P += B["cement_mill"].power_in[t]
+                    if "thermal_storage" in B and hasattr(B["thermal_storage"], "power_in"):
+                        P += B["thermal_storage"].power_in[t]
+                # Add grid import if modeled explicitly (kept positive as import)
+                if hasattr(mm, "grid_power"):
+                    P += mm.grid_power[t]
+                return P
+            m.total_power_input = pyo.Expression(m.time_steps, rule=_total_P_rule)
+
+        # ---------------- decision variables (integerized steps + binaries) ----------------
+        M_blocks = int(math.ceil(max(1.0, max_cap) / step)) if step > 0 else 0
+
+        # FCR symmetric
+        m.k_sym  = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.cap_sym= pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.bid_sym= pyo.Var(m.fcr_blocks, within=pyo.Binary)
+
+        # aFRR up/down (asymmetric)
+        m.k_up   = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.k_dn   = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.cap_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.cap_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.bid_up = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+        m.bid_dn = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+
+        # step mapping and min-bid
+        @m.Constraint(m.fcr_blocks)
+        def step_sym(mm, b): return mm.cap_sym[b] == step * mm.k_sym[b]
+        @m.Constraint(m.fcr_blocks)
+        def step_up(mm, b):  return mm.cap_up[b] == step * mm.k_up[b]
+        @m.Constraint(m.fcr_blocks)
+        def step_dn(mm, b):  return mm.cap_dn[b] == step * mm.k_dn[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def min_sym(mm, b):  return mm.cap_sym[b] >= min_bid * mm.bid_sym[b]
+        @m.Constraint(m.fcr_blocks)
+        def min_up(mm, b):   return mm.cap_up[b]  >= min_bid * mm.bid_up[b]
+        @m.Constraint(m.fcr_blocks)
+        def min_dn(mm, b):   return mm.cap_dn[b]  >= min_bid * mm.bid_dn[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def act_sym(mm, b):  return mm.k_sym[b] <= M_blocks * mm.bid_sym[b]
+        @m.Constraint(m.fcr_blocks)
+        def act_up(mm, b):   return mm.k_up[b]  <= M_blocks * mm.bid_up[b]
+        @m.Constraint(m.fcr_blocks)
+        def act_dn(mm, b):   return mm.k_dn[b]  <= M_blocks * mm.bid_dn[b]
+
+        # mutual exclusivity (one product per block; aFRR only one side)
+        @m.Constraint(m.fcr_blocks)
+        def one_product(mm, b):   return mm.bid_sym[b] + mm.bid_up[b] + mm.bid_dn[b] <= 1
+        @m.Constraint(m.fcr_blocks)
+        def afrr_one_side(mm, b): return mm.bid_up[b] + mm.bid_dn[b] <= 1
+
+        # disable by flags
+        if not enable_fcr:
+            @m.Constraint(m.fcr_blocks)
+            def no_fcr(mm, b): return mm.bid_sym[b] == 0
+        if not enable_afrr:
+            @m.Constraint(m.fcr_blocks)
+            def no_afrr_up(mm, b): return mm.bid_up[b] == 0
+            @m.Constraint(m.fcr_blocks)
+            def no_afrr_dn(mm, b): return mm.bid_dn[b] == 0
+
+        # block eligibility via threshold guardrail
+        @m.Constraint(m.fcr_blocks)
+        def eligible_sym(mm, b): return mm.cap_sym[b] <= max_cap * m.block_eligible[b]
+        @m.Constraint(m.fcr_blocks)
+        def eligible_up(mm, b):  return mm.cap_up[b]  <= max_cap * m.block_eligible[b]
+        @m.Constraint(m.fcr_blocks)
+        def eligible_dn(mm, b):  return mm.cap_dn[b]  <= max_cap * m.block_eligible[b]
+
+        # feasibility inside each block hour (headroom/footroom)
+        m.fcr_up_feas  = pyo.ConstraintList()
+        m.fcr_down_feas= pyo.ConstraintList()
+        m.fcr_sym_feas = pyo.ConstraintList()
+        for b in starts:
+            for k in range(L):
+                t = b + k
+                m.fcr_up_feas.add(  m.cap_up[b]  <= (max_cap - m.total_power_input[t]) )
+                m.fcr_down_feas.add(m.cap_dn[b]  <= (m.total_power_input[t] - min_cap) )
+                # symmetric must satisfy both
+                m.fcr_sym_feas.add(m.cap_sym[b] <= (max_cap - m.total_power_input[t]))
+                m.fcr_sym_feas.add(m.cap_sym[b] <= (m.total_power_input[t] - min_cap))
+
+        # ---------------- revenue expression (block-based) ----------------
+        @m.Expression()
+        def reserve_revenue(mm):
+            return (
+                sum(mm.fcr_block_price[b]      * mm.cap_sym[b] for b in mm.fcr_blocks)
+            + sum(mm.afrr_block_price_pos[b] * mm.cap_up[b]  for b in mm.fcr_blocks)
+            + sum(mm.afrr_block_price_neg[b] * mm.cap_dn[b]  for b in mm.fcr_blocks)
+            )
+
+        # ---------------- hourly variable cost (linear Expression) ----------------
+        # Reuse if it already exists; otherwise build a minimal one.
+        if not hasattr(m, "variable_cost"):
+            def _pE(mm, t):
+                return mm.electricity_price[t] if hasattr(mm, "electricity_price") else el_price_hour[int(t)]
+            def _vc_rule(mm, t):
+                cost = 0.0
+                if hasattr(mm, "grid_power"): cost += _pE(mm, t) * mm.grid_power[t]
+                if hasattr(mm, "dsm_blocks"):
+                    B = mm.dsm_blocks
+                    for name in ("calciner","kiln","electrolyser","cement_mill","thermal_storage"):
+                        if name in B and hasattr(B[name], "operating_cost"):
+                            cost += B[name].operating_cost[t]
+                return cost
+            m.variable_cost = pyo.Expression(m.time_steps, rule=_vc_rule)
+
+        # Optional: block-sum variable cost (handy for diagnostics)
+        def _blk_cost(mm, b):
+            return sum(mm.variable_cost[t] for t in mm.time_steps if (t >= b and t < b + L))
+        m.block_var_cost = pyo.Expression(m.fcr_blocks, rule=_blk_cost)
+
+    def _reserve_series(self, instance, T, block_len):
+        """
+        Build a compact, strategy-agnostic data bundle for reserve analytics.
+
+        Returns a dict with:
+        blocks               : list[int] block starts (model indices)
+        cap_sym/cap_up/cap_dn: per-block capacities [MW] aligned to `blocks`
+        price_sym/pos/neg    : per-block prices [€/MW·block] aligned to `blocks`
+        chosen               : dict {block_start -> "FCR" | "UP" | "DN" | "NONE"}
+        sym_stairs/up_stairs/dn_stairs : hourly capacity stairs (raw, not masked)
+        stairs_price_sym/pos/neg       : hourly price stairs (or None)
+        mask_sym/mask_up/mask_dn       : hourly stairs masked by awarded product only
+        """
+
+        # ---------- helpers ----------
+        def s(v):
+            try:
+                return float(pyo.value(v))
+            except Exception:
+                return float(v) if v is not None else 0.0
+
+        def pull_map(pyobj, keys):
+            """Read a Pyomo Var/Param into a {key -> float} dict for given keys."""
+            if pyobj is None:
+                return {}
+            d = {}
+            for k in keys:
+                d[k] = s(pyobj[k])
+            return d
+
+        def stairs(blocks, block_map, L, H):
+            """Expand per-block constant value into an hourly stair vector of length H."""
+            if not block_map:
+                return [0.0] * H
+            y = [0.0] * H
+            for b in blocks:
+                val = float(block_map.get(b, 0.0))
+                for k in range(L):
+                    t = b + k
+                    if 0 <= t < H:
+                        y[t] = val
+            return y
+
+        # ---------- inputs from model / instance ----------
+        H = len(T)
+        # Block index set
+        blocks = list(getattr(instance, "fcr_blocks", []))
+        if not blocks:
+            # Nothing to show
+            zero = [0.0] * H
+            return {
+                "blocks": [],
+                "cap_sym": [],
+                "cap_up": [],
+                "cap_dn": [],
+                "price_sym": [],
+                "price_pos": [],
+                "price_neg": [],
+                "chosen": {},
+                "sym_stairs": zero,
+                "up_stairs": zero,
+                "dn_stairs": zero,
+                "stairs_price_sym": None,
+                "stairs_price_pos": None,
+                "stairs_price_neg": None,
+                "mask_sym": zero,
+                "mask_up": zero,
+                "mask_dn": zero,
+            }
+
+        # Per-block capacities (your model uses cap_up, cap_dn; symmetric product is represented by cap_up==cap_dn)
+        cap_up_map = pull_map(getattr(instance, "cap_up", None), blocks)
+        cap_dn_map = pull_map(getattr(instance, "cap_dn", None), blocks)
+        # For convenience, define "sym" per block as min(up, dn) — that’s the feasible symmetric MW
+        # If you have a dedicated symmetric var, you could switch to that; this is robust.
+        cap_sym_map = {
+            b: min(cap_up_map.get(b, 0.0), cap_dn_map.get(b, 0.0)) for b in blocks
+        }
+
+        # Per-block prices (€/MW·block = sum of hourly €/MW/h over the block)
+        price_sym_map = pull_map(
+            getattr(instance, "fcr_block_price", None), blocks
+        )  # FCR
+        price_pos_map = pull_map(
+            getattr(instance, "afrr_block_price_pos", None), blocks
+        )  # aFRR+
+        price_neg_map = pull_map(
+            getattr(instance, "afrr_block_price_neg", None), blocks
+        )  # aFRR−
+
+        # Optional: bid-award binaries for clarity of "chosen" product if present
+        bid_sym_v = getattr(instance, "bid_sym", None)
+        bid_up_v = getattr(instance, "bid_up", None)
+        bid_dn_v = getattr(instance, "bid_dn", None)
+
+        # ---------- chosen product per block ----------
+        chosen = {}
+        for b in blocks:
+            # Prefer explicit binaries if available
+            y_sym = int(round(s(bid_sym_v[b]))) if bid_sym_v is not None else None
+            y_up = int(round(s(bid_up_v[b]))) if bid_up_v is not None else None
+            y_dn = int(round(s(bid_dn_v[b]))) if bid_dn_v is not None else None
+
+            if y_sym is not None or y_up is not None or y_dn is not None:
+                if y_sym == 1:
+                    chosen[b] = "FCR"
+                elif y_up == 1:
+                    chosen[b] = "UP"
+                elif y_dn == 1:
+                    chosen[b] = "DN"
+                else:
+                    chosen[b] = "NONE"
+            else:
+                # Fallback: infer from capacities/prices (award only one side if multiple > 0)
+                cu, cd, cs = (
+                    cap_up_map.get(b, 0.0),
+                    cap_dn_map.get(b, 0.0),
+                    cap_sym_map.get(b, 0.0),
+                )
+                pu, pn, ps = (
+                    price_pos_map.get(b, 0.0),
+                    price_neg_map.get(b, 0.0),
+                    price_sym_map.get(b, 0.0),
+                )
+
+                # Use the revenue contributions to decide the single awarded product
+                rev_candidates = [
+                    ("FCR", cs * ps),
+                    ("UP", cu * pu),
+                    ("DN", cd * pn),
+                ]
+                # Pick the product with largest revenue; break ties toward NONE if all zero
+                best = max(rev_candidates, key=lambda x: x[1])
+                chosen[b] = best[0] if best[1] > 1e-9 else "NONE"
+
+        # ---------- per-block arrays (aligned with `blocks`) ----------
+        cap_sym = [cap_sym_map.get(b, 0.0) for b in blocks]
+        cap_up = [cap_up_map.get(b, 0.0) for b in blocks]
+        cap_dn = [cap_dn_map.get(b, 0.0) for b in blocks]
+
+        price_sym = [price_sym_map.get(b, 0.0) for b in blocks]
+        price_pos = [price_pos_map.get(b, 0.0) for b in blocks]
+        price_neg = [price_neg_map.get(b, 0.0) for b in blocks]
+
+        # ---------- hourly stairs (raw totals, not masked) ----------
+        sym_stairs = stairs(blocks, cap_sym_map, block_len, H)
+        up_stairs = stairs(blocks, cap_up_map, block_len, H)
+        dn_stairs = stairs(blocks, cap_dn_map, block_len, H)
+
+        # Hourly price stairs (these are the same price repeated over each hour inside the block)
+        stairs_price_sym = (
+            stairs(blocks, price_sym_map, block_len, H)
+            if any(abs(v) > 1e-12 for v in price_sym)
+            else None
+        )
+        stairs_price_pos = (
+            stairs(blocks, price_pos_map, block_len, H)
+            if any(abs(v) > 1e-12 for v in price_pos)
+            else None
+        )
+        stairs_price_neg = (
+            stairs(blocks, price_neg_map, block_len, H)
+            if any(abs(v) > 1e-12 for v in price_neg)
+            else None
+        )
+
+        # ---------- hourly masks (only the awarded product per hour is kept) ----------
+        mask_sym = [0.0] * H
+        mask_up = [0.0] * H
+        mask_dn = [0.0] * H
+        for b in blocks:
+            lab = chosen.get(b, "NONE")
+            cS = cap_sym_map.get(b, 0.0)
+            cU = cap_up_map.get(b, 0.0)
+            cD = cap_dn_map.get(b, 0.0)
+            for k in range(block_len):
+                t = b + k
+                if 0 <= t < H:
+                    if lab == "FCR":
+                        mask_sym[t] = cS
+                    elif lab == "UP":
+                        mask_up[t] = cU
+                    elif lab == "DN":
+                        mask_dn[t] = cD
+                    # "NONE": leave zeros
+
+        return {
+            "blocks": blocks,
+            "cap_sym": cap_sym,
+            "cap_up": cap_up,
+            "cap_dn": cap_dn,
+            "price_sym": price_sym,
+            "price_pos": price_pos,
+            "price_neg": price_neg,
+            "chosen": chosen,
+            "sym_stairs": sym_stairs,
+            "up_stairs": up_stairs,
+            "dn_stairs": dn_stairs,
+            "stairs_price_sym": stairs_price_sym,
+            "stairs_price_pos": stairs_price_pos,
+            "stairs_price_neg": stairs_price_neg,
+            "mask_sym": mask_sym,
+            "mask_up": mask_up,
+            "mask_dn": mask_dn,
+        }
+        
+    def compute_reg_capacity_and_price(self, instance,
+                                   eta_e2h_default=1.0,
+                                   eta_fossil_default=0.90,
+                                   tes_eta_rt=None,
+                                   tes_value_mode="price",  # "price" or "lookahead"
+                                   lookahead_hours=24):
+        """
+        Returns per-hour:
+        - max_up_MW, max_down_MW
+        - price_up_EUR_per_MWhe (marginal of first MW up)
+        - price_down_EUR_per_MWhe (marginal of first MW down)
+        No duals, no re-solves. Builds a merit stack from available levers.
+
+        Assumptions:
+        * For e-calciner/e-kiln, fossil backfill is possible within process bounds (same hour).
+        * TES charging is a curtailable sink; optional look-ahead for its 'value'.
+        * Electrolyser can modulate; optional H2 price to value its output (if present).
+        """
+        import math
+
+        def safe(v):
+            try: return float(pyo.value(v))
+            except Exception:
+                try: return float(v)
+                except Exception: return 0.0
+
+        T = list(instance.time_steps)
+        H = len(T)
+        B = instance.dsm_blocks
+
+        # Grab blocks if they exist
+        ph = B["preheater"] if "preheater" in B else None
+        cc = B["calciner"]  if "calciner"  in B else None
+        rk = B["kiln"]      if "kiln"      in B else None
+        el = B["electrolyser"] if "electrolyser" in B else None
+        ts = B["thermal_storage"] if "thermal_storage" in B else None
+        cm = B["cement_mill"] if "cement_mill" in B else None
+
+        def ser(block, name):
+            if block is None or not hasattr(block, name): return None
+            return [safe(getattr(block, name)[t]) for t in T]
+
+        # Prices (defaults to 0 if missing)
+        pE  = [safe(instance.electricity_price[t]) for t in T] if hasattr(instance,"electricity_price") else [0.0]*H
+        pNG = [safe(instance.natural_gas_price[t]) for t in T] if hasattr(instance,"natural_gas_price") else [0.0]*H
+        pCO = [safe(instance.coal_price[t])        for t in T] if hasattr(instance,"coal_price")        else [0.0]*H
+        pH2 = [safe(instance.hydrogen_price[t])    for t in T] if hasattr(instance,"hydrogen_price")    else None
+
+        # Efficiencies
+        eta_fossil_cc = safe(getattr(cc, "eta_fossil", eta_fossil_default)) if cc else eta_fossil_default
+        eta_fossil_rk = safe(getattr(rk, "eta_fossil", eta_fossil_default)) if rk else eta_fossil_default
+        eta_e2h_cc    = safe(getattr(cc, "eta_electric_to_heat", eta_e2h_default)) if cc else eta_e2h_default
+        eta_e2h_rk    = safe(getattr(rk, "eta_electric_to_heat", eta_e2h_default)) if rk else eta_e2h_default
+        eta_el        = safe(getattr(el, "efficiency", 0.65)) if el else 0.65  # MWh_H2 per MWh_e
+
+        # TES round-trip (for optional look-ahead)
+        if tes_eta_rt is None:
+            eta_c = safe(getattr(ts, "eta_charge", 0.95)) if ts else 0.95
+            eta_d = safe(getattr(ts, "eta_discharge", 0.95)) if ts else 0.95
+            tes_eta_rt = eta_c * eta_d
+
+        # Identify fossil price actually relevant to each process
+        def fossil_price_for_calciner(i):
+            # If you tag fuel choice (e.g., cc has 'coal_in' vs 'natural_gas_in'), infer from flows
+            co = ser(cc, "coal_in"); ng = ser(cc, "natural_gas_in")
+            if co and (co[i] > 1e-9): return pCO[i]
+            if ng and (ng[i] > 1e-9): return pNG[i]
+            # fallback priority (BAU calciner often coal)
+            return pCO[i] if any(pCO) else pNG[i]
+
+        def fossil_price_for_kiln(i):
+            co = ser(rk, "coal_in"); ng = ser(rk, "natural_gas_in"); h2 = ser(rk, "hydrogen_in")
+            if h2 and (h2[i] > 1e-9):  # if H2 firing, value by pH2 if available
+                return pH2[i] if pH2 else 0.0  # €/MWh_H2 (we treat as thermal fuel price here)
+            if co and (co[i] > 1e-9): return pCO[i]
+            if ng and (ng[i] > 1e-9): return pNG[i]
+            # fallback
+            return pCO[i] if any(pCO) else (pNG[i] if any(pNG) else (pH2[i] if pH2 else 0.0))
+
+        # Current operating points and caps (MW_e)
+        def cap(block, name):
+            return safe(getattr(block, name)) if (block is not None and hasattr(block, name)) else 0.0
+
+        # power_in series
+        P_cc = ser(cc, "power_in"); P_rk = ser(rk, "power_in"); P_el = ser(el, "power_in"); P_ts = ser(ts, "power_in")
+        # max power
+        Pcc_max = cap(cc, "max_power"); Prk_max = cap(rk, "max_power"); Pel_max = cap(el, "max_power"); Pts_max = cap(ts, "max_Pelec")
+
+        # Helper to add a lever into the merit stack
+        # Each lever contributes (available_up, c_up) and (available_down, c_down)
+        def add_lever(levers, i, name, up_room, down_room, c_up, c_dn):
+            if up_room > 1e-6:
+                levers["up"].append((name, up_room, c_up))
+            if down_room > 1e-6:
+                levers["down"].append((name, down_room, c_dn))
+
+        # ---- Build per-hour stacks ----
+        max_up = [0.0]*H; max_dn = [0.0]*H
+        price_up = [math.nan]*H; price_dn = [math.nan]*H
+
+        # optional TES look-ahead “value of charge”
+        tes_val = [0.0]*H
+        if ts and P_ts and any(p > 1e-9 for p in P_ts) and tes_value_mode == "lookahead":
+            for i in range(H):
+                j2 = min(H, i+1+lookahead_hours)
+                fut = pE[i+1:j2] if j2 > i+1 else []
+                tes_val[i] = max(tes_eta_rt * (max(fut) if fut else pE[i]) - pE[i], 0.0)
+
+        for i in range(H):
+            levers = {"up": [], "down": []}
+
+            # ---- TES charger (electric heater mode) ----
+            if ts and P_ts is not None and Pts_max > 0.0:
+                up_room  = max(0.0, Pts_max - P_ts[i])
+                dn_room  = max(0.0, P_ts[i])  # can always reduce charging up to current level
+                c_up = pE[i]
+                c_dn = (tes_val[i] if tes_value_mode == "lookahead" else pE[i])  # conservative: lost chance to charge
+                add_lever(levers, i, "TES_charge", up_room, dn_room, c_up, c_dn)
+
+            # ---- Electrolyser ----
+            if el and P_el is not None and Pel_max > 0.0:
+                up_room = max(0.0, Pel_max - P_el[i])
+                dn_room = max(0.0, P_el[i])
+                if pH2:  # value H2 if price available
+                    c_up = pE[i] - pH2[i]*eta_el
+                    c_dn = pH2[i]*eta_el - pE[i]
+                else:
+                    c_up = pE[i]; c_dn = -pE[i]  # if no H2 value, treat as pure sink
+                add_lever(levers, i, "Electrolyser", up_room, dn_room, c_up, c_dn)
+
+            # ---- E-Calciner with fossil substitution (1:1 thermal) ----
+            if cc and P_cc is not None and Pcc_max > 0.0:
+                up_room = max(0.0, Pcc_max - P_cc[i])
+                dn_room = max(0.0, P_cc[i])
+                pF = fossil_price_for_calciner(i)
+                c_up = pE[i] - eta_e2h_cc * (pF / max(eta_fossil_cc, 1e-9))
+                c_dn = eta_e2h_cc * (pF / max(eta_fossil_cc, 1e-9)) - pE[i]
+                add_lever(levers, i, "E-Calciner", up_room, dn_room, c_up, c_dn)
+
+            # ---- E-Kiln with fossil substitution (plasma, induction, etc.) ----
+            if rk and P_rk is not None and Prk_max > 0.0:
+                up_room = max(0.0, Prk_max - P_rk[i])
+                dn_room = max(0.0, P_rk[i])
+                pF = fossil_price_for_kiln(i)
+                # If kiln fuel is H2, pF is €/MWh_H2; treat it as thermal with ~1:1 if your model defines it so.
+                c_up = pE[i] - eta_e2h_rk * (pF / max(eta_fossil_rk, 1e-9))
+                c_dn = eta_e2h_rk * (pF / max(eta_fossil_rk, 1e-9)) - pE[i]
+                add_lever(levers, i, "E-Kiln", up_room, dn_room, c_up, c_dn)
+
+            # ---- Cement mill auxiliaries (down only; up is usually zero unless cap slack) ----
+            if cm and hasattr(cm, "power_in"):
+                Pc = ser(cm, "power_in"); Pcm_max = cap(cm, "max_power")
+                if Pc:
+                    up_room = max(0.0, Pcm_max - Pc[i]) if Pcm_max > 0 else 0.0
+                    dn_room = max(0.0, Pc[i])
+                    # Reducing mill load usually cuts clinker throughput — if you disallow that, set dn_room=0.
+                    # If allowed, price it using a VoLL-based rule; here we mark it very expensive so it won't be chosen:
+                    VOLL_clk = 1e6  # €/MWh_e equivalent sentinel
+                    add_lever(levers, i, "CementMill", up_room, 0.0, pE[i], VOLL_clk)
+
+            # ---- Aggregate capacity and marginal prices ----
+            # Capacity is sum of available room. Marginal price (first MW) is min(cost) over levers with positive room.
+            # If you prefer to expose piecewise stacks, we can return the sorted arrays too.
+            max_up[i] = sum(x[1] for x in levers["up"])
+            max_dn[i] = sum(x[1] for x in levers["down"])
+
+            if levers["up"]:
+                # choose cheapest lever for first MW up
+                price_up[i] = min(x[2] for x in levers["up"])
+            if levers["down"]:
+                # choose cheapest foregone value for first MW down
+                price_dn[i] = min(x[2] for x in levers["down"])
+
+            # Guard: if negative marginal (already cheaper to shift), clamp to ~0 for bidding if desired
+            if price_up[i] is not None and not math.isnan(price_up[i]):
+                price_up[i] = float(max(price_up[i], 0.0))
+            if price_dn[i] is not None and not math.isnan(price_dn[i]):
+                price_dn[i] = float(max(price_dn[i], 0.0))
+
+        return {
+            "time": T,
+            "max_up_MW": max_up,
+            "max_down_MW": max_dn,
+            "price_up_EUR_per_MWhe": price_up,
+            "price_down_EUR_per_MWhe": price_dn,
+        }
+

@@ -775,6 +775,13 @@ class DSMFlex:
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
         if switch_flex_off:
             instance = self.switch_to_opt(instance)
+
+        # 2) solve MILP, fix binaries, solve LP, collect duals
+        self.solve_with_duals(solver_name="highs", tee=False)
+
+        # 3) export duals
+        self.export_shadow_prices_csv("./outputs/shadow_prices.csv")
+
         # solve the instance
         results = self.solver.solve(instance, options=self.solver_options)
 
@@ -826,12 +833,25 @@ class DSMFlex:
         # self.plot_2(instance, save_path="./outputs/DE_FCR_products.png", show=True)
 
         #Cement Plot plots
-        self.plot_1(instance, save_name="cement_BAU_week42", out_dir="./outputs", show=True)
+        # self.plot_1(instance, save_name="cement_BAU_week42", out_dir="./outputs", show=True)
         # self.plot_capacity_products(instance, save_name="cement_BAU_capacity_week42", out_dir="./outputs", show=True) 
         # self.dashboard_cement(instance,
         #                     baseline_instance=instance,   # or None
         #                     html_path="./outputs/cement_full_dashboard.html",
         #                     sankey_max_steps=168)
+
+    def export_shadow_prices_csv(self, path):
+        """
+        Writes self.shadow_prices to CSV. Call this after solve_with_duals().
+        """
+        import pandas as pd
+        sp = getattr(self, "shadow_prices", None)
+        if not sp:
+            raise RuntimeError("No shadow prices found. Call solve_with_duals() first.")
+        df = pd.DataFrame(sp)
+        # Keep Excel happy with €
+        df.to_csv(path, index=False, encoding="utf-8-sig")
+        return path
 
     def determine_optimal_operation_with_flex(self):
         """

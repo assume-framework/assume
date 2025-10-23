@@ -478,7 +478,7 @@ class flexableRedispatchStorage(BaseStrategy):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.foresight = parse_duration(kwargs.get("eom_foresight", "3h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "24h"))
         self.lookahead = parse_duration(kwargs.get("lookahead", "0h"))
 
     # ---------- helpers ----------
