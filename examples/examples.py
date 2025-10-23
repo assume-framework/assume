@@ -104,6 +104,10 @@ available_examples = {
         "scenario": "example_bus",
         "study_case": "eom",
     },
+    "backup": {
+        "scenario": "backup",
+        "study_case": "eom",
+    },
 }
 
 
@@ -120,7 +124,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "example_bus"
+    example = "backup"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

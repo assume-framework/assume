@@ -222,30 +222,30 @@ class DSMFlex:
                 )
                 
                 # Add emergency incentive calculation (incentive*emergency_signal*ev_discharge)
-                emergency_incentive = 0
-                if hasattr(self.model, 'emergency_signal') and hasattr(self.model, 'incentive'):
-                    for t in self.model.time_steps:
-                        for ev in getattr(self.model, 'evs', []):
-                            if ev in self.model.dsm_blocks and hasattr(self.model.dsm_blocks[ev], 'discharge'):
-                                emergency_incentive += (
-                                    self.model.incentive[t] * 
-                                    self.model.emergency_signal[t] * 
-                                    self.model.dsm_blocks[ev].discharge[t]
-                                )
+            ##    emergency_incentive = 0
+            ##    if hasattr(self.model, 'emergency_signal') and hasattr(self.model, 'incentive'):
+            ##        for t in self.model.time_steps:
+            ##            for ev in getattr(self.model, 'evs', []):
+            ##                if ev in self.model.dsm_blocks and hasattr(self.model.dsm_blocks[ev], 'discharge'):
+            ##                    emergency_incentive += (
+            ##                        self.model.incentive[t] * 
+            ##                        self.model.emergency_signal[t] * 
+            ##                        self.model.dsm_blocks[ev].discharge[t]
+            ##                    )
 
                 # Add FCR revenue if available (for prosumer depots)
-                fcr_revenue = 0
-                if hasattr(self.model, 'fcr_revenue'):
-                    fcr_revenue = self.model.fcr_revenue
+             ##   fcr_revenue = 0
+            ##    if hasattr(self.model, 'fcr_revenue'):
+             ##       fcr_revenue = self.model.fcr_revenue
                 
-                return net_income + emergency_incentive + fcr_revenue
+                return net_income ##+ emergency_incentive + fcr_revenue
 
-        elif self.objective == "bidirectional_prosumer_renewable_discharge":
+        elif self.objective == "bidirectional_prosumer_emergency_discharge":
 
             @self.model.Objective(sense=pyo.maximize)
             def obj_rule_opt(m):
                 """
-                Maximizes renewable discharge for bidirectional prosumer operation with emergency incentive and FCR revenue.
+                Maximizes emergency discharge for bidirectional prosumer operation with emergency incentive and FCR revenue.
                 Similar to net income but optimized for discharge scenarios.
                 """
                 # Use the same net income calculation as a base
@@ -266,11 +266,11 @@ class DSMFlex:
                                 )
 
                 # Add FCR revenue if available (for prosumer depots)
-                fcr_revenue = 0
-                if hasattr(self.model, 'fcr_revenue'):
-                    fcr_revenue = self.model.fcr_revenue
+               ## fcr_revenue = 0
+              ##  if hasattr(self.model, 'fcr_revenue'):
+               ##     fcr_revenue = self.model.fcr_revenue
                 
-                return net_income + emergency_incentive + fcr_revenue
+                return net_income + emergency_incentive #### + fcr_revenue
 
         else:
             raise ValueError(f"Unknown objective: {self.objective}")
@@ -968,6 +968,180 @@ class DSMFlex:
             self._plot_building_optimization(instance)
         # Add more technology-specific plots as needed
 
+    def _save_individual_plots_without_flex(self, instance, evs, charging_stations, time_steps):
+        """
+        Save each subplot as an individual PNG file - WITHOUT FLEX version
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
+        import numpy as np
+        import pyomo.environ as pyo
+
+        # 1. EV Status Matrix
+        fig1, ax1 = plt.subplots(figsize=(10, 6))
+        status_matrix = np.zeros((len(evs), len(time_steps)))
+
+        for i, ev in enumerate(evs):
+            for j, t in enumerate(time_steps):
+                ev_availability = getattr(instance, f"{ev}_availability", None)
+                if ev_availability is None or pyo.value(ev_availability[t]) == 0:
+                    status_matrix[i, j] = 0
+                    continue
+
+                is_charging = False
+                for cs in charging_stations:
+                    if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5:
+                        status_matrix[i, j] = 2
+                        is_charging = True
+                        break
+
+                if not is_charging and hasattr(instance, 'in_queue'):
+                    if pyo.value(instance.in_queue[ev, t]) > 0.5:
+                        status_matrix[i, j] = 1
+
+        colors = ['lightgray', 'yellow', 'green']
+        cmap = plt.matplotlib.colors.ListedColormap(colors)
+        im = ax1.imshow(status_matrix, aspect='auto', cmap=cmap, vmin=0, vmax=2)
+        ax1.set_yticks(np.arange(len(evs)))
+        ax1.set_yticklabels(evs)
+        ax1.set_xlabel('Time Steps')
+        ax1.set_title('EV Status (Gray=Driving, Yellow=Queue, Green=Charging) - WITHOUT FLEX')
+        legend_elements = [
+            mpatches.Patch(color='lightgray', label='Driving'),
+            mpatches.Patch(color='yellow', label='In Queue'),
+            mpatches.Patch(color='green', label='Charging')
+        ]
+        ax1.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.15, 1))
+        plt.tight_layout()
+        filename1 = 'bus_depot_1_ev_status_without_flex.png'
+        plt.savefig(filename1, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename1}")
+        plt.close()
+
+        # 2. Charging Station Utilization
+        fig2, ax2 = plt.subplots(figsize=(10, 6))
+        for cs in charging_stations:
+            cs_discharge = []
+            cs_max_power = pyo.value(instance.dsm_blocks[cs].max_power)
+
+            for t in time_steps:
+                discharge = pyo.value(instance.dsm_blocks[cs].discharge[t])
+                cs_discharge.append(discharge)
+
+            ax2.plot(time_steps, cs_discharge, label=f'{cs}', linewidth=2)
+            ax2.axhline(y=cs_max_power, color='gray', linestyle='--', alpha=0.5)
+
+        ax2.set_xlabel('Time Steps')
+        ax2.set_ylabel('Discharge Power (kW)')
+        ax2.set_title('Charging Station Power Output - WITHOUT FLEX')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        plt.tight_layout()
+        filename2 = 'bus_depot_2_charging_station_power_without_flex.png'
+        plt.savefig(filename2, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename2}")
+        plt.close()
+
+        # 3. EV Charging and Discharging Power
+        fig3, ax3 = plt.subplots(figsize=(10, 6))
+        for ev in evs[:5]:
+            if ev in instance.dsm_blocks:
+                ev_charge = [pyo.value(instance.dsm_blocks[ev].charge[t]) for t in time_steps]
+                ev_discharge = [pyo.value(instance.dsm_blocks[ev].discharge[t]) for t in time_steps]
+                ev_usage = [pyo.value(instance.dsm_blocks[ev].usage[t]) for t in time_steps]
+
+                ax3.plot(time_steps, ev_charge, label=f'{ev} Charge', color='blue', alpha=0.8)
+                ax3.plot(time_steps, [-d for d in ev_discharge], label=f'{ev} Discharge', color='red', alpha=0.8, linestyle='--')
+                ax3.plot(time_steps, [-u for u in ev_usage], label=f'{ev} Usage', color='orange', alpha=0.8, linestyle=':')
+
+        ax3.set_xlabel('Time Steps')
+        ax3.set_ylabel('Power (kW)')
+        ax3.set_title('EV Power: Charge (Blue), Discharge (Red), Usage (Orange) - WITHOUT FLEX')
+        ax3.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax3.grid(True, alpha=0.3)
+        ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+        plt.tight_layout()
+        filename3 = 'bus_depot_3_ev_power_without_flex.png'
+        plt.savefig(filename3, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename3}")
+        plt.close()
+
+        # 4. EV State of Charge
+        fig4, ax4 = plt.subplots(figsize=(10, 6))
+        for ev in evs[:5]:
+            if ev in instance.dsm_blocks and hasattr(instance.dsm_blocks[ev], 'soc'):
+                soc = [pyo.value(instance.dsm_blocks[ev].soc[t]) for t in time_steps]
+                max_capacity = pyo.value(instance.dsm_blocks[ev].max_capacity)
+                soc_percentage = [s/max_capacity * 100 for s in soc]
+                ax4.plot(time_steps, soc_percentage, label=ev, marker='o', markersize=3)
+
+        ax4.set_xlabel('Time Steps')
+        ax4.set_ylabel('State of Charge (%)')
+        ax4.set_title('EV Battery Status (First 5 EVs) - WITHOUT FLEX')
+        ax4.legend()
+        ax4.grid(True, alpha=0.3)
+        ax4.set_ylim([0, 105])
+        plt.tight_layout()
+        filename4 = 'bus_depot_4_ev_soc_without_flex.png'
+        plt.savefig(filename4, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename4}")
+        plt.close()
+
+        # 5. Queue Length Over Time
+        fig5, ax5 = plt.subplots(figsize=(10, 6))
+        queue_length = []
+        for t in time_steps:
+            if hasattr(instance, 'in_queue'):
+                count = sum(pyo.value(instance.in_queue[ev, t]) for ev in evs)
+            else:
+                count = 0
+            queue_length.append(count)
+
+        ax5.bar(time_steps, queue_length, color='orange', alpha=0.7)
+        ax5.set_xlabel('Time Steps')
+        ax5.set_ylabel('Number of EVs Waiting')
+        ax5.set_title('Queue Length Over Time - WITHOUT FLEX')
+        ax5.grid(True, alpha=0.3, axis='y')
+        plt.tight_layout()
+        filename5 = 'bus_depot_5_queue_length_without_flex.png'
+        plt.savefig(filename5, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename5}")
+        plt.close()
+
+        # 6. Financial Analysis
+        fig6, ax6 = plt.subplots(figsize=(10, 6))
+        electricity_prices = [pyo.value(instance.electricity_price[t]) for t in time_steps]
+        total_power = [pyo.value(instance.total_power_input[t]) for t in time_steps]
+        variable_costs = [pyo.value(instance.variable_cost[t]) for t in time_steps]
+        variable_revenues = [pyo.value(instance.variable_rev[t]) for t in time_steps]
+        net_incomes = [pyo.value(instance.net_income[t]) for t in time_steps]
+
+        ax6_twin = ax6.twinx()
+
+        line1 = ax6.plot(time_steps, variable_costs, 'r-', label='Variable Cost (€)', linewidth=2)
+        line2 = ax6.plot(time_steps, variable_revenues, 'g-', label='Variable Revenue (€)', linewidth=2)
+        line3 = ax6.plot(time_steps, net_incomes, 'purple', label='Net Income (€)', linewidth=2, linestyle='--')
+
+        ax6.set_xlabel('Time Steps')
+        ax6.set_ylabel('Financial Metrics (€)', color='black')
+        ax6.tick_params(axis='y', labelcolor='black')
+
+        line4 = ax6_twin.plot(time_steps, electricity_prices, 'b-', label='Electricity Price (€/MWh)', linewidth=1, alpha=0.7)
+        ax6_twin.set_ylabel('Electricity Price (€/MWh)', color='b')
+        ax6_twin.tick_params(axis='y', labelcolor='b')
+
+        lines = line1 + line2 + line3 + line4
+        labels = [l.get_label() for l in lines]
+        ax6.legend(lines, labels, loc='upper left')
+
+        ax6.set_title('Financial Analysis: Cost, Revenue, Net Income & Price - WITHOUT FLEX')
+        ax6.grid(True, alpha=0.3)
+        plt.tight_layout()
+        filename6 = 'bus_depot_6_financial_analysis_without_flex.png'
+        plt.savefig(filename6, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename6}")
+        plt.close()
+
     def _plot_bus_depot_optimization(self, instance):
         """
         Bus depot specific plotting logic
@@ -1137,57 +1311,172 @@ class DSMFlex:
         ax6.grid(True, alpha=0.3)
         
         plt.tight_layout()
+
+        # Save combined plot
+        combined_filename = 'bus_depot_combined_without_flex.png'
+        plt.savefig(combined_filename, dpi=300, bbox_inches='tight')
+        print(f"Combined plot saved: {combined_filename}")
+
         plt.show()
-        
+
+        # Save individual plots
+        self._save_individual_plots_without_flex(instance, evs, charging_stations, time_steps)
+
         # Export graph data to CSV files
         try:
             self._export_bus_depot_graphs_to_csv(instance, evs, charging_stations, time_steps)
         except PermissionError:
             print("CSV files are open in another program. Close them and run again to export data.")
-        
+
         # Print summary
         self._print_bus_depot_summary(instance, evs, charging_stations, time_steps)
 
     def _export_bus_depot_graphs_to_csv(self, instance, evs, charging_stations, time_steps):
         """
-        Export all 3 bus depot graph data to CSV files in C: path
+        Export all bus depot graph data to CSV files - WITHOUT FLEX version
+        Creates two detailed CSV files: one for EVs and one for Charging Stations
         """
         import pandas as pd
         import numpy as np
         import os
-        
+
         base_path = os.getcwd()
-        
+
+        # ========== ELECTRIC VEHICLES DETAILED CSV ==========
+        ev_detailed_data = []
+
+        for ev in evs:
+            if ev not in instance.dsm_blocks:
+                continue
+
+            for t in time_steps:
+                # Basic information
+                row = {
+                    'EV_ID': ev,
+                    'Time_Step': t,
+                }
+
+                # Operational Behaviour
+                ev_availability = getattr(instance, f"{ev}_availability", None)
+                if ev_availability is not None:
+                    row['Availability'] = pyo.value(ev_availability[t])
+                else:
+                    row['Availability'] = 0
+
+                # Status (Driving/Queue/Charging)
+                if row['Availability'] == 0:
+                    row['Status'] = 'Driving'
+                else:
+                    is_charging = False
+                    for cs in charging_stations:
+                        if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5:
+                            row['Status'] = 'Charging'
+                            row['Assigned_Station'] = cs
+                            is_charging = True
+                            break
+
+                    if not is_charging:
+                        if hasattr(instance, 'in_queue') and pyo.value(instance.in_queue[ev, t]) > 0.5:
+                            row['Status'] = 'In_Queue'
+                        else:
+                            row['Status'] = 'Idle'
+
+                # Power flows
+                row['Charge_Power_kW'] = pyo.value(instance.dsm_blocks[ev].charge[t])
+                row['Discharge_Power_kW'] = pyo.value(instance.dsm_blocks[ev].discharge[t])
+                row['Usage_Power_kW'] = pyo.value(instance.dsm_blocks[ev].usage[t])
+
+                # State of Charge
+                if hasattr(instance.dsm_blocks[ev], 'soc'):
+                    soc = pyo.value(instance.dsm_blocks[ev].soc[t])
+                    max_capacity = pyo.value(instance.dsm_blocks[ev].max_capacity)
+                    row['SOC_kWh'] = soc
+                    row['SOC_Percentage'] = (soc / max_capacity * 100) if max_capacity > 0 else 0
+                    row['Max_Capacity_kWh'] = max_capacity
+
+                # Net power (positive for charging, negative for discharging/usage)
+                row['Net_Power_kW'] = row['Charge_Power_kW'] - row['Discharge_Power_kW'] - row['Usage_Power_kW']
+
+                ev_detailed_data.append(row)
+
+        ev_df = pd.DataFrame(ev_detailed_data)
+        ev_csv_path = os.path.join(base_path, "ev_operational_details_without_flex.csv")
+        ev_df.to_csv(ev_csv_path, index=False)
+        print(f"EV Operational Details exported to: {ev_csv_path}")
+
+        # ========== CHARGING STATIONS DETAILED CSV ==========
+        cs_detailed_data = []
+
+        # Get electricity price for marginal cost calculation
+        electricity_prices = {t: pyo.value(instance.electricity_price[t]) for t in time_steps}
+
+        for cs in charging_stations:
+            if cs not in instance.dsm_blocks:
+                continue
+
+            cs_max_power = pyo.value(instance.dsm_blocks[cs].max_power)
+
+            for t in time_steps:
+                row = {
+                    'Station_ID': cs,
+                    'Time_Step': t,
+                }
+
+                # Discharge (power output to EVs)
+                discharge = pyo.value(instance.dsm_blocks[cs].discharge[t])
+                row['Discharge_Power_kW'] = discharge
+                row['Max_Power_kW'] = cs_max_power
+                row['Utilization_Percentage'] = (discharge / cs_max_power * 100) if cs_max_power > 0 else 0
+
+                # Cost and Revenue per time step
+                electricity_price = electricity_prices[t]
+                row['Electricity_Price_EUR_per_MWh'] = electricity_price
+
+                # Convert kW to MWh for cost calculation (assuming 1 hour time step)
+                energy_mwh = discharge / 1000.0  # kW to MW, 1 hour duration
+                row['Cost_per_Time_Step_EUR'] = energy_mwh * electricity_price
+
+                # Marginal cost (cost per kWh delivered)
+                row['Marginal_Cost_EUR_per_kWh'] = electricity_price / 1000.0 if electricity_price > 0 else 0
+
+                # Count assigned EVs
+                assigned_evs = sum(1 for ev in evs if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5)
+                row['Assigned_EVs_Count'] = assigned_evs
+
+                cs_detailed_data.append(row)
+
+        cs_df = pd.DataFrame(cs_detailed_data)
+        cs_csv_path = os.path.join(base_path, "charging_station_operational_details_without_flex.csv")
+        cs_df.to_csv(cs_csv_path, index=False)
+        print(f"Charging Station Operational Details exported to: {cs_csv_path}")
+
+        # ========== LEGACY EXPORTS (keep for compatibility) ==========
         # Graph 1: EV Status Matrix (Idle/Queue/Charging)
         status_matrix = np.zeros((len(evs), len(time_steps)))
-        
+
         for i, ev in enumerate(evs):
             for j, t in enumerate(time_steps):
-                # Get availability
                 ev_availability = getattr(instance, f"{ev}_availability", None)
                 if ev_availability is None or pyo.value(ev_availability[t]) == 0:
-                    status_matrix[i, j] = 0  # Not available (driving)
+                    status_matrix[i, j] = 0
                     continue
-                
-                # Check if charging
+
                 is_charging = False
                 for cs in charging_stations:
                     if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5:
-                        status_matrix[i, j] = 2  # Charging
+                        status_matrix[i, j] = 2
                         is_charging = True
                         break
-                
-                # Check if in queue
+
                 if not is_charging and hasattr(instance, 'in_queue'):
                     if pyo.value(instance.in_queue[ev, t]) > 0.5:
-                        status_matrix[i, j] = 1  # In queue
-        
-        # Create DataFrame for EV Status
+                        status_matrix[i, j] = 1
+
         status_df = pd.DataFrame(status_matrix, index=evs, columns=[f'timestep_{t}' for t in time_steps])
         csv_path1 = os.path.join(base_path, "ev_status_matrix.csv")
         status_df.to_csv(csv_path1)
         print(f"EV Status Matrix exported to: {csv_path1}")
-        
+
         # Graph 2: Charging Station Power Output
         cs_data = {}
         for cs in charging_stations:
@@ -1196,12 +1485,12 @@ class DSMFlex:
                 discharge = pyo.value(instance.dsm_blocks[cs].discharge[t])
                 cs_discharge.append(discharge)
             cs_data[cs] = cs_discharge
-        
-        cs_df = pd.DataFrame(cs_data, index=[f'timestep_{t}' for t in time_steps])
+
+        cs_df_legacy = pd.DataFrame(cs_data, index=[f'timestep_{t}' for t in time_steps])
         csv_path2 = os.path.join(base_path, "charging_station_power.csv")
-        cs_df.to_csv(csv_path2)
+        cs_df_legacy.to_csv(csv_path2)
         print(f"Charging Station Power exported to: {csv_path2}")
-        
+
         # Graph 3: EV Charging and Discharging Power
         ev_charge_data = {}
         ev_discharge_data = {}
@@ -1214,37 +1503,37 @@ class DSMFlex:
                 ev_charge_data[f'{ev}_charge'] = ev_charge
                 ev_discharge_data[f'{ev}_discharge'] = ev_discharge
                 ev_usage_data[f'{ev}_usage'] = ev_usage
-        
+
         if ev_charge_data or ev_discharge_data or ev_usage_data:
-            # Combine charge, discharge, and usage data
             ev_power_data = {**ev_charge_data, **ev_discharge_data, **ev_usage_data}
             ev_power_df = pd.DataFrame(ev_power_data, index=[f'timestep_{t}' for t in time_steps])
             csv_path3 = os.path.join(base_path, "ev_charging_power.csv")
             ev_power_df.to_csv(csv_path3)
             print(f"EV Charging and Discharging Power exported to: {csv_path3}")
-        
+
         # Graph 4: Financial Analysis Data
-        electricity_prices = [pyo.value(instance.electricity_price[t]) for t in time_steps]
         total_power = [pyo.value(instance.total_power_input[t]) for t in time_steps]
         variable_costs = [pyo.value(instance.variable_cost[t]) for t in time_steps]
         variable_revenues = [pyo.value(instance.variable_rev[t]) for t in time_steps]
         net_incomes = [pyo.value(instance.net_income[t]) for t in time_steps]
-        marginal_costs = [price * power for price, power in zip(electricity_prices, total_power)]
-        
+        marginal_costs = [electricity_prices[t] * total_power[i] for i, t in enumerate(time_steps)]
+
         financial_df = pd.DataFrame({
-            'electricity_price': electricity_prices,
+            'electricity_price': [electricity_prices[t] for t in time_steps],
             'total_power': total_power,
             'variable_cost': variable_costs,
             'variable_revenue': variable_revenues,
             'net_income': net_incomes,
             'marginal_cost': marginal_costs
         }, index=[f'timestep_{t}' for t in time_steps])
-        
+
         csv_path4 = os.path.join(base_path, "financial_analysis.csv")
         financial_df.to_csv(csv_path4)
-        print(f"Financial Analysis (Cost, Revenue, Net Income, Price) exported to: {csv_path4}")
-        
-        print(f"\nAll 4 graph datasets exported to CSV files in {base_path}")
+        print(f"Financial Analysis exported to: {csv_path4}")
+
+        print(f"\n[OK] All CSV files exported to {base_path}")
+        print(f"  - NEW: {ev_csv_path}")
+        print(f"  - NEW: {cs_csv_path}")
 
     def _print_bus_depot_summary(self, instance, evs, charging_stations, time_steps):
         """Print optimization summary for bus depot"""
@@ -1526,6 +1815,198 @@ class DSMFlex:
 
         return unit_dict
 
+    def _save_individual_plots_with_flex(self, instance, evs, charging_stations, time_steps):
+        """
+        Save each subplot as an individual PNG file - WITH FLEX version
+        """
+        import matplotlib.pyplot as plt
+        import matplotlib.patches as mpatches
+        import numpy as np
+        import pyomo.environ as pyo
+
+        # 1. EV Status Matrix
+        fig1, ax1 = plt.subplots(figsize=(10, 6))
+        status_matrix = np.zeros((len(evs), len(time_steps)))
+
+        for i, ev in enumerate(evs):
+            for j, t in enumerate(time_steps):
+                ev_availability = getattr(instance, f"{ev}_availability", None)
+                if ev_availability is None or pyo.value(ev_availability[t]) == 0:
+                    status_matrix[i, j] = 0
+                    continue
+
+                is_charging = False
+                for cs in charging_stations:
+                    if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5:
+                        status_matrix[i, j] = 2
+                        is_charging = True
+                        break
+
+                if not is_charging and hasattr(instance, 'in_queue'):
+                    if pyo.value(instance.in_queue[ev, t]) > 0.5:
+                        status_matrix[i, j] = 1
+
+        colors = ['lightgray', 'yellow', 'green']
+        cmap = plt.matplotlib.colors.ListedColormap(colors)
+        im = ax1.imshow(status_matrix, aspect='auto', cmap=cmap, vmin=0, vmax=2)
+        ax1.set_yticks(np.arange(len(evs)))
+        ax1.set_yticklabels(evs)
+        ax1.set_xlabel('Time Steps')
+        ax1.set_title('EV Status (Gray=Driving, Yellow=Queue, Green=Charging) - WITH FLEX')
+        legend_elements = [
+            mpatches.Patch(color='lightgray', label='Driving'),
+            mpatches.Patch(color='yellow', label='In Queue'),
+            mpatches.Patch(color='green', label='Charging')
+        ]
+        ax1.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1.15, 1))
+        plt.tight_layout()
+        filename1 = 'bus_depot_1_ev_status_with_flex.png'
+        plt.savefig(filename1, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename1}")
+        plt.close()
+
+        # 2. Charging Station Utilization
+        fig2, ax2 = plt.subplots(figsize=(10, 6))
+        for cs in charging_stations:
+            cs_discharge = []
+            cs_max_power = pyo.value(instance.dsm_blocks[cs].max_power)
+
+            for t in time_steps:
+                discharge = pyo.value(instance.dsm_blocks[cs].discharge[t])
+                cs_discharge.append(discharge)
+
+            ax2.plot(time_steps, cs_discharge, label=f'{cs}', linewidth=2)
+            ax2.axhline(y=cs_max_power, color='gray', linestyle='--', alpha=0.5)
+
+        ax2.set_xlabel('Time Steps')
+        ax2.set_ylabel('Discharge Power (kW)')
+        ax2.set_title('Charging Station Power Output - WITH FLEX')
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+        plt.tight_layout()
+        filename2 = 'bus_depot_2_charging_station_power_with_flex.png'
+        plt.savefig(filename2, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename2}")
+        plt.close()
+
+        # 3. EV Charging and Discharging Power
+        fig3, ax3 = plt.subplots(figsize=(10, 6))
+        for ev in evs[:5]:
+            if ev in instance.dsm_blocks:
+                ev_charge = [pyo.value(instance.dsm_blocks[ev].charge[t]) for t in time_steps]
+                ev_discharge = [pyo.value(instance.dsm_blocks[ev].discharge[t]) for t in time_steps]
+                ev_usage = [pyo.value(instance.dsm_blocks[ev].usage[t]) for t in time_steps]
+
+                ax3.plot(time_steps, ev_charge, label=f'{ev} Charge', color='blue', alpha=0.8)
+                ax3.plot(time_steps, [-d for d in ev_discharge], label=f'{ev} Discharge', color='red', alpha=0.8, linestyle='--')
+                ax3.plot(time_steps, [-u for u in ev_usage], label=f'{ev} Usage', color='orange', alpha=0.8, linestyle=':')
+
+        ax3.set_xlabel('Time Steps')
+        ax3.set_ylabel('Power (kW)')
+        ax3.set_title('EV Power: Charge (Blue), Discharge (Red), Usage (Orange) - WITH FLEX')
+        ax3.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax3.grid(True, alpha=0.3)
+        ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+        plt.tight_layout()
+        filename3 = 'bus_depot_3_ev_power_with_flex.png'
+        plt.savefig(filename3, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename3}")
+        plt.close()
+
+        # 4. EV State of Charge
+        fig4, ax4 = plt.subplots(figsize=(10, 6))
+        for ev in evs[:5]:
+            if ev in instance.dsm_blocks and hasattr(instance.dsm_blocks[ev], 'soc'):
+                soc = [pyo.value(instance.dsm_blocks[ev].soc[t]) for t in time_steps]
+                max_capacity = pyo.value(instance.dsm_blocks[ev].max_capacity)
+                soc_percentage = [s/max_capacity * 100 for s in soc]
+                ax4.plot(time_steps, soc_percentage, label=ev, marker='o', markersize=3)
+
+        ax4.set_xlabel('Time Steps')
+        ax4.set_ylabel('State of Charge (%)')
+        ax4.set_title('EV Battery Status (First 5 EVs) - WITH FLEX')
+        ax4.legend()
+        ax4.grid(True, alpha=0.3)
+        ax4.set_ylim([0, 105])
+        plt.tight_layout()
+        filename4 = 'bus_depot_4_ev_soc_with_flex.png'
+        plt.savefig(filename4, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename4}")
+        plt.close()
+
+        # 5. Load Shift Analysis
+        fig5, ax5 = plt.subplots(figsize=(10, 6))
+        if hasattr(instance, 'load_shift_pos') and hasattr(instance, 'load_shift_neg'):
+            load_shift_pos = [pyo.value(instance.load_shift_pos[t]) for t in time_steps]
+            load_shift_neg = [pyo.value(instance.load_shift_neg[t]) for t in time_steps]
+            net_shift = [pos - neg for pos, neg in zip(load_shift_pos, load_shift_neg)]
+
+            ax5.plot(time_steps, load_shift_pos, label='Load Shift Positive', color='green', linewidth=2)
+            ax5.plot(time_steps, [-neg for neg in load_shift_neg], label='Load Shift Negative', color='red', linewidth=2)
+            ax5.plot(time_steps, net_shift, label='Net Load Shift', color='purple', linewidth=2, linestyle='--')
+            ax5.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+
+            ax5.set_xlabel('Time Steps')
+            ax5.set_ylabel('Load Shift (kW)')
+            ax5.set_title('Load Shifting Analysis - WITH FLEX')
+            ax5.legend()
+            ax5.grid(True, alpha=0.3)
+        else:
+            # Fallback to queue length if load shift variables not available
+            queue_length = []
+            for t in time_steps:
+                if hasattr(instance, 'in_queue'):
+                    count = sum(pyo.value(instance.in_queue[ev, t]) for ev in evs)
+                else:
+                    count = 0
+                queue_length.append(count)
+
+            ax5.bar(time_steps, queue_length, color='orange', alpha=0.7)
+            ax5.set_xlabel('Time Steps')
+            ax5.set_ylabel('Number of EVs Waiting')
+            ax5.set_title('Queue Length Over Time - WITH FLEX')
+            ax5.grid(True, alpha=0.3, axis='y')
+
+        plt.tight_layout()
+        filename5 = 'bus_depot_5_load_shift_with_flex.png'
+        plt.savefig(filename5, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename5}")
+        plt.close()
+
+        # 6. Financial Analysis
+        fig6, ax6 = plt.subplots(figsize=(10, 6))
+        electricity_prices = [pyo.value(instance.electricity_price[t]) for t in time_steps]
+        total_power = [pyo.value(instance.total_power_input[t]) for t in time_steps]
+        variable_costs = [pyo.value(instance.variable_cost[t]) for t in time_steps]
+        variable_revenues = [pyo.value(instance.variable_rev[t]) for t in time_steps]
+        net_incomes = [pyo.value(instance.net_income[t]) for t in time_steps]
+
+        ax6_twin = ax6.twinx()
+
+        line1 = ax6.plot(time_steps, variable_costs, 'r-', label='Variable Cost (€)', linewidth=2)
+        line2 = ax6.plot(time_steps, variable_revenues, 'g-', label='Variable Revenue (€)', linewidth=2)
+        line3 = ax6.plot(time_steps, net_incomes, 'purple', label='Net Income (€)', linewidth=2, linestyle='--')
+
+        ax6.set_xlabel('Time Steps')
+        ax6.set_ylabel('Financial Metrics (€)', color='black')
+        ax6.tick_params(axis='y', labelcolor='black')
+
+        line4 = ax6_twin.plot(time_steps, electricity_prices, 'b-', label='Electricity Price (€/MWh)', linewidth=1, alpha=0.7)
+        ax6_twin.set_ylabel('Electricity Price (€/MWh)', color='b')
+        ax6_twin.tick_params(axis='y', labelcolor='b')
+
+        lines = line1 + line2 + line3 + line4
+        labels = [l.get_label() for l in lines]
+        ax6.legend(lines, labels, loc='upper left')
+
+        ax6.set_title('Financial Analysis: Cost, Revenue, Net Income & Price - WITH FLEX')
+        ax6.grid(True, alpha=0.3)
+        plt.tight_layout()
+        filename6 = 'bus_depot_6_financial_analysis_with_flex.png'
+        plt.savefig(filename6, dpi=300, bbox_inches='tight')
+        print(f"Individual plot saved: {filename6}")
+        plt.close()
+
     def _plot_bus_depot_optimization_with_flex(self, instance):
         """
         Bus depot specific plotting logic for WITH FLEX mode
@@ -1710,59 +2191,178 @@ class DSMFlex:
         
         ax6.set_title('Financial Analysis: Cost, Revenue, Net Income & Price - WITH FLEX')
         ax6.grid(True, alpha=0.3)
-        
+
         plt.tight_layout()
+
+        # Save combined plot
+        combined_filename = 'bus_depot_combined_with_flex.png'
+        plt.savefig(combined_filename, dpi=300, bbox_inches='tight')
+        print(f"Combined plot saved: {combined_filename}")
+
         plt.show()
-        
+
+        # Save individual plots
+        self._save_individual_plots_with_flex(instance, evs, charging_stations, time_steps)
+
         # Export graph data to CSV files with FLEX suffix
         try:
             self._export_bus_depot_graphs_to_csv_with_flex(instance, evs, charging_stations, time_steps)
         except PermissionError:
             print("CSV files are open in another program. Close them and run again to export data.")
-        
+
         # Print summary
         self._print_bus_depot_summary_with_flex(instance, evs, charging_stations, time_steps)
 
     def _export_bus_depot_graphs_to_csv_with_flex(self, instance, evs, charging_stations, time_steps):
         """
-        Export all bus depot graph data to CSV files with FLEX suffix
+        Export all bus depot graph data to CSV files - WITH FLEX version
+        Creates two detailed CSV files: one for EVs and one for Charging Stations
         """
         import pandas as pd
         import numpy as np
         import os
-        
+
         base_path = os.getcwd()
-        
+
+        # ========== ELECTRIC VEHICLES DETAILED CSV (WITH FLEX) ==========
+        ev_detailed_data = []
+
+        for ev in evs:
+            if ev not in instance.dsm_blocks:
+                continue
+
+            for t in time_steps:
+                # Basic information
+                row = {
+                    'EV_ID': ev,
+                    'Time_Step': t,
+                }
+
+                # Operational Behaviour
+                ev_availability = getattr(instance, f"{ev}_availability", None)
+                if ev_availability is not None:
+                    row['Availability'] = pyo.value(ev_availability[t])
+                else:
+                    row['Availability'] = 0
+
+                # Status (Driving/Queue/Charging)
+                if row['Availability'] == 0:
+                    row['Status'] = 'Driving'
+                else:
+                    is_charging = False
+                    for cs in charging_stations:
+                        if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5:
+                            row['Status'] = 'Charging'
+                            row['Assigned_Station'] = cs
+                            is_charging = True
+                            break
+
+                    if not is_charging:
+                        if hasattr(instance, 'in_queue') and pyo.value(instance.in_queue[ev, t]) > 0.5:
+                            row['Status'] = 'In_Queue'
+                        else:
+                            row['Status'] = 'Idle'
+
+                # Power flows
+                row['Charge_Power_kW'] = pyo.value(instance.dsm_blocks[ev].charge[t])
+                row['Discharge_Power_kW'] = pyo.value(instance.dsm_blocks[ev].discharge[t])
+                row['Usage_Power_kW'] = pyo.value(instance.dsm_blocks[ev].usage[t])
+
+                # State of Charge
+                if hasattr(instance.dsm_blocks[ev], 'soc'):
+                    soc = pyo.value(instance.dsm_blocks[ev].soc[t])
+                    max_capacity = pyo.value(instance.dsm_blocks[ev].max_capacity)
+                    row['SOC_kWh'] = soc
+                    row['SOC_Percentage'] = (soc / max_capacity * 100) if max_capacity > 0 else 0
+                    row['Max_Capacity_kWh'] = max_capacity
+
+                # Net power (positive for charging, negative for discharging/usage)
+                row['Net_Power_kW'] = row['Charge_Power_kW'] - row['Discharge_Power_kW'] - row['Usage_Power_kW']
+
+                ev_detailed_data.append(row)
+
+        ev_df = pd.DataFrame(ev_detailed_data)
+        ev_csv_path = os.path.join(base_path, "ev_operational_details_with_flex.csv")
+        ev_df.to_csv(ev_csv_path, index=False)
+        print(f"EV Operational Details (WITH FLEX) exported to: {ev_csv_path}")
+
+        # ========== CHARGING STATIONS DETAILED CSV (WITH FLEX) ==========
+        cs_detailed_data = []
+
+        # Get electricity price for marginal cost calculation
+        electricity_prices = {t: pyo.value(instance.electricity_price[t]) for t in time_steps}
+
+        for cs in charging_stations:
+            if cs not in instance.dsm_blocks:
+                continue
+
+            cs_max_power = pyo.value(instance.dsm_blocks[cs].max_power)
+
+            for t in time_steps:
+                row = {
+                    'Station_ID': cs,
+                    'Time_Step': t,
+                }
+
+                # Discharge (power output to EVs)
+                discharge = pyo.value(instance.dsm_blocks[cs].discharge[t])
+                row['Discharge_Power_kW'] = discharge
+                row['Max_Power_kW'] = cs_max_power
+                row['Utilization_Percentage'] = (discharge / cs_max_power * 100) if cs_max_power > 0 else 0
+
+                # Cost and Revenue per time step
+                electricity_price = electricity_prices[t]
+                row['Electricity_Price_EUR_per_MWh'] = electricity_price
+
+                # Convert kW to MWh for cost calculation (assuming 1 hour time step)
+                energy_mwh = discharge / 1000.0  # kW to MW, 1 hour duration
+                row['Cost_per_Time_Step_EUR'] = energy_mwh * electricity_price
+
+                # Marginal cost (cost per kWh delivered)
+                row['Marginal_Cost_EUR_per_kWh'] = electricity_price / 1000.0 if electricity_price > 0 else 0
+
+                # Revenue per time step (if applicable - V2G revenue)
+                # In flex mode, there might be revenue from V2G discharge
+                row['Revenue_per_Time_Step_EUR'] = 0  # Placeholder - can be calculated if V2G revenue exists
+
+                # Count assigned EVs
+                assigned_evs = sum(1 for ev in evs if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5)
+                row['Assigned_EVs_Count'] = assigned_evs
+
+                cs_detailed_data.append(row)
+
+        cs_df = pd.DataFrame(cs_detailed_data)
+        cs_csv_path = os.path.join(base_path, "charging_station_operational_details_with_flex.csv")
+        cs_df.to_csv(cs_csv_path, index=False)
+        print(f"Charging Station Operational Details (WITH FLEX) exported to: {cs_csv_path}")
+
+        # ========== LEGACY EXPORTS (keep for compatibility) ==========
         # Graph 1: EV Status Matrix (Idle/Queue/Charging)
         status_matrix = np.zeros((len(evs), len(time_steps)))
-        
+
         for i, ev in enumerate(evs):
             for j, t in enumerate(time_steps):
-                # Get availability
                 ev_availability = getattr(instance, f"{ev}_availability", None)
                 if ev_availability is None or pyo.value(ev_availability[t]) == 0:
-                    status_matrix[i, j] = 0  # Not available (driving)
+                    status_matrix[i, j] = 0
                     continue
-                
-                # Check if charging
+
                 is_charging = False
                 for cs in charging_stations:
                     if pyo.value(instance.is_assigned[ev, cs, t]) > 0.5:
-                        status_matrix[i, j] = 2  # Charging
+                        status_matrix[i, j] = 2
                         is_charging = True
                         break
-                
-                # Check if in queue
+
                 if not is_charging and hasattr(instance, 'in_queue'):
                     if pyo.value(instance.in_queue[ev, t]) > 0.5:
-                        status_matrix[i, j] = 1  # In queue
-        
-        # Create DataFrame for EV Status
+                        status_matrix[i, j] = 1
+
         status_df = pd.DataFrame(status_matrix, index=evs, columns=[f'timestep_{t}' for t in time_steps])
         csv_path1 = os.path.join(base_path, "ev_status_matrix_with_flex.csv")
         status_df.to_csv(csv_path1)
         print(f"EV Status Matrix (WITH FLEX) exported to: {csv_path1}")
-        
+
         # Graph 2: Charging Station Power Output
         cs_data = {}
         for cs in charging_stations:
@@ -1771,12 +2371,12 @@ class DSMFlex:
                 discharge = pyo.value(instance.dsm_blocks[cs].discharge[t])
                 cs_discharge.append(discharge)
             cs_data[cs] = cs_discharge
-        
-        cs_df = pd.DataFrame(cs_data, index=[f'timestep_{t}' for t in time_steps])
+
+        cs_df_legacy = pd.DataFrame(cs_data, index=[f'timestep_{t}' for t in time_steps])
         csv_path2 = os.path.join(base_path, "charging_station_power_with_flex.csv")
-        cs_df.to_csv(csv_path2)
+        cs_df_legacy.to_csv(csv_path2)
         print(f"Charging Station Power (WITH FLEX) exported to: {csv_path2}")
-        
+
         # Graph 3: EV Charging and Discharging Power
         ev_charge_data = {}
         ev_discharge_data = {}
@@ -1789,53 +2389,53 @@ class DSMFlex:
                 ev_charge_data[f'{ev}_charge'] = ev_charge
                 ev_discharge_data[f'{ev}_discharge'] = ev_discharge
                 ev_usage_data[f'{ev}_usage'] = ev_usage
-        
+
         if ev_charge_data or ev_discharge_data or ev_usage_data:
-            # Combine charge, discharge, and usage data
             ev_power_data = {**ev_charge_data, **ev_discharge_data, **ev_usage_data}
             ev_power_df = pd.DataFrame(ev_power_data, index=[f'timestep_{t}' for t in time_steps])
             csv_path3 = os.path.join(base_path, "ev_charging_power_with_flex.csv")
             ev_power_df.to_csv(csv_path3)
             print(f"EV Charging and Discharging Power (WITH FLEX) exported to: {csv_path3}")
-        
+
         # Graph 4: Load Shift Analysis (NEW for flex mode)
         if hasattr(instance, 'load_shift_pos') and hasattr(instance, 'load_shift_neg'):
             load_shift_pos = [pyo.value(instance.load_shift_pos[t]) for t in time_steps]
             load_shift_neg = [pyo.value(instance.load_shift_neg[t]) for t in time_steps]
             net_shift = [pos - neg for pos, neg in zip(load_shift_pos, load_shift_neg)]
-            
+
             load_shift_df = pd.DataFrame({
                 'load_shift_positive': load_shift_pos,
                 'load_shift_negative': load_shift_neg,
                 'net_load_shift': net_shift
             }, index=[f'timestep_{t}' for t in time_steps])
-            
+
             csv_path4 = os.path.join(base_path, "load_shift_analysis_with_flex.csv")
             load_shift_df.to_csv(csv_path4)
             print(f"Load Shift Analysis (WITH FLEX) exported to: {csv_path4}")
-        
+
         # Graph 5: Financial Analysis Data
-        electricity_prices = [pyo.value(instance.electricity_price[t]) for t in time_steps]
         total_power = [pyo.value(instance.total_power_input[t]) for t in time_steps]
         variable_costs = [pyo.value(instance.variable_cost[t]) for t in time_steps]
         variable_revenues = [pyo.value(instance.variable_rev[t]) for t in time_steps]
         net_incomes = [pyo.value(instance.net_income[t]) for t in time_steps]
-        marginal_costs = [price * power for price, power in zip(electricity_prices, total_power)]
-        
+        marginal_costs = [electricity_prices[t] * total_power[i] for i, t in enumerate(time_steps)]
+
         financial_df = pd.DataFrame({
-            'electricity_price': electricity_prices,
+            'electricity_price': [electricity_prices[t] for t in time_steps],
             'total_power': total_power,
             'variable_cost': variable_costs,
             'variable_revenue': variable_revenues,
             'net_income': net_incomes,
             'marginal_cost': marginal_costs
         }, index=[f'timestep_{t}' for t in time_steps])
-        
+
         csv_path5 = os.path.join(base_path, "financial_analysis_with_flex.csv")
         financial_df.to_csv(csv_path5)
         print(f"Financial Analysis (WITH FLEX) exported to: {csv_path5}")
-        
-        print(f"\nAll graph datasets (WITH FLEX) exported to CSV files in {base_path}")
+
+        print(f"\n[OK] All CSV files (WITH FLEX) exported to {base_path}")
+        print(f"  - NEW: {ev_csv_path}")
+        print(f"  - NEW: {cs_csv_path}")
 
     def _print_bus_depot_summary_with_flex(self, instance, evs, charging_stations, time_steps):
         """Print optimization summary for bus depot WITH FLEX"""

@@ -113,10 +113,10 @@ class BusDepot(DSMFlex, SupportsMinMax):
             # ---- Built-in FCR configuration (hardcoded German FCR) ----
             # Active only if self.is_prosumer is True
             self.fcr_enabled = bool(self.is_prosumer)
-            self.fcr_symmetric = False          # set True if you want symmetric product by default
-            self._FCR_BLOCK_LENGTH = 1         # hours, fixed TSO blocks
-            self._FCR_MIN_BID_MW   = 0.01        # minimum capacity per block
-            self._FCR_STEP_MW      = 0.01        # increment: bids in integer MW
+            self.fcr_symmetric = True          # set True if you want symmetric product by default
+            self._FCR_BLOCK_LENGTH = 2         # hours, fixed TSO blocks
+            self._FCR_MIN_BID_MW   = 0.1        # minimum capacity per block
+            self._FCR_STEP_MW      = 0.1        # increment: bids in integer MW
             # expected FCR value (€/MW/h) as hourly series; if not provided, assume zeros
             try:
                 self.fcr_price_eur_per_mw_h = self.forecaster["fcr_price"]
@@ -904,8 +904,8 @@ class BusDepot(DSMFlex, SupportsMinMax):
         # This combination significantly reduces unnecessary switching
 
         # Add FCR capacity market if prosumer is enabled
-        if self.is_prosumer:
-            self._add_fcr_capacity_market(self.model)
+    ##    if self.is_prosumer:
+      ##      self._add_fcr_capacity_market(self.model)
         
     def _add_fcr_capacity_market(self, model):
         """

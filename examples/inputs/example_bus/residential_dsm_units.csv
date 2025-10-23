@@ -1,6 +1,5 @@
 name,unit_type,technology,node,bidding_EOM,fuel_type,unit_operator,objective,flexibility_measure,congestion_threshold,cost_tolerance,power_flow_directionality,mileage,charging_profile,availability_profile,demand,max_power,ramp_up,ramp_down,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,efficiency_charge,efficiency_discharge,is_prosumer
-bangkok_1,bus_depot,electric_vehicle_1,north,naive_da_dsm,,dsm_operator_1,max_net_income,symmetric_flexible_block,0.8,10,bidirectional,0.0012,,Yes,,0.12,0.03,0.03,0.2,,,,0,0.87,1,Yes
-bangkok_1,bus_depot,electric_vehicle_2,north,naive_da_dsm,,dsm_operator_1,max_net_income,symmetric_flexible_block,0.8,10,bidirectional,0.0012,,Yes,,0.12,0.03,0.03,0.2,,,,0,0.87,1,Yes
-bangkok_1,bus_depot,electric_vehicle_3,north,naive_da_dsm,,dsm_operator_1,max_net_income,symmetric_flexible_block,0.8,10,bidirectional,0.0012,,Yes,,0.12,0.03,0.03,0.2,,,,0,0.87,1,Yes
+bangkok_1,bus_depot,electric_vehicle_1,north,naive_da_dsm,,dsm_operator_1,max_net_income,renewable_utilisation,0.8,10,bidirectional,0.0012,,Yes,,0.12,0.03,0.03,0.2,,,,0.3,0.87,1,Yes
+bangkok_1,bus_depot,electric_vehicle_2,north,naive_da_dsm,,dsm_operator_1,max_net_income,renewable_utilisation,0.8,10,bidirectional,0.0012,,Yes,,0.12,0.03,0.03,0.2,,,,0.7,0.87,1,Yes
 bangkok_1,bus_depot,charging_station_1,north,naive_da_dsm,,,,,,,bidirectional,,,Yes,,0.15,0.04,0.04,,,,,,,,
 bangkok_1,bus_depot,charging_station_2,north,naive_da_dsm,,,,,,,bidirectional,,,Yes,,0.15,0.04,0.04,,,,,,,,
