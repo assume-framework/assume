@@ -314,12 +314,10 @@ class World:
                 self.learning_config, start=self.start, end=self.end
             )
 
-            # separate process does not support buffer and learning
-            self.learning_agent_addr = addr(self.addr, "learning_agent")
             rl_agent = agent_composed_of(
                 self.learning_role,
                 register_in=self.container,
-                suggested_aid=self.learning_agent_addr.aid,
+                suggested_aid="learning_agent",
             )
             rl_agent.suspendable_tasks = False
 
@@ -335,7 +333,6 @@ class World:
 
         else:
             self.learning_role = None
-            self.learning_agent_addr = None
 
     def setup_output_agent(
         self,
@@ -474,27 +471,9 @@ class World:
 
         unit_operator_agent._role_context.data.update(
             {
-                "learning_output_agent_addr": self.output_agent_addr,
+                "output_agent_addr": self.output_agent_addr,
             }
         )
-
-        # after creation of an agent - we set additional context params
-        if self.learning_mode:
-            unit_operator_agent._role_context.data.update(
-                {
-                    "learning_agent_addr": self.learning_agent_addr,
-                    "train_start": self.start,
-                    "train_end": self.end,
-                    "train_freq": self.learning_config.get("train_freq", "24h"),
-                }
-            )
-
-        else:
-            unit_operator_agent._role_context.data.update(
-                {
-                    "output_agent_addr": self.output_agent_addr,
-                }
-            )
 
     def add_units_with_operator_subprocess(
         self, id: str, units: list[dict], strategies: dict[str, UnitOperatorStrategy]
@@ -525,7 +504,6 @@ class World:
             units_operator.add_unit(self.create_unit(**unit))
         data_update_dict = {
             "output_agent_addr": self.output_agent_addr,
-            "learning_output_agent_addr": self.output_agent_addr,
         }
 
         def creator(container):
@@ -611,10 +589,23 @@ class World:
 
             if strategy not in strategy_instances:
                 # Create and cache the strategy instance if not already created
-                strategy_instances[strategy] = self.bidding_strategies[strategy](
-                    unit_id=unit_id,
-                    **bidding_params,
-                )
+
+                # Check if the strategy is a LearningStrategy and we are in learning_mode for which the strategy needs access to the learnin_role
+                if (
+                    isinstance(strategy_instances[strategy], LearningStrategy)
+                    and self.learning_mode
+                ):
+                    strategy_instances[strategy] = self.bidding_strategies[strategy](
+                        unit_id=unit_id,
+                        learning_role=self.learning_role,
+                        **bidding_params,
+                    )
+
+                else:
+                    strategy_instances[strategy] = self.bidding_strategies[strategy](
+                        unit_id=unit_id,
+                        **bidding_params,
+                    )
 
             # Use the cached instance for this market
             bidding_strategies[market_id] = strategy_instances[strategy]

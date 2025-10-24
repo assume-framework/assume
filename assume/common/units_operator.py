@@ -23,6 +23,7 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import (
     aggregate_step_amount,
+    convert_tensors,
     timestamp2datetime,
 )
 from assume.strategies import DirectUnitOperatorStrategy, UnitOperatorStrategy
@@ -462,6 +463,10 @@ class UnitsOperator(Role):
             market_config=market,
             product_tuples=products,
         )
+
+        # TODO wollen iegetnich keine tensorabhängigkeit hier... aber einzeln convertieren dauert zu lange
+        orderbook = convert_tensors(orderbook)
+
         if not market.addr:
             logger.error("Market %s has no address", market.market_id)
             return
