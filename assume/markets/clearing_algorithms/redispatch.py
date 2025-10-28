@@ -234,66 +234,56 @@ class RedispatchMarketRole(MarketRole):
         return accepted_orders, rejected_orders, meta, flows
 
     def process_dispatch_data(self, network: pypsa.Network, orderbook_df: pd.DataFrame):
+        """
+        This function processes the dispatch data to calculate the redispatch volumes and prices
+        and update the orderbook with the accepted volumes and prices.
+
+        Args:
+            orderbook_df (pd.DataFrame): The orderbook to be cleared.
+        """
+
+        # Get all generators except for _backup generators
         generators_t_p = network.generators_t.p.filter(regex="^(?!.*_backup)")
+
+        # Use regex in a single call to filter and rename columns simultaneously for efficiency
         upward_redispatch = generators_t_p.filter(regex="_up$")
         downward_redispatch = generators_t_p.filter(regex="_down$")
+
+        # Find intersection of unit_ids in orderbook_df and columns in redispatch_volumes for direct mapping
         valid_units = orderbook_df["unit_id"].unique()
+
         for unit in valid_units:
-            mask_unit = orderbook_df["unit_id"] == unit
+            unit_orders = orderbook_df["unit_id"] == unit
 
-            # If you have an explicit column (e.g. 'bid_type'), use it.
-            # Otherwise, infer up/down from the sign of the offered volume.
-            if "bid_type" in orderbook_df.columns:
-                mask_up   = mask_unit & (orderbook_df["bid_type"] == "up")
-                mask_down = mask_unit & (orderbook_df["bid_type"] == "down")
-            else:
-                mask_up   = mask_unit & (orderbook_df["volume"] >= 0)
-                mask_down = mask_unit & (orderbook_df["volume"] <  0)
-
-            # ---- DEBUG: check shapes before adding --------------------------------
             if f"{unit}_up" in upward_redispatch.columns:
-                series_up = upward_redispatch[f"{unit}_up"]
-                print("DEBUG-UP", unit,
-                    "rows=", int(mask_up.sum()),
-                    "series_len=", len(series_up),
-                    "unique_hours=", orderbook_df.loc[mask_up, "start_time"].nunique())
+                orderbook_df.loc[unit_orders, "accepted_volume"] += upward_redispatch[
+                    f"{unit}_up"
+                ].values
+
             if f"{unit}_down" in downward_redispatch.columns:
-                series_down = downward_redispatch[f"{unit}_down"]
-                print("DEBUG-DOWN", unit,
-                    "rows=", int(mask_down.sum()),
-                    "series_len=", len(series_down),
-                    "unique_hours=", orderbook_df.loc[mask_down, "start_time"].nunique())
+                orderbook_df.loc[unit_orders, "accepted_volume"] -= downward_redispatch[
+                    f"{unit}_down"
+                ].values
 
-            # ---- Add upward redispatch (align by timestamp) -----------------------
-            if f"{unit}_up" in upward_redispatch.columns and mask_up.any():
-                idx_up = orderbook_df.loc[mask_up, "start_time"]
-                add_up = upward_redispatch[f"{unit}_up"].reindex(idx_up).to_numpy()
-                orderbook_df.loc[mask_up, "accepted_volume"] = (
-                    orderbook_df.loc[mask_up, "accepted_volume"].to_numpy() + add_up
-                )
-
-            # ---- Subtract downward redispatch (align by timestamp) ----------------
-            if f"{unit}_down" in downward_redispatch.columns and mask_down.any():
-                idx_down = orderbook_df.loc[mask_down, "start_time"]
-                sub_down = downward_redispatch[f"{unit}_down"].reindex(idx_down).to_numpy()
-                orderbook_df.loc[mask_down, "accepted_volume"] = (
-                    orderbook_df.loc[mask_down, "accepted_volume"].to_numpy() - sub_down
-                )
-
-            # ---- Pricing -----------------------------------------------------------
             if self.payment_mechanism == "pay_as_bid":
-                # price is the original bid price for nonzero accepted volume
-                m = mask_unit
-                orderbook_df.loc[m, "accepted_price"] = np.where(
-                    orderbook_df.loc[m, "accepted_volume"] != 0,
-                    orderbook_df.loc[m, "price"],
-                    0,
+                # set accepted price as the price bid price from the orderbook
+                orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
+                    orderbook_df.loc[unit_orders, "accepted_volume"] > 0,
+                    orderbook_df.loc[unit_orders, "price"],
+                    np.where(
+                        orderbook_df.loc[unit_orders, "accepted_volume"] < 0,
+                        orderbook_df.loc[unit_orders, "price"],
+                        0,  # This sets accepted_price to 0 when redispatch_volume is exactly 0
+                    ),
                 )
-            else:
+
+            elif self.payment_mechanism == "pay_as_clear":
+                # set accepted price as the nodal marginal price
                 nodal_marginal_prices = -network.buses_t.marginal_price
-                unit_node = orderbook_df.loc[mask_unit, "node"].values[0]
-                orderbook_df.loc[mask_unit, "accepted_price"] = np.where(
-                    orderbook_df.loc[mask_unit, "accepted_volume"] != 0,
+                unit_node = orderbook_df.loc[unit_orders, "node"].values[0]
+
+                orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
+                    orderbook_df.loc[unit_orders, "accepted_volume"] != 0,
                     nodal_marginal_prices[unit_node],
                     0,
                 )

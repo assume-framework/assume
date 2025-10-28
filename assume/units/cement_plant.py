@@ -127,6 +127,16 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.flexibility_measure = flexibility_measure
         self.cost_tolerance = cost_tolerance
         self.peak_load_cap = peak_load_cap
+        # Example: inject plant-scoped series (pseudo-code)
+        plant_id = str(id)
+        f = forecaster
+        # f.load_series is whatever your project’s method is to register Series
+        self.baseline_power = self.forecaster[f"{self.id}_baseline_power"]
+        self.max_up = self.forecaster[f"{self.id}_max_up"]
+        self.max_down = self.forecaster[f"{self.id}_max_down"]
+        self.price_up = self.forecaster[f"{self.id}_price_up"]
+        self.price_down = self.forecaster[f"{self.id}_price_down"]
+
 
         self.optimisation_counter = 0
         self.is_prosumer = str_to_bool(is_prosumer)
@@ -2071,190 +2081,335 @@ class CementPlant(DSMFlex, SupportsMinMax):
             "mask_dn": mask_dn,
         }
         
-    def compute_reg_capacity_and_price(self, instance,
-                                   eta_e2h_default=1.0,
-                                   eta_fossil_default=0.90,
-                                   tes_eta_rt=None,
-                                   tes_value_mode="price",  # "price" or "lookahead"
-                                   lookahead_hours=24):
+    def compute_reg_capacity_and_price(
+        self,
+        instance,
+        *,
+        eta_e2h_default=1.0,
+        eta_fossil_default=0.90,
+        tes_eta_rt=None,
+        tes_value_mode="price",
+        lookahead_hours=24,
+        include_co2=True,
+        co2_price_eur_per_t=None,
+        activation_duration_h: float = 1.0,   # <-- add this
+        **kwargs,                              # <-- and this for forwards-compat
+    ):
         """
-        Returns per-hour:
+        Returns per-hour dict with:
         - max_up_MW, max_down_MW
-        - price_up_EUR_per_MWhe (marginal of first MW up)
-        - price_down_EUR_per_MWhe (marginal of first MW down)
-        No duals, no re-solves. Builds a merit stack from available levers.
+        - price_up_EUR_per_MWhe, price_down_EUR_per_MWhe
+        - best_up_lever, best_down_lever
 
-        Assumptions:
-        * For e-calciner/e-kiln, fossil backfill is possible within process bounds (same hour).
-        * TES charging is a curtailable sink; optional look-ahead for its 'value'.
-        * Electrolyser can modulate; optional H2 price to value its output (if present).
+        Notes:
+        • activation_duration_h is currently not used inside this function
+            (prices are marginal €/MWhₑ for the first MW). Keep it in the
+            signature so callers can pass it; convert to €/MW for bids
+            outside using: price_[€/MWh] * activation_duration_h [h].
         """
+
         import math
+        import pyomo.environ as pyo
+        import numpy as np
 
+        # ---- helpers ----
         def safe(v):
-            try: return float(pyo.value(v))
+            try:
+                return float(pyo.value(v))
             except Exception:
-                try: return float(v)
-                except Exception: return 0.0
+                try:
+                    return float(v)
+                except Exception:
+                    return 0.0
 
-        T = list(instance.time_steps)
-        H = len(T)
-        B = instance.dsm_blocks
+        def _as_hourly(x, H, default=0.0):
+            """Coerce scalar / sequence / FastSeries-like into list[float] length H."""
+            if x is None:
+                return [default] * H
+            # scalar?
+            try:
+                val = float(x)
+                return [val] * H
+            except Exception:
+                pass
+            # sequence-like
+            try:
+                seq = list(x)
+            except Exception:
+                try:
+                    return [float(x[i]) for i in range(H)]
+                except Exception:
+                    return [default] * H
+            if len(seq) < H:
+                seq = seq + [seq[-1]] * (H - len(seq))
+            elif len(seq) > H:
+                seq = seq[:H]
+            out = []
+            for v in seq:
+                try:
+                    out.append(float(v))
+                except Exception:
+                    out.append(default)
+            return out
 
-        # Grab blocks if they exist
-        ph = B["preheater"] if "preheater" in B else None
-        cc = B["calciner"]  if "calciner"  in B else None
-        rk = B["kiln"]      if "kiln"      in B else None
-        el = B["electrolyser"] if "electrolyser" in B else None
-        ts = B["thermal_storage"] if "thermal_storage" in B else None
-        cm = B["cement_mill"] if "cement_mill" in B else None
-
-        def ser(block, name):
-            if block is None or not hasattr(block, name): return None
+        def ser(block, name, T):
+            if block is None or not hasattr(block, name):
+                return None
             return [safe(getattr(block, name)[t]) for t in T]
 
-        # Prices (defaults to 0 if missing)
-        pE  = [safe(instance.electricity_price[t]) for t in T] if hasattr(instance,"electricity_price") else [0.0]*H
-        pNG = [safe(instance.natural_gas_price[t]) for t in T] if hasattr(instance,"natural_gas_price") else [0.0]*H
-        pCO = [safe(instance.coal_price[t])        for t in T] if hasattr(instance,"coal_price")        else [0.0]*H
-        pH2 = [safe(instance.hydrogen_price[t])    for t in T] if hasattr(instance,"hydrogen_price")    else None
+        # ---- time base first (so H is known) ----
+        T = list(instance.time_steps)
+        H = len(T)
 
-        # Efficiencies
+        # ---- blocks ----
+        B  = instance.dsm_blocks
+        ph = B["preheater"]      if "preheater"      in B else None
+        cc = B["calciner"]       if "calciner"       in B else None
+        rk = B["kiln"]           if "kiln"           in B else None
+        el = B["electrolyser"]   if "electrolyser"   in B else None
+        ts = B["thermal_storage"]if "thermal_storage" in B else None
+        cm = B["cement_mill"]    if "cement_mill"    in B else None
+
+        # ---- prices (hourly vectors) ----
+        pE  = _as_hourly([safe(instance.electricity_price[t]) for t in T] if hasattr(instance, "electricity_price") else 0.0, H, default=0.0)
+        pNG = _as_hourly([safe(instance.natural_gas_price[t]) for t in T] if hasattr(instance, "natural_gas_price") else 0.0, H, default=0.0)
+        pCO = _as_hourly([safe(instance.coal_price[t])        for t in T] if hasattr(instance, "coal_price")        else 0.0, H, default=0.0)
+        pH2 = _as_hourly([safe(instance.hydrogen_price[t])    for t in T] if hasattr(instance, "hydrogen_price")    else None, H, default=0.0)
+
+        # CO2 price [€/tCO2] hourly
+        pCO2 = _as_hourly(co2_price_eur_per_t, H, default=0.0) if include_co2 else [0.0]*H
+
+        # ---- emission factors [tCO2/MWh_th] for fuels (adjust if your model differs) ----
+        EF_NG   = 0.202
+        EF_COAL = 0.341
+        EF_H2   = 0.0   # direct (scope-1) zero
+
+        # ---- efficiencies ----
         eta_fossil_cc = safe(getattr(cc, "eta_fossil", eta_fossil_default)) if cc else eta_fossil_default
         eta_fossil_rk = safe(getattr(rk, "eta_fossil", eta_fossil_default)) if rk else eta_fossil_default
         eta_e2h_cc    = safe(getattr(cc, "eta_electric_to_heat", eta_e2h_default)) if cc else eta_e2h_default
         eta_e2h_rk    = safe(getattr(rk, "eta_electric_to_heat", eta_e2h_default)) if rk else eta_e2h_default
         eta_el        = safe(getattr(el, "efficiency", 0.65)) if el else 0.65  # MWh_H2 per MWh_e
 
-        # TES round-trip (for optional look-ahead)
+        # TES round-trip (if needed for look-ahead)
         if tes_eta_rt is None:
             eta_c = safe(getattr(ts, "eta_charge", 0.95)) if ts else 0.95
             eta_d = safe(getattr(ts, "eta_discharge", 0.95)) if ts else 0.95
             tes_eta_rt = eta_c * eta_d
 
-        # Identify fossil price actually relevant to each process
-        def fossil_price_for_calciner(i):
-            # If you tag fuel choice (e.g., cc has 'coal_in' vs 'natural_gas_in'), infer from flows
-            co = ser(cc, "coal_in"); ng = ser(cc, "natural_gas_in")
-            if co and (co[i] > 1e-9): return pCO[i]
-            if ng and (ng[i] > 1e-9): return pNG[i]
-            # fallback priority (BAU calciner often coal)
-            return pCO[i] if any(pCO) else pNG[i]
+        # ---- series & caps ----
+        P_cc = ser(cc, "power_in", T); P_rk = ser(rk, "power_in", T)
+        P_el = ser(el, "power_in", T); P_ts = ser(ts, "power_in", T)
+        P_cm = ser(cm, "power_in", T)
 
-        def fossil_price_for_kiln(i):
-            co = ser(rk, "coal_in"); ng = ser(rk, "natural_gas_in"); h2 = ser(rk, "hydrogen_in")
-            if h2 and (h2[i] > 1e-9):  # if H2 firing, value by pH2 if available
-                return pH2[i] if pH2 else 0.0  # €/MWh_H2 (we treat as thermal fuel price here)
-            if co and (co[i] > 1e-9): return pCO[i]
-            if ng and (ng[i] > 1e-9): return pNG[i]
-            # fallback
-            return pCO[i] if any(pCO) else (pNG[i] if any(pNG) else (pH2[i] if pH2 else 0.0))
-
-        # Current operating points and caps (MW_e)
         def cap(block, name):
             return safe(getattr(block, name)) if (block is not None and hasattr(block, name)) else 0.0
 
-        # power_in series
-        P_cc = ser(cc, "power_in"); P_rk = ser(rk, "power_in"); P_el = ser(el, "power_in"); P_ts = ser(ts, "power_in")
-        # max power
-        Pcc_max = cap(cc, "max_power"); Prk_max = cap(rk, "max_power"); Pel_max = cap(el, "max_power"); Pts_max = cap(ts, "max_Pelec")
+        Pcc_max  = cap(cc, "max_power")
+        Prk_max  = cap(rk, "max_power")
+        Pel_max  = cap(el, "max_power")
+        Pts_max  = cap(ts, "max_Pelec")
+        Pcm_max  = cap(cm, "max_power")
 
-        # Helper to add a lever into the merit stack
-        # Each lever contributes (available_up, c_up) and (available_down, c_down)
-        def add_lever(levers, i, name, up_room, down_room, c_up, c_dn):
-            if up_room > 1e-6:
-                levers["up"].append((name, up_room, c_up))
-            if down_room > 1e-6:
-                levers["down"].append((name, down_room, c_dn))
+        # Fossil price seen by each process, incl. CO2
+        def fossil_price_for_calciner(i):
+            co = ser(cc, "coal_in", T) if cc else None
+            ng = ser(cc, "natural_gas_in", T) if cc else None
+            if co and co[i] > 1e-9:
+                return pCO[i] + pCO2[i] * EF_COAL
+            if ng and ng[i] > 1e-9:
+                return pNG[i] + pCO2[i] * EF_NG
+            # fallback (BAU often coal)
+            if any(pCO): return pCO[i] + pCO2[i] * EF_COAL
+            return pNG[i] + pCO2[i] * EF_NG
 
-        # ---- Build per-hour stacks ----
-        max_up = [0.0]*H; max_dn = [0.0]*H
-        price_up = [math.nan]*H; price_dn = [math.nan]*H
+        def fossil_price_for_kiln(i):
+            co = ser(rk, "coal_in", T) if rk else None
+            ng = ser(rk, "natural_gas_in", T) if rk else None
+            h2 = ser(rk, "hydrogen_in", T) if rk else None
+            if h2 and h2[i] > 1e-9:
+                return pH2[i] + pCO2[i] * EF_H2
+            if co and co[i] > 1e-9:
+                return pCO[i] + pCO2[i] * EF_COAL
+            if ng and ng[i] > 1e-9:
+                return pNG[i] + pCO2[i] * EF_NG
+            # fallback priority: coal → NG → H2
+            if any(pCO): return pCO[i] + pCO2[i] * EF_COAL
+            if any(pNG): return pNG[i] + pCO2[i] * EF_NG
+            return pH2[i] + pCO2[i] * EF_H2
 
-        # optional TES look-ahead “value of charge”
+        # Optional TES “value of charge” via look-ahead
         tes_val = [0.0]*H
         if ts and P_ts and any(p > 1e-9 for p in P_ts) and tes_value_mode == "lookahead":
             for i in range(H):
-                j2 = min(H, i+1+lookahead_hours)
+                j2 = min(H, i + 1 + int(lookahead_hours))
                 fut = pE[i+1:j2] if j2 > i+1 else []
                 tes_val[i] = max(tes_eta_rt * (max(fut) if fut else pE[i]) - pE[i], 0.0)
 
+        # ---- build stacks per hour ----
+        max_up   = [0.0]*H
+        max_down = [0.0]*H
+        price_up = [math.nan]*H
+        price_dn = [math.nan]*H
+        best_up  = [None]*H
+        best_dn  = [None]*H
+
         for i in range(H):
-            levers = {"up": [], "down": []}
+            levers_up = []   # (name, room_MW, c_up)
+            levers_dn = []   # (name, room_MW, c_dn)
 
-            # ---- TES charger (electric heater mode) ----
+            # TES charger (electrical heater mode)
             if ts and P_ts is not None and Pts_max > 0.0:
-                up_room  = max(0.0, Pts_max - P_ts[i])
-                dn_room  = max(0.0, P_ts[i])  # can always reduce charging up to current level
+                up_room = max(0.0, Pts_max - P_ts[i])
+                dn_room = max(0.0, P_ts[i])
                 c_up = pE[i]
-                c_dn = (tes_val[i] if tes_value_mode == "lookahead" else pE[i])  # conservative: lost chance to charge
-                add_lever(levers, i, "TES_charge", up_room, dn_room, c_up, c_dn)
+                c_dn = (tes_val[i] if tes_value_mode == "lookahead" else pE[i])
+                if up_room > 1e-6: levers_up.append(("TES_charge", up_room, c_up))
+                if dn_room > 1e-6: levers_dn.append(("TES_charge", dn_room, c_dn))
 
-            # ---- Electrolyser ----
+            # Electrolyser
             if el and P_el is not None and Pel_max > 0.0:
                 up_room = max(0.0, Pel_max - P_el[i])
                 dn_room = max(0.0, P_el[i])
-                if pH2:  # value H2 if price available
-                    c_up = pE[i] - pH2[i]*eta_el
-                    c_dn = pH2[i]*eta_el - pE[i]
-                else:
-                    c_up = pE[i]; c_dn = -pE[i]  # if no H2 value, treat as pure sink
-                add_lever(levers, i, "Electrolyser", up_room, dn_room, c_up, c_dn)
+                # value by H2 if available
+                valH2 = pH2[i] if pH2 is not None else 0.0
+                c_up = pE[i] - valH2 * eta_el
+                c_dn = valH2 * eta_el - pE[i]
+                if up_room > 1e-6: levers_up.append(("Electrolyser", up_room, c_up))
+                if dn_room > 1e-6: levers_dn.append(("Electrolyser", dn_room, c_dn))
 
-            # ---- E-Calciner with fossil substitution (1:1 thermal) ----
+            # E-Calciner (with fossil backfill)
             if cc and P_cc is not None and Pcc_max > 0.0:
                 up_room = max(0.0, Pcc_max - P_cc[i])
                 dn_room = max(0.0, P_cc[i])
-                pF = fossil_price_for_calciner(i)
-                c_up = pE[i] - eta_e2h_cc * (pF / max(eta_fossil_cc, 1e-9))
-                c_dn = eta_e2h_cc * (pF / max(eta_fossil_cc, 1e-9)) - pE[i]
-                add_lever(levers, i, "E-Calciner", up_room, dn_room, c_up, c_dn)
+                pF = fossil_price_for_calciner(i)  # €/MWh_th including CO2
+                c_e2h_th = eta_e2h_cc
+                c_up = pE[i] - c_e2h_th * (pF / max(eta_fossil_cc, 1e-9))
+                c_dn = c_e2h_th * (pF / max(eta_fossil_cc, 1e-9)) - pE[i]
+                if up_room > 1e-6: levers_up.append(("E-Calciner", up_room, c_up))
+                if dn_room > 1e-6: levers_dn.append(("E-Calciner", dn_room, c_dn))
 
-            # ---- E-Kiln with fossil substitution (plasma, induction, etc.) ----
+            # E-Kiln (with fossil/H2 backfill)
             if rk and P_rk is not None and Prk_max > 0.0:
                 up_room = max(0.0, Prk_max - P_rk[i])
                 dn_room = max(0.0, P_rk[i])
                 pF = fossil_price_for_kiln(i)
-                # If kiln fuel is H2, pF is €/MWh_H2; treat it as thermal with ~1:1 if your model defines it so.
-                c_up = pE[i] - eta_e2h_rk * (pF / max(eta_fossil_rk, 1e-9))
-                c_dn = eta_e2h_rk * (pF / max(eta_fossil_rk, 1e-9)) - pE[i]
-                add_lever(levers, i, "E-Kiln", up_room, dn_room, c_up, c_dn)
+                c_e2h_th = eta_e2h_rk
+                c_up = pE[i] - c_e2h_th * (pF / max(eta_fossil_rk, 1e-9))
+                c_dn = c_e2h_th * (pF / max(eta_fossil_rk, 1e-9)) - pE[i]
+                if up_room > 1e-6: levers_up.append(("E-Kiln", up_room, c_up))
+                if dn_room > 1e-6: levers_dn.append(("E-Kiln", dn_room, c_dn))
 
-            # ---- Cement mill auxiliaries (down only; up is usually zero unless cap slack) ----
-            if cm and hasattr(cm, "power_in"):
-                Pc = ser(cm, "power_in"); Pcm_max = cap(cm, "max_power")
-                if Pc:
-                    up_room = max(0.0, Pcm_max - Pc[i]) if Pcm_max > 0 else 0.0
-                    dn_room = max(0.0, Pc[i])
-                    # Reducing mill load usually cuts clinker throughput — if you disallow that, set dn_room=0.
-                    # If allowed, price it using a VoLL-based rule; here we mark it very expensive so it won't be chosen:
-                    VOLL_clk = 1e6  # €/MWh_e equivalent sentinel
-                    add_lever(levers, i, "CementMill", up_room, 0.0, pE[i], VOLL_clk)
+            # Cement mill auxiliaries (down only, usually disfavored)
+            if cm and P_cm is not None:
+                up_room = max(0.0, (Pcm_max - P_cm[i]) if Pcm_max > 0 else 0.0)
+                dn_room = max(0.0, P_cm[i])
+                # Make down extremely expensive if you wish to avoid impacting output:
+                VOLL_clk = 1e6
+                if up_room > 1e-6: levers_up.append(("CementMill", up_room, pE[i]))
+                # Comment-out next line if you NEVER want to reduce mill load:
+                # if dn_room > 1e-6: levers_dn.append(("CementMill", dn_room, VOLL_clk))
 
-            # ---- Aggregate capacity and marginal prices ----
-            # Capacity is sum of available room. Marginal price (first MW) is min(cost) over levers with positive room.
-            # If you prefer to expose piecewise stacks, we can return the sorted arrays too.
-            max_up[i] = sum(x[1] for x in levers["up"])
-            max_dn[i] = sum(x[1] for x in levers["down"])
+            # aggregate capacities
+            max_up[i]   = sum(r for _, r, _ in levers_up) if levers_up else 0.0
+            max_down[i] = sum(r for _, r, _ in levers_dn) if levers_dn else 0.0
 
-            if levers["up"]:
-                # choose cheapest lever for first MW up
-                price_up[i] = min(x[2] for x in levers["up"])
-            if levers["down"]:
-                # choose cheapest foregone value for first MW down
-                price_dn[i] = min(x[2] for x in levers["down"])
-
-            # Guard: if negative marginal (already cheaper to shift), clamp to ~0 for bidding if desired
-            if price_up[i] is not None and not math.isnan(price_up[i]):
-                price_up[i] = float(max(price_up[i], 0.0))
-            if price_dn[i] is not None and not math.isnan(price_dn[i]):
-                price_dn[i] = float(max(price_dn[i], 0.0))
+            # marginal (first MW) = cheapest lever cost
+            if levers_up:
+                name, room, cost = min(levers_up, key=lambda x: x[2])
+                price_up[i] = float(max(cost, 0.0))
+                best_up[i]  = name
+            if levers_dn:
+                name, room, cost = min(levers_dn, key=lambda x: x[2])
+                price_dn[i] = float(max(cost, 0.0))
+                best_dn[i]  = name
+                
+            if max_down[i] <= 1e-9:
+                price_dn[i] = 0.0
+                best_dn[i]  = "—"
+            if max_up[i] <= 1e-9:
+                price_up[i] = 0.0
+                best_up[i]  = "—"
 
         return {
             "time": T,
             "max_up_MW": max_up,
-            "max_down_MW": max_dn,
+            "max_down_MW": max_down,
             "price_up_EUR_per_MWhe": price_up,
             "price_down_EUR_per_MWhe": price_dn,
+            "best_up_lever": best_up,
+            "best_down_lever": best_dn,
         }
 
+    def build_redispatch_bids_from_instance(
+        self,
+        instance,
+        *,
+        activation_duration_h: float = 1.0,
+        include_co2: bool = True,
+        co2_price_eur_per_t: float | None = None,
+        csv_path: str = "./outputs/redispatch_bids.csv",
+    ):
+        """
+        Uses the solved `instance` to:
+        • read baseline (total_power_input, clinker rate, variable cost, prices),
+        • call compute_reg_capacity_and_price(...) for hourly feasible up/down + prices,
+        • write a single CSV (TSO-ready).
+        """
+        import pyomo.environ as pyo
+        import pandas as pd
+        import numpy as np
+
+        def safe(v):
+            try:
+                return float(pyo.value(v))
+            except Exception:
+                try:
+                    return float(v)
+                except Exception:
+                    return 0.0
+
+        T = list(instance.time_steps)
+
+        # Baseline series
+        base_elec = [safe(instance.total_power_input[t]) for t in T] if hasattr(instance, "total_power_input") else [0.0]*len(T)
+
+        kiln = instance.dsm_blocks["kiln"] if ("kiln" in instance.dsm_blocks) else None
+        if kiln is not None and hasattr(kiln, "clinker_out"):
+            clk = [safe(kiln.clinker_out[t]) for t in T]
+        elif hasattr(instance, "clinker_rate"):
+            clk = [safe(instance.clinker_rate[t]) for t in T]
+        else:
+            clk = [0.0]*len(T)
+
+        pE = [safe(instance.electricity_price[t]) for t in T] if hasattr(instance, "electricity_price") else None
+        vc = [safe(instance.variable_cost[t])    for t in T] if hasattr(instance, "variable_cost")    else None
+
+        # Compute redispatch feasible capacities & activation prices
+        out = self.compute_reg_capacity_and_price(
+            instance,
+            activation_duration_h=activation_duration_h,
+            tes_value_mode="price",                 # conservative for redispatch
+            include_co2=include_co2,
+            co2_price_eur_per_t=co2_price_eur_per_t,
+        )
+
+        df = pd.DataFrame({
+            "t": T,
+            "Baseline Elec Load [MW_e]": base_elec,
+            "Baseline Clinker [t/h]":    clk,
+            "Elec Price [€/MWh_e]":      pE if pE else np.nan,
+            "Variable Cost [€/h]":       vc if vc else np.nan,
+            "Max Up [MW_e]":             out["max_up_MW"],
+            "Max Down [MW_e]":           out["max_down_MW"],
+            "Price Up [€/MWh_e]":        out["price_up_EUR_per_MWhe"],
+            "Price Down [€/MWh_e]":      out["price_down_EUR_per_MWhe"],
+            "Best Up Lever":             out["best_up_lever"],
+            "Best Down Lever":           out["best_down_lever"],
+        })
+
+        if csv_path:
+            df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+
+        self.redispatch_last = {"instance": instance, "table": df, "raw": out}
+        return out, df

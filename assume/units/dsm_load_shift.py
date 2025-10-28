@@ -776,12 +776,6 @@ class DSMFlex:
         if switch_flex_off:
             instance = self.switch_to_opt(instance)
 
-        # 2) solve MILP, fix binaries, solve LP, collect duals
-        self.solve_with_duals(solver_name="highs", tee=False)
-
-        # 3) export duals
-        self.export_shadow_prices_csv("./outputs/shadow_prices.csv")
-
         # solve the instance
         results = self.solver.solve(instance, options=self.solver_options)
 
@@ -821,6 +815,16 @@ class DSMFlex:
             pyo.value(instance.variable_cost[t]) for t in instance.time_steps
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
+        # 5) build redispatch bids on the solved instance (hourly up/down + prices) and export CSV
+    #    adjust activation_duration_h and CO2 inclusion as needed
+        # self.build_redispatch_bids_from_instance(
+        #     instance,
+        #     activation_duration_h=1.0,        # or 0.25 for 15-min
+        #     include_co2=True,
+        #     co2_price_eur_per_t=getattr(self, "co2_price", None),
+        #     csv_path="./outputs/redispatch_bids.csv",
+        # )
+
 
         # # Dashboard & Plot
         # self.dashboard(
@@ -839,19 +843,6 @@ class DSMFlex:
         #                     baseline_instance=instance,   # or None
         #                     html_path="./outputs/cement_full_dashboard.html",
         #                     sankey_max_steps=168)
-
-    def export_shadow_prices_csv(self, path):
-        """
-        Writes self.shadow_prices to CSV. Call this after solve_with_duals().
-        """
-        import pandas as pd
-        sp = getattr(self, "shadow_prices", None)
-        if not sp:
-            raise RuntimeError("No shadow prices found. Call solve_with_duals() first.")
-        df = pd.DataFrame(sp)
-        # Keep Excel happy with €
-        df.to_csv(path, index=False, encoding="utf-8-sig")
-        return path
 
     def determine_optimal_operation_with_flex(self):
         """

@@ -478,7 +478,7 @@ class flexableRedispatchStorage(BaseStrategy):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.foresight = parse_duration(kwargs.get("eom_foresight", "24h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "3h"))
         self.lookahead = parse_duration(kwargs.get("lookahead", "0h"))
 
     # ---------- helpers ----------
@@ -567,7 +567,13 @@ class flexableRedispatchStorage(BaseStrategy):
 
     # ---------- main ----------
 
-    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
         bids = []
 
         # Proper aligned index
