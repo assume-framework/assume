@@ -8,6 +8,7 @@ import pandas as pd
 
 from assume.common.fast_pandas import FastIndex_from_pd, FastSeries
 
+
 class Calculations:
     """
     This class represents a forecaster that provides timeseries for forecasts derived from existing files.
@@ -57,7 +58,7 @@ class Calculations:
         self.lines = lines
 
         self.index = index
-        self.fuel_prices = pd.DataFrame(index=self.index.as_datetimeindex())
+        self.fuel_prices = pd.DataFrame(index=self.index)
         for column in fuel_prices.columns:
             self.fuel_prices[column] = fuel_prices[column].item()
         self.forecasts = pd.DataFrame(index=index)
@@ -257,7 +258,7 @@ class Calculations:
         ].copy()
 
         vre_feed_in_df = pd.DataFrame(
-            index=self.index.as_datetimeindex(),
+            index=self.index,
             columns=vre_powerplants_units.index,
             data=0.0,
         )
@@ -361,7 +362,7 @@ class Calculations:
             sum_demand += sum_imports - sum_exports
 
         # 6. Initialize the price forecast series.
-        price_forecast = pd.Series(index=self.index.as_datetimeindex(), data=0.0)
+        price_forecast = pd.Series(index=self.index, data=0.0)
 
         # 7. Loop over each time step
         for t in self.index:
@@ -417,7 +418,7 @@ class Calculations:
         if pp_series.fuel_type in self.fuel_prices.keys():
             fuel_price = self.fuel_prices[pp_series.fuel_type]
         else:
-            fuel_price = pd.Series(0.0, index=self.index.as_datetimeindex())
+            fuel_price = pd.Series(0.0, index=self.index)
 
         emission_factor = pp_series["emission_factor"]
         co2_price = self.fuel_prices["co2"]
@@ -443,7 +444,7 @@ class Calculations:
         """
         # Step 1: Calculate powerplant load using availability factors
         availability_factor_df = pd.DataFrame(
-            index=self.index.as_datetimeindex(),
+            index=self.index,
             columns=self.powerplants_units.index,
             data=0.0,
         )
@@ -474,7 +475,7 @@ class Calculations:
             net_load_by_node[node] = node_demand - node_generation
 
         # Step 3: Calculate line-specific congestion severity
-        line_congestion_severity = pd.DataFrame(index=self.index.as_datetimeindex())
+        line_congestion_severity = pd.DataFrame(index=self.index)
 
         for line_id, line_data in self.lines.iterrows():
             node1, node2 = line_data["bus0"], line_data["bus1"]
@@ -490,7 +491,7 @@ class Calculations:
             )
 
         # Step 4: Calculate node-specific congestion signal by aggregating connected lines
-        node_congestion_signal = pd.DataFrame(index=self.index.as_datetimeindex())
+        node_congestion_signal = pd.DataFrame(index=self.index)
 
         for node in self.demand_units["node"].unique():
             # Find all lines connected to this node
@@ -528,7 +529,7 @@ class Calculations:
                         utilisation signal time series for that node and a column for total utilisation across all nodes.
         """
         # Initialize a DataFrame to store renewable utilisation for each node
-        renewable_utilisation = pd.DataFrame(index=self.index.as_datetimeindex())
+        renewable_utilisation = pd.DataFrame(index=self.index)
 
         # Identify renewable power plants by filtering `powerplants_units` DataFrame
         renewable_plants = self.powerplants_units[
@@ -537,7 +538,7 @@ class Calculations:
 
         # Calculate utilisation based on availability and max power for each renewable plant
         for node in self.demand_units["node"].unique():
-            node_renewable_sum = pd.Series(0, index=self.index.as_datetimeindex())
+            node_renewable_sum = pd.Series(0, index=self.index)
 
             # Filter renewable plants in this specific node
             node_renewable_plants = renewable_plants[renewable_plants["node"] == node]
