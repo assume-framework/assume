@@ -99,7 +99,7 @@ class Calculations:
             prefix (str): The prefix of the column.
 
         Example:
-            >>> forecaster = CsvForecaster(index=FastIndex(start='2020-01-01', end='2025-01-01'))
+            >>> forecaster = Calculations(index=FastIndex(start='2020-01-01', end='2025-01-01'))
             >>> forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
             >>> print(forecaster['location_1_temperature'])
         """
