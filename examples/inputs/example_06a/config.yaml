@@ -4,7 +4,7 @@
  
 base:
   start_date: 2035-01-01 00:00
-  end_date: 2035-01-07 23:00
+  end_date: 2035-12-30 23:00
   time_step: 1h
   save_frequency_hours: 24
  
@@ -82,6 +82,6 @@ base:
         - max_power
       param_dict:
         network_path: .
-        solver: gurobi
+        solver: highs
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000

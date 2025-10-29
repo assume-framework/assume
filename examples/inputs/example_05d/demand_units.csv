@@ -626,5 +626,5 @@ way/957746797-380,inflex_demand,naive_eom,fixed_dispatch_strategy,,,1000000,0,wa
 way/97825259-380,inflex_demand,naive_eom,fixed_dispatch_strategy,,,1000000,0,way/97825259-380,eom_de
 way/97857512-220,inflex_demand,naive_eom,fixed_dispatch_strategy,,,1000000,0,way/97857512-220,eom_de
 way/979801144-380,inflex_demand,naive_eom,fixed_dispatch_strategy,,,1000000,0,way/979801144-380,eom_de
-demand_CRM_pos,reserve_capacity,,,naive_eom,,1000000,0,way/97857512-220,crm_de
-demand_CRM_neg,reserve_capacity,,,,naive_eom,1000000,0,way/979801144-380,crm_de
+demand_CRM_pos,reserve_capacity,,,naive_eom,,1000000,0,,crm_de
+demand_CRM_neg,reserve_capacity,,,,naive_eom,1000000,0,,crm_de
