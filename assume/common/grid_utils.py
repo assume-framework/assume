@@ -230,8 +230,6 @@ def add_redispatch_storage_units(
         sign=-1,
     )
 
-
-
 def add_loads(
     network: pypsa.Network,
     loads: pd.DataFrame,
@@ -329,29 +327,12 @@ def add_nodal_loads(
     )
 
 
-def add_redispatch_dsm(
-    network: pypsa.Network, industrial_dsm_units: pd.DataFrame
-) -> None:
-    """
-    This adds the industrial_dsm_units with the sold capacity in the DAM as loads
-    and the flexible capacity to ramp up and ramp down as upward and downward generators
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the units are added
-        industrial_dsm_units (pandas.DataFrame): the industrial_dsm_units dataframe
-    """
-
-    # simply copy the DataFrame straight over
+def add_redispatch_dsm(network: pypsa.Network, industrial_dsm_units: pd.DataFrame) -> None:
     dsm_units = industrial_dsm_units.copy()
 
-    # now build p_set exactly as before...
-    p_set = pd.DataFrame(
-        0,
-        index=network.snapshots,
-        columns=dsm_units.index,
-    )
-
-    network.madd(
+    # 0) Fixed baseline load
+    p_set = pd.DataFrame(0.0, index=network.snapshots, columns=dsm_units.index)
+    network.add(
         "Load",
         names=dsm_units.index,
         bus=dsm_units["node"],
@@ -359,20 +340,26 @@ def add_redispatch_dsm(
         sign=1,
     )
 
-    # upward redispatch
+    # Decide nominal caps (static). Prefer explicit columns if you have them:
+    # e.g., dsm_units["max_up_cap"], dsm_units["max_down_cap"].
+    # If not, use a large but safe bound:
+    p_nom_up   = dsm_units.get("max_up_cap", pd.Series(1e3, index=dsm_units.index))
+    p_nom_down = dsm_units.get("max_down_cap", pd.Series(1e3, index=dsm_units.index))
+
+    # upward redispatch (consume more) – use sign=-1
     network.madd(
         "Generator",
         names=dsm_units.index,
         suffix="_up",
         bus=dsm_units["node"],
-        p_nom=1,
-        p_min_pu=p_set,
-        p_max_pu=p_set,
-        marginal_cost=p_set,
+        p_nom=1,                     # keep the “1 MW trick”
+        p_min_pu=p_set,              # 0 before clearing
+        p_max_pu=p_set + 1,          # allow a band; clearing code can set p_set to accepted MW
+        marginal_cost=p_set,         # filled with bid price later
         sign=-1,
     )
 
-    # downward redispatch
+    # downward redispatch (consume less) – use sign=+1
     network.madd(
         "Generator",
         names=dsm_units.index,
@@ -380,7 +367,7 @@ def add_redispatch_dsm(
         bus=dsm_units["node"],
         p_nom=1,
         p_min_pu=p_set,
-        p_max_pu=p_set,
+        p_max_pu=p_set + 1,
         marginal_cost=p_set,
         sign=1,
     )

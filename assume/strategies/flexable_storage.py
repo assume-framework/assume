@@ -567,7 +567,13 @@ class flexableRedispatchStorage(BaseStrategy):
 
     # ---------- main ----------
 
-    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
+    def calculate_bids(
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
         bids = []
 
         # Proper aligned index

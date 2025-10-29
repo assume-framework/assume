@@ -775,6 +775,7 @@ class DSMFlex:
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
         if switch_flex_off:
             instance = self.switch_to_opt(instance)
+
         # solve the instance
         results = self.solver.solve(instance, options=self.solver_options)
 
@@ -814,6 +815,16 @@ class DSMFlex:
             pyo.value(instance.variable_cost[t]) for t in instance.time_steps
         ]
         self.variable_cost_series = FastSeries(index=self.index, value=variable_cost)
+        # 5) build redispatch bids on the solved instance (hourly up/down + prices) and export CSV
+    #    adjust activation_duration_h and CO2 inclusion as needed
+        # self.build_redispatch_bids_from_instance(
+        #     instance,
+        #     activation_duration_h=1.0,        # or 0.25 for 15-min
+        #     include_co2=True,
+        #     co2_price_eur_per_t=getattr(self, "co2_price", None),
+        #     csv_path="./outputs/redispatch_bids.csv",
+        # )
+
 
         # # Dashboard & Plot
         # self.dashboard(
@@ -826,7 +837,7 @@ class DSMFlex:
         # self.plot_2(instance, save_path="./outputs/DE_FCR_products.png", show=True)
 
         #Cement Plot plots
-        self.plot_1(instance, save_name="cement_BAU_week42", out_dir="./outputs", show=True)
+        # self.plot_1(instance, save_name="cement_BAU_week42", out_dir="./outputs", show=True)
         # self.plot_capacity_products(instance, save_name="cement_BAU_capacity_week42", out_dir="./outputs", show=True) 
         # self.dashboard_cement(instance,
         #                     baseline_instance=instance,   # or None

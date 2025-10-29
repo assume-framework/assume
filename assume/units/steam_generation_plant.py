@@ -141,6 +141,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.thermal_demand = self.forecaster[f"{self.id}_thermal_demand"]
         self.congestion_signal = self.forecaster[f"{self.id}_congestion_signal"]
         self.renewable_utilisation_signal = self.forecaster["availability_solar"]
+        self.marginal_heat_cost = self.forecaster["marginal_heat_cost"]
         self.congestion_threshold = congestion_threshold
         self.peak_load_cap = peak_load_cap
         self.objective = objective
@@ -171,6 +172,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
         # Initialize the model
         self.setup_model()
+        
 
     def define_parameters(self):
         """
@@ -407,6 +409,76 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             )
 
         return marginal_cost
+
+    def _fix_integer_vars(self, m):
+        """Fix all integer-like vars (Binary or Int in [0,1]) to their current values."""
+        fixed = []
+        for v in m.component_data_objects(pyo.Var, descend_into=True):
+            # Robust detection of binaries / general integers
+            is_binary_domain = (v.domain is pyo.Binary)
+            looks_like_binary = (v.is_integer() and v.lb is not None and v.ub is not None and v.lb == 0 and v.ub == 1)
+            is_general_integer = v.is_integer() and not looks_like_binary
+
+            if is_binary_domain or looks_like_binary or is_general_integer:
+                # must have a value from a prior solve:
+                val = pyo.value(v)
+                if val is None:
+                    # if any integer var is unset, you'll need a successful MILP solve first
+                    continue
+                v.fix(val)
+                fixed.append(v)
+        return fixed
+
+    def _unfix_integer_vars(self, m):
+        """Unfix all vars we previously fixed (binary / integer)."""
+        for v in m.component_data_objects(pyo.Var, descend_into=True):
+            if v.fixed:
+                v.unfix()
+
+    def solve_with_duals(self, solver_name="highs", tee=False):
+        """
+        1) Solve the full MILP (binaries free) to get an operational schedule.
+        2) Fix integer vars to their solved values.
+        3) Attach dual suffix and solve again (LP).
+        4) Read shadow prices and store to self.shadow_prices.
+        """
+        m = self.model
+
+        # --- 1) MILP solve
+        opt = pyo.SolverFactory(solver_name)
+        res1 = opt.solve(m, tee=tee)
+        # (optional) check status/termination here
+
+        # --- 2) Fix binaries/integers at their chosen values
+        self._fix_integer_vars(m)
+
+        # --- 3) Attach dual suffix & re-solve as LP
+        # Import-only is enough for HiGHS via appsi; for cplex/gurobi you could use both IMPORT|EXPORT
+        if not hasattr(m, "dual"):
+            m.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
+        res2 = opt.solve(m, tee=tee)
+
+        # --- 4) Read duals you care about
+        # Example: per-hour heat balance dual → marginal heat cost [€/MWh_th]
+        # Adjust the constraint name to match your model (e.g., m.heat_balance[t])
+        marg_heat = []
+        T = list(m.time_steps)
+        for t in T:
+            c = m.thermal_bus_balance_and_demand[t]  # <— CHANGE if your constraint is named differently
+            lam = m.dual.get(c, None)
+            marg_heat.append(float(lam) if lam is not None else float("nan"))
+
+        # Optional: also read duals of other balances if you want
+        # e.g., electricity system balance, storage energy balance, etc.
+
+        # Persist for later plots/exports
+        self.shadow_prices = {
+            "time": [t for t in T],
+            "marginal_heat_cost_eur_per_MWhth": marg_heat,
+        }
+
+        return res1, res2
+
 
     def _add_reserve_capacity_market_guardrail(self, model):
         """
@@ -1172,6 +1244,207 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             "mask_up": mask_up,
             "mask_dn": mask_dn,
         }
+
+        ######################### Strategy 1#######################################
+    
+    def _add_fcr_capacity_market(self, model):
+        """
+        Reserve capacity market with per-block exclusivity:
+        • Either FCR (symmetric) OR aFRR (asymmetric up/down) in a given 4h block.
+        German-style fixed 4h blocks: 00–04, 04–08, ...; integer MW, 1 MW min.
+        Activates only when self.is_prosumer is True.
+        """
+        if not self.is_prosumer:
+            return
+
+        import math
+
+        m = model
+        L = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))
+        step = float(getattr(self, "_FCR_STEP_MW", 1.0))
+        min_bid = float(getattr(self, "_FCR_MIN_BID_MW", 1.0))
+
+        # ---- Build fixed 4h blocks aligned to wall-clock hours ----
+        ts = self.index  # DatetimeIndex aligned with time_steps
+        starts_idx = [
+            i for i, t in enumerate(ts[: -L + 1]) if (t.hour % 4 == 0 and t.minute == 0)
+        ]
+        starts_idx = [i for i in starts_idx if i + L <= len(ts)]
+        m.fcr_blocks = pyo.Set(initialize=starts_idx, ordered=True)
+
+        # ---- Hourly -> block prices (sum €/MW/h over each 4h block) ----
+        N = len(ts)
+
+        def _as_vec(v):
+            if v is None:
+                return [0.0] * N
+            return [float(x) for x in v]
+
+        v_fcr = _as_vec(getattr(self, "fcr_price", None))
+        v_pos = _as_vec(getattr(self, "afrr_price_pos", None))
+        v_neg = _as_vec(getattr(self, "afrr_price_neg", None))
+
+        def _block_sum(vec):
+            # prefix sum to sum fast
+            ps = [0.0]
+            for x in vec:
+                ps.append(ps[-1] + x)
+            return {b: ps[b + L] - ps[b] for b in starts_idx}
+
+        m.fcr_block_price = pyo.Param(
+            m.fcr_blocks, initialize=_block_sum(v_fcr), mutable=False
+        )
+        m.afrr_block_price_pos = pyo.Param(
+            m.fcr_blocks, initialize=_block_sum(v_pos), mutable=False
+        )
+        m.afrr_block_price_neg = pyo.Param(
+            m.fcr_blocks, initialize=_block_sum(v_neg), mutable=False
+        )
+
+        # ---- Static plant electric envelope (for feasibility) ----
+        max_cap = 0.0
+        min_cap = 0.0
+        if self.has_heatpump:
+            max_cap += float(m.dsm_blocks["heat_pump"].max_power)
+            min_cap += float(m.dsm_blocks["heat_pump"].min_power)
+        if self.has_heat_resistor:
+            max_cap += float(m.dsm_blocks["heat_resistor"].max_power)
+            min_cap += float(m.dsm_blocks["heat_resistor"].min_power)
+        if self.has_boiler:
+            boiler = self.components["boiler"]
+            if getattr(boiler, "fuel_type", None) == "electricity":
+                max_cap += float(m.dsm_blocks["boiler"].max_power)
+                min_cap += float(m.dsm_blocks["boiler"].min_power)
+        if self.has_thermal_storage:
+            # electric heater into TES (generator mode)
+            max_cap += float(m.dsm_blocks["thermal_storage"].max_Pelec)
+        self.max_plant_capacity = max_cap
+        self.min_plant_capacity = min_cap
+
+        # ---- Variables ----
+        # Product selectors (per block)
+        m.sel_fcr = pyo.Var(
+            m.fcr_blocks, within=pyo.Binary
+        )  # choose symmetric FCR in this block
+        m.sel_afrr = pyo.Var(
+            m.fcr_blocks, within=pyo.Binary
+        )  # choose aFRR in this block
+
+        @m.Constraint(m.fcr_blocks)
+        def one_product_per_block(mm, b):
+            return mm.sel_fcr[b] + mm.sel_afrr[b] <= 1
+
+        # FCR (symmetric) capacity with step/min
+        M_blocks = int(math.ceil(max(1.0, max_cap) / step))  # big-M on step counts
+        m.k_sym = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.cap_sym = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+
+        @m.Constraint(m.fcr_blocks)
+        def sym_steps(mm, b):
+            return mm.cap_sym[b] == step * mm.k_sym[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def sym_active(mm, b):
+            return mm.k_sym[b] <= M_blocks * mm.sel_fcr[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def sym_minbid(mm, b):
+            return mm.cap_sym[b] >= min_bid * mm.sel_fcr[b]
+
+        # aFRR (asymmetric) capacities with step/min and per-side bids
+        m.k_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.k_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.cap_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.cap_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.bid_up = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+        m.bid_dn = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+
+        # steps
+        @m.Constraint(m.fcr_blocks)
+        def up_steps(mm, b):
+            return mm.cap_up[b] == step * mm.k_up[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def dn_steps(mm, b):
+            return mm.cap_dn[b] == step * mm.k_dn[b]
+
+        # activation tied to aFRR selection
+        @m.Constraint(m.fcr_blocks)
+        def up_active(mm, b):
+            return mm.k_up[b] <= M_blocks * mm.bid_up[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def dn_active(mm, b):
+            return mm.k_dn[b] <= M_blocks * mm.bid_dn[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def up_minbid(mm, b):
+            return mm.cap_up[b] >= min_bid * mm.bid_up[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def dn_minbid(mm, b):
+            return mm.cap_dn[b] >= min_bid * mm.bid_dn[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def up_sel_link(mm, b):
+            return mm.bid_up[b] <= mm.sel_afrr[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def dn_sel_link(mm, b):
+            return mm.bid_dn[b] <= mm.sel_afrr[b]
+
+        @m.Constraint(m.fcr_blocks)
+        def afrr_exclusive(mm, b):
+            # If aFRR is selected (sel_afrr=1) → exactly ONE of (bid_up, bid_dn) must be 1.
+            # If aFRR is not selected (sel_afrr=0) → both must be 0.
+            return mm.bid_up[b] + mm.bid_dn[b] == mm.sel_afrr[b]
+
+        # If you want to forbid "only up but not down" or vice versa for aFRR, uncomment:
+        # @m.Constraint(m.fcr_blocks)
+        # def afrr_any_when_selected(mm, b): return mm.bid_up[b] + mm.bid_dn[b] >= mm.sel_afrr[b]
+
+        # ---- Feasibility inside each 4h block (only for the chosen product) ----
+        # Use relaxed (deactivated) constraints via big-M on selectors.
+        BIGM = max(1.0, max_cap - min_cap)  # safe envelope width
+
+        m.fea = pyo.ConstraintList()
+        for b in starts_idx:
+            for k in range(L):
+                t = b + k
+                # FCR symmetric must be feasible both up & down
+                m.fea.add(
+                    m.cap_sym[b]
+                    <= (self.max_plant_capacity - m.total_power_input[t])
+                    + BIGM * (1 - m.sel_fcr[b])
+                )
+                m.fea.add(
+                    m.cap_sym[b]
+                    <= (m.total_power_input[t] - self.min_plant_capacity)
+                    + BIGM * (1 - m.sel_fcr[b])
+                )
+
+                # aFRR up/down independent when selected
+                m.fea.add(
+                    m.cap_up[b]
+                    <= (self.max_plant_capacity - m.total_power_input[t])
+                    + BIGM * (1 - m.bid_up[b])
+                )
+                m.fea.add(
+                    m.cap_dn[b]
+                    <= (m.total_power_input[t] - self.min_plant_capacity)
+                    + BIGM * (1 - m.bid_dn[b])
+                )
+
+        # ---- Revenue expression (paid once for whichever product is chosen) ----
+        @m.Expression()
+        def fcr_revenue(mm):
+            rev_fcr = sum(
+                mm.fcr_block_price[b] * mm.cap_sym[b] for b in mm.fcr_blocks
+            )  # symmetric
+            rev_afrr = sum(
+                mm.afrr_block_price_pos[b] * mm.cap_up[b] for b in mm.fcr_blocks
+            ) + sum(mm.afrr_block_price_neg[b] * mm.cap_dn[b] for b in mm.fcr_blocks)
+            return rev_fcr + rev_afrr
 
     ################### PLOT #######################
     def plot_1(self, instance, save_path=None, show=True):
@@ -3279,204 +3552,3 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             f.write("</body></html>")
         print(f"Full dashboard saved to: {html_path}")
 
-    ######################### Strategy 1#######################################
-    def _add_fcr_capacity_market(self, model):
-        """
-        Reserve capacity market with per-block exclusivity:
-        • Either FCR (symmetric) OR aFRR (asymmetric up/down) in a given 4h block.
-        German-style fixed 4h blocks: 00–04, 04–08, ...; integer MW, 1 MW min.
-        Activates only when self.is_prosumer is True.
-        """
-        if not self.is_prosumer:
-            return
-
-        import math
-
-        m = model
-        L = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))
-        step = float(getattr(self, "_FCR_STEP_MW", 1.0))
-        min_bid = float(getattr(self, "_FCR_MIN_BID_MW", 1.0))
-
-        # ---- Build fixed 4h blocks aligned to wall-clock hours ----
-        ts = self.index  # DatetimeIndex aligned with time_steps
-        starts_idx = [
-            i for i, t in enumerate(ts[: -L + 1]) if (t.hour % 4 == 0 and t.minute == 0)
-        ]
-        starts_idx = [i for i in starts_idx if i + L <= len(ts)]
-        m.fcr_blocks = pyo.Set(initialize=starts_idx, ordered=True)
-
-        # ---- Hourly -> block prices (sum €/MW/h over each 4h block) ----
-        N = len(ts)
-
-        def _as_vec(v):
-            if v is None:
-                return [0.0] * N
-            return [float(x) for x in v]
-
-        v_fcr = _as_vec(getattr(self, "fcr_price", None))
-        v_pos = _as_vec(getattr(self, "afrr_price_pos", None))
-        v_neg = _as_vec(getattr(self, "afrr_price_neg", None))
-
-        def _block_sum(vec):
-            # prefix sum to sum fast
-            ps = [0.0]
-            for x in vec:
-                ps.append(ps[-1] + x)
-            return {b: ps[b + L] - ps[b] for b in starts_idx}
-
-        m.fcr_block_price = pyo.Param(
-            m.fcr_blocks, initialize=_block_sum(v_fcr), mutable=False
-        )
-        m.afrr_block_price_pos = pyo.Param(
-            m.fcr_blocks, initialize=_block_sum(v_pos), mutable=False
-        )
-        m.afrr_block_price_neg = pyo.Param(
-            m.fcr_blocks, initialize=_block_sum(v_neg), mutable=False
-        )
-
-        # ---- Static plant electric envelope (for feasibility) ----
-        max_cap = 0.0
-        min_cap = 0.0
-        if self.has_heatpump:
-            max_cap += float(m.dsm_blocks["heat_pump"].max_power)
-            min_cap += float(m.dsm_blocks["heat_pump"].min_power)
-        if self.has_heat_resistor:
-            max_cap += float(m.dsm_blocks["heat_resistor"].max_power)
-            min_cap += float(m.dsm_blocks["heat_resistor"].min_power)
-        if self.has_boiler:
-            boiler = self.components["boiler"]
-            if getattr(boiler, "fuel_type", None) == "electricity":
-                max_cap += float(m.dsm_blocks["boiler"].max_power)
-                min_cap += float(m.dsm_blocks["boiler"].min_power)
-        if self.has_thermal_storage:
-            # electric heater into TES (generator mode)
-            max_cap += float(m.dsm_blocks["thermal_storage"].max_Pelec)
-        self.max_plant_capacity = max_cap
-        self.min_plant_capacity = min_cap
-
-        # ---- Variables ----
-        # Product selectors (per block)
-        m.sel_fcr = pyo.Var(
-            m.fcr_blocks, within=pyo.Binary
-        )  # choose symmetric FCR in this block
-        m.sel_afrr = pyo.Var(
-            m.fcr_blocks, within=pyo.Binary
-        )  # choose aFRR in this block
-
-        @m.Constraint(m.fcr_blocks)
-        def one_product_per_block(mm, b):
-            return mm.sel_fcr[b] + mm.sel_afrr[b] <= 1
-
-        # FCR (symmetric) capacity with step/min
-        M_blocks = int(math.ceil(max(1.0, max_cap) / step))  # big-M on step counts
-        m.k_sym = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
-        m.cap_sym = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
-
-        @m.Constraint(m.fcr_blocks)
-        def sym_steps(mm, b):
-            return mm.cap_sym[b] == step * mm.k_sym[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def sym_active(mm, b):
-            return mm.k_sym[b] <= M_blocks * mm.sel_fcr[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def sym_minbid(mm, b):
-            return mm.cap_sym[b] >= min_bid * mm.sel_fcr[b]
-
-        # aFRR (asymmetric) capacities with step/min and per-side bids
-        m.k_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
-        m.k_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
-        m.cap_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
-        m.cap_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
-        m.bid_up = pyo.Var(m.fcr_blocks, within=pyo.Binary)
-        m.bid_dn = pyo.Var(m.fcr_blocks, within=pyo.Binary)
-
-        # steps
-        @m.Constraint(m.fcr_blocks)
-        def up_steps(mm, b):
-            return mm.cap_up[b] == step * mm.k_up[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def dn_steps(mm, b):
-            return mm.cap_dn[b] == step * mm.k_dn[b]
-
-        # activation tied to aFRR selection
-        @m.Constraint(m.fcr_blocks)
-        def up_active(mm, b):
-            return mm.k_up[b] <= M_blocks * mm.bid_up[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def dn_active(mm, b):
-            return mm.k_dn[b] <= M_blocks * mm.bid_dn[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def up_minbid(mm, b):
-            return mm.cap_up[b] >= min_bid * mm.bid_up[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def dn_minbid(mm, b):
-            return mm.cap_dn[b] >= min_bid * mm.bid_dn[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def up_sel_link(mm, b):
-            return mm.bid_up[b] <= mm.sel_afrr[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def dn_sel_link(mm, b):
-            return mm.bid_dn[b] <= mm.sel_afrr[b]
-
-        @m.Constraint(m.fcr_blocks)
-        def afrr_exclusive(mm, b):
-            # If aFRR is selected (sel_afrr=1) → exactly ONE of (bid_up, bid_dn) must be 1.
-            # If aFRR is not selected (sel_afrr=0) → both must be 0.
-            return mm.bid_up[b] + mm.bid_dn[b] == mm.sel_afrr[b]
-
-        # If you want to forbid "only up but not down" or vice versa for aFRR, uncomment:
-        # @m.Constraint(m.fcr_blocks)
-        # def afrr_any_when_selected(mm, b): return mm.bid_up[b] + mm.bid_dn[b] >= mm.sel_afrr[b]
-
-        # ---- Feasibility inside each 4h block (only for the chosen product) ----
-        # Use relaxed (deactivated) constraints via big-M on selectors.
-        BIGM = max(1.0, max_cap - min_cap)  # safe envelope width
-
-        m.fea = pyo.ConstraintList()
-        for b in starts_idx:
-            for k in range(L):
-                t = b + k
-                # FCR symmetric must be feasible both up & down
-                m.fea.add(
-                    m.cap_sym[b]
-                    <= (self.max_plant_capacity - m.total_power_input[t])
-                    + BIGM * (1 - m.sel_fcr[b])
-                )
-                m.fea.add(
-                    m.cap_sym[b]
-                    <= (m.total_power_input[t] - self.min_plant_capacity)
-                    + BIGM * (1 - m.sel_fcr[b])
-                )
-
-                # aFRR up/down independent when selected
-                m.fea.add(
-                    m.cap_up[b]
-                    <= (self.max_plant_capacity - m.total_power_input[t])
-                    + BIGM * (1 - m.bid_up[b])
-                )
-                m.fea.add(
-                    m.cap_dn[b]
-                    <= (m.total_power_input[t] - self.min_plant_capacity)
-                    + BIGM * (1 - m.bid_dn[b])
-                )
-
-        # ---- Revenue expression (paid once for whichever product is chosen) ----
-        @m.Expression()
-        def fcr_revenue(mm):
-            rev_fcr = sum(
-                mm.fcr_block_price[b] * mm.cap_sym[b] for b in mm.fcr_blocks
-            )  # symmetric
-            rev_afrr = sum(
-                mm.afrr_block_price_pos[b] * mm.cap_up[b] for b in mm.fcr_blocks
-            ) + sum(mm.afrr_block_price_neg[b] * mm.cap_dn[b] for b in mm.fcr_blocks)
-            return rev_fcr + rev_afrr
-
-    ######################### Strategy 2#######################################
