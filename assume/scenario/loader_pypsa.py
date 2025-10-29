@@ -10,7 +10,11 @@ import pypsa
 from dateutil import rrule as rr
 
 from assume import World
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import (
+    DemandForecaster,
+    PowerplantForecaster,
+    UnitForecaster,
+)
 from assume.common.market_objects import MarketConfig, MarketProduct
 
 logger = logging.getLogger(__name__)
@@ -102,9 +106,9 @@ def load_pypsa(
                 "min_operating_time": generator.min_up_time,
                 "min_down_time": generator.min_down_time,
             },
-            NaiveForecast(
+            PowerplantForecaster(
                 index,
-                fuel_price=generator.marginal_cost,
+                fuel_prices={generator.carrier: generator.marginal_cost},
                 availability=av,
             ),
         )
@@ -132,7 +136,7 @@ def load_pypsa(
                 "node": load.node,
                 "price": 1e3,
             },
-            NaiveForecast(index, demand=load_t, **kwargs),
+            DemandForecaster(index, demand=load_t, **kwargs),
         )
 
     world.add_unit_operator("storage_operator")
@@ -163,7 +167,7 @@ def load_pypsa(
                 "emission_factor": 0,
                 "node": storage.bus,
             },
-            NaiveForecast(index, fuel_price=storage.marginal_cost),
+            UnitForecaster(index),
         )
 
 
