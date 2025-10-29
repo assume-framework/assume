@@ -46,7 +46,7 @@ class DemandForecaster(UnitForecaster):
         self,
         index: ForecastIndex,
         market_prices: dict[str, ForecastSeries] = None,
-        demand: ForecastSeries = 100,
+        demand: ForecastSeries = -100,
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
     ):
