@@ -115,8 +115,9 @@ class TorchLearningStrategy(LearningStrategy):
         # scaling factors for the observations
         upper_scaling_factor_price = max(unit.forecaster.price[market_id])
         lower_scaling_factor_price = min(unit.forecaster.price[market_id])
-        residual_load = FastSeries(unit.index, 0)
-        residual_load = unit.forecaster.residual_load[market_id]
+        residual_load = unit.forecaster.residual_load.get(
+            market_id, FastSeries(index=unit.index, value=0)
+        )
         upper_scaling_factor_res_load = max(residual_load)
         lower_scaling_factor_res_load = min(residual_load)
 

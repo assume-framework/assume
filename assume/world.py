@@ -27,7 +27,6 @@ from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
 
 from assume.common import (
-    Forecaster,
     MarketConfig,
     OutputDef,
     UnitsOperator,
@@ -35,6 +34,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
+from assume.common.forecaster import UnitForecaster
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
@@ -187,7 +187,7 @@ class World:
         learning_config: LearningConfig = {},
         episode: int = 1,
         eval_episode: int = 1,
-        forecaster: Forecaster | None = None,
+        forecaster: UnitForecaster | None = None,
         manager_address=None,
         real_time=False,
         **kwargs: dict,
@@ -546,7 +546,7 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
     ) -> BaseUnit:
         # provided unit type does not exist yet
         unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
@@ -819,7 +819,7 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
     ) -> None:
         """
         Creates a unit and adds it to the World instance.

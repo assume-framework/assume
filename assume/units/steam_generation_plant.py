@@ -141,7 +141,8 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             self.model.hydrogen_gas_price = pyo.Param(
                 self.model.time_steps,
                 initialize={
-                    t: value for t, value in enumerate(self.get_price("hydrogen"))
+                    t: value
+                    for t, value in enumerate(self.forecaster.get_price("hydrogen"))
                 },
             )
 

@@ -538,6 +538,11 @@ def test_all_assets_coordinated(steam_plant_with_hp_b_ts):
         electricity_price=[60] * 24,  # adapt if needed
         fuel_prices={"hydrogen_gas": [55] * 24},  # adapt if needed
         thermal_demand=demand_profile,
+        demand=0,
+        electricity_price_flex=0,
+        congestion_signal=0,
+        renewable_utilisation_signal=0,
+        thermal_storage_schedule=0,
     )
     # Replace the forecaster of the plant with the new one
     steam_plant_with_hp_b_ts.forecaster = new_forecast

@@ -176,7 +176,7 @@ class HydrogenForecaster(UnitForecaster):
         super().__init__(index, market_prices, residual_load, availability)
         self.electricity_price = self._to_series(electricity_price)
         self.hydrogen_demand = self._to_series(hydrogen_demand)
-        self.seasonal_storage_schedule = self._dict_to_series(seasonal_storage_schedule)
+        self.seasonal_storage_schedule = self._to_series(seasonal_storage_schedule)
 
 
 class ExchangeForecaster(UnitForecaster):

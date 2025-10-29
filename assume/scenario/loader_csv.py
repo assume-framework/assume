@@ -22,7 +22,6 @@ from assume.common.exceptions import AssumeException
 from assume.common.forecaster import (
     DemandForecaster,
     ExchangeForecaster,
-    Forecaster,
     PowerplantForecaster,
     UnitForecaster,
 )
@@ -359,7 +358,7 @@ def add_units(
     units_df: pd.DataFrame,
     unit_type: str,
     world: World,
-    forecaster: Forecaster,
+    forecaster: UnitForecaster,
 ) -> None:
     """
     Add units to the world from a given dataframe.
