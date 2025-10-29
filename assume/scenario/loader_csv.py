@@ -17,8 +17,15 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.base import LearningConfig
+from assume.common.calculations import Calculations
 from assume.common.exceptions import AssumeException
-from assume.common.forecasts import CsvForecaster, Forecaster
+from assume.common.forecaster import (
+    DemandForecaster,
+    ExchangeForecaster,
+    Forecaster,
+    PowerplantForecaster,
+    UnitForecaster,
+)
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     adjust_unit_operator_for_learning,
@@ -67,8 +74,6 @@ def load_file(
     Raises:
         FileNotFoundError: If the specified file is not found, returns None.
     """
-    df = None
-
     if file_name in config:
         if config[file_name] is None:
             return None
@@ -389,7 +394,7 @@ def add_units(
 def read_units(
     units_df: pd.DataFrame,
     unit_type: str,
-    forecaster: Forecaster,
+    forecaster: dict[str, UnitForecaster],
     world_bidding_strategies: dict[str, BaseStrategy],
     learning_mode: bool = False,
 ) -> dict[str, list[dict]]:
@@ -436,7 +441,7 @@ def read_units(
                 unit_type=unit_type,
                 unit_operator_id=operator_id,
                 unit_params=unit_params.to_dict(),
-                forecaster=forecaster,
+                forecaster=forecaster[unit_name],
             )
         )
     return units_dict
@@ -549,6 +554,58 @@ def load_config_and_create_forecaster(
     buses = load_file(path=path, config=config, file_name="buses")
     lines = load_file(path=path, config=config, file_name="lines")
 
+    calculator = Calculations(
+        index=index,
+        demand_units=demand_units,
+        exchange_units=exchange_units,
+        powerplants_units=powerplant_units,
+        buses=buses,
+        lines=lines,
+        fuel_prices=fuel_prices_df,
+        market_configs=config["markets_config"],
+    )
+    calculator.set_forecast(forecasts_df)
+    calculator.set_forecast(demand_df)
+    calculator.set_forecast(exchanges_df)
+    calculator.set_forecast(availability, prefix="availability_")
+    calculator.calc_forecast_if_needed()
+
+    unit_forecasts: dict[str, UnitForecaster] = {}
+    market_prices, residual_loads = calculator.calculate_market_forecasts()
+    if powerplant_units is not None:
+        for id, plant in powerplant_units.iterrows():
+            unit_forecasts[id] = PowerplantForecaster(
+                index=index,
+                availability=calculator[f"availability_{id}"],
+                fuel_prices=calculator.fuel_prices,
+                market_prices=market_prices,
+                residual_load=residual_loads,
+            )
+    if demand_units is not None:
+        for id, demand in demand_units.iterrows():
+            unit_forecasts[id] = DemandForecaster(
+                index=index,
+                availability=calculator[f"availability_{id}"],
+                demand=-demand_df[id].abs(),
+                market_prices=market_prices,
+            )
+    if storage_units is not None:
+        for id, storage in storage_units.iterrows():
+            unit_forecasts[id] = UnitForecaster(
+                index=index,
+                availability=calculator[f"availability_{id}"],
+                market_prices=market_prices,
+            )
+    if exchange_units is not None:
+        for id, exchange in exchange_units.iterrows():
+            unit_forecasts[id] = ExchangeForecaster(
+                index=index,
+                availability=calculator[f"availability_{id}"],
+                market_prices=market_prices,
+                volume_export=exchanges_df[f"{id}_export"],
+                volume_import=exchanges_df[f"{id}_import"],
+            )
+
     learning_config: LearningConfig = config.get("learning_config", {})
 
     # Check if simulation length is divisible by train_freq in learning config and adjust if not
@@ -574,25 +631,6 @@ def load_config_and_create_forecaster(
                 f"Adjusting train_freq to {new_train_freq_str}. Consider modifying simulation length or train_freq in the config to avoid this adjustment."
             )
 
-    forecaster = CsvForecaster(
-        index=index,
-        powerplants_units=powerplant_units,
-        demand_units=demand_units,
-        exchange_units=exchange_units,
-        market_configs=config["markets_config"],
-        buses=buses,
-        lines=lines,
-    )
-
-    forecaster.set_forecast(forecasts_df)
-    forecaster.set_forecast(demand_df)
-    forecaster.set_forecast(exchanges_df)
-    forecaster.set_forecast(availability, prefix="availability_")
-    forecaster.set_forecast(fuel_prices_df, prefix="fuel_price_")
-    forecaster.calc_forecast_if_needed()
-
-    forecaster.convert_forecasts_to_fast_series()
-
     return {
         "config": config,
         "simulation_id": simulation_id,
@@ -605,7 +643,7 @@ def load_config_and_create_forecaster(
         "demand_units": demand_units,
         "exchange_units": exchange_units,
         "dsm_units": dsm_units,
-        "forecaster": forecaster,
+        "unit_forecasts": unit_forecasts,
     }
 
 
@@ -645,7 +683,7 @@ def setup_world(
     demand_units = scenario_data["demand_units"]
     exchange_units = scenario_data["exchange_units"]
     dsm_units = scenario_data["dsm_units"]
-    forecaster = scenario_data["forecaster"]
+    unit_forecasts = scenario_data["unit_forecasts"]
 
     # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -708,7 +746,7 @@ def setup_world(
         episode=episode,
         eval_episode=eval_episode,
         bidding_params=bidding_strategy_params,
-        forecaster=forecaster,
+        # TODO custom unit forecasting
     )
 
     # get the market config from the config file and add the markets
@@ -740,7 +778,7 @@ def setup_world(
     powerplant_units = read_units(
         units_df=powerplant_units,
         unit_type="power_plant",
-        forecaster=forecaster,
+        forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
         learning_mode=learning_config["learning_mode"],
     )
@@ -748,7 +786,7 @@ def setup_world(
     storage_units = read_units(
         units_df=storage_units,
         unit_type="storage",
-        forecaster=forecaster,
+        forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
         learning_mode=learning_config["learning_mode"],
     )
@@ -756,7 +794,7 @@ def setup_world(
     demand_units = read_units(
         units_df=demand_units,
         unit_type="demand",
-        forecaster=forecaster,
+        forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
         learning_mode=learning_config["learning_mode"],
     )
@@ -764,7 +802,7 @@ def setup_world(
     exchange_units = read_units(
         units_df=exchange_units,
         unit_type="exchange",
-        forecaster=forecaster,
+        forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
     )
 
@@ -773,7 +811,7 @@ def setup_world(
             dsm_units = read_units(
                 units_df=units_df,
                 unit_type=unit_type,
-                forecaster=forecaster,
+                forecaster=unit_forecasts,
                 world_bidding_strategies=world.bidding_strategies,
                 learning_mode=learning_config["learning_mode"],
             )
