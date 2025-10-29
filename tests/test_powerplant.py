@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
-from assume.common.forecaster import NaiveForecast, PowerplantForecaster
+from assume.common.forecaster import PowerplantForecaster
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units import PowerPlant
 
@@ -308,11 +308,10 @@ def test_powerplant_ramping(power_plant_1):
 
 def test_powerplant_availability(power_plant_1):
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    ff = NaiveForecast(
+    ff = PowerplantForecaster(
         index,
         availability=[0.5, 0.01, 1, 1],
-        fuel_price=[10, 11, 12, 13],
-        co2_price=[10, 20, 30, 30],
+        fuel_prices={"others": [10, 11, 12, 13], "co2": [10, 20, 30, 30]},
     )
     # set availability
     power_plant_1.forecaster = ff
@@ -623,7 +622,7 @@ def test_initialising_invalid_powerplants():
         "unit_operator": "operator",
         "technology": "technology",
         "bidding_strategies": {},
-        "forecaster": NaiveForecast(index=index),
+        "forecaster": PowerplantForecaster(index=index),
         "max_power": 0.0,
     }
     with pytest.raises(ValueError, match="max_power=-10 must be >= 0 for unit id"):

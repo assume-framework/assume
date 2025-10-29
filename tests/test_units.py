@@ -7,12 +7,12 @@ from datetime import datetime
 import pandas as pd
 
 from assume.common.base import SupportsMinMax, SupportsMinMaxCharge
-from assume.common.forecaster import NaiveForecast
+from assume.common.forecaster import UnitForecaster
 
 
 def test_minmax():
     index = pd.date_range("2022-01-01", periods=24, freq="h")
-    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    forecaster = UnitForecaster(index, availability=1, market_prices={"EOM": 50})
 
     mm = SupportsMinMax(
         id="Test",
@@ -117,7 +117,7 @@ def test_minmax():
 
 def test_minmaxcharge():
     index = pd.date_range("2022-01-01", periods=24, freq="h")
-    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    forecaster = UnitForecaster(index, market_prices={"EOM": 50})
 
     mmc = SupportsMinMaxCharge(
         id="Test",
@@ -161,7 +161,7 @@ def test_minmaxcharge():
 
 def test_minmaxcharge_unconstrained():
     index = pd.date_range("2022-01-01", periods=24, freq="h")
-    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    forecaster = UnitForecaster(index, market_prices={"EOM": 50})
 
     mmc = SupportsMinMaxCharge(
         id="Test",
@@ -199,7 +199,7 @@ def test_minmax_operationtime():
     index = pd.date_range(
         start=datetime(2023, 7, 1), end=datetime(2023, 7, 2), freq="1h"
     )
-    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    forecaster = UnitForecaster(index, market_prices={"EOM": 50})
 
     mm = SupportsMinMax(
         id="Test",

@@ -19,7 +19,7 @@ from mango import (
 from mango.util.clock import ExternalClock
 
 from assume.common.fast_pandas import FastIndex
-from assume.common.forecaster import NaiveForecast
+from assume.common.forecaster import DemandForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.markets.base_market import MarketRole
@@ -83,7 +83,7 @@ async def test_request_messages():
         "unit_operator": "test_operator",
         "max_power": -1000,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, demand=1000),
+        "forecaster": DemandForecaster(index, demand=-1000),
     }
     unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)

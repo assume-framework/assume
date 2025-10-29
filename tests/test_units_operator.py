@@ -343,7 +343,7 @@ def test_participate_lambda():
         "unit_operator": "x",
         "max_power": 10,
         "min_power": 0,
-        "forecaster": PowerplantForecaster(index, fuel_prices={"others": 0, "co2": 0}),
+        "forecaster": PowerplantForecaster(index),
     }
     unit = PowerPlant("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -355,7 +355,7 @@ def test_participate_lambda():
         "unit_operator": "x",
         "max_power": 1000,
         "min_power": 0,
-        "forecaster": PowerplantForecaster(index, fuel_prices={"others": 0, "co2": 0}),
+        "forecaster": PowerplantForecaster(index),
     }
     unit = PowerPlant("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -387,7 +387,7 @@ def test_participate_custom_lambda():
         "unit_operator": "x",
         "max_power": 10,
         "min_power": 0,
-        "forecaster": PowerplantForecaster(index, fuel_prices={"others": 0, "co2": 0}),
+        "forecaster": PowerplantForecaster(index),
     }
     unit = PowerPlant("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -399,7 +399,7 @@ def test_participate_custom_lambda():
         "unit_operator": "x",
         "max_power": 1000,
         "min_power": 0,
-        "forecaster": PowerplantForecaster(index, fuel_prices={"others": 0, "co2": 0}),
+        "forecaster": PowerplantForecaster(index),
     }
     unit = PowerPlant("testdemand", **params_dict)
     units_role.add_unit(unit)

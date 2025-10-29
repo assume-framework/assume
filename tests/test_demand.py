@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 
-from assume.common.forecaster import NaiveForecast
+from assume.common.forecaster import DemandForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.strategies import ElasticDemandStrategy, NaiveSingleBidStrategy
 from assume.units.demand import Demand
@@ -27,7 +27,7 @@ def test_demand():
         datetime(2023, 7, 1, hour=2),
         None,
     )
-    forecaster = NaiveForecast(index, demand=-150)
+    forecaster = DemandForecaster(index, demand=-150)
     dem = Demand(
         id="demand",
         unit_operator="UO1",
@@ -82,7 +82,7 @@ def test_demand_series():
     price = pd.Series(1000, index=index)
     price.iloc[1] = 0
 
-    forecaster = NaiveForecast(index, demand=demand)
+    forecaster = DemandForecaster(index, demand=demand)
     dem = Demand(
         id="demand",
         unit_operator="UO1",
@@ -136,7 +136,7 @@ def test_elastic_demand_config_and_errors():
         datetime(2023, 7, 1, hour=2),
         None,
     )
-    forecaster = NaiveForecast(index, demand=-100)
+    forecaster = DemandForecaster(index, demand=-100)
 
     # Valid elastic demand (isoelastic model)
     dem = Demand(

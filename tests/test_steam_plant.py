@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from assume.common.fast_pandas import FastSeries
-from assume.common.forecaster import NaiveForecast, SteamgenerationForecaster
+from assume.common.forecaster import SteamgenerationForecaster
 from assume.strategies.naive_strategies import (
     DSM_NegCRM_Strategy,
     DSM_PosCRM_Strategy,
@@ -533,11 +533,11 @@ def test_all_assets_coordinated(steam_plant_with_hp_b_ts):
     demand_profile = [20] * 10 + [60] + [20] * 13
 
     # Re-create the forecast object with new demand
-    new_forecast = NaiveForecast(
+    new_forecast = SteamgenerationForecaster(
         index,
         electricity_price=[60] * 24,  # adapt if needed
-        hydrogen_gas_price=[55] * 24,  # adapt if needed
-        A360_thermal_demand=demand_profile,
+        fuel_prices={"hydrogen_gas": [55] * 24},  # adapt if needed
+        thermal_demand=demand_profile,
     )
     # Replace the forecaster of the plant with the new one
     steam_plant_with_hp_b_ts.forecaster = new_forecast

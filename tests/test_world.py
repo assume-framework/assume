@@ -5,7 +5,7 @@
 import asyncio
 
 from assume import World
-from assume.common.forecaster import NaiveForecast
+from assume.common.forecaster import DemandForecaster
 from assume.scenario.loader_csv import load_scenario_folder
 from assume.units.demand import Demand
 from tests.utils import index, setup_simple_world
@@ -39,7 +39,7 @@ def test_world_operators_default():
             "technology": "demand",
             "bidding_strategies": {},
         },
-        forecaster=NaiveForecast(index, demand=-100),
+        forecaster=DemandForecaster(index, demand=-100),
     )
     assert "test_operator" in world.unit_operators
     assert len(world.unit_operators["test_operator"].units) == 1
@@ -57,7 +57,7 @@ def test_world_operators_by_instance():
             max_power=-1000,
             technology="demand",
             bidding_strategies={},
-            forecaster=NaiveForecast(index, demand=-100),
+            forecaster=DemandForecaster(index, demand=-100),
         ),
     )
     assert "test_operator" in world.unit_operators
