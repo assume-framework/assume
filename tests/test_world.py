@@ -5,7 +5,7 @@
 import asyncio
 
 from assume import World
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import NaiveForecast
 from assume.scenario.loader_csv import load_scenario_folder
 from assume.units.demand import Demand
 from tests.utils import index, setup_simple_world

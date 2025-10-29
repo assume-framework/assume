@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 
 from assume.common.base import SupportsMinMax, SupportsMinMaxCharge
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import NaiveForecast
 
 
 def test_minmax():

@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from assume.common.fast_pandas import FastSeries
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import NaiveForecast, SteamgenerationForecaster
 from assume.strategies.naive_strategies import (
     DSM_NegCRM_Strategy,
     DSM_PosCRM_Strategy,
@@ -32,8 +32,9 @@ def steam_plant_components_with_hp():
 def steam_plant_with_hp(steam_plant_components_with_hp) -> SteamPlant:
     # Define the time index and forecast data
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
-        index,
+    forecast = SteamgenerationForecaster(
+        index=index,
+        demand=0,
         electricity_price=[
             60,
             60,
@@ -60,7 +61,14 @@ def steam_plant_with_hp(steam_plant_components_with_hp) -> SteamPlant:
             60,
             60,
         ],
-        A360_thermal_demand=[100] * 24,  # Constant thermal demand
+        electricity_price_flex=0,
+        fuel_prices={},
+        thermal_demand=[100] * 24,
+        congestion_signal=0,
+        renewable_utilisation_signal=0,
+        thermal_storage_schedule=0,
+        availability=0,
+        market_prices={"EOM": 0},
     )
 
     # Define a bidding strategy for the hydrogen plant
@@ -140,8 +148,9 @@ def steam_plant_components_with_hp_b():
 def steam_plant_with_hp_b(steam_plant_components_with_hp_b) -> SteamPlant:
     # Define the time index and forecast data
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
-        index,
+    forecast = SteamgenerationForecaster(
+        index=index,
+        demand=0,
         electricity_price=[
             60,
             60,
@@ -168,9 +177,14 @@ def steam_plant_with_hp_b(steam_plant_components_with_hp_b) -> SteamPlant:
             60,
             60,
         ],
-        hydrogen_gas_price=[55] * 24,
-        A360_thermal_demand=[100] * 24,  # Constant thermal demand
-        # test_steam_plant_congestion_signal=[0] * 24,  # No congestion
+        electricity_price_flex=0,
+        fuel_prices={},
+        thermal_demand=[100] * 24,
+        congestion_signal=0,
+        renewable_utilisation_signal=0,
+        thermal_storage_schedule=0,
+        availability=0,
+        market_prices={"EOM": 0},
     )
 
     # Define a bidding strategy for the hydrogen plant
@@ -264,8 +278,9 @@ def steam_plant_components_with_hp_b_ts():
 def steam_plant_with_hp_b_ts(steam_plant_components_with_hp_b_ts) -> SteamPlant:
     # Define the time index and forecast data
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
+    forecast = SteamgenerationForecaster(
         index,
+        demand=0,
         electricity_price=[
             60,
             60,
@@ -292,9 +307,14 @@ def steam_plant_with_hp_b_ts(steam_plant_components_with_hp_b_ts) -> SteamPlant:
             60,
             60,
         ],
-        natural_gas_price=[55] * 24,
-        A360_thermal_demand=[100] * 24,  # Constant thermal demand
-        # test_steam_plant_congestion_signal=[0] * 24,  # No congestion
+        electricity_price_flex=0,
+        fuel_prices={},
+        thermal_demand=[100] * 24,
+        congestion_signal=0,
+        renewable_utilisation_signal=0,
+        thermal_storage_schedule=0,
+        availability=0,
+        market_prices={"EOM": 0},
     )
 
     # Define a bidding strategy for the hydrogen plant
@@ -400,8 +420,9 @@ def steam_plant_with_hp_b_longterm_ts(
     steam_plant_components_with_hp_b_longterm_ts,
 ) -> SteamPlant:
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
+    forecast = SteamgenerationForecaster(
         index,
+        demand=0,
         electricity_price=[
             60,
             60,
@@ -428,34 +449,41 @@ def steam_plant_with_hp_b_longterm_ts(
             60,
             60,
         ],
-        hydrogen_gas_price=[
-            55,
-            55,
-            40,
-            100,
-            20,
-            55,
-            40,
-            55,
-            60,
-            55,
-            55,
-            100,
-            100,
-            80,
-            55,
-            55,
-            55,
-            55,
-            55,
-            55,
-            55,
-            55,
-            55,
-            60,
-        ],
-        A360_thermal_demand=[100] * 24,
-        # add schedule if your forecaster expects it, but for thermal demand it's enough
+        electricity_price_flex=0,
+        fuel_prices={
+            "hydrogen": [
+                55,
+                55,
+                40,
+                100,
+                20,
+                55,
+                40,
+                55,
+                60,
+                55,
+                55,
+                100,
+                100,
+                80,
+                55,
+                55,
+                55,
+                55,
+                55,
+                55,
+                55,
+                55,
+                55,
+                60,
+            ]
+        },
+        thermal_demand=[100] * 24,
+        congestion_signal=0,
+        renewable_utilisation_signal=0,
+        thermal_storage_schedule=0,
+        availability=0,
+        market_prices={"EOM": 0},
     )
     bidding_strategy = {"EOM": NaiveDADSMStrategy()}
     return SteamPlant(
@@ -534,11 +562,18 @@ def test_all_assets_coordinated(steam_plant_with_hp_b_ts):
 @pytest.fixture
 def steam_plant_with_crm_flex(steam_plant_components_with_hp_b):
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
+    forecast = SteamgenerationForecaster(
         index,
+        demand=0,
         electricity_price=[60] * 24,
-        hydrogen_gas_price=[55] * 24,
-        A360_thermal_demand=[100] * 24,
+        electricity_price_flex=0,
+        fuel_prices={},
+        thermal_demand=[100] * 24,
+        congestion_signal=0,
+        renewable_utilisation_signal=0,
+        thermal_storage_schedule=0,
+        availability=0,
+        market_prices={"EOM": 0},
     )
     bidding_strategy = {
         "CRM_pos": DSM_PosCRM_Strategy(),
@@ -596,11 +631,18 @@ def steam_plant_with_price_signal_flex(steam_plant_components_with_hp_b):
     index = pd.date_range("2023-01-01", periods=24, freq="h")
     # New price signal: simulate low prices at night, high in afternoon
     price_flex = [30] * 6 + [45] * 6 + [80] * 6 + [50] * 6
-    forecast = NaiveForecast(
+    forecast = SteamgenerationForecaster(
         index,
-        electricity_price=[60] * 24,  # Reference, will be replaced in flex mode
-        hydrogen_gas_price=[55] * 24,
-        A360_thermal_demand=[100] * 24,
+        demand=0,
+        electricity_price=[60] * 24,
+        electricity_price_flex=0,
+        fuel_prices={},
+        thermal_demand=[100] * 24,
+        congestion_signal=0,
+        renewable_utilisation_signal=0,
+        thermal_storage_schedule=0,
+        availability=0,
+        market_prices={"EOM": 0},
     )
     bidding_strategy = {}
     plant = SteamPlant(

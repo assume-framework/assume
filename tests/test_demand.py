@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.strategies import ElasticDemandStrategy, NaiveSingleBidStrategy
 from assume.units.demand import Demand

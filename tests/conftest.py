@@ -10,7 +10,7 @@ import pytest
 
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import NaiveForecast
 
 
 class MockMarketConfig:

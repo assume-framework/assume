@@ -14,7 +14,7 @@ from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
 from assume.common.fast_pandas import FastIndex
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.common.utils import datetime2timestamp
@@ -58,7 +58,7 @@ async def units_operator() -> UnitsOperator:
         "unit_operator": agent_id,
         "max_power": -1000,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, demand=1000),
+        "forecaster": DemandForecaster(index, market_prices={"EOM": 50}, demand=-1000),
     }
     unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -98,7 +98,7 @@ async def rl_units_operator() -> RLUnitsOperator:
         "unit_operator": agent_id,
         "max_power": -1000,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, demand=1000),
+        "forecaster": DemandForecaster(index, demand=-1000),
     }
     unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -184,7 +184,9 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
         "unit_operator": "test_operator",
         "max_power": 1000,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, powerplant=1000),
+        "forecaster": PowerplantForecaster(
+            index, fuel_prices={"others": 1000, "co2": 10}, residual_load={"EOM": 0}
+        ),
     }
     unit = PowerPlant("testplant", **params_dict)
     rl_units_operator.add_unit(unit)
@@ -296,7 +298,7 @@ def test_participate():
         "unit_operator": "x",
         "max_power": -1000,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, demand=1000),
+        "forecaster": DemandForecaster(index, demand=-1000),
     }
     unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -309,7 +311,7 @@ def test_participate():
         "unit_operator": "x",
         "max_power": -1000,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, demand=1000),
+        "forecaster": DemandForecaster(index, demand=-1000),
     }
     unit = Demand("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -341,7 +343,7 @@ def test_participate_lambda():
         "unit_operator": "x",
         "max_power": 10,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, demand=1000),
+        "forecaster": PowerplantForecaster(index, fuel_prices={"others": 0, "co2": 0}),
     }
     unit = PowerPlant("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -353,7 +355,7 @@ def test_participate_lambda():
         "unit_operator": "x",
         "max_power": 1000,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, demand=1000),
+        "forecaster": PowerplantForecaster(index, fuel_prices={"others": 0, "co2": 0}),
     }
     unit = PowerPlant("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -385,7 +387,7 @@ def test_participate_custom_lambda():
         "unit_operator": "x",
         "max_power": 10,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, demand=1000),
+        "forecaster": PowerplantForecaster(index, fuel_prices={"others": 0, "co2": 0}),
     }
     unit = PowerPlant("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -397,7 +399,7 @@ def test_participate_custom_lambda():
         "unit_operator": "x",
         "max_power": 1000,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, demand=1000),
+        "forecaster": PowerplantForecaster(index, fuel_prices={"others": 0, "co2": 0}),
     }
     unit = PowerPlant("testdemand", **params_dict)
     units_role.add_unit(unit)
@@ -447,7 +449,9 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
         "unit_operator": "test_operator",
         "max_power": 1000,
         "min_power": 0,
-        "forecaster": NaiveForecast(index, powerplant=1000),
+        "forecaster": PowerplantForecaster(
+            index, fuel_prices={"others": 1000, "co2": 10}
+        ),
     }
 
     unit1 = PowerPlant("testplant1", **params_dict)

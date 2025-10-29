@@ -19,7 +19,7 @@ from mango import (
 from mango.util.clock import ExternalClock
 
 from assume.common.fast_pandas import FastIndex
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import NaiveForecast
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.markets.base_market import MarketRole
