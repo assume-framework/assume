@@ -62,7 +62,7 @@ class Calculations:
         for column in fuel_prices.columns:
             if len(fuel_prices[column]) > 1:
                 self.fuel_prices[column] = fuel_prices[column]
-            else:    
+            else:
                 self.fuel_prices[column] = fuel_prices[column].item()
         self.forecasts = pd.DataFrame(index=index)
 
