@@ -1,13 +1,14 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
+from typing import TypeAlias
 
 import pandas as pd
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 
-type ForecastIndex = FastIndex | pd.DatetimeIndex | pd.Series
-type ForecastSeries = FastSeries | list | float | pd.Series
+ForecastIndex: TypeAlias = FastIndex | pd.DatetimeIndex | pd.Series
+ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 
 
 class UnitForecaster:
