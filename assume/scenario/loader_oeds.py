@@ -191,14 +191,14 @@ def load_oeds(
             # the unit_params have no hints
             {
                 "min_power": 0,
-                "max_power": demand.max(),
+                "max_power": -demand.max(),
                 "bidding_strategies": bidding_strategies["demand"],
                 "technology": "demand",
                 "location": (lat, lon),
                 "node": area,
                 "price": 1e3,
             },
-            DemandForecaster(index, demand=demand),
+            DemandForecaster(index, demand=-abs(demand)),
         )
 
         world.add_unit_operator(f"renewables{area}")

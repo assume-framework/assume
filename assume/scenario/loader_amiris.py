@@ -172,7 +172,7 @@ def add_agent_to_world(
                     agent["Id"],
                     {
                         "min_power": 0,
-                        "max_power": 100000,
+                        "max_power": -100000,
                         "bidding_strategies": {
                             "energy": "support",
                             "financial_support": "support",
@@ -253,7 +253,7 @@ def add_agent_to_world(
                     agent["Id"],
                     {
                         "min_power": 0,
-                        "max_power": 100000,
+                        "max_power": -100000,
                         "bidding_strategies": demand_strategies,
                         "technology": "demand",
                         "price": load["ValueOfLostLoad"],
@@ -494,6 +494,7 @@ def load_amiris(
         start=start,
         end=end,
         simulation_id=simulation_id,
+        save_frequency_hours=48,
     )
     # helper dict to map trader markups/markdowns to powerplants
     markups = {}

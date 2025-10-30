@@ -103,8 +103,8 @@ def load_pypsa(
                 "fuel_type": generator.carrier,
                 "ramp_up": ramp_up,
                 "ramp_down": ramp_down,
-                "min_operating_time": generator.min_up_time,
-                "min_down_time": generator.min_down_time,
+                "min_operating_time": generator.min_up_time or 1,
+                "min_down_time": generator.min_down_time or 1,
             },
             PowerplantForecaster(
                 index,
@@ -122,21 +122,19 @@ def load_pypsa(
         load_t = network.loads_t["p_set"][load.name]
         unit_type = "demand"
 
-        kwargs = {load.name: load_t}
-
         world.add_unit(
             load.name,
             unit_type,
             "demand_operator",
             {
                 "min_power": 0,
-                "max_power": load_t.max(),
+                "max_power": -load_t.max(),
                 "bidding_strategies": bidding_strategies[unit_type][load.name],
                 "technology": "demand",
                 "node": load.node,
                 "price": 1e3,
             },
-            DemandForecaster(index, demand=load_t, **kwargs),
+            DemandForecaster(index, demand=-abs(load_t)),
         )
 
     world.add_unit_operator("storage_operator")
@@ -181,11 +179,11 @@ if __name__ == "__main__":
 
     match study_case:
         case "ac_dc_meshed":
-            network = pypsa.examples.ac_dc_meshed(from_master=True)
+            network = pypsa.examples.ac_dc_meshed()
         case "scigrid_de":
-            network = pypsa.examples.scigrid_de(True, from_master=True)
+            network = pypsa.examples.scigrid_de()
         case "storage_hvdc":
-            network = pypsa.examples.storage_hvdc(True)
+            network = pypsa.examples.storage_hvdc()
         case _:
             logger.info(f"invalid studycase: {study_case}")
             network = pd.DataFrame()
