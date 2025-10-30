@@ -23,7 +23,10 @@ from assume.common.forecaster import (
     CustomUnitForecaster,
     DemandForecaster,
     ExchangeForecaster,
+    HydrogenForecaster,
     PowerplantForecaster,
+    SteamgenerationForecaster,
+    SteelplantForecaster,
     UnitForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -605,7 +608,44 @@ def load_config_and_create_forecaster(
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
             )
-
+    if dsm_units is not None:
+        for type, dsm in dsm_units.items():
+            for id, unit in dsm.iterrows():
+                if type == "steel_plant":
+                    unit_forecasts[id] = SteelplantForecaster(
+                        index=index,
+                        availability=calculator[f"availability_{id}"],
+                        market_prices=market_prices,
+                        fuel_prices=calculator.fuel_prices,
+                        residual_load=residual_loads,
+                        congestion_signal=0,  # TODO
+                        renewable_utilisation_signal=0,  # TODO
+                    )
+                if type == "hydrogen_plant":
+                    unit_forecasts[id] = HydrogenForecaster(
+                        index=index,
+                        availability=calculator[f"availability_{id}"],
+                        market_prices=market_prices,
+                        hydrogen_demand=unit["demand"],
+                        residual_load=residual_loads,
+                        electricity_price=0,  # TODO
+                        seasonal_storage_schedule=0,  # TODO
+                    )
+                if type == "steam_plant":
+                    unit_forecasts[id] = SteamgenerationForecaster(
+                        index=index,
+                        availability=calculator[f"availability_{id}"],
+                        demand=unit["demand"],
+                        market_prices=market_prices,
+                        fuel_prices=calculator.fuel_prices,
+                        residual_load=residual_loads,
+                        electricity_price=0,  # TODO
+                        congestion_signal=0,  # TODO
+                        renewable_utilisation_signal=0,  # TODO
+                        electricity_price_flex=0,  # TODO
+                        thermal_storage_schedule=0,  # TODO
+                        thermal_demand=0,  # TODO
+                    )
     learning_config: LearningConfig = config.get("learning_config", {})
 
     # Check if simulation length is divisible by train_freq in learning config and adjust if not
