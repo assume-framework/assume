@@ -138,7 +138,7 @@ def load_file(
             duplicates = df.index[df.index.duplicated()].unique()
 
             if len(duplicates) > 0:
-                duplicate_names = ", ".join(duplicates)
+                duplicate_names = ", ".join(map(str,duplicates))
                 raise ValueError(
                     f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
                 )
@@ -508,9 +508,12 @@ def load_config_and_create_forecaster(
         )
     demand_units["min_power"] = -abs(demand_units["min_power"])
     demand_units["max_power"] = -abs(demand_units["max_power"])
+
     if storage_units is not None:
-        storage_units["max_power_charge"] = -abs(storage_units["max_power_charge"])
-        storage_units["min_power_charge"] = -abs(storage_units["min_power_charge"])
+        if "max_power_charge" in storage_units.columns:
+            storage_units["max_power_charge"] = -abs(storage_units["max_power_charge"])
+        if "min_power_charge" in storage_units.columns:
+            storage_units["min_power_charge"] = -abs(storage_units["min_power_charge"])
 
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}

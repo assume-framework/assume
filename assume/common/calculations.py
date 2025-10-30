@@ -60,7 +60,10 @@ class Calculations:
         self.index = index
         self.fuel_prices = pd.DataFrame(index=self.index)
         for column in fuel_prices.columns:
-            self.fuel_prices[column] = fuel_prices[column].item()
+            if len(fuel_prices[column]) > 1:
+                self.fuel_prices[column] = fuel_prices[column]
+            else:    
+                self.fuel_prices[column] = fuel_prices[column].item()
         self.forecasts = pd.DataFrame(index=index)
 
     def __getitem__(self, column: str) -> FastSeries:
