@@ -75,11 +75,6 @@ class BaseUnit:
             self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
             self.outputs["regret"] = FastSeries(value=0.0, index=self.index)
 
-            # RL data stored as lists to simplify storing to the buffer
-            self.outputs["rl_observations"] = []
-            self.outputs["rl_actions"] = []
-            self.outputs["rl_rewards"] = []
-
     def calculate_bids(
         self,
         market_config: MarketConfig,
@@ -317,16 +312,6 @@ class BaseUnit:
             Start-up costs.
         """
         return 0
-
-    def reset_saved_rl_data(self):
-        """
-        Resets the saved RL data. This deletes all data besides the observation and action where we do not yet have calculated reward values.
-        """
-        values_len = len(self.outputs["rl_rewards"])
-
-        self.outputs["rl_observations"] = self.outputs["rl_observations"][values_len:]
-        self.outputs["rl_actions"] = self.outputs["rl_actions"][values_len:]
-        self.outputs["rl_rewards"] = []
 
 
 class SupportsMinMax(BaseUnit):

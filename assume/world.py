@@ -439,42 +439,6 @@ class World:
                 }
             )
 
-    def add_rl_unit_operator(self, id: str = "Operator-RL") -> None:
-        """
-        Add a RL unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
-        The unit operator is then added to the list of existing operators.
-
-        The RL unit operator differs from the standard unit operator in that it is used to handle learning units. It has additional
-        functions such as writing to the learning role and scheduling recurrent tasks for writing to the learning role. It also
-        writes learning outputs to the output role.
-
-        Args:
-            id (str): The identifier for the unit operator.
-        """
-
-        from assume.reinforcement_learning.learning_unit_operator import RLUnitsOperator
-
-        if self.unit_operators.get(id):
-            raise ValueError(f"Unit operator {id} already exists")
-
-        units_operator = RLUnitsOperator(available_markets=list(self.markets.values()))
-        # creating a new role agent and apply the role of a units operator
-        unit_operator_agent = agent_composed_of(
-            units_operator,
-            register_in=self.container,
-            suggested_aid=f"{id}",
-        )
-        unit_operator_agent.suspendable_tasks = False
-
-        # add the current unitsoperator to the list of operators currently existing
-        self.unit_operators[id] = units_operator
-
-        unit_operator_agent._role_context.data.update(
-            {
-                "output_agent_addr": self.output_agent_addr,
-            }
-        )
-
     def add_units_with_operator_subprocess(
         self, id: str, units: list[dict], strategies: dict[str, UnitOperatorStrategy]
     ):
@@ -541,20 +505,6 @@ class World:
             **unit_params,
         )
 
-    def add_learning_strategies_to_learning_role(self):
-        """
-        Add bidding strategies to the learning role for the specified unit.
-
-        Args:
-            unit_id (str): The identifier for the unit.
-            bidding_strategies (dict[str, BaseStrategy | UnitOperatorStrategy]): The bidding strategies for the unit.
-        """
-        for unit in self.unit_operators["Operator-RL"].rl_units:
-            for strategy in unit.bidding_strategies.values():
-                if isinstance(strategy, LearningStrategy):
-                    self.learning_role.rl_strats[unit.id] = strategy
-                    break
-
     def _prepare_bidding_strategies(self, unit_params, unit_id):
         """
         Prepare bidding strategies for the unit based on the specified parameters.
@@ -589,23 +539,27 @@ class World:
 
             if strategy not in strategy_instances:
                 # Create and cache the strategy instance if not already created
+                strategy_instances[strategy] = self.bidding_strategies[strategy](
+                    unit_id=unit_id,
+                    **bidding_params,
+                )
 
-                # Check if the strategy is a LearningStrategy and we are in learning_mode for which the strategy needs access to the learnin_role
-                if (
-                    isinstance(strategy_instances[strategy], LearningStrategy)
-                    and self.learning_mode
-                ):
-                    strategy_instances[strategy] = self.bidding_strategies[strategy](
-                        unit_id=unit_id,
-                        learning_role=self.learning_role,
-                        **bidding_params,
-                    )
+            # check if created cache has learning_strategy
+            if (
+                isinstance(strategy_instances[strategy], LearningStrategy)
+                and self.learning_mode
+            ):
+                # add learning role to the strategy to have access to store training data etc
+                strategy_instances[strategy] = self.bidding_strategies[strategy](
+                    unit_id=unit_id,
+                    learning_role=self.learning_role,
+                    **bidding_params,
+                )
 
-                else:
-                    strategy_instances[strategy] = self.bidding_strategies[strategy](
-                        unit_id=unit_id,
-                        **bidding_params,
-                    )
+                # TODO: can we do that independently from learning mode?
+                # add learning_strategy to the learning role for handling of initial exploration and buffer sizing
+                if self.learning_mode or self.evaluation_mode:
+                    self.learning_role.rl_strats[unit_id] = strategy_instances[strategy]
 
             # Use the cached instance for this market
             bidding_strategies[market_id] = strategy_instances[strategy]

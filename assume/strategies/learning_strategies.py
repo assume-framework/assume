@@ -52,7 +52,8 @@ class BaseLearningStrategy(LearningStrategy):
 
         # sets the device of the actor network
         # TODO learning role only exists if we are in learning_mode, I think, how do we do this if we evaluate learned strategies
-        device = self.learning_role.device  # kwargs.get("device", "cpu")
+        # Also the learning role does not exist before the initlisation appertely here, because I only add it after the bidding_strategies are prepared
+        device = kwargs.get("device", "cpu")  # self.learning_role.device
         self.device = th.device(device if th.cuda.is_available() else "cpu")
         if not self.learning_mode:
             self.device = th.device("cpu")
@@ -290,9 +291,6 @@ class BaseLearningStrategy(LearningStrategy):
             # noise is an tensor with zeros, because we are not in learning mode
             noise = th.zeros_like(curr_action, dtype=self.float_type)
 
-        if self.learning_mode:
-            self.learning_role.add_actions_to_buffer(self.unit_id, curr_action, noise)
-
         return curr_action, noise
 
 
@@ -494,6 +492,11 @@ class RLStrategy(BaseLearningStrategy):
         unit.outputs["actions"].at[start] = actions
         unit.outputs["exploration_noise"].at[start] = noise
 
+        if self.learning_mode:
+            self.learning_role.add_actions_to_buffer(
+                self.unit_id, start, actions, noise
+            )
+
         return bids
 
     def get_actions(self, next_observation):
@@ -679,12 +682,11 @@ class RLStrategy(BaseLearningStrategy):
         # Store results in unit outputs, which are later written to the database by the unit operator.
         profit += profit
         regret = regret_scale * opportunity_cost
-        total_costs = operational_cost
 
         # write rl-rewards to buffer
         if self.learning_mode:
             self.learning_role.add_reward_to_buffer(
-                unit.id, reward, regret, profit, total_costs
+                unit.id, start, reward, regret, profit
             )
 
 
@@ -794,6 +796,11 @@ class RLStrategySingleBid(RLStrategy):
         # store results in unit outputs as series to be written to the database by the unit operator
         unit.outputs["actions"].at[start] = actions
         unit.outputs["exploration_noise"].at[start] = noise
+
+        if self.learning_mode:
+            self.learning_role.add_actions_to_buffer(
+                self.unit_id, start, actions, noise
+            )
 
         return bids
 
@@ -1014,6 +1021,11 @@ class StorageRLStrategy(BaseLearningStrategy):
         unit.outputs["actions"].at[start] = actions
         unit.outputs["exploration_noise"].at[start] = noise
 
+        if self.learning_mode:
+            self.learning_role.add_actions_to_buffer(
+                self.unit_id, start, actions, noise
+            )
+
         return bids
 
     def calculate_reward(
@@ -1108,7 +1120,6 @@ class StorageRLStrategy(BaseLearningStrategy):
         unit.outputs["profit"].loc[start:end_excl] += profit
         unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["total_costs"].loc[start:end_excl] = order_cost
-        unit.outputs["rl_rewards"].append(reward)
 
 
 class RenewableRLStrategy(RLStrategySingleBid):
@@ -1350,5 +1361,3 @@ class RenewableRLStrategy(RLStrategySingleBid):
         unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
         unit.outputs["total_costs"].loc[start:end_excl] = operational_cost
-
-        unit.outputs["rl_rewards"].append(reward)

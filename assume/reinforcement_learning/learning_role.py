@@ -2,7 +2,9 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import asyncio
 import logging
+import shutil
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +14,7 @@ import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
+from assume.common.exceptions import AssumeException
 from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
@@ -87,8 +90,10 @@ class Learning(Role):
 
         if start is not None:
             self.start = datetime2timestamp(start)
+            self.start_datetime = start
         if end is not None:
             self.end = datetime2timestamp(end)
+            self.end_datetime = end
 
         self.datetime = None
 
@@ -124,6 +129,12 @@ class Learning(Role):
                 f"gradient_steps need to be positive, got {self.gradient_steps}"
             )
 
+        # ensure train_freq evenly divides simulation length (may adjust self.train_freq)
+        try:
+            self.sync_train_freq_with_simulation_horizon(learning_config)
+        except Exception as e:
+            logger.warning(f"Could not sync train_freq: {e}")
+
         self.batch_size = learning_config.get("batch_size", 128)
         self.gamma = learning_config.get("gamma", 0.99)
 
@@ -142,34 +153,159 @@ class Learning(Role):
         self.db_addr = None
         self.update_steps = None
 
-        # todo
-        recurrency_task = create_rrule(
-            start=self.start,
-            end=self.end,
-            freq=self.train_freq,
-        )
-
-        self.context.schedule_recurrent_task(
-            self.store_to_buffer_and_update, recurrency_task
-        )
-
         # init dictionaries for all learning instances in this role
-        self.all_obs = defaultdict(list)
-        self.all_actions = defaultdict(list)
-        self.all_rewards = defaultdict(list)
+        self.all_obs = defaultdict(lambda: defaultdict(list))
+        self.all_actions = defaultdict(lambda: defaultdict(list))
+        self.all_rewards = defaultdict(lambda: defaultdict(list))
+        self.all_regrets = defaultdict(lambda: defaultdict(list))
+        self.all_profits = defaultdict(lambda: defaultdict(list))
 
-    def store_to_buffer_and_update(self) -> None:
+    def on_ready(self):
+        """
+        Set up the learning role for reinforcement learning training.
+
+        Notes:
+            This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
+            for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
+            This cannot happen in the init since the context (compare mango agents) is not yet available there.
+        """
+        super().on_ready()
+
+        if not self.evaluation_mode:
+            recurrency_task = create_rrule(
+                start=self.start_datetime,
+                end=self.end_datetime,
+                freq=self.train_freq,
+            )
+
+            self.context.schedule_recurrent_task(
+                self.store_to_buffer_and_update, recurrency_task
+            )
+
+    def sync_train_freq_with_simulation_horizon(
+        self, learning_config: dict
+    ) -> str | None:
+        """
+        Ensure self.train_freq evenly divides the simulation length.
+        If not, adjust self.train_freq (in-place) and return the new string, otherwise return None.
+        Uses self.start_datetime/self.end_datetime when available, otherwise falls back to timestamp fields.
+        """
+        if not learning_config.get("learning_mode", False):
+            return None
+
+        train_freq_str = str(self.train_freq)
+        try:
+            train_freq = pd.Timedelta(train_freq_str)
+        except Exception:
+            logger.warning(
+                f"Invalid train_freq '{train_freq_str}' — skipping adjustment."
+            )
+            return None
+
+        total_length = self.end_datetime - self.start_datetime
+        quotient, remainder = divmod(total_length, train_freq)
+
+        if remainder != pd.Timedelta(0):
+            n_intervals = int(quotient) + 1
+            new_train_freq_hours = int(
+                (total_length / n_intervals).total_seconds() / 3600
+            )
+            new_train_freq_str = f"{new_train_freq_hours}h"
+            self.train_freq = new_train_freq_str
+            learning_config["train_freq"] = new_train_freq_str
+            logger.warning(
+                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
+                f"Adjusting train_freq to {new_train_freq_str}."
+            )
+
+        return None
+
+    def confirm_save_path(self, save_path: str, continue_learning: bool) -> None:
+        """
+        Check save_path and ask user how to proceed if it exists.
+        Raises AssumeException if user declines to proceed.
+        """
+        if Path(save_path).is_dir():
+            if continue_learning:
+                logger.warning(
+                    f"Save path '{save_path}' exists.\n"
+                    "You are in continue learning mode. New strategies may overwrite previous ones.\n"
+                    "It is recommended to use a different save path to avoid unintended overwrites.\n"
+                    "You can set 'trained_policies_save_path' in the config."
+                )
+                proceed = input(
+                    "Do you still want to proceed with the existing save path? (y/N) "
+                )
+                if not proceed.lower().startswith("y"):
+                    raise AssumeException(
+                        "Simulation aborted by user to avoid overwriting previous learned strategies. "
+                        "Consider setting a new 'simulation_id' or 'trained_policies_save_path' in the config."
+                    )
+            else:
+                logger.warning(
+                    f"Save path '{save_path}' exists. Previous training data will be deleted to start fresh."
+                )
+                accept = input("Do you want to overwrite and start fresh? (y/N) ")
+                if accept.lower().startswith("y"):
+                    shutil.rmtree(save_path, ignore_errors=True)
+                    logger.info(
+                        f"Previous strategies at '{save_path}' deleted. Starting fresh training."
+                    )
+                else:
+                    raise AssumeException(
+                        "Simulation aborted by user not to overwrite existing learned strategies. "
+                        "You can set a different 'simulation_id' or 'trained_policies_save_path' in the config."
+                    )
+
+    def determine_validation_interval(self, learning_config: dict) -> int:
+        """
+        Compute and validate validation_interval.
+
+        Returns:
+            validation_interval (int)
+        Raises:
+            ValueError if training_episodes is too small.
+        """
+        default_interval = int(learning_config.get("validation_episodes_interval", 5))
+        training_episodes = int(getattr(self, "training_episodes", 0))
+        validation_interval = min(training_episodes, default_interval)
+
+        min_required_episodes = (
+            int(getattr(self, "episodes_collecting_initial_experience", 0))
+            + validation_interval
+        )
+
+        if training_episodes < min_required_episodes:
+            raise ValueError(
+                f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({getattr(self, 'episodes_collecting_initial_experience', 0)}) and evaluation interval ({validation_interval})."
+            )
+
+        return validation_interval
+
+    async def store_to_buffer_and_update(self) -> None:
+        # run the existing (CPU/blocking) implementation in a thread
+        await asyncio.to_thread(self._store_to_buffer_and_update_sync)
+
+    def _store_to_buffer_and_update_sync(self) -> None:
         """
         This function takes all the information that the strategies wrote into the learning_role dicts and post_processes them to fit into the buffer.
         Further triggers the next policy update
 
         """
-        # check if all entries for the buffers have the same number of unit_ids as rl_strats
+
         for name, buffer in [
             ("observations", self.all_obs),
             ("actions", self.all_actions),
             ("rewards", self.all_rewards),
         ]:
+            # check if buffer currently empty, not always a problem but recurring would be bad
+            # TODO: this is because I schedule the update task to begin at simulation start
+            if len(buffer) == 0:
+                logger.warning(
+                    "No experience retrieved to store in buffer at update step!"
+                )
+                return
+            # check if all entries for the buffers have the same number of unit_ids as rl_strats
             if len(buffer) != len(self.rl_strats):
                 logger.error(
                     f"Number of unit_ids with {name} in learning role {len(buffer)} does not match number of rl_strats {len(self.rl_strats)}. "
@@ -185,12 +321,15 @@ class Learning(Role):
         )
 
         # write data to output agent before resetting it
+        # TODO: the storage buffer and update function is not called in evaluation and then no rewards are stored... Problem
         self.write_rl_params_to_output()
 
         # reset dicts as all experience is now in buffer
-        self.all_obs = defaultdict(list)
-        self.all_actions = defaultdict(list)
-        self.all_rewards = defaultdict(list)
+        self.all_obs = defaultdict(lambda: defaultdict(list))
+        self.all_actions = defaultdict(lambda: defaultdict(list))
+        self.all_rewards = defaultdict(lambda: defaultdict(list))
+        self.all_regrets = defaultdict(lambda: defaultdict(list))
+        self.all_profits = defaultdict(lambda: defaultdict(list))
 
         self.update_policy()
 
@@ -205,7 +344,7 @@ class Learning(Role):
         """
         self.all_obs[unit_id][start].append(observation)
 
-    def add_actions_to_buffer(self, unit_id, action, noise) -> None:
+    def add_actions_to_buffer(self, unit_id, start, action, noise) -> None:
         """
         Add the action and noise to the buffer dict, per unit_id.
 
@@ -215,11 +354,9 @@ class Learning(Role):
             noise (torch.Tensor): The noise to be added.
 
         """
-        self.all_actions[unit_id].append((action, noise))
+        self.all_actions[unit_id][start].append((action, noise))
 
-    def add_reward_to_buffer(
-        self, unit_id, reward, regret, profit, total_costs
-    ) -> None:
+    def add_reward_to_buffer(self, unit_id, start, reward, regret, profit) -> None:
         """
         Add the reward to the buffer dict, per unit_id.
 
@@ -228,10 +365,9 @@ class Learning(Role):
             reward (float): The reward to be added.
 
         """
-        self.all_rewards[unit_id].append(reward)
-        self.all_regrets[unit_id].append(regret)
-        self.all_profits[unit_id].append(profit)
-        self.all_total_costs[unit_id].append(total_costs)
+        self.all_rewards[unit_id][start].append(reward)
+        self.all_regrets[unit_id][start].append(regret)
+        self.all_profits[unit_id][start].append(profit)
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -275,24 +411,6 @@ class Learning(Role):
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
-
-    def setup(self) -> None:
-        """
-        Set up the learning role for reinforcement learning training.
-
-        Notes:
-            This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
-            for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
-        """
-
-        # TODO not needed anymore, can I get rid of setup then?
-        # subscribe to messages for handling the training process
-        # if not self.evaluation_mode:
-        #    self.context.subscribe_message(
-        #        self,
-        #        self.save_buffer_and_update,
-        #        lambda content, meta: content.get("context") == "rl_training",
-        #    )
 
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """

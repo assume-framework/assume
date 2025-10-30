@@ -537,31 +537,6 @@ def load_config_and_create_forecaster(
     buses = load_file(path=path, config=config, file_name="buses")
     lines = load_file(path=path, config=config, file_name="lines")
 
-    learning_config: LearningConfig = config.get("learning_config", {})
-
-    # Check if simulation length is divisible by train_freq in learning config and adjust if not
-    if config.get("learning_mode"):
-        train_freq_str = learning_config.get("train_freq", "24h")
-        train_freq = pd.Timedelta(train_freq_str)
-        total_length = end - start
-
-        # Compute remainder and determine the required intervals
-        quotient, remainder = divmod(total_length, train_freq)
-
-        if remainder != pd.Timedelta(0):
-            # Adjust train_freq so that it evenly divides total_length
-            n_intervals = quotient + 1
-            new_train_freq = (total_length / n_intervals).total_seconds() / 3600
-            new_train_freq_str = f"{int(new_train_freq)}h"  # Directly accessing hours
-
-            # Update the configuration
-            learning_config["train_freq"] = new_train_freq_str
-
-            logger.warning(
-                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). This will lead to a loss of training experience."
-                f"Adjusting train_freq to {new_train_freq_str}. Consider modifying simulation length or train_freq in the config to avoid this adjustment."
-            )
-
     forecaster = CsvForecaster(
         index=index,
         powerplants_units=powerplant_units,
@@ -664,7 +639,7 @@ def setup_world(
             )
 
     learning_config: LearningConfig = config.get("learning_config", {})
-    bidding_strategy_params = config.get("bidding_strategy_params", {})
+    bidding_params = config.get("bidding_strategy_params", {})
 
     learning_config["learning_mode"] = config.get("learning_mode", False)
     learning_config["evaluation_mode"] = evaluation_mode
@@ -673,6 +648,8 @@ def setup_world(
         learning_config["learning_mode"] = False
         learning_config["evaluation_mode"] = False
 
+    # TODO: I thought about moving this to the learning role as well but as long as we have the loop here and change things we should
+    # keep it here for now. Because stuff like terminate learning is changed in the loop and changes the was the world is inilaized.
     if not learning_config.get("trained_policies_save_path"):
         learning_config["trained_policies_save_path"] = (
             f"learned_strategies/{simulation_id}"
@@ -695,7 +672,7 @@ def setup_world(
         learning_config=learning_config,
         episode=episode,
         eval_episode=eval_episode,
-        bidding_params=bidding_strategy_params,
+        bidding_params=bidding_params,
         forecaster=forecaster,
     )
 
@@ -798,19 +775,13 @@ def setup_world(
     else:
         logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
-            if company_name == "Operator-RL" and world.learning_mode:
-                world.add_rl_unit_operator(id="Operator-RL")
-            else:
-                strategies = unit_operators_strategies.get(company_name, {})
-                world.add_unit_operator(id=str(company_name), strategies=strategies)
+            strategies = unit_operators_strategies.get(company_name, {})
+            world.add_unit_operator(id=str(company_name), strategies=strategies)
 
         # add the units to corresponding unit operators
         for op, op_units in units.items():
             for unit in op_units:
                 world.add_unit(**unit)
-
-    if world.learning_mode or world.evaluation_mode:
-        world.add_learning_strategies_to_learning_role()
 
     if (
         world.learning_mode
@@ -948,38 +919,8 @@ def run_learning(
 
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
-
-    if Path(save_path).is_dir():
-        if world.learning_config.get("continue_learning", False):
-            logger.warning(
-                f"Save path '{save_path}' exists.\n"
-                "You are in continue learning mode. New strategies may overwrite previous ones.\n"
-                "It is recommended to use a different save path to avoid unintended overwrites.\n"
-                "You can set 'trained_policies_save_path' in the config."
-            )
-            proceed = input(
-                "Do you still want to proceed with the existing save path? (y/N) "
-            )
-            if not proceed.lower().startswith("y"):
-                raise AssumeException(
-                    "Simulation aborted by user to avoid overwriting previous learned strategies. "
-                    "Consider setting a new 'simulation_id' or 'trained_policies_save_path' in the config."
-                )
-        else:
-            logger.warning(
-                f"Save path '{save_path}' exists. Previous training data will be deleted to start fresh."
-            )
-            accept = input("Do you want to overwrite and start fresh? (y/N) ")
-            if accept.lower().startswith("y"):
-                shutil.rmtree(save_path, ignore_errors=True)
-                logger.info(
-                    f"Previous strategies at '{save_path}' deleted. Starting fresh training."
-                )
-            else:
-                raise AssumeException(
-                    "Simulation aborted by user not to overwrite existing learned strategies. "
-                    "You can set a different 'simulation_id' or 'trained_policies_save_path' in the config."
-                )
+    continue_learning = world.learning_config.get("continue_learning", False)
+    world.learning_role.confirm_save_path(save_path, continue_learning)
 
     # also remove tensorboard logs
     tensorboard_path = f"tensorboard/{world.scenario_data['simulation_id']}"
@@ -1007,22 +948,9 @@ def run_learning(
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
-    # -----------------------------------------
-
-    validation_interval = min(
-        world.learning_role.training_episodes,
-        world.learning_config.get("validation_episodes_interval", 5),
+    validation_interval = world.learning_role.determine_validation_interval(
+        world.learning_config
     )
-
-    # Ensure training episodes exceed the sum of initial experience and one evaluation interval
-    min_required_episodes = (
-        world.learning_role.episodes_collecting_initial_experience + validation_interval
-    )
-
-    if world.learning_role.training_episodes < min_required_episodes:
-        raise ValueError(
-            f"Training episodes ({world.learning_role.training_episodes}) must be greater than the sum of initial experience episodes ({world.learning_role.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
-        )
 
     eval_episode = 1
 
@@ -1073,6 +1001,7 @@ def run_learning(
 
             total_rewards = world.output_role.get_sum_reward(episode=eval_episode)
 
+            # TODO: currently the writing to buffer etc is coupled to the training and buffer update and hence will not happen
             if len(total_rewards) == 0:
                 raise AssumeException("No rewards were collected during evaluation run")
 
