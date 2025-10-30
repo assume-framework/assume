@@ -41,6 +41,19 @@ class UnitForecaster:
         return result
 
 
+class CustomUnitForecaster(UnitForecaster):
+    def __init__(
+        self,
+        index: ForecastIndex,
+        **kwargs,
+    ):
+        super().__init__(index)
+        for k, v in kwargs.items():
+            if isinstance(v, pd.Series):
+                v = self._to_series(v)
+            self.__setattr__(k, v)
+
+
 class DemandForecaster(UnitForecaster):
     def __init__(
         self,

@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
 from mango import (
     RoleAgent,
     activate,
@@ -34,6 +35,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
+from assume.common.fast_pandas import FastIndex_from_pd
 from assume.common.forecaster import UnitForecaster
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
@@ -182,12 +184,12 @@ class World:
         start: datetime,
         end: datetime,
         simulation_id: str,
+        index: pd.DatetimeIndex,
         save_frequency_hours,
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         episode: int = 1,
         eval_episode: int = 1,
-        forecaster: UnitForecaster | None = None,
         manager_address=None,
         real_time=False,
         **kwargs: dict,
@@ -242,8 +244,7 @@ class World:
             else f"Evaluation Episode {eval_episode}"
         )
 
-        # forecaster is used only when loading custom unit types
-        self.forecaster = forecaster
+        self.index = FastIndex_from_pd(index)
 
         self.bidding_params = bidding_params
 
@@ -330,7 +331,7 @@ class World:
                 db_uri=self.db_uri,
                 output_agent_addr=self.output_agent_addr,
                 train_start=self.start,
-                freq=self.forecaster.index.freq,
+                freq=self.index.freq,
             )
 
         else:
@@ -606,7 +607,7 @@ class World:
                     )
                 raise ValueError(
                     f"""Bidding strategy {strategy} not registered. Please check the name of
-                    the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                        the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
                 )
 
             if strategy not in strategy_instances:

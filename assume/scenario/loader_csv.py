@@ -20,6 +20,7 @@ from assume.common.base import LearningConfig
 from assume.common.calculations import Calculations
 from assume.common.exceptions import AssumeException
 from assume.common.forecaster import (
+    CustomUnitForecaster,
     DemandForecaster,
     ExchangeForecaster,
     PowerplantForecaster,
@@ -643,6 +644,7 @@ def load_config_and_create_forecaster(
         "exchange_units": exchange_units,
         "dsm_units": dsm_units,
         "unit_forecasts": unit_forecasts,
+        "index": index,
     }
 
 
@@ -745,7 +747,7 @@ def setup_world(
         episode=episode,
         eval_episode=eval_episode,
         bidding_params=bidding_strategy_params,
-        # TODO custom unit forecasting
+        index=scenario_data["index"],
     )
 
     # get the market config from the config file and add the markets
@@ -908,6 +910,7 @@ def load_custom_units(
     inputs_path: str,
     scenario: str,
     file_name: str,
+    forecast_file_name: str,
     unit_type: str,
 ) -> None:
     """
@@ -948,16 +951,28 @@ def load_custom_units(
     if custom_units is None:
         logger.warning(f"No {file_name} units were provided!")
 
+    forecasts = load_file(
+        path=path,
+        config={},
+        file_name=forecast_file_name,
+    )
+    if forecasts is None:
+        logger.warning(f"No {forecast_file_name} forecasts were provided!")
+
     operators = custom_units.unit_operator.unique()
     for operator in operators:
         if operator not in world.unit_operators:
             world.add_unit_operator(id=str(operator))
 
+    kwargs = {}
+    for k, v in forecasts.items():
+        kwargs[k] = v
+    forecaster = CustomUnitForecaster(forecasts.index, **kwargs)
     add_units(
         units_df=custom_units,
         unit_type=unit_type,
         world=world,
-        forecaster=world.forecaster,
+        forecaster=forecaster,
     )
 
 
