@@ -12,7 +12,11 @@ import yaml
 from dateutil.relativedelta import relativedelta as rd
 from yaml_include import Constructor
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import (
+    DemandForecaster,
+    PowerplantForecaster,
+    UnitForecaster,
+)
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.strategies.extended import SupportStrategy
 from assume.world import World
@@ -168,7 +172,7 @@ def add_agent_to_world(
                     agent["Id"],
                     {
                         "min_power": 0,
-                        "max_power": 100000,
+                        "max_power": -100000,
                         "bidding_strategies": {
                             "energy": "support",
                             "financial_support": "support",
@@ -176,7 +180,7 @@ def add_agent_to_world(
                         "technology": "demand",
                         "price": value,
                     },
-                    NaiveForecast(index, demand=100000),
+                    DemandForecaster(index, demand=-100000),
                 )
         case "EnergyExchange" | "DayAheadMarketSingleZone":
             clearing_section = agent["Attributes"].get("Clearing", agent["Attributes"])
@@ -249,13 +253,13 @@ def add_agent_to_world(
                     agent["Id"],
                     {
                         "min_power": 0,
-                        "max_power": 100000,
+                        "max_power": -100000,
                         "bidding_strategies": demand_strategies,
                         "technology": "demand",
                         "price": load["ValueOfLostLoad"],
                     },
                     # demand_series might contain more values than index
-                    NaiveForecast(index, demand=demand_series[: len(index)]),
+                    DemandForecaster(index, demand=demand_series[: len(index)]),
                 )
 
         case "StorageTrader":
@@ -271,12 +275,10 @@ def add_agent_to_world(
 
             forecast_price = prices.get("co2", 20)
             # TODO forecast should be calculated using calculate_EOM_price_forecast
-            forecast = NaiveForecast(
+            forecast = UnitForecaster(
                 index,
-                availability=1,
-                co2_price=prices.get("co2", 2),
                 # price_forecast is used for price_EOM
-                price_forecast=forecast_price,
+                market_prices={"eom": forecast_price},
             )
 
             max_soc = device["EnergyToPowerRatio"] * device["InstalledPowerInMW"]
@@ -341,11 +343,13 @@ def add_agent_to_world(
                 availability = availability.reindex(index).ffill()
             availability *= prototype.get("UnplannedAvailabilityFactor", 1)
 
-            forecast = NaiveForecast(
+            forecast = PowerplantForecaster(
                 index,
                 availability=availability,
-                fuel_price=fuel_price,
-                co2_price=prices.get("co2", 2),
+                fuel_prices={
+                    "co2": prices.get("co2", 2),
+                    translate_fuel_type[prototype["FuelType"]]: fuel_price,
+                },
             )
             # TODO UnplannedAvailabilityFactor is not respected
 
@@ -399,11 +403,13 @@ def add_agent_to_world(
 
             fuel_price = prices.get(translate_fuel_type[attr["EnergyCarrier"]], 0)
             fuel_price += attr.get("OpexVarInEURperMWH", 0)
-            forecast = NaiveForecast(
+            forecast = PowerplantForecaster(
                 index,
                 availability=availability,
-                fuel_price=fuel_price,
-                co2_price=prices.get("co2", 0),
+                fuel_prices={
+                    translate_fuel_type[attr["EnergyCarrier"]]: fuel_price,
+                    "co2": prices.get("co2", 0),
+                },
             )
             support_instrument = attr.get("SupportInstrument")
             support_conf = supports.get(attr.get("Set"))
@@ -488,6 +494,7 @@ def load_amiris(
         start=start,
         end=end,
         simulation_id=simulation_id,
+        save_frequency_hours=48,
     )
     # helper dict to map trader markups/markdowns to powerplants
     markups = {}

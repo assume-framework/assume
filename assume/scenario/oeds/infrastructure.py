@@ -675,7 +675,7 @@ class InfrastructureInterface:
                 "unitID": id_,
                 "startDate": pd.to_datetime(data["startDate"].to_numpy()[0]),
                 "max_power_discharge": data["PMinus_max"].sum(),
-                "max_power_charge": data["PPlus_max"].sum(),
+                "max_power_charge": -data["PPlus_max"].sum(),
                 "max_soc": data["VMax"].to_numpy()[0],
                 "min_soc": 0,
                 "V0": data["VMax"].to_numpy()[0] / 2,
@@ -804,7 +804,7 @@ class InfrastructureInterface:
         # d = holidays.DE(subdiv='NW', years=year)
         holi = holidays.DE(years=year)
         e_slp = ElecSlp(year, holidays=holi)
-        profile = e_slp.get_profile(ann_el_demand_per_sector)
+        profile = e_slp.get_scaled_power_profiles(ann_el_demand_per_sector)
         profile["g7"] = (
             demand["industry"] + demand["agriculture"] + demand["business"] / 2
         ) / 8760

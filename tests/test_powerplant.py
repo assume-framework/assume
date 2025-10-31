@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import PowerplantForecaster
 from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units import PowerPlant
 
@@ -16,8 +16,11 @@ from assume.units import PowerPlant
 def power_plant_1() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    forecaster = NaiveForecast(
-        index, availability=1, fuel_price=[10, 11, 12, 13], co2_price=[10, 20, 30, 30]
+    forecaster = PowerplantForecaster(
+        index,
+        availability=1,
+        fuel_prices={"lignite": [10, 11, 12, 13], "co2": [10, 20, 30, 30]},
+        market_prices={"EOM": 0},
     )
     return PowerPlant(
         id="test_pp",
@@ -39,7 +42,12 @@ def power_plant_1() -> PowerPlant:
 def power_plant_2() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    forecaster = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    forecaster = PowerplantForecaster(
+        index,
+        availability=1,
+        fuel_prices={"lignite": 10, "co2": 10},
+        market_prices={"EOM": 0},
+    )
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
@@ -60,7 +68,12 @@ def power_plant_2() -> PowerPlant:
 def power_plant_3() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    forecaster = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    forecaster = PowerplantForecaster(
+        index,
+        availability=1,
+        fuel_prices={"lignite": 10, "co2": 10},
+        market_prices={"EOM": 0},
+    )
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
@@ -295,11 +308,10 @@ def test_powerplant_ramping(power_plant_1):
 
 def test_powerplant_availability(power_plant_1):
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    ff = NaiveForecast(
+    ff = PowerplantForecaster(
         index,
         availability=[0.5, 0.01, 1, 1],
-        fuel_price=[10, 11, 12, 13],
-        co2_price=[10, 20, 30, 30],
+        fuel_prices={"others": [10, 11, 12, 13], "co2": [10, 20, 30, 30]},
     )
     # set availability
     power_plant_1.forecaster = ff
@@ -342,7 +354,12 @@ def test_powerplant_availability(power_plant_1):
 
 def test_powerplant_execute_dispatch():
     index = pd.date_range("2022-01-01", periods=24, freq="h")
-    forecaster = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    forecaster = PowerplantForecaster(
+        index=index,
+        availability=1,
+        fuel_prices={"lignite": 10, "co2": 10},
+        market_prices={"EOM": 0},
+    )
     power_plant = PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
@@ -605,7 +622,7 @@ def test_initialising_invalid_powerplants():
         "unit_operator": "operator",
         "technology": "technology",
         "bidding_strategies": {},
-        "forecaster": NaiveForecast(index=index),
+        "forecaster": PowerplantForecaster(index=index),
         "max_power": 0.0,
     }
     with pytest.raises(ValueError, match="max_power=-10 must be >= 0 for unit id"):

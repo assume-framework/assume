@@ -170,7 +170,8 @@ class DSMFlex:
             pyo.Param(
                 model.time_steps,
                 initialize={
-                    t: value for t, value in enumerate(self.electricity_price_flex)
+                    t: value
+                    for t, value in enumerate(self.forecaster.electricity_price_flex)
                 },
             ),
         )

@@ -9,7 +9,7 @@ from typing import TypedDict
 import numpy as np
 
 from assume.common.fast_pandas import FastSeries, TensorFastSeries
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
@@ -40,7 +40,7 @@ class BaseUnit:
         unit_operator: str,
         technology: str,
         bidding_strategies: dict[str, BaseStrategy],
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
         node: str = "node0",
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,

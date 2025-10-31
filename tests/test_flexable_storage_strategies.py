@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import UnitForecaster
 from assume.strategies import (
     flexableEOMStorage,
     flexableNegCRMStorage,
@@ -22,7 +22,7 @@ from assume.units import Storage
 def storage() -> Storage:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2023-07-01", periods=48, freq="h")
-    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    forecaster = UnitForecaster(index, market_prices={"EOM": 50})
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
@@ -54,7 +54,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
     product_tuples = [(start, end, None)]
 
     # constant price of 50
-    storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    storage.forecaster = UnitForecaster(index, market_prices={"EOM": 50})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     # no change in price forecast -> no bidding
     assert len(bids) == 1
@@ -62,18 +62,14 @@ def test_flexable_eom_storage(mock_market_config, storage):
     assert bids[0]["volume"] == 60
 
     # increase the current price forecast -> discharging
-    storage.forecaster = NaiveForecast(
-        index, availability=1, price_forecast=[60, 50, 50, 50]
-    )
+    storage.forecaster = UnitForecaster(index, market_prices={"EOM": [60, 50, 50, 50]})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert bids[0]["price"] == 52.5 / storage.efficiency_discharge
     assert bids[0]["volume"] == 60
 
     # decrease current price forecast -> charging
-    storage.forecaster = NaiveForecast(
-        index, availability=1, price_forecast=[40, 50, 50, 50]
-    )
+    storage.forecaster = UnitForecaster(index, market_prices={"EOM": [40, 50, 50, 50]})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert bids[0]["price"] == 47.5 * storage.efficiency_charge
@@ -110,7 +106,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
         50,
         50,
     ]
-    storage.forecaster = NaiveForecast(index, availability=1, price_forecast=forecast)
+    storage.forecaster = UnitForecaster(index, market_prices={"EOM": forecast})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 24
     assert math.isclose(
@@ -169,7 +165,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     # constant price of 50
     specific_revenue = (50 - 4) * 360 / (0.36 * 1000)
 
-    storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    storage.forecaster = UnitForecaster(index, market_prices={"EOM": 50})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert math.isclose(bids[0]["price"], specific_revenue)
@@ -183,7 +179,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     assert bids[0]["volume"] == 60
 
     # specific revenue < 0
-    storage.forecaster = NaiveForecast(index, availability=1, price_forecast=3)
+    storage.forecaster = UnitForecaster(index, market_prices={"EOM": 3})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert bids[0]["price"] == 0
@@ -209,7 +205,7 @@ def test_flexable_neg_crm_storage(mock_market_config, storage):
     product_tuples = [(start, end, None)]
 
     # constant price of 50
-    storage.forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    storage.forecaster = UnitForecaster(index, market_prices={"EOM": 50})
     bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
     assert len(bids) == 1
     assert math.isclose(bids[0]["price"], 0)

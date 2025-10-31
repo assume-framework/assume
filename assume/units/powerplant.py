@@ -7,10 +7,10 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 import numpy as np
-import pandas as pd
 
-from assume.common.base import MinMaxChargeStrategy, SupportsMinMax
-from assume.common.forecasts import Forecaster
+from assume.common.base import MinMaxStrategy, SupportsMinMax
+from assume.common.fast_pandas import FastSeries
+from assume.common.forecaster import PowerplantForecaster
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +53,8 @@ class PowerPlant(SupportsMinMax):
         id: str,
         unit_operator: str,
         technology: str,
-        bidding_strategies: dict[str, MinMaxChargeStrategy],
-        forecaster: Forecaster,
+        bidding_strategies: dict[str, MinMaxStrategy],
+        forecaster: PowerplantForecaster,
         max_power: float,
         min_power: float = 0.0,
         efficiency: float = 1.0,
@@ -87,6 +87,12 @@ class PowerPlant(SupportsMinMax):
             location=location,
             **kwargs,
         )
+
+        if not isinstance(forecaster, PowerplantForecaster):
+            raise ValueError(
+                f"forecaster must be of type {PowerplantForecaster.__name__}"
+            )
+
         if min_power < 0:
             raise ValueError(f"{min_power=} must be >= 0 for unit {self.id}")
         if max_power < 0:
@@ -145,9 +151,7 @@ class PowerPlant(SupportsMinMax):
         """
         start = max(start, self.index[0])
 
-        max_power_values = (
-            self.forecaster.get_availability(self.id).loc[start:end] * self.max_power
-        )
+        max_power_values = self.forecaster.availability.loc[start:end] * self.max_power
 
         for t, max_power in zip(self.index[start:end], max_power_values):
             current_power = self.outputs["energy"].at[t]
@@ -166,7 +170,7 @@ class PowerPlant(SupportsMinMax):
 
     def calc_simple_marginal_cost(
         self,
-    ) -> pd.Series:
+    ) -> FastSeries:
         """
         Calculates the marginal cost of the unit (simple method) and returns the marginal cost of the unit.
 
@@ -274,7 +278,7 @@ class PowerPlant(SupportsMinMax):
         # min_power should be at least the heat demand at that time
         min_power = min_power.clip(min=heat_demand)
 
-        available_power = self.forecaster.get_availability(self.id).loc[start:end_excl]
+        available_power = self.forecaster.availability.loc[start:end_excl]
         max_power = available_power * self.max_power
         # check if available power is larger than max_power and raise an error if so
         if (max_power > self.max_power).any():

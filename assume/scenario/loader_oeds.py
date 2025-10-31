@@ -13,7 +13,7 @@ import pandas as pd
 from dateutil import rrule as rr
 
 from assume import World
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
 
@@ -114,11 +114,10 @@ def load_oeds(
                     "location": (8.18, 54.4),
                     "node": "DEF",
                 },
-                NaiveForecast(
+                PowerplantForecaster(
                     index,
                     availability=offshore_wind / offshore_wind.max(),
-                    fuel_price=0.2,
-                    co2_price=0,
+                    fuel_prices={"others": 0.2},
                 ),
             )
 
@@ -151,11 +150,7 @@ def load_oeds(
                     )
                 )
 
-            demand_save = demand.resample("h").mean()
-            # demand in MW
-            if not entsoe_demand:
-                demand = demand_save
-
+            # now store the area specific demand in CSV
             try:
                 config_path.mkdir(parents=True, exist_ok=True)
                 demand_save.to_csv(config_path / "demand.csv")
@@ -165,6 +160,12 @@ def load_oeds(
                 wind.to_csv(config_path / "wind.csv")
             except Exception:
                 shutil.rmtree(config_path, ignore_errors=True)
+
+            # demand in MW
+            if not entsoe_demand:
+                demand = demand_save
+            demand = demand.resample("h").mean()
+
         else:
             logger.info("use existing local time series")
             # demand from OEP is less accurate but extrapolates better
@@ -192,14 +193,14 @@ def load_oeds(
             # the unit_params have no hints
             {
                 "min_power": 0,
-                "max_power": demand.max(),
+                "max_power": -demand.max(),
                 "bidding_strategies": bidding_strategies["demand"],
                 "technology": "demand",
                 "location": (lat, lon),
                 "node": area,
                 "price": 1e3,
             },
-            NaiveForecast(index, demand=demand),
+            DemandForecaster(index, demand=-abs(demand)),
         )
 
         world.add_unit_operator(f"renewables{area}")
@@ -216,8 +217,10 @@ def load_oeds(
                 "location": (lat, lon),
                 "node": area,
             },
-            NaiveForecast(
-                index, availability=solar / solar.max(), fuel_price=0.1, co2_price=0
+            PowerplantForecaster(
+                index,
+                availability=solar / solar.max(),
+                fuel_prices={"others": 0.1},
             ),
         )
         if wind.max() > 0:
@@ -234,8 +237,8 @@ def load_oeds(
                     "location": (lat, lon),
                     "node": area,
                 },
-                NaiveForecast(
-                    index, availability=wind / wind.max(), fuel_price=0.2, co2_price=0
+                PowerplantForecaster(
+                    index, availability=wind / wind.max(), fuel_prices={"others": 0.2}
                 ),
             )
 
@@ -261,11 +264,10 @@ def load_oeds(
                 "location": (lat, lon),
                 "node": area,
             },
-            NaiveForecast(
+            PowerplantForecaster(
                 index,
                 availability=1,
-                fuel_price=fuel_prices["biomass"] + randomness,
-                co2_price=0,
+                fuel_prices={"others": fuel_prices["biomass"] + randomness},
             ),
         )
         water = infra_interface.get_run_river_systems_in_area(area=area)
@@ -285,7 +287,7 @@ def load_oeds(
                 "location": (lat, lon),
                 "node": area,
             },
-            NaiveForecast(index, availability=1, fuel_price=0.2, co2_price=0),
+            PowerplantForecaster(index, availability=1, fuel_prices={"others": 0.2}),
         )
 
         if True:
@@ -309,7 +311,9 @@ def load_oeds(
                         "location": (lat, lon),
                         "node": area,
                     },
-                    NaiveForecast(index, availability=1, fuel_price=0.2, co2_price=0),
+                    PowerplantForecaster(
+                        index, availability=1, fuel_prices={"others": 0.2}
+                    ),
                 )
 
         world.add_unit_operator(f"conventional{area}")
@@ -351,11 +355,13 @@ def load_oeds(
                         "location": (lat, lon),
                         "node": area,
                     },
-                    NaiveForecast(
+                    PowerplantForecaster(
                         index,
                         availability=availability,
-                        fuel_price=fuel_prices[fuel_type] + randomness,
-                        co2_price=fuel_prices["co2"],
+                        fuel_prices={
+                            "others": fuel_prices[fuel_type] + randomness,
+                            "co2": fuel_prices["co2"],
+                        },
                     ),
                 )
 

@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import ExchangeForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.strategies import NaiveExchangeStrategy
 from assume.units.exchange import Exchange
@@ -32,8 +32,12 @@ def market_config():
 def full_forecast():
     """Fixture for forecasted import/export values with both import and export data."""
     index = pd.date_range(start=datetime(2024, 1, 1), periods=24, freq="1h")
-    return NaiveForecast(
-        index, test_unit_import=100, test_unit_export=50
+    return ExchangeForecaster(
+        index=index,
+        volume_import=100,
+        volume_export=50,
+        availability=1,
+        market_prices={},
     )  # Both import and export
 
 
@@ -41,14 +45,14 @@ def full_forecast():
 def import_only_forecast():
     """Fixture for forecasted values where only import is available."""
     index = pd.date_range(start=datetime(2024, 1, 1), periods=24, freq="1h")
-    return NaiveForecast(index, test_unit_import=100)  # Only import, no export
+    return ExchangeForecaster(index, volume_import=100)  # Only import, no export
 
 
 @pytest.fixture
 def export_only_forecast():
     """Fixture for forecasted values where only export is available."""
     index = pd.date_range(start=datetime(2024, 1, 1), periods=24, freq="1h")
-    return NaiveForecast(index, test_unit_export=50)  # Only export, no import
+    return ExchangeForecaster(index, volume_export=50)  # Only export, no import
 
 
 @pytest.fixture

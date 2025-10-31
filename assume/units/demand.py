@@ -8,7 +8,7 @@ import numpy as np
 
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import DemandForecaster
 
 
 class Demand(SupportsMinMax):
@@ -37,7 +37,7 @@ class Demand(SupportsMinMax):
         bidding_strategies: dict,
         max_power: float,
         min_power: float,
-        forecaster: Forecaster,
+        forecaster: DemandForecaster,
         node: str = "node0",
         price: float = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
@@ -54,6 +54,9 @@ class Demand(SupportsMinMax):
             **kwargs,
         )
 
+        if not isinstance(forecaster, DemandForecaster):
+            raise ValueError(f"forecaster must be of type {DemandForecaster.__name__}")
+
         if max_power > 0:
             raise ValueError(
                 f"max_power must be < 0 but is {max_power} for unit {self.id}"
@@ -68,7 +71,6 @@ class Demand(SupportsMinMax):
         self.max_power = max_power
         self.min_power = min_power
 
-        self.volume = -abs(self.forecaster[self.id])  # demand is negative
         self.price = FastSeries(index=self.index, value=price)
 
         # Elastic demand parameters
@@ -137,7 +139,7 @@ class Demand(SupportsMinMax):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
         bid_volume = (
-            self.volume.loc[start:end_excl]
+            self.forecaster.demand.loc[start:end_excl]
             - self.outputs[product_type].loc[start:end_excl]
         )
 

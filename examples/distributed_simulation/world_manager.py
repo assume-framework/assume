@@ -7,7 +7,7 @@ import sys
 from mango import addr
 
 from assume import MarketConfig, World
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import DemandForecaster
 
 from .config import (
     agent_addresses,
@@ -40,11 +40,11 @@ async def create_worker(
         # the unit_params have no hints
         {
             "min_power": 0,
-            "max_power": 1000,
+            "max_power": -1000,
             "bidding_strategies": {market_config.market_id: "naive_eom"},
             "technology": "demand",
         },
-        NaiveForecast(index, demand=1000),
+        DemandForecaster(index, demand=-1000),
     )
 
 
