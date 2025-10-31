@@ -150,11 +150,7 @@ def load_oeds(
                     )
                 )
 
-            demand_save = demand.resample("h").mean()
-            # demand in MW
-            if not entsoe_demand:
-                demand = demand_save
-
+            # now store the area specific demand in CSV
             try:
                 config_path.mkdir(parents=True, exist_ok=True)
                 demand_save.to_csv(config_path / "demand.csv")
@@ -164,6 +160,12 @@ def load_oeds(
                 wind.to_csv(config_path / "wind.csv")
             except Exception:
                 shutil.rmtree(config_path, ignore_errors=True)
+
+            # demand in MW
+            if not entsoe_demand:
+                demand = demand_save
+            demand = demand.resample("h").mean()
+
         else:
             logger.info("use existing local time series")
             # demand from OEP is less accurate but extrapolates better
