@@ -335,10 +335,12 @@ class Learning(Role):
             # write data to output agent before resetting it
             self.write_rl_params_to_output(snapshot)
 
-            # Process snapshot in background
-            await asyncio.to_thread(
-                self._store_to_buffer_and_update_sync, snapshot, self.device
-            )
+            # if we are training also update the policy and write data into buffer
+            if not self.evaluation_mode:
+                # Process snapshot in background
+                await asyncio.to_thread(
+                    self._store_to_buffer_and_update_sync, snapshot, self.device
+                )
         else:
             logger.warning("No experience retrieved to store in buffer at update step!")
 
@@ -369,9 +371,7 @@ class Learning(Role):
             reward=transform_buffer_data(snapshot["rewards"], device),
         )
 
-        # if we are training also update the policy
-        if not self.evaluation_mode:
-            self.update_policy()
+        self.update_policy()
 
     def add_observation_to_buffer(self, unit_id, start, observation) -> None:
         """
