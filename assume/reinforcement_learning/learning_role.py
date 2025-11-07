@@ -347,7 +347,7 @@ class Learning(Role):
             # check if all entries for the buffers have the same number of unit_ids as rl_strats
             if len(buffer[first_start]) != len(self.rl_strats):
                 logger.error(
-                    f"Number of unit_ids with {name} in learning role {len(buffer[first_start])} does not match number of rl_strats {len(self.rl_strats)}. "
+                    f"Number of unit_ids with {name} in learning role ({len(buffer[first_start])}) does not match number of rl_strats ({len(self.rl_strats)}). "
                     "It seems like some learning_instances are not reporting experience. Cannot store to buffer and update policy!"
                 )
                 return
@@ -691,21 +691,15 @@ class Learning(Role):
         """
         output_agent_list = []
 
-        for unit_id in sorted(self.all_obs.keys()):
-            starts = self.all_obs[unit_id].keys()
+        for unit_id in sorted(self.all_obs[next(iter(self.all_obs))].keys()):
+            starts = self.all_obs.keys()
             for idx, start in enumerate(starts):
                 output_dict = {
                     "datetime": start,
                     "unit": unit_id,
-                    "reward": self.all_rewards[unit_id][idx]
-                    if idx < len(self.all_rewards[unit_id])
-                    else None,
-                    "regret": self.all_regrets[unit_id][idx]
-                    if idx < len(self.all_regrets[unit_id])
-                    else None,
-                    "profit": self.all_profits[unit_id][idx]
-                    if idx < len(self.all_profits[unit_id])
-                    else None,
+                    "reward": self.all_rewards[start][unit_id],
+                    "regret": self.all_regrets[start][unit_id],
+                    "profit": self.all_profits[start][unit_id],
                 }
 
                 action_tuple = (
