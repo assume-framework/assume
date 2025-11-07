@@ -484,14 +484,6 @@ class RLStrategy(BaseLearningStrategy):
             },
         ]
 
-        # store results in unit outputs as lists to be written to the buffer for learning
-        unit.outputs["rl_observations"].append(next_observation)
-        unit.outputs["rl_actions"].append(actions)
-
-        # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"].at[start] = actions
-        unit.outputs["exploration_noise"].at[start] = noise
-
         if self.learning_mode:
             self.learning_role.add_actions_to_buffer(
                 self.unit_id, start, actions, noise

@@ -15,11 +15,18 @@ from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
 from assume.common.exceptions import AssumeException
-from assume.common.utils import create_rrule, datetime2timestamp, timestamp2datetime
+from assume.common.utils import (
+    create_rrule,
+    datetime2timestamp,
+    timestamp2datetime,
+)
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
-from assume.reinforcement_learning.learning_utils import linear_schedule_func
+from assume.reinforcement_learning.learning_utils import (
+    linear_schedule_func,
+    transform_buffer_data,
+)
 from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
 logger = logging.getLogger(__name__)
@@ -60,6 +67,8 @@ class Learning(Role):
         self.trained_policies_load_path = learning_config.get(
             "trained_policies_load_path", self.trained_policies_save_path
         )
+
+        self.output_agent_addr = None  # TODO: Get this back
 
         # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
         self.early_stopping_steps = learning_config.get(
@@ -156,6 +165,7 @@ class Learning(Role):
         # init dictionaries for all learning instances in this role
         self.all_obs = defaultdict(lambda: defaultdict(list))
         self.all_actions = defaultdict(lambda: defaultdict(list))
+        self.all_noises = defaultdict(lambda: defaultdict(list))
         self.all_rewards = defaultdict(lambda: defaultdict(list))
         self.all_regrets = defaultdict(lambda: defaultdict(list))
         self.all_profits = defaultdict(lambda: defaultdict(list))
@@ -167,19 +177,33 @@ class Learning(Role):
         Notes:
             This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
             for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
-            This cannot happen in the init since the context (compare mango agents) is not yet available there.
+            This cannot happen in the init since the context (compare mango agents) is not yet available there.To avoid inconsistent replay buffer states (e.g. observation and action has been stored but not the reward), this
+            slightly shifts the timing of the buffer updates.
         """
         super().on_ready()
 
         if not self.evaluation_mode:
+            # would be nice to shift this by one time the train frequency but then we need to transform th string into the hour or time here which is done excessively
+            shifted_start = self.start_datetime
+
             recurrency_task = create_rrule(
-                start=self.start_datetime,
+                start=shifted_start,
                 end=self.end_datetime,
                 freq=self.train_freq,
             )
 
             self.context.schedule_recurrent_task(
                 self.store_to_buffer_and_update, recurrency_task
+            )
+
+            # Final buffer update at end of simulation
+            final_task = create_rrule(
+                start=self.end_datetime,  # Schedule exactly at end
+                end=self.end_datetime,  # Only once
+                freq="1h",  # Frequency doesn't matter for single execution
+            )
+            self.context.schedule_recurrent_task(
+                self.store_to_buffer_and_update, final_task
             )
 
     def sync_train_freq_with_simulation_horizon(
@@ -283,53 +307,62 @@ class Learning(Role):
         return validation_interval
 
     async def store_to_buffer_and_update(self) -> None:
-        # run the existing (CPU/blocking) implementation in a thread
-        await asyncio.to_thread(self._store_to_buffer_and_update_sync)
+        # Create snapshots of the current state so that we can store stuff in buffer asynchronously
+        all_timestamps = sorted(self.all_obs.keys())
+        if len(all_timestamps) > 1:  # only filter if we have more than one timestamp
+            # Create filtered snapshot (only selected timestamps for obs and actions, all for rewards)
+            snapshot = {
+                "obs": {t: self.all_obs[t] for t in all_timestamps},
+                "actions": {t: self.all_actions[t] for t in all_timestamps},
+                "rewards": {t: self.all_rewards[t] for t in all_timestamps},
+            }
 
-    def _store_to_buffer_and_update_sync(self) -> None:
+            # Reset the buffers immediately - new data will go into fresh containers
+            self.all_obs = defaultdict(lambda: defaultdict(list))
+            self.all_actions = defaultdict(lambda: defaultdict(list))
+            self.all_rewards = defaultdict(lambda: defaultdict(list))
+            self.all_noises = defaultdict(lambda: defaultdict(list))
+            self.all_regrets = defaultdict(lambda: defaultdict(list))
+            self.all_profits = defaultdict(lambda: defaultdict(list))
+
+            # run the existing (CPU/blocking) implementation in a thread
+            await asyncio.to_thread(
+                self._store_to_buffer_and_update_sync, snapshot, self.device
+            )
+
+        else:
+            logger.warning("No experience retrieved to store in buffer at update step!")
+
+    def _store_to_buffer_and_update_sync(self, snapshot, device) -> None:
         """
         This function takes all the information that the strategies wrote into the learning_role dicts and post_processes them to fit into the buffer.
         Further triggers the next policy update
 
         """
-
+        first_start = next(iter(snapshot["obs"]))
         for name, buffer in [
-            ("observations", self.all_obs),
-            ("actions", self.all_actions),
-            ("rewards", self.all_rewards),
+            ("observations", snapshot["obs"]),
+            ("actions", snapshot["actions"]),
+            ("rewards", snapshot["rewards"]),
         ]:
-            # check if buffer currently empty, not always a problem but recurring would be bad
-            # TODO: this is because I schedule the update task to begin at simulation start
-            if len(buffer) == 0:
-                logger.warning(
-                    "No experience retrieved to store in buffer at update step!"
-                )
-                return
             # check if all entries for the buffers have the same number of unit_ids as rl_strats
-            if len(buffer) != len(self.rl_strats):
+            if len(buffer[first_start]) != len(self.rl_strats):
                 logger.error(
-                    f"Number of unit_ids with {name} in learning role {len(buffer)} does not match number of rl_strats {len(self.rl_strats)}. "
+                    f"Number of unit_ids with {name} in learning role {len(buffer[first_start])} does not match number of rl_strats {len(self.rl_strats)}. "
                     "It seems like some learning_instances are not reporting experience. Cannot store to buffer and update policy!"
                 )
                 return
 
         # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
         self.buffer.add(
-            obs=[self.all_obs[key] for key in sorted(self.all_obs.keys())],
-            actions=[self.all_actions[key] for key in sorted(self.all_actions.keys())],
-            reward=[self.all_rewards[key] for key in sorted(self.all_rewards.keys())],
+            obs=transform_buffer_data(snapshot["obs"], device),
+            actions=transform_buffer_data(snapshot["actions"], device),
+            reward=transform_buffer_data(snapshot["rewards"], device),
         )
 
         # write data to output agent before resetting it
         # TODO: the storage buffer and update function is not called in evaluation and then no rewards are stored... Problem
         self.write_rl_params_to_output()
-
-        # reset dicts as all experience is now in buffer
-        self.all_obs = defaultdict(lambda: defaultdict(list))
-        self.all_actions = defaultdict(lambda: defaultdict(list))
-        self.all_rewards = defaultdict(lambda: defaultdict(list))
-        self.all_regrets = defaultdict(lambda: defaultdict(list))
-        self.all_profits = defaultdict(lambda: defaultdict(list))
 
         self.update_policy()
 
@@ -342,7 +375,7 @@ class Learning(Role):
             observation (torch.Tensor): The observation to be added.
 
         """
-        self.all_obs[unit_id][start].append(observation)
+        self.all_obs[start][unit_id].append(observation)
 
     def add_actions_to_buffer(self, unit_id, start, action, noise) -> None:
         """
@@ -354,7 +387,16 @@ class Learning(Role):
             noise (torch.Tensor): The noise to be added.
 
         """
-        self.all_actions[unit_id][start].append((action, noise))
+
+        # Add validation to catch unexpected unit_ids
+        if unit_id == 0 or unit_id is None:
+            logger.warning(
+                f"Got invalid unit_id while storing learning experience: {unit_id}"
+            )
+            return
+
+        self.all_actions[start][unit_id].append(action)
+        self.all_noises[start][unit_id].append(noise)
 
     def add_reward_to_buffer(self, unit_id, start, reward, regret, profit) -> None:
         """
@@ -365,9 +407,9 @@ class Learning(Role):
             reward (float): The reward to be added.
 
         """
-        self.all_rewards[unit_id][start].append(reward)
-        self.all_regrets[unit_id][start].append(regret)
-        self.all_profits[unit_id][start].append(profit)
+        self.all_rewards[start][unit_id].append(reward)
+        self.all_regrets[start][unit_id].append(regret)
+        self.all_profits[start][unit_id].append(profit)
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """

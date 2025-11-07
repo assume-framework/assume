@@ -188,6 +188,55 @@ def copy_layer_data(dst, src):
             dst[k].data.copy_(src[k].data)
 
 
+def transform_buffer_data(nested_dict: dict, device: th.device) -> list:
+    """
+    Transform nested dict {unit_id -> {datetime -> [values]}} into
+    torch tensor of shape (timesteps, powerplants, values). Compatible with buffer storage.
+    Get tensors from GPU to CPU.
+
+    Args:
+        nested_dict: Dict with structure {unit_id -> {datetime -> list[tensor]}}
+
+    Returns:
+        th.Tensor: Shape (n_timesteps, n_powerplants, feature_dim)
+    """
+    # Get sorted lists of units and timestamps (for consistent ordering)
+    all_times = sorted(nested_dict.keys())
+    unit_ids = sorted(
+        set(dt for unit_data in nested_dict.values() for dt in unit_data.keys())
+    )
+
+    # Get feature dimension from first non-empty value
+    feature_dim = None
+    for unit_data in nested_dict.values():
+        for values in unit_data.values():
+            if values:
+                val = values[0]
+                feature_dim = 1 if val.ndim == 0 else len(val)
+                break
+        if feature_dim is not None:
+            break
+
+    if feature_dim is None:
+        raise ValueError(
+            "Error, while transforming RL data for buffer: No data found to determine feature dimension"
+        )
+
+    # Pre-allocate tensor (keep on same device as input data)
+    result = th.zeros((len(all_times), len(unit_ids), feature_dim), device=device)
+
+    # Fill tensor with values (stays on same device as input so if on GPU it stays there during filling)
+    for t, timestamp in enumerate(all_times):
+        for u, unit_id in enumerate(unit_ids):
+            values = nested_dict[timestamp].get(unit_id, [])
+            if values:  # if we have values for this timestamp
+                result[t, u] = values[0]
+
+    # Convert to numpy array only once at the end
+    # TODO: this is now only freeing the GPU memory after all market operations happened. so the clearing etc happens with tensors currently. Detached ones of course but still.
+    return result.cpu().numpy()
+
+
 def transfer_weights(
     model: th.nn.Module,
     loaded_state: dict,
