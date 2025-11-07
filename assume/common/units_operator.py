@@ -464,7 +464,6 @@ class UnitsOperator(Role):
             product_tuples=products,
         )
 
-        # TODO wollen iegetnich keine tensorabhängigkeit hier... aber einzeln convertieren dauert zu lange
         orderbook = convert_tensors(orderbook)
 
         if not market.addr:

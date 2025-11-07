@@ -336,7 +336,7 @@ class Learning(Role):
             }
 
             # write data to output agent before resetting it
-            await self.write_rl_params_to_output(snapshot)
+            self.write_rl_params_to_output(snapshot)
 
             # if we are training also update the policy and write data into buffer
             if not self.evaluation_mode:
