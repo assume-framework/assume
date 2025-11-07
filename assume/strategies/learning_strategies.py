@@ -1374,22 +1374,23 @@ class RedispatchRLStrategy(RLStrategy):
         **kwargs,
     ) -> Orderbook:
         start = product_tuples[0][0]
-        end_all = product_tuples[-1][1]
+        #end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
         min_power, max_power = unit.min_power, unit.max_power
 
         bids = []
         for product in product_tuples:
             start = product[0]
+            end = product[1]
             current_power = unit.outputs["energy"].at[start]
-            marginal_cost = unit.calculate_marginal_cost(
-                 start, previous_power
-            )  # calculation of the marginal costs
-            price = unit.outputs["eom_bids"].at[start][0]
+            #marginal_cost = unit.calculate_marginal_cost(
+            #     start, previous_power
+            #)  # calculation of the marginal costs
+            price = unit.outputs["eom_bids"].at[start]
             bids.append(
                 {
-                    "start_time": product[0],
-                    "end_time": product[1],
+                    "start_time": start,
+                    "end_time": end,
                     "only_hours": product[2],
                     "price": price,
                     "volume": current_power,
@@ -1398,6 +1399,8 @@ class RedispatchRLStrategy(RLStrategy):
                     "node": unit.node,
                 }
             )
+
+        unit.outputs["redispatch_bids"].loc[product_tuples[0][0]] = price
 
         return bids
 
@@ -1595,4 +1598,4 @@ class RedispatchRLStrategy(RLStrategy):
 
         # store results in unit outputs which are written to database by unit operator
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["total_costs"].loc[start:end_excl] = costs
+        unit.outputs["total_costs"].loc[start:end_excl] += costs
