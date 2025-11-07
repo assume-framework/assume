@@ -182,29 +182,28 @@ class Learning(Role):
         """
         super().on_ready()
 
-        if not self.evaluation_mode:
-            # would be nice to shift this by one time the train frequency but then we need to transform th string into the hour or time here which is done excessively
-            shifted_start = self.start_datetime
+        # would be nice to shift this by one time the train frequency but then we need to transform th string into the hour or time here which is done excessively
+        shifted_start = self.start_datetime
 
-            recurrency_task = create_rrule(
-                start=shifted_start,
-                end=self.end_datetime,
-                freq=self.train_freq,
-            )
+        recurrency_task = create_rrule(
+            start=shifted_start,
+            end=self.end_datetime,
+            freq=self.train_freq,
+        )
 
-            self.context.schedule_recurrent_task(
-                self.store_to_buffer_and_update, recurrency_task
-            )
+        self.context.schedule_recurrent_task(
+            self.store_to_buffer_and_update, recurrency_task
+        )
 
-            # Final buffer update at end of simulation
-            final_task = create_rrule(
-                start=self.end_datetime,  # Schedule exactly at end
-                end=self.end_datetime,  # Only once
-                freq="1h",  # Frequency doesn't matter for single execution
-            )
-            self.context.schedule_recurrent_task(
-                self.store_to_buffer_and_update, final_task
-            )
+        # Final buffer update at end of simulation
+        final_task = create_rrule(
+            start=self.end_datetime,  # Schedule exactly at end
+            end=self.end_datetime,  # Only once
+            freq="1h",  # Frequency doesn't matter for single execution
+        )
+        self.context.schedule_recurrent_task(
+            self.store_to_buffer_and_update, final_task
+        )
 
     def sync_train_freq_with_simulation_horizon(
         self, learning_config: dict
@@ -307,28 +306,39 @@ class Learning(Role):
         return validation_interval
 
     async def store_to_buffer_and_update(self) -> None:
-        # Create snapshots of the current state so that we can store stuff in buffer asynchronously
-        all_timestamps = sorted(self.all_obs.keys())
-        if len(all_timestamps) > 1:  # only filter if we have more than one timestamp
+        # Atomic dict operations - create new references
+        current_obs = self.all_obs
+        current_actions = self.all_actions
+        current_rewards = self.all_rewards
+
+        # Reset buffers immediately with new defaultdicts
+        self.all_obs = defaultdict(lambda: defaultdict(list))
+        self.all_actions = defaultdict(lambda: defaultdict(list))
+        self.all_rewards = defaultdict(lambda: defaultdict(list))
+        self.all_noises = defaultdict(lambda: defaultdict(list))
+        self.all_regrets = defaultdict(lambda: defaultdict(list))
+        self.all_profits = defaultdict(lambda: defaultdict(list))
+
+        # Get timestamps from snapshot we took
+        all_timestamps = sorted(current_obs.keys())
+        if len(all_timestamps) > 1:
+            # Remove last timestamp that has no reward yet
+            timestamps_to_process = all_timestamps[:-1]
+
+            # Create filtered snapshot (only complete timesteps)
             snapshot = {
-                "obs": {t: self.all_obs[t] for t in all_timestamps},
-                "actions": {t: self.all_actions[t] for t in all_timestamps},
-                "rewards": {t: self.all_rewards[t] for t in all_timestamps},
+                "obs": {t: current_obs[t] for t in timestamps_to_process},
+                "actions": {t: current_actions[t] for t in timestamps_to_process},
+                "rewards": {t: current_rewards[t] for t in timestamps_to_process},
             }
 
-            # Reset the buffers immediately - new data will go into fresh containers
-            self.all_obs = defaultdict(lambda: defaultdict(list))
-            self.all_actions = defaultdict(lambda: defaultdict(list))
-            self.all_rewards = defaultdict(lambda: defaultdict(list))
-            self.all_noises = defaultdict(lambda: defaultdict(list))
-            self.all_regrets = defaultdict(lambda: defaultdict(list))
-            self.all_profits = defaultdict(lambda: defaultdict(list))
+            # write data to output agent before resetting it
+            self.write_rl_params_to_output(snapshot)
 
-            # run the existing (CPU/blocking) implementation in a thread
+            # Process snapshot in background
             await asyncio.to_thread(
                 self._store_to_buffer_and_update_sync, snapshot, self.device
             )
-
         else:
             logger.warning("No experience retrieved to store in buffer at update step!")
 
@@ -359,11 +369,9 @@ class Learning(Role):
             reward=transform_buffer_data(snapshot["rewards"], device),
         )
 
-        # write data to output agent before resetting it
-        # TODO: the storage buffer and update function is not called in evaluation and then no rewards are stored... Problem
-        self.write_rl_params_to_output()
-
-        self.update_policy()
+        # if we are training also update the policy
+        if not self.evaluation_mode:
+            self.update_policy()
 
     def add_observation_to_buffer(self, unit_id, start, observation) -> None:
         """
@@ -679,9 +687,7 @@ class Learning(Role):
 
         self.update_steps = 0
 
-    def write_rl_params_to_output(
-        self,
-    ):
+    def write_rl_params_to_output(self, snapshot):
         """
         Sends the current rl_strategy update to the output agent.
 
