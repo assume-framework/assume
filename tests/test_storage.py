@@ -10,7 +10,6 @@ import pytest
 
 from assume.common.forecasts import NaiveForecast
 from assume.strategies.flexable_storage import flexableEOMStorage
-from assume.strategies.naive_strategies import NaiveSingleBidStrategy
 from assume.units import Storage
 
 
@@ -22,7 +21,7 @@ def storage_unit() -> Storage:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
+        bidding_strategies={"EOM": flexableEOMStorage()},
         forecaster=forecaster,
         max_power_charge=-100,
         max_power_discharge=100,
@@ -36,7 +35,7 @@ def storage_unit() -> Storage:
         additional_cost_charge=3,
         additional_cost_discharge=4,
         additional_cost=1,
-        initial_soc=500,
+        initial_soc=None,
     )
 
 
@@ -461,6 +460,120 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
 
     # check that deltas are the same, which again must be due to only one considered market
     assert math.isclose(delta_soc_set_dispatch, delta_soc)
+
+
+def test_initialising_invalid_storages():
+    index = pd.date_range(
+        start=datetime(2023, 7, 1),
+        end=datetime(2023, 7, 2),
+        freq="1h",
+    )
+    param_dict = {
+        "id": "id",
+        "unit_operator": "operator",
+        "technology": "technology",
+        "bidding_strategies": {},
+        "forecaster": NaiveForecast(index=index),
+        "max_power_charge": 0.0,
+        "max_power_discharge": 0.0,
+        "max_soc": 0.0,
+    }
+    with pytest.raises(
+        ValueError, match="max_power_charge=10 must be <= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["max_power_charge"] = 10
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="min_power_charge=10 must be <= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["min_power_charge"] = 10
+        Storage(**d)
+    with pytest.raises(
+        ValueError,
+        match="max_power_charge=-10 must be <= min_power_charge=-20 for unit id",
+    ):
+        d = param_dict.copy()
+        d["max_power_charge"] = -10
+        d["min_power_charge"] = -20
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="max_power_discharge=-10 must be >= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["max_power_discharge"] = -10
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="min_power_discharge=-10 must be >= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["min_power_discharge"] = -10
+        Storage(**d)
+    with pytest.raises(
+        ValueError,
+        match="max_power_discharge=10 must be >= min_power_discharge=20 for unit id",
+    ):
+        d = param_dict.copy()
+        d["max_power_discharge"] = 10
+        d["min_power_discharge"] = 20
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="efficiency_charge=1.1 must be between 0 and 1 for unit id"
+    ):
+        d = param_dict.copy()
+        d["efficiency_charge"] = 1.1
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="efficiency_discharge=1.1 must be between 0 and 1 for unit id"
+    ):
+        d = param_dict.copy()
+        d["efficiency_discharge"] = 1.1
+        Storage(**d)
+    with pytest.raises(ValueError, match="ramp_up_charge=10 must be <= 0 for unit id"):
+        d = param_dict.copy()
+        d["ramp_up_charge"] = 10
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="ramp_down_charge=10 must be <= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["ramp_down_charge"] = 10
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="ramp_up_discharge=-10 must be >= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["ramp_up_discharge"] = -10
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="ramp_down_discharge=-10 must be >= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["ramp_down_discharge"] = -10
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="min_operating_time=-10 must be >= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["min_operating_time"] = -10
+        Storage(**d)
+    with pytest.raises(ValueError, match="min_down_time=-10 must be >= 0 for unit id"):
+        d = param_dict.copy()
+        d["min_down_time"] = -10
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="downtime_hot_start=-10 must be >= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["downtime_hot_start"] = -10
+        Storage(**d)
+    with pytest.raises(
+        ValueError, match="downtime_warm_start=-10 must be >= 0 for unit id"
+    ):
+        d = param_dict.copy()
+        d["downtime_warm_start"] = -10
+        Storage(**d)
 
 
 if __name__ == "__main__":

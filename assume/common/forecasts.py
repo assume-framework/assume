@@ -18,10 +18,10 @@ class Forecaster:
     the corresponding timeseries as pandas Series.
 
     Attributes:
-        index (pandas.Series): The index of the forecasts.
+        index (FastIndex): The index of the forecasts.
 
     Args:
-        index (pandas.Series): The index of the forecasts.
+        index (FastIndex | pd.Series | pd.DatetimeIndex): The index of the forecasts.
 
     Example:
         >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
@@ -30,8 +30,15 @@ class Forecaster:
 
     """
 
-    def __init__(self, index: FastIndex):
-        self.index = index
+    def __init__(self, index: FastIndex | pd.Series | pd.DatetimeIndex):
+        if isinstance(index, FastIndex):
+            self.index = index
+        elif isinstance(index, pd.Series) or isinstance(index, pd.DatetimeIndex):
+            self.index = FastIndex(
+                start=index[0], end=index[-1], freq=pd.infer_freq(index)
+            )
+        else:
+            raise TypeError("Index must be of type pd.Series or FastIndex")
 
     def __getitem__(self, column: str) -> FastSeries:
         """
@@ -58,7 +65,7 @@ class Forecaster:
             FastSeries: The availability of the unit.
 
         Example:
-        >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
+        >>> forecaster = Forecaster(index=FastIndex(start='2020-01-01', end='2025-01-01'))
         >>> availability = forecaster.get_availability('unit_1')
         >>> print(availability)
         """
@@ -77,7 +84,7 @@ class Forecaster:
             FastSeries: The price of the fuel.
 
         Example:
-            >>> forecaster = Forecaster(index=pd.Series([1, 2, 3]))
+            >>> forecaster = Forecaster(index=FastIndex(start='2020-01-01', end='2025-01-01'))
             >>> price = forecaster.get_price('lignite')
             >>> print(price)
         """
@@ -96,13 +103,13 @@ class CsvForecaster(Forecaster):
     Methods are included to retrieve forecasts for specific columns, availability of units,
     and prices of fuel types, returning the corresponding timeseries as pandas Series.
 
-    Notes:
+    Note:
     - Some built-in forecasts are calculated at the beginning of the simulation, such as price forecast and residual load forecast.
     - Price forecast is calculated for energy-only markets using a merit order approach.
     - Residual load forecast is calculated by subtracting the total available power from variable renewable energy power plants from the overall demand forecast. Only power plants containing 'wind' or 'solar' in their technology column are considered VRE power plants.
 
     Args:
-        index (pd.Series): The index of the forecasts.
+        index (FastIndex | pd.Series | pd.DatetimeIndex): The index of the forecasts.
         powerplants_units (pd.DataFrame): A DataFrame containing information about power plants.
         demand_units (pd.DataFrame): A DataFrame with demand unit data.
         market_configs (dict[str, dict]): Configuration details for the markets.
@@ -116,7 +123,7 @@ class CsvForecaster(Forecaster):
 
     def __init__(
         self,
-        index: pd.Series,
+        index: FastIndex | pd.Series | pd.DatetimeIndex,
         powerplants_units: pd.DataFrame,
         demand_units: pd.DataFrame,
         market_configs: dict[str, dict],
@@ -136,7 +143,7 @@ class CsvForecaster(Forecaster):
         self.buses = buses
         self.lines = lines
 
-        self.forecasts = pd.DataFrame(index=index)
+        self.forecasts = pd.DataFrame(index=self.index.as_datetimeindex())
         self.save_path = save_path
 
     def __getitem__(self, column: str) -> FastSeries:
@@ -176,7 +183,7 @@ class CsvForecaster(Forecaster):
             prefix (str): The prefix of the column.
 
         Example:
-            >>> forecaster = CsvForecaster(index=pd.Series([1, 2, 3]))
+            >>> forecaster = CsvForecaster(index=FastIndex(start='2020-01-01', end='2025-01-01'))
             >>> forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
             >>> print(forecaster['location_1_temperature'])
         """
@@ -313,7 +320,7 @@ class CsvForecaster(Forecaster):
         Returns:
             pd.Series: The residual demand forecast.
 
-        Notes:
+        Note:
             1. Selects VRE power plants from the powerplants_units DataFrame based on the technology column (wind or solar).
             2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
             3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
@@ -329,7 +336,9 @@ class CsvForecaster(Forecaster):
         ].copy()
 
         vre_feed_in_df = pd.DataFrame(
-            index=self.index, columns=vre_powerplants_units.index, data=0.0
+            index=self.index.as_datetimeindex(),
+            columns=vre_powerplants_units.index,
+            data=0.0,
         )
 
         for pp, max_power in vre_powerplants_units["max_power"].items():
@@ -383,7 +392,7 @@ class CsvForecaster(Forecaster):
                 - Sets the price based on the marginal cost of the unit that meets demand.
                 - Assigns a default price of 1000 if supply is insufficient.
 
-        Notes:
+        Note:
             - Extending the price forecast to additional markets beyond the DAM is planned.
             - Future enhancements may include storage integration in the price forecast.
 
@@ -431,7 +440,7 @@ class CsvForecaster(Forecaster):
             sum_demand += sum_imports - sum_exports
 
         # 6. Initialize the price forecast series.
-        price_forecast = pd.Series(index=self.index, data=0.0)
+        price_forecast = pd.Series(index=self.index.as_datetimeindex(), data=0.0)
 
         # 7. Loop over each time step
         for t in self.index:
@@ -476,7 +485,7 @@ class CsvForecaster(Forecaster):
         Returns:
             pandas.Series: The marginal cost of the power plant.
 
-        Notes:
+        Note:
             1. Determines the fuel price based on the fuel type of the power plant.
             2. Calculates the fuel cost by dividing the fuel price by the efficiency of the power plant.
             3. Calculates the emissions cost based on the CO2 price and emission factor, adjusted by the efficiency of the power plant.
@@ -488,7 +497,7 @@ class CsvForecaster(Forecaster):
         if fp_column in self.forecasts.columns:
             fuel_price = self.forecasts[fp_column]
         else:
-            fuel_price = pd.Series(0.0, index=self.index)
+            fuel_price = pd.Series(0.0, index=self.index.as_datetimeindex())
 
         emission_factor = pp_series["emission_factor"]
         co2_price = self.forecasts["fuel_price_co2"]
@@ -514,7 +523,9 @@ class CsvForecaster(Forecaster):
         """
         # Step 1: Calculate powerplant load using availability factors
         availability_factor_df = pd.DataFrame(
-            index=self.index, columns=self.powerplants_units.index, data=0.0
+            index=self.index.as_datetimeindex(),
+            columns=self.powerplants_units.index,
+            data=0.0,
         )
 
         # Calculate load for each powerplant based on availability factor and max power
@@ -543,7 +554,7 @@ class CsvForecaster(Forecaster):
             net_load_by_node[node] = node_demand - node_generation
 
         # Step 3: Calculate line-specific congestion severity
-        line_congestion_severity = pd.DataFrame(index=self.index)
+        line_congestion_severity = pd.DataFrame(index=self.index.as_datetimeindex())
 
         for line_id, line_data in self.lines.iterrows():
             node1, node2 = line_data["bus0"], line_data["bus1"]
@@ -559,7 +570,7 @@ class CsvForecaster(Forecaster):
             )
 
         # Step 4: Calculate node-specific congestion signal by aggregating connected lines
-        node_congestion_signal = pd.DataFrame(index=self.index)
+        node_congestion_signal = pd.DataFrame(index=self.index.as_datetimeindex())
 
         for node in self.demand_units["node"].unique():
             # Find all lines connected to this node
@@ -597,7 +608,7 @@ class CsvForecaster(Forecaster):
                         utilisation signal time series for that node and a column for total utilisation across all nodes.
         """
         # Initialize a DataFrame to store renewable utilisation for each node
-        renewable_utilisation = pd.DataFrame(index=self.index)
+        renewable_utilisation = pd.DataFrame(index=self.index.as_datetimeindex())
 
         # Identify renewable power plants by filtering `powerplants_units` DataFrame
         renewable_plants = self.powerplants_units[
@@ -606,7 +617,7 @@ class CsvForecaster(Forecaster):
 
         # Calculate utilisation based on availability and max power for each renewable plant
         for node in self.demand_units["node"].unique():
-            node_renewable_sum = pd.Series(0, index=self.index)
+            node_renewable_sum = pd.Series(0, index=self.index.as_datetimeindex())
 
             # Filter renewable plants in this specific node
             node_renewable_plants = renewable_plants[renewable_plants["node"] == node]
@@ -657,10 +668,6 @@ class CsvForecaster(Forecaster):
         if inferred_freq is None:
             raise ValueError("Frequency could not be inferred from the index.")
 
-        self.index = FastIndex(
-            start=self.index[0], end=self.index[-1], freq=inferred_freq
-        )
-
         # Initialize an empty dictionary to store FastSeries
         fast_forecasts = {}
 
@@ -681,17 +688,17 @@ class RandomCsvForecaster(CsvForecaster):
     standard deviation of the noise.
 
     Attributes:
-        index (pandas.Series): The index of the forecasts.
+        index (FastIndex): The index of the forecasts.
         powerplants_units (pandas.DataFrame): The power plants.
         sigma (float): The standard deviation of the noise.
 
     Args:
-        index (pandas.Series): The index of the forecasts.
+        index (FastIndex | pd.Series | pd.DatetimeIndex): The index of the forecasts.
         powerplants_units (pandas.DataFrame): The power plants.
         sigma (float): The standard deviation of the noise.
 
     Example:
-        >>> forecaster = RandomCsvForecaster(index=pd.Series([1, 2, 3]))
+        >>> forecaster = RandomCsvForecaster(index=FastIndex(start='2020-01-01', end='2025-01-01'))
         >>> forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
         >>> print(forecaster['location_1_temperature'])
 
@@ -699,7 +706,7 @@ class RandomCsvForecaster(CsvForecaster):
 
     def __init__(
         self,
-        index: pd.Series,
+        index: FastIndex | pd.Series | pd.DatetimeIndex,
         powerplants_units: pd.DataFrame,
         demand_units: pd.DataFrame,
         market_configs: dict = {},
@@ -710,8 +717,6 @@ class RandomCsvForecaster(CsvForecaster):
         super().__init__(
             index, powerplants_units, demand_units, market_configs, *args, **kwargs
         )
-
-        self.index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
         self.sigma = sigma
 
     def __getitem__(self, column: str) -> FastSeries:
@@ -748,7 +753,7 @@ class NaiveForecast(Forecaster):
     the provided index and the corresponding values.
 
     Attributes:
-        index (pandas.Series): The index of the forecasts.
+        index (FastIndex): The index of the forecasts.
         availability (float | list, optional): The availability of the power plants.
         fuel_price (float | list, optional): The fuel price.
         co2_price (float | list, optional): The CO2 price.
@@ -756,7 +761,7 @@ class NaiveForecast(Forecaster):
         price_forecast (float | list, optional): The price forecast.
 
     Args:
-        index (pandas.Series): The index of the forecasts.
+        index (FastIndex | pd.Series | pd.DatetimeIndex): The index of the forecasts.
         availability (float | list, optional): The availability of the power plants.
         fuel_price (float | list, optional): The fuel price.
         co2_price (float | list, optional): The CO2 price.
@@ -775,7 +780,7 @@ class NaiveForecast(Forecaster):
 
     def __init__(
         self,
-        index: pd.Series,
+        index: FastIndex | pd.Series | pd.DatetimeIndex,
         availability: float | list = 1,
         fuel_price: float | list = 10,
         co2_price: float | list = 10,
@@ -785,7 +790,6 @@ class NaiveForecast(Forecaster):
         **kwargs,
     ):
         super().__init__(index)
-        self.index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
 
         # Convert attributes to FastSeries if they are not already Series
         self.fuel_price = FastSeries(

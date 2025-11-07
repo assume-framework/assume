@@ -81,7 +81,7 @@ async def test_request_messages():
         "bidding_strategies": {"energy": NaiveSingleBidStrategy()},
         "technology": "energy",
         "unit_operator": "test_operator",
-        "max_power": 1000,
+        "max_power": -1000,
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }

@@ -12,6 +12,8 @@ import torch as th
 from assume.common.base import (
     BaseUnit,
     LearningStrategy,
+    MinMaxChargeStrategy,
+    MinMaxStrategy,
     SupportsMinMax,
     SupportsMinMaxCharge,
 )
@@ -23,7 +25,11 @@ from assume.reinforcement_learning.learning_utils import NormalActionNoise
 logger = logging.getLogger(__name__)
 
 
-class BaseLearningStrategy(LearningStrategy):
+class TorchLearningStrategy(LearningStrategy):
+    """
+    A strategy to enable machine learning with pytorch.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -224,7 +230,7 @@ class BaseLearningStrategy(LearningStrategy):
 
         Returns
         -------
-        individual_observations : np.array
+        individual_observations : np.ndarray
             Strategy and unit-specific observations.
         """
 
@@ -294,7 +300,7 @@ class BaseLearningStrategy(LearningStrategy):
         return curr_action, noise
 
 
-class RLStrategy(BaseLearningStrategy):
+class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -539,7 +545,7 @@ class RLStrategy(BaseLearningStrategy):
 
         Returns
         -------
-        individual_observations : np.array
+        individual_observations : np.ndarray
             Scaled total dispatched capacity and marginal cost.
 
         Notes
@@ -682,7 +688,7 @@ class RLStrategy(BaseLearningStrategy):
             )
 
 
-class RLStrategySingleBid(RLStrategy):
+class RLStrategySingleBid(RLStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy with Single-Bid Structure for Energy-Only Markets.
 
@@ -797,7 +803,7 @@ class RLStrategySingleBid(RLStrategy):
         return bids
 
 
-class StorageRLStrategy(BaseLearningStrategy):
+class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -900,7 +906,7 @@ class StorageRLStrategy(BaseLearningStrategy):
 
         Returns
         -------
-        individual_observations: np.array
+        individual_observations: np.ndarray
             Array containing state of charge and energy cost.
 
         Notes
@@ -1206,7 +1212,7 @@ class RenewableRLStrategy(RLStrategySingleBid):
 
         Returns
         -------
-        individual_observations: np.array
+        individual_observations: np.ndarray
             Array containing state of charge and energy cost.
 
         Notes

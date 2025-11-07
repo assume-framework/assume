@@ -310,7 +310,6 @@ class Learning(Role):
         # Create snapshots of the current state so that we can store stuff in buffer asynchronously
         all_timestamps = sorted(self.all_obs.keys())
         if len(all_timestamps) > 1:  # only filter if we have more than one timestamp
-            # Create filtered snapshot (only selected timestamps for obs and actions, all for rewards)
             snapshot = {
                 "obs": {t: self.all_obs[t] for t in all_timestamps},
                 "actions": {t: self.all_actions[t] for t in all_timestamps},
@@ -548,7 +547,7 @@ class Learning(Role):
         the number of episodes completed is greater than the number of episodes required for initial experience collection. If so,
         it triggers the policy update process by calling the `update_policy` method of the associated reinforcement learning algorithm.
 
-        Notes:
+        Note:
             This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
         """
         if self.episodes_done >= self.episodes_collecting_initial_experience:
@@ -570,7 +569,7 @@ class Learning(Role):
         Returns:
             bool: True if early stopping criteria is triggered.
 
-        Notes:
+        Note:
             This method is typically used during the evaluation phase to save policies that achieve superior performance.
             Currently the best evaluation metric is still assessed by the development team and preliminary we use the average rewards.
         """

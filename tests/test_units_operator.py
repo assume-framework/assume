@@ -56,7 +56,7 @@ async def units_operator() -> UnitsOperator:
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
         "technology": "energy",
         "unit_operator": agent_id,
-        "max_power": 1000,
+        "max_power": -1000,
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
@@ -96,7 +96,7 @@ async def rl_units_operator() -> RLUnitsOperator:
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
         "technology": "energy",
         "unit_operator": agent_id,
-        "max_power": 1000,
+        "max_power": -1000,
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
@@ -294,7 +294,7 @@ def test_participate():
         "bidding_strategies": {"wrong_market": NaiveSingleBidStrategy()},
         "technology": "energy",
         "unit_operator": "x",
-        "max_power": 1000,
+        "max_power": -1000,
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }
@@ -307,7 +307,7 @@ def test_participate():
         "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
         "technology": "energy",
         "unit_operator": "x",
-        "max_power": 1000,
+        "max_power": -1000,
         "min_power": 0,
         "forecaster": NaiveForecast(index, demand=1000),
     }

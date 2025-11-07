@@ -6,12 +6,12 @@ from datetime import datetime, timedelta
 
 import numpy as np
 
-from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index, parse_duration
 
 
-class flexableEOM(BaseStrategy):
+class flexableEOM(MinMaxStrategy):
     """
     A strategy that bids on the EOM-market.
 
@@ -242,7 +242,7 @@ class flexableEOM(BaseStrategy):
         update_avg_op_time(unit, product_type, products_index[0], products_index[-1])
 
 
-class flexablePosCRM(BaseStrategy):
+class flexablePosCRM(MinMaxStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
 
@@ -357,7 +357,7 @@ class flexablePosCRM(BaseStrategy):
         return bids
 
 
-class flexableNegCRM(BaseStrategy):
+class flexableNegCRM(MinMaxStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 

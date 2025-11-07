@@ -6,12 +6,12 @@ from datetime import timedelta
 
 import numpy as np
 
-from assume.common.base import BaseStrategy, SupportsMinMaxCharge
+from assume.common.base import MinMaxChargeStrategy, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import parse_duration
 
 
-class flexableEOMStorage(BaseStrategy):
+class flexableEOMStorage(MinMaxChargeStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.
 
@@ -209,7 +209,7 @@ class flexableEOMStorage(BaseStrategy):
             unit.outputs["total_costs"].loc[start:end_excl] = costs
 
 
-class flexablePosCRMStorage(BaseStrategy):
+class flexablePosCRMStorage(MinMaxChargeStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.
 
@@ -347,7 +347,7 @@ class flexablePosCRMStorage(BaseStrategy):
         return bids
 
 
-class flexableNegCRMStorage(BaseStrategy):
+class flexableNegCRMStorage(MinMaxChargeStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 

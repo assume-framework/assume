@@ -153,7 +153,7 @@ def load_dsm_units(
     handle different technologies, and organizes the data into a structured DataFrame. It then splits the DataFrame
     based on unique unit_types.
 
-    Parameters:
+    Args:
         path (str): The directory path where the CSV file is located.
         config (dict): Configuration dictionary, potentially used for specifying additional options or behaviors
                        (not used in the current implementation but provides flexibility for future enhancements).
@@ -163,7 +163,7 @@ def load_dsm_units(
         dict: A dictionary where each key is a unique unit_type and the value is a DataFrame containing
               the corresponding DSM units of that type.
 
-    Notes:
+    Note:
         - The CSV file is expected to have columns such as 'name', 'technology', 'unit_type', and other operational parameters.
         - The function assumes that the first non-null value in common and bidding columns is representative if multiple
           entries exist for the same plant.
@@ -489,6 +489,21 @@ def load_config_and_create_forecaster(
     demand_units = load_file(path=path, config=config, file_name="demand_units")
     exchange_units = load_file(path=path, config=config, file_name="exchange_units")
 
+    if powerplant_units is None or demand_units is None:
+        raise ValueError("No power plant or no demand units were provided!")
+
+    if ((demand_units["min_power"] < 0) & (demand_units["max_power"] > 0)).any() or (
+        (demand_units["min_power"] > 0) & (demand_units["max_power"] < 0)
+    ).any():
+        raise ValueError(
+            "min_power and max_power must both be either negative or positive"
+        )
+    demand_units["min_power"] = -abs(demand_units["min_power"])
+    demand_units["max_power"] = -abs(demand_units["max_power"])
+    if storage_units is not None:
+        storage_units["max_power_charge"] = -abs(storage_units["max_power_charge"])
+        storage_units["min_power_charge"] = -abs(storage_units["min_power_charge"])
+
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
     for unit_type in ["industrial_dsm_units", "residential_dsm_units"]:
@@ -499,9 +514,6 @@ def load_config_and_create_forecaster(
         )
         if units is not None:
             dsm_units.update(units)
-
-    if powerplant_units is None or demand_units is None:
-        raise ValueError("No power plant or no demand units were provided!")
 
     forecasts_df = load_file(
         path=path, config=config, file_name="forecasts_df", index=index
@@ -811,7 +823,7 @@ def load_scenario_folder(
     Raises:
         ValueError: If the specified scenario or study case is not found in the provided inputs.
 
-    Notes:
+    Note:
         - The function sets up the world environment based on the provided inputs and configuration files.
         - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
         - After calling this function, the world environment is prepared for further simulation and analysis.
@@ -853,7 +865,7 @@ def load_custom_units(
             unit_type="custom_type"
         )
 
-    Notes:
+    Note:
         - The function loads custom units from the specified file within the given scenario and adds them to the world environment for simulation.
         - If the specified custom units file is not found, a warning is logged.
         - Each unique unit operator in the custom units is added to the world's unit operators.
@@ -998,6 +1010,9 @@ def run_learning(
             world.run()
 
             world.learning_role.tensor_board_logger.update_tensorboard()
+
+            if not world.db_uri:
+                raise AssumeException("No learning rewards as no database was given")
 
             total_rewards = world.output_role.get_sum_reward(episode=eval_episode)
 

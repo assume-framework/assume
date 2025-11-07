@@ -14,12 +14,11 @@ class Exchange(BaseUnit):
     Attributes:
         id (str): The unique identifier of the unit.
         unit_operator (str): The operator of the unit.
-        direction (str): The exchange-direction ("import" or "export") of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
-        max_power (float): The max. power value of the unit in MW.
-        min_power (float): The min. power value of the unit in MW.
+        forecaster: The forecaster containing the import and export volume time series
         node (str, optional): The node of the unit. Defaults to "node0".
-        price (float): The price of the unit.
+        price_import (float): The price for import of the unit.
+        price_export (float): The price for export of the unit.
         location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
 
     Methods

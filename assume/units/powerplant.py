@@ -7,8 +7,9 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 import numpy as np
+import pandas as pd
 
-from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.base import MinMaxChargeStrategy, SupportsMinMax
 from assume.common.forecasts import Forecaster
 
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ class PowerPlant(SupportsMinMax):
         id (str): The ID of the storage unit.
         unit_operator (str): The operator of the unit.
         technology (str): The technology of the unit.
-        bidding_strategies (dict[str, BaseStrategy]): The bidding strategies of the unit.
+        bidding_strategies (dict[str, MinMaxChargeStrategy]): The bidding strategies of the unit.
         forecaster (Forecaster): A forecaster used to get key variables such as fuel or electricity prices.
         max_power (float): The maximum power output capacity of the power plant in MW.
         min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
@@ -52,7 +53,7 @@ class PowerPlant(SupportsMinMax):
         id: str,
         unit_operator: str,
         technology: str,
-        bidding_strategies: dict[str, BaseStrategy],
+        bidding_strategies: dict[str, MinMaxChargeStrategy],
         forecaster: Forecaster,
         max_power: float,
         min_power: float = 0.0,
@@ -66,8 +67,8 @@ class PowerPlant(SupportsMinMax):
         hot_start_cost: float = 0,
         warm_start_cost: float = 0,
         cold_start_cost: float = 0,
-        min_operating_time: float = 0,
-        min_down_time: float = 0,
+        min_operating_time: int = 1,  # hours
+        min_down_time: int = 1,  # hours
         downtime_hot_start: int = 0,  # hours
         downtime_warm_start: int = 0,  # hours
         heat_extraction: bool = False,
@@ -86,7 +87,12 @@ class PowerPlant(SupportsMinMax):
             location=location,
             **kwargs,
         )
-
+        if min_power < 0:
+            raise ValueError(f"{min_power=} must be >= 0 for unit {self.id}")
+        if max_power < 0:
+            raise ValueError(f"{max_power=} must be >= 0 for unit {self.id}")
+        if min_power > max_power:
+            raise ValueError(f"{min_power=} must be <= {max_power=} for unit {self.id}")
         self.max_power = max_power
         self.min_power = min_power
         self.efficiency = efficiency
@@ -101,11 +107,15 @@ class PowerPlant(SupportsMinMax):
         self.cold_start_cost = cold_start_cost * max_power
 
         # check ramping enabled
-        self.ramp_down = max_power if ramp_down == 0 or ramp_down is None else ramp_down
-        self.ramp_up = max_power if ramp_up == 0 or ramp_up is None else ramp_up
+        self.ramp_down = None if ramp_down == 0 else ramp_down
+        self.ramp_up = None if ramp_up == 0 else ramp_up
 
-        self.min_operating_time = min_operating_time if min_operating_time > 0 else 1
-        self.min_down_time = min_down_time if min_down_time > 0 else 1
+        if min_operating_time <= 0:
+            raise ValueError(f"{min_operating_time=} must be > 0 for unit {self.id}")
+        self.min_operating_time = min_operating_time
+        if min_down_time <= 0:
+            raise ValueError(f"{min_down_time=} must be > 0 for unit {self.id}")
+        self.min_down_time = min_down_time
         self.downtime_hot_start = downtime_hot_start / (
             self.index.freq / timedelta(hours=1)
         )
@@ -113,21 +123,13 @@ class PowerPlant(SupportsMinMax):
             self.index.freq / timedelta(hours=1)
         )
 
-        self.init_marginal_cost()
-
-    def init_marginal_cost(self):
-        """
-        Initializes the marginal cost of the unit using calc_cimple_marginal_cost().
-
-        Args:
-        """
         self.marginal_cost = self.calc_simple_marginal_cost()
 
     def execute_current_dispatch(
         self,
         start: datetime,
         end: datetime,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Executes the current dispatch of the unit based on the provided timestamps.
 
@@ -139,7 +141,7 @@ class PowerPlant(SupportsMinMax):
             end (pandas.Timestamp): The end time of the dispatch.
 
         Returns:
-            np.array: The volume of the unit within the given time range.
+            np.ndarray: The volume of the unit within the given time range.
         """
         start = max(start, self.index[0])
 
@@ -164,12 +166,12 @@ class PowerPlant(SupportsMinMax):
 
     def calc_simple_marginal_cost(
         self,
-    ):
+    ) -> pd.Series:
         """
         Calculates the marginal cost of the unit (simple method) and returns the marginal cost of the unit.
 
         Returns:
-            float: The marginal cost of the unit.
+            pandas.Series: The marginal cost of the unit.
         """
         fuel_price = self.forecaster.get_price(self.fuel_type)
         co2_price = self.forecaster.get_price("co2")
@@ -245,7 +247,7 @@ class PowerPlant(SupportsMinMax):
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the minimum and maximum power output of the unit and returns it,
         while considering heat demand and positive capacity reserve power.
@@ -289,7 +291,7 @@ class PowerPlant(SupportsMinMax):
 
         return min_power, max_power
 
-    def calculate_marginal_cost(self, start: datetime, power: float):
+    def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
         Calculates the marginal cost of the unit based on the provided start time and power output and returns it.
         Returns the marginal cost of the unit.

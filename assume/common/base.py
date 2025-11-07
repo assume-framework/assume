@@ -221,7 +221,7 @@ class BaseUnit:
         self,
         start: datetime,
         end: datetime,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Checks if the total dispatch plan is feasible.
 
@@ -329,9 +329,16 @@ class SupportsMinMax(BaseUnit):
     min_operating_time: int = 0
     min_down_time: int = 0
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        bidding_strategies: dict[str, BaseStrategy] = kwargs["bidding_strategies"]
+        for strategy in bidding_strategies.values():
+            if not isinstance(strategy, MinMaxStrategy):
+                raise ValueError(f"strategy {strategy} is not a MinMaxStrategy!")
+
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type: str = "energy"
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the min and max power for the given time period.
 
@@ -341,7 +348,7 @@ class SupportsMinMax(BaseUnit):
             product_type (str): The product type of the unit.
 
         Returns:
-            tuple[np.array, np.array]: The min and max power for the given time period.
+            tuple[np.ndarray, np.ndarray]: The min and max power for the given time period.
         """
 
     def calculate_ramp(
@@ -485,21 +492,28 @@ class SupportsMinMaxCharge(BaseUnit):
     # positive float - if this storage is discharging, what is the minimum output power
     max_power_discharge: float
     # positive float - if this storage is discharging, what is the maximum output power
-    ramp_up_discharge: float
+    ramp_up_discharge: float | None
     # positive float - when discharging,
-    ramp_down_discharge: float
+    ramp_down_discharge: float | None
     # positive float
-    ramp_up_charge: float
+    ramp_up_charge: float | None
     # negative
-    ramp_down_charge: float
+    ramp_down_charge: float | None
     # ramp_down_charge is negative
     max_soc: float
     efficiency_charge: float
     efficiency_discharge: float
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        bidding_strategies: dict[str, BaseStrategy] = kwargs["bidding_strategies"]
+        for strategy in bidding_strategies.values():
+            if not isinstance(strategy, MinMaxChargeStrategy):
+                raise ValueError(f"strategy {strategy} is not a MinMaxChargeStrategy!")
+
     def calculate_min_max_charge(
         self, start: datetime, end: datetime, soc: float = None
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the min and max charging power for the given time period.
 
@@ -509,12 +523,12 @@ class SupportsMinMaxCharge(BaseUnit):
             soc (float, optional): The current state-of-charge. Defaults to None.
 
         Returns:
-            tuple[np.array, np.array]: The min and max charging power for the given time period.
+            tuple[np.ndarray, np.ndarray]: The min and max charging power for the given time period.
         """
 
     def calculate_min_max_discharge(
         self, start: datetime, end: datetime, soc: float = None
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the min and max discharging power for the given time period.
 
@@ -524,7 +538,7 @@ class SupportsMinMaxCharge(BaseUnit):
             soc (float, optional): The current state-of-charge. Defaults to None.
 
         Returns:
-            tuple[np.array, np.array]: The min and max discharging power for the given time period.
+            tuple[np.ndarray, np.ndarray]: The min and max discharging power for the given time period.
         """
 
     def calculate_ramp_discharge(
@@ -543,7 +557,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             previous_power (float): The previous power output of the unit.
             power_discharge (float): The discharging power output of the unit.
-            current_power (float, optional): The current power output of the unit. Defaults to 0.
+            current_power (float, optional): The current power output of the unit already sold on another market. Defaults to 0.
 
         Returns:
             float: The discharging power adjusted to the ramping constraints.
@@ -552,31 +566,31 @@ class SupportsMinMaxCharge(BaseUnit):
         # - 800 MW to 0 with charge ramp down and then 200 MW with discharge ramp up
         # if storage was charging before we need to check if we can ramp back to zero
         if (
-            previous_power < 0
+            previous_power < 0  # charging
             and self.calculate_ramp_charge(previous_power, 0, current_power) < 0
         ):
             # if we can not ramp back to 0, we can not discharge anything
             return self.calculate_ramp_charge(previous_power, 0, current_power)
-        else:
-            # as we can ramp the charging to 0, we can assume that the previous_power = 0
-            previous_power = max(previous_power, 0)
 
-            power_discharge = min(
-                power_discharge,
-                # what I had + how much I could - what I already sold
-                max(0, previous_power + self.ramp_up_discharge - current_power),
-                self.max_power_discharge - current_power,
+        # as we can ramp the charging to 0, we can assume that the previous_power = 0
+        previous_power = max(previous_power, 0)
+
+        # limit the highest possible discharge
+        power_discharge = min(power_discharge, self.max_power_discharge - current_power)
+        if self.ramp_up_discharge is not None:
+            # limit to the ramp
+            # what I had + how much I could - what I already sold
+            ramp_limited_discharge = max(
+                previous_power + self.ramp_up_discharge - current_power, 0
             )
-            # restrict only if ramping defined
-            if self.ramp_down_discharge and power_discharge != 0:
-                power_discharge = max(
-                    power_discharge,
-                    # what I had - ramp down = minimum_required
-                    # as I already provide current_power,
-                    # need to at least offer minimum_required - current_power
-                    previous_power - self.ramp_down_discharge - current_power,
-                    0,
-                )
+            power_discharge = min(power_discharge, ramp_limited_discharge)
+
+        # restrict only if ramping defined
+        if self.ramp_down_discharge is not None and power_discharge != 0:
+            # what I had - ramp down = minimum_required
+            minimum_required = previous_power - self.ramp_down_discharge
+            # as I already provide current_power, need to at least offer minimum_required - current_power
+            power_discharge = max(power_discharge, minimum_required - current_power, 0)
         return power_discharge
 
     def calculate_ramp_charge(
@@ -603,26 +617,24 @@ class SupportsMinMaxCharge(BaseUnit):
         ):
             # if we can not ramp back to 0, we can not charge anything
             return self.calculate_ramp_discharge(previous_power, 0, current_power)
-        else:
-            # as we can ramp the charging to 0, we can assume that the previous_power = 0
-            previous_power = min(previous_power, 0)
+        # as we can ramp the charging to 0, we can assume that the previous_power = 0
+        previous_power = min(previous_power, 0)
 
-            power_charge = max(
-                power_charge,
-                # what I had + how much I could - what I already sold
-                min(0, previous_power + self.ramp_up_charge - current_power),
-                self.max_power_charge - current_power,
+        # limit the highest possible charge
+        power_charge = max(power_charge, self.max_power_charge - current_power)
+        if self.ramp_up_charge is not None:
+            # what I had + how much I could - what I already sold
+            ramp_limited_charge = min(
+                previous_power + self.ramp_up_charge - current_power, 0
             )
-            # restrict only if ramping defined
-            if self.ramp_down_charge and power_charge != 0:
-                power_charge = min(
-                    power_charge,
-                    # what I had - ramp down = minimum_required
-                    # as I already provide current_power,
-                    # need to at least offer minimum_required - current_power
-                    previous_power - self.ramp_down_charge - current_power,
-                    0,
-                )
+            power_charge = max(power_charge, ramp_limited_charge)
+        # restrict only if ramping defined
+        if self.ramp_down_charge is not None and power_charge != 0:
+            # what I had - ramp down = minimum_required
+            minimum_required = previous_power - self.ramp_down_charge
+            # as I already provide current_power,
+            # need to at least offer minimum_required - current_power
+            power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
     def set_dispatch_plan(
@@ -794,6 +806,18 @@ class LearningStrategy(BaseStrategy):
 
         # access to the learning_role that orchestrates learning
         self.learning_role = learning_role
+
+
+class MinMaxStrategy(BaseStrategy):
+    pass
+
+
+class MinMaxChargeStrategy(BaseStrategy):
+    pass
+
+
+class ExchangeStrategy(BaseStrategy):
+    pass
 
 
 class LearningConfig(TypedDict):

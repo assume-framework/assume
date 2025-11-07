@@ -22,8 +22,15 @@ class MockMarketConfig:
 
 
 class MockMinMaxUnit(SupportsMinMax):
-    def __init__(self, forecaster, **kwargs):
-        super().__init__("", "", "", {}, forecaster, None, **kwargs)
+    def __init__(self, forecaster):
+        super().__init__(
+            id="",
+            unit_operator="",
+            technology="",
+            bidding_strategies={},
+            forecaster=forecaster,
+            location=None,
+        )
         self.max_power = 1000
         self.min_power = 0
         self.ramp_down = 200
@@ -31,7 +38,7 @@ class MockMinMaxUnit(SupportsMinMax):
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         min = FastSeries(value=100, index=self.index).loc[start:end]
         max = FastSeries(value=400, index=self.index).loc[start:end]
         return min, max
