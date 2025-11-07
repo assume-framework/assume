@@ -68,8 +68,6 @@ class Learning(Role):
             "trained_policies_load_path", self.trained_policies_save_path
         )
 
-        self.output_agent_addr = None  # TODO: Get this back
-
         # if early_stopping_steps are not provided then set default to no early stopping (early_stopping_steps need to be greater than validation_episodes)
         self.early_stopping_steps = learning_config.get(
             "early_stopping_steps",
@@ -159,7 +157,6 @@ class Learning(Role):
         self.avg_rewards = []
 
         self.tensor_board_logger = None
-        self.db_addr = None
         self.update_steps = None
 
         # init dictionaries for all learning instances in this role
@@ -182,7 +179,7 @@ class Learning(Role):
         """
         super().on_ready()
 
-        # would be nice to shift this by one time the train frequency but then we need to transform th string into the hour or time here which is done excessively
+        # TODO: would be nice to shift this by one time the train frequency but then we need to transform th string into the hour or time here which is done excessively
         shifted_start = self.start_datetime
 
         recurrency_task = create_rrule(
@@ -310,6 +307,9 @@ class Learning(Role):
         current_obs = self.all_obs
         current_actions = self.all_actions
         current_rewards = self.all_rewards
+        current_noises = self.all_noises
+        current_regrets = self.all_regrets
+        current_profits = self.all_profits
 
         # Reset buffers immediately with new defaultdicts
         self.all_obs = defaultdict(lambda: defaultdict(list))
@@ -330,10 +330,13 @@ class Learning(Role):
                 "obs": {t: current_obs[t] for t in timestamps_to_process},
                 "actions": {t: current_actions[t] for t in timestamps_to_process},
                 "rewards": {t: current_rewards[t] for t in timestamps_to_process},
+                "noises": {t: current_noises[t] for t in timestamps_to_process},
+                "regret": {t: current_regrets[t] for t in timestamps_to_process},
+                "profit": {t: current_profits[t] for t in timestamps_to_process},
             }
 
             # write data to output agent before resetting it
-            self.write_rl_params_to_output(snapshot)
+            await self.write_rl_params_to_output(snapshot)
 
             # if we are training also update the policy and write data into buffer
             if not self.evaluation_mode:
@@ -697,27 +700,20 @@ class Learning(Role):
         """
         output_agent_list = []
 
-        for unit_id in sorted(self.all_obs[next(iter(self.all_obs))].keys()):
-            starts = self.all_obs.keys()
+        for unit_id in sorted(snapshot["obs"][next(iter(snapshot["obs"]))].keys()):
+            starts = snapshot["obs"].keys()
             for idx, start in enumerate(starts):
                 output_dict = {
                     "datetime": start,
                     "unit": unit_id,
-                    "reward": self.all_rewards[start][unit_id],
-                    "regret": self.all_regrets[start][unit_id],
-                    "profit": self.all_profits[start][unit_id],
+                    "reward": snapshot["rewards"][start][unit_id][0],
+                    "regret": snapshot["regret"][start][unit_id][0],
+                    "profit": snapshot["profit"][start][unit_id][0],
                 }
 
-                action_tuple = (
-                    self.all_actions[unit_id][idx]
-                    if idx < len(self.all_actions[unit_id])
-                    else None
-                )
-                noise_tuple = (
-                    self.all_noises[unit_id][idx]
-                    if idx < len(self.all_noises[unit_id])
-                    else None
-                )
+                action_tuple = snapshot["actions"][start][unit_id][0]
+
+                noise_tuple = snapshot["noises"][start][unit_id][0]
 
                 if action_tuple is not None:
                     action_dim = len(action_tuple)
@@ -729,11 +725,9 @@ class Learning(Role):
 
                 output_agent_list.append(output_dict)
 
-        db_addr = self.output_agent_addr
-
-        if db_addr and output_agent_list:
+        if self.db_addr and output_agent_list:
             self.context.schedule_instant_message(
-                receiver_addr=db_addr,
+                receiver_addr=self.db_addr,
                 content={
                     "context": "write_results",
                     "type": "rl_params",
