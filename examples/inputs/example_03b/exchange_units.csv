@@ -1,12 +1,12 @@
 name,bidding_EOM,price_import,price_export,unit_operator
-DE_NL,naive_exchange,0,2999,Exchanges Operator
-DE_CH,naive_exchange,0,2999,Exchanges Operator
-DE_DK,naive_exchange,0,2999,Exchanges Operator
-DE_CZ,naive_exchange,0,2999,Exchanges Operator
-DE_LU,naive_exchange,0,2999,Exchanges Operator
-DE_SE,naive_exchange,0,2999,Exchanges Operator
-DE_AT,naive_exchange,0,2999,Exchanges Operator
-DE_FR,naive_exchange,0,2999,Exchanges Operator
-DE_PL,naive_exchange,0,2999,Exchanges Operator
-DE_NO,naive_exchange,0,2999,Exchanges Operator
-DE_BE,naive_exchange,0,2999,Exchanges Operator
+DE_NL,exchange_energy_naive,0,2999,Exchanges Operator
+DE_CH,exchange_energy_naive,0,2999,Exchanges Operator
+DE_DK,exchange_energy_naive,0,2999,Exchanges Operator
+DE_CZ,exchange_energy_naive,0,2999,Exchanges Operator
+DE_LU,exchange_energy_naive,0,2999,Exchanges Operator
+DE_SE,exchange_energy_naive,0,2999,Exchanges Operator
+DE_AT,exchange_energy_naive,0,2999,Exchanges Operator
+DE_FR,exchange_energy_naive,0,2999,Exchanges Operator
+DE_PL,exchange_energy_naive,0,2999,Exchanges Operator
+DE_NO,exchange_energy_naive,0,2999,Exchanges Operator
+DE_BE,exchange_energy_naive,0,2999,Exchanges Operator

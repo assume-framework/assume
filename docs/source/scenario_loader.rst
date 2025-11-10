@@ -55,7 +55,8 @@ The AMIRIS loader can be used to run examples configured for usage with the ener
     # Create a simulation world
     world = World(database_uri=db_uri)
 
-    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+    default_strategy = {mc.market_id: "powerplant_energy_naive" for mc in marketdesign}
+    default_demand_strategy = {mc.market_id: "demand_energy_naive" for mc in marketdesign}
 
     bidding_strategies = {
         "hard coal": default_strategy,
@@ -66,7 +67,7 @@ The AMIRIS loader can be used to run examples configured for usage with the ener
         "nuclear": default_strategy,
         "wind": default_strategy,
         "solar": default_strategy,
-        "demand": default_strategy,
+        "demand": default_demand_strategy,
     }
 
     # Let the loader add everything to the world
@@ -126,7 +127,8 @@ An example configuration of how this can be used is shown here:
         )
     ]
 
-    default_strategy = {mc.market_id: "naive_eom" for mc in marketdesign}
+    default_strategy = {mc.market_id: "powerplant_energy_naive" for mc in marketdesign}
+    default_demand_strategy = {mc.market_id: "demand_energy_naive" for mc in marketdesign}
 
     bidding_strategies = {
         "hard coal": default_strategy,
@@ -137,7 +139,7 @@ An example configuration of how this can be used is shown here:
         "nuclear": default_strategy,
         "wind": default_strategy,
         "solar": default_strategy,
-        "demand": default_strategy,
+        "demand": default_demand_strategy,
     }
 
     # load the dataset from the database
@@ -188,15 +190,15 @@ An example can be seen from the pypsa scigrid case:
     ]
 
     bidding_strategies = {
-        "hard coal": "naive_redispatch",
-        "lignite": "naive_redispatch",
-        "oil": "naive_redispatch",
-        "gas": "naive_redispatch",
-        "biomass": "naive_redispatch",
-        "nuclear": "naive_redispatch",
-        "wind": "naive_redispatch",
-        "solar": "naive_redispatch",
-        "demand": "naive_redispatch",
+        "hard coal": "powerplant_energy_naive_redispatch",
+        "lignite": "powerplant_energy_naive_redispatch",
+        "oil": "powerplant_energy_naive_redispatch",
+        "gas": "powerplant_energy_naive_redispatch",
+        "biomass": "powerplant_energy_naive_redispatch",
+        "nuclear": "powerplant_energy_naive_redispatch",
+        "wind": "powerplant_energy_naive_redispatch",
+        "solar": "powerplant_energy_naive_redispatch",
+        "demand": "demand_energy_naive_redispatch",
     }
     load_pypsa(world, scenario, study_case, network, marketdesign, bidding_strategies)
     load_pypsa(world, "world_pypsa", "scigrid_de", network, marketdesign)

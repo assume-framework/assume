@@ -83,7 +83,7 @@ class World:
         unit_types (dict[str, BaseUnit], optional): Available unit types.
         dst_components (dict[str, DemandSideTechnology], optional): Demand-side technologies.
         bidding_strategies (dict[str, type[BaseStrategy]], optional): Bidding strategies for the world instance.
-            - If `"pp_learning"` is unavailable, learning strategies may be missing due to missing dependencies (e.g., `torch`).
+            - If `"powerplant_energy_learning"` is unavailable, learning strategies may be missing due to missing dependencies (e.g., `torch`).
         clearing_mechanisms (dict[str, MarketRole], optional): Market clearing mechanisms.
         additional_kpis (dict[str, OutputDef], optional): Additional performance indicators.
         scenario_data (dict, optional): Dictionary for scenario-specific data.
@@ -161,7 +161,7 @@ class World:
         self.dst_components = demand_side_technologies
 
         self.bidding_strategies = bidding_strategies
-        if "pp_learning" not in bidding_strategies:
+        if "powerplant_energy_learning" not in bidding_strategies:
             logger.info(
                 "Learning Strategies are not available. Check that you have torch installed."
             )
@@ -602,7 +602,7 @@ class World:
                 # raise a deprecated warning for learning_advanced_orders
                 if strategy == "learning_advanced_orders":
                     logger.warning(
-                        "The bidding strategy 'learning_advanced_orders' is deprecated. Please use regular 'pp_learning' instead."
+                        "The bidding strategy 'learning_advanced_orders' is deprecated. Please use regular 'powerplant_energy_learning' instead."
                     )
                 raise ValueError(
                     f"""Bidding strategy {strategy} not registered. Please check the name of

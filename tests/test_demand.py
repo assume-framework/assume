@@ -123,7 +123,7 @@ def test_demand_series():
     assert bids[0]["price"] == price.iloc[1]
 
 
-def test_elastic_demand_config_and_errors():
+def test_demand_energy_heuristic_elastic_config_and_errors():
     strategies = {"EOM": ElasticDemandStrategy()}
 
     index = pd.date_range(
@@ -140,7 +140,7 @@ def test_elastic_demand_config_and_errors():
 
     # Valid elastic demand (isoelastic model)
     dem = Demand(
-        id="elastic_demand",
+        id="demand_energy_heuristic_elastic",
         unit_operator="UO1",
         technology="energy",
         bidding_strategies=strategies,
@@ -168,7 +168,7 @@ def test_elastic_demand_config_and_errors():
 
     # Valid elastic demand (linear model)
     dem = Demand(
-        id="elastic_demand",
+        id="demand_energy_heuristic_elastic",
         unit_operator="UO1",
         technology="energy",
         bidding_strategies=strategies,

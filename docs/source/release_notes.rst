@@ -80,7 +80,7 @@ Upcoming Release
 - **Add single bid RL strategy:** Added a new reinforcement learning strategy that allows agents to submit bids based on one action value only that determines the price at which the full capacity is offered.
 - **Bidding Strategy for Elastic Demand**: The new `ElasticDemandStrategy` enables demand units to submit multiple bids that approximate a marginal utility curve, using
   either linear or isoelastic price elasticity models. Unlike other strategies, it does **not** rely on predefined volumes—bids are dynamically generated based on the
-  unit’s elasticity configuration. To use this strategy, set `bidding_strategy` to `"elastic_demand"` in the `demand_units.csv` file and specify the following
+  unit’s elasticity configuration. To use this strategy, set `bidding_strategy` to `"demand_energy_heuristic_elastic"` in the `demand_units.csv` file and specify the following
   parameters: `elasticity` (must be negative), `elasticity_model` (`"linear"` or `"isoelastic"`), `num_bids`, and `price` (which acts as `max_price`). The `elasticity_model`
   defines the shape of the demand curve, with `"linear"` producing a straight-line decrease and `"isoelastic"` generating a hyperbolic curve. `num_bids` determines how many
   bid steps are submitted, allowing control over the granularity of demand flexibility.
@@ -232,7 +232,7 @@ v0.4.2 - (5th November 2024)
 - **Residential Components**: Added new residential DST components including PV, EV, Heat Pump, and Boiler, now with enhanced docstrings for better usability.
 - **Modular DST Components**: DST components have been converted from functions to classes, improving modularity and reusability.
 - **Generic Storage Class**: Introduced a `GenericStorage` class for storage components. Specific classes, such as EV and Hydrogen Storage, now inherit from it.
-- **Storage Learning Strategy**: Added a new DRL-based learning strategy for storage units. To use it, set `storage_learning` in the `bidding_EOM` column of `storage_units.csv`. Refer to the `StorageRLStrategy` documentation for more details.
+- **Storage Learning Strategy**: Added a new DRL-based learning strategy for storage units. To use it, set `storage_energy_learning` in the `bidding_EOM` column of `storage_units.csv`. Refer to the `StorageRLStrategy` documentation for more details.
 - **Mango 2.x Update**: Upgraded to mango 2.x, enabling synchronous world creation. To upgrade an existing environment, run:
   ```
   pip uninstall -y mango-agents mango-agents-assume && pip install assume-framework --upgrade

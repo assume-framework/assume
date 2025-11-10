@@ -133,7 +133,7 @@ def test_exchange_export_only(exchange_export_only):
     ), "Import should default to 0 when missing"
 
 
-def test_naive_exchange_strategy_bidding(exchange_unit, market_config):
+def test_exchange_energy_naive_strategy_bidding(exchange_unit, market_config):
     """Test if NaiveExchangeStrategy generates correct bids when both import and export exist."""
     strategy = NaiveExchangeStrategy()
     product_tuple = (datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 1), None)
@@ -155,7 +155,7 @@ def test_naive_exchange_strategy_bidding(exchange_unit, market_config):
             assert bid["price"] == exchange_unit.price_export, "Incorrect export price"
 
 
-def test_naive_exchange_strategy_import_only(exchange_import_only, market_config):
+def test_exchange_energy_naive_strategy_import_only(exchange_import_only, market_config):
     """Test if the strategy only generates import bids when export is unavailable."""
     strategy = NaiveExchangeStrategy()
     product_tuple = (datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 1), None)
@@ -169,7 +169,7 @@ def test_naive_exchange_strategy_import_only(exchange_import_only, market_config
     ), "Incorrect import price"
 
 
-def test_naive_exchange_strategy_export_only(exchange_export_only, market_config):
+def test_exchange_energy_naive_strategy_export_only(exchange_export_only, market_config):
     """Test if the strategy only generates export bids when import is unavailable."""
     strategy = NaiveExchangeStrategy()
     product_tuple = (datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 1), None)
