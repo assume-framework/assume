@@ -1,7 +1,7 @@
 name,technology,node,bidding_EOM,bidding_Redispatch,fuel_type,max_power,min_power,additional_cost,unit_operator,emission_factor,efficiency
-Lignite,lignite,north,naive_eom,naive_redispatch,renewable,30000.0,0,0,wind operator,0,1.0
-Diesel 0,diesel,north,redispatch_learning,redispatch_learning,diesel,1000.0,0,65,diesel operator,0,0.3
-Diesel 1,diesel,north,naive_eom,naive_redispatch,diesel,1000.0,0,66,rl operator,0,0.3
+Wind Onshore,wind onshore,north,naive_eom,naive_redispatch,renewable,30000.0,0,0,wind operator,0,1.0
+Diesel 0,diesel,north,redispatch_learning,redispatch_learning,diesel,1000.0,0,65,rl operator,0,0.3
+Diesel 1,diesel,north,naive_eom,naive_redispatch,diesel,1000.0,0,66,diesel operator,0,0.3
 Diesel 2,diesel,north,naive_eom,naive_redispatch,diesel,1000.0,0,67,diesel operator,0,0.3
 Diesel 3,diesel,north,naive_eom,naive_redispatch,diesel,1000.0,0,68,diesel operator,0,0.3
 Diesel 4,diesel,north,naive_eom,naive_redispatch,diesel,1000.0,0,69,diesel operator,0,0.3

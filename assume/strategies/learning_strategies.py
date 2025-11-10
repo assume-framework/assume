@@ -1509,9 +1509,10 @@ class RedispatchRLStrategy(RLStrategy):
         profit = revenue - costs
 
         # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["total_costs"].loc[start:end_excl] += costs
+        unit.outputs["redispatch_profit"].loc[start:end_excl] = profit
+        unit.outputs["redispatch_costs"].loc[start:end_excl] = costs
 
+        unit.outputs['profit'].loc[start:end_excl] = unit.outputs["eom_profit"].loc[start:end_excl] + unit.outputs["redispatch_profit"].loc[start:end_excl]
         # calculate reward
         scaling = 0.1 / unit.max_power
         reward = unit.outputs["profit"].loc[start:end_excl].sum() * scaling
@@ -1597,5 +1598,5 @@ class RedispatchRLStrategy(RLStrategy):
         profit = revenue - costs
 
         # store results in unit outputs which are written to database by unit operator
-        unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["total_costs"].loc[start:end_excl] += costs
+        unit.outputs["eom_profit"].loc[start:end_excl] = profit
+        unit.outputs["eom_costs"].loc[start:end_excl] = costs
