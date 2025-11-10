@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import asyncio
 import logging
 import shutil
 from collections import defaultdict
@@ -179,8 +178,9 @@ class Learning(Role):
         """
         super().on_ready()
 
-        # TODO: would be nice to shift this by one time the train frequency but then we need to transform th string into the hour or time here which is done excessively
-        shifted_start = self.start_datetime
+        shifted_start = self.start_datetime + pd.Timedelta(
+            self.train_freq
+        )  # shift start by hours in time frequency
 
         recurrency_task = create_rrule(
             start=shifted_start,
@@ -189,18 +189,9 @@ class Learning(Role):
         )
 
         self.context.schedule_recurrent_task(
-            self.store_to_buffer_and_update, recurrency_task,
+            self.store_to_buffer_and_update,
+            recurrency_task,
             src="no_wait",
-        )
-
-        # Final buffer update at end of simulation
-        final_task = create_rrule(
-            start=self.end_datetime,  # Schedule exactly at end
-            end=self.end_datetime,  # Only once
-            freq="1h",  # Frequency doesn't matter for single execution
-        )
-        self.context.schedule_recurrent_task(
-            self.store_to_buffer_and_update, final_task
         )
 
     def sync_train_freq_with_simulation_horizon(
@@ -320,14 +311,14 @@ class Learning(Role):
         self.all_regrets = defaultdict(lambda: defaultdict(list))
         self.all_profits = defaultdict(lambda: defaultdict(list))
 
-        # Get timestamps from snapshot we took
+        # Get timestamps from cache we took
         all_timestamps = sorted(current_obs.keys())
         if len(all_timestamps) > 1:
             # Remove last timestamp that has no reward yet
             timestamps_to_process = all_timestamps[:-1]
 
-            # Create filtered snapshot (only complete timesteps)
-            snapshot = {
+            # Create filtered cache (only complete timesteps)
+            cache = {
                 "obs": {t: current_obs[t] for t in timestamps_to_process},
                 "actions": {t: current_actions[t] for t in timestamps_to_process},
                 "rewards": {t: current_rewards[t] for t in timestamps_to_process},
@@ -337,26 +328,26 @@ class Learning(Role):
             }
 
             # write data to output agent before resetting it
-            self.write_rl_params_to_output(snapshot)
+            self.write_rl_params_to_output(cache)
 
             # if we are training also update the policy and write data into buffer
             if not self.evaluation_mode:
-                # Process snapshot in background
-                await self._store_to_buffer_and_update_sync(snapshot, self.device)
+                # Process cache in background
+                await self._store_to_buffer_and_update_sync(cache, self.device)
         else:
             logger.warning("No experience retrieved to store in buffer at update step!")
 
-    async def _store_to_buffer_and_update_sync(self, snapshot, device) -> None:
+    async def _store_to_buffer_and_update_sync(self, cache, device) -> None:
         """
         This function takes all the information that the strategies wrote into the learning_role dicts and post_processes them to fit into the buffer.
         Further triggers the next policy update
 
         """
-        first_start = next(iter(snapshot["obs"]))
+        first_start = next(iter(cache["obs"]))
         for name, buffer in [
-            ("observations", snapshot["obs"]),
-            ("actions", snapshot["actions"]),
-            ("rewards", snapshot["rewards"]),
+            ("observations", cache["obs"]),
+            ("actions", cache["actions"]),
+            ("rewards", cache["rewards"]),
         ]:
             # check if all entries for the buffers have the same number of unit_ids as rl_strats
             if len(buffer[first_start]) != len(self.rl_strats):
@@ -368,9 +359,9 @@ class Learning(Role):
 
         # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
         self.buffer.add(
-            obs=transform_buffer_data(snapshot["obs"], device),
-            actions=transform_buffer_data(snapshot["actions"], device),
-            reward=transform_buffer_data(snapshot["rewards"], device),
+            obs=transform_buffer_data(cache["obs"], device),
+            actions=transform_buffer_data(cache["actions"], device),
+            reward=transform_buffer_data(cache["rewards"], device),
         )
 
         self.update_policy()
@@ -689,7 +680,7 @@ class Learning(Role):
 
         self.update_steps = 0
 
-    def write_rl_params_to_output(self, snapshot):
+    def write_rl_params_to_output(self, cache):
         """
         Sends the current rl_strategy update to the output agent.
 
@@ -699,20 +690,20 @@ class Learning(Role):
         """
         output_agent_list = []
 
-        for unit_id in sorted(snapshot["obs"][next(iter(snapshot["obs"]))].keys()):
-            starts = snapshot["obs"].keys()
+        for unit_id in sorted(cache["obs"][next(iter(cache["obs"]))].keys()):
+            starts = cache["obs"].keys()
             for idx, start in enumerate(starts):
                 output_dict = {
                     "datetime": start,
                     "unit": unit_id,
-                    "reward": snapshot["rewards"][start][unit_id][0],
-                    "regret": snapshot["regret"][start][unit_id][0],
-                    "profit": snapshot["profit"][start][unit_id][0],
+                    "reward": cache["rewards"][start][unit_id][0],
+                    "regret": cache["regret"][start][unit_id][0],
+                    "profit": cache["profit"][start][unit_id][0],
                 }
 
-                action_tuple = snapshot["actions"][start][unit_id][0]
+                action_tuple = cache["actions"][start][unit_id][0]
 
-                noise_tuple = snapshot["noises"][start][unit_id][0]
+                noise_tuple = cache["noises"][start][unit_id][0]
 
                 if action_tuple is not None:
                     action_dim = len(action_tuple)
@@ -782,7 +773,7 @@ class Learning(Role):
         ]
 
         if self.db_addr:
-            self.context.send_message(
+            self.context.schedule_instant_message(
                 receiver_addr=self.db_addr,
                 content={
                     "context": "write_results",
