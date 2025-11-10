@@ -9,7 +9,7 @@ import pandas as pd
 from assume.common.fast_pandas import FastIndex_from_pd, FastSeries
 
 
-class Calculations:
+class ForecastInitialisation:
     """
     This class represents a forecaster that provides timeseries for forecasts derived from existing files.
 
@@ -103,7 +103,7 @@ class Calculations:
             prefix (str): The prefix of the column.
 
         Example:
-            >>> forecaster = Calculations(index=FastIndex(start='2020-01-01', end='2025-01-01'))
+            >>> forecaster = ForecastInitialisation(index=FastIndex(start='2020-01-01', end='2025-01-01'))
             >>> forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
             >>> print(forecaster['location_1_temperature'])
         """

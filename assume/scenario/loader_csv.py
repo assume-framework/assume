@@ -17,8 +17,8 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.base import LearningConfig
-from assume.common.calculations import Calculations
 from assume.common.exceptions import AssumeException
+from assume.common.forecast_initialisation import ForecastInitialisation
 from assume.common.forecaster import (
     CustomUnitForecaster,
     DemandForecaster,
@@ -560,7 +560,7 @@ def load_config_and_create_forecaster(
     buses = load_file(path=path, config=config, file_name="buses")
     lines = load_file(path=path, config=config, file_name="lines")
 
-    calculator = Calculations(
+    calculator = ForecastInitialisation(
         index=index,
         demand_units=demand_units,
         exchange_units=exchange_units,
