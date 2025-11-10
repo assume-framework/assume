@@ -189,7 +189,8 @@ class Learning(Role):
         )
 
         self.context.schedule_recurrent_task(
-            self.store_to_buffer_and_update, recurrency_task
+            self.store_to_buffer_and_update, recurrency_task,
+            src="no_wait",
         )
 
         # Final buffer update at end of simulation
@@ -341,13 +342,11 @@ class Learning(Role):
             # if we are training also update the policy and write data into buffer
             if not self.evaluation_mode:
                 # Process snapshot in background
-                await asyncio.to_thread(
-                    self._store_to_buffer_and_update_sync, snapshot, self.device
-                )
+                await self._store_to_buffer_and_update_sync(snapshot, self.device)
         else:
             logger.warning("No experience retrieved to store in buffer at update step!")
 
-    def _store_to_buffer_and_update_sync(self, snapshot, device) -> None:
+    async def _store_to_buffer_and_update_sync(self, snapshot, device) -> None:
         """
         This function takes all the information that the strategies wrote into the learning_role dicts and post_processes them to fit into the buffer.
         Further triggers the next policy update
@@ -783,7 +782,7 @@ class Learning(Role):
         ]
 
         if self.db_addr:
-            self.context.schedule_instant_message(
+            self.context.send_message(
                 receiver_addr=self.db_addr,
                 content={
                     "context": "write_results",
