@@ -12,6 +12,16 @@ ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 
 
 class UnitForecaster:
+    """
+    A generalized forecaster for units
+
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
+        availability (ForecastSeries): Forecasted availability of a unit
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
@@ -43,6 +53,14 @@ class UnitForecaster:
 
 
 class CustomUnitForecaster(UnitForecaster):
+    """
+    A more general unit forecaster used e.g. for csv imports
+
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        **kwargs: The desired attributes for this forecast
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
@@ -56,6 +74,17 @@ class CustomUnitForecaster(UnitForecaster):
 
 
 class DemandForecaster(UnitForecaster):
+    """
+    A forecaster for demand units
+
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+        demand (ForecastSeries): Forecasted demand (must be negative)
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
+        availability (ForecastSeries): Forecasted availability of a unit
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
@@ -71,6 +100,18 @@ class DemandForecaster(UnitForecaster):
 
 
 class SteelplantForecaster(UnitForecaster):
+    """
+    A forecaster for steelplant units
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+        fuel_prices (dict[str, ForecastSeries]): Map of fuel type -> forecasted fuel prices
+        availability (ForecastSeries): Forecasted availability of a unit
+        congestion_signal (ForecastSeries): Forecasted congestion signal
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
+        renewable_utilisation_signal (ForecastSeries): Forecasted renewable utilisation signal
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
@@ -95,6 +136,16 @@ class SteelplantForecaster(UnitForecaster):
 
 
 class PowerplantForecaster(UnitForecaster):
+    """
+    A forecaster for powerplant units
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        fuel_prices (dict[str, ForecastSeries]): Map of fuel type -> forecasted fuel prices
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
+        availability (ForecastSeries): Forecasted availability of a unit
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
@@ -115,6 +166,23 @@ class PowerplantForecaster(UnitForecaster):
 
 
 class SteamgenerationForecaster(UnitForecaster):
+    """
+    A forecaster for steam generation units
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        electricity_price (ForecastSeries): Forecasted electricity price
+        fuel_prices (dict[str, ForecastSeries]): Map of fuel type -> forecasted fuel prices
+        demand (ForecastSeries): Forecasted electricity demand
+        electricity_price_flex (ForecastSeries): Forecasted flexible electricity price
+        thermal_demand (ForecastSeries): Forecasted thermal demand
+        congestion_signal (ForecastSeries): Forecasted congestion signal
+        renewable_utilisation_signal (ForecastSeries): Forecasted renewable utilisation signal
+        thermal_storage_schedule (ForecastSeries): Forecasted thermal storage schedule
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
+        availability (ForecastSeries): Forecasted availability of a unit
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
@@ -149,6 +217,22 @@ class SteamgenerationForecaster(UnitForecaster):
 
 
 class BuildingForecaster(UnitForecaster):
+    """
+    A forecaster for building units
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        fuel_prices (dict[str, ForecastSeries]): Map of fuel type -> forecasted fuel prices
+        heat_demand (ForecastSeries): Forecasted heat demand
+        ev_load_profile (ForecastSeries): Forecasted electric vehicle load profile
+        battery_load_profile (ForecastSeries): Forecasted battery load profile
+        pv_profile (ForecastSeries): Forecasted photovoltaic profile
+        load_profile (ForecastSeries): Forecasted overall load profile
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
+        availability (ForecastSeries): Forecasted availability of a unit
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+        load_profile (ForecastSeries): Forecasted load profile
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
@@ -177,6 +261,18 @@ class BuildingForecaster(UnitForecaster):
 
 
 class HydrogenForecaster(UnitForecaster):
+    """
+    A forecaster for hydrogen units
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        electricity_price (ForecastSeries): Forecasted electricity price
+        hydrogen_demand (ForecastSeries): Forecasted hydrogen demand
+        seasonal_storage_schedule (ForecastSeries): Forecasted seasonal storage schedule
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
+        availability (ForecastSeries): Forecasted availability of a unit
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
@@ -194,6 +290,17 @@ class HydrogenForecaster(UnitForecaster):
 
 
 class ExchangeForecaster(UnitForecaster):
+    """
+    A forecaster for exchange units
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        volume_import (ForecastSeries): Forecasted import volume
+        volume_export (ForecastSeries): Forecasted export volume
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
+        availability (ForecastSeries): Forecasted availability of a unit
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
