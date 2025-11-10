@@ -183,7 +183,6 @@ class World:
         end: datetime,
         simulation_id: str,
         save_frequency_hours,
-        lr_logfreq: str = "h",
         bidding_params: dict = {},
         learning_config: LearningConfig = {},
         episode: int = 1,
@@ -199,7 +198,6 @@ class World:
             start (datetime.datetime): The start datetime for the simulation.
             end (datetime.datetime): The end datetime for the simulation.
             simulation_id (str): The unique identifier for the simulation.
-            lr_logfreq (str): Log frequency of the learning role
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
             learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
@@ -240,8 +238,6 @@ class World:
             if not self.evaluation_mode
             else f"Evaluation Episode {eval_episode}"
         )
-
-        self.lr_logfreq = lr_logfreq
 
         self.bidding_params = bidding_params
 
@@ -328,7 +324,6 @@ class World:
                 db_uri=self.db_uri,
                 output_agent_addr=self.output_agent_addr,
                 train_start=self.start,
-                freq=self.lr_logfreq,
             )
 
         else:
