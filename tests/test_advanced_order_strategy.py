@@ -7,7 +7,8 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.fast_pandas import FastIndex, FastSeries
+from assume.common.forecaster import PowerplantForecaster
 from assume.strategies import (
     EnergyHeuristicFlexableBlockStrategy,
     EnergyHeuristicFlexableLinkedStrategy,
@@ -21,8 +22,15 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-07-01", periods=48, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    index = FastIndex(start="2023-07-01", periods=48, freq="h")
+    ff = PowerplantForecaster(
+        index,
+        availability=FastSeries(index, 1),
+        market_prices={
+            "EOM": FastSeries(index, 0),
+        },
+        fuel_prices={"lignite": FastSeries(index, 10), "co2": FastSeries(index, 10)},
+    )
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",

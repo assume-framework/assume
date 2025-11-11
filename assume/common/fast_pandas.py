@@ -275,6 +275,10 @@ class FastIndex:
         raise TypeError("Frequency must be a string or timedelta")
 
 
+def FastIndex_from_pd(idx: pd.DatetimeIndex | pd.Series):
+    return FastIndex(start=idx[0], end=idx[-1], freq=pd.infer_freq(idx))
+
+
 class FastSeries:
     """
     A fast, memory-efficient replacement for pandas Series with a FastIndex.
@@ -290,7 +294,7 @@ class FastSeries:
     """
 
     def __init__(
-        self, index: FastIndex, value: float | np.ndarray = 0.0, name: str = ""
+        self, index: FastIndex, value: float | np.ndarray | list = 0.0, name: str = ""
     ):
         """
         Initialize the FastSeries.

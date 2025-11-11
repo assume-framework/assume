@@ -16,6 +16,8 @@ Upcoming Release
 
 - **Changed action clamping**: The action clamping was changed to extreme values defined by dicts. Instead of using the min and max of a forward pass in the NN, the clamping is now based on the activation function of the actor network. Previously, the output range was incorrectly assumed based only on the input, which failed when weights were negative due to Xavier initialization.
 - **Adjusted reward scaling**: Reward scaling now considers current available power instead of the unit’s max_power, reducing reward distortion when availability limits capacity. Available power is now derived from offered_order_volume instead of unit.calculate_min_max_power. Because dispatch is set before reward calculation, the previous method left available power at 0 whenever the unit was dispatched.
+- **Update pytest dependency**: Tests now run with Pytest 9
+- **Add new docs feature**: dependencies to build docs can now be installed with `pip install -e .[docs]`
 
   **New Features:**
 - **Unit Operator Portfolio Strategy**: A new bidding strategy type that enables portfolio optimization, where the default is called `UnitsOperatorEnergyNaiveDirectStrategy`. This strategy simply passes through bidding decisions of individual units within a portfolio, which was the default behavior beforehand as well. Further we added 'UnitsOperatorEnergyHeuristicCournotStrategy' which allows to model bidding behavior of a portfolio of units in a day-ahead market. The strategy calculates the optimal bid price and quantity for each unit in the portfolio, taking into account markup and the production costs of the units. This enables users to simulate and analyze the impact of strategic portfolio bidding on market outcomes and unit profitability.

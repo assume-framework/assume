@@ -7,6 +7,8 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
+from assume.common.forecaster import PowerplantForecaster
+
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
     from assume.strategies.learning_strategies import EnergyLearningStrategy, EnergyLearningSingleBidStrategy
@@ -15,7 +17,6 @@ except ImportError:
     EnergyLearningStrategy = None
     EnergyLearningSingleBidStrategy = None
 
-from assume.common.forecasts import NaiveForecast
 from assume.units import PowerPlant
 
 start = datetime(2023, 7, 1)
@@ -26,7 +27,11 @@ end = datetime(2023, 7, 2)
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    ff = PowerplantForecaster(
+        index,
+        fuel_prices={"lignite": 10, "co2": 10},
+        residual_load={"EOM": 0},
+    )
     learning_config: LearningConfig = {
         "algorithm": "matd3",
         "learning_mode": True,

@@ -10,6 +10,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from assume.common.forecaster import UnitForecaster
+
 try:
     import torch as th
 
@@ -18,7 +20,6 @@ try:
 except ImportError:
     th = None
 
-from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig
 from assume.units import Storage
 
@@ -41,12 +42,12 @@ def storage_unit() -> Storage:
     }
 
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    ff = UnitForecaster(index, market_prices={"test_market": 50})
     return Storage(
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
-        bidding_strategies={"EOM": StorageEnergyLearningStrategy(**learning_config)},
+        bidding_strategies={"test_market": StorageEnergyLearningStrategy(**learning_config)},
         max_power_charge=-500,  # Negative for charging
         max_power_discharge=500,
         max_soc=1000,
@@ -85,7 +86,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
     ]
 
     # get the strategy
-    strategy = storage_unit.bidding_strategies["EOM"]
+    strategy = storage_unit.bidding_strategies["test_market"]
 
     # Define the 'sell' action: [0.2, 0.5] -> price=20, direction='sell'
     sell_action = [0.2, 0.5]
@@ -179,7 +180,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
     ]
 
     # Instantiate the StorageEnergyLearningStrategy
-    strategy = storage_unit.bidding_strategies["EOM"]
+    strategy = storage_unit.bidding_strategies["test_market"]
 
     # Define the 'buy' action: [-0.3] -> price=30, direction='buy'
     buy_action = [-0.3]
@@ -271,7 +272,7 @@ def test_storage_rl_strategy_cost_stored_energy(mock_market_config, storage_unit
     ]
 
     # Instantiate the StorageEnergyLearningStrategy
-    strategy = storage_unit.bidding_strategies["EOM"]
+    strategy = storage_unit.bidding_strategies["test_market"]
 
     # Define sequence of actions over 3 hours: [charge, sell, sell]
     # Format: [normalized_price (-1, 1), direction indicated by sign (negative: buy bid, positive: sell bid)]

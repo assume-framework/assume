@@ -8,7 +8,8 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.fast_pandas import FastIndex
+from assume.common.forecaster import PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
 from assume.strategies.dmas_powerplant import EnergyOptimizationDmasStrategy
@@ -19,13 +20,12 @@ from .utils import get_test_prices
 
 @pytest.fixture
 def power_plant_1() -> PowerPlant:
-    index = pd.date_range("2022-01-01", periods=4, freq="h")
-    ff = NaiveForecast(
-        index,
+    index = FastIndex("2022-01-01", periods=4, freq="h")
+    ff = PowerplantForecaster(
+        index=index,
         availability=1,
-        fuel_price=[10, 11, 12, 13],
-        co2_price=[10, 20, 30, 30],
-        price_forecast=50,
+        fuel_prices={"lignite": [10, 11, 12, 13], "co2": [10, 20, 30, 30]},
+        market_prices={"EOM": 50},
     )
     # Create a PowerPlant instance with some example parameters
     return PowerPlant(
@@ -49,12 +49,11 @@ def power_plant_day(fuel_type="lignite") -> PowerPlant:
     index = pd.date_range("2022-01-01", periods=periods, freq="h")
 
     prices = get_test_prices(periods)
-    ff = NaiveForecast(
+    ff = PowerplantForecaster(
         index,
         availability=1,
-        fuel_price=prices[fuel_type],
-        co2_price=prices["co2"],
-        price_forecast=prices["power"],
+        fuel_prices=prices,
+        market_prices={"EOM": prices["power"]},
     )
     # Create a PowerPlant instance with some example parameters
     return PowerPlant(
@@ -186,7 +185,7 @@ def test_dmas_prevent_start(power_plant_day):
     assert hour_count == 24
 
     # quite bad forecast here
-    power_plant_day.forecaster.price_forecast.iloc[10:11] = -10
+    power_plant_day.forecaster.price["EOM"].iloc[10:11] = -10
 
     mc = MarketConfig(
         market_id="EOM",
@@ -220,7 +219,7 @@ def test_dmas_prevent_start_end(power_plant_day):
     assert hour_count == 24
 
     # quite bad forecast here
-    power_plant_day.forecaster.price_forecast.iloc[20:24] = -10
+    power_plant_day.forecaster.price["EOM"].iloc[20:24] = -10
 
     mc = MarketConfig(
         market_id="EOM",

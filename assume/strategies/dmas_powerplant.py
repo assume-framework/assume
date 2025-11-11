@@ -298,8 +298,8 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
         prices_24h = prices[:hour_count].copy()
         prices_48h = prices[:hour_count2].copy()
         try:
-            fuel_prices = unit.forecaster.get_price(unit.fuel_type)
-            emission_prices = unit.forecaster.get_price("co2")
+            fuel_prices = unit.forecaster.fuel_prices[unit.fuel_type]
+            emission_prices = unit.forecaster.fuel_prices["co2"]
         except KeyError:
             logger.error(f"no price for {unit.fuel_type=} with {steps=} and {start=}")
             raise Exception(f"No Fuel prices given for fuel {unit.fuel_type}")
@@ -450,13 +450,13 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
         hour_count = len(product_tuples)
         hour_count2 = hour_count * 2
 
-        base_price = unit.forecaster[f"price_{market_config.market_id}"][
+        base_price = unit.forecaster.price[market_config.market_id][
             start : start + timedelta(hours=hour_count2 - 1)
         ]
-        e_price = unit.forecaster.get_price("co2")[
+        e_price = unit.forecaster.fuel_prices["co2"][
             start : start + timedelta(hours=hour_count2 - 1)
         ]
-        fuel_price = unit.forecaster.get_price(unit.fuel_type)[
+        fuel_price = unit.forecaster.fuel_prices[unit.fuel_type][
             start : start + timedelta(hours=hour_count2 - 1)
         ]
         self.optimize(unit, start, hour_count, base_price)
