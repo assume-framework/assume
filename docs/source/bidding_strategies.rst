@@ -38,6 +38,7 @@ The ASSUME framework provides multiple options in terms of Bidding Strategy meth
  ============================== =============================================================
   Bidding Strategy Methodology   Description
  ============================== =============================================================
+  Naive                          Simple bidding strategies for participating in a market mechanism that follows the Merit Order principle.
   Heuristic                      Basic methodology to form bids, based on participating in a market mechanism that follows the Merit Order principle. These strategies do not utilise forecasting
                                  or consider finer details such as the effects of changing a power plant's operational state (start-up costs etc.),
                                  so the bid volume is of the order of its max. power capacity (given ramping constraints) and the bid price is set to the marginal cost.
@@ -76,6 +77,7 @@ We'll now take a look at the different Bidding Strategies within each methodolog
 
 Naive
 -------------
+Naive strategies
 
 +------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
 | bidding_strategy_id                | For Market   | Description                                                                                        |
