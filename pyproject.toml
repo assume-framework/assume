@@ -65,9 +65,9 @@ test = [
     "ruff >=0.4.9",
     "mypy >=1.1.1",
     "matplotlib >=3.7.2",
-    "pytest >=7.2.2",
-    "pytest-cov >=4.1.0",
-    "pytest-asyncio >=0.21.1",
+    "pytest >=9",
+    "pytest-cov >=7.0.0",
+    "pytest-asyncio >=1.3.0",
 ]
 all = [
     "assume-framework[oeds, network, learning]",
@@ -111,9 +111,7 @@ ignore = ["E501", "G004", "E731"]
 ]
 
 [tool.pytest]
-testpaths = "tests"
-
-[tool.pytest.ini_options]
+testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
@@ -127,7 +125,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "require_learning",
 ]
-addopts = "--ignore=assume-db"
+addopts = ["--ignore=assume-db"]
 
 [tool.coverage.run]
 omit = ["tests/*"]
