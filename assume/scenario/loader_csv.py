@@ -1111,7 +1111,6 @@ def run_learning(
 
             total_rewards = world.output_role.get_sum_reward(episode=eval_episode)
 
-            # TODO: currently the writing to buffer etc is coupled to the training and buffer update and hence will not happen
             if len(total_rewards) == 0:
                 raise AssumeException("No rewards were collected during evaluation run")
 

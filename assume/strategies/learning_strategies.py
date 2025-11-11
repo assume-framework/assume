@@ -85,6 +85,8 @@ class TorchLearningStrategy(LearningStrategy):
                 dt=kwargs.get("noise_dt", 1.0),
             )
 
+            self.learning_role.register_strategy(self)
+
         elif Path(kwargs["trained_policies_load_path"]).is_dir():
             self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
         else:

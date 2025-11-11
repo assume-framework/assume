@@ -549,11 +549,6 @@ class World:
                     **bidding_params,
                 )
 
-                # TODO: can we do that independently from learning mode?
-                # add learning_strategy to the learning role for handling of initial exploration and buffer sizing
-                if self.learning_mode or self.evaluation_mode:
-                    self.learning_role.rl_strats[unit_id] = strategy_instances[strategy]
-
             # Use the cached instance for this market
             bidding_strategies[market_id] = strategy_instances[strategy]
 

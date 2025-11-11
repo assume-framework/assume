@@ -294,6 +294,17 @@ class Learning(Role):
 
         return validation_interval
 
+    def register_strategy(self, strategy: LearningStrategy) -> None:
+        """
+        Register a learning strategy with this learning role.
+
+        Args:
+            strategy (LearningStrategy): The learning strategy to register.
+
+        """
+
+        self.rl_strats[strategy.unit_id] = strategy
+
     async def store_to_buffer_and_update(self) -> None:
         # Atomic dict operations - create new references
         current_obs = self.all_obs
