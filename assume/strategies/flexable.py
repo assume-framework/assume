@@ -242,7 +242,7 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
         update_avg_op_time(unit, product_type, products_index[0], products_index[-1])
 
 
-class flexablePosCRM(MinMaxStrategy):
+class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
 
@@ -357,7 +357,7 @@ class flexablePosCRM(MinMaxStrategy):
         return bids
 
 
-class CapacityHeuristicBalancingStrategy(MinMaxStrategy):
+class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 

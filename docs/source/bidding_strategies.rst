@@ -38,21 +38,19 @@ The ASSUME framework provides multiple options in terms of Bidding Strategy meth
 ==============================  =============================================================
 Bidding Strategy Methodology    Description
 ==============================  =============================================================
-Naive                           Simple bidding strategies for participating in a market mechanism that follows the Merit Order principle.
+Naive                           Simple bidding strategies for participating in a market mechanism that follows the Merit Order principle. No additional dependencies needed.
 Heuristic                       Basic methodology to form bids, based on participating in a market mechanism that follows the Merit Order principle. These strategies do not utilise
                                 forecasting or consider finer details such as the effects of changing a power plant's operational state (start-up costs etc.), so the bid volume is
                                 of the order of its maximum power capacity (given ramping constraints), and the bid price is set to the marginal cost.
-Optimization                    This methodology, based on the flexABLE methodology [`Qussous et al. 2022 <https://doi.org/10.3390/en15020494>`_], offers more refined strategising
+Optimization                    Methodology, based on the flexABLE methodology [`Qussous et al. 2022 <https://doi.org/10.3390/en15020494>`_], offers more refined strategising
                                 compared to the Naive methods. Applicable to power plant and storage units, it incorporates market dynamics to a greater degree by forecasting market
                                 prices, as well as accounting for operational history, potential power loss due to heat production, and the fact that a plant can make bids for
                                 multiple markets at the same time.
-DMAS-Optimization               Optimization using forecasts and avoided cost calculation used for smart bids coming from the DMAS methodology
-                                <https://github.com/NOWUM/dmas/>`_.
 Learning                        A `reinforcement learning <https://assume.readthedocs.io/en/latest/learning.html>`_ (RL) approach to formulating bids for an Energy-Only Market.
                                 Agents perform actions (choose bid price(s) and for storage a direction) informed by observations (including forecasted residual load, forecasted
                                 price, marginal cost). Bid volumes are fixed to the maximum possible volume. Based on the reward (profits) from accepted bids, agents learn to optimise
-                                bids to maximise profits.
-Miscellaneous                   Other bidding strategies not belonging to a specific methodology.
+                                bids to maximise profits. This requires to have PyTorch installed.
+Interactive                     Strategies which let a user handle input through a terminal or other interface.
 ==============================  =============================================================
 
 
@@ -75,7 +73,8 @@ Advanced-Bidding Unit   hydro        powerplant_energy_heuristic_block   powerpl
 We'll now take a look at the different Bidding Strategies within each methodology, their associated "bidding_strategy_id", and for which unit and market type(s) they are valid.
 
 Naive
--------------
+-----
+
 ==================================  =======================  =====================================================================================================================
 bidding_strategy_id                 For Market Types         Description
 ==================================  =======================  =====================================================================================================================
@@ -105,7 +104,7 @@ Naive method API references:
 - :py:meth:`assume.strategies.naive_strategies.ExchangeEnergyNaiveStrategy`
 
 Heuristic
--------------
+---------
 
 ============================================  ==================  ==================================================================================================================
 bidding_strategy_id                           For Market Types    Description
@@ -117,8 +116,8 @@ powerplant_energy_heuristic_flexable          EOM                 A more refined
                                                                   costs, while the flexible bid covers additional power up to the maximum capacity at marginal cost. It
                                                                   incorporates price forecasting and accounts for ramping constraints, operational history, and power loss
                                                                   due to heat production.
-powerplant_energy_heuristic_block             EOM                 TODO
-powerplant_energy_heuristic_linked            EOM                 TODO
+powerplant_energy_heuristic_block             EOM                 A power plant strategy valid for complex market clearing which bids dict blocks to the market.
+powerplant_energy_heuristic_linked            EOM                 A power plant strategy which handles block and linked bids on a market with these fields as a dict.
 powerplant_capacity_heuristic_balancing_neg   CRM_neg             A bid on the negative Capacity or Energy CRM; volume is determined by calculating how much it can reduce
                                                                   power. The capacity price is found by comparing the revenue it could receive if it bid this volume on
                                                                   the EOM; the energy price is the negative of marginal cost.
@@ -145,48 +144,42 @@ powerplant_energy_heuristic_profile           EOM                 Formulated sim
 
 Heuristic method API references:
 
-- :py:meth:`assume.strategies.standard_powerplant.StandardEOMPowerplantStrategy`
-- :py:meth:`assume.strategies.standard_advanced_orders.StandardProfileEOMPowerplantStrategy`
-- :py:meth:`assume.strategies.standard_powerplant.StandardNegCRMPowerplantStrategy`
-- :py:meth:`assume.strategies.standard_powerplant.StandardPosCRMPowerplantStrategy`
-- :py:meth:`assume.strategies.standard_storage.StandardEOMStorageStrategy`
-- :py:meth:`assume.strategies.standard_storage.StandardNegCRMStorageStrategy`
-- :py:meth:`assume.strategies.standard_storage.StandardPosCRMStorageStrategy`
+- :py:meth:`assume.strategies.naive_strategies.EnergyHeuristicElasticStrategy`
+
+- :py:meth:`assume.strategies.advanced_orders.EnergyHeuristicFlexableLinkedStrategy`
+- :py:meth:`assume.strategies.advanced_orders.EnergyHeuristicFlexableBlockStrategy`
+- :py:meth:`assume.strategies.flexable.CapacityHeuristicBalancingNegStrategy`
+- :py:meth:`assume.strategies.flexable.CapacityHeuristicBalancingPosStrategy`
+
+- :py:meth:`assume.strategies.flexable_storage.StorageEnergyHeuristicFlexableStrategy`
+- :py:meth:`assume.strategies.flexable_storage.StorageCapacityHeuristicBalancingNegStrategy`
+- :py:meth:`assume.strategies.flexable_storage.StorageCapacityHeuristicBalancingPosStrategy`
 
 Optimization
--------------
+------------
 
 ===========================================  ==================  ============
 bidding_strategy_id                          For Market Types    Description
 ===========================================  ==================  ============
-household_energy_optimisation                EOM                 TODO
-industry_energy_optimisation                 EOM                 TODO
-household_capacity_heuristic_balancing_neg   CRM_neg             TODO
-household_capacity_heuristic_balancing_pos   CRM_pos             TODO
-industry_capacity_heuristic_balancing_neg    CRM_neg             TODO
-industry_capacity_heuristic_balancing_pos    CRM_pos             TODO
+household_energy_optimization                EOM                 An energy strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
+industry_energy_optimization                 EOM                 An energy strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
+household_capacity_heuristic_balancing_neg   CRM_neg             A postivie capacity strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
+household_capacity_heuristic_balancing_pos   CRM_pos             A postivie capacity strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
+industry_capacity_heuristic_balancing_neg    CRM_neg             A negative capacity strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
+industry_capacity_heuristic_balancing_pos    CRM_pos             A negative capacity strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
+powerplant_energy_optimization_dmas          EOM                 Power plant strategy using forecast optimization and avoided cost calculation used for smart bids coming from the DMAS methodology
+storage_energy_optimization_dmas             EOM                 Storage strategy using forecasts and avoided cost calculation used for smart bids coming from the DMAS methodology
 ===========================================  ==================  ============
 
 Optimization method API references:
 - :py:meth:`assume.strategies.naive_strategies.DsmEnergyOptimizationStrategy`
-
-DMAS Optimization
------------------
-
-=====================================  ================== ============
-bidding_strategy_id                    For Market Types   Description
-=====================================  ================== ============
-powerplant_energy_optimization_dmas    EOM                TODO
-storage_energy_optimization_dmas       EOM                TODO
-=====================================  ================== ============
-
-DMAS method API references:
-
+- :py:meth:`assume.strategies.naive_strategies.DsmCapacityHeuristicBalancingPosStrategy`
+- :py:meth:`assume.strategies.naive_strategies.DsmCapacityHeuristicBalancingNegStrategy`
 - :py:meth:`assume.strategies.dmas_powerplant.EnergyOptimizationDmasStrategy`
 - :py:meth:`assume.strategies.dmas_storage.StorageEnergyOptimizationDmasStrategy`
 
 Learning
--------------
+--------
 
 ===================================== ================== =============================================================
 bidding_strategy_id                   For Market Types   Description
@@ -216,18 +209,17 @@ Learning method API references:
 - :py:meth:`assume.strategies.learning_strategies.EnergyLearningStrategy`
 - :py:meth:`assume.strategies.learning_strategies.EnergyLearningSingleBidStrategy`
 - :py:meth:`assume.strategies.learning_strategies.StorageEnergyLearningStrategy`
-- :py:meth:`assume.strategies.learning_strategies.StorageEnergyLearningSingleBidStrategy`
 - :py:meth:`assume.strategies.learning_strategies.RenewableEnergyLearningSingleBidStrategy`
 
 Other
--------------
+-----
 
 =============================== ================ ================== =============================================================
-bidding_strategy_id             For Unit Types  For Market Types  Description
+bidding_strategy_id             For Unit Types   For Market Types   Description
 =============================== ================ ================== =============================================================
-powerplant_energy_interactive   Any             Any               The bidding volume and price is manually entered in the terminal.
+powerplant_energy_interactive   Any              Any                The bidding volume and price is manually entered in the terminal.
 =============================== ================ ================== =============================================================
 
 Miscellaneous method API references:
 
-- :py:meth:`assume.strategies.manual_strategies.EnergyInteractiveStrategy`
+- :py:meth:`assume.strategies.interactive_strategies.EnergyInteractiveStrategy`

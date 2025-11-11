@@ -10,8 +10,8 @@ from assume.strategies.advanced_orders import (
 from assume.strategies.extended import EnergyNaiveOtcStrategy
 from assume.strategies.flexable import (
     EnergyHeuristicFlexableStrategy,
-    CapacityHeuristicBalancingStrategy,
-    flexablePosCRM,
+    CapacityHeuristicBalancingNegStrategy,
+    CapacityHeuristicBalancingPosStrategy,
 )
 from assume.strategies.flexable_storage import (
     StorageEnergyHeuristicFlexableStrategy,
@@ -26,10 +26,10 @@ from assume.strategies.naive_strategies import (
     EnergyNaiveStrategy,
     ExchangeEnergyNaiveStrategy,
     EnergyHeuristicElasticStrategy,
-    CapacityHeuristicBalancingPosStrategy,
-    CapacityHeuristicBalancingNegStrategy,
+    DsmCapacityHeuristicBalancingPosStrategy,
+    DsmCapacityHeuristicBalancingNegStrategy,
 )
-from assume.strategies.manual_strategies import EnergyInteractiveStrategy
+from assume.strategies.interactive_strategies import EnergyInteractiveStrategy
 from assume.strategies.dmas_powerplant import EnergyOptimizationDmasStrategy
 from assume.strategies.dmas_storage import StorageEnergyOptimizationDmasStrategy
 from assume.strategies.portfolio_strategies import (
@@ -49,13 +49,13 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "otc_strategy": EnergyNaiveOtcStrategy,
     "flexable_eom": EnergyHeuristicFlexableStrategy,
     "flexable_eom_block": EnergyHeuristicFlexableBlockStrategy,
-    "flexable_neg_crm": CapacityHeuristicBalancingStrategy,
-    "flexable_pos_crm": flexablePosCRM,
+    "flexable_neg_crm": CapacityHeuristicBalancingNegStrategy,
+    "flexable_pos_crm": CapacityHeuristicBalancingPosStrategy,
     "flexable_eom_linked": EnergyHeuristicFlexableLinkedStrategy,
     "flexable_neg_crm_storage": StorageCapacityHeuristicBalancingNegStrategy,
     "flexable_pos_crm_storage": StorageCapacityHeuristicBalancingPosStrategy,
-    "pos_crm_dsm": CapacityHeuristicBalancingPosStrategy,
-    "neg_crm_dsm": CapacityHeuristicBalancingNegStrategy,
+    "pos_crm_dsm": DsmCapacityHeuristicBalancingPosStrategy,
+    "neg_crm_dsm": DsmCapacityHeuristicBalancingNegStrategy,
     "naive_redispatch": EnergyNaiveRedispatchStrategy,
     "naive_da_dsm": DsmEnergyOptimizationStrategy,
     "naive_redispatch_dsm": DsmEnergyNaiveRedispatchStrategy,
@@ -71,15 +71,15 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "powerplant_energy_heuristic_flexable": EnergyHeuristicFlexableStrategy,
     "powerplant_energy_heuristic_block": EnergyHeuristicFlexableBlockStrategy,
     "powerplant_energy_heuristic_linked": EnergyHeuristicFlexableLinkedStrategy,
-    "powerplant_capacity_heuristic_balancing_neg": CapacityHeuristicBalancingStrategy,
-    "powerplant_capacity_heuristic_balancing_pos": CapacityHeuristicBalancingStrategy,
+    "powerplant_capacity_heuristic_balancing_neg": CapacityHeuristicBalancingNegStrategy,
+    "powerplant_capacity_heuristic_balancing_pos": CapacityHeuristicBalancingPosStrategy,
     "storage_energy_heuristic_flexable": StorageEnergyHeuristicFlexableStrategy,
     "storage_capacity_heuristic_balancing_neg": StorageCapacityHeuristicBalancingNegStrategy,
     "storage_capacity_heuristic_balancing_pos": StorageCapacityHeuristicBalancingPosStrategy,
-    "household_capacity_heuristic_balancing_pos": CapacityHeuristicBalancingPosStrategy,
-    "industry_capacity_heuristic_balancing_pos": CapacityHeuristicBalancingPosStrategy,
-    "household_capacity_heuristic_balancing_neg": CapacityHeuristicBalancingNegStrategy,
-    "industry_capacity_heuristic_balancing_neg": CapacityHeuristicBalancingNegStrategy,
+    "household_capacity_heuristic_balancing_pos": DsmCapacityHeuristicBalancingPosStrategy,
+    "industry_capacity_heuristic_balancing_pos": DsmCapacityHeuristicBalancingPosStrategy,
+    "household_capacity_heuristic_balancing_neg": DsmCapacityHeuristicBalancingNegStrategy,
+    "industry_capacity_heuristic_balancing_neg": DsmCapacityHeuristicBalancingNegStrategy,
     "powerplant_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
     "demand_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
     "household_energy_optimization": DsmEnergyOptimizationStrategy,

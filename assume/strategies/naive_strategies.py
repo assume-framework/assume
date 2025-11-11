@@ -517,7 +517,7 @@ class EnergyHeuristicElasticStrategy(MinMaxStrategy):
         return volume
 
 
-class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
+class DsmCapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
     """
     Strategy for Positive CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """
@@ -555,7 +555,7 @@ class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
         return self.remove_empty_bids(bids)
 
 
-class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
+class DsmCapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
     """
     Strategy for Negative CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """
