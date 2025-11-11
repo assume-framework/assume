@@ -71,12 +71,12 @@ follows the underscore (the market names need to match with those in the config 
 
 
 
- ======================= ================== =========================               =============================                =============================                  ============
+ ======================= ================== ======================================  =============================                =============================                  ============
   name                    technology        bidding_EOM                             bidding_CRM_pos                              bidding_CRM_neg                                max_power
- ======================= ================== =========================               =============================                =============================                  ===========
+ ======================= ================== ======================================  =============================                =============================                  ===========
   Naive-Bidding Unit      hydro              powerplant_energy_naive                powerplant_capacity_heuristic_balancing_pos  powerplant_capacity_heuristic_balancing_neg    1000
   Advanced-Bidding Unit   hydro              powerplant_energy_heuristic_block      powerplant_capacity_heuristic_balancing_pos  powerplant_capacity_heuristic_balancing_neg    1000
- ======================= ================== =========================               =============================                =============================                  ===========
+ ======================= ================== ======================================  =============================                =============================                  ===========
 
 We'll now take a look at the different Bidding Strategies within each methodology, their associated "bidding_strategy_id", and for which unit and market type(s) they are valid.
 
@@ -97,8 +97,9 @@ demand_energy_naive_balancing              CRM_neg            market configurati
                                                                 the bid price very high and volume equalling demand at the timepoint.
 
 
-powerplant_energy_naive_otc               OTC                Similar to :code:`powerplant_energy_naive`, however it is bid on the OTC market, representing bilateral trades.
-demand_energy_naive_otc                                   Similar to :code:`demand_energy_naive`, however it is bid on the OTC market, representing bilateral trades.
+powerplant_energy_naive_otc               OTC                Similar to :code:`powerplant_energy_naive` and :code:`demand_energy_naive`,
+demand_energy_naive_otc                                                                however it is bid on the OTC market, representing bilateral trades.
+                                  
 
 powerplant_energy_naive_redispatch      redispatch          A naive strategy that simply submits all information about
 demand_energy_naive_redispatch                              the unit and currently dispatched power for the following hours
@@ -106,40 +107,23 @@ demand_energy_naive_redispatch                              the unit and current
                                                             the ramp up and down values, and the dispatch.
 
 
-household_energy_naive
+household_energy_naive_redispatch       redispatch          A naive strategy of a Demand Side Management (DSM) unit (industry or households)
+industry_energy_naive_redispatch                            that bids the available flexibility of the unit on the redispatch market.
+                                                            The bid volume is the flexible power requirement of the unit at the start
+                                                            time of the product. The bid price is the marginal cost of the unit at the
+                                                            start time of the product.
+    
 
-industry_energy_naive
+powerplant_energy_naive_profile         EOM, CRM_pos,       Similar to :code:`naive`, however it is a block bid for 24 hours to
+                                    CRM_neg                     simulate a bid for the Day-Ahead market, where bid price is set to the marginal cost
+                                                                at the starting timepoint.
 
-household_energy_naive_redispatch
-
-industry_energy_naive_redispatch
-
-powerplant_energy_naive_profile
-
-exchange_energy_naive
-                                       EOM, CRM_pos,         Similar to :code:`powerplant_energy_naive` and :code:`demand_energy_naive`, however
-                                             CRM_neg            formulated for balancing markets.
-
-  naive_profile                          EOM, CRM_pos,      Similar to :code:`naive`, however it is a block bid for 24 hours to
-                                    CRM_neg            simulate a bid for the Day-Ahead market, where bid price is set to the marginal cost
-                                                 at the starting timepoint.
-  naive_profile_dsm         EOM, CRM_pos,      Strategy for a Demand-Side Management (DSM) unit bid, for a 24-hour period,
-                                 CRM_neg            where the bid volume is the unit's optimal power requirement
-                                                                       at the product's start time, and the bid price is set to a fixed marginal cost (3000 €/MWh).
-  naive_exchange                            EOM                This bidding strategy is formulated so as to incorporate cross-border trading into the market mechanism.
-                                                                       An export and an import bid are made.
-                                                                       Export bids have negative volumes and are treated as demand
-                                                                       (with bidding price close to maximum to virtually guarantee acceptance) on the market.
-                                                                       Import bids have positive volumes and are treated as supply
-                                                                       (with bidding price close to minimum to virtually guarantee acceptance) on the market.
-  naive_redispatch                      redispatch         A naive strategy that simply submits all information about the unit and
-                                                                currently dispatched power for the following hours to the redispatch market.
-                                                      Information includes the marginal cost, the ramp up and down values, and the dispatch.
-                            
-  naive_redispatch_dsm          redispatch         A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of
-                                                the unit on the redispatch market.
-                                                                       The bid volume is the flexible power requirement of the unit at the start time of the product.
-                                                                       The bid price is the marginal cost of the unit at the start time of the product.
+exchange_energy_naive                   EOM                 This bidding strategy is formulated so as to incorporate cross-border trading into the market mechanism.
+                                                            An export and an import bid are made. Export bids have negative volumes and are treated as demand
+                                                            (with bidding price close to maximum to virtually guarantee acceptance) on the market.
+                                                            Import bids have positive volumes and are treated as supply (with bidding price close to minimum
+                                                            to virtually guarantee acceptance) on the market.
+                    
  ========================= ======================= ================== =============================================================
 
 Naive method API references:
