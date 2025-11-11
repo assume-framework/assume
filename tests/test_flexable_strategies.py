@@ -8,7 +8,7 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import PowerplantForecaster
 from assume.strategies import (
     CapacityHeuristicBalancingStrategy,
     EnergyHeuristicFlexableStrategy,
@@ -24,7 +24,10 @@ end = datetime(2023, 7, 2)
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2023-07-01", periods=48, freq="h")
-    forecaster = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    forecaster = PowerplantForecaster(
+        index,
+        fuel_prices={"lignite": 10, "co2": 10},
+    )
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",

@@ -9,7 +9,7 @@ from dateutil import rrule as rr
 
 from assume import World
 from assume.common.fast_pandas import FastIndex
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 
 log = logging.getLogger(__name__)
@@ -55,14 +55,16 @@ def init(world, n=1):
         # the unit_params have no hints
         {
             "min_power": 0,
-            "max_power": 1000,
+            "max_power": -1000,
             "bidding_strategies": {"EOM": "demand_energy_naive"},
             "technology": "demand",
         },
-        NaiveForecast(index, demand=1000),
+        DemandForecaster(index, demand=-1000),
     )
 
-    nuclear_forecast = NaiveForecast(index, availability=1, fuel_price=3, co2_price=0.1)
+    nuclear_forecast = PowerplantForecaster(
+        index, availability=1, fuel_prices={"others": 3, "co2": 0.1}
+    )
     for i in range(n):
         world.add_unit_operator(f"my_operator{i}")
         world.add_unit(

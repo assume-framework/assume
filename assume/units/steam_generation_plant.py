@@ -8,7 +8,7 @@ from datetime import datetime
 import pyomo.environ as pyo
 
 from assume.common.base import SupportsMinMax
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import SteamgenerationForecaster
 from assume.units.dsm_load_shift import DSMFlex
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
-        forecaster: Forecaster,
+        forecaster: SteamgenerationForecaster,
         components: dict[str, dict] = None,
         technology: str = "steam_generator_plant",
         objective: str = "min_variable_cost",
@@ -66,6 +66,11 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             location=location,
             **kwargs,
         )
+
+        if not isinstance(forecaster, SteamgenerationForecaster):
+            raise ValueError(
+                f"forecaster must be of type {SteamgenerationForecaster.__name__}"
+            )
 
         # Check if the required components are present in the components dictionary
         for component in self.required_technologies:
@@ -93,23 +98,18 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             storage_cfg = self.components["thermal_storage"]
             storage_type = storage_cfg.get("storage_type", "short-term")
             if storage_type == "long-term":
-                schedule_key = f"{self.id}_thermal_storage_schedule"
-                schedule_series = self.forecaster[schedule_key]
-                storage_cfg["storage_schedule_profile"] = schedule_series
+                storage_cfg["storage_schedule_profile"] = (
+                    forecaster.thermal_storage_schedule
+                )
 
         # Add price forecasts
-        self.electricity_price = self.forecaster["electricity_price"]
-        self.electricity_price_flex = self.forecaster["electricity_price_flex"]
-        if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
-            self.natural_gas_price = self.forecaster["natural_gas_price"]
-        if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
-            self.hydrogen_gas_price = self.forecaster["hydrogen_gas_price"]
+        self.electricity_price = forecaster.electricity_price
+        self.electricity_price_flex = forecaster.electricity_price_flex
         self.demand = demand
-        self.thermal_demand = self.forecaster[f"{self.id}_thermal_demand"]
-        self.congestion_signal = self.forecaster[f"{self.id}_congestion_signal"]
-        self.renewable_utilisation_signal = self.forecaster[
-            f"{node}_renewable_utilisation"
-        ]
+        self.thermal_demand = forecaster.thermal_demand
+        self.congestion_signal = forecaster.congestion_signal
+        self.renewable_utilisation_signal = forecaster.renewable_utilisation_signal
+
         self.congestion_threshold = congestion_threshold
         self.peak_load_cap = peak_load_cap
         self.objective = objective
@@ -131,14 +131,18 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
             self.model.natural_gas_price = pyo.Param(
                 self.model.time_steps,
-                initialize={t: value for t, value in enumerate(self.natural_gas_price)},
+                initialize={
+                    t: value
+                    for t, value in enumerate(self.forecaster.get_price("natural_gas"))
+                },
             )
 
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
             self.model.hydrogen_gas_price = pyo.Param(
                 self.model.time_steps,
                 initialize={
-                    t: value for t, value in enumerate(self.hydrogen_gas_price)
+                    t: value
+                    for t, value in enumerate(self.forecaster.get_price("hydrogen"))
                 },
             )
 
@@ -164,7 +168,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
 
     def initialize_process_sequence(self):
         # Per-time-step constraint (default)
-        if not self.demand or self.demand == 0:
+        if not self.forecaster.demand or self.forecaster.demand == 0:
 
             @self.model.Constraint(self.model.time_steps)
             def direct_heat_balance(m, t):
@@ -211,7 +215,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             """
             Ensures the thermal output meets the absolute demand.
             """
-            if not self.demand or self.demand == 0:
+            if not self.forecaster.demand or self.forecaster.demand == 0:
                 return pyo.Constraint.Skip
             else:
                 return (

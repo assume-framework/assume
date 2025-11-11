@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import UnitForecaster
 from assume.strategies.flexable_storage import StorageEnergyHeuristicFlexableStrategy
 from assume.units import Storage
 
@@ -16,7 +16,7 @@ from assume.units import Storage
 @pytest.fixture
 def storage_unit() -> Storage:
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    forecaster = UnitForecaster(index, availability=1, market_prices={"EOM": 50})
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
@@ -473,7 +473,7 @@ def test_initialising_invalid_storages():
         "unit_operator": "operator",
         "technology": "technology",
         "bidding_strategies": {},
-        "forecaster": NaiveForecast(index=index),
+        "forecaster": UnitForecaster(index=index),
         "max_power_charge": 0.0,
         "max_power_discharge": 0.0,
         "max_soc": 0.0,

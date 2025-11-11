@@ -119,7 +119,7 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
                 current_power_charge,
                 min_power_charge,
             )
-            price_forecast = unit.forecaster[f"price_{market_config.market_id}"]
+            price_forecast = unit.forecaster.price[market_config.market_id]
 
             # calculate average price
             average_price = calculate_price_average(
@@ -290,7 +290,7 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
-                price_forecast=unit.forecaster[f"price_{market_config.market_id}"],
+                price_forecast=unit.forecaster.price[market_config.market_id],
             )
 
             # if specific revenue is positive, bid specific_revenue

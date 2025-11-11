@@ -17,6 +17,7 @@ from assume.common.base import (
     SupportsMinMax,
     SupportsMinMaxCharge,
 )
+from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
@@ -112,23 +113,22 @@ class TorchLearningStrategy(LearningStrategy):
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
-        upper_scaling_factor_price = max(unit.forecaster[f"price_{market_id}"])
-        lower_scaling_factor_price = min(unit.forecaster[f"price_{market_id}"])
-        upper_scaling_factor_res_load = max(
-            unit.forecaster[f"residual_load_{market_id}"]
+        upper_scaling_factor_price = max(unit.forecaster.price[market_id])
+        lower_scaling_factor_price = min(unit.forecaster.price[market_id])
+        residual_load = unit.forecaster.residual_load.get(
+            market_id, FastSeries(index=unit.index, value=0)
         )
-        lower_scaling_factor_res_load = min(
-            unit.forecaster[f"residual_load_{market_id}"]
-        )
+        upper_scaling_factor_res_load = max(residual_load)
+        lower_scaling_factor_res_load = min(residual_load)
 
         self.scaled_res_load_obs = min_max_scale(
-            unit.forecaster[f"residual_load_{market_id}"],
+            residual_load,
             lower_scaling_factor_res_load,
             upper_scaling_factor_res_load,
         )
 
         self.scaled_prices_obs = min_max_scale(
-            unit.forecaster[f"price_{market_id}"],
+            unit.forecaster.price[market_id],
             lower_scaling_factor_price,
             upper_scaling_factor_price,
         )
