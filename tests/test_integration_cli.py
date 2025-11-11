@@ -37,7 +37,7 @@ def test_cli():
 @pytest.mark.slow
 @pytest.mark.require_network
 def test_cli_network():
-    args = "-s example_01d -c base -db sqlite:///./examples/local_db/test_mini.db"
+    args = "-s example_01d -c base -db sqlite:///./examples/local_db/test_mini_net.db"
     cli(args.split(" "))
 
 
