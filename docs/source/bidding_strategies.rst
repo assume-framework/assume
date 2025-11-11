@@ -79,32 +79,36 @@ Naive
 -------------
 Naive strategies
 
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
-| bidding_strategy_id                  | For Market Types | Description                                                                                                      |
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
-| powerplant_energy_naive              | EOM, CRM_pos,    | The basic bidding strategy formulated for participating in a merit order market at a single timepoint (hour). It |
-|                                      | CRM_neg          | uses marginal cost for its bid price and the maximum possible power output (given ramping constraints) as its    |
-|                                      |                  | volume.                                                                                                          |
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
-| demand_energy_naive                  | EOM, CRM_pos,    | The basic bidding strategy for demand units in a merit order market. A demand unit can realise a                 |
-|                                      | CRM_neg          | "price-inelastic" bid by setting the bid price very high and volume equal to demand at the timepoint.           |
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
-| powerplant_energy_naive_otc          | OTC              | Similar to ``powerplant_energy_naive`` but for OTC (bilateral) trades.                                           |
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
-| demand_energy_naive_otc              | OTC              | Similar to ``demand_energy_naive`` but for OTC (bilateral) trades.                                               |
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
-| powerplant_energy_naive_profile      | EOM, CRM_pos,    | Similar to ``powerplant_energy_naive`` but as a 24-hour block bid (Day-Ahead). Bid price is set to the marginal  |
-|                                      | CRM_neg          | cost at the starting timepoint.                                                                                  |
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
-| powerplant_energy_naive_redispatch   | redispatch       | Submits unit information and currently dispatched power for the following hours to the redispatch market        |
-|                                      |                  | (includes marginal cost, ramping, and dispatch).                                                                 |
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
-| demand_energy_naive_redispatch       | redispatch       | Naive DSM strategy for industry/household units; bids available flexibility on redispatch. Volume equals         |
-|                                      |                  | flexible power at product start; price equals marginal cost at product start.                                    |
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
-| exchange_energy_naive                | EOM              | Incorporates cross-border trading: submits export (negative volume) and import bids. Exports are treated as      |
-|                                      |                  | demand with a very high bid price; imports as supply with a very low bid price to virtually guarantee acceptance.|
-+--------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+.. list-table::
+    :header-rows: 1
+
+    * - bidding_strategy_id
+      - For Market Types
+      - Description
+    * - powerplant_energy_naive
+      - EOM, CRM_pos, CRM_neg
+      - Basic merit-order strategy for a single hour. Uses marginal cost as bid price and offers the maximum feasible power (respecting ramping constraints) as bid volume.
+    * - demand_energy_naive
+      - EOM, CRM_pos, CRM_neg
+      - Naive demand strategy. Can represent price-inelastic demand by using a very high bid price and a volume equal to the demand at the timepoint.
+    * - powerplant_energy_naive_otc
+      - OTC
+      - OTC variant of powerplant_energy_naive for bilateral trades with similar pricing and volume rules.
+    * - demand_energy_naive_otc
+      - OTC
+      - OTC variant of demand_energy_naive for bilateral trades.
+    * - powerplant_energy_naive_profile
+      - EOM, CRM_pos, CRM_neg
+      - Day-ahead / 24-hour block variant. Submits a block bid (e.g., 24 hours) and sets the block's bid price from the marginal cost at the block start.
+    * - powerplant_energy_naive_redispatch
+      - redispatch
+      - Submits current unit status and upcoming dispatched power to the redispatch market, including marginal cost, ramping, and dispatch info.
+    * - demand_energy_naive_redispatch
+      - redispatch
+      - Naive DSM redispatch strategy for industry/household units. Bids available flexibility at product start with volume = flexible power and price = marginal cost at product start.
+    * - exchange_energy_naive
+      - EOM
+      - Cross-border/native exchange strategy. Submits export (negative volume) and import bids; exports treated like demand with a high price, imports like supply with a very low price to ensure acceptance.
 
 Naive method API references:
 
