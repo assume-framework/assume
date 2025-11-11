@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from assume import MarketConfig, World
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import PowerplantForecaster
 
 from .config import (
     agent_address,
@@ -26,7 +26,9 @@ async def create_worker(
         market_config.addr = market_operator_addr
         world.markets[f"{market_config.market_id}"] = market_config
 
-    nuclear_forecast = NaiveForecast(index, availability=1, fuel_price=3, co2_price=0.1)
+    nuclear_forecast = PowerplantForecaster(
+        index, availability=1, fuel_prices={"others": 3, "co2": 0.1}
+    )
     for m in range(m_agents):
         world.add_unit_operator(f"my_operator{i} {m}")
         world.add_unit(

@@ -1,9 +1,9 @@
 name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,heat_extraction,max_heat_extraction,unit_operator
-Wind Onshore,wind_onshore,flexable_eom,-,-,renewable,0,53190,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
-Wind Offshore,wind_offshore,flexable_eom,-,-,renewable,0,7560,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
-Solar,solar,flexable_eom,-,-,renewable,0,48860,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
-Hydro,hydro,flexable_eom,-,-,renewable,0,4940,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
-Biomass,biomass,flexable_eom,-,-,renewable,0,8340,0,1,,,0,0,0,0,0,0,0,0,renewables_operator
+Wind Onshore,wind_onshore,flexable_eom,-,-,renewable,0,53190,0,1,,,0,0,0,0,1,1,0,0,renewables_operator
+Wind Offshore,wind_offshore,flexable_eom,-,-,renewable,0,7560,0,1,,,0,0,0,0,1,1,0,0,renewables_operator
+Solar,solar,flexable_eom,-,-,renewable,0,48860,0,1,,,0,0,0,0,1,1,0,0,renewables_operator
+Hydro,hydro,flexable_eom,-,-,renewable,0,4940,0,1,,,0,0,0,0,1,1,0,0,renewables_operator
+Biomass,biomass,flexable_eom,-,-,renewable,0,8340,0,1,,,0,0,0,0,1,1,0,0,renewables_operator
 KKW ISAR 2,nuclear,flexable_eom,flexable_pos_crm,flexable_neg_crm,uranium,0,1485,590,0.33,890,890,10.3,140,140,140,72,10,no,0,UNIPER
 KKW BROKDORF,nuclear,flexable_eom,flexable_pos_crm,flexable_neg_crm,uranium,0,1480,590,0.33,890,890,10.3,140,140,140,72,10,no,0,UNIPER
 KKW PHILIPPSBURG 2,nuclear,flexable_eom,flexable_pos_crm,flexable_neg_crm,uranium,0,1468,590,0.33,880,880,10.3,140,140,140,72,10,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
@@ -196,68 +196,68 @@ KWK ANLAGE NEUSTADT,combined cycle gas turbine,flexable_eom,flexable_pos_crm,fle
 HKW SCHWERIN LANKOW,combined cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,24,10,0.471,20,20,3.5,24.1,34.2,46.7,5,3,yes,0,STADTWERKE SCHWERIN
 KWK ANLAGE MOHN MEDIA GÜTERSLOH,combined cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,22,9,0.45,19,19,3.5,24.1,34.2,46.7,5,3,yes,0,MOHN MEDIA
 HKW HBB RAUBLING,combined cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,21,9,0.46,18,18,3.5,24.1,34.2,46.7,5,3,yes,0,ROMAN BAUERNFEIND PAPIERFABRIK
-KW STAUDINGER 4,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,622,160,0.317,622,622,5.5,17.1,21.8,29.6,0,0,no,0,UNIPER
-NUERNBERG FRANKEN 1,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,440,110,0.363,440,440,5.5,17.1,21.8,29.6,0,0,no,0,UNIPER
-IRSCHING 3,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,440,110,0.308,440,440,5.5,17.1,21.8,29.6,0,0,no,25,UNIPER
-KW HUNTORF CAES GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,321,90,0.31,321,321,5.5,17.1,21.8,29.6,0,0,no,0,UNIPER
-KW DUISBURG HUCKINGEN BLOCK A,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,303,80,0.363,303,303,5.5,17.1,21.8,29.6,0,0,yes,34,STADTWERKE DUISBURG AG
-KW DUISBURG HUCKINGEN BLOCK B,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,303,80,0.363,303,303,5.5,17.1,21.8,29.6,0,0,yes,34,STADTWERKE DUISBURG AG
-KW WEISWEILER VGT BLOCK G,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,272,70,0.377,272,272,5.5,17.1,21.8,29.6,0,0,no,0,RWE POWER AG
-KW WEISWEILER VGT BLOCK H,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,272,70,0.377,272,272,5.5,17.1,21.8,29.6,0,0,no,0,RWE POWER AG
-DKW BGH O1 BURGHAUSEN WACKER CHEMIE,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,178,50,0.36,178,178,5.5,17.1,21.8,29.6,0,0,yes,350,WACKER-CHEMIE GMBH
-KW MITTELSBUEREN BLOCK 4,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,150,40,0.374,150,150,5.5,17.1,21.8,29.6,0,0,yes,0,SWB AG
-KW BREMEN HASTEDT 14,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,150,40,0.298,150,150,5.5,17.1,21.8,29.6,0,0,yes,128,SWB AG
-LICHTERFELDE 2,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,150,40,0.298,150,150,5.5,17.1,21.8,29.6,0,0,yes,240,VATTENFALL EUROPE AG
-KW HANNOVER HERRENHAUSEN B,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,100,30,0.38,100,100,5.5,17.1,21.8,29.6,0,0,yes,280,STADTWERKE HANNOVER AG
-HKW FRANKFURT WEST GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,98,25,0.352,98,98,5.5,17.1,21.8,29.6,0,0,yes,150,MAINOVA AG
-KW MAINZ II GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,94,24,0.41,94,94,5.5,17.1,21.8,29.6,0,0,no,45,KRAFTWERK MAINZ-WIESBADEN AG
-KW MARL BLOCK 312 EVONIK,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,78,20,0.4,78,78,5.5,17.1,21.8,29.6,0,0,yes,390,EVONIK INDUSTRIES AG
-CHARLOTTENBURG GT 1,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,71,18,0.308,71,71,5.5,17.1,21.8,29.6,0,0,yes,100,VATTENFALL EUROPE AG
-CHARLOTTENBURG GT 2,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,71,18,0.308,71,71,5.5,17.1,21.8,29.6,0,0,yes,100,VATTENFALL EUROPE AG
-HKW CHEMNITZ NORD II BLOCK A,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,67,17,0.335,67,67,5.5,17.1,21.8,29.6,0,0,yes,0,EINS ENERGIE IN SACHSEN GMBH
-INDUSTRIEKRAFTWERK BERNBURG (IKB),open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,66,17,0.36,66,66,5.5,17.1,21.8,29.6,0,0,yes,215,SOLVAY SA
-ALTBACH II GT E,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,65,17,0.361,65,65,5.5,17.1,21.8,29.6,0,0,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
-KW OBERNBURG GT1,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,64,16,0.36,64,64,5.5,17.1,21.8,29.6,0,0,yes,112,AKZO NOBEL FIBERS BV
-GTKW BIELEFELD UMMELN,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,60,15,0.31,60,60,5.5,17.1,21.8,29.6,0,0,no,0,STADTWERKE BIELEFELD GMBH
-CHARLOTTENBURG GT 3,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,60,15,0.308,60,60,5.5,17.1,21.8,29.6,0,0,yes,100,VATTENFALL EUROPE AG
-KW LANDESBERGEN GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,56,14,0.345,56,56,5.5,17.1,21.8,29.6,0,0,no,0,STATKRAFT AS
-GERSTEINWERK BLOCK I GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,55,14,0.308,55,55,5.5,17.1,21.8,29.6,0,0,no,0,RWE POWER AG
-KW ZIELITZ,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,52,13,0.41,52,52,5.5,17.1,21.8,29.6,0,0,no,0,K+S AG
-KW EMDEN BLOCK 4 GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,50,13,0.308,50,50,5.5,17.1,21.8,29.6,0,0,no,0,STATKRAFT AS
-IKW GENDORF INFRASERV,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,49,13,0.369,49,49,5.5,9.3,9.3,9.3,0,0,no,0,INFRASERV
-GTKW DARMSTADT GT 1,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,47,12,0.396,47,47,5.5,9.3,9.3,9.3,0,0,no,0,ENTEGA AG
-GTKW DARMSTADT GT 2,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,47,12,0.396,47,47,5.5,9.3,9.3,9.3,0,0,no,0,ENTEGA AG
-UPM SCHONGAU,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,45,12,0.308,45,45,5.5,9.3,9.3,9.3,0,0,no,0,UPM OYJ
-WOLFEN ENVIA,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,40,10,0.361,40,40,5.5,9.3,9.3,9.3,0,0,no,0,ENVIA MITTELDEUTSCHE ENERGIE
-HKW DUISBURG WANHEIM IIIA,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,40,10,0.36,40,40,5.5,9.3,9.3,9.3,0,0,no,0,STADTWERKE DUISBURG AG
-KW LEUNA GT 3,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.36,38,38,5.5,9.3,9.3,9.3,0,0,no,0,STEAG GMBH
-AHRENSFELDE GT D,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.353,38,38,5.5,9.3,9.3,9.3,0,0,no,0,VATTENFALL EUROPE AG
-AHRENSFELDE GT A,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.344,38,38,5.5,9.3,9.3,9.3,0,0,no,0,VATTENFALL EUROPE AG
-AHRENSFELDE GT B,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.344,38,38,5.5,9.3,9.3,9.3,0,0,no,0,VATTENFALL EUROPE AG
-THYROW GT E,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.344,38,38,5.5,9.3,9.3,9.3,0,0,no,0,VATTENFALL EUROPE AG
-AHRENSFELDE GT C,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.343,38,38,5.5,9.3,9.3,9.3,0,0,no,0,VATTENFALL EUROPE AG
-INGOLSTADT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,400,100,0.308,400,400,5.5,20.7,35.8,45.1,0,0,no,0,UNIPER
-INGOLSTADT 4,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,400,100,0.308,400,400,5.5,20.7,35.8,45.1,0,0,no,0,UNIPER
-MARBACH 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,275,70,0.308,275,275,5.5,20.7,35.8,45.1,0,0,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
-LICHTERFELDE 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,150,40,0.298,150,150,5.5,20.7,35.8,45.1,0,0,no,0,VATTENFALL EUROPE AG
-WALHEIM GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,120,30,0.326,120,120,5.5,20.7,35.8,45.1,0,0,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
-BARMEN II,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,111,30,0.339,111,111,5.5,20.7,35.8,45.1,0,0,no,0,WSW - WUPPERTALER STADTWERKE AG
-WILMERSDORF GT 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,110,30,0.307,110,110,5.5,20.7,35.8,45.1,0,0,no,0,VATTENFALL EUROPE AG
-WILMERSDORF GT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,110,30,0.307,110,110,5.5,20.7,35.8,45.1,0,0,no,0,VATTENFALL EUROPE AG
-WERDOHL ELVERLINGSEN 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,107,30,0.307,107,107,5.5,20.7,35.8,45.1,0,0,no,0,ENERVIE - SUEDWESTFALEN ENERGIE
-WERDOHL ELVERLINGSEN 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,98,25,0.308,98,98,5.5,20.7,35.8,45.1,0,0,no,0,ENERVIE - SUEDWESTFALEN ENERGIE
-ALTBACH I GT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,97,25,0.298,97,97,5.5,20.7,35.8,45.1,0,0,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
-MITTELSBUEREN GT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,88,22,0.308,88,88,5.5,20.7,35.8,45.1,0,0,no,0,SWB AG
-FLINGERN GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,77,20,0.298,77,77,5.5,20.7,35.8,45.1,0,0,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
-ALTBACH I GT 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,75,19,0.298,75,75,5.5,20.7,35.8,45.1,0,0,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
-MARBACH 3 GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,60,15,0.35,60,60,5.5,20.7,35.8,45.1,0,0,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
-MARIENEHE 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,60,15,0.35,60,60,5.5,20.7,35.8,45.1,0,0,no,0,UNIPER
-WILHELMSHAVEN GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,56,14,0.308,56,56,5.5,20.7,35.8,45.1,0,0,no,0,UNIPER
-NUERNBERG FRANKEN I GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,53,14,0.308,53,53,5.5,20.7,35.8,45.1,0,0,no,0,UNIPER
-WEDEL GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,51,13,0.298,51,51,5.5,20.7,35.8,45.1,0,0,no,0,VATTENFALL EUROPE AG
-WEDEL GT 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,51,13,0.298,51,51,5.5,20.7,35.8,45.1,0,0,no,0,VATTENFALL EUROPE AG
-ALTBACH I NO 5 GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,50,13,0.298,50,50,5.5,20.7,35.8,45.1,0,0,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
-PEISSENBERG 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,44,11,0.326,44,44,5.5,9.3,9.3,9.3,0,0,no,0,PEISSENBERGER KRAFTWERKS GMBH
-GROSSKAYNA GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,38,10,0.352,38,38,5.5,9.3,9.3,9.3,0,0,no,0,ENVIA MITTELDEUTSCHE ENERGIE
-GROSSKAYNA GT 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,38,10,0.352,38,38,5.5,9.3,9.3,9.3,0,0,no,0,ENVIA MITTELDEUTSCHE ENERGIE
-GROSSKAYNA GT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,38,10,0.352,38,38,5.5,9.3,9.3,9.3,0,0,no,0,ENVIA MITTELDEUTSCHE ENERGIE
+KW STAUDINGER 4,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,622,160,0.317,622,622,5.5,17.1,21.8,29.6,1,1,no,0,UNIPER
+NUERNBERG FRANKEN 1,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,440,110,0.363,440,440,5.5,17.1,21.8,29.6,1,1,no,0,UNIPER
+IRSCHING 3,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,440,110,0.308,440,440,5.5,17.1,21.8,29.6,1,1,no,25,UNIPER
+KW HUNTORF CAES GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,321,90,0.31,321,321,5.5,17.1,21.8,29.6,1,1,no,0,UNIPER
+KW DUISBURG HUCKINGEN BLOCK A,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,303,80,0.363,303,303,5.5,17.1,21.8,29.6,1,1,yes,34,STADTWERKE DUISBURG AG
+KW DUISBURG HUCKINGEN BLOCK B,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,303,80,0.363,303,303,5.5,17.1,21.8,29.6,1,1,yes,34,STADTWERKE DUISBURG AG
+KW WEISWEILER VGT BLOCK G,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,272,70,0.377,272,272,5.5,17.1,21.8,29.6,1,1,no,0,RWE POWER AG
+KW WEISWEILER VGT BLOCK H,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,272,70,0.377,272,272,5.5,17.1,21.8,29.6,1,1,no,0,RWE POWER AG
+DKW BGH O1 BURGHAUSEN WACKER CHEMIE,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,178,50,0.36,178,178,5.5,17.1,21.8,29.6,1,1,yes,350,WACKER-CHEMIE GMBH
+KW MITTELSBUEREN BLOCK 4,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,150,40,0.374,150,150,5.5,17.1,21.8,29.6,1,1,yes,0,SWB AG
+KW BREMEN HASTEDT 14,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,150,40,0.298,150,150,5.5,17.1,21.8,29.6,1,1,yes,128,SWB AG
+LICHTERFELDE 2,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,150,40,0.298,150,150,5.5,17.1,21.8,29.6,1,1,yes,240,VATTENFALL EUROPE AG
+KW HANNOVER HERRENHAUSEN B,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,100,30,0.38,100,100,5.5,17.1,21.8,29.6,1,1,yes,280,STADTWERKE HANNOVER AG
+HKW FRANKFURT WEST GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,98,25,0.352,98,98,5.5,17.1,21.8,29.6,1,1,yes,150,MAINOVA AG
+KW MAINZ II GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,94,24,0.41,94,94,5.5,17.1,21.8,29.6,1,1,no,45,KRAFTWERK MAINZ-WIESBADEN AG
+KW MARL BLOCK 312 EVONIK,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,78,20,0.4,78,78,5.5,17.1,21.8,29.6,1,1,yes,390,EVONIK INDUSTRIES AG
+CHARLOTTENBURG GT 1,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,71,18,0.308,71,71,5.5,17.1,21.8,29.6,1,1,yes,100,VATTENFALL EUROPE AG
+CHARLOTTENBURG GT 2,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,71,18,0.308,71,71,5.5,17.1,21.8,29.6,1,1,yes,100,VATTENFALL EUROPE AG
+HKW CHEMNITZ NORD II BLOCK A,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,67,17,0.335,67,67,5.5,17.1,21.8,29.6,1,1,yes,0,EINS ENERGIE IN SACHSEN GMBH
+INDUSTRIEKRAFTWERK BERNBURG (IKB),open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,66,17,0.36,66,66,5.5,17.1,21.8,29.6,1,1,yes,215,SOLVAY SA
+ALTBACH II GT E,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,65,17,0.361,65,65,5.5,17.1,21.8,29.6,1,1,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+KW OBERNBURG GT1,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,64,16,0.36,64,64,5.5,17.1,21.8,29.6,1,1,yes,112,AKZO NOBEL FIBERS BV
+GTKW BIELEFELD UMMELN,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,60,15,0.31,60,60,5.5,17.1,21.8,29.6,1,1,no,0,STADTWERKE BIELEFELD GMBH
+CHARLOTTENBURG GT 3,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,60,15,0.308,60,60,5.5,17.1,21.8,29.6,1,1,yes,100,VATTENFALL EUROPE AG
+KW LANDESBERGEN GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,56,14,0.345,56,56,5.5,17.1,21.8,29.6,1,1,no,0,STATKRAFT AS
+GERSTEINWERK BLOCK I GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,55,14,0.308,55,55,5.5,17.1,21.8,29.6,1,1,no,0,RWE POWER AG
+KW ZIELITZ,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,52,13,0.41,52,52,5.5,17.1,21.8,29.6,1,1,no,0,K+S AG
+KW EMDEN BLOCK 4 GT,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,50,13,0.308,50,50,5.5,17.1,21.8,29.6,1,1,no,0,STATKRAFT AS
+IKW GENDORF INFRASERV,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,49,13,0.369,49,49,5.5,9.3,9.3,9.3,1,1,no,0,INFRASERV
+GTKW DARMSTADT GT 1,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,47,12,0.396,47,47,5.5,9.3,9.3,9.3,1,1,no,0,ENTEGA AG
+GTKW DARMSTADT GT 2,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,47,12,0.396,47,47,5.5,9.3,9.3,9.3,1,1,no,0,ENTEGA AG
+UPM SCHONGAU,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,45,12,0.308,45,45,5.5,9.3,9.3,9.3,1,1,no,0,UPM OYJ
+WOLFEN ENVIA,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,40,10,0.361,40,40,5.5,9.3,9.3,9.3,1,1,no,0,ENVIA MITTELDEUTSCHE ENERGIE
+HKW DUISBURG WANHEIM IIIA,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,40,10,0.36,40,40,5.5,9.3,9.3,9.3,1,1,no,0,STADTWERKE DUISBURG AG
+KW LEUNA GT 3,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.36,38,38,5.5,9.3,9.3,9.3,1,1,no,0,STEAG GMBH
+AHRENSFELDE GT D,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.353,38,38,5.5,9.3,9.3,9.3,1,1,no,0,VATTENFALL EUROPE AG
+AHRENSFELDE GT A,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.344,38,38,5.5,9.3,9.3,9.3,1,1,no,0,VATTENFALL EUROPE AG
+AHRENSFELDE GT B,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.344,38,38,5.5,9.3,9.3,9.3,1,1,no,0,VATTENFALL EUROPE AG
+THYROW GT E,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.344,38,38,5.5,9.3,9.3,9.3,1,1,no,0,VATTENFALL EUROPE AG
+AHRENSFELDE GT C,open cycle gas turbine,flexable_eom,flexable_pos_crm,flexable_neg_crm,natural gas,0.201,38,10,0.343,38,38,5.5,9.3,9.3,9.3,1,1,no,0,VATTENFALL EUROPE AG
+INGOLSTADT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,400,100,0.308,400,400,5.5,20.7,35.8,45.1,1,1,no,0,UNIPER
+INGOLSTADT 4,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,400,100,0.308,400,400,5.5,20.7,35.8,45.1,1,1,no,0,UNIPER
+MARBACH 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,275,70,0.308,275,275,5.5,20.7,35.8,45.1,1,1,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+LICHTERFELDE 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,150,40,0.298,150,150,5.5,20.7,35.8,45.1,1,1,no,0,VATTENFALL EUROPE AG
+WALHEIM GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,120,30,0.326,120,120,5.5,20.7,35.8,45.1,1,1,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+BARMEN II,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,111,30,0.339,111,111,5.5,20.7,35.8,45.1,1,1,no,0,WSW - WUPPERTALER STADTWERKE AG
+WILMERSDORF GT 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,110,30,0.307,110,110,5.5,20.7,35.8,45.1,1,1,no,0,VATTENFALL EUROPE AG
+WILMERSDORF GT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,110,30,0.307,110,110,5.5,20.7,35.8,45.1,1,1,no,0,VATTENFALL EUROPE AG
+WERDOHL ELVERLINGSEN 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,107,30,0.307,107,107,5.5,20.7,35.8,45.1,1,1,no,0,ENERVIE - SUEDWESTFALEN ENERGIE
+WERDOHL ELVERLINGSEN 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,98,25,0.308,98,98,5.5,20.7,35.8,45.1,1,1,no,0,ENERVIE - SUEDWESTFALEN ENERGIE
+ALTBACH I GT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,97,25,0.298,97,97,5.5,20.7,35.8,45.1,1,1,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+MITTELSBUEREN GT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,88,22,0.308,88,88,5.5,20.7,35.8,45.1,1,1,no,0,SWB AG
+FLINGERN GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,77,20,0.298,77,77,5.5,20.7,35.8,45.1,1,1,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+ALTBACH I GT 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,75,19,0.298,75,75,5.5,20.7,35.8,45.1,1,1,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+MARBACH 3 GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,60,15,0.35,60,60,5.5,20.7,35.8,45.1,1,1,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+MARIENEHE 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,60,15,0.35,60,60,5.5,20.7,35.8,45.1,1,1,no,0,UNIPER
+WILHELMSHAVEN GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,56,14,0.308,56,56,5.5,20.7,35.8,45.1,1,1,no,0,UNIPER
+NUERNBERG FRANKEN I GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,53,14,0.308,53,53,5.5,20.7,35.8,45.1,1,1,no,0,UNIPER
+WEDEL GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,51,13,0.298,51,51,5.5,20.7,35.8,45.1,1,1,no,0,VATTENFALL EUROPE AG
+WEDEL GT 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,51,13,0.298,51,51,5.5,20.7,35.8,45.1,1,1,no,0,VATTENFALL EUROPE AG
+ALTBACH I NO 5 GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,50,13,0.298,50,50,5.5,20.7,35.8,45.1,1,1,no,0,ENBW ENERGIE BADEN-WURTTEMBERG
+PEISSENBERG 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,44,11,0.326,44,44,5.5,9.3,9.3,9.3,1,1,no,0,PEISSENBERGER KRAFTWERKS GMBH
+GROSSKAYNA GT 1,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,38,10,0.352,38,38,5.5,9.3,9.3,9.3,1,1,no,0,ENVIA MITTELDEUTSCHE ENERGIE
+GROSSKAYNA GT 2,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,38,10,0.352,38,38,5.5,9.3,9.3,9.3,1,1,no,0,ENVIA MITTELDEUTSCHE ENERGIE
+GROSSKAYNA GT 3,oil,flexable_eom,flexable_pos_crm,flexable_neg_crm,oil,0.776,38,10,0.352,38,38,5.5,9.3,9.3,9.3,1,1,no,0,ENVIA MITTELDEUTSCHE ENERGIE

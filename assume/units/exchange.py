@@ -4,7 +4,7 @@
 
 
 from assume.common.base import BaseUnit
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import ExchangeForecaster
 
 
 class Exchange(BaseUnit):
@@ -30,7 +30,7 @@ class Exchange(BaseUnit):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
-        forecaster: Forecaster,
+        forecaster: ExchangeForecaster,
         node: str = "node0",
         price_import: float = 0.0,
         price_export: float = 2999.0,
@@ -48,12 +48,15 @@ class Exchange(BaseUnit):
             **kwargs,
         )
 
-        self.volume_import = abs(
-            self.forecaster[f"{self.id}_import"]
-        )  # import is positive
-        self.volume_export = -abs(
-            self.forecaster[f"{self.id}_export"]
-        )  # export is negative
+        if not isinstance(forecaster, ExchangeForecaster):
+            raise ValueError(
+                f"forecaster must be of type {ExchangeForecaster.__name__}"
+            )
+
+        # import is positive
+        self.volume_import = abs(forecaster.volume_import)
+        # export is negative
+        self.volume_export = -abs(forecaster.volume_export)
 
         self.price_import = price_import
         self.price_export = price_export
