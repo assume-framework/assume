@@ -531,23 +531,23 @@ class World:
                 )
 
             if strategy not in strategy_instances:
-                # Create and cache the strategy instance if not already created
-                strategy_instances[strategy] = self.bidding_strategies[strategy](
-                    unit_id=unit_id,
-                    **bidding_params,
-                )
-
-            # check if created cache has learning_strategy
-            if (
-                isinstance(strategy_instances[strategy], LearningStrategy)
-                and self.learning_mode
-            ):
-                # add learning role to the strategy to have access to store training data etc
-                strategy_instances[strategy] = self.bidding_strategies[strategy](
-                    unit_id=unit_id,
-                    learning_role=self.learning_role,
-                    **bidding_params,
-                )
+                # check if created cache has learning_strategy
+                if (
+                    issubclass(self.bidding_strategies[strategy], LearningStrategy)
+                    and self.learning_mode
+                ):
+                    # add learning role to the strategy to have access to store training data etc
+                    strategy_instances[strategy] = self.bidding_strategies[strategy](
+                        unit_id=unit_id,
+                        learning_role=self.learning_role,
+                        **bidding_params,
+                    )
+                else:
+                    # Create and cache the strategy instance if not already created
+                    strategy_instances[strategy] = self.bidding_strategies[strategy](
+                        unit_id=unit_id,
+                        **bidding_params,
+                    )
 
             # Use the cached instance for this market
             bidding_strategies[market_id] = strategy_instances[strategy]
