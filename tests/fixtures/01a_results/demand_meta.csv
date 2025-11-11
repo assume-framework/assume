@@ -1,0 +1,2 @@
+index,max_power,min_power,node,simulation,technology,unit_operator
+demand_EOM,-1000000,0,node0,example_01a_tiny,inflex_demand,eom_de
