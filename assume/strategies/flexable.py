@@ -11,7 +11,7 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index, parse_duration
 
 
-class flexableEOM(MinMaxStrategy):
+class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
     """
     A strategy that bids on the EOM-market.
 
@@ -357,7 +357,7 @@ class flexablePosCRM(MinMaxStrategy):
         return bids
 
 
-class flexableNegCRM(MinMaxStrategy):
+class CapacityHeuristicBalancingStrategy(MinMaxStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 

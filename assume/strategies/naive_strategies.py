@@ -7,7 +7,7 @@ from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
 
-class NaiveSingleBidStrategy(MinMaxStrategy):
+class EnergyNaiveStrategy(MinMaxStrategy):
     """
     A naive strategy that bids the marginal cost of the unit on the market.
 
@@ -87,7 +87,7 @@ class NaiveSingleBidStrategy(MinMaxStrategy):
             return self.remove_empty_bids(bids)
 
 
-class NaiveProfileStrategy(MinMaxStrategy):
+class EnergyNaiveProfileStrategy(MinMaxStrategy):
     """
     A naive strategy that bids the marginal cost of the unit as block bids over 24 hours on the day ahead market.
     """
@@ -143,7 +143,7 @@ class NaiveProfileStrategy(MinMaxStrategy):
         return bids
 
 
-class NaiveDADSMStrategy(MinMaxStrategy):
+class DsmEnergyOptimizationStrategy(MinMaxStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit. The bid volume is the optimal power requirement of
     the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
@@ -197,7 +197,7 @@ class NaiveDADSMStrategy(MinMaxStrategy):
         return bids
 
 
-class NaiveRedispatchDSMStrategy(MinMaxStrategy):
+class DsmEnergyNaiveRedispatchStrategy(MinMaxStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of the unit on the redispatch market.
     The bid volume is the flexible power requirement of the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
@@ -235,7 +235,7 @@ class NaiveRedispatchDSMStrategy(MinMaxStrategy):
         return bids
 
 
-class NaiveRedispatchStrategy(MinMaxStrategy):
+class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
     """
     A naive strategy that simply submits all information about the unit and
     currently dispatched power for the following hours to the redispatch market.
@@ -295,7 +295,7 @@ class NaiveRedispatchStrategy(MinMaxStrategy):
         return bids
 
 
-class NaiveExchangeStrategy(MinMaxStrategy):
+class ExchangeEnergyNaiveStrategy(MinMaxStrategy):
     """
     A naive strategy for an exchange unit that bids the defined import and export prices on the market.
     It submits two bids, one for import and one for export, with the respective prices and volumes.
@@ -362,7 +362,7 @@ class NaiveExchangeStrategy(MinMaxStrategy):
         return bids
 
 
-class ElasticDemandStrategy(MinMaxStrategy):
+class EnergyHeuristicElasticStrategy(MinMaxStrategy):
     """
     A bidding strategy for a demand unit that submits multiple bids to approximate
     a marginal utility curve, based on linear or isoelastic demand theory.
@@ -517,7 +517,7 @@ class ElasticDemandStrategy(MinMaxStrategy):
         return volume
 
 
-class DSM_PosCRM_Strategy(MinMaxStrategy):
+class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
     """
     Strategy for Positive CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """
@@ -555,7 +555,7 @@ class DSM_PosCRM_Strategy(MinMaxStrategy):
         return self.remove_empty_bids(bids)
 
 
-class DSM_NegCRM_Strategy(MinMaxStrategy):
+class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
     """
     Strategy for Negative CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """

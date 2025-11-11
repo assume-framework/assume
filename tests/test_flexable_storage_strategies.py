@@ -11,9 +11,9 @@ import pytest
 
 from assume.common.forecasts import NaiveForecast
 from assume.strategies import (
-    flexableEOMStorage,
-    flexableNegCRMStorage,
-    flexablePosCRMStorage,
+    StorageEnergyHeuristicFlexableStrategy,
+    StorageCapacityHeuristicBalancingNegStrategy,
+    StorageCapacityHeuristicBalancingPosStrategy,
 )
 from assume.units import Storage
 
@@ -49,7 +49,7 @@ def test_flexable_eom_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 1)
-    strategy = flexableEOMStorage()
+    strategy = StorageEnergyHeuristicFlexableStrategy()
     mc = mock_market_config
     product_tuples = [(start, end, None)]
 
@@ -161,7 +161,7 @@ def test_flexable_pos_crm_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 4, 0, 0)
-    strategy = flexablePosCRMStorage()
+    strategy = StorageCapacityHeuristicBalancingPosStrategy()
     mc = mock_market_config
     mc.product_type = "energy_pos"
     product_tuples = [(start, end, None)]
@@ -202,7 +202,7 @@ def test_flexable_neg_crm_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)
     end = datetime(2023, 7, 1, 4, 0, 0)
-    strategy = flexableNegCRMStorage()
+    strategy = StorageCapacityHeuristicBalancingNegStrategy()
     mc = mock_market_config
     # Calculations for negative energy
     mc.product_type = "energy_neg"

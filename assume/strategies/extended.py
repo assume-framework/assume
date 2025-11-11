@@ -6,10 +6,10 @@ import dateutil.rrule as rr
 
 from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.strategies.naive_strategies import NaiveSingleBidStrategy
+from assume.strategies.naive_strategies import EnergyNaiveStrategy
 
 
-class OTCStrategy(MinMaxStrategy):
+class EnergyNaiveOtcStrategy(MinMaxStrategy):
     """
     Strategy for OTC (over the counter trading) markets
     """
@@ -78,7 +78,7 @@ def is_co2emissionless(units):
     return all([requirement(info["technology"]) for info in units])
 
 
-class SupportStrategy(NaiveSingleBidStrategy):
+class SupportStrategy(EnergyNaiveStrategy):
     """
     Strategy for support markets.
     A list of allowed `contract_types` is given, as well as a value which is used to bid contracts.

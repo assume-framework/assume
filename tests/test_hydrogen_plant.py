@@ -8,7 +8,7 @@ import pytest
 
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import NaiveForecast
-from assume.strategies.naive_strategies import NaiveDADSMStrategy
+from assume.strategies.naive_strategies import DsmEnergyOptimizationStrategy
 from assume.units.hydrogen_plant import HydrogenPlant
 
 
@@ -48,7 +48,7 @@ def hydrogen_plant(hydrogen_components) -> HydrogenPlant:
         price_EOM=[60] * 24,
         hydrogen_demand=[400 / 24.0] * 24,  # Uniform per-step demand summing to 400
     )
-    bidding_strategy = {"EOM": NaiveDADSMStrategy()}
+    bidding_strategy = {"EOM": DsmEnergyOptimizationStrategy()}
     return HydrogenPlant(
         id="test_hydrogen_plant",
         unit_operator="test_operator",
@@ -220,7 +220,7 @@ def test_unknown_technology_error():
             unit_operator="test_operator",
             objective="min_variable_cost",
             flexibility_measure="cost_based_load_shift",
-            bidding_strategies={"EOM": NaiveDADSMStrategy()},
+            bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
             components=hydrogen_components,
             forecaster=NaiveForecast(
                 index=pd.date_range("2023-01-01", periods=24, freq="h"),
@@ -253,7 +253,7 @@ def hydrogen_plant_no_storage(hydrogen_components_no_storage) -> HydrogenPlant:
         price_EOM=[60] * 24,
         hydrogen_demand=[800 / 24.0] * 24,  # Uniform demand, no storage
     )
-    bidding_strategy = {"EOM": NaiveDADSMStrategy()}
+    bidding_strategy = {"EOM": DsmEnergyOptimizationStrategy()}
     return HydrogenPlant(
         id="test_hydrogen_plant_no_storage",
         unit_operator="test_operator",

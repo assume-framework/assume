@@ -3,109 +3,109 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from assume.common.base import BaseStrategy, LearningStrategy
-from assume.strategies.advanced_orders import flexableEOMBlock, flexableEOMLinked
-from assume.strategies.extended import OTCStrategy
-from assume.strategies.flexable import flexableEOM, flexableNegCRM, flexablePosCRM
+from assume.strategies.advanced_orders import EnergyHeuristicFlexableBlockStrategy, EnergyHeuristicFlexableLinkedStrategy
+from assume.strategies.extended import EnergyNaiveOtcStrategy
+from assume.strategies.flexable import EnergyHeuristicFlexableStrategy, CapacityHeuristicBalancingStrategy, flexablePosCRM
 from assume.strategies.flexable_storage import (
-    flexableEOMStorage,
-    flexableNegCRMStorage,
-    flexablePosCRMStorage,
+    StorageEnergyHeuristicFlexableStrategy,
+    StorageCapacityHeuristicBalancingNegStrategy,
+    StorageCapacityHeuristicBalancingPosStrategy,
 )
 from assume.strategies.naive_strategies import (
-    NaiveDADSMStrategy,
-    NaiveProfileStrategy,
-    NaiveRedispatchDSMStrategy,
-    NaiveRedispatchStrategy,
-    NaiveSingleBidStrategy,
-    NaiveExchangeStrategy,
-    ElasticDemandStrategy,
-    DSM_PosCRM_Strategy,
-    DSM_NegCRM_Strategy,
+    DsmEnergyOptimizationStrategy,
+    EnergyNaiveProfileStrategy,
+    DsmEnergyNaiveRedispatchStrategy,
+    EnergyNaiveRedispatchStrategy,
+    EnergyNaiveStrategy,
+    ExchangeEnergyNaiveStrategy,
+    EnergyHeuristicElasticStrategy,
+    CapacityHeuristicBalancingPosStrategy,
+    CapacityHeuristicBalancingNegStrategy,
 )
-from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
-from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
-from assume.strategies.dmas_storage import DmasStorageStrategy
+from assume.strategies.manual_strategies import EnergyInteractiveStrategy
+from assume.strategies.dmas_powerplant import EnergyOptimizationDmasStrategy
+from assume.strategies.dmas_storage import StorageEnergyOptimizationDmasStrategy
 from assume.strategies.portfolio_strategies import (
     UnitOperatorStrategy,
-    DirectUnitOperatorStrategy,
-    CournotPortfolioStrategy,
+    UnitsOperatorEnergyNaiveDirectStrategy,
+    UnitsOperatorEnergyHeuristicCournotStrategy,
 )
 
 bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     #TODO: REMOVE BECAUSE OF DEPRECATION ####################################
-    "naive_neg_reserve": NaiveSingleBidStrategy,
-    "naive_exchange": NaiveExchangeStrategy,
-    "naive_eom": NaiveSingleBidStrategy,
-    "elastic_demand": ElasticDemandStrategy,
-    "naive_pos_reserve": NaiveSingleBidStrategy,
-    "flexable_eom_storage": flexableEOMStorage,
-    "otc_strategy": OTCStrategy,
-    "flexable_eom": flexableEOM,
-    "flexable_eom_block": flexableEOMBlock,
-    "flexable_neg_crm": flexableNegCRM,
+    "naive_neg_reserve": EnergyNaiveStrategy,
+    "naive_exchange": ExchangeEnergyNaiveStrategy,
+    "naive_eom": EnergyNaiveStrategy,
+    "elastic_demand": EnergyHeuristicElasticStrategy,
+    "naive_pos_reserve": EnergyNaiveStrategy,
+    "flexable_eom_storage": StorageEnergyHeuristicFlexableStrategy,
+    "otc_strategy": EnergyNaiveOtcStrategy,
+    "flexable_eom": EnergyHeuristicFlexableStrategy,
+    "flexable_eom_block": EnergyHeuristicFlexableBlockStrategy,
+    "flexable_neg_crm": CapacityHeuristicBalancingStrategy,
     "flexable_pos_crm": flexablePosCRM,
-    "flexable_eom_linked": flexableEOMLinked,
-    "flexable_neg_crm_storage": flexableNegCRMStorage,
-    "flexable_pos_crm_storage": flexablePosCRMStorage,
-    "pos_crm_dsm": DSM_PosCRM_Strategy,
-    "neg_crm_dsm": DSM_NegCRM_Strategy,
-    "naive_redispatch": NaiveRedispatchStrategy,
-    "naive_da_dsm": NaiveDADSMStrategy,
-    "naive_redispatch_dsm": NaiveRedispatchDSMStrategy,
+    "flexable_eom_linked": EnergyHeuristicFlexableLinkedStrategy,
+    "flexable_neg_crm_storage": StorageCapacityHeuristicBalancingNegStrategy,
+    "flexable_pos_crm_storage": StorageCapacityHeuristicBalancingPosStrategy,
+    "pos_crm_dsm": CapacityHeuristicBalancingPosStrategy,
+    "neg_crm_dsm": CapacityHeuristicBalancingNegStrategy,
+    "naive_redispatch": EnergyNaiveRedispatchStrategy,
+    "naive_da_dsm": DsmEnergyOptimizationStrategy,
+    "naive_redispatch_dsm": DsmEnergyNaiveRedispatchStrategy,
     # END OF REMOVE ################################################################
 
 
-    "powerplant_energy_naive": NaiveSingleBidStrategy,
-    "demand_energy_naive": NaiveSingleBidStrategy,
-    "powerplant_energy_naive_balancing": NaiveSingleBidStrategy,
-    "demand_energy_naive_balancing": NaiveSingleBidStrategy,
-    "demand_energy_heuristic_elastic": ElasticDemandStrategy,
-    "exchange_energy_naive": NaiveExchangeStrategy,
-    "demand_energy_naive_otc": OTCStrategy,
-    "powerplant_energy_naive_otc": OTCStrategy,
-    "powerplant_energy_heuristic_flexable": flexableEOM,
-    "powerplant_energy_heuristic_block": flexableEOMBlock,
-    "powerplant_energy_heuristic_linked": flexableEOMLinked,
-    "powerplant_capacity_heuristic_balancing_neg": flexableNegCRM,
-    "powerplant_capacity_heuristic_balancing_pos": flexableNegCRM,
-    "storage_energy_heuristic_flexable": flexableEOMStorage,
-    "storage_capacity_heuristic_balancing_neg": flexableNegCRMStorage,
-    "storage_capacity_heuristic_balancing_pos": flexablePosCRMStorage,
-    "household_capacity_heuristic_balancing_pos": DSM_PosCRM_Strategy,
-    "industry_capacity_heuristic_balancing_pos": DSM_PosCRM_Strategy,
-    "household_capacity_heuristic_balancing_neg": DSM_NegCRM_Strategy,
-    "industry_capacity_heuristic_balancing_neg": DSM_NegCRM_Strategy,
-    "powerplant_energy_naive_redispatch": NaiveRedispatchStrategy,
-    "demand_energy_naive_redispatch": NaiveRedispatchStrategy,
-    "household_energy_naive": NaiveDADSMStrategy,
-    "industry_energy_naive": NaiveDADSMStrategy,
-    "household_energy_naive_redispatch": NaiveRedispatchDSMStrategy,
-    "industry_energy_naive_redispatch": NaiveRedispatchDSMStrategy,
-    "powerplant_energy_heuristic_dmas": DmasPowerplantStrategy,
-    "storage_energy_heuristic_dmas": DmasStorageStrategy,
-    "units_operator_energy_heuristic_cournot":CournotPortfolioStrategy,
-    "units_operator_energy_naive_direct":DirectUnitOperatorStrategy,
-    "powerplant_energy_naive_profile": NaiveProfileStrategy,
-    "powerplant_energy_interactive":SimpleManualTerminalStrategy,
+    "powerplant_energy_naive": EnergyNaiveStrategy,
+    "demand_energy_naive": EnergyNaiveStrategy,
+    "powerplant_energy_naive_balancing": EnergyNaiveStrategy,
+    "demand_energy_naive_balancing": EnergyNaiveStrategy,
+    "demand_energy_heuristic_elastic": EnergyHeuristicElasticStrategy,
+    "exchange_energy_naive": ExchangeEnergyNaiveStrategy,
+    "demand_energy_naive_otc": EnergyNaiveOtcStrategy,
+    "powerplant_energy_naive_otc": EnergyNaiveOtcStrategy,
+    "powerplant_energy_heuristic_flexable": EnergyHeuristicFlexableStrategy,
+    "powerplant_energy_heuristic_block": EnergyHeuristicFlexableBlockStrategy,
+    "powerplant_energy_heuristic_linked": EnergyHeuristicFlexableLinkedStrategy,
+    "powerplant_capacity_heuristic_balancing_neg": CapacityHeuristicBalancingStrategy,
+    "powerplant_capacity_heuristic_balancing_pos": CapacityHeuristicBalancingStrategy,
+    "storage_energy_heuristic_flexable": StorageEnergyHeuristicFlexableStrategy,
+    "storage_capacity_heuristic_balancing_neg": StorageCapacityHeuristicBalancingNegStrategy,
+    "storage_capacity_heuristic_balancing_pos": StorageCapacityHeuristicBalancingPosStrategy,
+    "household_capacity_heuristic_balancing_pos": CapacityHeuristicBalancingPosStrategy,
+    "industry_capacity_heuristic_balancing_pos": CapacityHeuristicBalancingPosStrategy,
+    "household_capacity_heuristic_balancing_neg": CapacityHeuristicBalancingNegStrategy,
+    "industry_capacity_heuristic_balancing_neg": CapacityHeuristicBalancingNegStrategy,
+    "powerplant_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
+    "demand_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
+    "household_energy_optimization": DsmEnergyOptimizationStrategy,
+    "industry_energy_optimization": DsmEnergyOptimizationStrategy,
+    "household_energy_naive_redispatch": DsmEnergyNaiveRedispatchStrategy,
+    "industry_energy_naive_redispatch": DsmEnergyNaiveRedispatchStrategy,
+    "powerplant_energy_optimization_dmas": EnergyOptimizationDmasStrategy,
+    "storage_energy_optimization_dmas": StorageEnergyOptimizationDmasStrategy,
+    "units_operator_energy_heuristic_cournot":UnitsOperatorEnergyHeuristicCournotStrategy,
+    "units_operator_energy_naive_direct":UnitsOperatorEnergyNaiveDirectStrategy,
+    "powerplant_energy_naive_profile": EnergyNaiveProfileStrategy,
+    "powerplant_energy_interactive":EnergyInteractiveStrategy,
 }
 
 try:
     from assume.strategies.learning_strategies import (
-        RLStrategy,
-        RLStrategySingleBid,
-        StorageRLStrategy,
-        RenewableRLStrategy,
+        EnergyLearningStrategy,
+        EnergyLearningSingleBidStrategy,
+        StorageEnergyLearningStrategy,
+        RenewableEnergyLearningSingleBidStrategy,
     )
     #TODO: REMOVE DEPRECATION###########################################
-    bidding_strategies["pp_learning"] = RLStrategy
-    bidding_strategies["storage_learning"] = StorageRLStrategy
-    bidding_strategies["renewable_eom_learning"] = RenewableRLStrategy
+    bidding_strategies["pp_learning"] = EnergyLearningStrategy
+    bidding_strategies["storage_learning"] = StorageEnergyLearningStrategy
+    bidding_strategies["renewable_eom_learning"] = RenewableEnergyLearningSingleBidStrategy
     # END OF REMOVE DEPRECATION ###########################################
 
-    bidding_strategies["powerplant_energy_learning"] = RLStrategy
-    bidding_strategies["powerplant_energy_learning_single_bid"] = RLStrategySingleBid
-    bidding_strategies["storage_energy_learning"] = StorageRLStrategy
-    bidding_strategies["renewable_energy_learning_single_bid"] = RenewableRLStrategy
+    bidding_strategies["powerplant_energy_learning"] = EnergyLearningStrategy
+    bidding_strategies["powerplant_energy_learning_single_bid"] = EnergyLearningSingleBidStrategy
+    bidding_strategies["storage_energy_learning"] = StorageEnergyLearningStrategy
+    bidding_strategies["renewable_energy_learning_single_bid"] = RenewableEnergyLearningSingleBidStrategy
 
 
 except ImportError:

@@ -11,7 +11,7 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import parse_duration
 
 
-class flexableEOMStorage(MinMaxChargeStrategy):
+class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.
 
@@ -209,7 +209,7 @@ class flexableEOMStorage(MinMaxChargeStrategy):
             unit.outputs["total_costs"].loc[start:end_excl] = costs
 
 
-class flexablePosCRMStorage(MinMaxChargeStrategy):
+class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.
 
@@ -347,7 +347,7 @@ class flexablePosCRMStorage(MinMaxChargeStrategy):
         return bids
 
 
-class flexableNegCRMStorage(MinMaxChargeStrategy):
+class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 

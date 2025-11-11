@@ -22,13 +22,13 @@ UnitOperatorStrategy
 --------------------
 
 The UnitsOperatorStrategies can be used to adjust the behavior of the UnitsOperator.
-The default is the :py:meth:`assume.strategies.portfolio_strategies.DirectUnitOperatorStrategy`.
+The default is the :py:meth:`assume.strategies.portfolio_strategies.UnitsOperatorEnergyNaiveDirectStrategy`.
 It formulates the bids to the market according to the bidding strategy of the each unit individually.
 This calls `calculate_bids`` of each unit and returns the aggregated list of all individual bids of all units.
 This is the default for all UnitsOperators which do not have a separate strategy configured.
 
-Another implementation includes the :py:meth:`assume.strategies.portfolio_strategies.CournotPortfolioStrategy` that adds a markup to the marginal cost of each unit of the units operator.
-The marginal cost is computed with NaiveSingleBidStrategy and the markup depends on the total capacity of the unit operator.
+Another implementation includes the :py:meth:`assume.strategies.portfolio_strategies.UnitsOperatorEnergyHeuristicCournotStrategy` that adds a markup to the marginal cost of each unit of the units operator.
+The marginal cost is computed with EnergyNaiveStrategy and the markup depends on the total capacity of the unit operator.
 
 UnitStrategies
 --------------
@@ -123,12 +123,12 @@ Naive
 
 Naive method API references:
 
-- :meth:`assume.strategies.naive_strategies.NaiveSingleBidStrategy`
-- :meth:`assume.strategies.naive_strategies.NaiveProfileStrategy`
-- :meth:`assume.strategies.naive_strategies.NaiveExchangeStrategy`
-- :meth:`assume.strategies.naive_strategies.NaiveRedispatchStrategy`
-- :meth:`assume.strategies.naive_strategies.NaiveDADSMStrategy`
-- :meth:`assume.strategies.naive_strategies.NaiveRedispatchDSMStrategy`
+- :meth:`assume.strategies.naive_strategies.EnergyNaiveStrategy`
+- :meth:`assume.strategies.naive_strategies.EnergyNaiveProfileStrategy`
+- :meth:`assume.strategies.naive_strategies.ExchangeEnergyNaiveStrategy`
+- :meth:`assume.strategies.naive_strategies.EnergyNaiveRedispatchStrategy`
+- :meth:`assume.strategies.naive_strategies.DsmEnergyOptimizationStrategy`
+- :meth:`assume.strategies.naive_strategies.DsmEnergyNaiveRedispatchStrategy`
 
 Standard
 -------------
@@ -185,8 +185,8 @@ DMAS
 
 DMAS method API references:
 
-- :meth:`assume.strategies.dmas_powerplant.DmasPowerplantStrategy`
-- :meth:`assume.strategies.dmas_storage.DmasStorageStrategy`
+- :meth:`assume.strategies.dmas_powerplant.EnergyOptimizationDmasStrategy`
+- :meth:`assume.strategies.dmas_storage.StorageEnergyOptimizationDmasStrategy`
 
 Learning
 -------------
@@ -226,5 +226,5 @@ Other
 
 Miscellaneous method API references:
 
-- :meth:`assume.strategies.extended.OTCStrategy`
-- :meth:`assume.strategies.manual_strategies.SimpleManualTerminalStrategy`
+- :meth:`assume.strategies.extended.EnergyNaiveOtcStrategy`
+- :meth:`assume.strategies.manual_strategies.EnergyInteractiveStrategy`

@@ -9,11 +9,11 @@ from assume.common.utils import parse_duration
 from assume.strategies.flexable import (
     calculate_EOM_price_if_off,
     calculate_EOM_price_if_on,
-    flexableEOM,
+    EnergyHeuristicFlexableStrategy,
 )
 
 
-class flexableEOMBlock(flexableEOM):
+class EnergyHeuristicFlexableBlockStrategy(EnergyHeuristicFlexableStrategy):
     """
     A strategy that bids on the EOM-market with block bids.
 
@@ -188,7 +188,7 @@ class flexableEOMBlock(flexableEOM):
         return bids
 
 
-class flexableEOMLinked(flexableEOM):
+class EnergyHeuristicFlexableLinkedStrategy(EnergyHeuristicFlexableStrategy):
     """
     A strategy that bids on the EOM-market with block and linked bids.
     """

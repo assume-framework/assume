@@ -9,7 +9,7 @@ import pytest
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecasts import CsvForecaster
 from assume.common.market_objects import MarketConfig
-from assume.strategies.naive_strategies import NaiveDADSMStrategy
+from assume.strategies.naive_strategies import DsmEnergyOptimizationStrategy
 from assume.units.building import Building
 
 
@@ -201,7 +201,7 @@ def test_building_initialization_heatpump(
     building = Building(
         id="building",
         unit_operator="operator_hp",
-        bidding_strategies={"EOM": NaiveDADSMStrategy()},
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
@@ -547,14 +547,14 @@ def test_building_bidding_strategy_execution(
     default_flexibility_measure,
 ):
     """
-    Test that the NaiveDADSMStrategy's calculate_bids method is executed correctly,
+    Test that the DsmEnergyOptimizationStrategy's calculate_bids method is executed correctly,
     and unit.determine_optimal_operation_without_flex() is called.
     """
-    # Create the Building instance with a NaiveDADSMStrategy
+    # Create the Building instance with a DsmEnergyOptimizationStrategy
     building = Building(
         id="building",
         unit_operator="operator_hp",
-        bidding_strategies={"EOM": NaiveDADSMStrategy()},
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,

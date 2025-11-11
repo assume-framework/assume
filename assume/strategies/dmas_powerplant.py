@@ -32,7 +32,7 @@ from assume.common.utils import get_supported_solver
 logger = logging.getLogger(__name__)
 
 
-class DmasPowerplantStrategy(MinMaxStrategy):
+class EnergyOptimizationDmasStrategy(MinMaxStrategy):
     def __init__(self, steps=[-10, -1, 0, 1, 10], *args, **kwargs):
         """
         Initializes the strategy

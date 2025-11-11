@@ -6,7 +6,7 @@ from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
-class SimpleManualTerminalStrategy(MinMaxStrategy):
+class EnergyInteractiveStrategy(MinMaxStrategy):
     """
     A simple strategy where the user can input the bids of an agent manually.
     Only one agent should have this strategy in a simulation in one process, so that the terminal does not wait for multiple responses.
