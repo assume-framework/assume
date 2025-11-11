@@ -135,12 +135,6 @@ class Learning(Role):
                 f"gradient_steps need to be positive, got {self.gradient_steps}"
             )
 
-        # ensure train_freq evenly divides simulation length (may adjust self.train_freq)
-        try:
-            self.sync_train_freq_with_simulation_horizon(learning_config)
-        except Exception as e:
-            logger.warning(f"Could not sync train_freq: {e}")
-
         self.batch_size = learning_config.get("batch_size", 128)
         self.gamma = learning_config.get("gamma", 0.99)
 
@@ -157,6 +151,8 @@ class Learning(Role):
 
         self.tensor_board_logger = None
         self.update_steps = None
+
+        self.sync_train_freq_with_simulation_horizon()
 
         # init dictionaries for all learning instances in this role
         self.all_obs = defaultdict(lambda: defaultdict(list))
@@ -194,43 +190,47 @@ class Learning(Role):
             src="no_wait",
         )
 
-    def sync_train_freq_with_simulation_horizon(
-        self, learning_config: dict
-    ) -> str | None:
+    def sync_train_freq_with_simulation_horizon(self) -> str | None:
         """
         Ensure self.train_freq evenly divides the simulation length.
         If not, adjust self.train_freq (in-place) and return the new string, otherwise return None.
         Uses self.start_datetime/self.end_datetime when available, otherwise falls back to timestamp fields.
         """
-        if not learning_config.get("learning_mode", False):
-            return None
 
-        train_freq_str = str(self.train_freq)
+        # ensure train_freq evenly divides simulation length (may adjust self.train_freq)
         try:
-            train_freq = pd.Timedelta(train_freq_str)
-        except Exception:
-            logger.warning(
-                f"Invalid train_freq '{train_freq_str}' — skipping adjustment."
-            )
-            return None
+            if not self.learning_mode:
+                return None
 
-        total_length = self.end_datetime - self.start_datetime
-        quotient, remainder = divmod(total_length, train_freq)
+            train_freq_str = str(self.train_freq)
+            try:
+                train_freq = pd.Timedelta(train_freq_str)
+            except Exception:
+                logger.warning(
+                    f"Invalid train_freq '{train_freq_str}' — skipping adjustment."
+                )
+                return None
 
-        if remainder != pd.Timedelta(0):
-            n_intervals = int(quotient) + 1
-            new_train_freq_hours = int(
-                (total_length / n_intervals).total_seconds() / 3600
-            )
-            new_train_freq_str = f"{new_train_freq_hours}h"
-            self.train_freq = new_train_freq_str
-            learning_config["train_freq"] = new_train_freq_str
-            logger.warning(
-                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
-                f"Adjusting train_freq to {new_train_freq_str}."
-            )
+            total_length = self.end_datetime - self.start_datetime
+            quotient, remainder = divmod(total_length, train_freq)
 
-        return None
+            if remainder != pd.Timedelta(0):
+                n_intervals = int(quotient) + 1
+                new_train_freq_hours = int(
+                    (total_length / n_intervals).total_seconds() / 3600
+                )
+                new_train_freq_str = f"{new_train_freq_hours}h"
+                self.train_freq = new_train_freq_str
+
+                logger.warning(
+                    f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
+                    f"Adjusting train_freq to {new_train_freq_str}."
+                )
+
+            return self.train_freq
+
+        except Exception as e:
+            logger.warning(f"Could not sync train_freq: {e}")
 
     def confirm_save_path(self, save_path: str, continue_learning: bool) -> None:
         """

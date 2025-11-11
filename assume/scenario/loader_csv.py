@@ -742,8 +742,6 @@ def setup_world(
         learning_config["learning_mode"] = False
         learning_config["evaluation_mode"] = False
 
-    # TODO: I thought about moving this to the learning role as well but as long as we have the loop here and change things we should
-    # keep it here for now. Because stuff like terminate learning is changed in the loop and changes the was the world is inilaized.
     if not learning_config.get("trained_policies_save_path"):
         learning_config["trained_policies_save_path"] = (
             f"learned_strategies/{simulation_id}"
@@ -1057,6 +1055,10 @@ def run_learning(
 
     validation_interval = world.learning_role.determine_validation_interval(
         world.learning_config
+    )
+
+    world.scenario_data["config"]["learning_config"]["train_freq"] = (
+        world.learning_role.sync_train_freq_with_simulation_horizon()
     )
 
     eval_episode = 1
