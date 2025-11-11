@@ -119,48 +119,46 @@ Naive method API references:
 Heuristic
 -------------
 
- ============================================== ================== =============================================================
-  bidding_strategy_id                            For Market Types   Description
- ============================================== ================== =============================================================
-  demand_energy_heuristic_elastic                EOM                This bidding strategy is formulated for a demand unit to realise a "price-elastic" demand bid,
-                                                                       approximating a marginal utility curve. The elasticity can be set to "linear" or "isoelastic".
-
-  powerplant_energy_heuristic_flexable           EOM                A more refined approach to bidding on the EOM compared to naive.
-                                                                        A unit submits both inflexible and flexible bids per hour.
-                                                                        The inflexible bid represents the minimum power output,
-                                                                        priced at marginal cost plus startup costs, while the flexible bid
-                                                                        covers additional power up to the maximum capacity at marginal cost.
-                                                                        It incorporates price forecasting and accounts for ramping constraints,
-                                                                        operational history, and power loss due to heat production.
-
-  powerplant_energy_heuristic_block              EOM
-  powerplant_energy_heuristic_linked
-
-  powerplant_capacity_heuristic_balancing_neg    CRM_neg            A bid on the negative Capacity or Energy CRM, volume is determined by calculating how much it can reduce power. The capacity price is
-                                                                                found by comparing the revenue it could receive if it bid this volume on the EOM, the energy price is the negative of marginal cost.
-
-  powerplant_capacity_heuristic_balancing_pos    CRM_pos            A bid on the positive Capacity or Energy CRM, volume is determined by calculating how much it can increase power. The capacity price is
-                                                                                found by comparing the revenue it could receive if it bid this volume on the EOM, the energy price is the positive of marginal cost.
-
-  storage_energy_heuristic_flexable              EOM                Determines strategy of Storage unit bidding on the EOM. The unit acts as a generator or load based on average price forecast.
-                                                                                If the current price forecast is greater than the average price, the Storage unit will bid to discharge at a price
-                                                                                equal to the average price divided by the discharge efficiency. Otherwise, it will bid to charge at the average price
-                                                                                multiplied by the charge efficiency. Calculates ramping constraints for charging and discharging based on theoretical state of charge (SOC),
-                                                                                ensuring that power output is feasible. The bid volume is subject to the charge/discharge capacity of the unit.
-
-  storage_capacity_heuristic_balancing_neg       CRM_neg            Analogous to :code:`storage_energy_heuristic_flexable`, but bids either on the negative capacity CRM or energy CRM.
-
-  storage_capacity_heuristic_balancing_pos       CRM_pos            Analogous to :code:`storage_energy_heuristic_flexable`, but bids either on the positive capacity CRM or energy CRM.
-
-  powerplant_energy_heuristic_profile            EOM                Formulated similarly to :code:`powerplant_energy_heuristic_flexable`, however the bid is for a block of multiple hours
-                                                                                instead of being for a single hour.
-                                                                                A minimum acceptance ratio (MAR) defines how to handle the possibility of rejected bids
-                                                                                within individual hours of the block. For the inflexible bid, the MAR is set to 1,
-                                                                                meaning that all bids within the block must be accepted otherwise the whole block bid is rejected.
-                                                                                A separate MAR can be set for children (flexible) bids.
-                                                                                See the `Advanced Orders tutorial <https://assume.readthedocs.io/en/latest/examples/06_advanced_orders_example.html#1.-Basics>`_
-                                                                                for a more detailed description.
- ================================== ======================= ================== =============================================================
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| bidding_strategy_id                            | For Market Types | Description                                                                                                      |
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| demand_energy_heuristic_elastic                | EOM              | This bidding strategy is formulated for a demand unit to realise a "price-elastic" demand bid, approximating a     |
+|                                               |                  | marginal utility curve. The elasticity can be set to "linear" or "isoelastic".                                    |
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| powerplant_energy_heuristic_flexable           | EOM              | A more refined approach to bidding on the EOM compared to naive. A unit submits both inflexible and flexible     |
+|                                               |                  | bids per hour. The inflexible bid represents the minimum power output, priced at marginal cost plus startup       |
+|                                               |                  | costs, while the flexible bid covers additional power up to the maximum capacity at marginal cost. It incorporates |
+|                                               |                  | price forecasting and accounts for ramping constraints, operational history, and power loss due to heat production.|
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| powerplant_energy_heuristic_block              | EOM              |                                                                                                                  |
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| powerplant_energy_heuristic_linked             | EOM              |                                                                                                                  |
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| powerplant_capacity_heuristic_balancing_neg    | CRM_neg          | A bid on the negative Capacity or Energy CRM; volume is determined by calculating how much it can reduce power.  |
+|                                               |                  | The capacity price is found by comparing the revenue it could receive if it bid this volume on the EOM; the       |
+|                                               |                  | energy price is the negative of marginal cost.                                                                   |
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| powerplant_capacity_heuristic_balancing_pos    | CRM_pos          | A bid on the positive Capacity or Energy CRM; volume is determined by calculating how much it can increase power. |
+|                                               |                  | The capacity price is found by comparing the revenue it could receive if it bid this volume on the EOM; the       |
+|                                               |                  | energy price is the positive of marginal cost.                                                                   |
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| storage_energy_heuristic_flexable              | EOM              | Determines strategy of Storage unit bidding on the EOM. The unit acts as a generator or load based on average    |
+|                                               |                  | price forecast. If the current price forecast is greater than the average price, the Storage unit will bid to     |
+|                                               |                  | discharge at a price equal to the average price divided by the discharge efficiency. Otherwise, it will bid to    |
+|                                               |                  | charge at the average price multiplied by the charge efficiency. Calculates ramping constraints for charging and  |
+|                                               |                  | discharging based on theoretical state of charge (SOC), ensuring that power output is feasible. The bid volume is |
+|                                               |                  | subject to the charge/discharge capacity of the unit.                                                            |
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| storage_capacity_heuristic_balancing_neg       | CRM_neg          | Analogous to :code:`storage_energy_heuristic_flexable`, but bids either on the negative capacity CRM or energy CRM.|
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| storage_capacity_heuristic_balancing_pos       | CRM_pos          | Analogous to :code:`storage_energy_heuristic_flexable`, but bids either on the positive capacity CRM or energy CRM.|
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
+| powerplant_energy_heuristic_profile            | EOM              | Formulated similarly to :code:`powerplant_energy_heuristic_flexable`, however the bid is for a block of multiple  |
+|                                               |                  | hours instead of being for a single hour. A minimum acceptance ratio (MAR) defines how to handle the possibility  |
+|                                               |                  | of rejected bids within individual hours of the block. For the inflexible bid, the MAR is set to 1, meaning that  |
+|                                               |                  | all bids within the block must be accepted otherwise the whole block bid is rejected. A separate MAR can be set for |
+|                                               |                  | children (flexible) bids. See the `Advanced Orders tutorial <https://assume.readthedocs.io/en/latest/examples/06_advanced_orders_example.html#1.-Basics>`_ |
++-----------------------------------------------+------------------+------------------------------------------------------------------------------------------------------------------+
 
 Heuristic method API references:
 
@@ -216,19 +214,19 @@ Learning
   bidding_strategy_id                     For Market Types   Description
  ======================================= ================== =============================================================
   powerplant_energy_learning              EOM                A `reinforcement learning <https://assume.readthedocs.io/en/latest/learning_algorithm.html#td3-twin-delayed-ddpg>`_ (RL) approach to formulating bids for a
-                                                                                Power Plant in an Energy-Only Market. The agent's actions are
-                                                                                two bid prices: one for the inflexible component (P_min) and another for the flexible component (P_max - P_min) of a unit's capacity.
-                                                                                The bids are informed by 50 observations, which include forecasted residual load, forecasted price, total capacity, and marginal cost,
-                                                                                all contributing to decision-making. Noise is added to the action, especially towards the beginning of the learning, to encourage exploration and novelty.
+                                                                Power Plant in an Energy-Only Market. The agent's actions are
+                                                                two bid prices: one for the inflexible component (P_min) and another for the flexible component (P_max - P_min) of a unit's capacity.
+                                                                The bids are informed by 50 observations, which include forecasted residual load, forecasted price, total capacity, and marginal cost,
+                                                                all contributing to decision-making. Noise is added to the action, especially towards the beginning of the learning, to encourage exploration and novelty.
 
-                                                                                The reward is calculated based on profits from executed bids, operational costs, opportunity costs (penalizing underutilized capacity),
-                                                                                and a regret term to minimize missed revenue opportunities. This approach encourages full utilization of the unit's capacity.
+                                                                The reward is calculated based on profits from executed bids, operational costs, opportunity costs (penalizing underutilized capacity),
+                                                                and a regret term to minimize missed revenue opportunities. This approach encourages full utilization of the unit's capacity.
 
   storage_energy_learning                 EOM                Similar RL approach as :code:`learning_eom_powerplant`, for a Storage unit. The make-up of the observations is similar to those for
-                                                                                :code:`learning_eom_powerplant`, with an additional observation being the State-of-Charge (SOC) of the storage unit. The agent has 2 actions -
-                                                                                a bid price, and a bid direction (to buy, sell or do nothing). The bid volume is subject to the charge/discharge capacity of the unit.
+                                                                :code:`learning_eom_powerplant`, with an additional observation being the State-of-Charge (SOC) of the storage unit. The agent has 2 actions -
+                                                                a bid price, and a bid direction (to buy, sell or do nothing). The bid volume is subject to the charge/discharge capacity of the unit.
 
-                                                                                The reward is calculated based on profits from executed bids, with fixed costs for charging/discharging incorporated.
+                                                                The reward is calculated based on profits from executed bids, with fixed costs for charging/discharging incorporated.
 
   powerplant_energy_learning_single_bid   EOM                Reinforcement Learning Strategy with Single-Bid Structure for Energy-Only Markets.
 
