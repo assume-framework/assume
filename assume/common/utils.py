@@ -607,27 +607,86 @@ def convert_tensors(data):
     try:
         import torch as th
 
-        if isinstance(data, pd.Series):
-            # Vectorized conversion
-            return data.map(lambda x: x.tolist() if isinstance(x, th.Tensor) else x)
+        def convert_tensor_batch(tensors):
+            # stack all tensors and push them over to CPU together to avoid inperformed multiple GPU-CPU transfers
+            batch = th.stack(tensors, dim=0).cpu()
+            return batch.tolist()
 
-        elif isinstance(data, dict):
-            # Recursively convert tensors in a dictionary
-            return {k: convert_tensors(v) for k, v in data.items()}
+        def collect_tensors_with_paths(data, path=None, collected=None):
+            """
+            Recursively collect all torch.Tensors from nested data structures,
+            storing both the tensor and its location path.
+            """
+            if collected is None:
+                collected = []
+            if path is None:
+                path = []
 
-        elif isinstance(data, list):
-            # Recursively convert tensors in a list
-            return [convert_tensors(item) for item in data]
+            if isinstance(data, pd.Series):
+                new_series = pd.Series(index=data.index, dtype=object)
+                for idx, x in data.items():
+                    if isinstance(x | (dict, list, th.Tensor)):
+                        new_val, _ = collect_tensors_with_paths(
+                            x, path + [idx], collected
+                        )
+                        new_series[idx] = new_val
+                    else:
+                        new_series[idx] = x
+                return new_series, collected
 
-        elif isinstance(data, th.Tensor):
-            # Handles both scalars and multi-dimensional tensors
-            return data.tolist()  # Converts to Python-native lists/ints/floats
+            elif isinstance(data, dict):
+                new_dict = {}
+                for k, v in data.items():
+                    new_dict[k], _ = collect_tensors_with_paths(
+                        v, path + [k], collected
+                    )
+                return new_dict, collected
+
+            elif isinstance(data, list):
+                new_list = []
+                for i, item in enumerate(data):
+                    new_item, _ = collect_tensors_with_paths(
+                        item, path + [i], collected
+                    )
+                    new_list.append(new_item)
+                return new_list, collected
+
+            elif isinstance(data, th.Tensor):
+                collected.append((path, data))
+                return None, collected
+
+            else:
+                return data, collected
+
+        def reconstruct_data(structure, tensor_paths, new_values):
+            """
+            Inserts the converted tensors (new_values) back into the structure
+            at the positions described by tensor_paths.
+            """
+            for path, val in zip(tensor_paths, new_values):
+                target = structure
+                for p in path[:-1]:
+                    target = target[p]
+                target[path[-1]] = val
+            return structure
+
+        # 1. collect tensors with their paths
+        structure, tensor_info = collect_tensors_with_paths(data)
+        tensor_paths, tensors = zip(*tensor_info) if tensor_info else ([], [])
+
+        # 2. Process batch from GPU to CPU and convert to list
+        converted = convert_tensor_batch(tensors) if tensors else []
+
+        # 3. reconstruct initial data structure
+        final_data = (
+            reconstruct_data(structure, tensor_paths, converted) if tensors else data
+        )
+
+        return final_data
 
     except ImportError:
         # If torch is not installed, return the data unchanged
         pass
-
-    return data
 
 
 # Function to parse the duration string
