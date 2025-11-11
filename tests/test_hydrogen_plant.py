@@ -7,7 +7,7 @@ import pyomo.environ as pyo
 import pytest
 
 from assume.common.fast_pandas import FastSeries
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import HydrogenForecaster
 from assume.strategies.naive_strategies import NaiveDADSMStrategy
 from assume.units.hydrogen_plant import HydrogenPlant
 
@@ -43,10 +43,13 @@ def hydrogen_components():
 @pytest.fixture
 def hydrogen_plant(hydrogen_components) -> HydrogenPlant:
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
+    forecast = HydrogenForecaster(
         index,
-        price_EOM=[60] * 24,
-        hydrogen_demand=[400 / 24.0] * 24,  # Uniform per-step demand summing to 400
+        electricity_price=0,
+        hydrogen_demand=[400 / 24.0] * 24,
+        seasonal_storage_schedule=0,
+        availability=0,
+        market_prices={"EOM": [60] * 24},
     )
     bidding_strategy = {"EOM": NaiveDADSMStrategy()}
     return HydrogenPlant(
@@ -222,9 +225,11 @@ def test_unknown_technology_error():
             flexibility_measure="cost_based_load_shift",
             bidding_strategies={"EOM": NaiveDADSMStrategy()},
             components=hydrogen_components,
-            forecaster=NaiveForecast(
+            forecaster=HydrogenForecaster(
                 index=pd.date_range("2023-01-01", periods=24, freq="h"),
-                price_EOM=[60] * 24,
+                market_prices={"EOM": [60] * 24},
+                electricity_price=0,
+                hydrogen_demand=0,
             ),
             demand=500,
         )
@@ -248,10 +253,13 @@ def hydrogen_components_no_storage():
 @pytest.fixture
 def hydrogen_plant_no_storage(hydrogen_components_no_storage) -> HydrogenPlant:
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
+    forecast = HydrogenForecaster(
         index,
-        price_EOM=[60] * 24,
-        hydrogen_demand=[800 / 24.0] * 24,  # Uniform demand, no storage
+        electricity_price=0,
+        hydrogen_demand=[800 / 24.0] * 24,
+        seasonal_storage_schedule=0,
+        availability=0,
+        market_prices={"EOM": [60] * 24},
     )
     bidding_strategy = {"EOM": NaiveDADSMStrategy()}
     return HydrogenPlant(

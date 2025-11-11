@@ -81,6 +81,7 @@ User Guide
 * :doc:`outputs`
 * :doc:`unit_operator`
 * :doc:`units`
+* :doc:`unit_forecasts`
 * :doc:`bidding_strategies`
 * :doc:`learning`
 * :doc:`learning_algorithm`
@@ -102,6 +103,7 @@ User Guide
    outputs
    unit_operator
    units
+   unit_forecasts
    bidding_strategies
    learning
    learning_algorithm

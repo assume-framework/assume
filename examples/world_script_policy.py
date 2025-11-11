@@ -10,7 +10,7 @@ from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
 from assume import World
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.markets.clearing_algorithms.contracts import PayAsBidContractRole
 
@@ -107,7 +107,7 @@ def init(world: World):
         # the unit_params have no hints
         {
             "min_power": 0,
-            "max_power": 1000,
+            "max_power": -1000,
             "bidding_strategies": {
                 "EOM": "support",
                 "Support": "support",
@@ -120,10 +120,12 @@ def init(world: World):
             },  # Feed-In-Tariff
             "technology": "demand",
         },
-        NaiveForecast(index, demand=1000),
+        DemandForecaster(index, demand=-1000),
     )
 
-    nuclear_forecast = NaiveForecast(index, availability=1, fuel_price=3, co2_price=0.1)
+    nuclear_forecast = PowerplantForecaster(
+        index, availability=1, fuel_prices={"co2": 0.1, "others": 3}
+    )
     world.add_unit(
         "nuclear1",
         "power_plant",
