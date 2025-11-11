@@ -64,65 +64,48 @@ When constructing a units CSV file, the bidding strategies are set using :code:`
 follows the underscore (the market names need to match with those in the config file).
 
 
-
-
-# TODO: UPDATE TABLE
-
-
-
-
- ======================= ================== ====================================== ============================================ ============================================== ===========
-  name                    technology         bidding_EOM                            bidding_CRM_pos                              bidding_CRM_neg                                max_power
- ======================= ================== ====================================== ============================================ ============================================== ===========
-  Naive-Bidding Unit      hydro              powerplant_energy_naive                powerplant_capacity_heuristic_balancing_pos  powerplant_capacity_heuristic_balancing_neg    1000
-  Advanced-Bidding Unit   hydro              powerplant_energy_heuristic_block      powerplant_capacity_heuristic_balancing_pos  powerplant_capacity_heuristic_balancing_neg    1000
- ======================= ================== ====================================== ============================================ ============================================== ===========
++------------------------+------------+-------------------------------------+--------------------------------------------------+--------------------------------------------------+-----------+
+| name                   | technology | bidding_EOM                         | bidding_CRM_pos                                  | bidding_CRM_neg                                  | max_power |
++------------------------+------------+-------------------------------------+--------------------------------------------------+--------------------------------------------------+-----------+
+| Naive-Bidding Unit     | hydro      | powerplant_energy_naive             | powerplant_capacity_heuristic_balancing_pos      | powerplant_capacity_heuristic_balancing_neg      | 1000      |
++------------------------+------------+-------------------------------------+--------------------------------------------------+--------------------------------------------------+-----------+
+| Advanced-Bidding Unit  | hydro      | powerplant_energy_heuristic_block   | powerplant_capacity_heuristic_balancing_pos      | powerplant_capacity_heuristic_balancing_neg      | 1000      |
++------------------------+------------+-------------------------------------+--------------------------------------------------+--------------------------------------------------+-----------+
 
 We'll now take a look at the different Bidding Strategies within each methodology, their associated "bidding_strategy_id", and for which unit and market type(s) they are valid.
 
 Naive
 -------------
 
-==================================== ====================  =============================================================
- bidding_strategy_id                  For Market Types      Description
-==================================== ====================  =============================================================
- powerplant_energy_naive                EOM, CRM_pos,       The basic bidding strategy formulated for participating in a merit order
- powerplant_energy_naive_balancing          CRM_neg            market configuration, at any one timepoint (hour).
-                                                               It uses marginal cost for its bid price, and max. possible power
-                                                               output (given ramping constraints) as its volume.
-
-demand_energy_naive                    EOM, CRM_pos,        The basic bidding strategy formulated for participating in a merit order
-demand_energy_naive_balancing              CRM_neg              market configuration, at any one timepoint (hour).         
-                                                                A demand unit can realise a "price-inelastic" demand bid by setting
-                                                                the bid price very high and volume equalling demand at the timepoint.
-
-
-powerplant_energy_naive_otc               OTC               Similar to :code:`powerplant_energy_naive` and :code:`demand_energy_naive`,
-demand_energy_naive_otc                                         however it is bid on the OTC market, representing bilateral trades.
-                                  
-powerplant_energy_naive_profile         EOM, CRM_pos,       Similar to :code:`powerplant_energy_naive`, however it is a block bid for 24 hours to
-                                        CRM_neg                 simulate a bid for the Day-Ahead market, where bid price is set to the marginal cost
-                                                                at the starting timepoint.
-
-
-powerplant_energy_naive_redispatch      redispatch           A naive strategy that simply submits all information about
-demand_energy_naive_redispatch                                  the unit and currently dispatched power for the following hours
-                                                                to the redispatch market. Information includes the marginal cost,
-                                                                the ramp up and down values, and the dispatch.
-
-
-household_energy_naive_redispatch       redispatch           A naive strategy of a Demand Side Management (DSM) unit (industry or households)
-industry_energy_naive_redispatch                                that bids the available flexibility of the unit on the redispatch market.
-                                                                The bid volume is the flexible power requirement of the unit at the start
-                                                                time of the product. The bid price is the marginal cost of the unit at the
-                                                                start time of the product.
-    
-exchange_energy_naive                   EOM                 This bidding strategy is formulated so as to incorporate cross-border trading into the market mechanism.
-                                                                An export and an import bid are made. Export bids have negative volumes and are treated as demand
-                                                                (with bidding price close to maximum to virtually guarantee acceptance) on the market.
-                                                                Import bids have positive volumes and are treated as supply (with bidding price close to minimum
-                                                                to virtually guarantee acceptance) on the market.
-==================================== ====================  =============================================================
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
+| bidding_strategy_id                | For Market   | Description                                                                                        |
+|                                    | Types        |                                                                                                    |
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
+| powerplant_energy_naive            | EOM, CRM_pos,| The basic bidding strategy formulated for participating in a merit order market at a single       |
+|                                    | CRM_neg      | timepoint (hour). It uses marginal cost for its bid price and the maximum possible power output   |
+|                                    |              | (given ramping constraints) as its volume.                                                        |
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
+| demand_energy_naive                | EOM, CRM_pos,| The basic bidding strategy for demand units in a merit order market. A demand unit can realise a  |
+|                                    | CRM_neg      | "price-inelastic" bid by setting the bid price very high and volume equal to demand at the        |
+|                                    |              | timepoint.                                                                                         |
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
+| powerplant_energy_naive_otc        | OTC          | Similar to ``powerplant_energy_naive`` but for OTC (bilateral) trades.                            |
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
+| demand_energy_naive_otc            | OTC          | Similar to ``demand_energy_naive`` but for OTC (bilateral) trades.                                |
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
+| powerplant_energy_naive_profile    | EOM, CRM_pos,| Similar to ``powerplant_energy_naive`` but as a 24-hour block bid (Day-Ahead). Bid price is set   |
+|                                    | CRM_neg      | to the marginal cost at the starting timepoint.                                                   |
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
+| powerplant_energy_naive_redispatch | redispatch   | Submits unit information and currently dispatched power for the following hours to the           |
+|                                    |              | redispatch market (includes marginal cost, ramping, and dispatch).                                |
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
+| demand_energy_naive_redispatch     | redispatch   | Naive DSM strategy for industry/household units; bids available flexibility on redispatch. Volume |
+|                                    |              | equals flexible power at product start; price equals marginal cost at product start.              |
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
+| exchange_energy_naive              | EOM          | Incorporates cross-border trading: submits export (negative volume) and import bids. Exports are  |
+|                                    |              | treated as demand with a very high bid price; imports as supply with a very low bid price to      |
+|                                    |              | virtually guarantee acceptance.                                                                    |
++------------------------------------+--------------+----------------------------------------------------------------------------------------------------+
 
 Naive method API references:
 
@@ -153,23 +136,23 @@ Heuristic
   powerplant_energy_heuristic_block              EOM
   powerplant_energy_heuristic_linked
 
-  powerplant_capacity_heuristic_balancing_neg
+  powerplant_capacity_heuristic_balancing_neg    CRM_neg            A bid on the negative Capacity or Energy CRM, volume is determined by calculating how much it can reduce power. The capacity price is
+                                                                                found by comparing the revenue it could receive if it bid this volume on the EOM, the energy price is the negative of marginal cost.
 
-  powerplant_capacity_heuristic_balancing_pos
+  powerplant_capacity_heuristic_balancing_pos    CRM_pos            A bid on the positive Capacity or Energy CRM, volume is determined by calculating how much it can increase power. The capacity price is
+                                                                                found by comparing the revenue it could receive if it bid this volume on the EOM, the energy price is the positive of marginal cost.
 
-  storage_energy_heuristic_flexable
+  storage_energy_heuristic_flexable              EOM                Determines strategy of Storage unit bidding on the EOM. The unit acts as a generator or load based on average price forecast.
+                                                                                If the current price forecast is greater than the average price, the Storage unit will bid to discharge at a price
+                                                                                equal to the average price divided by the discharge efficiency. Otherwise, it will bid to charge at the average price
+                                                                                multiplied by the charge efficiency. Calculates ramping constraints for charging and discharging based on theoretical state of charge (SOC),
+                                                                                ensuring that power output is feasible. The bid volume is subject to the charge/discharge capacity of the unit.
 
-  storage_capacity_heuristic_balancing_neg
+  storage_capacity_heuristic_balancing_neg       CRM_neg            Analogous to :code:`storage_energy_heuristic_flexable`, but bids either on the negative capacity CRM or energy CRM.
 
-  storage_capacity_heuristic_balancing_pos
+  storage_capacity_heuristic_balancing_pos       CRM_pos            Analogous to :code:`storage_energy_heuristic_flexable`, but bids either on the positive capacity CRM or energy CRM.
 
-  standard_eom_powerplant                          EOM                A more refined approach to bidding on the EOM compared to :code:`naive`.
-                                                                                A unit submits both inflexible and flexible bids per hour.
-                                                                                The inflexible bid represents the minimum power output, priced at marginal cost plus startup costs,
-                                                                                while the flexible bid covers additional power up to the maximum capacity at marginal cost.
-                                                                                It incorporates price forecasting and accounts for ramping constraints, operational history,
-                                                                                and power loss due to heat production.
-  standard_profile_eom_powerplant                  EOM                Formulated similarly to :code:`eom_powerplant`, however the bid is for a block of multiple hours
+  powerplant_energy_heuristic_profile            EOM                Formulated similarly to :code:`powerplant_energy_heuristic_flexable`, however the bid is for a block of multiple hours
                                                                                 instead of being for a single hour.
                                                                                 A minimum acceptance ratio (MAR) defines how to handle the possibility of rejected bids
                                                                                 within individual hours of the block. For the inflexible bid, the MAR is set to 1,
@@ -177,17 +160,6 @@ Heuristic
                                                                                 A separate MAR can be set for children (flexible) bids.
                                                                                 See the `Advanced Orders tutorial <https://assume.readthedocs.io/en/latest/examples/06_advanced_orders_example.html#1.-Basics>`_
                                                                                 for a more detailed description.
-  standard_neg_crm_powerplant                      CRM_neg            A bid on the negative Capacity or Energy CRM, volume is determined by calculating how much it can reduce power. The capacity price is
-                                                                                found by comparing the revenue it could receive if it bid this volume on the EOM, the energy price is the negative of marginal cost.
-  standard_pos_crm_powerplant                      CRM_pos            A bid on the positive Capacity or Energy CRM, volume is determined by calculating how much it can increase power. The capacity price is
-                                                                                found by comparing the revenue it could receive if it bid this volume on the EOM, the energy price is the marginal cost.
-  standard_eom_storage                                EOM                Determines strategy of Storage unit bidding on the EOM. The unit acts as a generator or load based on average price forecast.
-                                                                                If the current price forecast is greater than the average price, the Storage unit will bid to discharge at a price
-                                                                                equal to the average price divided by the discharge efficiency. Otherwise, it will bid to charge at the average price
-                                                                                multiplied by the charge efficiency. Calculates ramping constraints for charging and discharging based on theoretical state of charge (SOC),
-                                                                                ensuring that power output is feasible. The bid volume is subject to the charge/discharge capacity of the unit.
-  standard_neg_crm_storage                            CRM_neg            Analogous to :code:`standard_eom_storage`, but bids either on the negative capacity CRM or energy CRM.
-  standard_pos_crm_storage                            CRM_pos            Analogous to :code:`standard_eom_storage`, but bids either on the positive capacity CRM or energy CRM.
  ================================== ======================= ================== =============================================================
 
 Heuristic method API references:
