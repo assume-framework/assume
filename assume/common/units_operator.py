@@ -25,7 +25,10 @@ from assume.common.utils import (
     aggregate_step_amount,
     timestamp2datetime,
 )
-from assume.strategies import UnitsOperatorEnergyNaiveDirectStrategy, UnitOperatorStrategy
+from assume.strategies import (
+    UnitOperatorStrategy,
+    UnitsOperatorEnergyNaiveDirectStrategy,
+)
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)

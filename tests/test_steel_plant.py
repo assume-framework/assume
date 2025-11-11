@@ -9,8 +9,8 @@ import pytest
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import SteelplantForecaster
 from assume.strategies.naive_strategies import (
-    DsmEnergyOptimizationStrategy,
     DsmEnergyNaiveRedispatchStrategy,
+    DsmEnergyOptimizationStrategy,
 )
 from assume.units.steel_plant import SteelPlant
 

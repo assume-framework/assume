@@ -3,9 +3,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from assume.common.base import BaseStrategy, LearningStrategy
-from assume.strategies.advanced_orders import EnergyHeuristicFlexableBlockStrategy, EnergyHeuristicFlexableLinkedStrategy
+from assume.strategies.advanced_orders import (
+    EnergyHeuristicFlexableBlockStrategy,
+    EnergyHeuristicFlexableLinkedStrategy,
+)
 from assume.strategies.extended import EnergyNaiveOtcStrategy
-from assume.strategies.flexable import EnergyHeuristicFlexableStrategy, CapacityHeuristicBalancingStrategy, flexablePosCRM
+from assume.strategies.flexable import (
+    EnergyHeuristicFlexableStrategy,
+    CapacityHeuristicBalancingStrategy,
+    flexablePosCRM,
+)
 from assume.strategies.flexable_storage import (
     StorageEnergyHeuristicFlexableStrategy,
     StorageCapacityHeuristicBalancingNegStrategy,
@@ -32,7 +39,7 @@ from assume.strategies.portfolio_strategies import (
 )
 
 bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
-    #TODO: REMOVE BECAUSE OF DEPRECATION ####################################
+    # TODO: REMOVE BECAUSE OF DEPRECATION ####################################
     "naive_neg_reserve": EnergyNaiveStrategy,
     "naive_exchange": ExchangeEnergyNaiveStrategy,
     "naive_eom": EnergyNaiveStrategy,
@@ -53,8 +60,6 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "naive_da_dsm": DsmEnergyOptimizationStrategy,
     "naive_redispatch_dsm": DsmEnergyNaiveRedispatchStrategy,
     # END OF REMOVE ################################################################
-
-
     "powerplant_energy_naive": EnergyNaiveStrategy,
     "demand_energy_naive": EnergyNaiveStrategy,
     "powerplant_energy_naive_balancing": EnergyNaiveStrategy,
@@ -83,10 +88,10 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "industry_energy_naive_redispatch": DsmEnergyNaiveRedispatchStrategy,
     "powerplant_energy_optimization_dmas": EnergyOptimizationDmasStrategy,
     "storage_energy_optimization_dmas": StorageEnergyOptimizationDmasStrategy,
-    "units_operator_energy_heuristic_cournot":UnitsOperatorEnergyHeuristicCournotStrategy,
-    "units_operator_energy_naive_direct":UnitsOperatorEnergyNaiveDirectStrategy,
+    "units_operator_energy_heuristic_cournot": UnitsOperatorEnergyHeuristicCournotStrategy,
+    "units_operator_energy_naive_direct": UnitsOperatorEnergyNaiveDirectStrategy,
     "powerplant_energy_naive_profile": EnergyNaiveProfileStrategy,
-    "powerplant_energy_interactive":EnergyInteractiveStrategy,
+    "powerplant_energy_interactive": EnergyInteractiveStrategy,
 }
 
 try:
@@ -96,16 +101,23 @@ try:
         StorageEnergyLearningStrategy,
         RenewableEnergyLearningSingleBidStrategy,
     )
-    #TODO: REMOVE DEPRECATION###########################################
+
+    # TODO: REMOVE DEPRECATION###########################################
     bidding_strategies["pp_learning"] = EnergyLearningStrategy
     bidding_strategies["storage_learning"] = StorageEnergyLearningStrategy
-    bidding_strategies["renewable_eom_learning"] = RenewableEnergyLearningSingleBidStrategy
+    bidding_strategies["renewable_eom_learning"] = (
+        RenewableEnergyLearningSingleBidStrategy
+    )
     # END OF REMOVE DEPRECATION ###########################################
 
     bidding_strategies["powerplant_energy_learning"] = EnergyLearningStrategy
-    bidding_strategies["powerplant_energy_learning_single_bid"] = EnergyLearningSingleBidStrategy
+    bidding_strategies["powerplant_energy_learning_single_bid"] = (
+        EnergyLearningSingleBidStrategy
+    )
     bidding_strategies["storage_energy_learning"] = StorageEnergyLearningStrategy
-    bidding_strategies["renewable_energy_learning_single_bid"] = RenewableEnergyLearningSingleBidStrategy
+    bidding_strategies["renewable_energy_learning_single_bid"] = (
+        RenewableEnergyLearningSingleBidStrategy
+    )
 
 
 except ImportError:

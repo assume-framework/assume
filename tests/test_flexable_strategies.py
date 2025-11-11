@@ -10,8 +10,8 @@ import pytest
 
 from assume.common.forecaster import PowerplantForecaster
 from assume.strategies import (
-    EnergyHeuristicFlexableStrategy,
     CapacityHeuristicBalancingStrategy,
+    EnergyHeuristicFlexableStrategy,
     flexablePosCRM,
 )
 from assume.units import PowerPlant

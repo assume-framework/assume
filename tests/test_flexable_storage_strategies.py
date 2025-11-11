@@ -11,9 +11,9 @@ import pytest
 
 from assume.common.forecaster import UnitForecaster
 from assume.strategies import (
-    StorageEnergyHeuristicFlexableStrategy,
     StorageCapacityHeuristicBalancingNegStrategy,
     StorageCapacityHeuristicBalancingPosStrategy,
+    StorageEnergyHeuristicFlexableStrategy,
 )
 from assume.units import Storage
 

@@ -87,7 +87,9 @@ class MockElasticDemand:
         (-0.5, "linear"),
     ],
 )
-def test_demand_energy_heuristic_elastic_strategy_robust_range(mock_market_config, elasticity, model):
+def test_demand_energy_heuristic_elastic_strategy_robust_range(
+    mock_market_config, elasticity, model
+):
     """
     Parametric test to check multiple elasticity values and model types.
     Ensures bid count, price monotonicity, and volume validity.
@@ -113,7 +115,9 @@ def test_demand_energy_heuristic_elastic_strategy_robust_range(mock_market_confi
     assert prices[0] == unit.max_price
 
 
-def test_demand_energy_heuristic_elastic_strategy_raises_when_volume_exceeds_max(mock_market_config):
+def test_demand_energy_heuristic_elastic_strategy_raises_when_volume_exceeds_max(
+    mock_market_config,
+):
     """
     Tests that a ValueError is raised when first block bid volume exceeds max_power.
     """

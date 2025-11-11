@@ -47,7 +47,9 @@ def storage_unit() -> Storage:
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
-        bidding_strategies={"test_market": StorageEnergyLearningStrategy(**learning_config)},
+        bidding_strategies={
+            "test_market": StorageEnergyLearningStrategy(**learning_config)
+        },
         max_power_charge=-500,  # Negative for charging
         max_power_discharge=500,
         max_soc=1000,
