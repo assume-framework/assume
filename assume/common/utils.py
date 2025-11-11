@@ -625,7 +625,7 @@ def convert_tensors(data):
             if isinstance(data, pd.Series):
                 new_series = pd.Series(index=data.index, dtype=object)
                 for idx, x in data.items():
-                    if isinstance(x | (dict, list, th.Tensor)):
+                    if isinstance(x, (dict | list | th.Tensor)):
                         new_val, _ = collect_tensors_with_paths(
                             x, path + [idx], collected
                         )
