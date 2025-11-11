@@ -57,7 +57,7 @@ The ASSUME framework provides multiple options in terms of Bidding Strategy meth
 For each Bidding Strategy methodology there are multiple Bidding Strategy options depending on the product and market that the bid is intended for,
 as well as the type of unit making the bid.
 
-Accordingly, each Bidding Strategy has an associated ID which takes the form "unit_product_method_comment", the comment beeing optional.
+Accordingly, each Bidding Strategy has an associated ID which takes the form "unit_product_method_comment", the comment being optional.
 This "bidding_strategy_id" needs to be entered when defining a unit's bidding strategy. Each Bidding Strategy and associated ID for each methodology is defined and described further below.
 
 When constructing a units CSV file, the bidding strategies are set using :code:`"bidding_*"` columns, where the market type the bidding strategy is applied to
