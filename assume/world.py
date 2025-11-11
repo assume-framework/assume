@@ -27,7 +27,6 @@ from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
 
 from assume.common import (
-    Forecaster,
     MarketConfig,
     OutputDef,
     UnitsOperator,
@@ -35,6 +34,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
+from assume.common.forecaster import UnitForecaster
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
@@ -187,7 +187,6 @@ class World:
         learning_config: LearningConfig = {},
         episode: int = 1,
         eval_episode: int = 1,
-        forecaster: Forecaster | None = None,
         manager_address=None,
         real_time=False,
         **kwargs: dict,
@@ -199,11 +198,9 @@ class World:
             start (datetime.datetime): The start datetime for the simulation.
             end (datetime.datetime): The end datetime for the simulation.
             simulation_id (str): The unique identifier for the simulation.
-            index (pandas.Series): The index for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
             learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
-            forecaster (Forecaster, optional): The forecaster used for custom unit types. Defaults to None.
             manager_address: The address of the manager.
             **kwargs: Additional keyword arguments.
 
@@ -241,9 +238,6 @@ class World:
             if not self.evaluation_mode
             else f"Evaluation Episode {eval_episode}"
         )
-
-        # forecaster is used only when loading custom unit types
-        self.forecaster = forecaster
 
         self.bidding_params = bidding_params
 
@@ -328,7 +322,6 @@ class World:
                 db_uri=self.db_uri,
                 output_agent_addr=self.output_agent_addr,
                 train_start=self.start,
-                freq=self.forecaster.index.freq,
             )
 
         else:
@@ -488,7 +481,7 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
     ) -> BaseUnit:
         # provided unit type does not exist yet
         unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
@@ -534,7 +527,7 @@ class World:
                     )
                 raise ValueError(
                     f"""Bidding strategy {strategy} not registered. Please check the name of
-                    the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                        the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
                 )
 
             if strategy not in strategy_instances:
@@ -764,7 +757,7 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
     ) -> None:
         """
         Creates a unit and adds it to the World instance.

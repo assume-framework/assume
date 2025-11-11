@@ -7,7 +7,7 @@ import logging
 import pyomo.environ as pyo
 
 from assume.common.base import SupportsMinMax
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import HydrogenForecaster
 from assume.units.dsm_load_shift import DSMFlex
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
-        forecaster: Forecaster,
+        forecaster: HydrogenForecaster,
         components: dict[str, dict] = None,
         technology: str = "hydrogen_plant",
         objective: str = "min_variable_cost",
@@ -72,6 +72,11 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             **kwargs,
         )
 
+        if not isinstance(forecaster, HydrogenForecaster):
+            raise ValueError(
+                f"forecaster must be of type {HydrogenForecaster.__name__}"
+            )
+
         # check if the required components are present in the components dictionary
         for component in self.required_technologies:
             if component not in components.keys():
@@ -90,8 +95,8 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 )
 
         # Initialize parameters
-        self.electricity_price = self.forecaster["price_EOM"]
-        self.hydrogen_demand = self.forecaster["hydrogen_demand"]
+        self.electricity_price = self.forecaster.price["EOM"]
+        self.hydrogen_demand = self.forecaster.hydrogen_demand
         self.demand = demand
 
         self.objective = objective
@@ -109,9 +114,9 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
             storage_cfg = self.components["hydrogen_seasonal_storage"]
             storage_type = storage_cfg.get("storage_type", "short-term")
             if storage_type == "long-term":
-                schedule_key = f"{self.id}_hydrogen_seasonal_storage_schedule"
-                schedule_series = self.forecaster[schedule_key]
-                storage_cfg["storage_schedule_profile"] = schedule_series
+                storage_cfg["storage_schedule_profile"] = (
+                    forecaster.seasonal_storage_schedule
+                )
 
         # Initialize the model
         self.setup_model()

@@ -10,7 +10,7 @@ import numpy as np
 
 from assume.common.base import SupportsMinMaxCharge
 from assume.common.fast_pandas import FastSeries
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import UnitForecaster
 
 logger = logging.getLogger(__name__)
 EPS = 1e-4
@@ -57,7 +57,7 @@ class Storage(SupportsMinMaxCharge):
         unit_operator: str,
         technology: str,
         bidding_strategies: dict,
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
         max_power_charge: float,
         max_power_discharge: float,
         max_soc: float,
