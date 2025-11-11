@@ -18,6 +18,7 @@ Upcoming Release
 - **Adjusted reward scaling**: Reward scaling now considers current available power instead of the unit’s max_power, reducing reward distortion when availability limits capacity. Available power is now derived from offered_order_volume instead of unit.calculate_min_max_power. Because dispatch is set before reward calculation, the previous method left available power at 0 whenever the unit was dispatched.
 - **Update pytest dependency**: Tests now run with Pytest 9
 - **Add new docs feature**: dependencies to build docs can now be installed with `pip install -e .[docs]`
+- **Fix tests on Windows**: One test was always failing on Windows, which is fixed so that all tests succeed on all archs
 
   **New Features:**
 - **Unit Operator Portfolio Strategy**: A new bidding strategy type that enables portfolio optimization, where the default is called `DirectUnitOperatorStrategy`. This strategy simply passes through bidding decisions of individual units within a portfolio, which was the default behavior beforehand as well. Further we added 'CournotPortfolioStrategy' which allows to model bidding behavior of a portfolio of units in a day-ahead market. The strategy calculates the optimal bid price and quantity for each unit in the portfolio, taking into account markup and the production costs of the units. This enables users to simulate and analyze the impact of strategic portfolio bidding on market outcomes and unit profitability.
