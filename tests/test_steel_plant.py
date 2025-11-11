@@ -7,10 +7,10 @@ import pyomo.environ as pyo
 import pytest
 
 from assume.common.fast_pandas import FastSeries
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import SteelplantForecaster
 from assume.strategies.naive_strategies import (
-    NaiveDADSMStrategy,
-    NaiveRedispatchDSMStrategy,
+    DsmEnergyOptimizationStrategy,
+    DsmEnergyNaiveRedispatchStrategy,
 )
 from assume.units.steel_plant import SteelPlant
 
@@ -58,18 +58,16 @@ def dsm_components():
 def create_steel_plant(dsm_components, flexibility_measure):
     """Helper function to create a SteelPlant with a specific flexibility measure."""
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
+    forecast = SteelplantForecaster(
         index,
-        price_EOM=[50] * 24,
-        fuel_price_natural_gas=[30] * 24,
-        co2_price=[20] * 24,
-        east_congestion_severity=[0.5] * 8 + [0.9] * 8 + [0.2] * 8,
-        south_renewable_utilisation=[0.1 * i for i in range(24)],
+        market_prices={"EOM": [50] * 24},
+        fuel_prices={"natural_gas": [30] * 24, "co2": [20] * 24},
+        renewable_utilisation_signal=[0.1 * i for i in range(24)],
     )
 
     bidding_strategies = {
-        "EOM": NaiveDADSMStrategy(),
-        "RD": NaiveRedispatchDSMStrategy(),
+        "EOM": DsmEnergyOptimizationStrategy(),
+        "RD": DsmEnergyNaiveRedispatchStrategy(),
     }
 
     return SteelPlant(
@@ -282,11 +280,10 @@ def test_renewable_utilisation(steel_plant_renewable_utilisation):
 @pytest.fixture
 def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
+    forecast = SteelplantForecaster(
         index,
-        price_EOM=[50] * 24,
-        fuel_price_natural_gas=[30] * 24,
-        co2_price=[20] * 24,
+        market_prices={"EOM": [50] * 24},
+        fuel_prices={"natural_gas": [30] * 24, "co2": [20] * 24},
     )
 
     dsm_components.pop("electrolyser", None)
@@ -296,8 +293,8 @@ def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
         objective="min_variable_cost",
         flexibility_measure="cost_based_load_shift",
         bidding_strategies={
-            "EOM": NaiveDADSMStrategy(),
-            "RD": NaiveRedispatchDSMStrategy(),
+            "EOM": DsmEnergyOptimizationStrategy(),
+            "RD": DsmEnergyNaiveRedispatchStrategy(),
         },
         node="south",
         components=dsm_components,
@@ -310,11 +307,10 @@ def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
 # --- Initialization Tests ---
 def test_handle_missing_components():
     index = pd.date_range("2023-01-01", periods=24, freq="h")
-    forecast = NaiveForecast(
+    forecast = SteelplantForecaster(
         index,
-        price_EOM=[50] * 24,
-        fuel_price_natural_gas=[30] * 24,
-        co2_price=[20] * 24,
+        market_prices={"EOM": [50] * 24},
+        fuel_prices={"natural_gas": [30] * 24, "co2": [20] * 24},
     )
     with pytest.raises(
         ValueError, match="Component dri_plant is required for the steel plant unit."

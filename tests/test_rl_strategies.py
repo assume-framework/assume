@@ -7,15 +7,16 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
+from assume.common.forecaster import PowerplantForecaster
+
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
-    from assume.strategies.learning_strategies import RLStrategy, RLStrategySingleBid
+    from assume.strategies.learning_strategies import EnergyLearningStrategy, EnergyLearningSingleBidStrategy
 
 except ImportError:
-    RLStrategy = None
-    RLStrategySingleBid = None
+    EnergyLearningStrategy = None
+    EnergyLearningSingleBidStrategy = None
 
-from assume.common.forecasts import NaiveForecast
 from assume.units import PowerPlant
 
 start = datetime(2023, 7, 1)
@@ -26,7 +27,11 @@ end = datetime(2023, 7, 2)
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    ff = PowerplantForecaster(
+        index,
+        fuel_prices={"lignite": 10, "co2": 10},
+        residual_load={"EOM": 0},
+    )
     learning_config: LearningConfig = {
         "algorithm": "matd3",
         "learning_mode": True,
@@ -43,7 +48,7 @@ def power_plant() -> PowerPlant:
         min_power=200,
         efficiency=0.5,
         additional_cost=10,
-        bidding_strategies={"EOM": RLStrategy(**learning_config)},
+        bidding_strategies={"EOM": EnergyLearningStrategy(**learning_config)},
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,
@@ -54,9 +59,9 @@ def power_plant() -> PowerPlant:
 @pytest.mark.parametrize(
     "strategy_class, obs_dim, act_dim, actor_architecture, expected_bid_count, expected_volumes",
     [
-        (RLStrategy, 38, 2, "mlp", 2, [200, 800]),
-        (RLStrategy, 38, 2, "lstm", 2, [200, 800]),
-        (RLStrategySingleBid, 74, 1, "mlp", 1, [1000]),
+        (EnergyLearningStrategy, 38, 2, "mlp", 2, [200, 800]),
+        (EnergyLearningStrategy, 38, 2, "lstm", 2, [200, 800]),
+        (EnergyLearningSingleBidStrategy, 74, 1, "mlp", 1, [1000]),
     ],
 )
 def test_learning_strategies_parametrized(

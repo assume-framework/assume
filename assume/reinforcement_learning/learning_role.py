@@ -414,7 +414,6 @@ class Learning(Role):
         db_uri: str,
         output_agent_addr: str,
         train_start: str,
-        freq: str,
     ):
         """
         Initialize the logging for the reinforcement learning agent.

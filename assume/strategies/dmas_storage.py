@@ -105,7 +105,7 @@ def get_solver_factory(
     return SolverFactory(solvers[0])
 
 
-class DmasStorageStrategy(MinMaxChargeStrategy):
+class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
     """Strategy for a storage unit that uses DMAS to optimize its operation"""
 
     def __init__(self, *args, **kwargs):
@@ -186,7 +186,7 @@ class DmasStorageStrategy(MinMaxChargeStrategy):
         opt_results = {key: np.zeros(hour_count) for key in PRICE_FUNCS.keys()}
         time_range = range(hour_count)
 
-        base_price = unit.forecaster[f"price_{market_id}"][
+        base_price = unit.forecaster.price[market_id][
             start : start + timedelta(hours=hour_count)
         ]
 
@@ -255,7 +255,7 @@ class DmasStorageStrategy(MinMaxChargeStrategy):
         )
         total_orders = {}
         block_id = 0
-        power_prices = unit.forecaster[f"price_{market_config.market_id}"][
+        power_prices = unit.forecaster.price[market_config.market_id][
             start : start + timedelta(hours=hour_count)
         ]
         for key, power in opt_results.items():

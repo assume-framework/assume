@@ -8,20 +8,20 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
-from assume.common.forecasts import NaiveForecast
-from assume.strategies.flexable_storage import flexableEOMStorage
+from assume.common.forecaster import UnitForecaster
+from assume.strategies.flexable_storage import StorageEnergyHeuristicFlexableStrategy
 from assume.units import Storage
 
 
 @pytest.fixture
 def storage_unit() -> Storage:
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    forecaster = UnitForecaster(index, availability=1, market_prices={"EOM": 50})
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"EOM": flexableEOMStorage()},
+        bidding_strategies={"EOM": StorageEnergyHeuristicFlexableStrategy()},
         forecaster=forecaster,
         max_power_charge=-100,
         max_power_discharge=100,
@@ -324,7 +324,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
 
     mc = mock_market_config
 
-    strategy = flexableEOMStorage()
+    strategy = StorageEnergyHeuristicFlexableStrategy()
     product_tuples = [(start, end, None)]
 
     storage_unit.outputs["energy"][start] = 100
@@ -404,7 +404,7 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
         product_tuples.append((s, end, None))
 
     mc = mock_market_config
-    strategy = flexableEOMStorage()
+    strategy = StorageEnergyHeuristicFlexableStrategy()
 
     storage_unit.outputs["energy"][start] = 100
     storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
@@ -473,7 +473,7 @@ def test_initialising_invalid_storages():
         "unit_operator": "operator",
         "technology": "technology",
         "bidding_strategies": {},
-        "forecaster": NaiveForecast(index=index),
+        "forecaster": UnitForecaster(index=index),
         "max_power_charge": 0.0,
         "max_power_discharge": 0.0,
         "max_soc": 0.0,

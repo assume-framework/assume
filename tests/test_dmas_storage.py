@@ -8,10 +8,10 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.strategies.dmas_storage import DmasStorageStrategy
+from assume.strategies.dmas_storage import StorageEnergyOptimizationDmasStrategy
 from assume.units import Storage
 
 from .utils import get_test_prices
@@ -20,13 +20,13 @@ from .utils import get_test_prices
 @pytest.fixture
 def storage_unit() -> Storage:
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    forecaster = NaiveForecast(index, availability=1, price_forecast=50)
+    forecaster = UnitForecaster(index, market_prices={"EOM": 50}, availability=1)
 
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"EOM": DmasStorageStrategy()},
+        bidding_strategies={"EOM": StorageEnergyOptimizationDmasStrategy()},
         forecaster=forecaster,
         max_power_charge=-100,
         max_power_discharge=100,
@@ -49,17 +49,12 @@ def storage_day() -> Storage:
     index = pd.date_range("2022-01-01", periods=periods, freq="h")
 
     prices = get_test_prices(periods)
-    ff = NaiveForecast(
-        index,
-        availability=1,
-        co2_price=prices["co2"],
-        price_forecast=prices["power"],
-    )
+    ff = UnitForecaster(index, market_prices={"EOM": prices["power"]}, availability=1)
     return Storage(
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"EOM": DmasStorageStrategy()},
+        bidding_strategies={"EOM": StorageEnergyOptimizationDmasStrategy()},
         max_power_charge=-100,
         max_power_discharge=100,
         max_soc=1000,
@@ -77,7 +72,7 @@ def storage_day() -> Storage:
 
 
 def test_dmas_str_init(storage_unit):
-    strategy = DmasStorageStrategy()
+    strategy = StorageEnergyOptimizationDmasStrategy()
     hour_count = len(storage_unit.index)
 
     strategy.build_model(
@@ -88,7 +83,7 @@ def test_dmas_str_init(storage_unit):
 
 
 def test_dmas_calc(storage_unit):
-    strategy = DmasStorageStrategy()
+    strategy = StorageEnergyOptimizationDmasStrategy()
     hour_count = len(storage_unit.index) // 2
 
     mc = MarketConfig(
@@ -112,7 +107,7 @@ def test_dmas_calc(storage_unit):
 
 
 def test_dmas_day(storage_day):
-    strategy = DmasStorageStrategy()
+    strategy = StorageEnergyOptimizationDmasStrategy()
     hour_count = len(storage_day.index) // 2
     assert hour_count == 24
 

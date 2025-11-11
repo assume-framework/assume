@@ -16,9 +16,11 @@ Upcoming Release
 
 - **Changed action clamping**: The action clamping was changed to extreme values defined by dicts. Instead of using the min and max of a forward pass in the NN, the clamping is now based on the activation function of the actor network. Previously, the output range was incorrectly assumed based only on the input, which failed when weights were negative due to Xavier initialization.
 - **Adjusted reward scaling**: Reward scaling now considers current available power instead of the unit’s max_power, reducing reward distortion when availability limits capacity. Available power is now derived from offered_order_volume instead of unit.calculate_min_max_power. Because dispatch is set before reward calculation, the previous method left available power at 0 whenever the unit was dispatched.
+- **Update pytest dependency**: Tests now run with Pytest 9
+- **Add new docs feature**: dependencies to build docs can now be installed with `pip install -e .[docs]`
 
   **New Features:**
-- **Unit Operator Portfolio Strategy**: A new bidding strategy type that enables portfolio optimization, where the default is called `DirectUnitOperatorStrategy`. This strategy simply passes through bidding decisions of individual units within a portfolio, which was the default behavior beforehand as well. Further we added 'CournotPortfolioStrategy' which allows to model bidding behavior of a portfolio of units in a day-ahead market. The strategy calculates the optimal bid price and quantity for each unit in the portfolio, taking into account markup and the production costs of the units. This enables users to simulate and analyze the impact of strategic portfolio bidding on market outcomes and unit profitability.
+- **Unit Operator Portfolio Strategy**: A new bidding strategy type that enables portfolio optimization, where the default is called `UnitsOperatorEnergyNaiveDirectStrategy`. This strategy simply passes through bidding decisions of individual units within a portfolio, which was the default behavior beforehand as well. Further we added 'UnitsOperatorEnergyHeuristicCournotStrategy' which allows to model bidding behavior of a portfolio of units in a day-ahead market. The strategy calculates the optimal bid price and quantity for each unit in the portfolio, taking into account markup and the production costs of the units. This enables users to simulate and analyze the impact of strategic portfolio bidding on market outcomes and unit profitability.
 
 
 0.5.5 - (13th August 2025)
@@ -48,7 +50,7 @@ Upcoming Release
 - **Hydrogen_plant:** The HydrogenPlant master class has been refactored for modularity. Technologies such as the electrolyser and (optionally) the SeasonalHydrogenStorage are now connected in a flexible manner, supporting both per-timestep and cumulative hydrogen demand balancing. The plant model now robustly accommodates both storage and non-storage configurations, ensuring correct mass balances across all scenarios.
 - **Steam Generation Plant:** Introduced a 'SteamGenerationPlant' class to model steam generation processes. This class supports both electric and thermal inputs, allowing for flexible operation based on available resources. The plant can be configured with various components, such as heat pumps and boilers, to optimize steam production.
 - **New Demand Side Flexibility Measure** Implemented 'symmetric_flexible_block' flexibility measure for demand side units. This measure allows users to define a symmetric block of flexibility, enabling to construct a load profile based on which the block bids for CRM amrket can be formulated.
-- **Positive and Negative Flexibility for DSM Units** Introduced the bidding strategies 'DSM_PosCRM_Strategy' and 'DSM_PosCRM_Strategy' to define positive and negative flexibility for demand side management (DSM) units. This feature allows users to participate DSM units in a Control Reserve Market (CRM).
+- **Positive and Negative Flexibility for DSM Units** Introduced the bidding strategies 'CapacityHeuristicBalancingPosStrategy' and 'CapacityHeuristicBalancingPosStrategy' to define positive and negative flexibility for demand side management (DSM) units. This feature allows users to participate DSM units in a Control Reserve Market (CRM).
 - **Electricity price signal based Flexibility Signal for DSM**: Implemented'electricity_price_signal' flexibility measure for demand side units, Thus measure allows to shift the load based on the electricity price signal, enabling users to perform this operation based on a reference load profile.
 - **Documentation**: Fullscale DSM Tutorial and adjusted learning tutorials to include new bidding strategy and one particularly for storages.
 - **New Redispatch Tutorial**: Provide a new tutorial referencing ongoing dveelopment on an extra branch.
@@ -78,7 +80,7 @@ Upcoming Release
 **New Features:**
 
 - **Add single bid RL strategy:** Added a new reinforcement learning strategy that allows agents to submit bids based on one action value only that determines the price at which the full capacity is offered.
-- **Bidding Strategy for Elastic Demand**: The new `ElasticDemandStrategy` enables demand units to submit multiple bids that approximate a marginal utility curve, using
+- **Bidding Strategy for Elastic Demand**: The new `EnergyHeuristicElasticStrategy` enables demand units to submit multiple bids that approximate a marginal utility curve, using
   either linear or isoelastic price elasticity models. Unlike other strategies, it does **not** rely on predefined volumes—bids are dynamically generated based on the
   unit’s elasticity configuration. To use this strategy, set `bidding_strategy` to `"demand_energy_heuristic_elastic"` in the `demand_units.csv` file and specify the following
   parameters: `elasticity` (must be negative), `elasticity_model` (`"linear"` or `"isoelastic"`), `num_bids`, and `price` (which acts as `max_price`). The `elasticity_model`
@@ -232,7 +234,7 @@ v0.4.2 - (5th November 2024)
 - **Residential Components**: Added new residential DST components including PV, EV, Heat Pump, and Boiler, now with enhanced docstrings for better usability.
 - **Modular DST Components**: DST components have been converted from functions to classes, improving modularity and reusability.
 - **Generic Storage Class**: Introduced a `GenericStorage` class for storage components. Specific classes, such as EV and Hydrogen Storage, now inherit from it.
-- **Storage Learning Strategy**: Added a new DRL-based learning strategy for storage units. To use it, set `storage_energy_learning` in the `bidding_EOM` column of `storage_units.csv`. Refer to the `StorageRLStrategy` documentation for more details.
+- **Storage Learning Strategy**: Added a new DRL-based learning strategy for storage units. To use it, set `storage_energy_learning` in the `bidding_EOM` column of `storage_units.csv`. Refer to the `StorageEnergyLearningStrategy` documentation for more details.
 - **Mango 2.x Update**: Upgraded to mango 2.x, enabling synchronous world creation. To upgrade an existing environment, run:
   ```
   pip uninstall -y mango-agents mango-agents-assume && pip install assume-framework --upgrade

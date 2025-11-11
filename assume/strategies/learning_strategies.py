@@ -17,6 +17,7 @@ from assume.common.base import (
     SupportsMinMax,
     SupportsMinMaxCharge,
 )
+from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
@@ -112,23 +113,22 @@ class TorchLearningStrategy(LearningStrategy):
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
-        upper_scaling_factor_price = max(unit.forecaster[f"price_{market_id}"])
-        lower_scaling_factor_price = min(unit.forecaster[f"price_{market_id}"])
-        upper_scaling_factor_res_load = max(
-            unit.forecaster[f"residual_load_{market_id}"]
+        upper_scaling_factor_price = max(unit.forecaster.price[market_id])
+        lower_scaling_factor_price = min(unit.forecaster.price[market_id])
+        residual_load = unit.forecaster.residual_load.get(
+            market_id, FastSeries(index=unit.index, value=0)
         )
-        lower_scaling_factor_res_load = min(
-            unit.forecaster[f"residual_load_{market_id}"]
-        )
+        upper_scaling_factor_res_load = max(residual_load)
+        lower_scaling_factor_res_load = min(residual_load)
 
         self.scaled_res_load_obs = min_max_scale(
-            unit.forecaster[f"residual_load_{market_id}"],
+            residual_load,
             lower_scaling_factor_res_load,
             upper_scaling_factor_res_load,
         )
 
         self.scaled_prices_obs = min_max_scale(
-            unit.forecaster[f"price_{market_id}"],
+            unit.forecaster.price[market_id],
             lower_scaling_factor_price,
             upper_scaling_factor_price,
         )
@@ -293,7 +293,7 @@ class TorchLearningStrategy(LearningStrategy):
         return curr_action, noise
 
 
-class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
+class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -684,23 +684,23 @@ class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
         unit.outputs["rl_rewards"].append(reward)
 
 
-class RLStrategySingleBid(RLStrategy, MinMaxStrategy):
+class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy with Single-Bid Structure for Energy-Only Markets.
 
-    This strategy is a simplified variant of the standard `RLStrategy`, which typically submits two
+    This strategy is a simplified variant of the standard `EnergyLearningStrategy`, which typically submits two
     separate price bids for inflexible (P_min) and flexible (P_max - P_min) components. Instead,
-    `RLStrategySingleBid` submits a single bid that always offers the unit's maximum power,
+    `EnergyLearningSingleBidStrategy` submits a single bid that always offers the unit's maximum power,
     effectively treating the full capacity as inflexible from a bidding perspective.
 
     The core reinforcement learning mechanics, including the observation structure, actor network
-    architecture, and reward formulation, remain consistent with the two-bid `RLStrategy`. However,
+    architecture, and reward formulation, remain consistent with the two-bid `EnergyLearningStrategy`. However,
     this strategy modifies the action space to produce only a single bid price, and omits the
     decomposition of capacity into flexible and inflexible parts.
 
     Attributes
     ----------
-    Inherits all attributes from RLStrategy, with the exception of:
+    Inherits all attributes from EnergyLearningStrategy, with the exception of:
     - act_dim : int
         Reduced to 1 to reflect single bid pricing.
     - foresight : int
@@ -794,7 +794,7 @@ class RLStrategySingleBid(RLStrategy, MinMaxStrategy):
         return bids
 
 
-class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
+class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -1041,7 +1041,7 @@ class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
         # that the strategy is not designed for multiple orders and the market configuration should be adjusted
         if len(orderbook) > 1:
             raise ValueError(
-                "StorageRLStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
+                "StorageEnergyLearningStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
             )
 
         order = orderbook[0]
@@ -1107,7 +1107,7 @@ class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
         unit.outputs["rl_rewards"].append(reward)
 
 
-class RenewableRLStrategy(RLStrategySingleBid):
+class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
     """
     Reinforcement Learning Strategy for a renewable unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.

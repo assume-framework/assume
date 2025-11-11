@@ -7,10 +7,11 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.fast_pandas import FastIndex, FastSeries
+from assume.common.forecaster import PowerplantForecaster
 from assume.strategies import (
-    flexableEOMBlock,
-    flexableEOMLinked,
+    EnergyHeuristicFlexableBlockStrategy,
+    EnergyHeuristicFlexableLinkedStrategy,
 )
 from assume.units import PowerPlant
 
@@ -21,8 +22,15 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
-    index = pd.date_range("2023-07-01", periods=48, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    index = FastIndex(start="2023-07-01", periods=48, freq="h")
+    ff = PowerplantForecaster(
+        index,
+        availability=FastSeries(index, 1),
+        market_prices={
+            "EOM": FastSeries(index, 0),
+        },
+        fuel_prices={"lignite": FastSeries(index, 10), "co2": FastSeries(index, 10)},
+    )
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
@@ -41,7 +49,7 @@ def power_plant() -> PowerPlant:
 def test_eom_with_blocks(mock_market_config, power_plant):
     power_plant.ramp_up = 400
     product_index = pd.date_range("2023-07-01", periods=24, freq="h")
-    strategy = flexableEOMBlock()
+    strategy = EnergyHeuristicFlexableBlockStrategy()
     mc = mock_market_config
     mc.product_type = "energy_eom"
     product_tuples = [
@@ -92,7 +100,7 @@ def test_eom_with_blocks(mock_market_config, power_plant):
 def test_eom_with_links(mock_market_config, power_plant):
     power_plant.ramp_up = 400
     product_index = pd.date_range("2023-07-01", periods=24, freq="h")
-    strategy = flexableEOMLinked()
+    strategy = EnergyHeuristicFlexableLinkedStrategy()
     mc = mock_market_config
     mc.product_type = "energy_eom"
     product_tuples = [
