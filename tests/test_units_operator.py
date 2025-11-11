@@ -19,7 +19,9 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.common.utils import datetime2timestamp
 from assume.strategies.naive_strategies import EnergyNaiveStrategy
-from assume.strategies.portfolio_strategies import UnitsOperatorEnergyNaiveDirectStrategy
+from assume.strategies.portfolio_strategies import (
+    UnitsOperatorEnergyNaiveDirectStrategy,
+)
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
 

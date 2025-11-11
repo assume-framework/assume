@@ -405,8 +405,12 @@ if __name__ == "__main__":
     ]
 
     default_strategy = {mc.market_id: "powerplant_energy_naive" for mc in marketdesign}
-    default_naive_strategy = {mc.market_id: "powerplant_energy_naive" for mc in marketdesign}
-    default_demand_strategy = {mc.market_id: "demand_energy_naive" for mc in marketdesign}
+    default_naive_strategy = {
+        mc.market_id: "powerplant_energy_naive" for mc in marketdesign
+    }
+    default_demand_strategy = {
+        mc.market_id: "demand_energy_naive" for mc in marketdesign
+    }
 
     bidding_strategies = {
         "hard coal": default_strategy,
@@ -419,7 +423,9 @@ if __name__ == "__main__":
         "wind": default_naive_strategy,
         "solar": default_naive_strategy,
         "demand": default_demand_strategy,
-        "storage": {mc.market_id: "storage_energy_heuristic_flexable" for mc in marketdesign},
+        "storage": {
+            mc.market_id: "storage_energy_heuristic_flexable" for mc in marketdesign
+        },
     }
     load_oeds(
         world,

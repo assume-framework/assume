@@ -155,7 +155,9 @@ def test_exchange_energy_naive_strategy_bidding(exchange_unit, market_config):
             assert bid["price"] == exchange_unit.price_export, "Incorrect export price"
 
 
-def test_exchange_energy_naive_strategy_import_only(exchange_import_only, market_config):
+def test_exchange_energy_naive_strategy_import_only(
+    exchange_import_only, market_config
+):
     """Test if the strategy only generates import bids when export is unavailable."""
     strategy = ExchangeEnergyNaiveStrategy()
     product_tuple = (datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 1), None)
@@ -169,7 +171,9 @@ def test_exchange_energy_naive_strategy_import_only(exchange_import_only, market
     ), "Incorrect import price"
 
 
-def test_exchange_energy_naive_strategy_export_only(exchange_export_only, market_config):
+def test_exchange_energy_naive_strategy_export_only(
+    exchange_export_only, market_config
+):
     """Test if the strategy only generates export bids when import is unavailable."""
     strategy = ExchangeEnergyNaiveStrategy()
     product_tuple = (datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 1), None)

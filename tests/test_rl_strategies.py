@@ -9,7 +9,10 @@ import pytest
 
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
-    from assume.strategies.learning_strategies import EnergyLearningStrategy, EnergyLearningSingleBidStrategy
+    from assume.strategies.learning_strategies import (
+        EnergyLearningSingleBidStrategy,
+        EnergyLearningStrategy,
+    )
 
 except ImportError:
     EnergyLearningStrategy = None

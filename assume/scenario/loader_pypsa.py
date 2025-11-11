@@ -223,7 +223,9 @@ if __name__ == "__main__":
         )
     default_strategies = {
         mc.market_id: (
-            "powerplant_energy_naive_redispatch" if mc.market_mechanism == "redispatch" else "demand_energy_naive"
+            "powerplant_energy_naive_redispatch"
+            if mc.market_mechanism == "redispatch"
+            else "demand_energy_naive"
         )
         for mc in marketdesign
     }

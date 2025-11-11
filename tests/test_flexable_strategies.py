@@ -10,8 +10,8 @@ import pytest
 
 from assume.common.forecasts import NaiveForecast
 from assume.strategies import (
-    EnergyHeuristicFlexableStrategy,
     CapacityHeuristicBalancingStrategy,
+    EnergyHeuristicFlexableStrategy,
     flexablePosCRM,
 )
 from assume.units import PowerPlant
