@@ -608,7 +608,7 @@ def convert_tensors(data):
         import torch as th
 
         def convert_tensor_batch(tensors):
-            # stack all tensors and push them over to CPU together to avoid inperformed multiple GPU-CPU transfers
+            # stack all tensors and push them over to CPU together to avoid unperformed multiple GPU-CPU transfers
             batch = th.stack(tensors, dim=0).cpu()
             return batch.tolist()
 
@@ -616,6 +616,7 @@ def convert_tensors(data):
             """
             Recursively collect all torch.Tensors from nested data structures,
             storing both the tensor and its location path.
+            Returns a copy of the structure with placeholders for tensors.
             """
             if collected is None:
                 collected = []
@@ -623,21 +624,18 @@ def convert_tensors(data):
                 path = []
 
             if isinstance(data, pd.Series):
-                new_series = pd.Series(index=data.index, dtype=object)
+                new_series = pd.Series(index=data.index, name=data.name, dtype=object)
                 for idx, x in data.items():
-                    if isinstance(x, (dict | list | th.Tensor)):
-                        new_val, _ = collect_tensors_with_paths(
-                            x, path + [idx], collected
-                        )
-                        new_series[idx] = new_val
-                    else:
-                        new_series[idx] = x
+                    new_val, collected = collect_tensors_with_paths(
+                        x, path + [idx], collected
+                    )
+                    new_series[idx] = new_val
                 return new_series, collected
 
             elif isinstance(data, dict):
                 new_dict = {}
                 for k, v in data.items():
-                    new_dict[k], _ = collect_tensors_with_paths(
+                    new_dict[k], collected = collect_tensors_with_paths(
                         v, path + [k], collected
                     )
                 return new_dict, collected
@@ -645,17 +643,20 @@ def convert_tensors(data):
             elif isinstance(data, list):
                 new_list = []
                 for i, item in enumerate(data):
-                    new_item, _ = collect_tensors_with_paths(
+                    new_item, collected = collect_tensors_with_paths(
                         item, path + [i], collected
                     )
                     new_list.append(new_item)
                 return new_list, collected
 
             elif isinstance(data, th.Tensor):
+                # Store the path and tensor
                 collected.append((path, data))
+                # Return a placeholder (will be replaced later)
                 return None, collected
 
             else:
+                # Non-tensor data, return as-is
                 return data, collected
 
         def reconstruct_data(structure, tensor_paths, new_values):
@@ -664,23 +665,41 @@ def convert_tensors(data):
             at the positions described by tensor_paths.
             """
             for path, val in zip(tensor_paths, new_values):
+                if not path:  # Empty path means the root is a tensor
+                    return val
+
                 target = structure
+                # Navigate to the parent of the target location
                 for p in path[:-1]:
                     target = target[p]
-                target[path[-1]] = val
+
+                # Set the final value
+                final_key = path[-1]
+                if isinstance(target, (list | pd.Series)):
+                    target[final_key] = val
+                elif isinstance(target, dict):
+                    target[final_key] = val
+
             return structure
 
-        # 1. collect tensors with their paths
+        # Handle the case where data itself is a tensor
+        if isinstance(data, th.Tensor):
+            return data.cpu().tolist()
+
+        # 1. Collect tensors with their paths
         structure, tensor_info = collect_tensors_with_paths(data)
-        tensor_paths, tensors = zip(*tensor_info) if tensor_info else ([], [])
+
+        if not tensor_info:
+            # No tensors found, return original data
+            return data
+
+        tensor_paths, tensors = zip(*tensor_info)
 
         # 2. Process batch from GPU to CPU and convert to list
-        converted = convert_tensor_batch(tensors) if tensors else []
+        converted = convert_tensor_batch(list(tensors))
 
-        # 3. reconstruct initial data structure
-        final_data = (
-            reconstruct_data(structure, tensor_paths, converted) if tensors else data
-        )
+        # 3. Reconstruct initial data structure
+        final_data = reconstruct_data(structure, tensor_paths, converted)
 
         return final_data
 
