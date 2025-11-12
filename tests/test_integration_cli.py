@@ -37,7 +37,8 @@ def test_cli():
 @pytest.mark.slow
 @pytest.mark.require_network
 def test_cli_network():
-    args = "-s example_01d -c base -db sqlite:///./examples/local_db/test_mini_net.db"
+    dburi = "sqlite:///./examples/local_db/test_mini_net.db"
+    args = f"-s example_01d -c base -db {dburi}"
     cli(args.split(" "))
 
 
@@ -45,5 +46,23 @@ def test_cli_network():
 @pytest.mark.require_learning
 def test_cli_learning():
     os.putenv("OVERWRITE_LEARNED_STRATEGIES", "TRUE")
-    args = "-s example_02a -c tiny -db sqlite:///./examples/local_db/test_mini_rl.db"
+    dburi = "sqlite:///./examples/local_db/test_mini_rl.db"
+    args = f"-s example_02a -c tiny -db {dburi}"
     cli(args.split(" "))
+
+    db = create_engine(dburi)
+    with db.begin() as conn:
+        got = pd.read_sql(
+            """
+                          SELECT episode,
+                                 unit,
+                                 SUM(reward) AS total_reward
+                          FROM rl_params
+                          WHERE simulation = 'example_02a_tiny'
+                            AND evaluation_mode = FALSE
+                          GROUP BY episode, unit
+                          """,
+            conn,
+        )
+    assert len(got) == 10
+    assert got["total_reward"][0] < got["total_reward"][9]  # its somehow converging
