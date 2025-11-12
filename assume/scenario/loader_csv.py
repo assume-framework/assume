@@ -1056,7 +1056,7 @@ def run_learning(
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
 
-    if Path(save_path).is_dir() and os.getenv("OVERWRITE_LEARNED_STRATEGIES") == "":
+    if Path(save_path).is_dir() and not os.getenv("OVERWRITE_LEARNED_STRATEGIES"):
         if world.learning_config.get("continue_learning", False):
             logger.warning(
                 f"Save path '{save_path}' exists.\n"
