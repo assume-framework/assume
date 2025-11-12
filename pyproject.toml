@@ -132,6 +132,7 @@ filterwarnings = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "require_learning",
+    "require_network",
 ]
 addopts = ["--ignore=assume-db"]
 
