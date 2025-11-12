@@ -114,10 +114,10 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_with_vre_and_storage"
+    example = "small_learning_2"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     #     unit_type="custom_unit",
     # )
 
-    if world.learning_config.get("learning_mode", False):
+    if world.learning_config.learning_mode:
         # run learning if learning mode is enabled
         run_learning(world)
 

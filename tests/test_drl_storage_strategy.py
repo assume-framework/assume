@@ -28,31 +28,30 @@ def storage_unit() -> Storage:
     """
     Fixture to create a Storage unit instance with example parameters.
     """
-    # Define the learning configuration for the StorageEnergyLearningStrategy
-    learning_config: LearningConfig = {
+    # Define the learning configuration for the StorageRLStrategy
+    config = {
         "obs_dim": 50,
         "act_dim": 2,
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "training_episodes": 3,
         "unit_id": "test_storage",
-        "max_bid_price": 100,
         "max_demand": 1000,
-        "evaluation_mode": False,
-        "continue_learning": False,
-        "trained_policies_save_path": "not required",
+        "learning_config": LearningConfig(
+            algorithm="matd3",
+            learning_mode=True,
+            training_episodes=3,
+            max_bid_price=100,
+        ),
     }
 
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = UnitForecaster(index, market_prices={"test_market": 50})
-    learning_role = Learning(learning_config, index[0], index[-1])
+    learning_role = Learning(config["learning_config"], index[0], index[-1])
     return Storage(
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
         bidding_strategies={
             "test_market": StorageEnergyLearningStrategy(
-                learning_role=learning_role, **learning_config
+                learning_role=learning_role, **config
             )
         },
         max_power_charge=-500,  # Negative for charging
@@ -107,7 +106,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=10.0):
             # Calculate bids using the strategy
-            bids = strategy.calculate_bids(
+            bids = strategy.calculate_bids(  # TODO
                 storage_unit, mc, product_tuples=product_tuples
             )
 

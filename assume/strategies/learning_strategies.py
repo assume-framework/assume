@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from copy import deepcopy
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,7 +27,6 @@ from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
 logger = logging.getLogger(__name__)
 
-
 class TorchLearningStrategy(LearningStrategy):
     """
     A strategy to enable machine learning with pytorch.
@@ -38,17 +38,18 @@ class TorchLearningStrategy(LearningStrategy):
         self.unit_id = kwargs["unit_id"]
 
         # defines bounds of actions space
-        self.min_bid_price = kwargs.get("min_bid_price", -100)
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
+        self.min_bid_price = self.learning_config.min_bid_price
+        self.max_bid_price = self.learning_config.max_bid_price
 
         # tells us whether we are training the agents or just executing per-learning strategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.evaluation_mode = kwargs.get("evaluation_mode", False)
+        self.learning_mode = self.learning_config.learning_mode
+        self.evaluation_mode = self.learning_config.evaluation_mode
 
         # based on learning config
-        self.algorithm = kwargs.get("algorithm", "matd3")
-        self.actor_architecture = kwargs.get("actor_architecture", "mlp")
+        self.algorithm = self.learning_config.algorithm
+        self.actor_architecture = self.learning_config.actor_architecture
 
+        # check if actor architecture is available
         if self.actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
                 self.actor_architecture
@@ -59,7 +60,7 @@ class TorchLearningStrategy(LearningStrategy):
             )
 
         # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
+        device = self.learning_config.device
         self.device = th.device(device if th.cuda.is_available() else "cpu")
         if self.learning_mode and not self.learning_role:
             raise AssumeException("Learning Role must be set in LearningMode")
@@ -73,28 +74,30 @@ class TorchLearningStrategy(LearningStrategy):
         self.float_type = th.float
 
         # define standard deviation for the initial exploration noise
-        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
+        self.exploration_noise_std = self.learning_config.exploration_noise_std
 
         if self.learning_mode or self.evaluation_mode:
-            self.collect_initial_experience_mode = bool(
-                kwargs.get("episodes_collecting_initial_experience", True)
+            self.collect_initial_experience_mode = (
+                self.learning_config.collect_initial_experience_mode
             )
 
             self.action_noise = NormalActionNoise(
                 mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
+                sigma=self.learning_config.noise_sigma,
                 action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
+                scale=self.learning_config.noise_scale,
+                dt=self.learning_config.noise_dt,
             )
 
             self.learning_role.register_strategy(self)
 
-        elif Path(kwargs["trained_policies_load_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
+        elif Path(self.learning_config.trained_policies_load_path).is_dir():
+            self.load_actor_params(
+                load_path=self.learning_config.trained_policies_load_path
+            )
         else:
             raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies. Expected them under filepath '{self.learning_config.trained_policies_load_path}'."
             )
 
     def load_actor_params(self, load_path):
@@ -725,6 +728,9 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
     """
 
     def __init__(self, *args, **kwargs):
+        obs_dim = kwargs.pop("obs_dim", 74)
+        act_dim = kwargs.pop("act_dim", 1)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
             *args,
             **kwargs,
