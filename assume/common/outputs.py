@@ -267,7 +267,12 @@ class WriteOutput(Role):
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
 
         # check for tensors and convert them to floats
-        df = df.apply(convert_tensors)
+        # TODO: apply on dataframe with datetime index (column is pd.Series) doesn't work
+        # df = df.apply(convert_tensors)
+
+        # workaround: apply on each column
+        for col in df.columns:
+            df[col] = df[col].apply(convert_tensors)
 
         return df
 
