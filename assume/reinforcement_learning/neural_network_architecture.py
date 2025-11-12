@@ -22,7 +22,7 @@ class CriticTD3(nn.Module):
         obs_dim: int,
         act_dim: int,
         float_type,
-        unique_obs_dim: int = 0,
+        unique_obs_dim: int,
     ):
         super().__init__()
 
@@ -197,7 +197,7 @@ class LSTMActor(Actor):
         obs_dim: int,
         act_dim: int,
         float_type,
-        unique_obs_dim: int = 0,
+        unique_obs_dim: int,
         num_timeseries_obs_dim: int = 3,
         *args,
         **kwargs,

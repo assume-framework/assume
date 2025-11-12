@@ -2,15 +2,19 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from copy import deepcopy
+import logging
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TypedDict
 
 import numpy as np
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
+
+logger = logging.getLogger(__name__)
 
 
 class BaseStrategy:
@@ -744,6 +748,141 @@ class BaseStrategy:
         return cleaned_bids
 
 
+@dataclass
+class LearningConfig:
+    """
+    A class for the learning configuration.
+
+    Attributes:
+        continue_learning (bool): Whether to use pre-learned strategies and then continue learning.
+            If True, loads existing policies from trained_policies_load_path and continues training. Default is False.
+        min_bid_price (float | None): The minimum bid price which limits the action of the actor to this price.
+            Used to constrain the actor's output to a realistic price range. Default is -100.0.
+        max_bid_price (float | None): The maximum bid price which limits the action of the actor to this price.
+            Used to constrain the actor's output to a realistic price range. Default is 100.0.
+        learning_mode (bool): Should we use learning mode at all? If False, the learning bidding strategy is
+            overwritten with a default strategy and no training occurs. Default is False.
+        evaluation_mode (bool): Whether to run in evaluation mode. If True, the agent uses the learned policy
+            without exploration noise and no training updates occur. Default is False.
+        algorithm (str): Specifies which reinforcement learning algorithm to use. Currently, only "matd3"
+            (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient) is implemented. Default is "matd3".
+        actor_architecture (str): The architecture of the neural networks used for the actors. Options include
+            "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
+        replay_buffer_size (int): The maximum number of transitions stored in the replay buffer for experience replay.
+            Larger buffers allow for more diverse training samples. Default is 500000.
+        learning_rate (float): The learning rate (step size) for the optimizer, which controls how much the
+            policy and value networks are updated during training. Default is 0.001.
+        learning_rate_schedule (str | None): Which learning rate decay schedule to use. Currently only "linear"
+            decay is available, which linearly decreases the learning rate over time. Default is None (constant learning rate).
+        training_episodes (int): The number of training episodes, where one episode is the entire simulation
+            horizon specified in the general config. Default is 100.
+        episodes_collecting_initial_experience (int): The number of episodes at the start during which random
+            actions are chosen instead of using the actor network. This helps populate the replay buffer with
+            diverse experiences. Default is 5.
+        collect_initial_experience_mode (bool): If True, the agent is currently in the initial experience
+            collection phase where it takes random actions. Default is True.
+        validation_episodes_interval (int): The interval (in episodes) at which validation episodes are run
+            to evaluate the current policy's performance without training updates. Default is 5.
+        train_freq (str): Defines the frequency in time steps at which the actor and critic networks are updated.
+            Accepts time strings like "24h" for 24 hours or "1d" for 1 day. Default is "24h".
+        gradient_steps (int): The number of gradient descent steps performed during each training update.
+            More steps can lead to better learning but increase computation time. Default is 100.
+        batch_size (int): The batch size of experiences sampled from the replay buffer for each training update.
+            Larger batches provide more stable gradients but require more memory. Default is 128.
+        gamma (float): The discount factor for future rewards, ranging from 0 to 1. Higher values give more
+            weight to long-term rewards in decision-making. Default is 0.99.
+        tau (float): The soft update coefficient for updating target networks. Controls how slowly target
+            networks track the main networks. Smaller values mean slower updates. Default is 0.005.
+        policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated.
+            TD3 updates the critic more frequently than the actor to stabilize training. Default is 2.
+        target_policy_noise (float): The standard deviation of noise added to target policy actions during
+            critic updates. This smoothing helps prevent overfitting to narrow policy peaks. Default is 0.2.
+        target_noise_clip (float): The maximum absolute value for clipping the target policy noise.
+            Prevents the noise from being too large. Default is 0.5.
+        device (str): The device to use for PyTorch computations. Options include "cpu", "cuda", or specific
+            CUDA devices like "cuda:0". Default is "cpu".
+        noise_sigma (float): The standard deviation of the Ornstein-Uhlenbeck or Gaussian noise distribution
+            used to generate exploration noise added to actions. Default is 0.1.
+        noise_scale (int): The scale factor multiplied by the noise drawn from the distribution.
+            Larger values increase exploration. Default is 1.
+        noise_dt (int): The time step parameter for the Ornstein-Uhlenbeck process, which determines how
+            quickly the noise decays over time. Used for noise scheduling. Default is 1.
+        exploration_noise_std (float): The standard deviation of Gaussian noise added to actions during
+            exploration in the environment. Higher values encourage more exploration. Default is 0.2.
+        action_noise_schedule (str | None): Which action noise decay schedule to use. Currently only "linear"
+            decay is available, which linearly decreases exploration noise over training. Default is "linear".
+        trained_policies_save_path (str | None): The directory path - relative to the scenario's inputs_path - where newly trained RL policies (actor and
+            critic networks) will be saved. Only needed when learning_mode is True. Default is None.
+        trained_policies_load_path (str | None): The directory path - relative to the scenario's inputs_path - from which pre-trained policies should be
+            loaded. If not provided, defaults to trained_policies_save_path. Only needed when continue_learning
+            is True. Default is None.
+        early_stopping_steps (int | None): The number of validation steps over which the moving average reward
+            is calculated for early stopping. If the reward doesn't improve by early_stopping_threshold over
+            this many steps, training stops. If None, defaults to training_episodes / validation_episodes_interval + 1.
+            Default is None.
+        early_stopping_threshold (float): The minimum improvement in moving average reward required to avoid
+            early stopping. If the reward improvement is less than this threshold over early_stopping_steps,
+            training is terminated early. Default is 0.05.
+    """
+
+    continue_learning: bool = False
+    min_bid_price: float | None = -100.0
+    max_bid_price: float | None = 100.0
+    learning_mode: bool = False
+    evaluation_mode: bool = False
+    algorithm: str = "matd3"
+    actor_architecture: str = "mlp"
+    replay_buffer_size: int = 50000
+    learning_rate: float = 0.001
+    learning_rate_schedule: str | None = None
+    training_episodes: int = 100
+    episodes_collecting_initial_experience: int = 5
+    collect_initial_experience_mode: bool = True
+    validation_episodes_interval: int = 5
+    train_freq: str = "24h"
+    gradient_steps: int = 100
+    batch_size: int = 128
+    gamma: float = 0.99
+    tau: float = 0.005
+    policy_delay: int = 2
+    target_policy_noise: float = 0.2
+    target_noise_clip: float = 0.5
+    device: str = "cpu"
+    noise_sigma: float = 0.1
+    noise_scale: int = 1
+    noise_dt: int = 1
+    exploration_noise_std: float = 0.2
+    action_noise_schedule: str | None = "linear"
+    trained_policies_save_path: str | None = ""
+    trained_policies_load_path: str | None = None
+    early_stopping_steps: int | None = None
+    early_stopping_threshold: float = 0.05
+
+    def __post_init__(self):
+        """Calculate defaults that depend on other fields and validate inputs."""
+        if self.early_stopping_steps is None:
+            self.early_stopping_steps = int(
+                self.training_episodes / self.validation_episodes_interval + 1
+            )
+
+        if self.trained_policies_load_path is None:
+            self.trained_policies_load_path = self.trained_policies_save_path
+
+        # if we do not have initial experience collected we will get an error as no samples are available on the
+        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
+        if self.episodes_collecting_initial_experience < 1:
+            logger.warning(
+                f"episodes_collecting_initial_experience need to be at least 1 to sample from buffer, got {self.episodes_collecting_initial_experience}. setting to 1"
+            )
+
+            self.episodes_collecting_initial_experience = 1
+
+        # check that gradient_steps is positive
+        if self.gradient_steps <= 0:
+            raise ValueError(
+                f"gradient_steps need to be positive, got {self.gradient_steps}"
+            )
+
 class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
@@ -758,6 +897,7 @@ class LearningStrategy(BaseStrategy):
         act_dim (int): The action dimension.
         unique_obs_dim (int): The unique observation dimension.
         num_timeseries_obs_dim (int): The number of observation timeseries dimension.
+        learning_role (Learning): The learning role orchestrating the learning.
 
     Args:
         *args (list): The arguments.
@@ -768,9 +908,9 @@ class LearningStrategy(BaseStrategy):
         self,
         obs_dim: int,
         act_dim: int,
-        unique_obs_dim: int = 0,
+        unique_obs_dim: int,
         num_timeseries_obs_dim: int = 3,
-        learning_role=None,
+        learning_role = None,
         *args,
         **kwargs,
     ):
@@ -778,6 +918,10 @@ class LearningStrategy(BaseStrategy):
         Initializes the learning strategy.
         """
         super().__init__(*args, **kwargs)
+
+        # access to the learning_role that orchestrates learning
+        self.learning_role = learning_role
+        self.learning_config = deepcopy(learning_role.learning_config)
 
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -790,10 +934,6 @@ class LearningStrategy(BaseStrategy):
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
 
-        # access to the learning_role that orchestrates learning
-        self.learning_role = learning_role
-
-
 class MinMaxStrategy(BaseStrategy):
     pass
 
@@ -804,33 +944,3 @@ class MinMaxChargeStrategy(BaseStrategy):
 
 class ExchangeStrategy(BaseStrategy):
     pass
-
-
-class LearningConfig(TypedDict):
-    """
-    A class for the learning configuration.
-    """
-
-    continue_learning: bool
-    min_bid_price: float
-    max_bid_price: float
-    learning_mode: bool
-    algorithm: str
-    actor_architecture: str
-    learning_rate: float
-    learning_rate_schedule: str
-    training_episodes: int
-    episodes_collecting_initial_experience: int
-    train_freq: str
-    gradient_steps: int
-    batch_size: int
-    gamma: float
-    device: str
-    noise_sigma: float
-    noise_scale: int
-    noise_dt: int
-    action_noise_schedule: str
-    trained_policies_save_path: str
-    trained_policies_load_path: str
-    early_stopping_steps: int
-    early_stopping_threshold: float

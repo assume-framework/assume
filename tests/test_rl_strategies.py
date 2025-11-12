@@ -36,16 +36,15 @@ def power_plant() -> PowerPlant:
         fuel_prices={"lignite": 10, "co2": 10},
         residual_load={"EOM": 0},
     )
-    learning_config: LearningConfig = {
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "evaluation_mode": False,
-        "continue_learning": False,
-        "trained_policies_save_path": "not required",
-        "training_episodes": 3,
+    config = {
         "unit_id": "test_pp",
+        "learning_config": LearningConfig(
+            algorithm="matd3",
+            learning_mode=True,
+            training_episodes=3,
+        ),
     }
-    learning_role = Learning(learning_config, start, end)
+    learning_role = Learning(config["learning_config"], start, end)
 
     return PowerPlant(
         id="test_pp",
@@ -57,9 +56,7 @@ def power_plant() -> PowerPlant:
         efficiency=0.5,
         additional_cost=10,
         bidding_strategies={
-            "EOM": EnergyLearningStrategy(
-                learning_role=learning_role, **learning_config
-            )
+            "EOM": EnergyLearningStrategy(learning_role=learning_role, **config)
         },
         fuel_type="lignite",
         emission_factor=0.5,
@@ -69,11 +66,11 @@ def power_plant() -> PowerPlant:
 
 @pytest.mark.require_learning
 @pytest.mark.parametrize(
-    "strategy_class, obs_dim, act_dim, actor_architecture, expected_bid_count, expected_volumes",
+    "strategy_class, obs_dim, act_dim, unique_obs_dim, actor_architecture, expected_bid_count, expected_volumes",
     [
-        (EnergyLearningStrategy, 38, 2, "mlp", 2, [200, 800]),
-        (EnergyLearningStrategy, 38, 2, "lstm", 2, [200, 800]),
-        (EnergyLearningSingleBidStrategy, 74, 1, "mlp", 1, [1000]),
+        (EnergyLearningStrategy, 38, 2, 2, "mlp", 2, [200, 800]),
+        (EnergyLearningStrategy, 38, 2, 2, "lstm", 2, [200, 800]),
+        (EnergyLearningSingleBidStrategy, 74, 1, 2, "mlp", 1, [1000]),
     ],
 )
 def test_learning_strategies_parametrized(
@@ -82,6 +79,7 @@ def test_learning_strategies_parametrized(
     strategy_class,
     obs_dim,
     act_dim,
+    unique_obs_dim,
     actor_architecture,
     expected_bid_count,
     expected_volumes,
@@ -92,24 +90,21 @@ def test_learning_strategies_parametrized(
     product_tuples = [
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
-
-    # Build learning config dynamically
-    learning_config: LearningConfig = {
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "training_episodes": 3,
+    # Build LearningConfig dynamically
+    config = {
         "unit_id": power_plant.id,
-        "evaluation_mode": False,
-        "continue_learning": False,
-        "trained_policies_save_path": "not required",
+        "learning_config": LearningConfig(
+            algorithm="matd3",
+            actor_architecture=actor_architecture,
+            learning_mode=True,
+            training_episodes=3,
+        ),
     }
-    if actor_architecture != "mlp":
-        learning_config["actor_architecture"] = actor_architecture
 
-    learning_role = Learning(learning_config, start, end)
+    learning_role = Learning(config["learning_config"], start, end)
     # Override the strategy
     power_plant.bidding_strategies[mc.market_id] = strategy_class(
-        learning_role=learning_role, **learning_config
+        learning_role=learning_role, **config
     )
     strategy = power_plant.bidding_strategies[mc.market_id]
 

@@ -186,7 +186,7 @@ class World:
         simulation_id: str,
         save_frequency_hours,
         bidding_params: dict = {},
-        learning_config: LearningConfig = {},
+        learning_config: LearningConfig | None = None,
         episode: int = 1,
         eval_episode: int = 1,
         manager_address=None,
@@ -223,8 +223,12 @@ class World:
         self.end = end
         self.learning_config = learning_config
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        self.learning_mode = self.learning_config.get("learning_mode", False)
-        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
+        if self.learning_config is None:
+            self.learning_mode = False
+            self.evaluation_mode = False
+        else:
+            self.learning_mode = self.learning_config.learning_mode
+            self.evaluation_mode = self.learning_config.evaluation_mode
 
         # initialize a config dictionary for the scenario data if not already present
         if not self.scenario_data.get("config"):
@@ -300,16 +304,14 @@ class World:
         the RL agent and adds the learning role to it for further processing.
         """
 
-        self.bidding_params.update(self.learning_config)
+        from assume.reinforcement_learning.learning_role import Learning
+
+        self.learning_role = Learning(
+            self.learning_config, start=self.start, end=self.end
+        )
 
         if self.learning_mode or self.evaluation_mode:
             # if so, we initiate the rl learning role with parameters
-            from assume.reinforcement_learning.learning_role import Learning
-
-            self.learning_role = Learning(
-                self.learning_config, start=self.start, end=self.end
-            )
-
             rl_agent = agent_composed_of(
                 self.learning_role,
                 register_in=self.container,
@@ -325,9 +327,6 @@ class World:
                 output_agent_addr=self.output_agent_addr,
                 train_start=self.start,
             )
-
-        else:
-            self.learning_role = None
 
     def setup_output_agent(
         self,
@@ -537,10 +536,7 @@ class World:
 
             if strategy not in strategy_instances:
                 # check if created cache has learning_strategy
-                if (
-                    issubclass(self.bidding_strategies[strategy], LearningStrategy)
-                    and self.learning_mode
-                ):
+                if issubclass(self.bidding_strategies[strategy], LearningStrategy):
                     # add learning role to the strategy to have access to store training data etc
                     strategy_instances[strategy] = self.bidding_strategies[strategy](
                         unit_id=unit_id,
