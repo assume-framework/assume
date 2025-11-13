@@ -14,7 +14,7 @@ As described in the :ref:`exchangeable_bidding_strategy`, a Bidding Strategy dic
 In general, there is a distinction between two kinds of strategy classes:
 
 - :py:meth:`assume.strategies.portfolio_strategies.UnitOperatorStrategy`, which indicate the use in a UnitsOperator and can be used to provide a Portfolio optimization.
-- :py:meth:`assume.strategies.naive_strategies.UnitStrategy`, which indicate the strategy used for a single unit of :doc:`units` and
+- Strategies used for a single unit of :doc:`units`, which range from naive (e.g. 'assume.strategies.naive_strategies.EnergyNaiveStrategy')to advanced (e.g. 'assume.strategies.advanced_orders.EnergyHeuristicFlexableLinkedStrategy').
 
 Both types have a function `calculate_bids` which is called with the information of the market and bids to bid on.
 
@@ -22,7 +22,7 @@ UnitOperatorStrategy
 --------------------
 
 The UnitsOperatorStrategies can be used to adjust the behavior of the UnitsOperator.
-The default is the :py:meth:`assume.strategies.portfolio_strategies.UnitsOperatorEnergyNaiveDirectStrategy`.
+The default is the :py:meth:`assume.strategies.portfolio_strategies.UnitsOperatorDirectStrategy`.
 It formulates the bids to the market according to the bidding strategy of the each unit individually.
 This calls `calculate_bids`` of each unit and returns the aggregated list of all individual bids of all units.
 This is the default for all UnitsOperators which do not have a separate strategy configured.
