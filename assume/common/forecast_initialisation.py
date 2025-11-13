@@ -32,7 +32,6 @@ class ForecastInitialisation:
         market_configs (dict[str, dict]): Configuration details for the markets.
         buses (pd.DataFrame | None, optional): A DataFrame of buses information. Defaults to None.
         lines (pd.DataFrame | None, optional): A DataFrame of line information. Defaults to None.
-        save_path (str, optional): Path where the forecasts should be saved. Defaults to an empty string.
         *args (object): Additional positional arguments.
         **kwargs (object): Additional keyword arguments.
 
@@ -570,3 +569,20 @@ class ForecastInitialisation:
         renewable_utilisation["all_nodes_renewable_utilisation"] = all_nodes_sum
 
         return renewable_utilisation
+
+    def save_forecasts(self, path: str):
+        """
+        Saves the forecasts to a csv file located at the specified path.
+
+        Args:
+            path (str): The path to save the forecasts to.
+
+        Raises:
+            ValueError: If no forecasts are provided, an error message is logged.
+        """
+
+        merged_forecasts = pd.DataFrame(self.forecasts)
+        merged_forecasts.index = pd.date_range(
+            start=self.index[0], end=self.index[-1], freq=self.index.freq
+        )
+        merged_forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
