@@ -27,7 +27,7 @@ from assume.common.utils import (
 )
 from assume.strategies import (
     UnitOperatorStrategy,
-    UnitsOperatorEnergyNaiveDirectStrategy,
+    UnitsOperatorDirectStrategy,
 )
 from assume.units import BaseUnit
 
@@ -69,7 +69,7 @@ class UnitsOperator(Role):
         for market in self.available_markets:
             if market.market_id not in self.portfolio_strategies.keys():
                 self.portfolio_strategies[market.market_id] = (
-                    UnitsOperatorEnergyNaiveDirectStrategy()
+                    UnitsOperatorDirectStrategy()
                 )
 
         # valid_orders per product_type

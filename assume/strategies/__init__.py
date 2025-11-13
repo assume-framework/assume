@@ -34,7 +34,7 @@ from assume.strategies.dmas_powerplant import EnergyOptimizationDmasStrategy
 from assume.strategies.dmas_storage import StorageEnergyOptimizationDmasStrategy
 from assume.strategies.portfolio_strategies import (
     UnitOperatorStrategy,
-    UnitsOperatorEnergyNaiveDirectStrategy,
+    UnitsOperatorDirectStrategy,
     UnitsOperatorEnergyHeuristicCournotStrategy,
 )
 
@@ -89,7 +89,7 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "powerplant_energy_optimization_dmas": EnergyOptimizationDmasStrategy,
     "storage_energy_optimization_dmas": StorageEnergyOptimizationDmasStrategy,
     "units_operator_energy_heuristic_cournot": UnitsOperatorEnergyHeuristicCournotStrategy,
-    "units_operator_energy_naive_direct": UnitsOperatorEnergyNaiveDirectStrategy,
+    "units_operator_direct": UnitsOperatorDirectStrategy,
     "powerplant_energy_naive_profile": EnergyNaiveProfileStrategy,
     "powerplant_energy_interactive": EnergyInteractiveStrategy,
 }

@@ -20,7 +20,7 @@ from assume.common.units_operator import UnitsOperator
 from assume.common.utils import datetime2timestamp
 from assume.strategies.naive_strategies import EnergyNaiveStrategy
 from assume.strategies.portfolio_strategies import (
-    UnitsOperatorEnergyNaiveDirectStrategy,
+    UnitsOperatorDirectStrategy,
 )
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
@@ -158,7 +158,7 @@ async def test_independent_bids_portfolio(units_operator: UnitsOperator):
     from assume.common.utils import get_available_products
 
     products = get_available_products(marketconfig.market_products, start)
-    strategy = UnitsOperatorEnergyNaiveDirectStrategy()
+    strategy = UnitsOperatorDirectStrategy()
     orderbook = strategy.calculate_bids(units_operator, marketconfig, products)
     assert len(orderbook) == 1
 

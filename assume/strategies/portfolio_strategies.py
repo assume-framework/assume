@@ -63,7 +63,7 @@ class UnitOperatorStrategy:
         return total_capacity
 
 
-class UnitsOperatorEnergyNaiveDirectStrategy(UnitOperatorStrategy):
+class UnitsOperatorDirectStrategy(UnitOperatorStrategy):
     def calculate_bids(
         self,
         units_operator,  # type: UnitsOperator
