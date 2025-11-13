@@ -88,7 +88,11 @@ powerplant_energy_naive_profile     EOM, CRM_pos, CRM_neg    Similar to powerpla
                                                              starting timepoint.
 powerplant_energy_naive_redispatch  redispatch               Submits unit info and currently dispatched power for upcoming hours to the redispatch market (includes marginal cost, ramping,
                                                              and dispatch information).
-demand_energy_naive_redispatch      redispatch               Naive DSM strategy for industry/household units; bids available flexibility on redispatch. Volume equals flexible power at product
+demand_energy_naive_redispatch      redispatch               Submits unit info and currently dispatched power for upcoming hours to the redispatch market (includes marginal cost, ramping,
+                                                             and dispatch information).
+household_energy_naive_redispatch   redispatch               Naive DSM strategy for industry/household units; bids available flexibility on redispatch. Volume equals flexible power at product
+                                                             start; price equals marginal cost at product start.
+industry_energy_naive_redispatch   redispatch                Naive DSM strategy for industry/household units; bids available flexibility on redispatch. Volume equals flexible power at product
                                                              start; price equals marginal cost at product start.
 exchange_energy_naive               EOM                      Incorporates cross-border trading: submits export (negative volume) and import bids. Exports are treated as demand with very high
                                                              bid price; imports as supply with a very low bid price to virtually guarantee acceptance.
