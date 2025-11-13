@@ -46,7 +46,7 @@ Optimization                    Methodology, based on the flexABLE methodology [
                                 compared to the Naive methods. Applicable to power plant and storage units, it incorporates market dynamics to a greater degree by forecasting market
                                 prices, as well as accounting for operational history, potential power loss due to heat production, and the fact that a plant can make bids for
                                 multiple markets at the same time.
-Learning                        A `reinforcement learning <https://assume.readthedocs.io/en/latest/learning.html>`_ (RL) approach to formulating bids for an Energy-Only Market.
+Learning                        A :doc:`reinforcement learning <learning>` (RL) approach to formulating bids for an Energy-Only Market.
                                 Agents perform actions (choose bid price(s) and for storage a direction) informed by observations (including forecasted residual load, forecasted
                                 price, marginal cost). Bid volumes are fixed to the maximum possible volume. Based on the reward (profits) from accepted bids, agents learn to optimise
                                 bids to maximise profits. This requires to have PyTorch installed.
@@ -184,7 +184,7 @@ Learning
 ===================================== ================== =============================================================
 bidding_strategy_id                   For Market Types   Description
 ===================================== ================== =============================================================
-powerplant_energy_learning            EOM                A `reinforcement learning <https://assume.readthedocs.io/en/latest/learning_algorithm.html#td3-twin-delayed-ddpg>`_ (RL) approach to formulating bids for a
+powerplant_energy_learning            EOM                A :ref:`reinforcement learning <td3learning>` (RL) approach to formulating bids for a
                                                          Power Plant in an Energy-Only Market. The agent's actions are
                                                          two bid prices: one for the inflexible component (P_min) and another for the flexible component (P_max - P_min) of a unit's capacity.
                                                          The bids are informed by 50 observations, which include forecasted residual load, forecasted price, total capacity, and marginal cost,

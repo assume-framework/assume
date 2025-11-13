@@ -73,7 +73,7 @@ assume.strategies.naive\_strategies module
    :show-inheritance:
 
 assume.strategies.interactive\_strategies module
-----------------------------------------------
+------------------------------------------------
 
 .. automodule:: assume.strategies.interactive_strategies
    :members:
