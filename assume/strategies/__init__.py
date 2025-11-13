@@ -38,8 +38,8 @@ from assume.strategies.portfolio_strategies import (
     UnitsOperatorEnergyHeuristicCournotStrategy,
 )
 
-bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
-    # TODO: REMOVE BECAUSE OF DEPRECATION ####################################
+# TODO remove after a few releases
+deprecated_bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "naive_neg_reserve": EnergyNaiveStrategy,
     "naive_exchange": ExchangeEnergyNaiveStrategy,
     "naive_eom": EnergyNaiveStrategy,
@@ -59,7 +59,9 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "naive_redispatch": EnergyNaiveRedispatchStrategy,
     "naive_da_dsm": DsmEnergyOptimizationStrategy,
     "naive_redispatch_dsm": DsmEnergyNaiveRedispatchStrategy,
-    # END OF REMOVE ################################################################
+}
+
+bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "powerplant_energy_naive": EnergyNaiveStrategy,
     "demand_energy_naive": EnergyNaiveStrategy,
     "powerplant_energy_naive_balancing": EnergyNaiveStrategy,
@@ -102,13 +104,12 @@ try:
         RenewableEnergyLearningSingleBidStrategy,
     )
 
-    # TODO: REMOVE DEPRECATION###########################################
-    bidding_strategies["pp_learning"] = EnergyLearningStrategy
-    bidding_strategies["storage_learning"] = StorageEnergyLearningStrategy
-    bidding_strategies["renewable_eom_learning"] = (
+    deprecated_bidding_strategies["pp_learning"] = EnergyLearningStrategy
+    deprecated_bidding_strategies["storage_learning"] = StorageEnergyLearningStrategy
+    deprecated_bidding_strategies["renewable_eom_learning"] = (
         RenewableEnergyLearningSingleBidStrategy
     )
-    # END OF REMOVE DEPRECATION ###########################################
+    deprecated_bidding_strategies["learning_advanced_orders"] = EnergyLearningStrategy
 
     bidding_strategies["powerplant_energy_learning"] = EnergyLearningStrategy
     bidding_strategies["powerplant_energy_learning_single_bid"] = (

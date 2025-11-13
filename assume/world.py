@@ -41,6 +41,7 @@ from assume.strategies import (
     LearningStrategy,
     UnitOperatorStrategy,
     bidding_strategies,
+    deprecated_bidding_strategies,
 )
 from assume.units import BaseUnit, demand_side_technologies, unit_types
 
@@ -165,6 +166,7 @@ class World:
             logger.info(
                 "Learning Strategies are not available. Check that you have torch installed."
             )
+        self.bidding_strategies.update(deprecated_bidding_strategies)
 
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.additional_kpis: dict[str, OutputDef] = {}
@@ -593,13 +595,16 @@ class World:
 
             if strategy not in self.bidding_strategies:
                 # raise a deprecated warning for learning_advanced_orders
-                if strategy == "learning_advanced_orders":
-                    logger.warning(
-                        "The bidding strategy 'learning_advanced_orders' is deprecated. Please use regular 'powerplant_energy_learning' instead."
-                    )
                 raise ValueError(
                     f"""Bidding strategy {strategy} not registered. Please check the name of
                         the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                )
+
+            # remove when deprecated bidding strategies are removed
+            if strategy in deprecated_bidding_strategies.keys():
+                logger.warning(
+                    "Bidding strategy %s is deprecated. Use the new naming instead",
+                    strategy,
                 )
 
             if strategy not in strategy_instances:
