@@ -120,11 +120,19 @@ powerplant_energy_heuristic_flexable          EOM                 A more refined
                                                                   costs, while the flexible bid covers additional power up to the maximum capacity at marginal cost. It
                                                                   incorporates price forecasting and accounts for ramping constraints, operational history, and power loss
                                                                   due to heat production.
-powerplant_energy_heuristic_block             EOM                 A power plant strategy valid for complex market clearing which bids dict blocks to the market.
-powerplant_energy_heuristic_linked            EOM                 A power plant strategy which handles block and linked bids on a market with these fields as a dict.
-powerplant_capacity_heuristic_balancing_neg   CRM_neg             A bid on the negative Capacity or Energy CRM; volume is determined by calculating how much it can reduce
-                                                                  power. The capacity price is found by comparing the revenue it could receive if it bid this volume on
-                                                                  the EOM; the energy price is the negative of marginal cost.
+powerplant_energy_heuristic_block             EOM                 A power plant strategy valid for complex market clearing which bids dict blocks to the market. The bid is for a
+                                                                  block of multiple hours instead of being for a single hour. A minimum acceptance ratio (MAR) defines how to
+                                                                  handle rejected bids within individual hours of the block. For the inflexible bid, the MAR is set to 1,
+                                                                  meaning all bids within the block must be accepted otherwise the whole block bid is rejected. A separate MAR
+                                                                  can be set for children (flexible) bids. See the Advanced Orders tutorial:
+                                                                  https://assume.readthedocs.io/en/latest/examples/06_advanced_orders_example.html#1.-Basics
+powerplant_energy_heuristic_linked            EOM                 A power plant strategy which handles block and linked bids on a market with these fields as a dict. The strategy
+                                                                  is similar to :code:`powerplant_energy_heuristic_block` but allows to integrate the flexible bids as linked bids.
+                                                                  See the Advanced Orders tutorial:
+                                                                  https://assume.readthedocs.io/en/latest/examples/06_advanced_orders_example.html#1.-Basics
+powerplant_capacity_heuristic_balancing_neg   CRM_neg             A bid on the negative Capacity or Energy Control Reserve Market (CRM); volume is determined by calculating how
+                                                                  much it can reduce power. The capacity price is found by comparing the revenue it could receive if it bid this
+                                                                  volume on the EOM; the energy price is the negative of marginal cost.
 powerplant_capacity_heuristic_balancing_pos   CRM_pos             A bid on the positive Capacity or Energy CRM; volume is determined by calculating how much it can increase
                                                                   power. The capacity price is found by comparing the revenue it could receive if it bid this volume on
                                                                   the EOM; the energy price is the positive of marginal cost.
@@ -138,20 +146,14 @@ storage_capacity_heuristic_balancing_neg      CRM_neg             Analogous to :
                                                                   energy CRM.
 storage_capacity_heuristic_balancing_pos      CRM_pos             Analogous to :code:`storage_energy_heuristic_flexable`, but bids either on the positive capacity CRM or
                                                                   energy CRM.
-powerplant_energy_heuristic_profile           EOM                 Formulated similarly to :code:`powerplant_energy_heuristic_flexable`, however the bid is for a block of
-                                                                  multiple hours instead of being for a single hour. A minimum acceptance ratio (MAR) defines how to handle
-                                                                  rejected bids within individual hours of the block. For the inflexible bid, the MAR is set to 1, meaning
-                                                                  all bids within the block must be accepted otherwise the whole block bid is rejected. A separate MAR can
-                                                                  be set for children (flexible) bids. See the Advanced Orders tutorial:
-                                                                  https://assume.readthedocs.io/en/latest/examples/06_advanced_orders_example.html#1.-Basics
 ============================================  ==================  ==================================================================================================================
 
 Heuristic method API references:
 
 - :py:meth:`assume.strategies.naive_strategies.EnergyHeuristicElasticStrategy`
 
-- :py:meth:`assume.strategies.advanced_orders.EnergyHeuristicFlexableLinkedStrategy`
 - :py:meth:`assume.strategies.advanced_orders.EnergyHeuristicFlexableBlockStrategy`
+- :py:meth:`assume.strategies.advanced_orders.EnergyHeuristicFlexableLinkedStrategy`
 - :py:meth:`assume.strategies.flexable.CapacityHeuristicBalancingNegStrategy`
 - :py:meth:`assume.strategies.flexable.CapacityHeuristicBalancingPosStrategy`
 
@@ -167,15 +169,16 @@ bidding_strategy_id                          For Market Types    Description
 ===========================================  ==================  ============
 household_energy_optimization                EOM                 An energy strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
 industry_energy_optimization                 EOM                 An energy strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
-household_capacity_heuristic_balancing_neg   CRM_neg             A postivie capacity strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
-household_capacity_heuristic_balancing_pos   CRM_pos             A postivie capacity strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
+household_capacity_heuristic_balancing_neg   CRM_neg             A negative capacity strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
+household_capacity_heuristic_balancing_pos   CRM_pos             A positive capacity strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
 industry_capacity_heuristic_balancing_neg    CRM_neg             A negative capacity strategy of a Household DSM unit. The bid volume is the optimal power requirement of the optimization.
-industry_capacity_heuristic_balancing_pos    CRM_pos             A negative capacity strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
+industry_capacity_heuristic_balancing_pos    CRM_pos             A positive capacity strategy of a Industry DSM unit. The bid volume is the optimal power requirement of the optimization.
 powerplant_energy_optimization_dmas          EOM                 Power plant strategy using forecast optimization and avoided cost calculation used for smart bids coming from the DMAS methodology
 storage_energy_optimization_dmas             EOM                 Storage strategy using forecasts and avoided cost calculation used for smart bids coming from the DMAS methodology
 ===========================================  ==================  ============
 
 Optimization method API references:
+
 - :py:meth:`assume.strategies.naive_strategies.DsmEnergyOptimizationStrategy`
 - :py:meth:`assume.strategies.naive_strategies.DsmCapacityHeuristicBalancingPosStrategy`
 - :py:meth:`assume.strategies.naive_strategies.DsmCapacityHeuristicBalancingNegStrategy`
