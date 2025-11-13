@@ -191,15 +191,20 @@ class ForecastInitialisation:
                 )
                 continue
 
-            if market_id not in price_forecasts:
+            price_forecasts[market_id] = self.forecasts.get(f"price_{market_id}")
+            if price_forecasts[market_id] is None:
+                # calculate if not present
                 price_forecasts[market_id] = self.calculate_market_price_forecast(
-                    market_id=market_id
+                    market_id
                 )
 
-            if market_id not in residual_loads:
+            residual_loads[market_id] = self.forecasts.get(f"residual_load_{market_id}")
+            if residual_loads[market_id] is None:
+                # calculate if not present
                 residual_loads[market_id] = self.calculate_residual_load_forecast(
-                    market_id=market_id
+                    market_id
                 )
+
         return price_forecasts, residual_loads
 
     def add_node_congestion_signals(self):
