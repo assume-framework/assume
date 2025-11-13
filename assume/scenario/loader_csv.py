@@ -20,6 +20,7 @@ from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
 from assume.common.forecast_initialisation import ForecastInitialisation
 from assume.common.forecaster import (
+    BuildingForecaster,
     CustomUnitForecaster,
     DemandForecaster,
     ExchangeForecaster,
@@ -614,6 +615,19 @@ def load_config_and_create_forecaster(
     if dsm_units is not None:
         for type, dsm in dsm_units.items():
             for id, unit in dsm.iterrows():
+                if type == "building":
+                    unit_forecasts[id] = BuildingForecaster(
+                        index=index,
+                        availability=calculator[f"availability_{id}"],
+                        market_prices=market_prices,
+                        fuel_prices=calculator.fuel_prices,
+                        residual_load=residual_loads,
+                        load_profile=0,  # TODO
+                        ev_load_profile=0,  # TODO
+                        heat_demand=0,  # TODO
+                        battery_load_profile=0,  # TODO
+                        pv_profile=0,  # TODO
+                    )
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
                         index=index,
