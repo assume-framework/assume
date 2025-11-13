@@ -569,11 +569,11 @@ def load_config_and_create_forecaster(
         lines=lines,
         fuel_prices=fuel_prices_df,
         market_configs=config["markets_config"],
+        forecasts=forecasts_df,
+        demand=demand_df,
+        availability=availability,
+        exchanges=exchanges_df,
     )
-    calculator.set_forecast(forecasts_df)
-    calculator.set_forecast(demand_df)
-    calculator.set_forecast(exchanges_df)
-    calculator.set_forecast(availability, prefix="availability_")
     calculator.calc_forecast_if_needed()
 
     unit_forecasts: dict[str, UnitForecaster] = {}

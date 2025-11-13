@@ -44,6 +44,10 @@ class ForecastInitialisation:
         powerplants_units: pd.DataFrame,
         demand_units: pd.DataFrame,
         market_configs: dict[str, dict],
+        forecasts: pd.DataFrame,
+        availability: pd.DataFrame,
+        demand: pd.DataFrame,
+        exchanges: pd.DataFrame,
         fuel_prices: pd.DataFrame = None,
         exchange_units: pd.DataFrame | None = None,
         buses: pd.DataFrame | None = None,
@@ -65,6 +69,10 @@ class ForecastInitialisation:
             else:
                 self.fuel_prices[column] = fuel_prices[column].item()
         self.forecasts = pd.DataFrame(index=index)
+        self.set_forecast(forecasts)
+        self.set_forecast(demand)
+        self.set_forecast(exchanges)
+        self.set_forecast(availability, prefix="availability_")
 
     def __getitem__(self, column: str) -> FastSeries:
         """
