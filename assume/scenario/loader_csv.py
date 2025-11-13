@@ -622,6 +622,9 @@ def load_config_and_create_forecaster(
                         market_prices=market_prices,
                         fuel_prices=calculator.fuel_prices,
                         residual_load=residual_loads,
+                        electricity_price=calculator[
+                            "price_EOM"
+                        ],  # TODO how to handle other markets?
                         load_profile=0,  # TODO
                         ev_load_profile=0,  # TODO
                         heat_demand=0,  # TODO
@@ -635,6 +638,9 @@ def load_config_and_create_forecaster(
                         market_prices=market_prices,
                         fuel_prices=calculator.fuel_prices,
                         residual_load=residual_loads,
+                        electricity_price=calculator[
+                            "price_EOM"
+                        ],  # TODO how to handle other markets?
                         congestion_signal=0,  # TODO
                         renewable_utilisation_signal=0,  # TODO
                     )
@@ -645,7 +651,9 @@ def load_config_and_create_forecaster(
                         market_prices=market_prices,
                         hydrogen_demand=unit["demand"],
                         residual_load=residual_loads,
-                        electricity_price=0,  # TODO
+                        electricity_price=calculator[
+                            "price_EOM"
+                        ],  # TODO how to handle other markets?
                         seasonal_storage_schedule=0,  # TODO
                     )
                 if type == "steam_plant":
@@ -656,7 +664,9 @@ def load_config_and_create_forecaster(
                         market_prices=market_prices,
                         fuel_prices=calculator.fuel_prices,
                         residual_load=residual_loads,
-                        electricity_price=0,  # TODO
+                        electricity_price=calculator[
+                            "electricity_price"
+                        ],  # TODO how to handle other markets?
                         congestion_signal=0,  # TODO
                         renewable_utilisation_signal=0,  # TODO
                         electricity_price_flex=0,  # TODO
