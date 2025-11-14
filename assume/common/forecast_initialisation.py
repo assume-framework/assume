@@ -3,10 +3,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
+from collections.abc import Callable
 
 import pandas as pd
-
-from assume.common.fast_pandas import FastIndex, FastSeries
 
 
 class ForecastInitialisation:
@@ -52,113 +51,37 @@ class ForecastInitialisation:
         buses: pd.DataFrame | None = None,
         lines: pd.DataFrame | None = None,
     ):
-        self.logger = logging.getLogger(__name__)
+        self.index = index
+        self._logger = logging.getLogger(__name__)
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
         self.market_configs = market_configs
         self.exchange_units = exchange_units
         self.buses = buses
         self.lines = lines
+        self.demand = demand
+        self.exchanges = exchanges
 
-        self.index = index
         self.fuel_prices = pd.DataFrame(index=self.index)
         for column in fuel_prices.columns:
             if len(fuel_prices[column]) > 1:
                 self.fuel_prices[column] = fuel_prices[column]
             else:
                 self.fuel_prices[column] = fuel_prices[column].item()
-        self.forecasts = pd.DataFrame(index=index)
-        self.set_forecast(forecasts)
-        self.set_forecast(demand)
-        self.set_forecast(exchanges)
+        if forecasts is None:
+            forecasts = pd.DataFrame(index=self.index)
+        self._forecasts = forecasts
         self._availability = availability
 
-        self._calc_forecast_if_needed()
+    def forecasts(self, id: str) -> pd.Series:
+        if self._forecasts is not None and id in self._forecasts.columns:
+            return self._forecasts[id]
+        return pd.Series(0.0, self.index, name=id)
 
-    def availability(self, id: str) -> FastSeries:
+    def availability(self, id: str) -> pd.Series:
         if self._availability is not None and id in self._availability.columns:
-            return FastSeries.from_pandas_series(self._availability[id])
-        else:
-            return FastSeries(
-                index=FastIndex.from_pandas_index(self.index),
-                value=1.0,
-                name=f"availability_{id}",
-            )
-
-    def __getitem__(self, column: str) -> FastSeries:
-        """
-        Returns the forecast for a given column.
-
-        If the column does not exist in the forecasts, a Series of zeros is returned. If the column contains "availability", a Series of ones is returned.
-
-        Args:
-            column (str): The column of the forecast.
-        Returns:
-            FastSeries: The forecast for the given column.
-        """
-        if column not in self.forecasts.keys():
-            self.forecasts[column] = FastSeries(
-                value=0.0, index=FastIndex.from_pandas_index(self.index), name=column
-            )
-        return self.forecasts[column]
-
-    def set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""):
-        """
-        Sets the forecast for a given column.
-        If data is a DataFrame, it sets the forecast for each column in the DataFrame. If data is
-        a Series, it sets the forecast for the given column. If data is None, no action is taken.
-
-        Args:
-            data (pd.DataFrame | pd.Series | None): The forecast data.
-            prefix (str): The prefix of the column.
-
-        Example:
-            >>> forecaster = ForecastInitialisation(index=FastIndex(start='2020-01-01', end='2025-01-01'))
-            >>> forecaster.set_forecast(pd.Series([22, 25, 17], name='temperature'), prefix='location_1_')
-            >>> print(forecaster['location_1_temperature'])
-        """
-
-        if data is None:
-            return
-        elif isinstance(data, pd.DataFrame):
-            if prefix:
-                # set prefix for columns to set
-                columns = [prefix + column for column in data.columns]
-                data.columns = columns
-            if len(data.index) == 1:
-                # if we have a single value which should be set for the whole series
-                for column in data.columns:
-                    self.forecasts[column] = data[column].item()
-            else:
-                # Add new columns to the existing DataFrame, overwriting any existing columns with the same names
-                new_columns = set(data.columns) - set(self.forecasts.columns)
-                self.forecasts = pd.concat(
-                    [self.forecasts, data[list(new_columns)]], axis=1
-                )
-        else:
-            self.forecasts[prefix + data.name] = data
-
-    def _calc_forecast_if_needed(self):
-        """
-        Calculates the forecasts if they are not already calculated.
-
-        This method calculates price forecast and residual load forecast for available markets,
-        and other necessary forecasts if they don't already exist.
-        """
-        if self.buses is None or self.lines is None:
-            return
-        # check if the demand_units have a node column and if the nodes are available in the buses
-        if (
-            "node" in self.demand_units.columns
-            and self.demand_units["node"].isin(self.buses.index).all()
-        ):
-            self.add_node_congestion_signals()
-            self.add_utilisation_forecasts()
-            return
-        self.logger.warning(
-            "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
-            "Either 'node' column is missing in demand_units or nodes are not available in buses."
-        )
+            return self._availability[id]
+        return pd.Series(1.0, self.index, name=f"availability_{id}")
 
     def calculate_market_forecasts(
         self,
@@ -166,51 +89,62 @@ class ForecastInitialisation:
         """Calculate market-specific price and residual load forecasts."""
         price_forecasts: dict[str, pd.Series] = {}
         residual_loads: dict[str, pd.Series] = {}
+
         for market_id, config in self.market_configs.items():
             if config["product_type"] != "energy":
-                self.logger.warning(
+                self._logger.warning(
                     f"Price forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
                 )
                 continue
-
-            price_forecasts[market_id] = self.forecasts.get(f"price_{market_id}")
+            price_forecasts[market_id] = self._forecasts.get(f"price_{market_id}")
             if price_forecasts[market_id] is None:
                 # calculate if not present
-                price_forecasts[market_id] = self.calculate_market_price_forecast(
-                    market_id
-                )
+                forecast = self.calculate_market_price_forecast(market_id)
+                price_forecasts[market_id] = forecast
 
-            residual_loads[market_id] = self.forecasts.get(f"residual_load_{market_id}")
+            residual_loads[market_id] = self._forecasts.get(
+                f"residual_load_{market_id}"
+            )
             if residual_loads[market_id] is None:
                 # calculate if not present
-                residual_loads[market_id] = self.calculate_residual_load_forecast(
-                    market_id
-                )
+                load_forecast = self.calculate_residual_load_forecast(market_id)
+                residual_loads[market_id] = load_forecast
 
         return price_forecasts, residual_loads
 
-    def add_node_congestion_signals(self):
-        """Add node-specific congestion signals to the forecasts."""
-        node_congestion_signal_df = self.calculate_node_specific_congestion_forecast()
-        for col in node_congestion_signal_df.columns:
-            if col not in self.forecasts.columns:
-                self.forecasts[col] = node_congestion_signal_df[col]
-
-    def add_utilisation_forecasts(self):
-        """Add renewable utilisation forecasts if missing."""
-        utilisation_columns = [
-            f"{node}_renewable_utilisation"
-            for node in self.demand_units["node"].unique()
-        ]
-        utilisation_columns.append("all_nodes_renewable_utilisation")
-
-        if not all(col in self.forecasts.columns for col in utilisation_columns):
-            renewable_utilisation_forecast = (
-                self.calculate_renewable_utilisation_forecast()
+    def calc_forecasts(self):
+        if self.buses is None or self.lines is None:
+            return None, None
+        if (
+            "node" not in self.demand_units.columns
+            or not self.demand_units["node"].isin(self.buses.index).all()
+        ):
+            self._logger.warning(
+                "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
+                "Either 'node' column is missing in demand_units or nodes are not available in buses."
             )
-            for col in renewable_utilisation_forecast.columns:
-                if col not in self.forecasts.columns:
-                    self.forecasts[col] = renewable_utilisation_forecast[col]
+            return None, None
+
+        nodes = {node for node in self.demand_units["node"].unique()}
+        all_nodes = nodes | {"all"}
+        return (
+            self._calc_unpresent(nodes, self.calc_congestion_forecast),
+            self._calc_unpresent(all_nodes, self.calc_renewable_utilisation),
+        )
+
+    def _calc_unpresent(
+        self, columns: set, calculation_func: Callable[[], pd.DataFrame]
+    ) -> pd.DataFrame:
+        """
+        Checks if all specified columns are present in the forecasts, if not calculate them using the provided function.
+        """
+        if columns.issubset(set(self._forecasts.columns)):
+            return self._forecasts[columns]
+        df = calculation_func()
+        for col in df.columns:
+            if col in self._forecasts.columns:
+                df[col] = self._forecasts[col]
+        return df
 
     def get_registered_market_participants(self, market_id: str) -> pd.DataFrame:
         """
@@ -226,8 +160,7 @@ class ForecastInitialisation:
             pd.DataFrame: The registered market participants.
 
         """
-
-        self.logger.warning(
+        self._logger.warning(
             "Functionality of using the different markets and specified registration for the price forecast is not implemented yet"
         )
         return self.powerplants_units
@@ -242,7 +175,7 @@ class ForecastInitialisation:
         powerplants = self.powerplants_units
         if mask is not None:
             powerplants = powerplants[mask]
-        av_list = [self.availability(id).as_pd_series() for id in powerplants.index]
+        av_list = [self.availability(id) for id in powerplants.index]
         availabilities = pd.DataFrame(av_list).T
         availabilities.columns = powerplants.index
         return powerplants.max_power * availabilities
@@ -265,7 +198,7 @@ class ForecastInitialisation:
         demand_units = self.demand_units[
             self.demand_units[f"bidding_{market_id}"].notnull()
         ]
-        sum_demand = self.forecasts[demand_units.index].sum(axis=1)
+        sum_demand = self.demand[demand_units.index].sum(axis=1)
 
         # get exchanges if exchange_units are available
         if self.exchange_units is not None:
@@ -274,10 +207,10 @@ class ForecastInitialisation:
             ]
             # get sum of imports as name of exchange_unit_import
             import_units = [f"{unit}_import" for unit in exchange_units.index]
-            sum_imports = self.forecasts[import_units].sum(axis=1)
+            sum_imports = self.exchanges[import_units].sum(axis=1)
             # get sum of exports as name of exchange_unit_export
             export_units = [f"{unit}_export" for unit in exchange_units.index]
-            sum_exports = self.forecasts[export_units].sum(axis=1)
+            sum_exports = self.exchanges[export_units].sum(axis=1)
             # add imports and exports to the sum_demand
             sum_demand += sum_imports - sum_exports
 
@@ -340,7 +273,7 @@ class ForecastInitialisation:
         demand_units = self.demand_units[
             self.demand_units[f"bidding_{market_id}"].notnull()
         ]
-        sum_demand = self.forecasts[demand_units.index].sum(axis=1)
+        sum_demand = self.demand[demand_units.index].sum(axis=1)
 
         # get exchanges if exchange_units are available
         if self.exchange_units is not None:
@@ -349,10 +282,10 @@ class ForecastInitialisation:
             ]
             # get sum of imports as name of exchange_unit_import
             import_units = [f"{unit}_import" for unit in exchange_units.index]
-            sum_imports = self.forecasts[import_units].sum(axis=1)
+            sum_imports = self.exchanges[import_units].sum(axis=1)
             # get sum of exports as name of exchange_unit_export
             export_units = [f"{unit}_export" for unit in exchange_units.index]
-            sum_exports = self.forecasts[export_units].sum(axis=1)
+            sum_exports = self.exchanges[export_units].sum(axis=1)
             # add imports and exports to the sum_demand
             sum_demand += sum_imports - sum_exports
 
@@ -428,7 +361,7 @@ class ForecastInitialisation:
 
         return marginal_cost
 
-    def calculate_node_specific_congestion_forecast(self) -> pd.DataFrame:
+    def calc_congestion_forecast(self) -> pd.DataFrame:
         """
         Calculates a collective node-specific congestion signal by aggregating the congestion severity of all
         transmission lines connected to each node, taking into account powerplant load based on availability factors.
@@ -449,7 +382,7 @@ class ForecastInitialisation:
             node_demand_units = self.demand_units[
                 self.demand_units["node"] == node
             ].index
-            node_demand = self.forecasts[node_demand_units].sum(axis=1)
+            node_demand = self.demand[node_demand_units].sum(axis=1)
 
             # Calculate total generation for this node by summing powerplant loads
             node_generation_units = self.powerplants_units[
@@ -505,7 +438,7 @@ class ForecastInitialisation:
 
         return node_congestion_signal
 
-    def calculate_renewable_utilisation_forecast(self) -> pd.DataFrame:
+    def calc_renewable_utilisation(self) -> pd.DataFrame:
         """
         Calculates the renewable utilisation forecast by summing the available renewable generation
         for each node and an overall 'all_nodes' summary.
@@ -545,7 +478,7 @@ class ForecastInitialisation:
             ValueError: If no forecasts are provided, an error message is logged.
         """
 
-        merged_forecasts = pd.DataFrame(self.forecasts)
+        merged_forecasts = pd.DataFrame(self._forecasts)
         merged_forecasts.index = pd.date_range(
             start=self.index[0], end=self.index[-1], freq=self.index.freq
         )

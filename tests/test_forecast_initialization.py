@@ -8,16 +8,14 @@ import pytest
 
 from assume.common.forecast_initialisation import ForecastInitialisation
 
-fixture_path = "./tests/fixtures/forecast_init"
+path = "./tests/fixtures/forecast_init"
 
 
 @pytest.fixture
 def forecast_init():
     index = pd.date_range("2022-01-01", periods=4, freq="h")
-    powerplants_units = pd.read_csv(
-        f"{fixture_path}/powerplants_units.csv", index_col="name"
-    )
-    demand_units = pd.read_csv(f"{fixture_path}/demand_units.csv", index_col="name")
+    powerplants_units = pd.read_csv(f"{path}/powerplants_units.csv", index_col="name")
+    demand_units = pd.read_csv(f"{path}/demand_units.csv", index_col="name")
     market_configs = {
         "EOM": {
             "operator": "EOM_operator",
@@ -33,18 +31,18 @@ def forecast_init():
             "market_mechanism": "pay_as_clear",
         }
     }
-    forecasts = pd.read_csv(
-        f"{fixture_path}/forecasts.csv", index_col="datetime", parse_dates=["datetime"]
+    demand = pd.read_csv(
+        f"{path}/demand.csv", index_col="datetime", parse_dates=["datetime"]
     )
     fuel_prices = pd.DataFrame(index=index, data={"co2": [10]})
     forecast_init = ForecastInitialisation(
-        index,
-        powerplants_units,
-        demand_units,
-        market_configs,
-        forecasts,
+        index=index,
+        powerplants_units=powerplants_units,
+        demand_units=demand_units,
+        market_configs=market_configs,
+        forecasts=pd.DataFrame(),
         availability=pd.DataFrame(),
-        demand=pd.DataFrame(),
+        demand=demand,
         exchanges=pd.DataFrame(),
         fuel_prices=fuel_prices,
     )
@@ -60,7 +58,7 @@ def test_forecast_init(forecast_init):
 
 def test_forecast_init_used_forecast(forecast_init):
     prices = pd.DataFrame(index=forecast_init.index, data={"price_EOM": [1, 2, 3, 4]})
-    forecast_init.set_forecast(prices)
+    forecast_init._forecasts = prices
 
     market_forecast, load_forecast = forecast_init.calculate_market_forecasts()
     # assert the passed forecast is kept
