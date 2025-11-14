@@ -99,6 +99,14 @@ class PowerPlant(SupportsMinMax):
             raise ValueError(f"{max_power=} must be >= 0 for unit {self.id}")
         if min_power > max_power:
             raise ValueError(f"{min_power=} must be <= {max_power=} for unit {self.id}")
+        if not 0 <= efficiency <= 1:
+            raise ValueError(
+                f"{efficiency=} must be between 0 and 1 for unit {self.id}"
+            )
+        if emission_factor < 0:
+            raise ValueError(f"{emission_factor=} must be >= 0 for unit {self.id}")
+        if max_heat_extraction < 0:
+            raise ValueError(f"{max_heat_extraction=} must be >= 0 for unit {self.id}")
         self.max_power = max_power
         self.min_power = min_power
         self.efficiency = efficiency

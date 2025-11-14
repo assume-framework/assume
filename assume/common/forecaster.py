@@ -121,10 +121,12 @@ class SteelplantForecaster(UnitForecaster):
         congestion_signal: ForecastSeries = 0,
         residual_load: dict[str, ForecastSeries] = None,
         renewable_utilisation_signal: ForecastSeries = 0,
+        electricity_price: ForecastSeries = None,
     ):
         super().__init__(index, market_prices, residual_load, availability)
         self.fuel_prices = self._dict_to_series(fuel_prices)
         self.congestion_signal = self._to_series(congestion_signal)
+        self.electricity_price = self._to_series(electricity_price)
         self.renewable_utilisation_signal = self._to_series(
             renewable_utilisation_signal
         )
@@ -241,6 +243,7 @@ class BuildingForecaster(UnitForecaster):
         ev_load_profile: ForecastSeries,
         battery_load_profile: ForecastSeries,
         pv_profile: ForecastSeries,
+        electricity_price: ForecastSeries = None,
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         market_prices: dict[str, ForecastSeries] = None,
@@ -253,6 +256,7 @@ class BuildingForecaster(UnitForecaster):
         self.battery_load_profile = self._to_series(battery_load_profile)
         self.pv_profile = self._to_series(pv_profile)
         self.load_profile = self._to_series(load_profile)
+        self.electricity_price = self._to_series(electricity_price)
 
     def get_price(self, fuel: str) -> FastSeries:
         if fuel not in self.fuel_prices:
