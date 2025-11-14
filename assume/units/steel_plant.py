@@ -104,7 +104,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # FIXME assuming only one market
         self.market_id = list(bidding_strategies.keys())[0]
 
-        self.electricity_price = forecaster.price[self.market_id]
+        self.electricity_price = forecaster.electricity_price
         self.steel_demand = demand
         self.natural_gas_price = self.forecaster.get_price("natural_gas")
         self.hydrogen_price = self.forecaster.get_price("hydrogen")
