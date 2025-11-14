@@ -198,7 +198,7 @@ def transfer_weights(
     unique_obs: int,
 ) -> dict | None:
     """
-    Transfer weights from loaded model to new model. Copy only those obs_ and action-slices for matching IDs.
+    Transfer weights from loaded model to new model. Copy only those obs- and action-slices for matching IDs.
     New IDs keep their original (random) weights. Function only works if the neural network architeczture remained stable besides the input layer, namely with the same hidden layers.
 
     Args:

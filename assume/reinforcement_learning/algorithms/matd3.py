@@ -340,7 +340,7 @@ class TD3(RLAlgorithm):
 
         The created actor networks are associated with each unit strategy and stored as attributes.
 
-        Notes:
+        Note:
             The observation dimension need to be the same, due to the centralized criic that all actors share.
             If you have units with different observation dimensions. They need to have different critics and hence learning roles.
 
@@ -381,7 +381,7 @@ class TD3(RLAlgorithm):
 
         This method initializes critic networks for each agent in the reinforcement learning setup.
 
-        Notes:
+        Note:
             The observation dimension need to be the same, due to the centralized criic that all actors share.
             If you have units with different observation dimensions. They need to have different critics and hence learning roles.
         """
@@ -454,7 +454,7 @@ class TD3(RLAlgorithm):
         """
         Update the policy of the reinforcement learning agent using the Twin Delayed Deep Deterministic Policy Gradients (TD3) algorithm.
 
-        Notes:
+        Note:
             This function performs the policy update step, which involves updating the actor (policy) and critic (Q-function) networks
             using TD3 algorithm. It iterates over the specified number of gradient steps and performs the following steps for each
             learning strategy:

@@ -51,7 +51,7 @@ Yet, the possible integration of reinforcement learning methods into the behavio
 Simulations which solely rely on rule-based bidding strategy representation, limit the ability to represent future markets or alternative markets designs, as in reality bidding agents would adapt to the new market design.
 Most notably, `ASSUME` enables the highest number of simultaneously learning market agents in literature [@miskiwExplainableDeepReinforcement2024].
 This feature allows for the exploration of new market designs and emergent dynamics in energy markets using a common open-source simulation framework.
-Further unique features of `ASSUME` are the extensive market abstraction which allows to define complex multi-market scenarios as shown in [@maurerMarketAbstractionEnergy2023].
+Further unique features of `ASSUME` are the extensive market abstraction which allows to define complex multi-market scenarios as shown by @maurerMarketAbstractionEnergy2023.
 Even redispatch markets and nodal markets are supported, making it possible to represent network constraints and market coupling.
 `ASSUME` is designed to provide results which are easily comparable and interactable.
 This is set in contrast to other agent-based simulation frameworks, which are often designed to be used for a specific use case.
@@ -76,8 +76,8 @@ This also includes a variety of notebooks which clarify the usage through exampl
 
 # Publications
 
-`ASSUME` has been used to investigate the usage of complex order types like block bids in wholesale markets [@adamsBlockOrdersMatter2024] as well as for the integration of demand-side flexibility and redispatch markets in [@khanraEconomicEvaluationElectricity2024].
-Studies of applicability of reinforcement learning methods in energy markets were tackled in [@harderHowSatisfactoryCan2024], while an analysis of explainable AI methods was applied to `ASSUME` in [@miskiwExplainableDeepReinforcement2024].
+`ASSUME` has been used to investigate the usage of complex order types like block bids in wholesale markets [@adamsBlockOrdersMatter2024] as well as for the integration of demand-side flexibility and redispatch markets by @khanraEconomicEvaluationElectricity2024.
+Studies of applicability of reinforcement learning methods in energy markets were tackled by @harderHowSatisfactoryCan2024, while an analysis of explainable AI methods was applied to `ASSUME` by @miskiwExplainableDeepReinforcement2024.
 For better interoperability with other energy system model data, adapters to interact from `ASSUME` with PyPSA and AMIRIS are available and make a comparison to other renomated market simulation tools possible [@maurerKnowYourTools2024].
 
 # Acknowledgements

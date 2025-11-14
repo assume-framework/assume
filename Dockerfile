@@ -9,9 +9,8 @@ RUN useradd -m -s /bin/bash admin
 RUN mkdir /src
 WORKDIR /src
 COPY README.md pyproject.toml .
-#RUN python -m pip install --upgrade pip
-# that's needed to use create the requirements.txt only
-RUN pip install pip-tools
+# https://github.com/jazzband/pip-tools/pull/2221
+RUN pip install "pip-tools<7.5.0"
 RUN mkdir assume assume_cli
 RUN touch assume/__init__.py
 RUN pip-compile --resolver=backtracking -o requirements.txt ./pyproject.toml

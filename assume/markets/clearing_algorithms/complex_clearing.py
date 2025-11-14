@@ -41,13 +41,13 @@ def market_clearing_opt(
         market_products (list[MarketProduct]): The products to be traded.
         mode (str): The mode of the market clearing determining whether the minimum acceptance ratio is considered.
         with_linked_bids (bool): Whether the market clearing should include linked bids.
-        incidence_matrix (pd.DataFrame): The incidence matrix of the network. (Shows the connections between nodes.)
+        incidence_matrix (pd.DataFrame): The directed incidence matrix of the network.
         lines (pd.DataFrame): The lines and their capacities of the network.
 
     Returns:
         tuple[pyomo.core.base.PyomoModel.ConcreteModel, pyomo.opt.results.SolverResults]: The solved pyomo model and the solver results
 
-    Notes:
+    Note:
         The problem is formulated as a mixed-integer linear program (MILP) and solved using the pyomo package.
         The objective function is to maximize the social welfare and defined as the sum of the product of the price, volume, and acceptance ratio of each order.
         The decision variables are given by the acceptance ratio of each order bounded by 0 and 1 and the acceptance as a binary variable.
@@ -269,7 +269,7 @@ class ComplexClearingRole(MarketRole):
 
     Attributes:
         marketconfig (MarketConfig): The market configuration.
-        incidence_matrix (pd.DataFrame): The incidence matrix representing the power network connections.
+        incidence_matrix (pd.DataFrame): The directed incidence matrix representing the power network connections (definition according to Wikipedia https://en.wikipedia.org/wiki/Incidence_matrix)
         nodes (list): List of nodes or zones in the network, depending on the selected representation.
 
     Supported Parameters in ``param_dict``:
@@ -428,7 +428,7 @@ class ComplexClearingRole(MarketRole):
             meta (list[dict]): The market clearing results.
             flows (dict): The power flows on the lines.
 
-        Notes:
+        Note:
             First the market clearing is solved using the cost minimization with the pyomo model market_clearing_opt.
             Then the market clearing prices are extracted from the solved model as dual variables of the energy balance constraint.
             Next the surplus of each order and its children is calculated and orders with negative surplus are removed from the orderbook.

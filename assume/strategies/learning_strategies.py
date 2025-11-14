@@ -12,9 +12,12 @@ import torch as th
 from assume.common.base import (
     BaseUnit,
     LearningStrategy,
+    MinMaxChargeStrategy,
+    MinMaxStrategy,
     SupportsMinMax,
     SupportsMinMaxCharge,
 )
+from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
@@ -23,13 +26,18 @@ from assume.reinforcement_learning.learning_utils import NormalActionNoise
 logger = logging.getLogger(__name__)
 
 
-class BaseLearningStrategy(LearningStrategy):
+class TorchLearningStrategy(LearningStrategy):
+    """
+    A strategy to enable machine learning with pytorch.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
         # defines bounds of actions space
+        self.min_bid_price = kwargs.get("min_bid_price", -100)
         self.max_bid_price = kwargs.get("max_bid_price", 100)
 
         # tells us whether we are training the agents or just executing per-learning strategies
@@ -105,32 +113,28 @@ class BaseLearningStrategy(LearningStrategy):
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
-        upper_scaling_factor_price = max(unit.forecaster[f"price_{market_id}"])
-        lower_scaling_factor_price = min(unit.forecaster[f"price_{market_id}"])
-        upper_scaling_factor_res_load = max(
-            unit.forecaster[f"residual_load_{market_id}"]
+        upper_scaling_factor_price = max(unit.forecaster.price[market_id])
+        lower_scaling_factor_price = min(unit.forecaster.price[market_id])
+        residual_load = unit.forecaster.residual_load.get(
+            market_id, FastSeries(index=unit.index, value=0)
         )
-        lower_scaling_factor_res_load = min(
-            unit.forecaster[f"residual_load_{market_id}"]
-        )
+        upper_scaling_factor_res_load = max(residual_load)
+        lower_scaling_factor_res_load = min(residual_load)
 
         self.scaled_res_load_obs = min_max_scale(
-            unit.forecaster[f"residual_load_{market_id}"],
+            residual_load,
             lower_scaling_factor_res_load,
             upper_scaling_factor_res_load,
         )
 
         self.scaled_prices_obs = min_max_scale(
-            unit.forecaster[f"price_{market_id}"],
+            unit.forecaster.price[market_id],
             lower_scaling_factor_price,
             upper_scaling_factor_price,
         )
 
     def create_observation(
-        self,
-        unit: BaseUnit,
-        market_id: str,
-        start: datetime,
+        self, unit: BaseUnit, market_id: str, start: datetime, end: datetime
     ):
         """
         Constructs a scaled observation tensor based on the unit's forecast data and internal state.
@@ -143,6 +147,8 @@ class BaseLearningStrategy(LearningStrategy):
             Identifier for the specific market.
         start : datetime
             Start time for the observation period.
+        end : datetime
+            End time for the observation period.
 
         Returns
         -------
@@ -183,7 +189,7 @@ class BaseLearningStrategy(LearningStrategy):
         )
 
         # --- 3. Individual observations ---
-        individual_observations = self.get_individual_observations(unit, start)
+        individual_observations = self.get_individual_observations(unit, start, end)
 
         # concat all observations into one array
         observation = np.concatenate(
@@ -203,9 +209,7 @@ class BaseLearningStrategy(LearningStrategy):
         return observation
 
     def get_individual_observations(
-        self,
-        unit: BaseUnit,
-        start: datetime,
+        self, unit: BaseUnit, start: datetime, end: datetime
     ):
         """
         Retrieves the unit-specific observations.
@@ -219,7 +223,7 @@ class BaseLearningStrategy(LearningStrategy):
 
         Returns
         -------
-        individual_observations : np.array
+        individual_observations : np.ndarray
             Strategy and unit-specific observations.
         """
 
@@ -275,6 +279,11 @@ class BaseLearningStrategy(LearningStrategy):
                     device=self.device, dtype=self.float_type
                 )
                 curr_action += noise
+
+                # make sure that noise adding does not exceed the actual output of the NN as it pushes results in a direction that actor can't even reach
+                curr_action = th.clamp(
+                    curr_action, self.actor.min_output, self.actor.max_output
+                )
         else:
             # if we are not in learning mode we just use the actor neural net to get the action without adding noise
             curr_action = self.actor(next_observation).detach()
@@ -284,7 +293,7 @@ class BaseLearningStrategy(LearningStrategy):
         return curr_action, noise
 
 
-class RLStrategy(BaseLearningStrategy):
+class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -429,6 +438,7 @@ class RLStrategy(BaseLearningStrategy):
             unit=unit,
             market_id=market_config.market_id,
             start=start,
+            end=end,
         )
 
         # =============================================================================
@@ -517,9 +527,7 @@ class RLStrategy(BaseLearningStrategy):
         return curr_action, noise
 
     def get_individual_observations(
-        self,
-        unit: SupportsMinMax,
-        start: datetime,
+        self, unit: SupportsMinMax, start: datetime, end: datetime
     ):
         """
         Retrieves the unit-specific observations. For dispatchable units, this includes the last dispatched volume and the current marginal costs.
@@ -533,7 +541,7 @@ class RLStrategy(BaseLearningStrategy):
 
         Returns
         -------
-        individual_observations : np.array
+        individual_observations : np.ndarray
             Scaled total dispatched capacity and marginal cost.
 
         Notes
@@ -676,7 +684,7 @@ class RLStrategy(BaseLearningStrategy):
         unit.outputs["rl_rewards"].append(reward)
 
 
-class RLStrategySingleBid(RLStrategy):
+class RLStrategySingleBid(RLStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy with Single-Bid Structure for Energy-Only Markets.
 
@@ -748,6 +756,7 @@ class RLStrategySingleBid(RLStrategy):
             unit=unit,
             market_id=market_config.market_id,
             start=start,
+            end=end,
         )
 
         # =============================================================================
@@ -758,7 +767,7 @@ class RLStrategySingleBid(RLStrategy):
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
-        # actions are in the range [-1,1], we need to transform them into actual bids
+        # actions are in the range [-1,1] + noise, we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
         bid_price = actions[0] * self.max_bid_price
 
@@ -785,7 +794,7 @@ class RLStrategySingleBid(RLStrategy):
         return bids
 
 
-class StorageRLStrategy(BaseLearningStrategy):
+class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -872,6 +881,40 @@ class StorageRLStrategy(BaseLearningStrategy):
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
 
+    def get_individual_observations(
+        self, unit: SupportsMinMaxCharge, start: datetime, end: datetime
+    ):
+        """
+        Retrieves the unit-specific observations for storage units. For storages we use the state of charge and cost of currently stored energy as the individual observations.
+        We define the latter as the average volume weighted procurement costs of the currently stored energy.
+
+        Args
+        ----
+        unit : SupportsMinMaxCharge
+            Storage unit providing forecasted and current state data.
+        start : datetime.datetime
+            Start time for the observation period.
+
+        Returns
+        -------
+        individual_observations: np.ndarray
+            Array containing state of charge and energy cost.
+
+        Notes
+        -----
+        Observations are scaled by the unit's max state of charge and energy costs, creating input for
+        the agent's action selection.
+        """
+        # get the current soc and energy cost value
+        soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
+        cost_stored_energy_scaled = (
+            unit.outputs["cost_stored_energy"].at[start] / self.max_bid_price
+        )
+
+        individual_observations = np.array([soc_scaled, cost_stored_energy_scaled])
+
+        return individual_observations
+
     def calculate_bids(
         self,
         unit: SupportsMinMaxCharge,
@@ -910,6 +953,7 @@ class StorageRLStrategy(BaseLearningStrategy):
             unit=unit,
             market_id=market_config.market_id,
             start=start,
+            end=end_all,
         )
         # =============================================================================
         # Get the Actions, based on the observations
@@ -990,7 +1034,6 @@ class StorageRLStrategy(BaseLearningStrategy):
         -----
         Rewards are based on profit and include fixed costs for charging and discharging.
         """
-
         product_type = marketconfig.product_type
         reward = 0
 
@@ -1063,14 +1106,87 @@ class StorageRLStrategy(BaseLearningStrategy):
         unit.outputs["total_costs"].loc[start:end_excl] = order_cost
         unit.outputs["rl_rewards"].append(reward)
 
+
+class RenewableRLStrategy(RLStrategySingleBid):
+    """
+    Reinforcement Learning Strategy for a renewable unit that enables the agent to learn
+    optimal bidding strategies on an Energy-Only Market.
+
+    The observation space for this strategy consists of 75 elements. Key components include:
+    - **Price Forecasts**
+    - **Residual Load Forecasts**
+    - **Historic Prices**
+    As individual observations we provide the
+    - **Renewable Generation Forecasts**
+    - **Marginal Costs**
+    - **Previous Time Step Generation**
+
+    The agent's actions are formulated as one value, representing the bid price at which it bids its full capacity.
+    These actions are scaled and interpreted to form actionable market bids, with specific conditions
+    dictating the bid type.
+
+    - **Bid Price**: The one action value determines the price at which the agent will bid.
+
+    Rewards are based on the profit generated by the agent's market bids.
+
+    Attributes
+    ----------
+    foresight : int
+        Number of time steps for forecasting market conditions. Defaults to 24.
+    max_bid_price : float
+        Maximum allowable bid price. Defaults to 100.
+    device : str
+        Device used for computation ("cpu" or "cuda"). Defaults to "cpu".
+    float_type : str
+        Data type for floating-point calculations. Defaults to "float32".
+    learning_mode : bool
+        Whether the agent is in learning mode. Defaults to False.
+    algorithm : str
+        RL algorithm used by the agent. Defaults to "matd3".
+    actor_architecture_class : type[torch.nn.Module]
+        Class of the neural network for the actor network. Defaults to MLPActor.
+    actor : torch.nn.Module
+        The neural network used to predict actions.
+    order_types : list[str]
+        Types of market orders used by the strategy. Defaults to ["SB"].
+    action_noise : NormalActionNoise
+        Noise model added to actions during learning for exploration. Defaults to None.
+    collect_initial_experience_mode : bool
+        Whether the agent is in an exploration mode for initial experience. Defaults to True.
+
+    Args
+    ----
+    *args : Variable length argument list.
+    **kwargs : Arbitrary keyword arguments.
+    """
+
+    def __init__(self, *args, **kwargs):
+        obs_dim = kwargs.pop("obs_dim", 75)
+        act_dim = kwargs.pop("act_dim", 1)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 3)
+        super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
+
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations. This value is fixed for each strategy, as the
+        # neural network architecture is predefined, and the size of the observations must remain consistent.
+        # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
+        # as the observation dimension depends on the foresight value.
+        self.foresight = 24
+
+        # define allowed order types
+        self.order_types = kwargs.get("order_types", ["SB"])
+
     def get_individual_observations(
-        self,
-        unit: SupportsMinMaxCharge,
-        start: datetime,
+        self, unit: SupportsMinMaxCharge, start: datetime, end: datetime
     ):
         """
-        Retrieves the unit-specific observations for storage units. For storages we use the state of charge and cost of currently stored energy as the individual observations.
-        We define the latter as the average volume weighted procurement costs of the currently stored energy.
+        Retrieves the unit-specific observations for renewable units. For them we add the availabilities of the generation in the observation space.
 
         Args
         ----
@@ -1078,23 +1194,157 @@ class StorageRLStrategy(BaseLearningStrategy):
             Storage unit providing forecasted and current state data.
         start : datetime.datetime
             Start time for the observation period.
+        end : datetime.datetime
+            End time for the observation period.
 
         Returns
         -------
-        individual_observations: np.array
+        individual_observations: np.ndarray
             Array containing state of charge and energy cost.
 
         Notes
         -----
-        Observations are scaled by the unit's max state of charge and energy costs, creating input for
-        the agent's action selection.
+        Observations are scaled by the unit's max power and the max bid price.
         """
-        # get the current soc and energy cost value
-        soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
-        cost_stored_energy_scaled = (
-            unit.outputs["cost_stored_energy"].at[start] / self.max_bid_price
+        # --- Current volume & marginal cost ---
+        current_volume = unit.get_output_before(start)
+        current_costs = unit.calculate_marginal_cost(start, current_volume)
+        _, available_power = unit.calculate_min_max_power(start, end)
+
+        scaled_total_dispatch = current_volume / unit.max_power
+        scaled_marginal_cost = current_costs / self.max_bid_price
+        scaled_available_power = available_power[0] / unit.max_power
+
+        individual_observations = np.array(
+            [scaled_total_dispatch, scaled_marginal_cost, scaled_available_power]
         )
 
-        individual_observations = np.array([soc_scaled, cost_stored_energy_scaled])
-
         return individual_observations
+
+    def calculate_reward(
+        self,
+        unit: SupportsMinMaxCharge,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        """
+        Calculates the reward for the renewable unit based on profits, costs, and opportunity costs from market transactions.
+
+        Args
+        ----
+        unit : SupportsMinMax
+            The unit for which to calculate the reward.
+        marketconfig : MarketConfig
+            Market configuration settings.
+        orderbook : Orderbook
+            Orderbook containing executed bids and details.
+
+        Notes
+        -----
+        The reward is computed by combining the following:
+        **Profit**: Income from accepted bids minus marginal and start-up costs.
+        **Opportunity Cost**: Penalty for underutilizing capacity, calculated as potential lost income.
+        **Regret Term**: A scaled regret term penalizes high opportunity costs to guide effective bidding.
+
+        The reward is scaled and stored along with other outputs in the unit’s data to support learning.
+        """
+        # Function is called after the market is cleared, and we get the market feedback,
+        # allowing us to calculate profit based on the realized transactions.
+
+        product_type = marketconfig.product_type
+
+        start = orderbook[0]["start_time"]
+        end = orderbook[0]["end_time"]
+        # `end_excl` marks the last product's start time by subtracting one frequency interval.
+        end_excl = end - unit.index.freq
+
+        # Depending on how the unit calculates marginal costs, retrieve cost values.
+        marginal_cost = unit.calculate_marginal_cost(
+            start, unit.outputs[product_type].at[start]
+        )
+        market_clearing_price = orderbook[0]["accepted_price"]
+
+        duration = (end - start) / timedelta(hours=1)
+
+        income = 0.0
+        operational_cost = 0.0
+
+        accepted_volume_total = 0
+        offered_volume_total = 0
+
+        # Iterate over all orders in the orderbook to calculate order-specific profit.
+        for order in orderbook:
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_volume_total += accepted_volume
+
+            offered_volume_total += order["volume"]
+
+            # Calculate profit as income minus operational cost for this event.
+            order_income = market_clearing_price * accepted_volume * duration
+            order_cost = marginal_cost * accepted_volume * duration
+
+            # Accumulate income and operational cost for all orders.
+            income += order_income
+            operational_cost += order_cost
+
+        # Consideration of start-up costs, divided evenly between upward and downward regulation events.
+        if (
+            unit.outputs[product_type].at[start] != 0
+            and unit.outputs[product_type].at[start - unit.index.freq] == 0
+        ):
+            operational_cost += unit.hot_start_cost / 2
+        elif (
+            unit.outputs[product_type].at[start] == 0
+            and unit.outputs[product_type].at[start - unit.index.freq] != 0
+        ):
+            operational_cost += unit.hot_start_cost / 2
+
+        profit = income - operational_cost
+
+        # Stabilizing learning: Limit positive profit to 10% of its absolute value.
+        # This reduces variance in rewards and prevents overfitting to extreme profit-seeking behavior.
+        # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
+        # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
+        # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
+        profit = min(profit, 0.5 * abs(profit))
+
+        # get potential maximum infeed according to availability from order volume
+        # Note: this will only work as the correct reference point when the volume is not defined by an action
+        # using a call unit_calculate_min_max_power here would be false since the dispatch of the order is already set, leading to no available power anymore
+        available_power = offered_volume_total
+
+        # Opportunity cost: The income lost due to not operating at full capacity.
+        opportunity_cost = (
+            (market_clearing_price - marginal_cost)
+            * (available_power - accepted_volume_total)
+            * duration
+        )
+
+        # If opportunity cost is negative, no income was lost, so we set it to zero.
+        opportunity_cost = max(opportunity_cost, 0)
+
+        # Dynamic regret scaling:
+        # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
+        # - If no dispatch happens, apply higher regret (0.5) to discourage idle behavior, if it could have been profitable.
+        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 0.5
+
+        # --------------------
+        # 4.1 Calculate Reward
+        # Instead of directly setting reward = profit, we incorporate a regret term (opportunity cost penalty).
+        # This guides the agent toward strategies that maximize accepted bids while minimizing lost opportunities.
+
+        # scaling factor to normalize the reward to the range [-1,1]
+        if available_power == 0:
+            scaling = 0
+        else:
+            scaling = 1 / (self.max_bid_price * available_power)
+
+        reward = scaling * (profit - regret_scale * opportunity_cost)
+
+        # Store results in unit outputs, which are later written to the database by the unit operator.
+        unit.outputs["profit"].loc[start:end_excl] += profit
+        unit.outputs["reward"].loc[start:end_excl] = reward
+        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
+        unit.outputs["total_costs"].loc[start:end_excl] = operational_cost
+
+        unit.outputs["rl_rewards"].append(reward)

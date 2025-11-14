@@ -3,11 +3,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 
 
-class NaiveSingleBidStrategy(BaseStrategy):
+class NaiveSingleBidStrategy(MinMaxStrategy):
     """
     A naive strategy that bids the marginal cost of the unit on the market.
 
@@ -87,7 +87,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
             return self.remove_empty_bids(bids)
 
 
-class NaiveProfileStrategy(BaseStrategy):
+class NaiveProfileStrategy(MinMaxStrategy):
     """
     A naive strategy that bids the marginal cost of the unit as block bids over 24 hours on the day ahead market.
     """
@@ -143,7 +143,7 @@ class NaiveProfileStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDADSMStrategy(BaseStrategy):
+class NaiveDADSMStrategy(MinMaxStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit. The bid volume is the optimal power requirement of
     the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
@@ -197,7 +197,7 @@ class NaiveDADSMStrategy(BaseStrategy):
         return bids
 
 
-class NaiveRedispatchDSMStrategy(BaseStrategy):
+class NaiveRedispatchDSMStrategy(MinMaxStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of the unit on the redispatch market.
     The bid volume is the flexible power requirement of the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
@@ -235,7 +235,7 @@ class NaiveRedispatchDSMStrategy(BaseStrategy):
         return bids
 
 
-class NaiveRedispatchStrategy(BaseStrategy):
+class NaiveRedispatchStrategy(MinMaxStrategy):
     """
     A naive strategy that simply submits all information about the unit and
     currently dispatched power for the following hours to the redispatch market.
@@ -295,7 +295,7 @@ class NaiveRedispatchStrategy(BaseStrategy):
         return bids
 
 
-class NaiveExchangeStrategy(BaseStrategy):
+class NaiveExchangeStrategy(MinMaxStrategy):
     """
     A naive strategy for an exchange unit that bids the defined import and export prices on the market.
     It submits two bids, one for import and one for export, with the respective prices and volumes.
@@ -362,7 +362,7 @@ class NaiveExchangeStrategy(BaseStrategy):
         return bids
 
 
-class ElasticDemandStrategy(BaseStrategy):
+class ElasticDemandStrategy(MinMaxStrategy):
     """
     A bidding strategy for a demand unit that submits multiple bids to approximate
     a marginal utility curve, based on linear or isoelastic demand theory.
@@ -486,19 +486,24 @@ class ElasticDemandStrategy(BaseStrategy):
         """
         Calculate the first block bid volume at max_price. P = Price, Q = Quantity, E = Elasticity.
         Assumes isoelastic demand:
-            Q = Q_max * P^E
+
+        .. math::
+            Q = Q_{max} * P^E
 
         The first block bid is the volume that is always bid at maximum price, because the
         willingness to pay for it is higher than the markets maximal price.
         The first block bid volume is calculated by finding the intersection of the isoelastic demand
         curve and the maximum price in the marginal utility plot. All demand left of the intersection
-        is always bought at maximum price and is called Q_first.
+        is always bought at maximum price and is called $Q_{first}$.
 
-            Q_first = Q
-            Q_first = Q_max * P^E
+        .. math::
+            Q_{first} = Q
+            Q_{first} = Q_{max} * P^E
 
         Therefore:
-            Q_first = max_power * (max_price ** E)
+
+        .. math::
+            Q_{first} = power_{max} * (price_{max} ^ E)
 
         Returns:
             float: Volume > 0, demand that is always bought at max willingness to pay
@@ -512,7 +517,7 @@ class ElasticDemandStrategy(BaseStrategy):
         return volume
 
 
-class DSM_PosCRM_Strategy(BaseStrategy):
+class DSM_PosCRM_Strategy(MinMaxStrategy):
     """
     Strategy for Positive CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """
@@ -550,7 +555,7 @@ class DSM_PosCRM_Strategy(BaseStrategy):
         return self.remove_empty_bids(bids)
 
 
-class DSM_NegCRM_Strategy(BaseStrategy):
+class DSM_NegCRM_Strategy(MinMaxStrategy):
     """
     Strategy for Negative CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """

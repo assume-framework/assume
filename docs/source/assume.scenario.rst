@@ -28,6 +28,16 @@ OEDS Loader
    :undoc-members:
    :show-inheritance:
 
+.. _oeds_infrastructure:
+
+OEDS Infrastructure
+-------------------
+
+.. automodule:: assume.scenario.oeds.infrastructure
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 .. _amiris_loader:
 
 AMIRIS Loader

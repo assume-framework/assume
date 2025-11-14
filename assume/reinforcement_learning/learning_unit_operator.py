@@ -13,7 +13,7 @@ from assume.common.market_objects import (
     Orderbook,
 )
 from assume.common.utils import convert_tensors, create_rrule, get_products_index
-from assume.strategies import BaseStrategy, LearningStrategy
+from assume.strategies import LearningStrategy, UnitOperatorStrategy
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -23,9 +23,9 @@ class RLUnitsOperator(UnitsOperator):
     def __init__(
         self,
         available_markets: list[MarketConfig],
-        opt_portfolio: tuple[bool, BaseStrategy] | None = None,
+        portfolio_strategies: dict[str, UnitOperatorStrategy] = {},
     ):
-        super().__init__(available_markets, opt_portfolio)
+        super().__init__(available_markets, portfolio_strategies)
 
         self.rl_units = []
         self.learning_strategies = {

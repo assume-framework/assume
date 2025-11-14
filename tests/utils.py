@@ -6,8 +6,10 @@ from datetime import datetime, timedelta
 from itertools import product
 
 import numpy as np
+import pandas as pd
 
 from assume.common.market_objects import Order
+from assume.world import World
 
 
 def create_orderbook(order: Order = None, node_ids=[0], count=100, seed=30):
@@ -143,3 +145,19 @@ def get_test_prices(num: int = 24):
     )
 
     return prices
+
+
+start, end = datetime(2022, 1, 1), datetime(2022, 1, 31)
+index = pd.date_range(start=start, end=end, freq="d")
+
+
+def setup_simple_world() -> World:
+    world = World(database_uri=None, export_csv_path=None)
+    world.setup(
+        start=start,
+        end=end,
+        save_frequency_hours=48,
+        simulation_id="a_simulation",
+        index=index,
+    )
+    return world

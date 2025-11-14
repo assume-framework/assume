@@ -10,7 +10,11 @@ import pypsa
 from dateutil import rrule as rr
 
 from assume import World
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import (
+    DemandForecaster,
+    PowerplantForecaster,
+    UnitForecaster,
+)
 from assume.common.market_objects import MarketConfig, MarketProduct
 
 logger = logging.getLogger(__name__)
@@ -99,12 +103,12 @@ def load_pypsa(
                 "fuel_type": generator.carrier,
                 "ramp_up": ramp_up,
                 "ramp_down": ramp_down,
-                "min_operating_time": generator.min_up_time,
-                "min_down_time": generator.min_down_time,
+                "min_operating_time": generator.min_up_time or 1,
+                "min_down_time": generator.min_down_time or 1,
             },
-            NaiveForecast(
+            PowerplantForecaster(
                 index,
-                fuel_price=generator.marginal_cost,
+                fuel_prices={generator.carrier: generator.marginal_cost},
                 availability=av,
             ),
         )
@@ -118,21 +122,19 @@ def load_pypsa(
         load_t = network.loads_t["p_set"][load.name]
         unit_type = "demand"
 
-        kwargs = {load.name: load_t}
-
         world.add_unit(
             load.name,
             unit_type,
             "demand_operator",
             {
                 "min_power": 0,
-                "max_power": load_t.max(),
+                "max_power": -load_t.max(),
                 "bidding_strategies": bidding_strategies[unit_type][load.name],
                 "technology": "demand",
                 "node": load.node,
                 "price": 1e3,
             },
-            NaiveForecast(index, demand=load_t, **kwargs),
+            DemandForecaster(index, demand=-abs(load_t)),
         )
 
     world.add_unit_operator("storage_operator")
@@ -163,7 +165,7 @@ def load_pypsa(
                 "emission_factor": 0,
                 "node": storage.bus,
             },
-            NaiveForecast(index, fuel_price=storage.marginal_cost),
+            UnitForecaster(index),
         )
 
 
@@ -177,11 +179,11 @@ if __name__ == "__main__":
 
     match study_case:
         case "ac_dc_meshed":
-            network = pypsa.examples.ac_dc_meshed(from_master=True)
+            network = pypsa.examples.ac_dc_meshed()
         case "scigrid_de":
-            network = pypsa.examples.scigrid_de(True, from_master=True)
+            network = pypsa.examples.scigrid_de()
         case "storage_hvdc":
-            network = pypsa.examples.storage_hvdc(True)
+            network = pypsa.examples.storage_hvdc()
         case _:
             logger.info(f"invalid studycase: {study_case}")
             network = pd.DataFrame()

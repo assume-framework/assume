@@ -347,7 +347,7 @@ def separate_orders(orderbook: Orderbook):
     Returns:
         list: The updated orderbook.
 
-    Notes:
+    Note:
         This function separates orders with several hours into single hour orders and modifies the orderbook in place.
     """
 
@@ -531,11 +531,9 @@ def create_incidence_matrix(lines, buses, zones_id=None):
             and node1 in nodes
         ):
             if node0 != node1:  # Only create incidence for different nodes
-                # Set incidence values: +1 for the "from" node and -1 for the "to" node
-                incidence_matrix.at[node0, line_idx] = (
-                    1  # Outgoing from bus0 (or zone0)
-                )
-                incidence_matrix.at[node1, line_idx] = -1  # Incoming to bus1 (or zone1)
+                # Create a directed incidence matrix (definition according to Wikipedia https://en.wikipedia.org/wiki/Incidence_matrix)
+                incidence_matrix.at[node0, line_idx] = -1  # leaving node
+                incidence_matrix.at[node1, line_idx] = 1  # entering node
 
     # Return the incidence matrix as a Data
     return incidence_matrix

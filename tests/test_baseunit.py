@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from assume.common.base import BaseStrategy, BaseUnit
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import PowerplantForecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
@@ -38,8 +38,10 @@ class BasicStrategy(BaseStrategy):
 def base_unit(request) -> BaseUnit:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2022-01-01", periods=4, freq=request.param)
-    forecaster = NaiveForecast(
-        index, availability=1, fuel_price=[10, 11, 12, 13], co2_price=[10, 20, 30, 30]
+    forecaster = PowerplantForecaster(
+        index,
+        availability=1,
+        fuel_prices={"others": [10, 11, 12, 13], "co2": [10, 20, 30, 30]},
     )
     return BaseUnit(
         id="test_pp",

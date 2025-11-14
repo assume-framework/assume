@@ -34,7 +34,7 @@ class RedispatchMarketRole(MarketRole):
     Args:
         marketconfig (MarketConfig): The market configuration.
 
-    Notes:
+    Note:
         Users can also configure the path to the network data, the solver to be used,
         and the backup marginal cost in the param_dict of the market configuration.
 

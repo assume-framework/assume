@@ -81,11 +81,14 @@ User Guide
 * :doc:`outputs`
 * :doc:`unit_operator`
 * :doc:`units`
+* :doc:`unit_forecasts`
+* :doc:`bidding_strategies`
 * :doc:`learning`
 * :doc:`learning_algorithm`
 * :doc:`support_policies`
 * :doc:`distributed_simulation`
 * :doc:`manual_simulation`
+* :doc:`realtime_simulation`
 * :doc:`command_line_interface`
 * :doc:`assume`
 
@@ -100,11 +103,14 @@ User Guide
    outputs
    unit_operator
    units
+   unit_forecasts
+   bidding_strategies
    learning
    learning_algorithm
    support_policies
    distributed_simulation
    manual_simulation
+   realtime_simulation
    command_line_interface
    assume
 

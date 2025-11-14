@@ -19,7 +19,7 @@ from mango import (
     create_tcp_container,
 )
 from mango.container.core import Container
-from mango.util.clock import ExternalClock
+from mango.util.clock import AsyncioClock, ExternalClock
 from mango.util.distributed_clock import DistributedClockAgent, DistributedClockManager
 from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine, make_url
@@ -27,7 +27,6 @@ from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
 
 from assume.common import (
-    Forecaster,
     MarketConfig,
     OutputDef,
     UnitsOperator,
@@ -35,9 +34,14 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
+from assume.common.forecaster import UnitForecaster
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import LearningStrategy, bidding_strategies
+from assume.strategies import (
+    LearningStrategy,
+    UnitOperatorStrategy,
+    bidding_strategies,
+)
 from assume.units import BaseUnit, demand_side_technologies, unit_types
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -70,7 +74,7 @@ class World:
         db (sqlalchemy.engine.base.Engine, optional): The database connection engine.
         container (mango.Container, optional): The container for the world instance.
         loop (asyncio.AbstractEventLoop, optional): The event loop for asynchronous operations.
-        clock (ExternalClock, optional): External clock instance.
+        clock (Clock, optional): ExternalClock or AsyncioClock instance.
         start (datetime.datetime, optional): Start datetime for the simulation.
         end (datetime.datetime, optional): End datetime for the simulation.
         market_operators (dict[str, mango.RoleAgent], optional): Market operators in the world instance.
@@ -183,8 +187,8 @@ class World:
         learning_config: LearningConfig = {},
         episode: int = 1,
         eval_episode: int = 1,
-        forecaster: Forecaster | None = None,
         manager_address=None,
+        real_time=False,
         **kwargs: dict,
     ) -> None:
         """
@@ -194,11 +198,9 @@ class World:
             start (datetime.datetime): The start datetime for the simulation.
             end (datetime.datetime): The end datetime for the simulation.
             simulation_id (str): The unique identifier for the simulation.
-            index (pandas.Series): The index for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
             learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
-            forecaster (Forecaster, optional): The forecaster used for custom unit types. Defaults to None.
             manager_address: The address of the manager.
             **kwargs: Additional keyword arguments.
 
@@ -206,7 +208,14 @@ class World:
             None
         """
 
-        self.clock = ExternalClock(0)
+        if real_time:
+            if manager_address:
+                raise Exception("Can't have manager when running realtime")
+            if self.distributed_role is not None:
+                raise Exception("Can't have distributed role when running realtime")
+            self.clock = AsyncioClock()
+        else:
+            self.clock = ExternalClock(0)
         self.simulation_id = simulation_id
         self.start = start
         self.end = end
@@ -229,9 +238,6 @@ class World:
             if not self.evaluation_mode
             else f"Evaluation Episode {eval_episode}"
         )
-
-        # forecaster is used only when loading custom unit types
-        self.forecaster = forecaster
 
         self.bidding_params = bidding_params
 
@@ -318,7 +324,6 @@ class World:
                 db_uri=self.db_uri,
                 output_agent_addr=self.output_agent_addr,
                 train_start=self.start,
-                freq=self.forecaster.index.freq,
             )
 
         else:
@@ -389,7 +394,9 @@ class World:
             )
             output_agent.suspendable_tasks = False
 
-    def add_unit_operator(self, id: str) -> None:
+    def add_unit_operator(
+        self, id: str, strategies: dict[str, UnitOperatorStrategy] = {}
+    ) -> None:
         """
         Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
         The unit operator is then added to the list of existing operators. Unit operator receives the output agent address
@@ -402,7 +409,14 @@ class World:
         if self.unit_operators.get(id):
             raise ValueError(f"Unit operator {id} already exists")
 
-        units_operator = UnitsOperator(available_markets=list(self.markets.values()))
+        bidding_strategies = self._prepare_bidding_strategies(
+            {"bidding_strategies": strategies}, id
+        )
+
+        units_operator = UnitsOperator(
+            available_markets=list(self.markets.values()),
+            portfolio_strategies=bidding_strategies,
+        )
 
         # creating a new role agent and apply the role of a units operator
         unit_operator_agent = RoleAgent()
@@ -475,7 +489,9 @@ class World:
                 }
             )
 
-    def add_units_with_operator_subprocess(self, id: str, units: list[dict]):
+    def add_units_with_operator_subprocess(
+        self, id: str, units: list[dict], strategies: dict[str, UnitOperatorStrategy]
+    ):
         """
         Adds a units operator with given ID in a separate process
         and creates and adds the given list of unit dictionaries to it
@@ -494,7 +510,9 @@ class World:
                 market.opening_hours._cache_complete = False
                 market.opening_hours._cache_gen = None
         self.addresses.append(addr(self.addr, clock_agent_name))
-        units_operator = UnitsOperator(available_markets=markets)
+        units_operator = UnitsOperator(
+            available_markets=markets, portfolio_strategies=strategies
+        )
 
         for unit in units:
             units_operator.add_unit(self.create_unit(**unit))
@@ -521,7 +539,7 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
     ) -> BaseUnit:
         # provided unit type does not exist yet
         unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
@@ -544,7 +562,7 @@ class World:
 
         Args:
             unit_id (str): The identifier for the unit.
-            bidding_strategies (dict[str, BaseStrategy]): The bidding strategies for the unit.
+            bidding_strategies (dict[str, BaseStrategy | UnitOperatorStrategy]): The bidding strategies for the unit.
         """
         for unit in self.unit_operators["Operator-RL"].rl_units:
             for strategy in unit.bidding_strategies.values():
@@ -561,7 +579,7 @@ class World:
             unit_id (str): The identifier for the unit.
 
         Returns:
-            dict[str, BaseStrategy]: The bidding strategies for the unit.
+            dict[str, BaseStrategy | UnitOperatorStrategy]: The bidding strategies for the unit.
         """
         bidding_strategies = {}
         strategy_instances = {}  # Cache to store created instances
@@ -581,7 +599,7 @@ class World:
                     )
                 raise ValueError(
                     f"""Bidding strategy {strategy} not registered. Please check the name of
-                    the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                        the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
                 )
 
             if strategy not in strategy_instances:
@@ -607,14 +625,24 @@ class World:
             unit_operator_id (str): The identifier of the unit operator.
         """
 
-        if unit_operator_id not in self.unit_operators:
-            raise ValueError(f"Invalid unit operator: {unit_operator_id}")
+        self._validate_unit_operator(unit_operator_id)
 
         if unit_type not in self.unit_types:
             raise ValueError(f"Invalid unit type: {unit_type}")
 
         if self.unit_operators[unit_operator_id].units.get(id):
             raise ValueError(f"Unit {id} already exists")
+
+    def _validate_unit_operator(self, unit_operator_id: str):
+        """
+        Validate the existence of a unit operator in the simulation.
+
+        Args:
+            unit_operator_id (str): The identifier for the unit operator.
+        """
+
+        if unit_operator_id not in self.unit_operators.keys():
+            raise ValueError(f"Invalid unit operator: {unit_operator_id}")
 
     def add_market_operator(self, id: str) -> None:
         """
@@ -671,6 +699,17 @@ class World:
         self.markets[f"{market_config.market_id}"] = market_config
 
     async def _step(self, container):
+        """
+        Executes a simulation step for the container.
+        Manages distribution of time using the clock_manager.
+        Waits for completion or sleeping of active tasks before returning the schedule.
+
+        Args:
+            container (mango.Container): the container which should be awaited
+
+        Returns:
+            float: the time delta since the last activity in seconds
+        """
         if self.distributed_role:
             # TODO find better way than sleeping
             # we need to wait, until the last step is executed correctly
@@ -703,25 +742,34 @@ class World:
         async with activate(self.container) as c:
             await tasks_complete_or_sleeping(c)
             logger.debug("all agents up - starting simulation")
+
             pbar = tqdm(total=end_ts - start_ts)
 
-            # allow registration before first opening
-            self.clock.set_time(start_ts - 1)
-            if self.distributed_role is not False:
-                await self.clock_manager.broadcast(self.clock.time)
-            prev_delta = 0
-            while self.clock.time < end_ts:
-                await asyncio.sleep(0)
-                delta = await self._step(c)
-                if delta or prev_delta:
+            if isinstance(self.clock, ExternalClock):
+                # allow registration before first opening
+                self.clock.set_time(start_ts - 1)
+                if self.distributed_role is not False:
+                    await self.clock_manager.broadcast(self.clock.time)
+                prev_delta = 0
+                while self.clock.time < end_ts:
+                    await asyncio.sleep(0)
+                    delta = await self._step(c)
+                    if delta or prev_delta:
+                        pbar.update(delta)
+                        pbar.set_description(
+                            f"{self.simulation_desc} {timestamp2datetime(self.clock.time)}",
+                            refresh=False,
+                        )
+                    else:
+                        self.clock.set_time(end_ts)
+                    prev_delta = delta
+            else:
+                # real-time mode
+                while self.clock.time < end_ts:
+                    time = self.clock.time
+                    await asyncio.sleep(1)
+                    delta = self.clock.time - time
                     pbar.update(delta)
-                    pbar.set_description(
-                        f"{self.simulation_desc} {timestamp2datetime(self.clock.time)}",
-                        refresh=False,
-                    )
-                else:
-                    self.clock.set_time(end_ts)
-                prev_delta = delta
             pbar.close()
 
     def run(self):
@@ -764,10 +812,10 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
     ) -> None:
         """
-        Add a unit to the World instance.
+        Creates a unit and adds it to the World instance.
 
         This method checks if the unit operator exists, verifies the unit type, and ensures that the unit operator
         does not already have a unit with the same id. It then creates bidding strategies for the unit and creates
@@ -789,3 +837,16 @@ class World:
         )
 
         self.unit_operators[unit_operator_id].add_unit(unit)
+
+    def add_unit_instance(self, operator_id: str, unit: BaseUnit):
+        """
+        Add an existing unit to the World instance.
+
+        This method checks if the unit operator exists and then assigns the provided unit instance to it.
+
+        Args:
+            operator_id (str): The identifier of the unit operator.
+            unit (BaseUnit): The unit instance to be added.
+        """
+        self._validate_unit_operator(operator_id)
+        self.unit_operators[operator_id].add_unit(unit)

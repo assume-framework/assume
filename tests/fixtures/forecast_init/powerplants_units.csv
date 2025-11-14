@@ -1,0 +1,2 @@
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,unit_operator
+Unit 1,nuclear,naive_eom,uranium,0.0,1000.0,200.0,0.3,10.3,Operator 1
