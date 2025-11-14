@@ -8,6 +8,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+import warnings
 
 from mango import (
     RoleAgent,
@@ -698,6 +699,73 @@ class World:
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.market_id}"] = market_config
 
+    def _validate_setup(self):
+        """ Pre-empt invalid/unclear states, by detecting defective setups. """
+
+        # Integrity of schedule.
+        for market_id, market_config in self.markets.items():
+            market_start = market_config.opening_hours.dtstart, 
+            market_end = market_config.opening_hours.until,
+            
+            if market_start < self.start or market_end > self.end:
+                msg = (f"Market {market_id} violates world schedule. \n"
+                       f"Market start: {market_start}, end: {market_end}. \n)"
+                       f"World start: {market_start}, end: {market_end}.)")
+                raise ValueError(msg)
+
+        # Integrity of reference.
+        # For each UnitOperator: strategies must reference existing markets.
+        unit_operators = list(self.unit_operators.values())
+        for operator in unit_operators.keys():
+            for market_id in operator.portfolio_strategies.keys():
+                if market_id not in list(self.markets.keys()):
+                    msg = (f"Strategies of unit operator {operator} references"
+                           f"market {market_id} which is not known in world."
+                           f"Known markets are:\n{list(self.markets.keys())}.")
+                    raise ValueError(msg)
+
+        # Each market should be referenced by a market strategy.
+        referenced_markets = {market 
+                              for market in operator.portfolio_strategies.keys()
+                              for operator in unit_operators}
+        for market_id in self.markets.keys():
+            if not market_id in referenced_markets:
+                msg = f"Added market {market_id}, has no participants."
+                warnings.warn(msg)
+        
+        # Real-world integrity.
+        # A Re-Dispatch market can only open if an earlier market closed.
+        for market_config in self.markets.values():
+            earliest_redispatch_opening = min(
+                {config["start_date"] for config in self.markets.values()
+                 if config["market_mechanism"] == "redispatch"})
+            
+            earliest_dispatch_closing = min(
+                {config["end_date"] for config in self.markets.values()
+                 if config["market_mechanism"] != "redispatch"})
+
+            if earliest_redispatch_opening < earliest_dispatch_closing:
+                msg = (f"First re-dispatch market opens before first dispatch "
+                       f"market has closed.")
+                raise ValueError(msg)
+
+        # Existence of demand implies existence of generation and vice versa.
+        demand_exists, generation_exists = False, False
+        for operator in unit_operators.keys():
+            for unit in operator.units:
+                # ToDo: Are the defintions of demand and generation exhaustive?
+                if type(unit) in [self.unit_types["Demand"]]:
+                    demand_exists = True
+                elif type(unit) in [self.unit_types["PowerPlant"],
+                                    self.unit_types["HydrogenPlant"]]:
+                    generation_exists = True
+        if demand_exists and not generation_exists:
+            msg = "Demand units but no generation units were created. "
+            warnings.warn(msg)
+        elif generation_exists and not demand_exists:
+            msg = "Generation units but no demand units were created. "
+            warnings.warn(msg)
+
     async def _step(self, container):
         """
         Executes a simulation step for the container.
@@ -737,6 +805,8 @@ class World:
             start_ts (datetime.datetime): The start timestamp for the simulation run.
             end_ts (datetime.datetime): The end timestamp for the simulation run.
         """
+        self._validate_setup()
+
         logger.debug("activating container")
         # agent is implicit added to self.container._agents
         async with activate(self.container) as c:
@@ -783,6 +853,8 @@ class World:
         the simulation time reaches the end timestamp, the method closes the progress bar and shuts down the simulation
         container.
         """
+
+        self._validate_setup()
 
         start_ts = datetime2timestamp(self.start)
         end_ts = datetime2timestamp(self.end)
