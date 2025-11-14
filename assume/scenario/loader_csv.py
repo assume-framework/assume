@@ -575,7 +575,6 @@ def load_config_and_create_forecaster(
         availability=availability,
         exchanges=exchanges_df,
     )
-    calculator.calc_forecast_if_needed()
 
     unit_forecasts: dict[str, UnitForecaster] = {}
     market_prices, residual_loads = calculator.calculate_market_forecasts()
@@ -583,7 +582,7 @@ def load_config_and_create_forecaster(
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
                 index=index,
-                availability=calculator[f"availability_{id}"],
+                availability=calculator.availability(id),
                 fuel_prices=calculator.fuel_prices,
                 market_prices=market_prices,
                 residual_load=residual_loads,
@@ -592,7 +591,7 @@ def load_config_and_create_forecaster(
         for id, demand in demand_units.iterrows():
             unit_forecasts[id] = DemandForecaster(
                 index=index,
-                availability=calculator[f"availability_{id}"],
+                availability=calculator.availability(id),
                 demand=-demand_df[id].abs(),
                 market_prices=market_prices,
             )
@@ -600,14 +599,14 @@ def load_config_and_create_forecaster(
         for id, storage in storage_units.iterrows():
             unit_forecasts[id] = UnitForecaster(
                 index=index,
-                availability=calculator[f"availability_{id}"],
+                availability=calculator.availability(id),
                 market_prices=market_prices,
             )
     if exchange_units is not None:
         for id, exchange in exchange_units.iterrows():
             unit_forecasts[id] = ExchangeForecaster(
                 index=index,
-                availability=calculator[f"availability_{id}"],
+                availability=calculator.availability(id),
                 market_prices=market_prices,
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
@@ -618,7 +617,7 @@ def load_config_and_create_forecaster(
                 if type == "building":
                     unit_forecasts[id] = BuildingForecaster(
                         index=index,
-                        availability=calculator[f"availability_{id}"],
+                        availability=calculator.availability(id),
                         market_prices=market_prices,
                         fuel_prices=calculator.fuel_prices,
                         residual_load=residual_loads,
@@ -634,7 +633,7 @@ def load_config_and_create_forecaster(
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
                         index=index,
-                        availability=calculator[f"availability_{id}"],
+                        availability=calculator.availability(id),
                         market_prices=market_prices,
                         fuel_prices=calculator.fuel_prices,
                         residual_load=residual_loads,
@@ -647,7 +646,7 @@ def load_config_and_create_forecaster(
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
                         index=index,
-                        availability=calculator[f"availability_{id}"],
+                        availability=calculator.availability(id),
                         market_prices=market_prices,
                         hydrogen_demand=unit["demand"],
                         residual_load=residual_loads,
@@ -659,7 +658,7 @@ def load_config_and_create_forecaster(
                 if type == "steam_plant":
                     unit_forecasts[id] = SteamgenerationForecaster(
                         index=index,
-                        availability=calculator[f"availability_{id}"],
+                        availability=calculator.availability(id),
                         demand=unit["demand"],
                         market_prices=market_prices,
                         fuel_prices=calculator.fuel_prices,

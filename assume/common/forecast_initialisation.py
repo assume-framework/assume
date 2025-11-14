@@ -6,7 +6,7 @@ import logging
 
 import pandas as pd
 
-from assume.common.fast_pandas import FastIndex_from_pd, FastSeries
+from assume.common.fast_pandas import FastIndex, FastSeries
 
 
 class ForecastInitialisation:
@@ -71,7 +71,19 @@ class ForecastInitialisation:
         self.set_forecast(forecasts)
         self.set_forecast(demand)
         self.set_forecast(exchanges)
-        self.set_forecast(availability, prefix="availability_")
+        self._availability = availability
+
+        self._calc_forecast_if_needed()
+
+    def availability(self, id: str) -> FastSeries:
+        if self._availability is not None and id in self._availability.columns:
+            return FastSeries.from_pandas_series(self._availability[id])
+        else:
+            return FastSeries(
+                index=FastIndex.from_pandas_index(self.index),
+                value=1.0,
+                name=f"availability_{id}",
+            )
 
     def __getitem__(self, column: str) -> FastSeries:
         """
@@ -81,22 +93,13 @@ class ForecastInitialisation:
 
         Args:
             column (str): The column of the forecast.
-
         Returns:
             FastSeries: The forecast for the given column.
-
         """
-
         if column not in self.forecasts.keys():
-            if "availability" in column:
-                self.forecasts[column] = FastSeries(
-                    value=1.0, index=FastIndex_from_pd(self.index), name=column
-                )
-            else:
-                self.forecasts[column] = FastSeries(
-                    value=0.0, index=FastIndex_from_pd(self.index), name=column
-                )
-
+            self.forecasts[column] = FastSeries(
+                value=0.0, index=FastIndex.from_pandas_index(self.index), name=column
+            )
         return self.forecasts[column]
 
     def set_forecast(self, data: pd.DataFrame | pd.Series | None, prefix=""):
@@ -135,48 +138,27 @@ class ForecastInitialisation:
         else:
             self.forecasts[prefix + data.name] = data
 
-    def add_missing_availability_columns(self):
-        """Add missing availability columns to the forecasts."""
-        missing_cols = [
-            f"availability_{pp}"
-            for pp in self.powerplants_units.index
-            if f"availability_{pp}" not in self.forecasts.columns
-        ]
-
-        if missing_cols:
-            # Create a DataFrame with the missing columns initialized to 1
-            missing_data = pd.DataFrame(
-                1, index=self.forecasts.index, columns=missing_cols
-            )
-            # Append the missing columns to the forecasts
-            self.forecasts = pd.concat([self.forecasts, missing_data], axis=1).copy()
-
-    def calc_forecast_if_needed(self):
+    def _calc_forecast_if_needed(self):
         """
         Calculates the forecasts if they are not already calculated.
 
         This method calculates price forecast and residual load forecast for available markets,
         and other necessary forecasts if they don't already exist.
         """
-        self.add_missing_availability_columns()
-        self.calculate_market_forecasts()
-
-        # the following forecasts are only calculated if buses and lines are available
-        # and self.demand_units have a node column
-        if self.buses is not None and self.lines is not None:
-            # check if the demand_units have a node column and
-            # if the nodes are available in the buses
-            if (
-                "node" in self.demand_units.columns
-                and self.demand_units["node"].isin(self.buses.index).all()
-            ):
-                self.add_node_congestion_signals()
-                self.add_utilisation_forecasts()
-            else:
-                self.logger.warning(
-                    "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
-                    "Either 'node' column is missing in demand_units or nodes are not available in buses."
-                )
+        if self.buses is None or self.lines is None:
+            return
+        # check if the demand_units have a node column and if the nodes are available in the buses
+        if (
+            "node" in self.demand_units.columns
+            and self.demand_units["node"].isin(self.buses.index).all()
+        ):
+            self.add_node_congestion_signals()
+            self.add_utilisation_forecasts()
+            return
+        self.logger.warning(
+            "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
+            "Either 'node' column is missing in demand_units or nodes are not available in buses."
+        )
 
     def calculate_market_forecasts(
         self,
@@ -230,7 +212,7 @@ class ForecastInitialisation:
                 if col not in self.forecasts.columns:
                     self.forecasts[col] = renewable_utilisation_forecast[col]
 
-    def get_registered_market_participants(self, market_id):
+    def get_registered_market_participants(self, market_id: str) -> pd.DataFrame:
         """
         Retrieves information about market participants to make accurate price forecasts.
 
@@ -250,6 +232,21 @@ class ForecastInitialisation:
         )
         return self.powerplants_units
 
+    def _calc_power(self, mask: pd.Series = None) -> pd.DataFrame:
+        """
+        Calculates the output power of each power plant based on its availability and maximum power.
+
+        Args:
+            mask (pd.Series, optional): An optional boolean mask to filter power plants
+        """
+        powerplants = self.powerplants_units
+        if mask is not None:
+            powerplants = powerplants[mask]
+        av_list = [self.availability(id).as_pd_series() for id in powerplants.index]
+        availabilities = pd.DataFrame(av_list).T
+        availabilities.columns = powerplants.index
+        return powerplants.max_power * availabilities
+
     def calculate_residual_load_forecast(self, market_id) -> pd.Series:
         """
         This method calculates the residual demand forecast by subtracting the total available power from renewable energy (VRE) power plants from the overall demand forecast for each time step.
@@ -265,22 +262,6 @@ class ForecastInitialisation:
             5. If exchange units are available, imports and exports are subtracted and added to the demand forecast, respectively.
 
         """
-
-        vre_powerplants_units = self.powerplants_units[
-            self.powerplants_units["technology"].str.contains(
-                r"\b(?:wind|solar)\b", case=False, na=False
-            )
-        ].copy()
-
-        vre_feed_in_df = pd.DataFrame(
-            index=self.index,
-            columns=vre_powerplants_units.index,
-            data=0.0,
-        )
-
-        for pp, max_power in vre_powerplants_units["max_power"].items():
-            vre_feed_in_df[pp] = self.forecasts[f"availability_{pp}"] * max_power
-
         demand_units = self.demand_units[
             self.demand_units[f"bidding_{market_id}"].notnull()
         ]
@@ -300,7 +281,13 @@ class ForecastInitialisation:
             # add imports and exports to the sum_demand
             sum_demand += sum_imports - sum_exports
 
-        res_demand_df = sum_demand - vre_feed_in_df.sum(axis=1)
+        mask = self.powerplants_units["technology"].str.contains(
+            r"\b(?:wind|solar)", case=False, na=False
+        )
+        vre_feed_in_df = self._calc_power(mask).sum(axis=1)
+        if vre_feed_in_df.empty:
+            vre_feed_in_df = 0
+        res_demand_df = sum_demand - vre_feed_in_df
 
         return res_demand_df
 
@@ -344,18 +331,11 @@ class ForecastInitialisation:
         #    The resulting DataFrame has rows = time steps and columns = units.
         marginal_costs = powerplants_units.apply(self.calculate_marginal_cost, axis=1).T
 
-        # 3. Get forecast availabilities and reformat the column names to match unit identifiers.
-        col_availabilities = self.forecasts.columns[
-            self.forecasts.columns.str.startswith("availability")
-        ]
-        availabilities = self.forecasts[col_availabilities].copy()
-        availabilities.columns = col_availabilities.str.replace("availability_", "")
-
-        # 4. Compute available power for each unit at each time step.
+        # 3. Compute available power for each unit at each time step.
         #    Since max_power is a float, this multiplication broadcasts over each column.
-        power = self.powerplants_units.max_power * availabilities
+        power = self._calc_power()
 
-        # 5. Process the demand.
+        # 4. Process the demand.
         #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
         demand_units = self.demand_units[
             self.demand_units[f"bidding_{market_id}"].notnull()
@@ -376,10 +356,10 @@ class ForecastInitialisation:
             # add imports and exports to the sum_demand
             sum_demand += sum_imports - sum_exports
 
-        # 6. Initialize the price forecast series.
+        # 5. Initialize the price forecast series.
         price_forecast = pd.Series(index=self.index, data=0.0)
 
-        # 7. Loop over each time step
+        # 6. Loop over each time step
         for t in self.index:
             # Get marginal costs and available power for time t (both are Series indexed by unit)
             mc_t = marginal_costs.loc[t]
@@ -457,18 +437,9 @@ class ForecastInitialisation:
             pd.DataFrame: A DataFrame with columns for each node, where each column represents the collective
                           congestion signal time series for that node.
         """
-        # Step 1: Calculate powerplant load using availability factors
-        availability_factor_df = pd.DataFrame(
-            index=self.index,
-            columns=self.powerplants_units.index,
-            data=0.0,
-        )
 
-        # Calculate load for each powerplant based on availability factor and max power
-        for pp, max_power in self.powerplants_units["max_power"].items():
-            availability_factor_df[pp] = (
-                self.forecasts[f"availability_{pp}"] * max_power
-            )
+        # Step 1: Calculate load for each powerplant based on availability factor and max power
+        availability_factor_df = self._calc_power()
 
         # Step 2: Calculate net load for each node (demand - generation)
         net_load_by_node = {}
@@ -546,28 +517,16 @@ class ForecastInitialisation:
         # Initialize a DataFrame to store renewable utilisation for each node
         renewable_utilisation = pd.DataFrame(index=self.index)
 
-        # Identify renewable power plants by filtering `powerplants_units` DataFrame
-        renewable_plants = self.powerplants_units[
-            self.powerplants_units["fuel_type"] == "renewable"
-        ]
-
-        # Calculate utilisation based on availability and max power for each renewable plant
+        # calculate power for renewable plants
+        renewable_mask = self.powerplants_units["fuel_type"] == "renewable"
+        powers = self._calc_power(renewable_mask)
+        # Calculate utilisation based on availability and max power for each node
         for node in self.demand_units["node"].unique():
-            node_renewable_sum = pd.Series(0, index=self.index)
-
-            # Filter renewable plants in this specific node
-            node_renewable_plants = renewable_plants[renewable_plants["node"] == node]
-
-            for pp in node_renewable_plants.index:
-                max_power = node_renewable_plants.loc[pp, "max_power"]
-                availability_col = f"availability_{pp}"
-
-                # Calculate renewable power based on availability and max capacity
-                if availability_col in self.forecasts.columns:
-                    node_renewable_sum += self.forecasts[availability_col] * max_power
-
-            # Store the node-specific renewable utilisation
-            renewable_utilisation[f"{node}_renewable_utilisation"] = node_renewable_sum
+            node_mask = self.powerplants_units["node"] == node
+            # get the renewable units for this node
+            node_units = self.powerplants_units[node_mask & renewable_mask].index
+            utilization = powers[node_units].sum(axis=1)
+            renewable_utilisation[f"{node}_renewable_utilisation"] = utilization
 
         # Calculate the total renewable utilisation across all nodes
         all_nodes_sum = renewable_utilisation.sum(axis=1)

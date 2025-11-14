@@ -52,8 +52,6 @@ def forecast_init():
 
 
 def test_forecast_init(forecast_init):
-    forecast_init.calc_forecast_if_needed()
-
     market_forecast, load_forecast = forecast_init.calculate_market_forecasts()
     # assert the passed forecast is generated
     assert list(market_forecast["EOM"]) == [10.3] * 4
@@ -63,7 +61,6 @@ def test_forecast_init(forecast_init):
 def test_forecast_init_used_forecast(forecast_init):
     prices = pd.DataFrame(index=forecast_init.index, data={"price_EOM": [1, 2, 3, 4]})
     forecast_init.set_forecast(prices)
-    forecast_init.calc_forecast_if_needed()
 
     market_forecast, load_forecast = forecast_init.calculate_market_forecasts()
     # assert the passed forecast is kept
