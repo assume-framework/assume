@@ -221,6 +221,7 @@ Learning method API references:
 - :py:meth:`assume.strategies.learning_strategies.EnergyLearningSingleBidStrategy`
 - :py:meth:`assume.strategies.learning_strategies.StorageEnergyLearningStrategy`
 - :py:meth:`assume.strategies.learning_strategies.RenewableEnergyLearningSingleBidStrategy`
+- :py:meth:`assume.strategies.learning_strategies.EnergyLearningSingleBidRedispatchStrategy`
 
 Other
 -----
