@@ -1383,9 +1383,10 @@ class EnergyLearningSingleBidRedispatchStrategy(RLStrategy):
             start = product[0]
             end = product[1]
             current_power = unit.outputs["energy"].at[start]
-            #marginal_cost = unit.calculate_marginal_cost(
-            #     start, previous_power
-            #)  # calculation of the marginal costs
+            
+            # get the bid price from the EOM bids calculated before
+            # the bid price on the redispatch market is based on the EOM bid price
+            # as to represent regulated bids based on the spot market bids
             price = unit.outputs["eom_bids"].at[start]
             bids.append(
                 {
@@ -1411,6 +1412,22 @@ class EnergyLearningSingleBidRedispatchStrategy(RLStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        """
+        Generates a single price bid for the full available capacity (max_power).
+
+        The method observes unit state, derives an action (bid price) from
+        the actor network, and constructs one bid covering the entire capacity, without
+        distinguishing between flexible and inflexible components.
+
+        Notes
+        -----
+        The bid is written to the unit outputs for later reference during redispatch bidding as 'eom_bids'.
+
+        Returns
+        -------
+        Orderbook
+            A list containing one bid with start/end time, full volume, and calculated price.
+        """
         start = product_tuples[0][0]
         end = product_tuples[0][1]
 
@@ -1477,6 +1494,22 @@ class EnergyLearningSingleBidRedispatchStrategy(RLStrategy):
         marketconfig: MarketConfig,
         orderbook: Orderbook,
     ):
+        """
+        Calculates the redispatch_profit for the unit and the total profit as sum of redispatch_profit, eom_profit and costs.
+
+        Args
+        ----
+        unit : SupportsMinMax
+            The unit for which to calculate the reward.
+        marketconfig : MarketConfig
+            Market configuration settings.
+        orderbook : Orderbook
+            Orderbook containing executed bids and details.
+
+        Notes
+        -----
+        The reward is scaled and stored along with other outputs in the unit’s data to support learning.
+        """
         revenue = 0
         costs = 0
         profit = 0
@@ -1527,7 +1560,7 @@ class EnergyLearningSingleBidRedispatchStrategy(RLStrategy):
         orderbook: Orderbook,
     ):
         """
-        Calculates the reward for the unit based on profits, costs, and opportunity costs from market transactions.
+        Calculates the reward for the unit on eom market based on profits and costs.
 
         Args
         ----
@@ -1540,12 +1573,7 @@ class EnergyLearningSingleBidRedispatchStrategy(RLStrategy):
 
         Notes
         -----
-        The reward is computed by combining the following:
-        - **Profit**: Income from accepted bids minus marginal and start-up costs.
-        - **Opportunity Cost**: Penalty for underutilizing capacity, calculated as potential lost income.
-        - **Regret Term**: A scaled regret term penalizes high opportunity costs to guide effective bidding.
-
-        The reward is scaled and stored along with other outputs in the unit’s data to support learning.
+        The profit is written to the unit outputs for later reference during reward calculation as 'eom_profit'.
         """
         # function is called after the market is cleared and we get the market feedback,
         # so we can calculate the profit
