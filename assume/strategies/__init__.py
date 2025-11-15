@@ -59,14 +59,14 @@ try:
         RLStrategySingleBid,
         StorageRLStrategy,
         RenewableRLStrategy,
-        RedispatchRLStrategy,
+        EnergyLearningSingleBidRedispatchStrategy,
     )
 
     bidding_strategies["pp_learning"] = RLStrategy
     bidding_strategies["pp_learning_single_bid"] = RLStrategySingleBid
     bidding_strategies["storage_learning"] = StorageRLStrategy
     bidding_strategies["renewable_eom_learning"] = RenewableRLStrategy
-    bidding_strategies["redispatch_learning"] = RedispatchRLStrategy
+    bidding_strategies["powerplant_energy_learning_redispatch"] = EnergyLearningSingleBidRedispatchStrategy
 
 except ImportError:
     pass

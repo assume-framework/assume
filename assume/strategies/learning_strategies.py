@@ -1351,7 +1351,7 @@ class RenewableRLStrategy(RLStrategySingleBid):
 
         unit.outputs["rl_rewards"].append(reward)
 
-class RedispatchRLStrategy(RLStrategy):
+class EnergyLearningSingleBidRedispatchStrategy(RLStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(act_dim=1, *args, **kwargs)
 
