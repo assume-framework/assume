@@ -1,6 +1,6 @@
 name,technology,node,bidding_EOM,bidding_Redispatch,fuel_type,max_power,min_power,additional_cost,unit_operator,emission_factor,efficiency
 Wind Onshore,wind onshore,north,naive_eom,naive_redispatch,renewable,30000.0,0,0,wind operator,0,1.0
-Diesel 0,diesel,north,redispatch_learning,redispatch_learning,diesel,1000.0,0,65,rl operator,0,0.3
+Diesel 0,diesel,north,naive_eom,naive_redispatch,diesel,1000.0,0,65,diesel operator,0,0.3
 Diesel 1,diesel,north,naive_eom,naive_redispatch,diesel,1000.0,0,66,diesel operator,0,0.3
 Diesel 2,diesel,north,naive_eom,naive_redispatch,diesel,1000.0,0,67,diesel operator,0,0.3
 Diesel 3,diesel,north,naive_eom,naive_redispatch,diesel,1000.0,0,68,diesel operator,0,0.3
@@ -46,7 +46,7 @@ Coal 12,lignite,north,naive_eom,naive_redispatch,lignite,1000.0,0,32,coal operat
 Coal 13,lignite,north,naive_eom,naive_redispatch,lignite,1000.0,0,33,coal operator,0,0.5
 Coal 14,lignite,north,naive_eom,naive_redispatch,lignite,1000.0,0,34,coal operator,0,0.5
 Coal 15,lignite,north,naive_eom,naive_redispatch,lignite,1000.0,0,35,coal operator,0,0.5
-Coal 16,lignite,north,naive_eom,naive_redispatch,lignite,1000.0,0,36,coal operator,0,0.5
+Coal 16,lignite,north,redispatch_learning,redispatch_learning,lignite,1000.0,0,36,rl operator,0,0.5
 Coal 17,lignite,north,naive_eom,naive_redispatch,lignite,1000.0,0,37,coal operator,0,0.5
 Coal 18,lignite,north,naive_eom,naive_redispatch,lignite,1000.0,0,38,coal operator,0,0.5
 Coal 19,lignite,north,naive_eom,naive_redispatch,lignite,1000.0,0,39,coal operator,0,0.5

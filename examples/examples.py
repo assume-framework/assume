@@ -104,6 +104,8 @@ available_examples = {
     "learning_redispatch_4_nodes": {"scenario": "example_01d", "study_case": "learning_case"},
     "redispatch_hirth": {"scenario":"2_nodes", "study_case":"base_case"},
     "learning_redispatch_hirth_diesel": {"scenario":"2_nodes", "study_case":"learning_single_diesel"},
+    "learning_redispatch_hirth_coal": {"scenario":"2_nodes", "study_case":"learning_single_coal"},
+    "learning_redispatch_hirth_gas": {"scenario":"2_nodes", "study_case":"learning_single_gas"},
 }
 
 
@@ -120,7 +122,7 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "learning_redispatch_hirth_diesel"
+    example = "learning_redispatch_hirth_coal"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
