@@ -5,13 +5,16 @@
 import calendar
 import inspect
 import logging
+import os
 import re
+import shutil
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
+from pathlib import Path
 
 import dateutil.rrule as rr
 import numpy as np
@@ -20,6 +23,7 @@ import yaml
 from pyomo.opt import check_available_solvers
 
 from assume.common.base import BaseStrategy, LearningStrategy
+from assume.common.exceptions import AssumeException
 from assume.common.market_objects import MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
@@ -790,3 +794,46 @@ def get_supported_solver(default_solver: str | None = None):
         solver = solvers[0]
 
     return solver
+
+def confirm_learning_save_path(self, save_path: str, continue_learning: bool) -> None:
+    """
+    Check save_path and ask user how to proceed if it exists.
+    Raises AssumeException if user declines to proceed.
+    """
+    if not Path(save_path).is_dir():
+        return
+
+    if continue_learning:
+        logger.warning(
+            f"Save path '{save_path}' exists.\n"
+            "You are in continue learning mode. New strategies may overwrite previous ones.\n"
+            "It is recommended to use a different save path to avoid unintended overwrites.\n"
+            "You can set 'trained_policies_save_path' in the config."
+        )
+        proceed = input(
+            "Do you still want to proceed with the existing save path? (y/N) "
+        )
+        if not proceed.lower().startswith("y"):
+            raise AssumeException(
+                "Simulation aborted by user to avoid overwriting previous learned strategies. "
+                "Consider setting a new 'simulation_id' or 'trained_policies_save_path' in the config."
+            )
+    else:
+        logger.warning(
+            f"Save path '{save_path}' exists. Previous training data will be deleted to start fresh."
+        )
+        if os.getenv("OVERWRITE_LEARNED_STRATEGIES"):
+            accept = "y"
+        else:
+            accept = input("Do you want to overwrite and start fresh? (y/N) ")
+
+        if accept.lower().startswith("y"):
+            shutil.rmtree(save_path, ignore_errors=True)
+            logger.info(
+                f"Previous strategies at '{save_path}' deleted. Starting fresh training."
+            )
+        else:
+            raise AssumeException(
+                "Simulation aborted by user not to overwrite existing learned strategies. "
+                "You can set a different 'simulation_id' or 'trained_policies_save_path' in the config."
+            )

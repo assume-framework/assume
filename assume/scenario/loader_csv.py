@@ -33,6 +33,7 @@ from assume.common.forecaster import (
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     adjust_unit_operator_for_learning,
+    confirm_learning_save_path,
     convert_to_rrule_freq,
     normalize_availability,
 )
@@ -1048,7 +1049,7 @@ def run_learning(
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
     continue_learning = world.learning_config.get("continue_learning", False)
-    world.learning_role.confirm_save_path(save_path, continue_learning)
+    confirm_learning_save_path(save_path, continue_learning)
 
     # also remove tensorboard logs
     tensorboard_path = f"tensorboard/{world.scenario_data['simulation_id']}"
