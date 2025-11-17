@@ -95,11 +95,18 @@ class Storage(SupportsMinMaxCharge):
             location=location,
             **kwargs,
         )
-
+        if max_soc < 0:
+            raise ValueError(f"{max_soc=} must be >= 0 for unit {self.id}")
+        if min_soc < 0:
+            raise ValueError(f"{min_soc=} must be >= 0 for unit {self.id}")
+        if max_soc < min_soc:
+            raise ValueError(f"{max_soc=} must be >= {min_soc=} for unit {self.id}")
         self.max_soc = max_soc
         self.min_soc = min_soc
         if initial_soc is None:
             initial_soc = max_soc / 2
+        if initial_soc < 0:
+            raise ValueError(f"{initial_soc=} must be >= 0 for unit {self.id}")
         self.initial_soc = initial_soc
 
         if max_power_charge > 0:
@@ -126,6 +133,8 @@ class Storage(SupportsMinMaxCharge):
         self.outputs["soc"] = FastSeries(value=self.initial_soc, index=self.index)
         self.outputs["cost_stored_energy"] = FastSeries(value=0.0, index=self.index)
 
+        if soc_tick < 0:
+            raise ValueError(f"{soc_tick=} must be >= 0 for unit {self.id}")
         self.soc_tick = soc_tick
 
         if not 0 <= efficiency_charge <= 1:

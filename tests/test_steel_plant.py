@@ -60,7 +60,7 @@ def create_steel_plant(dsm_components, flexibility_measure):
     index = pd.date_range("2023-01-01", periods=24, freq="h")
     forecast = SteelplantForecaster(
         index,
-        market_prices={"EOM": [50] * 24},
+        electricity_price=[50] * 24,
         fuel_prices={"natural_gas": [30] * 24, "co2": [20] * 24},
         renewable_utilisation_signal=[0.1 * i for i in range(24)],
     )
@@ -282,7 +282,7 @@ def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
     index = pd.date_range("2023-01-01", periods=24, freq="h")
     forecast = SteelplantForecaster(
         index,
-        market_prices={"EOM": [50] * 24},
+        electricity_price=[50] * 24,
         fuel_prices={"natural_gas": [30] * 24, "co2": [20] * 24},
     )
 

@@ -75,7 +75,15 @@ jobs:
 
     - name: Test with pytest & integration tests
       run: |
-        pytest -m "not require_learning"
+        pytest -m "not require_learning and not require_network"
+
+    - name: Install pypsa dependencies
+      run: |
+        python -m pip install -e .[network]
+
+    - name: Test with pypsa
+      run: |
+        pytest -m "require_network and not require_learning"
 
     - name: Install torch dependencies
       run: |
@@ -83,7 +91,7 @@ jobs:
 
     - name: Test pytest with torch & integration tests
       run: |
-        pytest --cov --cov-report=xml --junitxml="result.xml"
+        pytest -m "require_learning" --cov --cov-report=xml --junitxml="result.xml"
 
     - name: Upload tests results
       uses: actions/upload-artifact@v4

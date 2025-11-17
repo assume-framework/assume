@@ -8,7 +8,7 @@ from typing import TypedDict
 
 import numpy as np
 
-from assume.common.fast_pandas import FastSeries, TensorFastSeries
+from assume.common.fast_pandas import FastIndex, FastSeries, TensorFastSeries
 from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
@@ -50,7 +50,7 @@ class BaseUnit:
         self.technology = technology
         self.bidding_strategies: dict[str, BaseStrategy] = bidding_strategies
         self.forecaster = forecaster
-        self.index = forecaster.index
+        self.index: FastIndex = forecaster.index
 
         self.node = node
         self.location = location
