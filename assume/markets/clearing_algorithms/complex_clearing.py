@@ -30,7 +30,7 @@ def market_clearing_opt_constraints(
     mode: str,
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame,
-    lines: pd.DataFrame
+    lines: pd.DataFrame,
 ):
     """
     Adds the constraints to the model.
@@ -185,6 +185,7 @@ def market_clearing_opt_constraints(
                 model.transmission_constr.add(model.flows[t, line] <= capacity)
                 model.transmission_constr.add(model.flows[t, line] >= -capacity)
 
+
 def market_clearing_opt_objective(model: pyo.ConcreteModel, orders: Orderbook):
     """
     Define the objective function as cost minimization
@@ -200,6 +201,7 @@ def market_clearing_opt_objective(model: pyo.ConcreteModel, orders: Orderbook):
 
     model.objective = pyo.Objective(expr=obj_expr, sense=pyo.minimize)
 
+
 def market_clearing_opt(
     orders: Orderbook,
     market_products: list[MarketProduct],
@@ -209,8 +211,8 @@ def market_clearing_opt(
     lines: pd.DataFrame = None,
     solver: str = "appsi_highs",
     solver_options: dict = {},
-    func_constraints = market_clearing_opt_constraints,
-    func_objective = market_clearing_opt_objective
+    func_constraints=market_clearing_opt_constraints,
+    func_objective=market_clearing_opt_objective,
 ):
     """
     Sets up and solves the market clearing optimization problem.
@@ -253,7 +255,9 @@ def market_clearing_opt(
     """
     model = pyo.ConcreteModel()
 
-    func_constraints(model, orders, market_products, mode, with_linked_bids, incidence_matrix, lines)
+    func_constraints(
+        model, orders, market_products, mode, with_linked_bids, incidence_matrix, lines
+    )
 
     func_objective(model, orders)
 
