@@ -20,6 +20,7 @@ from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
 from assume.common.forecast_initialisation import ForecastInitialisation
 from assume.common.forecaster import (
+    BuildingForecaster,
     CustomUnitForecaster,
     DemandForecaster,
     ExchangeForecaster,
@@ -569,11 +570,11 @@ def load_config_and_create_forecaster(
         lines=lines,
         fuel_prices=fuel_prices_df,
         market_configs=config["markets_config"],
+        forecasts=forecasts_df,
+        demand=demand_df,
+        availability=availability,
+        exchanges=exchanges_df,
     )
-    calculator.set_forecast(forecasts_df)
-    calculator.set_forecast(demand_df)
-    calculator.set_forecast(exchanges_df)
-    calculator.set_forecast(availability, prefix="availability_")
     calculator.calc_forecast_if_needed()
 
     unit_forecasts: dict[str, UnitForecaster] = {}
@@ -614,6 +615,22 @@ def load_config_and_create_forecaster(
     if dsm_units is not None:
         for type, dsm in dsm_units.items():
             for id, unit in dsm.iterrows():
+                if type == "building":
+                    unit_forecasts[id] = BuildingForecaster(
+                        index=index,
+                        availability=calculator[f"availability_{id}"],
+                        market_prices=market_prices,
+                        fuel_prices=calculator.fuel_prices,
+                        residual_load=residual_loads,
+                        electricity_price=calculator[
+                            "price_EOM"
+                        ],  # TODO how to handle other markets?
+                        load_profile=0,  # TODO
+                        ev_load_profile=0,  # TODO
+                        heat_demand=0,  # TODO
+                        battery_load_profile=0,  # TODO
+                        pv_profile=0,  # TODO
+                    )
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
                         index=index,
@@ -621,6 +638,9 @@ def load_config_and_create_forecaster(
                         market_prices=market_prices,
                         fuel_prices=calculator.fuel_prices,
                         residual_load=residual_loads,
+                        electricity_price=calculator[
+                            "price_EOM"
+                        ],  # TODO how to handle other markets?
                         congestion_signal=0,  # TODO
                         renewable_utilisation_signal=0,  # TODO
                     )
@@ -631,7 +651,9 @@ def load_config_and_create_forecaster(
                         market_prices=market_prices,
                         hydrogen_demand=unit["demand"],
                         residual_load=residual_loads,
-                        electricity_price=0,  # TODO
+                        electricity_price=calculator[
+                            "price_EOM"
+                        ],  # TODO how to handle other markets?
                         seasonal_storage_schedule=0,  # TODO
                     )
                 if type == "steam_plant":
@@ -642,7 +664,9 @@ def load_config_and_create_forecaster(
                         market_prices=market_prices,
                         fuel_prices=calculator.fuel_prices,
                         residual_load=residual_loads,
-                        electricity_price=0,  # TODO
+                        electricity_price=calculator[
+                            "electricity_price"
+                        ],  # TODO how to handle other markets?
                         congestion_signal=0,  # TODO
                         renewable_utilisation_signal=0,  # TODO
                         electricity_price_flex=0,  # TODO
@@ -1056,7 +1080,7 @@ def run_learning(
     # check if we already stored policies for this simulation
     save_path = world.learning_config["trained_policies_save_path"]
 
-    if Path(save_path).is_dir():
+    if Path(save_path).is_dir() and not os.getenv("OVERWRITE_LEARNED_STRATEGIES"):
         if world.learning_config.get("continue_learning", False):
             logger.warning(
                 f"Save path '{save_path}' exists.\n"

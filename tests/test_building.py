@@ -130,7 +130,8 @@ def forecaster(price_profile):
         battery_load_profile=3,
         pv_profile=10,
         availability=0.25,
-        market_prices={"EOM": price_profile},
+        electricity_price=price_profile,
+        market_prices={},
         load_profile=20,
     )
     # If the Building class expects specific keys for EV availability, add them here
@@ -687,7 +688,7 @@ def test_non_prosumer_no_energy_export(forecaster, building_components_heatpump)
 
     # check that power is zero when price is 1000
     for idx in building.index:
-        if building.forecaster.price["EOM"].at[idx] == 1000:
+        if building.forecaster.electricity_price.at[idx] == 1000:
             assert (
                 building.opt_power_requirement.at[idx] >= 0
             ), "Prosumer should be able to export power to the grid."

@@ -113,7 +113,7 @@ class Building(DSMFlex, SupportsMinMax):
 
         self.market_id = "EOM"  # FIXME enable other markets
 
-        self.electricity_price = self.forecaster.price[self.market_id]
+        self.electricity_price = self.forecaster.electricity_price
         self.natural_gas_price = self.forecaster.get_price("natural_gas")
         self.heat_demand = self.forecaster.heat_demand
         self.ev_load_profile = self.forecaster.ev_load_profile

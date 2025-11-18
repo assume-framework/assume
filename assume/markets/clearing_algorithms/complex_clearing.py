@@ -739,18 +739,18 @@ def extract_results(
                 }
             )
 
-        flows_filtered = {}
+    flows_filtered = {}
 
-        if log_flows:
-            # extract flows
+    if log_flows:
+        # extract flows
 
-            # Check if the model has the 'flows' attribute
-            if hasattr(model, "flows"):
-                flows = model.flows
+        # Check if the model has the 'flows' attribute
+        if hasattr(model, "flows"):
+            flows = model.flows
 
-                # filter flows and only use positive flows to half the size of the dict
-                flows_filtered = {
-                    index: flow.value for index, flow in flows.items() if not flow.stale
-                }
+            # filter flows and only use positive flows to half the size of the dict
+            flows_filtered = {
+                index: flow.value for index, flow in flows.items() if not flow.stale
+            }
 
     return accepted_orders, rejected_orders, meta, flows_filtered
