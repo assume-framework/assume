@@ -18,8 +18,10 @@ from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.common.utils import datetime2timestamp
-from assume.strategies.naive_strategies import NaiveSingleBidStrategy
-from assume.strategies.portfolio_strategies import DirectUnitOperatorStrategy
+from assume.strategies.naive_strategies import EnergyNaiveStrategy
+from assume.strategies.portfolio_strategies import (
+    UnitsOperatorDirectStrategy,
+)
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
 
@@ -53,7 +55,7 @@ async def units_operator() -> UnitsOperator:
     index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
-        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"EOM": EnergyNaiveStrategy()},
         "technology": "energy",
         "unit_operator": agent_id,
         "max_power": -1000,
@@ -93,7 +95,7 @@ async def rl_units_operator() -> RLUnitsOperator:
     index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
-        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"EOM": EnergyNaiveStrategy()},
         "technology": "energy",
         "unit_operator": agent_id,
         "max_power": -1000,
@@ -156,7 +158,7 @@ async def test_independent_bids_portfolio(units_operator: UnitsOperator):
     from assume.common.utils import get_available_products
 
     products = get_available_products(marketconfig.market_products, start)
-    strategy = DirectUnitOperatorStrategy()
+    strategy = UnitsOperatorDirectStrategy()
     orderbook = strategy.calculate_bids(units_operator, marketconfig, products)
     assert len(orderbook) == 1
 
@@ -166,7 +168,7 @@ async def test_independent_bids_portfolio(units_operator: UnitsOperator):
 
 @pytest.mark.require_learning
 async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
-    from assume.strategies.learning_strategies import RLStrategy
+    from assume.strategies.learning_strategies import EnergyLearningStrategy
 
     marketconfig = rl_units_operator.available_markets[0]
     start = datetime(2020, 1, 1)
@@ -175,7 +177,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     params_dict = {
         "bidding_strategies": {
-            "EOM": RLStrategy(
+            "EOM": EnergyLearningStrategy(
                 unit_id="testplant",
                 learning_mode=True,
             )
@@ -216,7 +218,7 @@ async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
 
     rl_units_operator.units["testplant"].bidding_strategies[
         "EOM"
-    ].bidding_strategies = RLStrategy(
+    ].bidding_strategies = EnergyLearningStrategy(
         unit_id="testplant",
         learning_mode=True,
         observation_dimension=50,
@@ -293,7 +295,7 @@ def test_participate():
     assert not units_role.participate(marketconfig)
 
     params_dict = {
-        "bidding_strategies": {"wrong_market": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"wrong_market": EnergyNaiveStrategy()},
         "technology": "energy",
         "unit_operator": "x",
         "max_power": -1000,
@@ -306,7 +308,7 @@ def test_participate():
     assert not units_role.participate(marketconfig)
 
     params_dict = {
-        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"EOM": EnergyNaiveStrategy()},
         "technology": "energy",
         "unit_operator": "x",
         "max_power": -1000,
@@ -338,7 +340,7 @@ def test_participate_lambda():
     assert not units_role.participate(marketconfig)
 
     params_dict = {
-        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"EOM": EnergyNaiveStrategy()},
         "technology": "energy",
         "unit_operator": "x",
         "max_power": 10,
@@ -350,7 +352,7 @@ def test_participate_lambda():
     assert not units_role.participate(marketconfig)
 
     params_dict = {
-        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"EOM": EnergyNaiveStrategy()},
         "technology": "wind offshore",
         "unit_operator": "x",
         "max_power": 1000,
@@ -382,7 +384,7 @@ def test_participate_custom_lambda():
     assert not units_role.participate(marketconfig)
 
     params_dict = {
-        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"EOM": EnergyNaiveStrategy()},
         "technology": "energy",
         "unit_operator": "x",
         "max_power": 10,
@@ -394,7 +396,7 @@ def test_participate_custom_lambda():
     assert not units_role.participate(marketconfig)
 
     params_dict = {
-        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"EOM": EnergyNaiveStrategy()},
         "technology": "energy",
         "unit_operator": "x",
         "max_power": 1000,
@@ -412,7 +414,7 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
     """Test that learning data from two RL units is correctly formatted and sent."""
     import torch as th
 
-    from assume.strategies.learning_strategies import RLStrategy
+    from assume.strategies.learning_strategies import EnergyLearningStrategy
 
     # Constants
     obs_dim = 2
@@ -443,7 +445,7 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
     # --- Add two RL-enabled PowerPlant units ---
     params_dict = {
         "bidding_strategies": {
-            "EOM": RLStrategy(unit_id="testplant1", learning_mode=True),
+            "EOM": EnergyLearningStrategy(unit_id="testplant1", learning_mode=True),
         },
         "technology": "energy",
         "unit_operator": "test_operator",
@@ -458,7 +460,7 @@ async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
     rl_units_operator.add_unit(unit1)
 
     # Clone params_dict and update for the second unit
-    params_dict["bidding_strategies"]["EOM"] = RLStrategy(
+    params_dict["bidding_strategies"]["EOM"] = EnergyLearningStrategy(
         unit_id="testplant2", learning_mode=True
     )
     unit2 = PowerPlant("testplant2", **params_dict)

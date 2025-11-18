@@ -11,11 +11,14 @@ from assume.common.forecaster import PowerplantForecaster
 
 try:
     from assume.reinforcement_learning.learning_role import LearningConfig
-    from assume.strategies.learning_strategies import RLStrategy, RLStrategySingleBid
+    from assume.strategies.learning_strategies import (
+        EnergyLearningSingleBidStrategy,
+        EnergyLearningStrategy,
+    )
 
 except ImportError:
-    RLStrategy = None
-    RLStrategySingleBid = None
+    EnergyLearningStrategy = None
+    EnergyLearningSingleBidStrategy = None
 
 from assume.units import PowerPlant
 
@@ -48,7 +51,7 @@ def power_plant() -> PowerPlant:
         min_power=200,
         efficiency=0.5,
         additional_cost=10,
-        bidding_strategies={"EOM": RLStrategy(**learning_config)},
+        bidding_strategies={"EOM": EnergyLearningStrategy(**learning_config)},
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,
@@ -59,9 +62,9 @@ def power_plant() -> PowerPlant:
 @pytest.mark.parametrize(
     "strategy_class, obs_dim, act_dim, actor_architecture, expected_bid_count, expected_volumes",
     [
-        (RLStrategy, 38, 2, "mlp", 2, [200, 800]),
-        (RLStrategy, 38, 2, "lstm", 2, [200, 800]),
-        (RLStrategySingleBid, 74, 1, "mlp", 1, [1000]),
+        (EnergyLearningStrategy, 38, 2, "mlp", 2, [200, 800]),
+        (EnergyLearningStrategy, 38, 2, "lstm", 2, [200, 800]),
+        (EnergyLearningSingleBidStrategy, 74, 1, "mlp", 1, [1000]),
     ],
 )
 def test_learning_strategies_parametrized(

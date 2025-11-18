@@ -105,7 +105,7 @@ def get_solver_factory(
     return SolverFactory(solvers[0])
 
 
-class DmasStorageStrategy(MinMaxChargeStrategy):
+class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
     """Strategy for a storage unit that uses DMAS to optimize its operation"""
 
     def __init__(self, *args, **kwargs):

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.strategies.naive_strategies import NaiveSingleBidStrategy
+from assume.strategies.naive_strategies import EnergyNaiveStrategy
 
 
 class UnitOperatorStrategy:
@@ -63,7 +63,7 @@ class UnitOperatorStrategy:
         return total_capacity
 
 
-class DirectUnitOperatorStrategy(UnitOperatorStrategy):
+class UnitsOperatorDirectStrategy(UnitOperatorStrategy):
     def calculate_bids(
         self,
         units_operator,  # type: UnitsOperator
@@ -104,10 +104,10 @@ class DirectUnitOperatorStrategy(UnitOperatorStrategy):
         return bids
 
 
-class CournotPortfolioStrategy(UnitOperatorStrategy):
+class UnitsOperatorEnergyHeuristicCournotStrategy(UnitOperatorStrategy):
     """
     A Cournot strategy that adds a markup to the marginal cost of each unit of
-    the units operator. The marginal cost is computed with NaiveSingleBidStrategy,
+    the units operator. The marginal cost is computed with EnergyNaiveStrategy,
     and the markup depends on the total capacity of the unit operator.
     """
 
@@ -146,7 +146,7 @@ class CournotPortfolioStrategy(UnitOperatorStrategy):
 
         for unit_id, unit in units_operator.units.items():
             # Compute bids from marginal costs of a unit
-            bids = NaiveSingleBidStrategy().calculate_bids(
+            bids = EnergyNaiveStrategy().calculate_bids(
                 unit,
                 market_config,
                 product_tuples,

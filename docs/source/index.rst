@@ -19,13 +19,13 @@ designs and dynamics in energy markets.
 
 Developers
 ----------
-The project is `developed by <https://assume.readthedocs.io/en/latest/developers.html>`_
+The project is :doc:`developed by <developers>`
 a collaborative team of researchers from INATECH at the University of Freiburg,
 IISM at Karlsruhe Institute of Technology, Fraunhofer Institute for Systems and Innovation Research,
 Fraunhofer Institution for Energy Infrastructures and Geothermal Energy,
-and FH Aachen - University of Applied Sciences. Each contributor brings valuable
-expertise in electricity market modeling, deep reinforcement learning, demand side
-flexibility, and infrastructure modeling.
+and FH Aachen - University of Applied Sciences.
+Each contributor brings valuable expertise in electricity market modeling, deep reinforcement learning,
+demand side flexibility, and infrastructure modeling.
 
 Funding
 -------

@@ -41,6 +41,7 @@ from assume.strategies import (
     LearningStrategy,
     UnitOperatorStrategy,
     bidding_strategies,
+    deprecated_bidding_strategies,
 )
 from assume.units import BaseUnit, demand_side_technologies, unit_types
 
@@ -83,7 +84,7 @@ class World:
         unit_types (dict[str, BaseUnit], optional): Available unit types.
         dst_components (dict[str, DemandSideTechnology], optional): Demand-side technologies.
         bidding_strategies (dict[str, type[BaseStrategy]], optional): Bidding strategies for the world instance.
-            - If `"pp_learning"` is unavailable, learning strategies may be missing due to missing dependencies (e.g., `torch`).
+            - If `"powerplant_energy_learning"` is unavailable, learning strategies may be missing due to missing dependencies (e.g., `torch`).
         clearing_mechanisms (dict[str, MarketRole], optional): Market clearing mechanisms.
         additional_kpis (dict[str, OutputDef], optional): Additional performance indicators.
         scenario_data (dict, optional): Dictionary for scenario-specific data.
@@ -161,10 +162,11 @@ class World:
         self.dst_components = demand_side_technologies
 
         self.bidding_strategies = bidding_strategies
-        if "pp_learning" not in bidding_strategies:
+        if "powerplant_energy_learning" not in bidding_strategies:
             logger.info(
                 "Learning Strategies are not available. Check that you have torch installed."
             )
+        self.bidding_strategies.update(deprecated_bidding_strategies)
 
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.additional_kpis: dict[str, OutputDef] = {}
@@ -593,13 +595,16 @@ class World:
 
             if strategy not in self.bidding_strategies:
                 # raise a deprecated warning for learning_advanced_orders
-                if strategy == "learning_advanced_orders":
-                    logger.warning(
-                        "The bidding strategy 'learning_advanced_orders' is deprecated. Please use regular 'pp_learning' instead."
-                    )
                 raise ValueError(
                     f"""Bidding strategy {strategy} not registered. Please check the name of
                         the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                )
+
+            # remove when deprecated bidding strategies are removed
+            if strategy in deprecated_bidding_strategies.keys():
+                logger.warning(
+                    "Bidding strategy %s is deprecated. Use the new naming instead",
+                    strategy,
                 )
 
             if strategy not in strategy_instances:

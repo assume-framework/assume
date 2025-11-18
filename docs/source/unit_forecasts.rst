@@ -2,9 +2,9 @@
 ..
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
-###########
+##############
 Unit Forecasts
-###########
+##############
 
 To provide units with static input data such as availability, fuel prices or market price prediction data, each unit has an associated unit forecast.
 

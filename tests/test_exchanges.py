@@ -10,7 +10,7 @@ from dateutil import rrule as rr
 
 from assume.common.forecaster import ExchangeForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import NaiveExchangeStrategy
+from assume.strategies import ExchangeEnergyNaiveStrategy
 from assume.units.exchange import Exchange
 
 # === FIXTURES ===
@@ -61,7 +61,7 @@ def exchange_unit(full_forecast):
     return Exchange(
         id="test_unit",
         unit_operator="test_operator",
-        bidding_strategies={"EOM": NaiveExchangeStrategy()},
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
         forecaster=full_forecast,
         price_import=10.0,
         price_export=2000.0,
@@ -74,7 +74,7 @@ def exchange_import_only(import_only_forecast):
     return Exchange(
         id="test_unit",
         unit_operator="test_operator",
-        bidding_strategies={"EOM": NaiveExchangeStrategy()},
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
         forecaster=import_only_forecast,
         price_import=10.0,
         price_export=2000.0,
@@ -87,7 +87,7 @@ def exchange_export_only(export_only_forecast):
     return Exchange(
         id="test_unit",
         unit_operator="test_operator",
-        bidding_strategies={"EOM": NaiveExchangeStrategy()},
+        bidding_strategies={"EOM": ExchangeEnergyNaiveStrategy()},
         forecaster=export_only_forecast,
         price_import=10.0,
         price_export=2000.0,
@@ -137,9 +137,9 @@ def test_exchange_export_only(exchange_export_only):
     ), "Import should default to 0 when missing"
 
 
-def test_naive_exchange_strategy_bidding(exchange_unit, market_config):
-    """Test if NaiveExchangeStrategy generates correct bids when both import and export exist."""
-    strategy = NaiveExchangeStrategy()
+def test_exchange_energy_naive_strategy_bidding(exchange_unit, market_config):
+    """Test if ExchangeEnergyNaiveStrategy generates correct bids when both import and export exist."""
+    strategy = ExchangeEnergyNaiveStrategy()
     product_tuple = (datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 1), None)
 
     bids = strategy.calculate_bids(exchange_unit, market_config, [product_tuple])
@@ -159,9 +159,11 @@ def test_naive_exchange_strategy_bidding(exchange_unit, market_config):
             assert bid["price"] == exchange_unit.price_export, "Incorrect export price"
 
 
-def test_naive_exchange_strategy_import_only(exchange_import_only, market_config):
+def test_exchange_energy_naive_strategy_import_only(
+    exchange_import_only, market_config
+):
     """Test if the strategy only generates import bids when export is unavailable."""
-    strategy = NaiveExchangeStrategy()
+    strategy = ExchangeEnergyNaiveStrategy()
     product_tuple = (datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 1), None)
 
     bids = strategy.calculate_bids(exchange_import_only, market_config, [product_tuple])
@@ -173,9 +175,11 @@ def test_naive_exchange_strategy_import_only(exchange_import_only, market_config
     ), "Incorrect import price"
 
 
-def test_naive_exchange_strategy_export_only(exchange_export_only, market_config):
+def test_exchange_energy_naive_strategy_export_only(
+    exchange_export_only, market_config
+):
     """Test if the strategy only generates export bids when import is unavailable."""
-    strategy = NaiveExchangeStrategy()
+    strategy = ExchangeEnergyNaiveStrategy()
     product_tuple = (datetime(2024, 1, 1, 0), datetime(2024, 1, 1, 1), None)
 
     bids = strategy.calculate_bids(exchange_export_only, market_config, [product_tuple])

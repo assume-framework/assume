@@ -10,9 +10,9 @@ from dateutil.relativedelta import relativedelta as rd
 from assume.common.market_objects import MarketProduct
 from assume.common.utils import get_available_products
 from assume.strategies import (
-    ElasticDemandStrategy,
-    NaiveProfileStrategy,
-    NaiveSingleBidStrategy,
+    EnergyHeuristicElasticStrategy,
+    EnergyNaiveProfileStrategy,
+    EnergyNaiveStrategy,
 )
 
 start = datetime(2023, 7, 1)
@@ -20,7 +20,7 @@ end = datetime(2023, 7, 2)
 
 
 def test_naive_strategy(mock_market_config, mock_supports_minmax):
-    strategy = NaiveSingleBidStrategy()
+    strategy = EnergyNaiveStrategy()
     mc = mock_market_config
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(
@@ -32,7 +32,7 @@ def test_naive_strategy(mock_market_config, mock_supports_minmax):
 
 def test_naive_da_strategy(mock_market_config, mock_supports_minmax):
     # test with mock market
-    strategy = NaiveProfileStrategy()
+    strategy = EnergyNaiveProfileStrategy()
     mc = mock_market_config
     unit = mock_supports_minmax
     product_tuples = [(start, end, None)]
@@ -87,12 +87,14 @@ class MockElasticDemand:
         (-0.5, "linear"),
     ],
 )
-def test_elastic_demand_strategy_robust_range(mock_market_config, elasticity, model):
+def test_demand_energy_heuristic_elastic_strategy_robust_range(
+    mock_market_config, elasticity, model
+):
     """
     Parametric test to check multiple elasticity values and model types.
     Ensures bid count, price monotonicity, and volume validity.
     """
-    strategy = ElasticDemandStrategy()
+    strategy = EnergyHeuristicElasticStrategy()
     unit = MockElasticDemand(
         elasticity=elasticity,
         max_price=100.0,
@@ -113,11 +115,13 @@ def test_elastic_demand_strategy_robust_range(mock_market_config, elasticity, mo
     assert prices[0] == unit.max_price
 
 
-def test_elastic_demand_strategy_raises_when_volume_exceeds_max(mock_market_config):
+def test_demand_energy_heuristic_elastic_strategy_raises_when_volume_exceeds_max(
+    mock_market_config,
+):
     """
     Tests that a ValueError is raised when first block bid volume exceeds max_power.
     """
-    strategy = ElasticDemandStrategy()
+    strategy = EnergyHeuristicElasticStrategy()
     unit = MockElasticDemand(
         elasticity=0.1,  # Extreme elasticity to trigger large volume
         max_price=500.0,

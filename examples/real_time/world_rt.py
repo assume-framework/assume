@@ -70,7 +70,7 @@ def init(world, n=1):
         {
             "min_power": 0,
             "max_power": -1000,
-            "bidding_strategies": {"EOM": "naive_eom"},
+            "bidding_strategies": {"EOM": "demand_energy_naive"},
             "technology": "demand",
         },
         DemandForecaster(index, demand=-1000),
@@ -88,7 +88,7 @@ def init(world, n=1):
             {
                 "min_power": 200 / n,
                 "max_power": 1000 / n,
-                "bidding_strategies": {"EOM": "naive_eom"},
+                "bidding_strategies": {"EOM": "powerplant_energy_naive"},
                 "technology": "nuclear",
             },
             nuclear_forecast,

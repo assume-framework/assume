@@ -225,7 +225,9 @@ if __name__ == "__main__":
         )
     default_strategies = {
         mc.market_id: (
-            "naive_redispatch" if mc.market_mechanism == "redispatch" else "naive_eom"
+            "powerplant_energy_naive_redispatch"
+            if mc.market_mechanism == "redispatch"
+            else "demand_energy_naive"
         )
         for mc in marketdesign
     }
@@ -234,7 +236,7 @@ if __name__ == "__main__":
     bidding_strategies = {
         "power_plant": defaultdict(lambda: default_strategies),
         "demand": defaultdict(
-            lambda: {mc.market_id: "naive_eom" for mc in marketdesign}
+            lambda: {mc.market_id: "demand_energy_naive" for mc in marketdesign}
         ),
         "storage": defaultdict(lambda: default_strategies),
     }

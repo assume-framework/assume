@@ -8,14 +8,14 @@ import pytest
 from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import OTCStrategy
+from assume.strategies import EnergyNaiveOtcStrategy
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
 
 
 def test_otc_strategy(mock_supports_minmax):
-    strategy = OTCStrategy(scale_firm_power_capacity=0.1)
+    strategy = EnergyNaiveOtcStrategy(scale_firm_power_capacity=0.1)
 
     mc = MarketConfig(
         "Test",
@@ -40,7 +40,7 @@ def test_otc_strategy(mock_supports_minmax):
 
 @pytest.mark.parametrize("scale", [0.1, 0.2, 1.0, 0.0])
 def test_otc_strategy_scaled(scale, mock_supports_minmax):
-    strategy = OTCStrategy(scale_firm_power_capacity=scale)
+    strategy = EnergyNaiveOtcStrategy(scale_firm_power_capacity=scale)
 
     mc = MarketConfig(
         market_id="OTC",

@@ -38,7 +38,7 @@ async def create_worker(
             {
                 "min_power": 200 / (n_proc * m_agents),
                 "max_power": 1000 / (n_proc * m_agents),
-                "bidding_strategies": {"EOM": "naive_eom"},
+                "bidding_strategies": {"EOM": "powerplant_energy_naive"},
                 "technology": "nuclear",
             },
             nuclear_forecast,
