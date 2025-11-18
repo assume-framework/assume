@@ -112,7 +112,7 @@ class ForecastInitialisation:
 
         return price_forecasts, residual_loads
 
-    def calc_forecasts(self):
+    def calc_node_forecasts(self):
         if self.buses is None or self.lines is None:
             return None, None
         if (
