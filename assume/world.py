@@ -663,7 +663,7 @@ class World:
             if market_start < self.start or market_end > self.end:
                 msg = (f"Market {market_id} violates world schedule. \n"
                        f"Market start: {market_start}, end: {market_end}. \n)"
-                       f"World start: {market_start}, end: {market_end}.)")
+                       f"World start: {self.start}, end: {self.end}.)")
                 raise ValueError(msg)
 
         # Integrity of reference.
