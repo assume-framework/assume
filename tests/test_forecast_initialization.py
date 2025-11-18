@@ -43,8 +43,6 @@ def forecast_init():
         fuel_prices=pd.read_csv(f"{path}/fuel_prices.csv", index_col="fuel"),
         lines=pd.read_csv(f"{path}/lines.csv", index_col="line"),
         buses=pd.read_csv(f"{path}/buses.csv", index_col="name"),
-        forecasts=pd.DataFrame(),
-        exchanges=pd.DataFrame(),
     )
     return forecast_init
 

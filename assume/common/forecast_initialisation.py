@@ -8,6 +8,16 @@ from collections.abc import Callable
 import pandas as pd
 
 
+def _ensure_not_none(
+    df: pd.DataFrame | None, index: pd.DatetimeIndex | pd.Series, check_index=False
+) -> pd.DataFrame:
+    if df is None:
+        return pd.DataFrame(index=index)
+    if check_index and index.freq != df.index.inferred_freq:
+        raise ValueError("Forecast frequency does not match index frequency.")
+    return df
+
+
 class ForecastInitialisation:
     """
     This class represents a forecaster that provides timeseries for forecasts derived from existing files.
@@ -42,14 +52,14 @@ class ForecastInitialisation:
         powerplants_units: pd.DataFrame,
         demand_units: pd.DataFrame,
         market_configs: dict[str, dict],
-        forecasts: pd.DataFrame,
-        availability: pd.DataFrame,
-        demand: pd.DataFrame,
-        exchanges: pd.DataFrame,
+        demand: pd.DataFrame = None,
+        availability: pd.DataFrame = None,
+        exchanges: pd.DataFrame = None,
+        forecasts: pd.DataFrame = None,
         fuel_prices: pd.DataFrame = None,
-        exchange_units: pd.DataFrame | None = None,
-        buses: pd.DataFrame | None = None,
-        lines: pd.DataFrame | None = None,
+        exchange_units: pd.DataFrame = None,
+        buses: pd.DataFrame = None,
+        lines: pd.DataFrame = None,
     ):
         self.index = index
         self._logger = logging.getLogger(__name__)
@@ -59,19 +69,16 @@ class ForecastInitialisation:
         self.exchange_units = exchange_units
         self.buses = buses
         self.lines = lines
-        self.demand = demand
-        self.exchanges = exchanges
+        self.demand = _ensure_not_none(demand, index, check_index=True)
+        self.exchanges = _ensure_not_none(exchanges, index, check_index=True)
 
-        self.fuel_prices = pd.DataFrame(index=self.index)
-        for column in fuel_prices.columns:
-            if len(fuel_prices[column]) > 1:
-                self.fuel_prices[column] = fuel_prices[column]
-            else:
-                self.fuel_prices[column] = fuel_prices[column].item()
-        if forecasts is None:
-            forecasts = pd.DataFrame(index=self.index)
-        self._forecasts = forecasts
-        self._availability = availability
+        fuel_prices = _ensure_not_none(fuel_prices, index)
+        if len(fuel_prices) <= 1:  # single value provided, extend to full index
+            fuel_prices.index = index[:1]
+            fuel_prices = fuel_prices.reindex(index, method="ffill")
+        self.fuel_prices = fuel_prices
+        self._forecasts = _ensure_not_none(forecasts, index, check_index=True)
+        self._availability = _ensure_not_none(availability, index, check_index=True)
 
     def forecasts(self, id: str) -> pd.Series:
         if self._forecasts is not None and id in self._forecasts.columns:
