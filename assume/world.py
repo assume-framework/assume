@@ -657,8 +657,8 @@ class World:
 
         # Integrity of schedule.
         for market_id, market_config in self.markets.items():
-            market_start = market_config.opening_hours.dtstart, 
-            market_end = market_config.opening_hours.until,
+            market_start = market_config.opening_hours[0] 
+            market_end = market_config.opening_hours[-1]
             
             if market_start < self.start or market_end > self.end:
                 msg = (f"Market {market_id} violates world schedule. \n"
@@ -669,7 +669,7 @@ class World:
         # Integrity of reference.
         # For each UnitOperator: strategies must reference existing markets.
         unit_operators = list(self.unit_operators.values())
-        for operator in unit_operators.keys():
+        for operator in unit_operators:
             for market_id in operator.portfolio_strategies.keys():
                 if market_id not in list(self.markets.keys()):
                     msg = (f"Strategies of unit operator {operator} references"
@@ -688,29 +688,35 @@ class World:
         
         # Real-world integrity.
         # A Re-Dispatch market can only open if an earlier market closed.
-        for market_config in self.markets.values():
-            earliest_redispatch_opening = min(
-                {config["start_date"] for config in self.markets.values()
-                 if config["market_mechanism"] == "redispatch"})
-            
-            earliest_dispatch_closing = min(
-                {config["end_date"] for config in self.markets.values()
-                 if config["market_mechanism"] != "redispatch"})
+        dispatch_markets = [config for config in self.markets.values()
+                            if config.market_mechanism != "redispatch"]
+        redispatch_markets = [config for config in self.markets.values()
+                              if config.market_mechanism == "redispatch"]
 
-            if earliest_redispatch_opening < earliest_dispatch_closing:
-                msg = (f"First re-dispatch market opens before first dispatch "
+        if len(redispatch_markets) > 0:
+            if len(dispatch_markets) == 0:
+                msg = "Redispatch market but no dispatch market was defined."
+                raise ValueError(msg)
+            
+            earliest_dispatch_closing = min(x.opening_hours[-1]
+                                            for x in dispatch_markets)
+            earliest_redispatch_opening = min(x.opening_hours[0]
+                                              for x in redispatch_markets)
+
+            if earliest_redispatch_opening <= earliest_dispatch_closing:
+                msg = (f"First redispatch market opens before first dispatch "
                        f"market has closed.")
                 raise ValueError(msg)
 
         # Existence of demand implies existence of generation and vice versa.
         demand_exists, generation_exists = False, False
-        for operator in unit_operators.keys():
-            for unit in operator.units:
+        for operator in unit_operators:
+            for unit in operator.units.values():
                 # ToDo: Are the defintions of demand and generation exhaustive?
-                if type(unit) in [self.unit_types["Demand"]]:
+                if type(unit) in [self.unit_types["demand"]]:
                     demand_exists = True
-                elif type(unit) in [self.unit_types["PowerPlant"],
-                                    self.unit_types["HydrogenPlant"]]:
+                elif type(unit) in [self.unit_types["power_plant"],
+                                    self.unit_types["hydrogen_plant"]]:
                     generation_exists = True
         if demand_exists and not generation_exists:
             msg = "Demand units but no generation units were created. "
