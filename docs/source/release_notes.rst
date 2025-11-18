@@ -19,6 +19,9 @@ Upcoming Release
 - **Update pytest dependency**: Tests now run with Pytest 9
 - **Add new docs feature**: dependencies to build docs can now be installed with `pip install -e .[docs]`
 
+**Improvements:**
+- **Application of new naming convention for bidding strategies: [unit]_[market]_[method]_[comment] for bidding strategy keys (in snake_case) and [Unit][Market][Method][Comment]Strategy for bidding strategy classes (in PascalCase for classes)
+
   **New Features:**
 - **Unit Operator Portfolio Strategy**: A new bidding strategy type that enables portfolio optimization, where the default is called `UnitsOperatorEnergyNaiveDirectStrategy`. This strategy simply passes through bidding decisions of individual units within a portfolio, which was the default behavior beforehand as well. Further we added 'UnitsOperatorEnergyHeuristicCournotStrategy' which allows to model bidding behavior of a portfolio of units in a day-ahead market. The strategy calculates the optimal bid price and quantity for each unit in the portfolio, taking into account markup and the production costs of the units. This enables users to simulate and analyze the impact of strategic portfolio bidding on market outcomes and unit profitability.
 
