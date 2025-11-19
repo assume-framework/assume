@@ -578,7 +578,7 @@ def load_config_and_create_forecaster(
 
     unit_forecasts: dict[str, UnitForecaster] = {}
     market_prices, residual_loads = initializer.calculate_market_forecasts()
-    congestion_signal, renewable_utilization = initializer.calc_forecasts()
+    congestion_signal, renewable_utilization = initializer.calc_node_forecasts()
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(

@@ -45,7 +45,7 @@ def test_cli_network():
 @pytest.mark.slow
 @pytest.mark.require_learning
 def test_cli_learning():
-    os.putenv("OVERWRITE_LEARNED_STRATEGIES", "TRUE")
+    os.environ["OVERWRITE_LEARNED_STRATEGIES"] = "TRUE"
     dburi = "sqlite:///./examples/local_db/test_mini_rl.db"
     args = f"-s example_02a -c tiny -db {dburi}"
     cli(args.split(" "))
