@@ -17,6 +17,7 @@ from assume.common.base import (
     SupportsMinMax,
     SupportsMinMaxCharge,
 )
+from assume.common.exceptions import AssumeException
 from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
@@ -58,8 +59,12 @@ class TorchLearningStrategy(LearningStrategy):
             )
 
         # sets the device of the actor network
-        device = kwargs.get("device", "cpu")  # self.learning_role.device
+        device = kwargs.get("device", "cpu")
         self.device = th.device(device if th.cuda.is_available() else "cpu")
+        if self.learning_mode and not self.learning_role:
+            raise AssumeException("Learning Role must be set in LearningMode")
+
+        # always use CPU in evaluation mode for performance reasons
         if not self.learning_mode:
             self.device = th.device("cpu")
 
@@ -491,9 +496,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         ]
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(
-                self.unit_id, start, actions, noise
-            )
+            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
 
         return bids
 
@@ -654,9 +657,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # while still being able to capitalize on any market inefficiencies that may arise.
         # However this will lead the learning agents to converge to the market price they should bid from below marginal costs.
         # We only advise using this if profits can spike extremely high due to market conditions, or many learning units enter tactic collusion.
-        # IMPROTANT: This is a clear case of reward_tuning to stabilize learning - Use with caution!
+        # IMPORTANT: This is a clear case of reward_tuning to stabilize learning - Use with caution!
         # profit_scale= 0.1
-        
+
         profit_scale = 1
         profit = min(profit, profit_scale * abs(profit))
 
@@ -801,9 +804,7 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
         ]
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(
-                self.unit_id, start, actions, noise
-            )
+            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
 
         return bids
 
@@ -1018,9 +1019,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
             )
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(
-                self.unit_id, start, actions, noise
-            )
+            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
 
         return bids
 
