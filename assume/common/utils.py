@@ -707,7 +707,7 @@ def convert_tensors(data):
 
     except ImportError:
         # If torch is not installed, return the data unchanged
-        pass
+        return data
 
 
 # Function to parse the duration string
