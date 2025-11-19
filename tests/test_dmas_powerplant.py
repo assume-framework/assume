@@ -12,7 +12,7 @@ from assume.common.fast_pandas import FastIndex
 from assume.common.forecaster import PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
+from assume.strategies.dmas_powerplant import EnergyOptimizationDmasStrategy
 from assume.units import PowerPlant
 
 from .utils import get_test_prices
@@ -32,7 +32,7 @@ def power_plant_1() -> PowerPlant:
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
-        bidding_strategies={"EOM": DmasPowerplantStrategy()},
+        bidding_strategies={"EOM": EnergyOptimizationDmasStrategy()},
         max_power=1000,
         min_power=200,
         efficiency=0.5,
@@ -60,7 +60,7 @@ def power_plant_day(fuel_type="lignite") -> PowerPlant:
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
-        bidding_strategies={"EOM": DmasPowerplantStrategy()},
+        bidding_strategies={"EOM": EnergyOptimizationDmasStrategy()},
         max_power=1000,
         min_power=200,
         efficiency=0.5,
@@ -72,7 +72,7 @@ def power_plant_day(fuel_type="lignite") -> PowerPlant:
 
 
 def test_dmas_init(power_plant_1):
-    strategy = DmasPowerplantStrategy()
+    strategy = EnergyOptimizationDmasStrategy()
     hour_count = len(power_plant_1.index)
 
     prices = get_test_prices()
@@ -90,7 +90,7 @@ def test_dmas_init(power_plant_1):
 
 
 def test_dmas_calc(power_plant_1):
-    strategy = DmasPowerplantStrategy()
+    strategy = EnergyOptimizationDmasStrategy()
     hour_count = len(power_plant_1.index) // 2
 
     mc = MarketConfig(
@@ -116,7 +116,7 @@ def test_dmas_calc(power_plant_1):
 
 
 def test_dmas_day(power_plant_day):
-    strategy = DmasPowerplantStrategy()
+    strategy = EnergyOptimizationDmasStrategy()
     hour_count = len(power_plant_day.index) // 2
     assert hour_count == 24
 
@@ -148,7 +148,7 @@ def test_dmas_ramp_day(power_plant_day):
     """
     power_plant_day.ramp_down = power_plant_day.max_power / 2
     power_plant_day.ramp_up = power_plant_day.max_power / 2
-    strategy = DmasPowerplantStrategy()
+    strategy = EnergyOptimizationDmasStrategy()
     hour_count = len(power_plant_day.index) // 2
     assert hour_count == 24
 
@@ -180,7 +180,7 @@ def test_dmas_prevent_start(power_plant_day):
     Even if the price is not well between the day.
     The market should still see this as the best option instead of turning off the powerplant
     """
-    strategy = DmasPowerplantStrategy()
+    strategy = EnergyOptimizationDmasStrategy()
     hour_count = len(power_plant_day.index) // 2
     assert hour_count == 24
 
@@ -214,7 +214,7 @@ def test_dmas_prevent_start_end(power_plant_day):
     The powerplant should bid negative at the end of the day to produce a prevented start.
     This should ensure, that the powerplant is on at the start of the next day
     """
-    strategy = DmasPowerplantStrategy()
+    strategy = EnergyOptimizationDmasStrategy()
     hour_count = len(power_plant_day.index) // 2
     assert hour_count == 24
 

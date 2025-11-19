@@ -9,8 +9,8 @@ import pytest
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import SteelplantForecaster
 from assume.strategies.naive_strategies import (
-    NaiveDADSMStrategy,
-    NaiveRedispatchDSMStrategy,
+    DsmEnergyNaiveRedispatchStrategy,
+    DsmEnergyOptimizationStrategy,
 )
 from assume.units.steel_plant import SteelPlant
 
@@ -66,8 +66,8 @@ def create_steel_plant(dsm_components, flexibility_measure):
     )
 
     bidding_strategies = {
-        "EOM": NaiveDADSMStrategy(),
-        "RD": NaiveRedispatchDSMStrategy(),
+        "EOM": DsmEnergyOptimizationStrategy(),
+        "RD": DsmEnergyNaiveRedispatchStrategy(),
     }
 
     return SteelPlant(
@@ -293,8 +293,8 @@ def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
         objective="min_variable_cost",
         flexibility_measure="cost_based_load_shift",
         bidding_strategies={
-            "EOM": NaiveDADSMStrategy(),
-            "RD": NaiveRedispatchDSMStrategy(),
+            "EOM": DsmEnergyOptimizationStrategy(),
+            "RD": DsmEnergyNaiveRedispatchStrategy(),
         },
         node="south",
         components=dsm_components,

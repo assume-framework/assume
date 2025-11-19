@@ -10,8 +10,8 @@ import pytest
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import PowerplantForecaster
 from assume.strategies import (
-    flexableEOMBlock,
-    flexableEOMLinked,
+    EnergyHeuristicFlexableBlockStrategy,
+    EnergyHeuristicFlexableLinkedStrategy,
 )
 from assume.units import PowerPlant
 
@@ -49,7 +49,7 @@ def power_plant() -> PowerPlant:
 def test_eom_with_blocks(mock_market_config, power_plant):
     power_plant.ramp_up = 400
     product_index = pd.date_range("2023-07-01", periods=24, freq="h")
-    strategy = flexableEOMBlock()
+    strategy = EnergyHeuristicFlexableBlockStrategy()
     mc = mock_market_config
     mc.product_type = "energy_eom"
     product_tuples = [
@@ -100,7 +100,7 @@ def test_eom_with_blocks(mock_market_config, power_plant):
 def test_eom_with_links(mock_market_config, power_plant):
     power_plant.ramp_up = 400
     product_index = pd.date_range("2023-07-01", periods=24, freq="h")
-    strategy = flexableEOMLinked()
+    strategy = EnergyHeuristicFlexableLinkedStrategy()
     mc = mock_market_config
     mc.product_type = "energy_eom"
     product_tuples = [

@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from assume.common.forecaster import PowerplantForecaster
-from assume.strategies.naive_strategies import NaiveSingleBidStrategy
+from assume.strategies.naive_strategies import EnergyNaiveStrategy
 from assume.units import PowerPlant
 
 
@@ -26,7 +26,7 @@ def power_plant_1() -> PowerPlant:
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
-        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
         index=forecaster.index,
         max_power=1000,
         min_power=200,
@@ -52,7 +52,7 @@ def power_plant_2() -> PowerPlant:
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
-        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
         index=forecaster.index,
         max_power=1000,
         min_power=0,
@@ -78,7 +78,7 @@ def power_plant_3() -> PowerPlant:
         id="test_pp",
         unit_operator="test_operator",
         technology="hard coal",
-        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
         index=forecaster.index,
         max_power=1000,
         min_power=0,
@@ -364,7 +364,7 @@ def test_powerplant_execute_dispatch():
         id="test_pp",
         unit_operator="test_operator",
         technology="coal",
-        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
         index=forecaster.index,
         max_power=700,
         min_power=50,

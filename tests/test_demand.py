@@ -10,12 +10,12 @@ from dateutil import rrule as rr
 
 from assume.common.forecaster import DemandForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
-from assume.strategies import ElasticDemandStrategy, NaiveSingleBidStrategy
+from assume.strategies import EnergyHeuristicElasticStrategy, EnergyNaiveStrategy
 from assume.units.demand import Demand
 
 
 def test_demand():
-    strategies = {"EOM": NaiveSingleBidStrategy()}
+    strategies = {"EOM": EnergyNaiveStrategy()}
 
     index = pd.date_range(
         start=datetime(2023, 7, 1),
@@ -64,7 +64,7 @@ def test_demand():
 
 
 def test_demand_series():
-    strategies = {"EOM": NaiveSingleBidStrategy()}
+    strategies = {"EOM": EnergyNaiveStrategy()}
 
     index = pd.date_range(
         start=datetime(2023, 7, 1),
@@ -123,8 +123,8 @@ def test_demand_series():
     assert bids[0]["price"] == price.iloc[1]
 
 
-def test_elastic_demand_config_and_errors():
-    strategies = {"EOM": ElasticDemandStrategy()}
+def test_demand_energy_heuristic_elastic_config_and_errors():
+    strategies = {"EOM": EnergyHeuristicElasticStrategy()}
 
     index = pd.date_range(
         start=datetime(2023, 7, 1),
@@ -140,7 +140,7 @@ def test_elastic_demand_config_and_errors():
 
     # Valid elastic demand (isoelastic model)
     dem = Demand(
-        id="elastic_demand",
+        id="demand_energy_heuristic_elastic",
         unit_operator="UO1",
         technology="energy",
         bidding_strategies=strategies,
@@ -168,7 +168,7 @@ def test_elastic_demand_config_and_errors():
 
     # Valid elastic demand (linear model)
     dem = Demand(
-        id="elastic_demand",
+        id="demand_energy_heuristic_elastic",
         unit_operator="UO1",
         technology="energy",
         bidding_strategies=strategies,

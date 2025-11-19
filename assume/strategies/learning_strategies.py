@@ -209,7 +209,7 @@ class TorchLearningStrategy(LearningStrategy):
         ).flatten()
 
         if self.learning_mode:
-            self.learning_role.add_observation_to_buffer(
+            self.learning_role.add_observation_to_cache(
                 self.unit_id, start, observation
             )
 
@@ -300,7 +300,7 @@ class TorchLearningStrategy(LearningStrategy):
         return curr_action, noise
 
 
-class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
+class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -491,7 +491,7 @@ class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
         ]
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_buffer(
+            self.learning_role.add_actions_to_cache(
                 self.unit_id, start, actions, noise
             )
 
@@ -648,11 +648,17 @@ class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
         profit = income - operational_cost
 
         # Stabilizing learning: Limit positive profit to 10% of its absolute value.
-        # This reduces variance in rewards and prevents overfitting to extreme profit-seeking behavior.
+        # This reduces variance in rewards and avoids extreme profit-seeking behavior.
         # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
-        # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
-        # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
-        profit = min(profit, 0.1 * abs(profit))
+        # This leads to the agent learning to bid close to marginal costs to ensure acceptance,
+        # while still being able to capitalize on any market inefficiencies that may arise.
+        # However this will lead the learning agents to converge to the market price they should bid from below marginal costs.
+        # We only advise using this if profits can spike extremely high due to market conditions, or many learning units enter tactic collusion.
+        # IMPROTANT: This is a clear case of reward_tuning to stabilize learning - Use with caution!
+        # profit_scale= 0.1
+        
+        profit_scale = 1
+        profit = min(profit, profit_scale * abs(profit))
 
         # Opportunity cost: The income lost due to not operating at full capacity.
         opportunity_cost = (
@@ -690,28 +696,28 @@ class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         # write rl-rewards to buffer
         if self.learning_mode:
-            self.learning_role.add_reward_to_buffer(
+            self.learning_role.add_reward_to_cache(
                 unit.id, start, reward, regret, profit
             )
 
 
-class RLStrategySingleBid(RLStrategy, MinMaxStrategy):
+class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy with Single-Bid Structure for Energy-Only Markets.
 
-    This strategy is a simplified variant of the standard `RLStrategy`, which typically submits two
+    This strategy is a simplified variant of the standard `EnergyLearningStrategy`, which typically submits two
     separate price bids for inflexible (P_min) and flexible (P_max - P_min) components. Instead,
-    `RLStrategySingleBid` submits a single bid that always offers the unit's maximum power,
+    `EnergyLearningSingleBidStrategy` submits a single bid that always offers the unit's maximum power,
     effectively treating the full capacity as inflexible from a bidding perspective.
 
     The core reinforcement learning mechanics, including the observation structure, actor network
-    architecture, and reward formulation, remain consistent with the two-bid `RLStrategy`. However,
+    architecture, and reward formulation, remain consistent with the two-bid `EnergyLearningStrategy`. However,
     this strategy modifies the action space to produce only a single bid price, and omits the
     decomposition of capacity into flexible and inflexible parts.
 
     Attributes
     ----------
-    Inherits all attributes from RLStrategy, with the exception of:
+    Inherits all attributes from EnergyLearningStrategy, with the exception of:
     - act_dim : int
         Reduced to 1 to reflect single bid pricing.
     - foresight : int
@@ -795,14 +801,14 @@ class RLStrategySingleBid(RLStrategy, MinMaxStrategy):
         ]
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_buffer(
+            self.learning_role.add_actions_to_cache(
                 self.unit_id, start, actions, noise
             )
 
         return bids
 
 
-class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
+class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -1012,7 +1018,7 @@ class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
             )
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_buffer(
+            self.learning_role.add_actions_to_cache(
                 self.unit_id, start, actions, noise
             )
 
@@ -1047,7 +1053,7 @@ class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
         # that the strategy is not designed for multiple orders and the market configuration should be adjusted
         if len(orderbook) > 1:
             raise ValueError(
-                "StorageRLStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
+                "StorageEnergyLearningStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
             )
 
         order = orderbook[0]
@@ -1113,10 +1119,10 @@ class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
 
         # write rl-rewards to buffer
         if self.learning_mode:
-            self.learning_role.add_reward_to_buffer(unit.id, start, reward, 0, profit)
+            self.learning_role.add_reward_to_cache(unit.id, start, reward, 0, profit)
 
 
-class RenewableRLStrategy(RLStrategySingleBid):
+class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
     """
     Reinforcement Learning Strategy for a renewable unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -1358,6 +1364,6 @@ class RenewableRLStrategy(RLStrategySingleBid):
 
         # write rl-rewards to buffer
         if self.learning_mode:
-            self.learning_role.add_reward_to_buffer(
+            self.learning_role.add_reward_to_cache(
                 unit.id, start, reward, regret, profit
             )

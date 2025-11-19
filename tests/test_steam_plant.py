@@ -8,9 +8,9 @@ import pytest
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import SteamgenerationForecaster
 from assume.strategies.naive_strategies import (
-    DSM_NegCRM_Strategy,
-    DSM_PosCRM_Strategy,
-    NaiveDADSMStrategy,
+    DsmCapacityHeuristicBalancingNegStrategy,
+    DsmCapacityHeuristicBalancingPosStrategy,
+    DsmEnergyOptimizationStrategy,
 )
 from assume.units.steam_generation_plant import SteamPlant
 
@@ -73,7 +73,7 @@ def steam_plant_with_hp(steam_plant_components_with_hp) -> SteamPlant:
 
     # Define a bidding strategy for the hydrogen plant
     bidding_strategy = {
-        "EOM": NaiveDADSMStrategy(),
+        "EOM": DsmEnergyOptimizationStrategy(),
     }
 
     # Initialize the HydrogenPlant with the specified components, forecast, and strategy
@@ -189,7 +189,7 @@ def steam_plant_with_hp_b(steam_plant_components_with_hp_b) -> SteamPlant:
 
     # Define a bidding strategy for the hydrogen plant
     bidding_strategy = {
-        "EOM": NaiveDADSMStrategy(),
+        "EOM": DsmEnergyOptimizationStrategy(),
     }
 
     # Initialize the HydrogenPlant with the specified components, forecast, and strategy
@@ -319,7 +319,7 @@ def steam_plant_with_hp_b_ts(steam_plant_components_with_hp_b_ts) -> SteamPlant:
 
     # Define a bidding strategy for the hydrogen plant
     bidding_strategy = {
-        "EOM": NaiveDADSMStrategy(),
+        "EOM": DsmEnergyOptimizationStrategy(),
     }
 
     # Initialize the HydrogenPlant with the specified components, forecast, and strategy
@@ -485,7 +485,7 @@ def steam_plant_with_hp_b_longterm_ts(
         availability=0,
         market_prices={"EOM": 0},
     )
-    bidding_strategy = {"EOM": NaiveDADSMStrategy()}
+    bidding_strategy = {"EOM": DsmEnergyOptimizationStrategy()}
     return SteamPlant(
         id="A360",
         unit_operator="test_operator",
@@ -581,8 +581,8 @@ def steam_plant_with_crm_flex(steam_plant_components_with_hp_b):
         market_prices={"EOM": 0},
     )
     bidding_strategy = {
-        "CRM_pos": DSM_PosCRM_Strategy(),
-        "CRM_neg": DSM_NegCRM_Strategy(),
+        "CRM_pos": DsmCapacityHeuristicBalancingPosStrategy(),
+        "CRM_neg": DsmCapacityHeuristicBalancingNegStrategy(),
     }
     return SteamPlant(
         id="A360",
@@ -616,13 +616,13 @@ def test_crm_block_flexibility_and_bidding(steam_plant_with_crm_flex):
         product_tuples.append((index[i], index[i + block_length], None))
 
     # --- POSITIVE CRM ---
-    pos_strategy = DSM_PosCRM_Strategy()
+    pos_strategy = DsmCapacityHeuristicBalancingPosStrategy()
     pos_bids = pos_strategy.calculate_bids(
         steam_plant_with_crm_flex, market_config, product_tuples
     )
     assert isinstance(pos_bids, list)
     # --- NEGATIVE CRM ---
-    neg_strategy = DSM_NegCRM_Strategy()
+    neg_strategy = DsmCapacityHeuristicBalancingNegStrategy()
     neg_bids = neg_strategy.calculate_bids(
         steam_plant_with_crm_flex, market_config, product_tuples
     )

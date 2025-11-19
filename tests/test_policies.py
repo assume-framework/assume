@@ -23,7 +23,7 @@ from assume.common.forecaster import DemandForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.markets.base_market import MarketRole
-from assume.strategies.naive_strategies import NaiveSingleBidStrategy
+from assume.strategies.naive_strategies import EnergyNaiveStrategy
 from assume.units.demand import Demand
 
 start = datetime(2020, 1, 1)
@@ -78,7 +78,7 @@ async def test_request_messages():
     index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
 
     params_dict = {
-        "bidding_strategies": {"energy": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"energy": EnergyNaiveStrategy()},
         "technology": "energy",
         "unit_operator": "test_operator",
         "max_power": -1000,

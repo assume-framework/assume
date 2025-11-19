@@ -26,7 +26,10 @@ from assume.common.utils import (
     convert_tensors,
     timestamp2datetime,
 )
-from assume.strategies import DirectUnitOperatorStrategy, UnitOperatorStrategy
+from assume.strategies import (
+    UnitOperatorStrategy,
+    UnitsOperatorDirectStrategy,
+)
 from assume.units import BaseUnit
 
 logger = logging.getLogger(__name__)
@@ -67,7 +70,7 @@ class UnitsOperator(Role):
         for market in self.available_markets:
             if market.market_id not in self.portfolio_strategies.keys():
                 self.portfolio_strategies[market.market_id] = (
-                    DirectUnitOperatorStrategy()
+                    UnitsOperatorDirectStrategy()
                 )
 
         # valid_orders per product_type

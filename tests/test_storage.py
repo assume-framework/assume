@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 
 from assume.common.forecaster import UnitForecaster
-from assume.strategies.flexable_storage import flexableEOMStorage
+from assume.strategies.flexable_storage import StorageEnergyHeuristicFlexableStrategy
 from assume.units import Storage
 
 
@@ -21,7 +21,7 @@ def storage_unit() -> Storage:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"EOM": flexableEOMStorage()},
+        bidding_strategies={"EOM": StorageEnergyHeuristicFlexableStrategy()},
         forecaster=forecaster,
         max_power_charge=-100,
         max_power_discharge=100,
@@ -324,7 +324,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
 
     mc = mock_market_config
 
-    strategy = flexableEOMStorage()
+    strategy = StorageEnergyHeuristicFlexableStrategy()
     product_tuples = [(start, end, None)]
 
     storage_unit.outputs["energy"][start] = 100
@@ -404,7 +404,7 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
         product_tuples.append((s, end, None))
 
     mc = mock_market_config
-    strategy = flexableEOMStorage()
+    strategy = StorageEnergyHeuristicFlexableStrategy()
 
     storage_unit.outputs["energy"][start] = 100
     storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
