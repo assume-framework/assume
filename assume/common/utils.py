@@ -679,9 +679,7 @@ def convert_tensors(data):
 
                 # Set the final value
                 final_key = path[-1]
-                if isinstance(target, (list | pd.Series)):
-                    target[final_key] = val
-                elif isinstance(target, dict):
+                if isinstance(target, (list | pd.Series | dict)):
                     target[final_key] = val
 
             return structure
@@ -795,7 +793,8 @@ def get_supported_solver(default_solver: str | None = None):
 
     return solver
 
-def confirm_learning_save_path(self, save_path: str, continue_learning: bool) -> None:
+
+def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
     """
     Check save_path and ask user how to proceed if it exists.
     Raises AssumeException if user declines to proceed.

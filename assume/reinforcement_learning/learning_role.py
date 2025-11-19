@@ -153,6 +153,8 @@ class Learning(Role):
         self.sync_train_freq_with_simulation_horizon()
 
         # init dictionaries for all learning instances in this role
+        # Note: we use atomic-swaps later to ensure no overwrites while we write the data into the buffer
+        # this works since we do not use multi-threading, otherwise threading.locks would be needed here.
         self.all_obs = defaultdict(lambda: defaultdict(list))
         self.all_actions = defaultdict(lambda: defaultdict(list))
         self.all_noises = defaultdict(lambda: defaultdict(list))
@@ -230,7 +232,6 @@ class Learning(Role):
         except Exception as e:
             logger.warning(f"Could not sync train_freq: {e}")
 
-
     def determine_validation_interval(self, learning_config: dict) -> int:
         """
         Compute and validate validation_interval.
@@ -276,7 +277,7 @@ class Learning(Role):
         current_regrets = self.all_regrets
         current_profits = self.all_profits
 
-        # Reset buffers immediately with new defaultdicts
+        # Reset cache dicts immediately with new defaultdicts
         self.all_obs = defaultdict(lambda: defaultdict(list))
         self.all_actions = defaultdict(lambda: defaultdict(list))
         self.all_rewards = defaultdict(lambda: defaultdict(list))
@@ -312,7 +313,7 @@ class Learning(Role):
 
     async def _store_to_buffer_and_update_sync(self, cache, device) -> None:
         """
-        This function takes all the information that the strategies wrote into the learning_role dicts and post_processes them to fit into the buffer.
+        This function takes all the information that the strategies wrote into the learning_role cache dicts and post_processes them to fit into the buffer.
         Further triggers the next policy update
 
         """
@@ -339,9 +340,9 @@ class Learning(Role):
 
         self.update_policy()
 
-    def add_observation_to_buffer(self, unit_id, start, observation) -> None:
+    def add_observation_to_cache(self, unit_id, start, observation) -> None:
         """
-        Add the observation to the buffer dict, per unit_id.
+        Add the observation to the cache dict, per unit_id.
 
         Args:
             unit_id (str): The id of the unit.
@@ -350,9 +351,9 @@ class Learning(Role):
         """
         self.all_obs[start][unit_id].append(observation)
 
-    def add_actions_to_buffer(self, unit_id, start, action, noise) -> None:
+    def add_actions_to_cache(self, unit_id, start, action, noise) -> None:
         """
-        Add the action and noise to the buffer dict, per unit_id.
+        Add the action and noise to the cache dict, per unit_id.
 
         Args:
             unit_id (str): The id of the unit.
@@ -371,9 +372,9 @@ class Learning(Role):
         self.all_actions[start][unit_id].append(action)
         self.all_noises[start][unit_id].append(noise)
 
-    def add_reward_to_buffer(self, unit_id, start, reward, regret, profit) -> None:
+    def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
         """
-        Add the reward to the buffer dict, per unit_id.
+        Add the reward to the cache dict, per unit_id.
 
         Args:
             unit_id (str): The id of the unit.

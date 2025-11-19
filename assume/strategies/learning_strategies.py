@@ -58,8 +58,6 @@ class TorchLearningStrategy(LearningStrategy):
             )
 
         # sets the device of the actor network
-        # TODO learning role only exists if we are in learning_mode, I think, how do we do this if we evaluate learned strategies
-        # Also the learning role does not exist before the initlisation appertely here, because I only add it after the bidding_strategies are prepared
         device = kwargs.get("device", "cpu")  # self.learning_role.device
         self.device = th.device(device if th.cuda.is_available() else "cpu")
         if not self.learning_mode:
@@ -603,6 +601,8 @@ class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         start = orderbook[0]["start_time"]
         end = orderbook[0]["end_time"]
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
+        end_excl = end - unit.index.freq
 
         # Depending on how the unit calculates marginal costs, retrieve cost values.
         marginal_cost = unit.calculate_marginal_cost(
@@ -683,6 +683,11 @@ class RLStrategy(TorchLearningStrategy, MinMaxStrategy):
         profit += profit
         regret = regret_scale * opportunity_cost
 
+        # Store results in unit outputs
+        # Note: these are not learning-specific results but stored for all units for analysis
+        unit.outputs["profit"].loc[start:end_excl] += profit
+        unit.outputs["total_costs"].loc[start:end_excl] = order_cost
+
         # write rl-rewards to buffer
         if self.learning_mode:
             self.learning_role.add_reward_to_buffer(
@@ -715,8 +720,8 @@ class RLStrategySingleBid(RLStrategy, MinMaxStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = self.learning_role.obs_dim  # kwargs.pop("obs_dim", 74)
-        act_dim = self.learning_role.act_dim  # kwargs.pop("act_dim", 1)
+        obs_dim = self.learning_role.obs_dim
+        act_dim = self.learning_role.act_dim
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
             obs_dim=obs_dim,
@@ -788,14 +793,6 @@ class RLStrategySingleBid(RLStrategy, MinMaxStrategy):
                 "node": unit.node,
             },
         ]
-
-        # store results in unit outputs as lists to be written to the buffer for learning
-        unit.outputs["rl_observations"].append(next_observation)
-        unit.outputs["rl_actions"].append(actions)
-
-        # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"].at[start] = actions
-        unit.outputs["exploration_noise"].at[start] = noise
 
         if self.learning_mode:
             self.learning_role.add_actions_to_buffer(
@@ -1014,13 +1011,6 @@ class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
                 }
             )
 
-        unit.outputs["rl_observations"].append(next_observation)
-        unit.outputs["rl_actions"].append(actions)
-
-        # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"].at[start] = actions
-        unit.outputs["exploration_noise"].at[start] = noise
-
         if self.learning_mode:
             self.learning_role.add_actions_to_buffer(
                 self.unit_id, start, actions, noise
@@ -1117,9 +1107,13 @@ class StorageRLStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
         reward += scaling_factor * profit
 
         # Store results in unit outputs
+        # Note: these are not learning-specific results but stored for all units for analysis
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
         unit.outputs["total_costs"].loc[start:end_excl] = order_cost
+
+        # write rl-rewards to buffer
+        if self.learning_mode:
+            self.learning_role.add_reward_to_buffer(unit.id, start, reward, 0, profit)
 
 
 class RenewableRLStrategy(RLStrategySingleBid):
@@ -1354,10 +1348,16 @@ class RenewableRLStrategy(RLStrategySingleBid):
         else:
             scaling = 1 / (self.max_bid_price * available_power)
 
-        reward = scaling * (profit - regret_scale * opportunity_cost)
+        regret = regret_scale * opportunity_cost
+        reward = scaling * (profit - regret)
 
-        # Store results in unit outputs, which are later written to the database by the unit operator.
+        # Store results in unit outputs
+        # Note: these are not learning-specific results but stored for all units for analysis
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
-        unit.outputs["total_costs"].loc[start:end_excl] = operational_cost
+        unit.outputs["total_costs"].loc[start:end_excl] = order_cost
+
+        # write rl-rewards to buffer
+        if self.learning_mode:
+            self.learning_role.add_reward_to_buffer(
+                unit.id, start, reward, regret, profit
+            )

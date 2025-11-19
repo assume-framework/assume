@@ -188,14 +188,14 @@ def copy_layer_data(dst, src):
             dst[k].data.copy_(src[k].data)
 
 
-def transform_buffer_data(nested_dict: dict, device: th.device) -> list:
+def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
     """
-    Transform nested dict {unit_id -> {datetime -> [values]}} into
+    Transform nested dict {datetime -> {unit_id -> [values]}} into
     torch tensor of shape (timesteps, powerplants, values). Compatible with buffer storage.
     Get tensors from GPU to CPU.
 
     Args:
-        nested_dict: Dict with structure {unit_id -> {datetime -> list[tensor]}}
+        nested_dict: Dict with structure {datetime -> {unit_id -> list[tensor]}}
 
     Returns:
         th.Tensor: Shape (n_timesteps, n_powerplants, feature_dim)
@@ -232,8 +232,6 @@ def transform_buffer_data(nested_dict: dict, device: th.device) -> list:
             if values:  # if we have values for this timestamp
                 result[t, u] = values[0]
 
-    # Convert to numpy array only once at the end
-    # TODO: this is now only freeing the GPU memory after all market operations happened. so the clearing etc happens with tensors currently. Detached ones of course but still.
     return result.cpu().numpy()
 
 
