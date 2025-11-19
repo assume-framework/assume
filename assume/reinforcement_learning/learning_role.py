@@ -232,7 +232,7 @@ class Learning(Role):
         except Exception as e:
             logger.warning(f"Could not sync train_freq: {e}")
 
-    def determine_validation_interval(self, learning_config: dict) -> int:
+    def determine_validation_interval(self, learning_config: LearningConfig) -> int:
         """
         Compute and validate validation_interval.
 
@@ -241,18 +241,17 @@ class Learning(Role):
         Raises:
             ValueError if training_episodes is too small.
         """
-        default_interval = int(learning_config.get("validation_episodes_interval", 5))
-        training_episodes = int(getattr(self, "training_episodes", 0))
+        default_interval = learning_config.get("validation_episodes_interval", 5)
+        training_episodes = self.training_episodes
         validation_interval = min(training_episodes, default_interval)
 
         min_required_episodes = (
-            int(getattr(self, "episodes_collecting_initial_experience", 0))
-            + validation_interval
+            self.episodes_collecting_initial_experience + validation_interval
         )
 
         if training_episodes < min_required_episodes:
             raise ValueError(
-                f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({getattr(self, 'episodes_collecting_initial_experience', 0)}) and evaluation interval ({validation_interval})."
+                f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({self.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
             )
 
         return validation_interval

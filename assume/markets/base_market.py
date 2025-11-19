@@ -138,8 +138,6 @@ class MarketRole(MarketMechanism, Role):
         super().setup()
         self.marketconfig.addr = self.context.addr
 
-        market_id = getattr(self.marketconfig, "market_id", "Unknown Market ID")
-
         # Validate required fields in market configuration
         missing_fields = [
             field
@@ -149,7 +147,7 @@ class MarketRole(MarketMechanism, Role):
         if missing_fields:
             error_message = (
                 f"Missing required field(s) {missing_fields} from additional_fields "
-                f"for market '{market_id}'."
+                f"for market '{self.marketconfig.market_id}'."
             )
             logger.error(error_message)
             raise ValueError(error_message)

@@ -7,10 +7,10 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
+from assume.common.base import LearningConfig
 from assume.common.forecaster import PowerplantForecaster
 
 try:
-    from assume.reinforcement_learning.learning_role import LearningConfig
     from assume.strategies.learning_strategies import (
         EnergyLearningSingleBidStrategy,
         EnergyLearningStrategy,
