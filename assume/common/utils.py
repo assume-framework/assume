@@ -794,6 +794,13 @@ def get_supported_solver(default_solver: str | None = None):
     return solver
 
 
+def interactive_input(prompt: str, default: str = "") -> str:
+    if os.getenv("NON_INTERACTIVE"):
+        return default
+    else:
+        return input(prompt)
+
+
 def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
     """
     Check save_path and ask user how to proceed if it exists.
@@ -809,8 +816,9 @@ def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
             "It is recommended to use a different save path to avoid unintended overwrites.\n"
             "You can set 'trained_policies_save_path' in the config."
         )
-        proceed = input(
-            "Do you still want to proceed with the existing save path? (y/N) "
+        proceed = interactive_input(
+            "Do you still want to proceed with the existing save path? (y/N) ",
+            default="y",
         )
         if not proceed.lower().startswith("y"):
             raise AssumeException(
@@ -821,10 +829,9 @@ def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
         logger.warning(
             f"Save path '{save_path}' exists. Previous training data will be deleted to start fresh."
         )
-        if os.getenv("OVERWRITE_LEARNED_STRATEGIES"):
-            accept = "y"
-        else:
-            accept = input("Do you want to overwrite and start fresh? (y/N) ")
+        accept = interactive_input(
+            "Do you want to overwrite and start fresh? (y/N) ", default="y"
+        )
 
         if accept.lower().startswith("y"):
             shutil.rmtree(save_path, ignore_errors=True)
