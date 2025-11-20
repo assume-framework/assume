@@ -82,6 +82,6 @@ base:
         - max_power
       param_dict:
         network_path: .
-        solver: gurobi
+        solver: highs
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
