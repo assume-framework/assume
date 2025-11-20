@@ -5,6 +5,7 @@
 import json
 import os
 from copy import deepcopy
+from datetime import datetime
 
 import pytest
 
@@ -20,6 +21,9 @@ try:
 
 except ImportError:
     pass
+
+start = datetime(2023, 7, 1)
+end = datetime(2023, 7, 2)
 
 
 @pytest.fixture
@@ -53,7 +57,7 @@ def base_learning_config():
 @pytest.fixture(scope="function")
 def learning_role_n(base_learning_config):
     config = base_learning_config.copy()
-    learn = Learning(config)
+    learn = Learning(config, start, end)
     learn.rl_strats["agent_0"] = LearningStrategy(**config)
     learn.rl_strats["agent_1"] = LearningStrategy(**config)
     return learn
@@ -62,7 +66,7 @@ def learning_role_n(base_learning_config):
 @pytest.fixture(scope="function")
 def learning_role_n_plus_m(base_learning_config):
     config = base_learning_config.copy()
-    learn = Learning(config)
+    learn = Learning(config, start, end)
     learn.rl_strats["agent_0"] = LearningStrategy(**config)
     learn.rl_strats["agent_1"] = LearningStrategy(**config)
     learn.rl_strats["agent_2"] = LearningStrategy(**config)
@@ -211,7 +215,7 @@ def test_td3_load_matching_n(base_learning_config, saved_n_agent_model):
     save_dir, original_states = saved_n_agent_model
 
     config_n_new = base_learning_config.copy()
-    learn_n_new = Learning(config_n_new)
+    learn_n_new = Learning(config_n_new, start, end)
     learn_n_new.rl_strats["agent_0"] = LearningStrategy(**config_n_new)
     learn_n_new.rl_strats["agent_1"] = LearningStrategy(**config_n_new)
     learn_n_new.initialize_policy()
@@ -369,7 +373,7 @@ def test_td3_load_transfer_n_minus_m(
 @pytest.mark.require_learning
 def test_td3_load_corrupted_or_incomplete_critic(tmp_path, base_learning_config):
     config = base_learning_config.copy()
-    learning = Learning(config)
+    learning = Learning(config, start, end)
     learning.rl_strats["agent_0"] = LearningStrategy(**config)
     learning.initialize_policy()
 
@@ -416,7 +420,7 @@ def test_initialize_policy_dimension_mismatch(
     config = base_learning_config.copy()
     config["num_timeseries_obs_dim"] = 1  # Ensure field exists for valid check
 
-    learn = Learning(config)
+    learn = Learning(config, start, end)
 
     # Create one agent with default config
     strat_0 = LearningStrategy(**config)
@@ -441,7 +445,7 @@ def test_initialize_policy_all_dimensions_match(base_learning_config):
     config = base_learning_config.copy()
     config["num_timeseries_obs_dim"] = 1  # Ensure the optional field is populated
 
-    learn = Learning(config)
+    learn = Learning(config, start, end)
     learn.rl_strats["agent_0"] = LearningStrategy(**config)
     learn.rl_strats["agent_1"] = LearningStrategy(**config)
     learn.rl_strats["agent_2"] = LearningStrategy(**config)

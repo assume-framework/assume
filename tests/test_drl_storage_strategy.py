@@ -1,5 +1,3 @@
-# tests/test_drl_storage_strategy.py
-
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
@@ -16,6 +14,7 @@ from assume.common.forecaster import UnitForecaster
 try:
     import torch as th
 
+    from assume.reinforcement_learning import Learning
     from assume.strategies.learning_strategies import StorageEnergyLearningStrategy
 except ImportError:
     th = None
@@ -31,24 +30,30 @@ def storage_unit() -> Storage:
     """
     # Define the learning configuration for the StorageEnergyLearningStrategy
     learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
+        "obs_dim": 50,
+        "act_dim": 2,
         "algorithm": "matd3",
         "learning_mode": True,
         "training_episodes": 3,
         "unit_id": "test_storage",
         "max_bid_price": 100,
         "max_demand": 1000,
+        "evaluation_mode": False,
+        "continue_learning": False,
+        "trained_policies_save_path": "not required",
     }
 
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = UnitForecaster(index, market_prices={"test_market": 50})
+    learning_role = Learning(learning_config, index[0], index[-1])
     return Storage(
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
         bidding_strategies={
-            "test_market": StorageEnergyLearningStrategy(**learning_config)
+            "test_market": StorageEnergyLearningStrategy(
+                learning_role=learning_role, **learning_config
+            )
         },
         max_power_charge=-500,  # Negative for charging
         max_power_discharge=500,

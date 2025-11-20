@@ -11,6 +11,7 @@ from assume.common.base import LearningConfig
 from assume.common.forecaster import PowerplantForecaster
 
 try:
+    from assume.reinforcement_learning import Learning
     from assume.strategies.learning_strategies import (
         EnergyLearningSingleBidStrategy,
         EnergyLearningStrategy,
@@ -38,9 +39,15 @@ def power_plant() -> PowerPlant:
     learning_config: LearningConfig = {
         "algorithm": "matd3",
         "learning_mode": True,
+        "evaluation_mode": False,
+        "continue_learning": False,
+        "trained_policies_save_path": "not required",
         "training_episodes": 3,
         "unit_id": "test_pp",
+        "obs_dim": 3,
+        "act_dim": 2,
     }
+    learning_role = Learning(learning_config, start, end)
 
     return PowerPlant(
         id="test_pp",
@@ -51,7 +58,11 @@ def power_plant() -> PowerPlant:
         min_power=200,
         efficiency=0.5,
         additional_cost=10,
-        bidding_strategies={"EOM": EnergyLearningStrategy(**learning_config)},
+        bidding_strategies={
+            "EOM": EnergyLearningStrategy(
+                learning_role=learning_role, **learning_config
+            )
+        },
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,
@@ -90,12 +101,20 @@ def test_learning_strategies_parametrized(
         "learning_mode": True,
         "training_episodes": 3,
         "unit_id": power_plant.id,
+        "evaluation_mode": False,
+        "continue_learning": False,
+        "trained_policies_save_path": "not required",
+        "obs_dim": 3,
+        "act_dim": 2,
     }
     if actor_architecture != "mlp":
         learning_config["actor_architecture"] = actor_architecture
 
+    learning_role = Learning(learning_config, start, end)
     # Override the strategy
-    power_plant.bidding_strategies[mc.market_id] = strategy_class(**learning_config)
+    power_plant.bidding_strategies[mc.market_id] = strategy_class(
+        learning_role=learning_role, **learning_config
+    )
     strategy = power_plant.bidding_strategies[mc.market_id]
 
     # Check if observation dimension is set accordingly and follows current default structure
