@@ -90,7 +90,7 @@ epub_show_urls = "footnote"
 # -- Options for nbsphinx -------------------------------------------------
 # nbsphinx_kernel_name = 'assume'
 nbsphinx_prolog = """
-{% set docname = env.doc2path(env.docname, base=None).replace("nblink", "ipynb").replace("examples/", "examples/notebooks/") %}
+{% set docname = env.docname.replace("examples/", "examples/notebooks/") + ".ipynb" %}
 .. note::
 
     You can `download <https://github.com/assume-framework/assume/tree/main/{{ docname }}>`_ this example as a Jupyter notebook
