@@ -164,7 +164,9 @@ class BaseUnit:
             self.outputs[product_type].loc[start:end_excl] += added_volume
 
             # Get the accepted price and store it in the outputs
-            if isinstance(order["accepted_price"], dict):
+            if "accepted_price" not in order:
+                accepted_price = 0
+            elif isinstance(order["accepted_price"], dict):
                 accepted_price = list(order["accepted_price"].values())
             else:
                 accepted_price = order["accepted_price"]
