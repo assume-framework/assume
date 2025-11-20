@@ -198,39 +198,35 @@ class Learning(Role):
         """
 
         # ensure train_freq evenly divides simulation length (may adjust self.train_freq)
+
+        if not self.learning_mode:
+            return None
+
+        train_freq_str = str(self.train_freq)
         try:
-            if not self.learning_mode:
-                return None
+            train_freq = pd.Timedelta(train_freq_str)
+        except Exception:
+            logger.warning(
+                f"Invalid train_freq '{train_freq_str}' — skipping adjustment."
+            )
+            return None
+        total_length = self.end_datetime - self.start_datetime
+        quotient, remainder = divmod(total_length, train_freq)
 
-            train_freq_str = str(self.train_freq)
-            try:
-                train_freq = pd.Timedelta(train_freq_str)
-            except Exception:
-                logger.warning(
-                    f"Invalid train_freq '{train_freq_str}' — skipping adjustment."
-                )
-                return None
+        if remainder != pd.Timedelta(0):
+            n_intervals = int(quotient) + 1
+            new_train_freq_hours = int(
+                (total_length / n_intervals).total_seconds() / 3600
+            )
+            new_train_freq_str = f"{new_train_freq_hours}h"
+            self.train_freq = new_train_freq_str
 
-            total_length = self.end_datetime - self.start_datetime
-            quotient, remainder = divmod(total_length, train_freq)
+            logger.warning(
+                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
+                f"Adjusting train_freq to {new_train_freq_str}."
+            )
 
-            if remainder != pd.Timedelta(0):
-                n_intervals = int(quotient) + 1
-                new_train_freq_hours = int(
-                    (total_length / n_intervals).total_seconds() / 3600
-                )
-                new_train_freq_str = f"{new_train_freq_hours}h"
-                self.train_freq = new_train_freq_str
-
-                logger.warning(
-                    f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
-                    f"Adjusting train_freq to {new_train_freq_str}."
-                )
-
-            return self.train_freq
-
-        except Exception as e:
-            logger.warning(f"Could not sync train_freq: {e}")
+        return self.train_freq
 
     def determine_validation_interval(self, learning_config: LearningConfig) -> int:
         """
