@@ -146,31 +146,44 @@ class BaseUnit:
         Args:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
-
         """
 
+        import logging
+
         product_type = marketconfig.product_type
+
         for order in orderbook:
             start = order["start_time"]
             end = order["end_time"]
-            # end includes the end of the last product, to get the last products' start time we deduct the frequency once
-            end_excl = end - self.index.freq
+            end_excl = end - self.index.freq  # last exclusive step
 
-            # Determine the added volume
-            if isinstance(order["accepted_volume"], dict):
+            if isinstance(order.get("accepted_volume"), dict):
                 added_volume = list(order["accepted_volume"].values())
             else:
-                added_volume = order["accepted_volume"]
+                added_volume = order.get("accepted_volume", 0.0)
+
             self.outputs[product_type].loc[start:end_excl] += added_volume
 
-            # Get the accepted price and store it in the outputs
-            if isinstance(order["accepted_price"], dict):
-                accepted_price = list(order["accepted_price"].values())
-            else:
-                accepted_price = order["accepted_price"]
-            self.outputs[f"{product_type}_accepted_price"].loc[start:end_excl] = (
-                accepted_price
+            accepted_price = (
+                order.get("accepted_price")
+                or order.get("clearing_price")
+                or order.get("price")
+                or 0.0
             )
+
+            # If it’s a dict (rare case for multi-product orders)
+            if isinstance(accepted_price, dict):
+                accepted_price = list(accepted_price.values())
+
+            # Log missing accepted_price once per offending order
+            if "accepted_price" not in order:
+                logging.warning(
+                    f"[BaseUnit.set_dispatch_plan] Missing 'accepted_price' for unit={getattr(self, 'id', '?')} "
+                    f"keys={list(order.keys())}"
+                )
+
+            self.outputs[f"{product_type}_accepted_price"].loc[start:end_excl] = accepted_price
+
 
     def calculate_cashflow_and_reward(
         self,
