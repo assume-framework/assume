@@ -274,6 +274,10 @@ class FastIndex:
                 raise ValueError(f"Invalid frequency string: {freq}. Error: {e}")
         raise TypeError("Frequency must be a string or timedelta")
 
+    @staticmethod
+    def from_pandas_index(idx: pd.DatetimeIndex | pd.Series):
+        return FastIndex(start=idx[0], end=idx[-1], freq=pd.infer_freq(idx))
+
 
 class FastSeries:
     """
@@ -290,7 +294,7 @@ class FastSeries:
     """
 
     def __init__(
-        self, index: FastIndex, value: float | np.ndarray = 0.0, name: str = ""
+        self, index: FastIndex, value: float | np.ndarray | list = 0.0, name: str = ""
     ):
         """
         Initialize the FastSeries.

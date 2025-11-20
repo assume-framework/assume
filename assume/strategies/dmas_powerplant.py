@@ -25,14 +25,14 @@ from pyomo.opt import (
     TerminationCondition,
 )
 
-from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_supported_solver
 
 logger = logging.getLogger(__name__)
 
 
-class DmasPowerplantStrategy(BaseStrategy):
+class EnergyOptimizationDmasStrategy(MinMaxStrategy):
     def __init__(self, steps=[-10, -1, 0, 1, 10], *args, **kwargs):
         """
         Initializes the strategy
@@ -74,7 +74,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         power_prices,
         runtime: int = None,
         p0: float = None,
-    ) -> None:
+    ) -> np.ndarray:
         """
         Builds the optimization model and returns the cashflow.
 
@@ -89,7 +89,7 @@ class DmasPowerplantStrategy(BaseStrategy):
             p0 (float, optional): Initial power. Defaults to None.
 
         Returns:
-            np.array: Cashflow.
+            np.ndarray: Cashflow.
         """
         runtime = runtime or unit.get_operation_time(start)
         p0 = p0 or unit.get_output_before(start)
@@ -139,21 +139,25 @@ class DmasPowerplantStrategy(BaseStrategy):
             self.model.model_max.add(self.model.z[t] * delta >= self.model.p_model[t])
             # ramping (gradients)
             if t == 0:
-                self.model.ramping_up_0 = Constraint(
-                    expr=self.model.p_out[0] <= p0 + unit.ramp_up
-                )
-                self.model.ramping_down_0 = Constraint(
-                    expr=self.model.p_out[0] >= p0 - unit.ramp_down
-                )
+                if unit.ramp_up is not None:
+                    self.model.ramping_up_0 = Constraint(
+                        expr=self.model.p_out[0] <= p0 + unit.ramp_up
+                    )
+                if unit.ramp_down is not None:
+                    self.model.ramping_down_0 = Constraint(
+                        expr=self.model.p_out[0] >= p0 - unit.ramp_down
+                    )
             else:
-                self.model.ramping_up.add(
-                    self.model.p_model[t] - self.model.p_model[t - 1]
-                    <= unit.ramp_up * self.model.z[t - 1]
-                )
-                self.model.ramping_down.add(
-                    self.model.p_model[t - 1] - self.model.p_model[t]
-                    <= unit.ramp_down * self.model.z[t]
-                )
+                if unit.ramp_up is not None:
+                    self.model.ramping_up.add(
+                        self.model.p_model[t] - self.model.p_model[t - 1]
+                        <= unit.ramp_up * self.model.z[t - 1]
+                    )
+                if unit.ramp_down is not None:
+                    self.model.ramping_down.add(
+                        self.model.p_model[t - 1] - self.model.p_model[t]
+                        <= unit.ramp_down * self.model.z[t]
+                    )
             # minimal run and stop time
             if t > unit.min_down_time:
                 self.model.stop_time.add(
@@ -270,7 +274,7 @@ class DmasPowerplantStrategy(BaseStrategy):
         hour_count: int,
         prices: pd.DataFrame = None,
         steps: tuple = None,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         optimizes the unit
 
@@ -282,7 +286,7 @@ class DmasPowerplantStrategy(BaseStrategy):
           steps(tuple): steps to optimize
 
         Returns:
-          np.array: generation
+          np.ndarray: generation
 
         """
         base_price = prices.copy()
@@ -294,8 +298,8 @@ class DmasPowerplantStrategy(BaseStrategy):
         prices_24h = prices[:hour_count].copy()
         prices_48h = prices[:hour_count2].copy()
         try:
-            fuel_prices = unit.forecaster.get_price(unit.fuel_type)
-            emission_prices = unit.forecaster.get_price("co2")
+            fuel_prices = unit.forecaster.fuel_prices[unit.fuel_type]
+            emission_prices = unit.forecaster.fuel_prices["co2"]
         except KeyError:
             logger.error(f"no price for {unit.fuel_type=} with {steps=} and {start=}")
             raise Exception(f"No Fuel prices given for fuel {unit.fuel_type}")
@@ -446,13 +450,13 @@ class DmasPowerplantStrategy(BaseStrategy):
         hour_count = len(product_tuples)
         hour_count2 = hour_count * 2
 
-        base_price = unit.forecaster[f"price_{market_config.market_id}"][
+        base_price = unit.forecaster.price[market_config.market_id][
             start : start + timedelta(hours=hour_count2 - 1)
         ]
-        e_price = unit.forecaster.get_price("co2")[
+        e_price = unit.forecaster.fuel_prices["co2"][
             start : start + timedelta(hours=hour_count2 - 1)
         ]
-        fuel_price = unit.forecaster.get_price(unit.fuel_type)[
+        fuel_price = unit.forecaster.fuel_prices[unit.fuel_type][
             start : start + timedelta(hours=hour_count2 - 1)
         ]
         self.optimize(unit, start, hour_count, base_price)

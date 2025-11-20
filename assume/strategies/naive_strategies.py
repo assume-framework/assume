@@ -13,7 +13,7 @@ from assume.common.market_objects import MarketConfig, Order, Orderbook, Product
 from assume.common.utils import parse_duration
 
 
-class NaiveSingleBidStrategy(BaseStrategy):
+class EnergyNaiveStrategy(MinMaxStrategy):
     """
     A naive strategy that bids the marginal cost of the unit on the market.
 
@@ -93,7 +93,7 @@ class NaiveSingleBidStrategy(BaseStrategy):
             return self.remove_empty_bids(bids)
 
 
-class NaiveProfileStrategy(BaseStrategy):
+class EnergyNaiveProfileStrategy(MinMaxStrategy):
     """
     A naive strategy that bids the marginal cost of the unit as block bids over 24 hours on the day ahead market.
     """
@@ -149,7 +149,7 @@ class NaiveProfileStrategy(BaseStrategy):
         return bids
 
 
-class NaiveDADSMStrategy(BaseStrategy):
+class DsmEnergyOptimizationStrategy(MinMaxStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit. The bid volume is the optimal power requirement of
     the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
@@ -203,135 +203,6 @@ class NaiveDADSMStrategy(BaseStrategy):
 
         return bids
 
-    def plot_power_requirements(self, unit: SupportsMinMax):
-        """
-        Plots the optimal power requirement and flexibility power requirement for comparison.
-
-        Args:
-            unit (SupportsMinMax): The unit containing power requirements.
-        """
-        # Retrieve power requirements data
-        opt_power_requirement = unit.opt_power_requirement
-        flex_power_requirement = unit.flex_power_requirement
-
-        # Plotting
-        plt.figure(figsize=(10, 6))
-        plt.plot(
-            opt_power_requirement.index,
-            opt_power_requirement,
-            label="Reference profile",
-            color="blue",
-        )
-        plt.plot(
-            flex_power_requirement.index,
-            flex_power_requirement,
-            label="Flex Profile",
-            color="orange",
-            linestyle="--",
-        )
-
-        # Labels and title
-        plt.xlabel("Time")
-        plt.ylabel("Power (MW)")
-        plt.title("Comparison of Reference and Flex Power Requirements")
-        plt.legend()
-        plt.grid(True)
-        plt.show()
-
-    def export_power_requirements_to_csv(self, unit: SupportsMinMax, file_path: str):
-        """
-        Exports the optimal and flexible power requirements time series to a CSV file.
-
-        Args:
-            unit (SupportsMinMax): The unit containing power requirements.
-            file_path (str): The path to save the CSV file.
-        """
-        # Combine the two series into a DataFrame for parallel export
-        df = pd.DataFrame(
-            {
-                "Optimal Power Requirement (kW)": unit.opt_power_requirement,
-                "Flex Power Requirement (kW)": unit.flex_power_requirement,
-            }
-        )
-        # Save to CSV
-        df.to_csv(file_path)
-
-
-class DSM_PosCRM_Strategy(BaseStrategy):
-    """
-    Strategy for Positive CRM Reserve (Demand Side, i.e., up & down, symmetric).
-    """
-
-    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
-        bids = []
-        max_power = unit.max_plant_capacity
-        min_power = unit.min_plant_capacity
-
-        for product in product_tuples:
-            start, end, only_hours = product
-            block_times = [dt for dt in unit.index.get_date_list() if start <= dt < end]
-
-            # For all time steps in block, calculate possible symmetric bid
-            up_caps = []
-            down_caps = []
-            for t in block_times:
-                flex = unit.flex_power_requirement.at[t]
-                up_caps.append(max_power - flex)
-                down_caps.append(flex - min_power)
-            # The symmetric bid is the minimum capacity that is possible in *all* timesteps in the block
-            symmetric_capacity = min(min(up_caps), min(down_caps))
-            if symmetric_capacity > 0:
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": only_hours,
-                        "price": 0,  # or unit.calculate_marginal_cost(...)
-                        "volume": symmetric_capacity,
-                        "unit_id": unit.id,
-                        "market_id": "CRM_pos",
-                    }
-                )
-        return self.remove_empty_bids(bids)
-
-
-class DSM_NegCRM_Strategy(BaseStrategy):
-    """
-    Strategy for Negative CRM Reserve (Demand Side, i.e., up & down, symmetric).
-    """
-
-    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
-        # IDENTICAL LOGIC as POS, since symmetric in Germany (volume is symmetric)
-        # If you ever want to do *only* neg or pos (asymmetric), just change which cap you use!
-        bids = []
-        max_power = unit.max_plant_capacity
-        min_power = unit.min_plant_capacity
-
-        for product in product_tuples:
-            start, end, only_hours = product
-            block_times = [dt for dt in unit.index.get_date_list() if start <= dt < end]
-
-            up_caps = []
-            down_caps = []
-            for t in block_times:
-                flex = unit.flex_power_requirement.at[t]
-                up_caps.append(max_power - flex)
-                down_caps.append(flex - min_power)
-            symmetric_capacity = min(min(up_caps), min(down_caps))
-            if symmetric_capacity > 0:
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": only_hours,
-                        "price": 0,
-                        "volume": symmetric_capacity,
-                        "unit_id": unit.id,
-                        "market_id": "CRM_neg",
-                    }
-                )
-        return self.remove_empty_bids(bids)
-
 
 class NaiveRedispatchDSMStrategy(BaseStrategy):
     """
@@ -371,7 +242,7 @@ class NaiveRedispatchDSMStrategy(BaseStrategy):
         return bids
 
 
-class NaiveRedispatchStrategy(BaseStrategy):
+class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
     """
     A naive strategy that simply submits all information about the unit and
     currently dispatched power for the following hours to the redispatch market.
@@ -759,7 +630,7 @@ class NaiveExchangeStrategy(BaseStrategy):
         return bids
 
 
-class ElasticDemandStrategy(BaseStrategy):
+class EnergyHeuristicElasticStrategy(MinMaxStrategy):
     """
     A bidding strategy for a demand unit that submits multiple bids to approximate
     a marginal utility curve, based on linear or isoelastic demand theory.
@@ -914,7 +785,7 @@ class ElasticDemandStrategy(BaseStrategy):
         return volume
 
 
-class DSM_PosCRM_Strategy(BaseStrategy):
+class DsmCapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
     """
     Strategy for Positive CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """
@@ -952,7 +823,7 @@ class DSM_PosCRM_Strategy(BaseStrategy):
         return self.remove_empty_bids(bids)
 
 
-class DSM_NegCRM_Strategy(BaseStrategy):
+class DsmCapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
     """
     Strategy for Negative CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """

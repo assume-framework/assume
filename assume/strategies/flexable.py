@@ -6,12 +6,12 @@ from datetime import datetime, timedelta
 
 import numpy as np
 
-from assume.common.base import BaseStrategy, SupportsMinMax
+from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_products_index, parse_duration
 
 
-class flexableEOM(BaseStrategy):
+class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
     """
     A strategy that bids on the EOM-market.
 
@@ -242,7 +242,7 @@ class flexableEOM(BaseStrategy):
         update_avg_op_time(unit, product_type, products_index[0], products_index[-1])
 
 
-class flexablePosCRM(BaseStrategy):
+class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the CRM (reserve market).
 
@@ -312,7 +312,7 @@ class flexablePosCRM(BaseStrategy):
             )
             # Specific revenue if power was offered on the energy market
             specific_revenue = get_specific_revenue(
-                price_forecast=unit.forecaster[f"price_{market_config.market_id}"],
+                price_forecast=unit.forecaster.price[market_config.market_id],
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
@@ -357,7 +357,7 @@ class flexablePosCRM(BaseStrategy):
         return bids
 
 
-class flexableNegCRM(BaseStrategy):
+class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 
@@ -423,7 +423,7 @@ class flexableNegCRM(BaseStrategy):
 
             # Specific revenue if power was offered on the energy market
             specific_revenue = get_specific_revenue(
-                price_forecast=unit.forecaster[f"price_{market_config.market_id}"],
+                price_forecast=unit.forecaster.price[market_config.market_id],
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
@@ -551,20 +551,20 @@ def calculate_EOM_price_if_on(
     if unit.outputs["heat"].at[start] > 0:
         heat_gen_cost = (
             unit.outputs["heat"].at[start]
-            * (unit.forecaster.get_price("natural gas").at[start] / 0.9)
+            * (unit.forecaster.get_price(unit.fuel_type).at[start] / 0.9)
         ) / bid_quantity_inflex
     else:
         heat_gen_cost = 0.0
 
     possible_revenue = get_specific_revenue(
-        price_forecast=unit.forecaster[f"price_{market_id}"],
+        price_forecast=unit.forecaster.price[market_id],
         marginal_cost=marginal_cost_flex,
         t=start,
         foresight=foresight,
     )
     if (
         possible_revenue >= 0
-        and unit.forecaster[f"price_{market_id}"].at[start] < marginal_cost_flex
+        and unit.forecaster.price[market_id].at[start] < marginal_cost_flex
     ):
         marginal_cost_flex = 0
 

@@ -8,9 +8,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
-from assume.common.forecasts import NaiveForecast
-from assume.strategies.flexable_storage import flexableEOMStorage
-from assume.strategies.naive_strategies import NaiveSingleBidStrategy
+from assume.common.forecaster import UnitForecaster
+from assume.strategies.flexable_storage import StorageEnergyHeuristicFlexableStrategy
 from assume.units import Storage
 
 
@@ -22,7 +21,7 @@ def storage_unit() -> Storage:
         id="Test_Storage",
         unit_operator="TestOperator",
         technology="TestTechnology",
-        bidding_strategies={"EOM": NaiveSingleBidStrategy()},
+        bidding_strategies={"EOM": StorageEnergyHeuristicFlexableStrategy()},
         forecaster=forecaster,
         max_power_charge=-100,
         max_power_discharge=100,
@@ -36,7 +35,7 @@ def storage_unit() -> Storage:
         additional_cost_charge=3,
         additional_cost_discharge=4,
         additional_cost=1,
-        initial_soc=500,
+        initial_soc=None,
     )
 
 
@@ -322,7 +321,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
 
     mc = mock_market_config
 
-    strategy = flexableEOMStorage()
+    strategy = StorageEnergyHeuristicFlexableStrategy()
     product_tuples = [(start, end, None)]
 
     storage_unit.outputs["energy"][start] = 100

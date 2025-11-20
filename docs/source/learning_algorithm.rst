@@ -70,6 +70,8 @@ This process will fail, when the number of hidden layers differs between the loa
 The Algorithms
 ==============
 
+.. _td3learning:
+
 TD3 (Twin Delayed DDPG)
 -----------------------
 

@@ -1,0 +1,9 @@
+name,technology,bidding_EOM,bidding_redispatch,bidding_nodal,bidding_DAM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,node,unit_operator
+Nuclear N11,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,1,north_1,Operator 1
+Wind N1,wind,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,renewable,0.0,1000.0,0,0.3,2,north_1,Operator 1
+Nuclear N12,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,3,north_1,Operator 2
+Solar N1,solar,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,renewable,0.0,1000.0,0,0.3,4,north_1,Operator 2
+Nuclear N21,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,5,north_1,Operator 1
+Wind N2,wind,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,renewable,0.0,1000.0,0,0.3,6,north_2,Operator 1
+Nuclear N22,nuclear,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,uranium,0.0,1000.0,0,0.3,7,north_2,Operator 2
+Solar N2,solar,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,renewable,0.0,1000.0,0,0.3,8,north_2,Operator 2

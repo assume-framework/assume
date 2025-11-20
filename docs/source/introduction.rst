@@ -97,6 +97,8 @@ bidding strategy. To enable portfolio optimizations, a unit operator can, howeve
 they define a bid together considering all the technical constraints and costs.
 
 
+.. _exchangeable_bidding_strategy:
+
 Exchangeable Bidding Strategy
 ------------------------------
 

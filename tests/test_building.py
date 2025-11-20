@@ -7,9 +7,9 @@ import pyomo.environ as pyo
 import pytest
 
 from assume.common.fast_pandas import FastSeries
-from assume.common.forecasts import CsvForecaster
+from assume.common.forecaster import BuildingForecaster
 from assume.common.market_objects import MarketConfig
-from assume.strategies.naive_strategies import NaiveDADSMStrategy
+from assume.strategies.naive_strategies import DsmEnergyOptimizationStrategy
 from assume.units.building import Building
 
 
@@ -122,23 +122,18 @@ def index():
 @pytest.fixture
 def forecaster(price_profile):
     index = pd.date_range("2023-01-01", periods=10, freq="h")
-    forecaster = CsvForecaster(
+    forecaster = BuildingForecaster(
         index=index,
-        powerplants_units=[],  # Add appropriate values
-        demand_units=[],
-        market_configs=[],
+        fuel_prices={"natural_gas": 30},
+        heat_demand=50,
+        ev_load_profile=5,
+        battery_load_profile=3,
+        pv_profile=10,
+        availability=0.25,
+        electricity_price=price_profile,
+        market_prices={},
+        load_profile=20,
     )
-    forecaster.forecasts["price_EOM"] = price_profile
-    forecaster.forecasts["fuel_price_natural gas"] = pd.Series([30] * 10, index=index)
-    forecaster.forecasts["building_heat_demand"] = pd.Series([50] * 10, index=index)
-    forecaster.forecasts["ev_load_profile"] = pd.Series([5] * 10, index=index)
-    forecaster.forecasts["battery_load_profile"] = pd.Series([3] * 10, index=index)
-    forecaster.forecasts["building_load_profile"] = pd.Series([20] * 10, index=index)
-    forecaster.forecasts["availability_solar"] = pd.Series([0.25] * 10, index=index)
-    forecaster.forecasts["building_pv_power_profile"] = pd.Series(
-        [10] * 10, index=index
-    )
-    forecaster.convert_forecasts_to_fast_series()
     # If the Building class expects specific keys for EV availability, add them here
     # forecaster.forecasts["electric_vehicle_availability"] = ev_availability_profile
     return forecaster
@@ -201,7 +196,7 @@ def test_building_initialization_heatpump(
     building = Building(
         id="building",
         unit_operator="operator_hp",
-        bidding_strategies={"EOM": NaiveDADSMStrategy()},
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
@@ -217,11 +212,6 @@ def test_building_initialization_heatpump(
     assert building.has_ev is True
     assert building.has_battery_storage is True
     assert building.has_pv is True
-
-    # check that values are set correctly for inflex_demand, heat_demand and electricity_price
-    assert all(building.inflex_demand == forecaster.forecasts["building_load_profile"])
-    assert all(building.heat_demand == forecaster.forecasts["building_heat_demand"])
-    assert all(building.electricity_price == forecaster.forecasts["price_EOM"])
 
 
 def test_building_initialization_boiler(
@@ -547,14 +537,14 @@ def test_building_bidding_strategy_execution(
     default_flexibility_measure,
 ):
     """
-    Test that the NaiveDADSMStrategy's calculate_bids method is executed correctly,
+    Test that the DsmEnergyOptimizationStrategy's calculate_bids method is executed correctly,
     and unit.determine_optimal_operation_without_flex() is called.
     """
-    # Create the Building instance with a NaiveDADSMStrategy
+    # Create the Building instance with a DsmEnergyOptimizationStrategy
     building = Building(
         id="building",
         unit_operator="operator_hp",
-        bidding_strategies={"EOM": NaiveDADSMStrategy()},
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
         components=building_components_heatpump,
         objective=default_objective,
         flexibility_measure=default_flexibility_measure,
@@ -698,7 +688,7 @@ def test_non_prosumer_no_energy_export(forecaster, building_components_heatpump)
 
     # check that power is zero when price is 1000
     for idx in building.index:
-        if building.forecaster.forecasts["price_EOM"].at[idx] == 1000:
+        if building.forecaster.electricity_price.at[idx] == 1000:
             assert (
                 building.opt_power_requirement.at[idx] >= 0
             ), "Prosumer should be able to export power to the grid."

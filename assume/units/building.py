@@ -13,7 +13,7 @@ import plotly.subplots as ps
 import pyomo.environ as pyo
 
 from assume.common.base import SupportsMinMax
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import BuildingForecaster
 from assume.common.utils import str_to_bool
 from assume.units.dsm_load_shift import DSMFlex
 
@@ -72,7 +72,7 @@ class Building(DSMFlex, SupportsMinMax):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
-        forecaster: Forecaster,
+        forecaster: BuildingForecaster,
         components: dict[str, dict],
         technology: str = "building",
         objective: str = "min_variable_cost",
@@ -95,6 +95,11 @@ class Building(DSMFlex, SupportsMinMax):
             **kwargs,
         )
 
+        if not isinstance(forecaster, BuildingForecaster):
+            raise ValueError(
+                f"forecaster must be of type {BuildingForecaster.__name__}"
+            )
+
         # check if the required components are present in the components dictionary
         for component in self.required_technologies:
             if component not in components.keys():
@@ -116,8 +121,7 @@ class Building(DSMFlex, SupportsMinMax):
         self.electricity_price = self.forecaster["price_EOM"]
         self.natural_gas_price = self.forecaster["fuel_price_natural gas"]
         self.heat_demand = self.forecaster[f"{self.id}_heat_demand"]
-        self.ev_load_profile = self.forecaster[f"{self.id}_ev_charging_profile"]
-        # self.ev_load_avilability = self.forecaster["ev_load_profile"]
+        self.ev_load_profile = self.forecaster["ev_load_profile"]
         self.battery_load_profile = self.forecaster["battery_load_profile"]
         self.inflex_demand = self.forecaster[f"{self.id}_load_profile"]
 

@@ -50,7 +50,7 @@ intersphinx_mapping = {
     "torch": ("https://pytorch.org/docs/stable/", None),
     "dateutil": ("https://dateutil.readthedocs.io/en/stable/", None),
     "pyomo": ("https://pyomo.readthedocs.io/en/stable/", None),
-    "pypsa": ("https://pypsa.readthedocs.io/en/latest/", None),
+    "pypsa": ("https://pypsa.readthedocs.io/latest/", None),
 }
 intersphinx_disabled_domains = ["std"]
 
@@ -90,7 +90,7 @@ epub_show_urls = "footnote"
 # -- Options for nbsphinx -------------------------------------------------
 # nbsphinx_kernel_name = 'assume'
 nbsphinx_prolog = """
-{% set docname = env.doc2path(env.docname, base=None).replace("nblink", "ipynb").replace("examples/", "examples/notebooks/") %}
+{% set docname = env.docname.replace("examples/", "examples/notebooks/") + ".ipynb" %}
 .. note::
 
     You can `download <https://github.com/assume-framework/assume/tree/main/{{ docname }}>`_ this example as a Jupyter notebook

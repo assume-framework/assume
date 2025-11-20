@@ -30,7 +30,17 @@ class RedispatchMarketRole(MarketRole):
     """
     A market role that performs redispatch to resolve congestion in the electricity market.
     It uses PyPSA to model the electricity network and perform the redispatch.
-    ...
+    The redispatched is based on the price the units submit in their orders.
+    This allows this to be a cost based redispatch if units submit their marginal costs as prices.
+    Or it can be a price based redispatch if units submit actual bid prices.
+
+    Args:
+        marketconfig (MarketConfig): The market configuration.
+
+    Note:
+        Users can also configure the path to the network data, the solver to be used,
+        and the backup marginal cost in the param_dict of the market configuration.
+
     """
 
     required_fields = ["node", "max_power", "min_power"]

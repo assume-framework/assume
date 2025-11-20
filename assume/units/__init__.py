@@ -14,7 +14,7 @@ from assume.units.building import Building
 from assume.units.cement_plant import CementPlant
 from assume.units.dst_components import demand_side_technologies
 
-unit_types: dict[str, BaseUnit] = {
+unit_types: dict[str, type[BaseUnit]] = {
     "power_plant": PowerPlant,
     "demand": Demand,
     "exchange": Exchange,

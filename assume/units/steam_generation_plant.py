@@ -55,7 +55,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
-        forecaster: Forecaster,
+        forecaster: SteamgenerationForecaster,
         components: dict[str, dict] = None,
         technology: str = "steam_generator_plant",
         objective: str = "min_variable_cost",
@@ -80,6 +80,11 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             location=location,
             **kwargs,
         )
+
+        if not isinstance(forecaster, SteamgenerationForecaster):
+            raise ValueError(
+                f"forecaster must be of type {SteamgenerationForecaster.__name__}"
+            )
 
         # Check if the required components are present in the components dictionary
         for component in self.required_technologies:
@@ -126,9 +131,9 @@ class SteamPlant(DSMFlex, SupportsMinMax):
             storage_cfg = self.components["thermal_storage"]
             storage_type = storage_cfg.get("storage_type", "short-term")
             if storage_type == "long-term":
-                schedule_key = f"{self.id}_thermal_storage_schedule"
-                schedule_series = self.forecaster[schedule_key]
-                storage_cfg["storage_schedule_profile"] = schedule_series
+                storage_cfg["storage_schedule_profile"] = (
+                    forecaster.thermal_storage_schedule
+                )
 
         # Add price forecasts
         self.electricity_price = self.forecaster["DE_EHV_HV_1"]
@@ -186,14 +191,18 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
             self.model.natural_gas_price = pyo.Param(
                 self.model.time_steps,
-                initialize={t: value for t, value in enumerate(self.natural_gas_price)},
+                initialize={
+                    t: value
+                    for t, value in enumerate(self.forecaster.get_price("natural_gas"))
+                },
             )
 
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "hydrogen_gas":
             self.model.hydrogen_gas_price = pyo.Param(
                 self.model.time_steps,
                 initialize={
-                    t: value for t, value in enumerate(self.hydrogen_gas_price)
+                    t: value
+                    for t, value in enumerate(self.forecaster.get_price("hydrogen"))
                 },
             )
 

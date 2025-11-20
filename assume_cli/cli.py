@@ -165,11 +165,13 @@ def cli(args=None):
         world.run()
 
     except KeyboardInterrupt:
-        pass
+        sys.exit(1)
     except AssumeException as e:
         logging.error(f"Stopping: {e}")
+        sys.exit(1)
     except Exception:
         logging.exception("Simulation aborted")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -23,50 +23,18 @@ logger = logging.getLogger(__name__)
 EPS = 1e-4
 
 
-def market_clearing_opt(
+def market_clearing_opt_constraints(
+    model: pyo.ConcreteModel,
     orders: Orderbook,
     market_products: list[MarketProduct],
     mode: str,
     with_linked_bids: bool,
-    incidence_matrix: pd.DataFrame = None,
-    lines: pd.DataFrame = None,
-    solver: str = "appsi_highs",
-    solver_options: dict = {},
+    incidence_matrix: pd.DataFrame,
+    lines: pd.DataFrame,
 ):
     """
-    Sets up and solves the market clearing optimization problem.
-
-    Args:
-        orders (Orderbook): The list of the orders.
-        market_products (list[MarketProduct]): The products to be traded.
-        mode (str): The mode of the market clearing determining whether the minimum acceptance ratio is considered.
-        with_linked_bids (bool): Whether the market clearing should include linked bids.
-        incidence_matrix (pd.DataFrame): The directed incidence matrix of the network.
-        lines (pd.DataFrame): The lines and their capacities of the network.
-
-    Returns:
-        tuple[pyomo.core.base.PyomoModel.ConcreteModel, pyomo.opt.results.SolverResults]: The solved pyomo model and the solver results
-
-    Notes:
-        The problem is formulated as a mixed-integer linear program (MILP) and solved using the pyomo package.
-        The objective function is to maximize the social welfare and defined as the sum of the product of the price, volume, and acceptance ratio of each order.
-        The decision variables are given by the acceptance ratio of each order bounded by 0 and 1 and the acceptance as a binary variable.
-
-        The energy balance constraint ensures that the sum of the accepted volumes of all orders is zero.
-        The acceptance of each order is bounded by 0 and 1.
-
-        If the mode is 'with_min_acceptance_ratio', the minimum acceptance ratio is considered.
-        The minimum acceptance ratio is defined as the ratio of the minimum volume to accept to the total volume of the order.
-
-        If linked bids are considered, the acceptance of a child bid is bounded by the acceptance of its parent bid.
-
-        The market clearing is solved using pyomo with the specified solver (HIGHS is used by default).
-        If the specified solver is not available, the model is solved using available solver.
-        If none of the solvers are available, an exception is raised.
-
-        After solving the model, the acceptance of each order is fixed to the value in the solution and the model is solved again.
-        This removes all binary variables from the model and allows to extract the market clearing prices from the dual variables of the energy balance constraint.
-
+    Adds the constraints to the model.
+    Used by :meth:`market_clearing_opt`.
     """
     # Set nodes and lines based on the incidence matrix and lines DataFrame
     if incidence_matrix is not None:
@@ -75,8 +43,6 @@ def market_clearing_opt(
     else:
         nodes = ["node0"]
         line_ids = ["line0"]
-
-    model = pyo.ConcreteModel()
 
     # add dual suffix to the model (we need this to extract the market clearing prices later)
     # if mode is not 'with_min_acceptance_ratio', otherwise the dual suffix is added later
@@ -219,7 +185,12 @@ def market_clearing_opt(
                 model.transmission_constr.add(model.flows[t, line] <= capacity)
                 model.transmission_constr.add(model.flows[t, line] >= -capacity)
 
-    # define the objective function as cost minimization
+
+def market_clearing_opt_objective(model: pyo.ConcreteModel, orders: Orderbook):
+    """
+    Define the objective function as cost minimization
+    Used by :meth:`market_clearing_opt`
+    """
     obj_expr = 0
     for order in orders:
         if order["bid_type"] == "SB":
@@ -229,6 +200,66 @@ def market_clearing_opt(
                 obj_expr += order["price"] * volume * model.xb[order["bid_id"]]
 
     model.objective = pyo.Objective(expr=obj_expr, sense=pyo.minimize)
+
+
+def market_clearing_opt(
+    orders: Orderbook,
+    market_products: list[MarketProduct],
+    mode: str,
+    with_linked_bids: bool,
+    incidence_matrix: pd.DataFrame = None,
+    lines: pd.DataFrame = None,
+    solver: str = "appsi_highs",
+    solver_options: dict = {},
+    func_constraints=market_clearing_opt_constraints,
+    func_objective=market_clearing_opt_objective,
+):
+    """
+    Sets up and solves the market clearing optimization problem.
+
+    Args:
+        orders (Orderbook): The list of the orders.
+        market_products (list[MarketProduct]): The products to be traded.
+        mode (str): The mode of the market clearing determining whether the minimum acceptance ratio is considered.
+        with_linked_bids (bool): Whether the market clearing should include linked bids.
+        incidence_matrix (pd.DataFrame): The directed incidence matrix of the network.
+        lines (pd.DataFrame): The lines and their capacities of the network.
+        solver (str):  Specifies the solver to be used for the optimization problem.
+        solver_options (dict): Additional solver options.
+        func_constraints: The function that is executed to add the constraints to the model. Defaults to :meth:`market_clearing_opt_constraints`.
+        func_objective: The function that is executed to add the objective function to the model. Defaults to :meth:`market_clearing_opt_objective`.
+
+    Returns:
+        tuple[pyomo.core.base.PyomoModel.ConcreteModel, pyomo.opt.results.SolverResults]: The solved pyomo model and the solver results
+
+    Note:
+        The problem is formulated as a mixed-integer linear program (MILP) and solved using the pyomo package.
+        The objective function is to maximize the social welfare and defined as the sum of the product of the price, volume, and acceptance ratio of each order.
+        The decision variables are given by the acceptance ratio of each order bounded by 0 and 1 and the acceptance as a binary variable.
+
+        The energy balance constraint ensures that the sum of the accepted volumes of all orders is zero.
+        The acceptance of each order is bounded by 0 and 1.
+
+        If the mode is 'with_min_acceptance_ratio', the minimum acceptance ratio is considered.
+        The minimum acceptance ratio is defined as the ratio of the minimum volume to accept to the total volume of the order.
+
+        If linked bids are considered, the acceptance of a child bid is bounded by the acceptance of its parent bid.
+
+        The market clearing is solved using pyomo with the specified solver (HIGHS is used by default).
+        If the specified solver is not available, the model is solved using available solver.
+        If none of the solvers are available, an exception is raised.
+
+        After solving the model, the acceptance of each order is fixed to the value in the solution and the model is solved again.
+        This removes all binary variables from the model and allows to extract the market clearing prices from the dual variables of the energy balance constraint.
+
+    """
+    model = pyo.ConcreteModel()
+
+    func_constraints(
+        model, orders, market_products, mode, with_linked_bids, incidence_matrix, lines
+    )
+
+    func_objective(model, orders)
 
     solver = SolverFactory(solver)
     # Solve the model
@@ -428,7 +459,7 @@ class ComplexClearingRole(MarketRole):
             meta (list[dict]): The market clearing results.
             flows (dict): The power flows on the lines.
 
-        Notes:
+        Note:
             First the market clearing is solved using the cost minimization with the pyomo model market_clearing_opt.
             Then the market clearing prices are extracted from the solved model as dual variables of the energy balance constraint.
             Next the surplus of each order and its children is calculated and orders with negative surplus are removed from the orderbook.
@@ -739,18 +770,18 @@ def extract_results(
                 }
             )
 
-        flows_filtered = {}
+    flows_filtered = {}
 
-        if log_flows:
-            # extract flows
+    if log_flows:
+        # extract flows
 
-            # Check if the model has the 'flows' attribute
-            if hasattr(model, "flows"):
-                flows = model.flows
+        # Check if the model has the 'flows' attribute
+        if hasattr(model, "flows"):
+            flows = model.flows
 
-                # filter flows and only use positive flows to half the size of the dict
-                flows_filtered = {
-                    index: flow.value for index, flow in flows.items() if not flow.stale
-                }
+            # filter flows and only use positive flows to half the size of the dict
+            flows_filtered = {
+                index: flow.value for index, flow in flows.items() if not flow.stale
+            }
 
     return accepted_orders, rejected_orders, meta, flows_filtered

@@ -27,7 +27,6 @@ from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
 
 from assume.common import (
-    Forecaster,
     MarketConfig,
     OutputDef,
     UnitsOperator,
@@ -35,9 +34,15 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
+from assume.common.forecaster import UnitForecaster
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
-from assume.strategies import LearningStrategy, bidding_strategies
+from assume.strategies import (
+    LearningStrategy,
+    UnitOperatorStrategy,
+    bidding_strategies,
+    deprecated_bidding_strategies,
+)
 from assume.units import BaseUnit, demand_side_technologies, unit_types
 
 file_handler = logging.FileHandler(filename="assume.log", mode="w+")
@@ -79,7 +84,7 @@ class World:
         unit_types (dict[str, BaseUnit], optional): Available unit types.
         dst_components (dict[str, DemandSideTechnology], optional): Demand-side technologies.
         bidding_strategies (dict[str, type[BaseStrategy]], optional): Bidding strategies for the world instance.
-            - If `"pp_learning"` is unavailable, learning strategies may be missing due to missing dependencies (e.g., `torch`).
+            - If `"powerplant_energy_learning"` is unavailable, learning strategies may be missing due to missing dependencies (e.g., `torch`).
         clearing_mechanisms (dict[str, MarketRole], optional): Market clearing mechanisms.
         additional_kpis (dict[str, OutputDef], optional): Additional performance indicators.
         scenario_data (dict, optional): Dictionary for scenario-specific data.
@@ -157,10 +162,11 @@ class World:
         self.dst_components = demand_side_technologies
 
         self.bidding_strategies = bidding_strategies
-        if "pp_learning" not in bidding_strategies:
+        if "powerplant_energy_learning" not in bidding_strategies:
             logger.info(
                 "Learning Strategies are not available. Check that you have torch installed."
             )
+        self.bidding_strategies.update(deprecated_bidding_strategies)
 
         self.clearing_mechanisms: dict[str, MarketRole] = clearing_mechanisms
         self.additional_kpis: dict[str, OutputDef] = {}
@@ -183,7 +189,6 @@ class World:
         learning_config: LearningConfig = {},
         episode: int = 1,
         eval_episode: int = 1,
-        forecaster: Forecaster | None = None,
         manager_address=None,
         real_time=False,
         **kwargs: dict,
@@ -195,11 +200,9 @@ class World:
             start (datetime.datetime): The start datetime for the simulation.
             end (datetime.datetime): The end datetime for the simulation.
             simulation_id (str): The unique identifier for the simulation.
-            index (pandas.Series): The index for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
             learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
-            forecaster (Forecaster, optional): The forecaster used for custom unit types. Defaults to None.
             manager_address: The address of the manager.
             **kwargs: Additional keyword arguments.
 
@@ -233,9 +236,6 @@ class World:
             if not self.evaluation_mode
             else f"Evaluation Episode {eval_episode}"
         )
-
-        # forecaster is used only when loading custom unit types
-        self.forecaster = forecaster
 
         self.bidding_params = bidding_params
 
@@ -322,7 +322,6 @@ class World:
                 db_uri=self.db_uri,
                 output_agent_addr=self.output_agent_addr,
                 train_start=self.start,
-                freq=self.forecaster.index.freq,
             )
 
         else:
@@ -390,7 +389,9 @@ class World:
             )
             output_agent.suspendable_tasks = False
 
-    def add_unit_operator(self, id: str) -> None:
+    def add_unit_operator(
+        self, id: str, strategies: dict[str, UnitOperatorStrategy] = {}
+    ) -> None:
         """
         Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
         The unit operator is then added to the list of existing operators. Unit operator receives the output agent address
@@ -403,7 +404,14 @@ class World:
         if self.unit_operators.get(id):
             raise ValueError(f"Unit operator {id} already exists")
 
-        units_operator = UnitsOperator(available_markets=list(self.markets.values()))
+        bidding_strategies = self._prepare_bidding_strategies(
+            {"bidding_strategies": strategies}, id
+        )
+
+        units_operator = UnitsOperator(
+            available_markets=list(self.markets.values()),
+            portfolio_strategies=bidding_strategies,
+        )
 
         # creating a new role agent and apply the role of a units operator
         unit_operator_agent = RoleAgent()
@@ -476,7 +484,9 @@ class World:
                 }
             )
 
-    def add_units_with_operator_subprocess(self, id: str, units: list[dict]):
+    def add_units_with_operator_subprocess(
+        self, id: str, units: list[dict], strategies: dict[str, UnitOperatorStrategy]
+    ):
         """
         Adds a units operator with given ID in a separate process
         and creates and adds the given list of unit dictionaries to it
@@ -495,7 +505,9 @@ class World:
                 market.opening_hours._cache_complete = False
                 market.opening_hours._cache_gen = None
         self.addresses.append(addr(self.addr, clock_agent_name))
-        units_operator = UnitsOperator(available_markets=markets)
+        units_operator = UnitsOperator(
+            available_markets=markets, portfolio_strategies=strategies
+        )
 
         for unit in units:
             units_operator.add_unit(self.create_unit(**unit))
@@ -522,7 +534,7 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
     ) -> BaseUnit:
         # provided unit type does not exist yet
         unit_class: type[BaseUnit] = self.unit_types.get(unit_type)
@@ -545,7 +557,7 @@ class World:
 
         Args:
             unit_id (str): The identifier for the unit.
-            bidding_strategies (dict[str, BaseStrategy]): The bidding strategies for the unit.
+            bidding_strategies (dict[str, BaseStrategy | UnitOperatorStrategy]): The bidding strategies for the unit.
         """
         for unit in self.unit_operators["Operator-RL"].rl_units:
             for strategy in unit.bidding_strategies.values():
@@ -562,7 +574,7 @@ class World:
             unit_id (str): The identifier for the unit.
 
         Returns:
-            dict[str, BaseStrategy]: The bidding strategies for the unit.
+            dict[str, BaseStrategy | UnitOperatorStrategy]: The bidding strategies for the unit.
         """
         bidding_strategies = {}
         strategy_instances = {}  # Cache to store created instances
@@ -575,9 +587,17 @@ class World:
                 continue
 
             if strategy not in self.bidding_strategies:
+                # raise a deprecated warning for learning_advanced_orders
                 raise ValueError(
                     f"""Bidding strategy {strategy} not registered. Please check the name of
-                    the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                        the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                )
+
+            # remove when deprecated bidding strategies are removed
+            if strategy in deprecated_bidding_strategies.keys():
+                logger.warning(
+                    "Bidding strategy %s is deprecated. Use the new naming instead",
+                    strategy,
                 )
 
             if strategy not in strategy_instances:
@@ -603,14 +623,24 @@ class World:
             unit_operator_id (str): The identifier of the unit operator.
         """
 
-        if unit_operator_id not in self.unit_operators:
-            raise ValueError(f"Invalid unit operator: {unit_operator_id}")
+        self._validate_unit_operator(unit_operator_id)
 
         if unit_type not in self.unit_types:
             raise ValueError(f"Invalid unit type: {unit_type}")
 
         if self.unit_operators[unit_operator_id].units.get(id):
             raise ValueError(f"Unit {id} already exists")
+
+    def _validate_unit_operator(self, unit_operator_id: str):
+        """
+        Validate the existence of a unit operator in the simulation.
+
+        Args:
+            unit_operator_id (str): The identifier for the unit operator.
+        """
+
+        if unit_operator_id not in self.unit_operators.keys():
+            raise ValueError(f"Invalid unit operator: {unit_operator_id}")
 
     def add_market_operator(self, id: str) -> None:
         """
@@ -780,10 +810,10 @@ class World:
         unit_type: str,
         unit_operator_id: str,
         unit_params: dict,
-        forecaster: Forecaster,
+        forecaster: UnitForecaster,
     ) -> None:
         """
-        Add a unit to the World instance.
+        Creates a unit and adds it to the World instance.
 
         This method checks if the unit operator exists, verifies the unit type, and ensures that the unit operator
         does not already have a unit with the same id. It then creates bidding strategies for the unit and creates
@@ -805,3 +835,16 @@ class World:
         )
 
         self.unit_operators[unit_operator_id].add_unit(unit)
+
+    def add_unit_instance(self, operator_id: str, unit: BaseUnit):
+        """
+        Add an existing unit to the World instance.
+
+        This method checks if the unit operator exists and then assigns the provided unit instance to it.
+
+        Args:
+            operator_id (str): The identifier of the unit operator.
+            unit (BaseUnit): The unit instance to be added.
+        """
+        self._validate_unit_operator(operator_id)
+        self.unit_operators[operator_id].add_unit(unit)

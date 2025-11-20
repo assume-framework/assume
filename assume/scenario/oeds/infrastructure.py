@@ -48,7 +48,6 @@ class InfrastructureInterface:
         structure_databases=(
             "mastr",
             "oep",
-            "windmodel",
             "nuts",
             "scigrid",
             "weather",
@@ -126,6 +125,8 @@ class InfrastructureInterface:
         if not area.startswith("DE"):
             return self.get_lat_lon(area)
         plz_codes = self.get_plz_codes(area)
+        if not plz_codes:
+            raise ValueError(f"invalid area selected: {area}")
         lat_lons = [self.get_lat_lon(plz) for plz in plz_codes]
         lat, lon = np.array(lat_lons).mean(axis=0)
         return lat, lon
@@ -543,7 +544,7 @@ class InfrastructureInterface:
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
-            f'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
+            f'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate", '
             f'"Nettonennleistung" as "maxPower", '
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
@@ -584,7 +585,7 @@ class InfrastructureInterface:
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
-            'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
+            'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate", '
             f'"Nettonennleistung" as "maxPower", '
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
@@ -674,7 +675,7 @@ class InfrastructureInterface:
                 "unitID": id_,
                 "startDate": pd.to_datetime(data["startDate"].to_numpy()[0]),
                 "max_power_discharge": data["PMinus_max"].sum(),
-                "max_power_charge": data["PPlus_max"].sum(),
+                "max_power_charge": -data["PPlus_max"].sum(),
                 "max_soc": data["VMax"].to_numpy()[0],
                 "min_soc": 0,
                 "V0": data["VMax"].to_numpy()[0] / 2,
@@ -803,7 +804,7 @@ class InfrastructureInterface:
         # d = holidays.DE(subdiv='NW', years=year)
         holi = holidays.DE(years=year)
         e_slp = ElecSlp(year, holidays=holi)
-        profile = e_slp.get_profile(ann_el_demand_per_sector)
+        profile = e_slp.get_scaled_power_profiles(ann_el_demand_per_sector)
         profile["g7"] = (
             demand["industry"] + demand["agriculture"] + demand["business"] / 2
         ) / 8760

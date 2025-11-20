@@ -12,9 +12,12 @@ import torch as th
 from assume.common.base import (
     BaseUnit,
     LearningStrategy,
+    MinMaxChargeStrategy,
+    MinMaxStrategy,
     SupportsMinMax,
     SupportsMinMaxCharge,
 )
+from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
@@ -23,13 +26,18 @@ from assume.reinforcement_learning.learning_utils import NormalActionNoise
 logger = logging.getLogger(__name__)
 
 
-class BaseLearningStrategy(LearningStrategy):
+class TorchLearningStrategy(LearningStrategy):
+    """
+    A strategy to enable machine learning with pytorch.
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
 
         # defines bounds of actions space
+        self.min_bid_price = kwargs.get("min_bid_price", -100)
         self.max_bid_price = kwargs.get("max_bid_price", 100)
 
         # tells us whether we are training the agents or just executing per-learning strategies
@@ -105,23 +113,22 @@ class BaseLearningStrategy(LearningStrategy):
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
-        upper_scaling_factor_price = max(unit.forecaster[f"price_{market_id}"])
-        lower_scaling_factor_price = min(unit.forecaster[f"price_{market_id}"])
-        upper_scaling_factor_res_load = max(
-            unit.forecaster[f"residual_load_{market_id}"]
+        upper_scaling_factor_price = max(unit.forecaster.price[market_id])
+        lower_scaling_factor_price = min(unit.forecaster.price[market_id])
+        residual_load = unit.forecaster.residual_load.get(
+            market_id, FastSeries(index=unit.index, value=0)
         )
-        lower_scaling_factor_res_load = min(
-            unit.forecaster[f"residual_load_{market_id}"]
-        )
+        upper_scaling_factor_res_load = max(residual_load)
+        lower_scaling_factor_res_load = min(residual_load)
 
         self.scaled_res_load_obs = min_max_scale(
-            unit.forecaster[f"residual_load_{market_id}"],
+            residual_load,
             lower_scaling_factor_res_load,
             upper_scaling_factor_res_load,
         )
 
         self.scaled_prices_obs = min_max_scale(
-            unit.forecaster[f"price_{market_id}"],
+            unit.forecaster.price[market_id],
             lower_scaling_factor_price,
             upper_scaling_factor_price,
         )
@@ -216,7 +223,7 @@ class BaseLearningStrategy(LearningStrategy):
 
         Returns
         -------
-        individual_observations : np.array
+        individual_observations : np.ndarray
             Strategy and unit-specific observations.
         """
 
@@ -286,7 +293,7 @@ class BaseLearningStrategy(LearningStrategy):
         return curr_action, noise
 
 
-class RLStrategy(BaseLearningStrategy):
+class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -534,7 +541,7 @@ class RLStrategy(BaseLearningStrategy):
 
         Returns
         -------
-        individual_observations : np.array
+        individual_observations : np.ndarray
             Scaled total dispatched capacity and marginal cost.
 
         Notes
@@ -677,23 +684,23 @@ class RLStrategy(BaseLearningStrategy):
         unit.outputs["rl_rewards"].append(reward)
 
 
-class RLStrategySingleBid(RLStrategy):
+class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy with Single-Bid Structure for Energy-Only Markets.
 
-    This strategy is a simplified variant of the standard `RLStrategy`, which typically submits two
+    This strategy is a simplified variant of the standard `EnergyLearningStrategy`, which typically submits two
     separate price bids for inflexible (P_min) and flexible (P_max - P_min) components. Instead,
-    `RLStrategySingleBid` submits a single bid that always offers the unit's maximum power,
+    `EnergyLearningSingleBidStrategy` submits a single bid that always offers the unit's maximum power,
     effectively treating the full capacity as inflexible from a bidding perspective.
 
     The core reinforcement learning mechanics, including the observation structure, actor network
-    architecture, and reward formulation, remain consistent with the two-bid `RLStrategy`. However,
+    architecture, and reward formulation, remain consistent with the two-bid `EnergyLearningStrategy`. However,
     this strategy modifies the action space to produce only a single bid price, and omits the
     decomposition of capacity into flexible and inflexible parts.
 
     Attributes
     ----------
-    Inherits all attributes from RLStrategy, with the exception of:
+    Inherits all attributes from EnergyLearningStrategy, with the exception of:
     - act_dim : int
         Reduced to 1 to reflect single bid pricing.
     - foresight : int
@@ -787,7 +794,7 @@ class RLStrategySingleBid(RLStrategy):
         return bids
 
 
-class StorageRLStrategy(BaseLearningStrategy):
+class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy):
     """
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -890,7 +897,7 @@ class StorageRLStrategy(BaseLearningStrategy):
 
         Returns
         -------
-        individual_observations: np.array
+        individual_observations: np.ndarray
             Array containing state of charge and energy cost.
 
         Notes
@@ -1027,7 +1034,6 @@ class StorageRLStrategy(BaseLearningStrategy):
         -----
         Rewards are based on profit and include fixed costs for charging and discharging.
         """
-
         product_type = marketconfig.product_type
         reward = 0
 
@@ -1035,7 +1041,7 @@ class StorageRLStrategy(BaseLearningStrategy):
         # that the strategy is not designed for multiple orders and the market configuration should be adjusted
         if len(orderbook) > 1:
             raise ValueError(
-                "StorageRLStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
+                "StorageEnergyLearningStrategy is not designed for multiple orders. Please adjust the market configuration or the strategy."
             )
 
         order = orderbook[0]
@@ -1101,7 +1107,7 @@ class StorageRLStrategy(BaseLearningStrategy):
         unit.outputs["rl_rewards"].append(reward)
 
 
-class RenewableRLStrategy(RLStrategySingleBid):
+class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
     """
     Reinforcement Learning Strategy for a renewable unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
@@ -1193,7 +1199,7 @@ class RenewableRLStrategy(RLStrategySingleBid):
 
         Returns
         -------
-        individual_observations: np.array
+        individual_observations: np.ndarray
             Array containing state of charge and energy cost.
 
         Notes
@@ -1258,9 +1264,6 @@ class RenewableRLStrategy(RLStrategySingleBid):
         )
         market_clearing_price = orderbook[0]["accepted_price"]
 
-        # get potential maximum infeed according to availability
-        _, available_power = unit.calculate_min_max_power(start, end)
-
         duration = (end - start) / timedelta(hours=1)
 
         income = 0.0
@@ -1305,10 +1308,15 @@ class RenewableRLStrategy(RLStrategySingleBid):
         # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
         profit = min(profit, 0.5 * abs(profit))
 
+        # get potential maximum infeed according to availability from order volume
+        # Note: this will only work as the correct reference point when the volume is not defined by an action
+        # using a call unit_calculate_min_max_power here would be false since the dispatch of the order is already set, leading to no available power anymore
+        available_power = offered_volume_total
+
         # Opportunity cost: The income lost due to not operating at full capacity.
         opportunity_cost = (
             (market_clearing_price - marginal_cost)
-            * (available_power[0] - accepted_volume_total)
+            * (available_power - accepted_volume_total)
             * duration
         )
 
@@ -1326,7 +1334,10 @@ class RenewableRLStrategy(RLStrategySingleBid):
         # This guides the agent toward strategies that maximize accepted bids while minimizing lost opportunities.
 
         # scaling factor to normalize the reward to the range [-1,1]
-        scaling = 1 / (self.max_bid_price * unit.max_power)
+        if available_power == 0:
+            scaling = 0
+        else:
+            scaling = 1 / (self.max_bid_price * available_power)
 
         reward = scaling * (profit - regret_scale * opportunity_cost)
 

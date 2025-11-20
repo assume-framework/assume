@@ -3,9 +3,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from assume.common.base import BaseStrategy, LearningStrategy
-from assume.strategies.advanced_orders import flexableEOMBlock, flexableEOMLinked
-from assume.strategies.extended import OTCStrategy
-from assume.strategies.flexable import flexableEOM, flexableNegCRM, flexablePosCRM
+from assume.strategies.advanced_orders import (
+    EnergyHeuristicFlexableBlockStrategy,
+    EnergyHeuristicFlexableLinkedStrategy,
+)
+from assume.strategies.extended import EnergyNaiveOtcStrategy
+from assume.strategies.flexable import (
+    EnergyHeuristicFlexableStrategy,
+    CapacityHeuristicBalancingNegStrategy,
+    CapacityHeuristicBalancingPosStrategy,
+)
 from assume.strategies.flexable_storage import (
     flexableEOMStorage,
     flexableNegCRMStorage,
@@ -68,16 +75,28 @@ try:
         RLAdvancedOrderStrategy,
     )
     from assume.strategies.learning_strategies import (
-        RLStrategy,
-        RLStrategySingleBid,
-        StorageRLStrategy,
-        RenewableRLStrategy,
+        EnergyLearningStrategy,
+        EnergyLearningSingleBidStrategy,
+        StorageEnergyLearningStrategy,
+        RenewableEnergyLearningSingleBidStrategy,
     )
 
-    bidding_strategies["pp_learning"] = RLStrategy
-    bidding_strategies["pp_learning_single_bid"] = RLStrategySingleBid
-    bidding_strategies["storage_learning"] = StorageRLStrategy
-    bidding_strategies["renewable_eom_learning"] = RenewableRLStrategy
+    deprecated_bidding_strategies["pp_learning"] = EnergyLearningStrategy
+    deprecated_bidding_strategies["storage_learning"] = StorageEnergyLearningStrategy
+    deprecated_bidding_strategies["renewable_eom_learning"] = (
+        RenewableEnergyLearningSingleBidStrategy
+    )
+    deprecated_bidding_strategies["learning_advanced_orders"] = EnergyLearningStrategy
+
+    bidding_strategies["powerplant_energy_learning"] = EnergyLearningStrategy
+    bidding_strategies["powerplant_energy_learning_single_bid"] = (
+        EnergyLearningSingleBidStrategy
+    )
+    bidding_strategies["storage_energy_learning"] = StorageEnergyLearningStrategy
+    bidding_strategies["renewable_energy_learning_single_bid"] = (
+        RenewableEnergyLearningSingleBidStrategy
+    )
+
 
 except ImportError:
     pass

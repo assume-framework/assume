@@ -8,7 +8,7 @@ import numpy as np
 
 from assume.common.base import SupportsMinMax
 from assume.common.fast_pandas import FastSeries
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import DemandForecaster
 
 
 class Demand(SupportsMinMax):
@@ -21,8 +21,8 @@ class Demand(SupportsMinMax):
         technology (str): The technology of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
         index (pandas.DatetimeIndex): The index of the unit.
-        max_power (float): The maximum power output capacity of the power plant in MW.
-        min_power (float, optional): The minimum power output capacity of the power plant in MW. Defaults to 0.0 MW.
+        max_power (float): The maximum power input (negative) capacity of the power plant in MW.
+        min_power (float, optional): The minimum power input (negative) capacity of the power plant in MW. Defaults to 0.0 MW.
         node (str, optional): The node of the unit. Defaults to "node0".
         price (float): The price of the unit.
         location (tuple[float, float]): Geographical location.
@@ -37,7 +37,7 @@ class Demand(SupportsMinMax):
         bidding_strategies: dict,
         max_power: float,
         min_power: float,
-        forecaster: Forecaster,
+        forecaster: DemandForecaster,
         node: str = "node0",
         price: float = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
@@ -54,17 +54,23 @@ class Demand(SupportsMinMax):
             **kwargs,
         )
 
+        if not isinstance(forecaster, DemandForecaster):
+            raise ValueError(f"forecaster must be of type {DemandForecaster.__name__}")
+
+        if max_power > 0:
+            raise ValueError(
+                f"max_power must be < 0 but is {max_power} for unit {self.id}"
+            )
+        if min_power > 0:
+            raise ValueError(
+                f"min_power must be < 0 but is {min_power} for unit {self.id}"
+            )
+        if max_power > min_power:
+            raise ValueError(f"{max_power=} must be <= {min_power=} for unit {self.id}")
+
         self.max_power = max_power
         self.min_power = min_power
 
-        if max_power > 0 and min_power <= 0:
-            self.max_power = min_power
-            self.min_power = -max_power
-
-        self.ramp_down = max(abs(self.min_power), abs(self.max_power))
-        self.ramp_up = self.ramp_down
-
-        self.volume = -abs(self.forecaster[self.id])  # demand is negative
         self.price = FastSeries(index=self.index, value=price)
 
         # Elastic demand parameters
@@ -101,7 +107,7 @@ class Demand(SupportsMinMax):
         self,
         start: datetime,
         end: datetime,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Execute the current dispatch of the unit.
         Returns the volume of the unit within the given time range.
@@ -111,14 +117,14 @@ class Demand(SupportsMinMax):
             end (datetime.datetime): The end time of the dispatch.
 
         Returns:
-            np.array: The volume of the unit for the given time range.
+            np.ndarray: The volume of the unit for the given time range.
         """
 
         return self.outputs["energy"].loc[start:end]
 
     def calculate_min_max_power(
         self, start: datetime, end: datetime, product_type="energy"
-    ) -> tuple[np.array, np.array]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         Calculates the minimum and maximum power output of the unit and returns the bid volume as both the minimum and maximum power output of the unit.
 
@@ -133,7 +139,7 @@ class Demand(SupportsMinMax):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
         bid_volume = (
-            self.volume.loc[start:end_excl]
+            self.forecaster.demand.loc[start:end_excl]
             - self.outputs[product_type].loc[start:end_excl]
         )
 
