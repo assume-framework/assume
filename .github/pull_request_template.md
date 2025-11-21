@@ -1,5 +1,8 @@
-<!-- SPDX-FileCopyrightText: ASSUME Developers -->
-<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!--
+SPDX-FileCopyrightText: ASSUME Developers
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 ## Related Issue
 Closes #<issue‑number>
 *If no issue exists, delete this line.*
