@@ -44,8 +44,6 @@ def power_plant() -> PowerPlant:
         "trained_policies_save_path": "not required",
         "training_episodes": 3,
         "unit_id": "test_pp",
-        "obs_dim": 3,
-        "act_dim": 2,
     }
     learning_role = Learning(learning_config, start, end)
 
@@ -104,8 +102,6 @@ def test_learning_strategies_parametrized(
         "evaluation_mode": False,
         "continue_learning": False,
         "trained_policies_save_path": "not required",
-        "obs_dim": 3,
-        "act_dim": 2,
     }
     if actor_architecture != "mlp":
         learning_config["actor_architecture"] = actor_architecture
