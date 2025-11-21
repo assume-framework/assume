@@ -331,7 +331,8 @@ class Learning(Role):
             reward=transform_buffer_data(cache["rewards"], device),
         )
 
-        self.update_policy()
+        if self.episodes_done >= self.episodes_collecting_initial_experience:
+            self.rl_algorithm.update_policy()
 
     def add_observation_to_cache(self, unit_id, start, observation) -> None:
         """
@@ -506,20 +507,6 @@ class Learning(Role):
                 raise FileNotFoundError(
                     f"Directory {directory} does not exist! Cannot load pretrained policies!"
                 )
-
-    def update_policy(self) -> None:
-        """
-        Update the policy of the reinforcement learning agent.
-
-        This method is responsible for updating the policy (actor) of the reinforcement learning agent asynchronously. It checks if
-        the number of episodes completed is greater than the number of episodes required for initial experience collection. If so,
-        it triggers the policy update process by calling the `update_policy` method of the associated reinforcement learning algorithm.
-
-        Note:
-            This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
-        """
-        if self.episodes_done >= self.episodes_collecting_initial_experience:
-            self.rl_algorithm.update_policy()
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """
