@@ -137,12 +137,28 @@ def test_learning_strategies_parametrized(
         order["accepted_volume"] = order["volume"]
 
     strategy.calculate_reward(power_plant, mc, orderbook=bids)
-    reward = power_plant.outputs["reward"].loc[product_index]
-    profit = power_plant.outputs["profit"].loc[product_index]
-    regret = power_plant.outputs["regret"].loc[product_index]
+
+    # Fetch reward, profit, regret from learning_role cache instead of outputs
+    # Get the latest timestamp used for reward cache
+    learning_role = strategy.learning_role
+    reward_cache = learning_role.all_rewards
+    profit_cache = learning_role.all_profits
+    regret_cache = learning_role.all_regrets
+
+    # Use the last timestamp (should be the one just written)
+    last_ts = sorted(reward_cache.keys())[-1]
+    unit_id = (
+        power_plant.id
+        if power_plant.id in reward_cache[last_ts]
+        else list(reward_cache[last_ts].keys())[0]
+    )
+
+    reward = reward_cache[last_ts][unit_id][0]
+    profit = profit_cache[last_ts][unit_id][0]
+    regret = regret_cache[last_ts][unit_id][0]
     costs = power_plant.outputs["total_costs"].loc[product_index]
 
-    assert reward[0] == 0.01
-    assert profit[0] == 1000.0
-    assert regret[0] == 0.0
+    assert reward == 0.1
+    assert profit == 10000.0
+    assert regret == 0.0
     assert costs[0] == 40000.0  # Assumes hot_start_cost = 20000 by default

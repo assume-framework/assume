@@ -685,17 +685,13 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         # scaling factor to normalize the reward to the range [-1,1]
         scaling = 1 / (self.max_bid_price * unit.max_power)
-
         reward = scaling * (profit - regret_scale * opportunity_cost)
-
-        # Store results in unit outputs, which are later written to the database by the unit operator.
-        profit += profit
         regret = regret_scale * opportunity_cost
 
         # Store results in unit outputs
         # Note: these are not learning-specific results but stored for all units for analysis
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["total_costs"].loc[start:end_excl] = order_cost
+        unit.outputs["total_costs"].loc[start:end_excl] += operational_cost
 
         # write rl-rewards to buffer
         if self.learning_mode:
@@ -1108,7 +1104,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         # Store results in unit outputs
         # Note: these are not learning-specific results but stored for all units for analysis
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["total_costs"].loc[start:end_excl] = order_cost
+        unit.outputs["total_costs"].loc[start:end_excl] += order_cost
 
         # write rl-rewards to buffer
         if self.learning_mode:
@@ -1353,7 +1349,7 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         # Store results in unit outputs
         # Note: these are not learning-specific results but stored for all units for analysis
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["total_costs"].loc[start:end_excl] = order_cost
+        unit.outputs["total_costs"].loc[start:end_excl] += operational_cost
 
         # write rl-rewards to buffer
         if self.learning_mode:
