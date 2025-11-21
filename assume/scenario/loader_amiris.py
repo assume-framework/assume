@@ -520,6 +520,7 @@ def load_amiris(
         "VariableRenewableOperator",
         "Biogas",
         "MeritOrderForecaster",
+        #"Unknown",
     ]
     agents_sorted = sorted(
         amiris_scenario["Agents"], key=lambda agent: keyorder.index(agent["Type"])
