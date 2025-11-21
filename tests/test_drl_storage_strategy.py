@@ -138,9 +138,21 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)
 
-            # Extract outputs
-            reward = storage_unit.outputs["reward"].loc[product_index]
-            profit = storage_unit.outputs["profit"].loc[product_index]
+            # Fetch reward, profit, costs from learning_role cache
+            learning_role = strategy.learning_role
+            reward_cache = learning_role.all_rewards
+            profit_cache = learning_role.all_profits
+
+            # Use the last timestamp
+            last_ts = sorted(reward_cache.keys())[-1]
+            unit_id = (
+                storage_unit.id
+                if storage_unit.id in reward_cache[last_ts]
+                else list(reward_cache[last_ts].keys())[0]
+            )
+
+            reward = reward_cache[last_ts][unit_id][0]
+            profit = profit_cache[last_ts][unit_id][0]
             costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
@@ -160,13 +172,13 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward[0]}"
+                reward == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward}"
 
             # Assert the calculated profit
             assert (
-                profit[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit[0]}"
+                profit == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit}"
 
             # Assert the calculated costs
             assert (
@@ -230,9 +242,21 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)
 
-            # Extract outputs
-            reward = storage_unit.outputs["reward"].loc[product_index]
-            profit = storage_unit.outputs["profit"].loc[product_index]
+            # Fetch reward, profit, costs from learning_role cache
+            learning_role = strategy.learning_role
+            reward_cache = learning_role.all_rewards
+            profit_cache = learning_role.all_profits
+
+            # Use the last timestamp
+            last_ts = sorted(reward_cache.keys())[-1]
+            unit_id = (
+                storage_unit.id
+                if storage_unit.id in reward_cache[last_ts]
+                else list(reward_cache[last_ts].keys())[0]
+            )
+
+            reward = reward_cache[last_ts][unit_id][0]
+            profit = profit_cache[last_ts][unit_id][0]
             costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
@@ -252,13 +276,13 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward[0]}"
+                reward == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward}"
 
             # Assert the calculated profit
             assert (
-                profit[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit[0]}"
+                profit == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit}"
 
             # Assert the calculated costs
             assert (
