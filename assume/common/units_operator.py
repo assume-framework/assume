@@ -23,6 +23,7 @@ from assume.common.market_objects import (
 )
 from assume.common.utils import (
     aggregate_step_amount,
+    convert_tensors,
     timestamp2datetime,
 )
 from assume.strategies import (
@@ -242,11 +243,6 @@ class UnitsOperator(Role):
         # we can calculate the cashflow and reward for the units
         self.calculate_unit_cashflow_and_reward(orderbook, marketconfig)
 
-        # if unit operator is a subclass of learning unit operator
-        # we need to write the learning data to the output agent
-        if hasattr(self, "write_learning_to_output"):
-            self.write_learning_to_output(orderbook, marketconfig.market_id)
-
     def handle_registration_feedback(
         self, content: RegistrationMessage, meta: MetaDict
     ) -> None:
@@ -465,6 +461,9 @@ class UnitsOperator(Role):
             market_config=market,
             product_tuples=products,
         )
+
+        orderbook = convert_tensors(orderbook)
+
         if not market.addr:
             logger.error("Market %s has no address", market.market_id)
             return

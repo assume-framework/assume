@@ -1,5 +1,3 @@
-# tests/test_drl_storage_strategy.py
-
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
@@ -10,12 +8,13 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from assume.common.base import LearningConfig
 from assume.common.forecaster import UnitForecaster
 
 try:
     import torch as th
 
-    from assume.reinforcement_learning.learning_role import LearningConfig
+    from assume.reinforcement_learning import Learning
     from assume.strategies.learning_strategies import StorageEnergyLearningStrategy
 except ImportError:
     th = None
@@ -31,24 +30,30 @@ def storage_unit() -> Storage:
     """
     # Define the learning configuration for the StorageEnergyLearningStrategy
     learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
+        "obs_dim": 50,
+        "act_dim": 2,
         "algorithm": "matd3",
         "learning_mode": True,
         "training_episodes": 3,
         "unit_id": "test_storage",
         "max_bid_price": 100,
         "max_demand": 1000,
+        "evaluation_mode": False,
+        "continue_learning": False,
+        "trained_policies_save_path": "not required",
     }
 
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = UnitForecaster(index, market_prices={"test_market": 50})
+    learning_role = Learning(learning_config, index[0], index[-1])
     return Storage(
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
         bidding_strategies={
-            "test_market": StorageEnergyLearningStrategy(**learning_config)
+            "test_market": StorageEnergyLearningStrategy(
+                learning_role=learning_role, **learning_config
+            )
         },
         max_power_charge=-500,  # Negative for charging
         max_power_discharge=500,
@@ -133,9 +138,21 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)
 
-            # Extract outputs
-            reward = storage_unit.outputs["reward"].loc[product_index]
-            profit = storage_unit.outputs["profit"].loc[product_index]
+            # Fetch reward, profit, costs from learning_role cache
+            learning_role = strategy.learning_role
+            reward_cache = learning_role.all_rewards
+            profit_cache = learning_role.all_profits
+
+            # Use the last timestamp
+            last_ts = sorted(reward_cache.keys())[-1]
+            unit_id = (
+                storage_unit.id
+                if storage_unit.id in reward_cache[last_ts]
+                else list(reward_cache[last_ts].keys())[0]
+            )
+
+            reward = reward_cache[last_ts][unit_id][0]
+            profit = profit_cache[last_ts][unit_id][0]
             costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
@@ -155,13 +172,13 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward[0]}"
+                reward == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward}"
 
             # Assert the calculated profit
             assert (
-                profit[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit[0]}"
+                profit == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit}"
 
             # Assert the calculated costs
             assert (
@@ -225,9 +242,21 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)
 
-            # Extract outputs
-            reward = storage_unit.outputs["reward"].loc[product_index]
-            profit = storage_unit.outputs["profit"].loc[product_index]
+            # Fetch reward, profit, costs from learning_role cache
+            learning_role = strategy.learning_role
+            reward_cache = learning_role.all_rewards
+            profit_cache = learning_role.all_profits
+
+            # Use the last timestamp
+            last_ts = sorted(reward_cache.keys())[-1]
+            unit_id = (
+                storage_unit.id
+                if storage_unit.id in reward_cache[last_ts]
+                else list(reward_cache[last_ts].keys())[0]
+            )
+
+            reward = reward_cache[last_ts][unit_id][0]
+            profit = profit_cache[last_ts][unit_id][0]
             costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
@@ -247,13 +276,13 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward[0]}"
+                reward == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward}"
 
             # Assert the calculated profit
             assert (
-                profit[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit[0]}"
+                profit == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit}"
 
             # Assert the calculated costs
             assert (

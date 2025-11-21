@@ -8,7 +8,7 @@ from typing import TypedDict
 
 import numpy as np
 
-from assume.common.fast_pandas import FastIndex, FastSeries, TensorFastSeries
+from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
@@ -60,25 +60,6 @@ class BaseUnit:
 
         self.avg_op_time = 0
         self.total_op_time = 0
-
-        # some data is stored as series to allow to store it in the outputs
-        # check if any bidding strategy is using the RL strategy
-        if any(
-            isinstance(strategy, LearningStrategy)
-            for strategy in self.bidding_strategies.values()
-        ):
-            self.outputs["actions"] = TensorFastSeries(value=0.0, index=self.index)
-            self.outputs["exploration_noise"] = TensorFastSeries(
-                value=0.0,
-                index=self.index,
-            )
-            self.outputs["reward"] = FastSeries(value=0.0, index=self.index)
-            self.outputs["regret"] = FastSeries(value=0.0, index=self.index)
-
-            # RL data stored as lists to simplify storing to the buffer
-            self.outputs["rl_observations"] = []
-            self.outputs["rl_actions"] = []
-            self.outputs["rl_rewards"] = []
 
     def calculate_bids(
         self,
@@ -317,16 +298,6 @@ class BaseUnit:
             Start-up costs.
         """
         return 0
-
-    def reset_saved_rl_data(self):
-        """
-        Resets the saved RL data. This deletes all data besides the observation and action where we do not yet have calculated reward values.
-        """
-        values_len = len(self.outputs["rl_rewards"])
-
-        self.outputs["rl_observations"] = self.outputs["rl_observations"][values_len:]
-        self.outputs["rl_actions"] = self.outputs["rl_actions"][values_len:]
-        self.outputs["rl_rewards"] = []
 
 
 class SupportsMinMax(BaseUnit):
@@ -799,6 +770,7 @@ class LearningStrategy(BaseStrategy):
         act_dim: int,
         unique_obs_dim: int = 0,
         num_timeseries_obs_dim: int = 3,
+        learning_role=None,
         *args,
         **kwargs,
     ):
@@ -817,6 +789,9 @@ class LearningStrategy(BaseStrategy):
         # defines the number of provided timeseries, this is necessary for correctly splitting
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
+
+        # access to the learning_role that orchestrates learning
+        self.learning_role = learning_role
 
 
 class MinMaxStrategy(BaseStrategy):

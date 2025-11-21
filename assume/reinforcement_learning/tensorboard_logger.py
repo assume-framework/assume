@@ -208,7 +208,7 @@ class TensorBoardLogger:
             AVG(critic_loss) AS critic_loss,
             AVG(critic_total_grad_norm) AS critic_total_grad_norm,
             MAX(critic_max_grad_norm) AS critic_max_grad_norm,
-            AVG(learning_rate) AS lr
+            AVG(learning_rate) AS learning_rate
         """
 
         query_grad = (
