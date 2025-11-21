@@ -160,7 +160,7 @@ def add_agent_to_world(
         m: "storage_energy_heuristic_flexable" for m in list(world.markets.keys())
     }
     demand_strategies = {m: "demand_energy_naive" for m in list(world.markets.keys())}
-    match agent["Type"]:
+    match agent.get("Type", "Unknown"):
         case "SupportPolicy":
             support_data = agent["Attributes"]["SetSupportData"]
             supports |= {x.pop("PolicySet"): x for x in support_data}
@@ -520,9 +520,10 @@ def load_amiris(
         "VariableRenewableOperator",
         "Biogas",
         "MeritOrderForecaster",
+        "Unknown",
     ]
     agents_sorted = sorted(
-        amiris_scenario["Agents"], key=lambda agent: keyorder.index(agent["Type"])
+        amiris_scenario["Agents"], key=lambda agent: keyorder.index(agent.get("Type", "Unknown"))
     )
     for agent in agents_sorted:
         add_agent_to_world(
