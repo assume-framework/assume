@@ -644,6 +644,12 @@ class BusDepot(DSMFlex, SupportsMinMax):
             doc="Queue logic: EV is in queue if available and not assigned to any CS",
         )
         def enforce_queue_logic(m, ev, t):
+            # Skip queue logic if CS count >= EV count (no queue needed)
+            total_cs_count = len(m.charging_stations)
+            total_ev_count = len(m.evs)
+            if total_cs_count >= total_ev_count:
+                return pyo.Constraint.Skip
+
             ev_availability = getattr(m, f"{ev}_availability", None)
             if ev_availability is not None:
                 # EV is in queue if available but not assigned to any charging station
@@ -651,7 +657,7 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 return m.in_queue[ev, t] == ev_availability[t] - total_ev_assignments
             return pyo.Constraint.Skip
         
-        # NEW: Global queue capacity constraint  
+        # NEW: Global queue capacity constraint
         @self.model.Constraint(
             self.model.time_steps,
             doc="Total queue size cannot exceed (available_evs - charging_stations)"
@@ -661,6 +667,12 @@ class BusDepot(DSMFlex, SupportsMinMax):
             Mathematical constraint: If we have N charging stations and M available EVs,
             then maximum queue size = max(0, M - N)
             """
+            # Skip queue logic if CS count >= EV count (no queue needed)
+            total_cs_count = len(m.charging_stations)
+            total_ev_count = len(m.evs)
+            if total_cs_count >= total_ev_count:
+                return pyo.Constraint.Skip
+
             # Count total available EVs
             total_available_evs = 0
             evs_list = sorted(m.evs)
@@ -668,16 +680,16 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 ev_availability = getattr(m, f"{ev}_availability", None)
                 if ev_availability is not None:
                     total_available_evs += ev_availability[t]
-            
+
             # Count total charging stations
             total_charging_stations = len(m.charging_stations)
-            
+
             # Calculate maximum possible queue size
             max_queue_size = max(0, total_available_evs - total_charging_stations)
-            
+
             # Total EVs in queue at time t
             total_in_queue = sum(m.in_queue[ev, t] for ev in evs_list)
-            
+
             # Constraint: queue size cannot exceed theoretical maximum
             return total_in_queue <= max_queue_size
         

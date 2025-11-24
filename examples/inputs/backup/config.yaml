@@ -4,7 +4,7 @@
 
 eom:
   start_date: 2025-01-01 00:00
-  end_date: 2025-01-08 00:00
+  end_date: 2025-01-02 00:00
   time_step: 15min
   save_frequency_hours: 24
 
