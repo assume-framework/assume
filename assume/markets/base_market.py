@@ -23,6 +23,7 @@ from assume.common.market_objects import (
     lambda_functions,
 )
 from assume.common.utils import (
+    convert_tensors,
     datetime2timestamp,
     get_available_products,
     separate_orders,
@@ -138,8 +139,6 @@ class MarketRole(MarketMechanism, Role):
         super().setup()
         self.marketconfig.addr = self.context.addr
 
-        market_id = getattr(self.marketconfig, "market_id", "Unknown Market ID")
-
         # Validate required fields in market configuration
         missing_fields = [
             field
@@ -149,7 +148,7 @@ class MarketRole(MarketMechanism, Role):
         if missing_fields:
             error_message = (
                 f"Missing required field(s) {missing_fields} from additional_fields "
-                f"for market '{market_id}'."
+                f"for market '{self.marketconfig.market_id}'."
             )
             logger.error(error_message)
             raise ValueError(error_message)
@@ -625,6 +624,10 @@ class MarketRole(MarketMechanism, Role):
         Args:
             market_products (list[MarketProduct]): The products to be traded.
         """
+
+        # convert tensors if present in the orderbook
+        self.all_orders = convert_tensors(self.all_orders)
+
         if not self.all_orders:
             logger.warning(
                 f"[{self.context.current_timestamp}] The order book for market {self.marketconfig.market_id} with products {market_products} is empty. No orders were found."

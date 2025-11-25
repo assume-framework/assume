@@ -12,11 +12,18 @@ import torch as th
 from mango import Role
 
 from assume.common.base import LearningConfig, LearningStrategy
-from assume.common.utils import datetime2timestamp, timestamp2datetime
+from assume.common.utils import (
+    create_rrule,
+    datetime2timestamp,
+    timestamp2datetime,
+)
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
-from assume.reinforcement_learning.learning_utils import linear_schedule_func
+from assume.reinforcement_learning.learning_utils import (
+    linear_schedule_func,
+    transform_buffer_data,
+)
 from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
 logger = logging.getLogger(__name__)
@@ -36,8 +43,8 @@ class Learning(Role):
     def __init__(
         self,
         learning_config: LearningConfig,
-        start: datetime = None,
-        end: datetime = None,
+        start: datetime,
+        end: datetime,
     ):
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
@@ -85,10 +92,10 @@ class Learning(Role):
         th.backends.cuda.matmul.allow_tf32 = True
         th.backends.cudnn.allow_tf32 = True
 
-        if start is not None:
-            self.start = datetime2timestamp(start)
-        if end is not None:
-            self.end = datetime2timestamp(end)
+        self.start = datetime2timestamp(start)
+        self.start_datetime = start
+        self.end = datetime2timestamp(end)
+        self.end_datetime = end
 
         self.datetime = None
 
@@ -139,8 +146,238 @@ class Learning(Role):
         self.avg_rewards = []
 
         self.tensor_board_logger = None
-        self.db_addr = None
         self.update_steps = None
+
+        self.sync_train_freq_with_simulation_horizon()
+
+        # init dictionaries for all learning instances in this role
+        # Note: we use atomic-swaps later to ensure no overwrites while we write the data into the buffer
+        # this works since we do not use multi-threading, otherwise threading.locks would be needed here.
+        self.all_obs = defaultdict(lambda: defaultdict(list))
+        self.all_actions = defaultdict(lambda: defaultdict(list))
+        self.all_noises = defaultdict(lambda: defaultdict(list))
+        self.all_rewards = defaultdict(lambda: defaultdict(list))
+        self.all_regrets = defaultdict(lambda: defaultdict(list))
+        self.all_profits = defaultdict(lambda: defaultdict(list))
+
+    def on_ready(self):
+        """
+        Set up the learning role for reinforcement learning training.
+
+        Notes:
+            This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
+            for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
+            This cannot happen in the init since the context (compare mango agents) is not yet available there.To avoid inconsistent replay buffer states (e.g. observation and action has been stored but not the reward), this
+            slightly shifts the timing of the buffer updates.
+        """
+        super().on_ready()
+
+        shifted_start = self.start_datetime + pd.Timedelta(
+            self.train_freq
+        )  # shift start by hours in time frequency
+
+        recurrency_task = create_rrule(
+            start=shifted_start,
+            end=self.end_datetime,
+            freq=self.train_freq,
+        )
+
+        self.context.schedule_recurrent_task(
+            self.store_to_buffer_and_update,
+            recurrency_task,
+            src="no_wait",
+        )
+
+    def sync_train_freq_with_simulation_horizon(self) -> str | None:
+        """
+        Ensure self.train_freq evenly divides the simulation length.
+        If not, adjust self.train_freq (in-place) and return the new string, otherwise return None.
+        Uses self.start_datetime/self.end_datetime when available, otherwise falls back to timestamp fields.
+        """
+
+        # ensure train_freq evenly divides simulation length (may adjust self.train_freq)
+
+        if not self.learning_mode:
+            return None
+
+        train_freq_str = str(self.train_freq)
+        try:
+            train_freq = pd.Timedelta(train_freq_str)
+        except Exception:
+            logger.warning(
+                f"Invalid train_freq '{train_freq_str}' — skipping adjustment."
+            )
+            return None
+        total_length = self.end_datetime - self.start_datetime
+        quotient, remainder = divmod(total_length, train_freq)
+
+        if remainder != pd.Timedelta(0):
+            n_intervals = int(quotient) + 1
+            new_train_freq_hours = int(
+                (total_length / n_intervals).total_seconds() / 3600
+            )
+            new_train_freq_str = f"{new_train_freq_hours}h"
+            self.train_freq = new_train_freq_str
+
+            logger.warning(
+                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
+                f"Adjusting train_freq to {new_train_freq_str}."
+            )
+
+        return self.train_freq
+
+    def determine_validation_interval(self, learning_config: LearningConfig) -> int:
+        """
+        Compute and validate validation_interval.
+
+        Returns:
+            validation_interval (int)
+        Raises:
+            ValueError if training_episodes is too small.
+        """
+        default_interval = learning_config.get("validation_episodes_interval", 5)
+        training_episodes = self.training_episodes
+        validation_interval = min(training_episodes, default_interval)
+
+        min_required_episodes = (
+            self.episodes_collecting_initial_experience + validation_interval
+        )
+
+        if training_episodes < min_required_episodes:
+            raise ValueError(
+                f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({self.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
+            )
+
+        return validation_interval
+
+    def register_strategy(self, strategy: LearningStrategy) -> None:
+        """
+        Register a learning strategy with this learning role.
+
+        Args:
+            strategy (LearningStrategy): The learning strategy to register.
+
+        """
+
+        self.rl_strats[strategy.unit_id] = strategy
+
+    async def store_to_buffer_and_update(self) -> None:
+        # Atomic dict operations - create new references
+        current_obs = self.all_obs
+        current_actions = self.all_actions
+        current_rewards = self.all_rewards
+        current_noises = self.all_noises
+        current_regrets = self.all_regrets
+        current_profits = self.all_profits
+
+        # Reset cache dicts immediately with new defaultdicts
+        self.all_obs = defaultdict(lambda: defaultdict(list))
+        self.all_actions = defaultdict(lambda: defaultdict(list))
+        self.all_rewards = defaultdict(lambda: defaultdict(list))
+        self.all_noises = defaultdict(lambda: defaultdict(list))
+        self.all_regrets = defaultdict(lambda: defaultdict(list))
+        self.all_profits = defaultdict(lambda: defaultdict(list))
+
+        # Get timestamps from cache we took
+        all_timestamps = sorted(current_obs.keys())
+        if len(all_timestamps) > 1:
+            # Remove last timestamp that has no reward yet
+            timestamps_to_process = all_timestamps[:-1]
+
+            # Create filtered cache (only complete timesteps)
+            cache = {
+                "obs": {t: current_obs[t] for t in timestamps_to_process},
+                "actions": {t: current_actions[t] for t in timestamps_to_process},
+                "rewards": {t: current_rewards[t] for t in timestamps_to_process},
+                "noises": {t: current_noises[t] for t in timestamps_to_process},
+                "regret": {t: current_regrets[t] for t in timestamps_to_process},
+                "profit": {t: current_profits[t] for t in timestamps_to_process},
+            }
+
+            # write data to output agent
+            self.write_rl_params_to_output(cache)
+
+            # if we are training also update the policy and write data into buffer
+            if not self.evaluation_mode:
+                # Process cache in background
+                await self._store_to_buffer_and_update_sync(cache, self.device)
+        else:
+            logger.warning("No experience retrieved to store in buffer at update step!")
+
+    async def _store_to_buffer_and_update_sync(self, cache, device) -> None:
+        """
+        This function takes all the information that the strategies wrote into the learning_role cache dicts and post_processes them to fit into the buffer.
+        Further triggers the next policy update
+
+        """
+        first_start = next(iter(cache["obs"]))
+        for name, buffer in [
+            ("observations", cache["obs"]),
+            ("actions", cache["actions"]),
+            ("rewards", cache["rewards"]),
+        ]:
+            # check if all entries for the buffers have the same number of unit_ids as rl_strats
+            if len(buffer[first_start]) != len(self.rl_strats):
+                logger.error(
+                    f"Number of unit_ids with {name} in learning role ({len(buffer[first_start])}) does not match number of rl_strats ({len(self.rl_strats)}). "
+                    "It seems like some learning_instances are not reporting experience. Cannot store to buffer and update policy!"
+                )
+                return
+
+        # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
+        self.buffer.add(
+            obs=transform_buffer_data(cache["obs"], device),
+            actions=transform_buffer_data(cache["actions"], device),
+            reward=transform_buffer_data(cache["rewards"], device),
+        )
+
+        if self.episodes_done >= self.episodes_collecting_initial_experience:
+            self.rl_algorithm.update_policy()
+
+    def add_observation_to_cache(self, unit_id, start, observation) -> None:
+        """
+        Add the observation to the cache dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            observation (torch.Tensor): The observation to be added.
+
+        """
+        self.all_obs[start][unit_id].append(observation)
+
+    def add_actions_to_cache(self, unit_id, start, action, noise) -> None:
+        """
+        Add the action and noise to the cache dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            action (torch.Tensor): The action to be added.
+            noise (torch.Tensor): The noise to be added.
+
+        """
+
+        # Add validation to catch unexpected unit_ids
+        if unit_id == 0 or unit_id is None:
+            logger.warning(
+                f"Got invalid unit_id while storing learning experience: {unit_id}"
+            )
+            return
+
+        self.all_actions[start][unit_id].append(action)
+        self.all_noises[start][unit_id].append(noise)
+
+    def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
+        """
+        Add the reward to the cache dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            reward (float): The reward to be added.
+
+        """
+        self.all_rewards[start][unit_id].append(reward)
+        self.all_regrets[start][unit_id].append(regret)
+        self.all_profits[start][unit_id].append(profit)
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
@@ -184,42 +421,6 @@ class Learning(Role):
             "buffer": self.buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
-
-    def setup(self) -> None:
-        """
-        Set up the learning role for reinforcement learning training.
-
-        Note:
-            This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
-            for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
-        """
-
-        # subscribe to messages for handling the training process
-        if not self.evaluation_mode:
-            self.context.subscribe_message(
-                self,
-                self.save_buffer_and_update,
-                lambda content, meta: content.get("context") == "rl_training",
-            )
-
-    def save_buffer_and_update(self, content: dict, meta: dict) -> None:
-        """
-        Handles the incoming messages and performs corresponding actions.
-
-        Args:
-            content (dict): The content of the message.
-            meta (dict): The metadata associated with the message. (not needed yet)
-        """
-
-        if content.get("type") == "save_buffer_and_update":
-            data = content["data"]
-            self.buffer.add(
-                obs=data[0],
-                actions=data[1],
-                reward=data[2],
-            )
-
-        self.update_policy()
 
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """
@@ -306,20 +507,6 @@ class Learning(Role):
                 raise FileNotFoundError(
                     f"Directory {directory} does not exist! Cannot load pretrained policies!"
                 )
-
-    def update_policy(self) -> None:
-        """
-        Update the policy of the reinforcement learning agent.
-
-        This method is responsible for updating the policy (actor) of the reinforcement learning agent asynchronously. It checks if
-        the number of episodes completed is greater than the number of episodes required for initial experience collection. If so,
-        it triggers the policy update process by calling the `update_policy` method of the associated reinforcement learning algorithm.
-
-        Note:
-            This method is typically scheduled to run periodically during training to continuously improve the agent's policy.
-        """
-        if self.episodes_done >= self.episodes_collecting_initial_experience:
-            self.rl_algorithm.update_policy()
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """
@@ -445,6 +632,51 @@ class Learning(Role):
         self.datetime = pd.to_datetime(train_start)
 
         self.update_steps = 0
+
+    def write_rl_params_to_output(self, cache):
+        """
+        Sends the current rl_strategy update to the output agent.
+
+        Args:
+            products_index (pandas.DatetimeIndex): The index of all products.
+            marketconfig (MarketConfig): The market configuration.
+        """
+        output_agent_list = []
+
+        for unit_id in sorted(cache["obs"][next(iter(cache["obs"]))].keys()):
+            starts = cache["obs"].keys()
+            for idx, start in enumerate(starts):
+                output_dict = {
+                    "datetime": start,
+                    "unit": unit_id,
+                    "reward": cache["rewards"][start][unit_id][0],
+                    "regret": cache["regret"][start][unit_id][0],
+                    "profit": cache["profit"][start][unit_id][0],
+                }
+
+                action_tuple = cache["actions"][start][unit_id][0]
+
+                noise_tuple = cache["noises"][start][unit_id][0]
+
+                if action_tuple is not None:
+                    action_dim = len(action_tuple)
+                    for i in range(action_dim):
+                        output_dict[f"actions_{i}"] = action_tuple[i]
+                if noise_tuple is not None:
+                    for i in range(len(noise_tuple)):
+                        output_dict[f"exploration_noise_{i}"] = noise_tuple[i]
+
+                output_agent_list.append(output_dict)
+
+        if self.db_addr and output_agent_list:
+            self.context.schedule_instant_message(
+                receiver_addr=self.db_addr,
+                content={
+                    "context": "write_results",
+                    "type": "rl_params",
+                    "data": output_agent_list,
+                },
+            )
 
     def write_rl_grad_params_to_output(
         self, learning_rate: float, unit_params_list: list[dict]

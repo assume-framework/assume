@@ -7,10 +7,11 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
+from assume.common.base import LearningConfig
 from assume.common.forecaster import PowerplantForecaster
 
 try:
-    from assume.reinforcement_learning.learning_role import LearningConfig
+    from assume.reinforcement_learning import Learning
     from assume.strategies.learning_strategies import (
         EnergyLearningSingleBidStrategy,
         EnergyLearningStrategy,
@@ -38,9 +39,13 @@ def power_plant() -> PowerPlant:
     learning_config: LearningConfig = {
         "algorithm": "matd3",
         "learning_mode": True,
+        "evaluation_mode": False,
+        "continue_learning": False,
+        "trained_policies_save_path": "not required",
         "training_episodes": 3,
         "unit_id": "test_pp",
     }
+    learning_role = Learning(learning_config, start, end)
 
     return PowerPlant(
         id="test_pp",
@@ -51,7 +56,11 @@ def power_plant() -> PowerPlant:
         min_power=200,
         efficiency=0.5,
         additional_cost=10,
-        bidding_strategies={"EOM": EnergyLearningStrategy(**learning_config)},
+        bidding_strategies={
+            "EOM": EnergyLearningStrategy(
+                learning_role=learning_role, **learning_config
+            )
+        },
         fuel_type="lignite",
         emission_factor=0.5,
         forecaster=ff,
@@ -90,12 +99,18 @@ def test_learning_strategies_parametrized(
         "learning_mode": True,
         "training_episodes": 3,
         "unit_id": power_plant.id,
+        "evaluation_mode": False,
+        "continue_learning": False,
+        "trained_policies_save_path": "not required",
     }
     if actor_architecture != "mlp":
         learning_config["actor_architecture"] = actor_architecture
 
+    learning_role = Learning(learning_config, start, end)
     # Override the strategy
-    power_plant.bidding_strategies[mc.market_id] = strategy_class(**learning_config)
+    power_plant.bidding_strategies[mc.market_id] = strategy_class(
+        learning_role=learning_role, **learning_config
+    )
     strategy = power_plant.bidding_strategies[mc.market_id]
 
     # Check if observation dimension is set accordingly and follows current default structure
@@ -122,12 +137,28 @@ def test_learning_strategies_parametrized(
         order["accepted_volume"] = order["volume"]
 
     strategy.calculate_reward(power_plant, mc, orderbook=bids)
-    reward = power_plant.outputs["reward"].loc[product_index]
-    profit = power_plant.outputs["profit"].loc[product_index]
-    regret = power_plant.outputs["regret"].loc[product_index]
+
+    # Fetch reward, profit, regret from learning_role cache instead of outputs
+    # Get the latest timestamp used for reward cache
+    learning_role = strategy.learning_role
+    reward_cache = learning_role.all_rewards
+    profit_cache = learning_role.all_profits
+    regret_cache = learning_role.all_regrets
+
+    # Use the last timestamp (should be the one just written)
+    last_ts = sorted(reward_cache.keys())[-1]
+    unit_id = (
+        power_plant.id
+        if power_plant.id in reward_cache[last_ts]
+        else list(reward_cache[last_ts].keys())[0]
+    )
+
+    reward = reward_cache[last_ts][unit_id][0]
+    profit = profit_cache[last_ts][unit_id][0]
+    regret = regret_cache[last_ts][unit_id][0]
     costs = power_plant.outputs["total_costs"].loc[product_index]
 
-    assert reward[0] == 0.01
-    assert profit[0] == 1000.0
-    assert regret[0] == 0.0
+    assert reward == 0.1
+    assert profit == 10000.0
+    assert regret == 0.0
     assert costs[0] == 40000.0  # Assumes hot_start_cost = 20000 by default

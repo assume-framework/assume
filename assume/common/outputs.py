@@ -266,6 +266,11 @@ class WriteOutput(Role):
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
 
+        # check for tensors and convert them to floats
+        # apply per column to ensure correct restructering after conversion
+        for col in df.columns:
+            df[col] = df[col].apply(convert_tensors)
+
         return df
 
     def convert_rl_grad_params(self, rl_grad_params: list[dict]):
@@ -280,6 +285,9 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
+
+        # check for tensors and convert them to floats
+        df = df.apply(convert_tensors)
 
         return df
 
@@ -497,8 +505,6 @@ class WriteOutput(Role):
             if df is None or df.empty:
                 continue
 
-            # check for tensors and convert them to floats
-            df = df.apply(convert_tensors)
             # sort dataframes by column names for consistent CSVs
             df = df.reindex(sorted(df.columns), axis=1)
 
