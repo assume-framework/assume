@@ -294,7 +294,7 @@ class Learning(Role):
                 "profit": {t: current_profits[t] for t in timestamps_to_process},
             }
 
-            # write data to output agent before resetting it
+            # write data to output agent
             self.write_rl_params_to_output(cache)
 
             # if we are training also update the policy and write data into buffer
