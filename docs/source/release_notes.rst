@@ -21,12 +21,17 @@ Upcoming Release
 - **Fix tests on Windows**: One test was always failing on Windows, which is fixed so that all tests succeed on all archs
 
 **Improvements:**
+- **Application of new naming convention for bidding strategies**: [unit]_[market]_[method]_[comment] for bidding strategy keys (in snake_case) and [Unit][Market][Method][Comment]Strategy for bidding strategy classes (in PascalCase for classes)
+- **Restructured learning_role tasks**: Major learning changes that make learning application more generalizable across the framework.
 
-- **Application of new naming convention for bidding strategies: [unit]_[market]_[method]_[comment] for bidding strategy keys (in snake_case) and [Unit][Market][Method][Comment]Strategy for bidding strategy classes (in PascalCase for classes)
+  - **Simplified learning data flow:** Removed the special ``learning_unit_operator`` that previously aggregated unit data and forwarded it to the learning role. Eliminates the single-sender dependency and avoids double bookkeeping across units and operators.
+  - **Direct write access:** All learning-capable entities (units, unit operators, market agents) now write learning data directly to the learning role.
+  - **Centralized logic:** Learning-related functionality is now almost always contained within the learning role, improving maintainability.
+  - **Note:** Distributed learning across multiple machines is no longer supported, but this feature was not in active use.
 
-  **New Features:**
+
+**New Features:**
 - **Unit Operator Portfolio Strategy**: A new bidding strategy type that enables portfolio optimization, where the default is called `UnitsOperatorEnergyNaiveDirectStrategy`. This strategy simply passes through bidding decisions of individual units within a portfolio, which was the default behavior beforehand as well. Further we added 'UnitsOperatorEnergyHeuristicCournotStrategy' which allows to model bidding behavior of a portfolio of units in a day-ahead market. The strategy calculates the optimal bid price and quantity for each unit in the portfolio, taking into account markup and the production costs of the units. This enables users to simulate and analyze the impact of strategic portfolio bidding on market outcomes and unit profitability.
-
 
 0.5.5 - (13th August 2025)
 ==========================

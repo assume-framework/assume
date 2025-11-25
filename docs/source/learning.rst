@@ -186,3 +186,24 @@ A more detailed description is given in the dashboard itself.
 .. image:: img/Grafana_Learning_2.jpeg
     :align: center
     :width: 500px
+
+In accordance with common machine learning practices and to align with widely accepted learning standards, we also integrate **TensorBoard** to visualize
+the training process. This provides a familiar and intuitive interface for users who have experience with deep learning frameworks, where TensorBoard is
+a de-facto standard for inspecting metrics such as losses, gradients, hyperparameters, and model behavior over time.
+
+TensorBoard logs are automatically written to the directory specified in the project (here ``./tensorboard/``).
+
+To launch TensorBoard locally, run:
+
+.. code-block:: bash
+
+    tensorboard --logdir ./tensorboard --port 6006
+
+After starting the server, open the following URL in your browser:
+
+::
+
+    http://localhost:6006
+
+TensorBoard will then display dashboards for scalars, histograms, graphs, projectors, and other relevant visualizations, depending on the metrics that
+the training pipeline currently exports.
