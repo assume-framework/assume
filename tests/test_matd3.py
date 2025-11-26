@@ -221,8 +221,12 @@ def test_td3_load_matching_n(base_learning_config, saved_n_agent_model):
 
     config_n_new = copy(base_learning_config)
     learn_n_new = Learning(config_n_new["learning_config"], start, end)
-    learn_n_new.rl_strats["agent_0"] = LearningStrategy(**config_n_new, learning_role=learn_n_new)
-    learn_n_new.rl_strats["agent_1"] = LearningStrategy(**config_n_new, learning_role=learn_n_new)
+    learn_n_new.rl_strats["agent_0"] = LearningStrategy(
+        **config_n_new, learning_role=learn_n_new
+    )
+    learn_n_new.rl_strats["agent_1"] = LearningStrategy(
+        **config_n_new, learning_role=learn_n_new
+    )
     learn_n_new.initialize_policy()
 
     learn_n_new.rl_algorithm.load_params(directory=save_dir)
