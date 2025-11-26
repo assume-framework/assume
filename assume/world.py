@@ -304,7 +304,7 @@ class World:
         the RL agent and adds the learning role to it for further processing.
         """
 
-        self.bidding_params.update(self.learning_config)
+        self.bidding_params["learning_config"] = self.learning_config
 
         if self.learning_mode or self.evaluation_mode:
             # if so, we initiate the rl learning role with parameters
