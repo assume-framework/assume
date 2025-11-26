@@ -65,4 +65,4 @@ def test_cli_learning():
             conn,
         )
     assert len(got) == 10
-    assert got["total_reward"][0] < got["total_reward"][9]  # its somehow converging
+    assert got["total_reward"][4] < got["total_reward"][9]  # its somehow converging
