@@ -28,30 +28,27 @@ def storage_unit() -> Storage:
     """
     Fixture to create a Storage unit instance with example parameters.
     """
-    # Define the learning configuration for the StorageRLStrategy
-    config = {
+    # Define the learning configuration for the StorageEnergyLearningStrategy
+    learning_config: LearningConfig = {
         "obs_dim": 50,
         "act_dim": 2,
         "unit_id": "test_storage",
         "max_demand": 1000,
-        "learning_config": LearningConfig(
-            algorithm="matd3",
-            learning_mode=True,
-            training_episodes=3,
-            max_bid_price=100,
-        ),
+        "evaluation_mode": False,
+        "continue_learning": False,
+        "trained_policies_save_path": "not required",
     }
 
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = UnitForecaster(index, market_prices={"test_market": 50})
-    learning_role = Learning(config["learning_config"], index[0], index[-1])
+    learning_role = Learning(learning_config, index[0], index[-1])
     return Storage(
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
         bidding_strategies={
             "test_market": StorageEnergyLearningStrategy(
-                learning_role=learning_role, **config
+                learning_role=learning_role, **learning_config
             )
         },
         max_power_charge=-500,  # Negative for charging

@@ -304,14 +304,16 @@ class World:
         the RL agent and adds the learning role to it for further processing.
         """
 
-        from assume.reinforcement_learning.learning_role import Learning
-
-        self.learning_role = Learning(
-            self.learning_config, start=self.start, end=self.end
-        )
+        self.bidding_params.update(self.learning_config)
 
         if self.learning_mode or self.evaluation_mode:
             # if so, we initiate the rl learning role with parameters
+            from assume.reinforcement_learning.learning_role import Learning
+
+            self.learning_role = Learning(
+                self.learning_config, start=self.start, end=self.end
+            )
+
             rl_agent = agent_composed_of(
                 self.learning_role,
                 register_in=self.container,
@@ -327,6 +329,9 @@ class World:
                 output_agent_addr=self.output_agent_addr,
                 train_start=self.start,
             )
+
+        else:
+            self.learning_role = None
 
     def setup_output_agent(
         self,
@@ -536,7 +541,10 @@ class World:
 
             if strategy not in strategy_instances:
                 # check if created cache has learning_strategy
-                if issubclass(self.bidding_strategies[strategy], LearningStrategy):
+                if (
+                    issubclass(self.bidding_strategies[strategy], LearningStrategy)
+                    and self.learning_mode
+                ):
                     # add learning role to the strategy to have access to store training data etc
                     strategy_instances[strategy] = self.bidding_strategies[strategy](
                         unit_id=unit_id,

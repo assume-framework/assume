@@ -103,7 +103,7 @@ def test_learning_strategies_parametrized(
 
     learning_role = Learning(config["learning_config"], start, end)
     # Override the strategy
-    power_plant.bidding_strategies[mc.market_id] = strategy_class(
+        learning_role=learning_role, **learning_config
         learning_role=learning_role, **config
     )
     strategy = power_plant.bidding_strategies[mc.market_id]

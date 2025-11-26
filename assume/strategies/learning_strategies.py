@@ -728,9 +728,6 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 74)
-        act_dim = kwargs.pop("act_dim", 1)
-        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
             *args,
             **kwargs,
