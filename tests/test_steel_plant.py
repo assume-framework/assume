@@ -215,9 +215,9 @@ def test_peak_load_shifting(steel_plant_peak_shifting):
     # Assert load shifting respects peak load cap
     for t in instance.time_steps:
         if instance.peak_indicator[t] == 1:
-            assert (
-                adjusted_total_power_input[t] <= instance.peak_load_cap_value
-            ), f"Peak load exceeded at time {t}"
+            assert adjusted_total_power_input[t] <= instance.peak_load_cap_value, (
+                f"Peak load exceeded at time {t}"
+            )
 
 
 def test_renewable_utilisation(steel_plant_renewable_utilisation):
@@ -272,9 +272,9 @@ def test_renewable_utilisation(steel_plant_renewable_utilisation):
 
     # Assert load shifting respects renewable signal intensity
     for t in instance.time_steps:
-        assert (
-            adjusted_total_power_input[1] <= instance.total_power_input[1].value
-        ), f"Load shift exceeds renewable intensity signal at time {t}"
+        assert adjusted_total_power_input[1] <= instance.total_power_input[1].value, (
+            f"Load shift exceeds renewable intensity signal at time {t}"
+        )
 
 
 @pytest.fixture
