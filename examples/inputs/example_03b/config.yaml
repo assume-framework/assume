@@ -6,10 +6,10 @@ base_case_2021:
   start_date: 2021-03-01 00:00
   end_date: 2021-03-31 00:00
   time_step: 1h
-  learning_mode: True
   save_frequency_hours: Null
 
   learning_config:
+    learning_mode: True
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 100

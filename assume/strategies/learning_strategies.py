@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from copy import deepcopy
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -18,7 +17,6 @@ from assume.common.base import (
     SupportsMinMax,
     SupportsMinMaxCharge,
 )
-from assume.common.exceptions import AssumeException
 from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
@@ -26,6 +24,7 @@ from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
 logger = logging.getLogger(__name__)
+
 
 class TorchLearningStrategy(LearningStrategy):
     """
@@ -60,14 +59,7 @@ class TorchLearningStrategy(LearningStrategy):
             )
 
         # sets the device of the actor network
-        device = self.learning_config.device
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if self.learning_mode and not self.learning_role:
-            raise AssumeException("Learning Role must be set in LearningMode")
-
-        # always use CPU in evaluation mode for performance reasons
-        if not self.learning_mode:
-            self.device = th.device("cpu")
+        self.device = self.learning_role.device
 
         # future: add option to choose between float16 and float32
         # float_type = kwargs.get("float_type", "float32")
@@ -77,9 +69,8 @@ class TorchLearningStrategy(LearningStrategy):
         self.exploration_noise_std = self.learning_config.exploration_noise_std
 
         if self.learning_mode or self.evaluation_mode:
-            self.collect_initial_experience_mode = (
-                self.learning_config.collect_initial_experience_mode
-            )
+            # learning role overwrites this if loaded from file or after initial experience episodes
+            self.collect_initial_experience_mode = True
 
             self.action_noise = NormalActionNoise(
                 mu=0.0,
@@ -91,6 +82,9 @@ class TorchLearningStrategy(LearningStrategy):
 
             self.learning_role.register_strategy(self)
 
+        # actor policies are only loaded from file if learning mode is off
+        # i.e., when loading pre-trained strategies without training ("learning_mode: false" and "trained_policies_load_path" specified in config)
+        # or final simulation run after training (terminate_learning == true)
         elif Path(self.learning_config.trained_policies_load_path).is_dir():
             self.load_actor_params(
                 load_path=self.learning_config.trained_policies_load_path
@@ -732,6 +726,9 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
+            obs_dim=obs_dim,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )

@@ -59,7 +59,12 @@ class Learning(Role):
             if self.learning_config and "cuda" in self.learning_config.device
             else "cpu"
         )
-        self.device = th.device(cuda_device if th.cuda.is_available() else "cpu")
+        # always use CPU in evaluation mode for performance reasons
+        self.device = th.device(
+            cuda_device
+            if (th.cuda.is_available() and not self.learning_config.evaluation_mode)
+            else "cpu"
+        )
 
         # future: add option to choose between float16 and float32
         # float_type = learning_config.float_type
@@ -74,8 +79,7 @@ class Learning(Role):
         self.end_datetime = end
 
         self.datetime = None
-
-        if self.learning_config and (self.learning_config.learning_mode or self.learning_config.evaluation_mode):
+        if self.learning_config.learning_mode:
             # configure additional learning parameters if we are in learning or evaluation mode
             if self.learning_config.learning_rate_schedule == "linear":
                 self.calc_lr_from_progress = linear_schedule_func(
@@ -289,7 +293,10 @@ class Learning(Role):
             reward=transform_buffer_data(cache["rewards"], device),
         )
 
-        if self.episodes_done >= self.learning_config.episodes_collecting_initial_experience:
+        if (
+            self.episodes_done
+            >= self.learning_config.episodes_collecting_initial_experience
+        ):
             self.rl_algorithm.update_policy()
 
     def add_observation_to_cache(self, unit_id, start, observation) -> None:
@@ -409,16 +416,23 @@ class Learning(Role):
         elapsed_duration = self.context.current_timestamp - self.start
 
         learning_episodes = (
-            self.learning_config.training_episodes - self.learning_config.episodes_collecting_initial_experience
+            self.learning_config.training_episodes
+            - self.learning_config.episodes_collecting_initial_experience
         )
 
-        if self.episodes_done < self.learning_config.episodes_collecting_initial_experience:
+        if (
+            self.episodes_done
+            < self.learning_config.episodes_collecting_initial_experience
+        ):
             progress_remaining = 1
         else:
             progress_remaining = (
                 1
                 - (
-                    (self.episodes_done - self.learning_config.episodes_collecting_initial_experience)
+                    (
+                        self.episodes_done
+                        - self.learning_config.episodes_collecting_initial_experience
+                    )
                     / learning_episodes
                 )
                 - ((1 / learning_episodes) * (elapsed_duration / total_duration))
@@ -457,12 +471,12 @@ class Learning(Role):
             and actors_and_critics is None
         ):
             directory = self.learning_config.trained_policies_load_path
-            if Path(directory).is_dir():
+            if directory and Path(directory).is_dir():
                 logger.info(f"Loading pretrained policies from {directory}!")
                 self.rl_algorithm.load_params(directory)
             else:
                 raise FileNotFoundError(
-                    f"Directory {directory} does not exist! Cannot load pretrained policies!"
+                    f"Directory {directory} does not exist! Cannot load pretrained policies from trained_policies_load_path!"
                 )
 
     def compare_and_save_policies(self, metrics: dict) -> bool:

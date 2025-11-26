@@ -186,7 +186,7 @@ class World:
         simulation_id: str,
         save_frequency_hours,
         bidding_params: dict = {},
-        learning_config: LearningConfig | None = None,
+        learning_config: dict | None = None,
         episode: int = 1,
         eval_episode: int = 1,
         manager_address=None,
@@ -202,7 +202,7 @@ class World:
             simulation_id (str): The unique identifier for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
-            learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
+            learning_config (dict | None, optional): Configuration for the learning process. Defaults to None.
             manager_address: The address of the manager.
             **kwargs: Additional keyword arguments.
 
@@ -221,14 +221,13 @@ class World:
         self.simulation_id = simulation_id
         self.start = start
         self.end = end
-        self.learning_config = learning_config
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        if self.learning_config is None:
-            self.learning_mode = False
-            self.evaluation_mode = False
-        else:
-            self.learning_mode = self.learning_config.learning_mode
-            self.evaluation_mode = self.learning_config.evaluation_mode
+        self.learning_mode = (
+            learning_config.get("learning_mode") if learning_config else False
+        )
+        self.evaluation_mode = (
+            learning_config.get("evaluation_mode") if learning_config else False
+        )
 
         # initialize a config dictionary for the scenario data if not already present
         if not self.scenario_data.get("config"):
@@ -285,7 +284,11 @@ class World:
             # self.clock_agent.stopped.add_done_callback(stop)
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
-            self.setup_learning(episode=episode, eval_episode=eval_episode)
+            self.setup_learning(
+                learning_config=learning_config,
+                episode=episode,
+                eval_episode=eval_episode,
+            )
 
             self.setup_output_agent(
                 save_frequency_hours=save_frequency_hours,
@@ -297,36 +300,43 @@ class World:
             )
             self.container.register(self.clock_manager)
 
-    def setup_learning(self, episode: int, eval_episode: int) -> None:
+    def setup_learning(
+        self, learning_config: dict, episode: int, eval_episode: int
+    ) -> None:
         """
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
         the RL agent and adds the learning role to it for further processing.
         """
 
-        from assume.reinforcement_learning.learning_role import Learning
+        # do not create learning role if learning config is missing completely
+        if learning_config:
+            from assume.reinforcement_learning.learning_role import Learning
 
-        self.learning_role = Learning(
-            self.learning_config, start=self.start, end=self.end
-        )
+            # create LearningConfig object
+            learning_config = LearningConfig(**learning_config)
 
-        if self.learning_mode or self.evaluation_mode:
-            # if so, we initiate the rl learning role with parameters
-            rl_agent = agent_composed_of(
-                self.learning_role,
-                register_in=self.container,
-                suggested_aid="learning_agent",
+            self.learning_role = Learning(
+                learning_config=learning_config, start=self.start, end=self.end
             )
-            rl_agent.suspendable_tasks = False
 
-            self.learning_role.init_logging(
-                simulation_id=self.simulation_id,
-                episode=episode,
-                eval_episode=eval_episode,
-                db_uri=self.db_uri,
-                output_agent_addr=self.output_agent_addr,
-                train_start=self.start,
-            )
+            if learning_config.learning_mode or learning_config.evaluation_mode:
+                # if so, we initiate the rl learning role with parameters
+                rl_agent = agent_composed_of(
+                    self.learning_role,
+                    register_in=self.container,
+                    suggested_aid="learning_agent",
+                )
+                rl_agent.suspendable_tasks = False
+
+                self.learning_role.init_logging(
+                    simulation_id=self.simulation_id,
+                    episode=episode,
+                    eval_episode=eval_episode,
+                    db_uri=self.db_uri,
+                    output_agent_addr=self.output_agent_addr,
+                    train_start=self.start,
+                )
 
     def setup_output_agent(
         self,

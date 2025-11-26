@@ -6,11 +6,10 @@ base:
   start_date: 2019-03-01 00:00
   end_date: 2019-03-31 00:00
   time_step: 1h
-  learning_mode: true
   save_frequency_hours: null
 
   learning_config:
-    continue_learning: false
+    learning_mode: true
     trained_policies_save_path: null
     trained_policies_load_path: null
     max_bid_price: 100
@@ -51,10 +50,10 @@ base_lstm:
   start_date: 2019-03-01 00:00
   end_date: 2019-03-31 00:00
   time_step: 1h
-  learning_mode: true
   save_frequency_hours: null
 
   learning_config:
+    learning_mode: true
     continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100
@@ -97,10 +96,10 @@ tiny:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-05 00:00
   time_step: 1h
-  learning_mode: true
   save_frequency_hours: null
 
   learning_config:
+    learning_mode: true
     continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100

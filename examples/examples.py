@@ -117,7 +117,7 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_learning_2"
+    example = "small_learning_1"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     #     unit_type="custom_unit",
     # )
 
-    if world.learning_config.learning_mode:
+    if world.learning_mode:
         # run learning if learning mode is enabled
         run_learning(world)
 

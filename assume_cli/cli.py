@@ -159,7 +159,7 @@ def cli(args=None):
 
         logging.info(f"loaded {args.scenario} - {args.case_study}")
 
-        if world.learning_config.learning_mode:
+        if world.learning_mode:
             run_learning(world)
 
         world.run()
