@@ -2,9 +2,9 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from copy import deepcopy
 import logging
 from collections import defaultdict
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -883,6 +883,7 @@ class LearningConfig:
                 f"gradient_steps need to be positive, got {self.gradient_steps}"
             )
 
+
 class LearningStrategy(BaseStrategy):
     """
     A strategy which provides learning functionality, has a method to calculate the reward.
@@ -910,7 +911,7 @@ class LearningStrategy(BaseStrategy):
         act_dim: int,
         unique_obs_dim: int,
         num_timeseries_obs_dim: int = 3,
-        learning_role = None,
+        learning_role=None,
         *args,
         **kwargs,
     ):
@@ -933,6 +934,7 @@ class LearningStrategy(BaseStrategy):
         # defines the number of provided timeseries, this is necessary for correctly splitting
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
+
 
 class MinMaxStrategy(BaseStrategy):
     pass

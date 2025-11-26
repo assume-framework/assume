@@ -35,7 +35,6 @@ class TD3(RLAlgorithm):
     def __init__(self, learning_role):
         super().__init__(learning_role)
 
-
         self.n_updates = 0
         self.grad_clip_norm = 1.0
 
@@ -731,7 +730,13 @@ class TD3(RLAlgorithm):
                     all_target_actor_params.extend(strategy.actor_target.parameters())
 
                 # Perform batch-wise Polyak update (NO LOOPS)
-                polyak_update(all_critic_params, all_target_critic_params, self.learning_config.tau)
-                polyak_update(all_actor_params, all_target_actor_params, self.learning_config.tau)
+                polyak_update(
+                    all_critic_params,
+                    all_target_critic_params,
+                    self.learning_config.tau,
+                )
+                polyak_update(
+                    all_actor_params, all_target_actor_params, self.learning_config.tau
+                )
 
         self.learning_role.write_rl_grad_params_to_output(learning_rate, unit_params)

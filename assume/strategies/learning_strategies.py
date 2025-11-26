@@ -2,7 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from copy import deepcopy
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -26,6 +25,7 @@ from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
 
 logger = logging.getLogger(__name__)
+
 
 class TorchLearningStrategy(LearningStrategy):
     """

@@ -75,7 +75,9 @@ class Learning(Role):
 
         self.datetime = None
 
-        if self.learning_config and (self.learning_config.learning_mode or self.learning_config.evaluation_mode):
+        if self.learning_config and (
+            self.learning_config.learning_mode or self.learning_config.evaluation_mode
+        ):
             # configure additional learning parameters if we are in learning or evaluation mode
             if self.learning_config.learning_rate_schedule == "linear":
                 self.calc_lr_from_progress = linear_schedule_func(
@@ -289,215 +291,10 @@ class Learning(Role):
             reward=transform_buffer_data(cache["rewards"], device),
         )
 
-        if self.episodes_done >= self.learning_config.episodes_collecting_initial_experience:
-
-        # check that gradient_steps is positive
-        if self.gradient_steps <= 0:
-            raise ValueError(
-                f"gradient_steps need to be positive, got {self.gradient_steps}"
-            )
-
-        self.batch_size = learning_config.get("batch_size", 128)
-        self.gamma = learning_config.get("gamma", 0.99)
-
-        self.eval_episodes_done = 0
-
-        # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
-        self.create_learning_algorithm(self.rl_algorithm)
-
-        # store evaluation values
-        self.max_eval = defaultdict(lambda: -1e9)
-        self.rl_eval = defaultdict(list)
-        # list of avg_changes
-        self.avg_rewards = []
-
-        self.tensor_board_logger = None
-        self.update_steps = None
-
-        self.sync_train_freq_with_simulation_horizon()
-
-        # init dictionaries for all learning instances in this role
-        # Note: we use atomic-swaps later to ensure no overwrites while we write the data into the buffer
-        # this works since we do not use multi-threading, otherwise threading.locks would be needed here.
-        self.all_obs = defaultdict(lambda: defaultdict(list))
-        self.all_actions = defaultdict(lambda: defaultdict(list))
-        self.all_noises = defaultdict(lambda: defaultdict(list))
-        self.all_rewards = defaultdict(lambda: defaultdict(list))
-        self.all_regrets = defaultdict(lambda: defaultdict(list))
-        self.all_profits = defaultdict(lambda: defaultdict(list))
-
-    def on_ready(self):
-        """
-        Set up the learning role for reinforcement learning training.
-
-        Notes:
-            This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
-            for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
-            This cannot happen in the init since the context (compare mango agents) is not yet available there.To avoid inconsistent replay buffer states (e.g. observation and action has been stored but not the reward), this
-            slightly shifts the timing of the buffer updates.
-        """
-        super().on_ready()
-
-        shifted_start = self.start_datetime + pd.Timedelta(
-            self.train_freq
-        )  # shift start by hours in time frequency
-
-        recurrency_task = create_rrule(
-            start=shifted_start,
-            end=self.end_datetime,
-            freq=self.train_freq,
-        )
-
-        self.context.schedule_recurrent_task(
-            self.store_to_buffer_and_update,
-            recurrency_task,
-            src="no_wait",
-        )
-
-    def sync_train_freq_with_simulation_horizon(self) -> str | None:
-        """
-        Ensure self.train_freq evenly divides the simulation length.
-        If not, adjust self.train_freq (in-place) and return the new string, otherwise return None.
-        Uses self.start_datetime/self.end_datetime when available, otherwise falls back to timestamp fields.
-        """
-
-        # ensure train_freq evenly divides simulation length (may adjust self.train_freq)
-
-        if not self.learning_mode:
-            return None
-
-        train_freq_str = str(self.train_freq)
-        try:
-            train_freq = pd.Timedelta(train_freq_str)
-        except Exception:
-            logger.warning(
-                f"Invalid train_freq '{train_freq_str}' — skipping adjustment."
-            )
-            return None
-        total_length = self.end_datetime - self.start_datetime
-        quotient, remainder = divmod(total_length, train_freq)
-
-        if remainder != pd.Timedelta(0):
-            n_intervals = int(quotient) + 1
-            new_train_freq_hours = int(
-                (total_length / n_intervals).total_seconds() / 3600
-            )
-            new_train_freq_str = f"{new_train_freq_hours}h"
-            self.train_freq = new_train_freq_str
-
-            logger.warning(
-                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
-                f"Adjusting train_freq to {new_train_freq_str}."
-            )
-
-        return self.train_freq
-
-    def determine_validation_interval(self, learning_config: LearningConfig) -> int:
-        """
-        Compute and validate validation_interval.
-
-        Returns:
-            validation_interval (int)
-        Raises:
-            ValueError if training_episodes is too small.
-        """
-        default_interval = learning_config.get("validation_episodes_interval", 5)
-        training_episodes = self.training_episodes
-        validation_interval = min(training_episodes, default_interval)
-
-        min_required_episodes = (
-            self.episodes_collecting_initial_experience + validation_interval
-        )
-
-        if training_episodes < min_required_episodes:
-            raise ValueError(
-                f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({self.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
-            )
-
-        return validation_interval
-
-    def register_strategy(self, strategy: LearningStrategy) -> None:
-        """
-        Register a learning strategy with this learning role.
-
-        Args:
-            strategy (LearningStrategy): The learning strategy to register.
-
-        """
-
-        self.rl_strats[strategy.unit_id] = strategy
-
-    async def store_to_buffer_and_update(self) -> None:
-        # Atomic dict operations - create new references
-        current_obs = self.all_obs
-        current_actions = self.all_actions
-        current_rewards = self.all_rewards
-        current_noises = self.all_noises
-        current_regrets = self.all_regrets
-        current_profits = self.all_profits
-
-        # Reset cache dicts immediately with new defaultdicts
-        self.all_obs = defaultdict(lambda: defaultdict(list))
-        self.all_actions = defaultdict(lambda: defaultdict(list))
-        self.all_rewards = defaultdict(lambda: defaultdict(list))
-        self.all_noises = defaultdict(lambda: defaultdict(list))
-        self.all_regrets = defaultdict(lambda: defaultdict(list))
-        self.all_profits = defaultdict(lambda: defaultdict(list))
-
-        # Get timestamps from cache we took
-        all_timestamps = sorted(current_obs.keys())
-        if len(all_timestamps) > 1:
-            # Remove last timestamp that has no reward yet
-            timestamps_to_process = all_timestamps[:-1]
-
-            # Create filtered cache (only complete timesteps)
-            cache = {
-                "obs": {t: current_obs[t] for t in timestamps_to_process},
-                "actions": {t: current_actions[t] for t in timestamps_to_process},
-                "rewards": {t: current_rewards[t] for t in timestamps_to_process},
-                "noises": {t: current_noises[t] for t in timestamps_to_process},
-                "regret": {t: current_regrets[t] for t in timestamps_to_process},
-                "profit": {t: current_profits[t] for t in timestamps_to_process},
-            }
-
-            # write data to output agent
-            self.write_rl_params_to_output(cache)
-
-            # if we are training also update the policy and write data into buffer
-            if not self.evaluation_mode:
-                # Process cache in background
-                await self._store_to_buffer_and_update_sync(cache, self.device)
-        else:
-            logger.warning("No experience retrieved to store in buffer at update step!")
-
-    async def _store_to_buffer_and_update_sync(self, cache, device) -> None:
-        """
-        This function takes all the information that the strategies wrote into the learning_role cache dicts and post_processes them to fit into the buffer.
-        Further triggers the next policy update
-
-        """
-        first_start = next(iter(cache["obs"]))
-        for name, buffer in [
-            ("observations", cache["obs"]),
-            ("actions", cache["actions"]),
-            ("rewards", cache["rewards"]),
-        ]:
-            # check if all entries for the buffers have the same number of unit_ids as rl_strats
-            if len(buffer[first_start]) != len(self.rl_strats):
-                logger.error(
-                    f"Number of unit_ids with {name} in learning role ({len(buffer[first_start])}) does not match number of rl_strats ({len(self.rl_strats)}). "
-                    "It seems like some learning_instances are not reporting experience. Cannot store to buffer and update policy!"
-                )
-                return
-
-        # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
-        self.buffer.add(
-            obs=transform_buffer_data(cache["obs"], device),
-            actions=transform_buffer_data(cache["actions"], device),
-            reward=transform_buffer_data(cache["rewards"], device),
-        )
-
-        if self.episodes_done >= self.episodes_collecting_initial_experience:
+        if (
+            self.episodes_done
+            >= self.learning_config.episodes_collecting_initial_experience
+        ):
             self.rl_algorithm.update_policy()
 
     def add_observation_to_cache(self, unit_id, start, observation) -> None:
@@ -617,16 +414,23 @@ class Learning(Role):
         elapsed_duration = self.context.current_timestamp - self.start
 
         learning_episodes = (
-            self.learning_config.training_episodes - self.learning_config.episodes_collecting_initial_experience
+            self.learning_config.training_episodes
+            - self.learning_config.episodes_collecting_initial_experience
         )
 
-        if self.episodes_done < self.learning_config.episodes_collecting_initial_experience:
+        if (
+            self.episodes_done
+            < self.learning_config.episodes_collecting_initial_experience
+        ):
             progress_remaining = 1
         else:
             progress_remaining = (
                 1
                 - (
-                    (self.episodes_done - self.learning_config.episodes_collecting_initial_experience)
+                    (
+                        self.episodes_done
+                        - self.learning_config.episodes_collecting_initial_experience
+                    )
                     / learning_episodes
                 )
                 - ((1 / learning_episodes) * (elapsed_duration / total_duration))

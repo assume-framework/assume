@@ -45,7 +45,7 @@ def test_learning_init():
     }
 
     # test init
-    learn = Learning(learning_config, start, end)
+    learn = Learning(config["learning_config"], start, end)
     assert len(learn.rl_strats) == 0
 
     # we need to add learning strategies first

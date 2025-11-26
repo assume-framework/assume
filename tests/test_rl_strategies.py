@@ -103,9 +103,6 @@ def test_learning_strategies_parametrized(
 
     learning_role = Learning(config["learning_config"], start, end)
     # Override the strategy
-        learning_role=learning_role, **learning_config
-        learning_role=learning_role, **config
-    )
     strategy = power_plant.bidding_strategies[mc.market_id]
 
     # Check if observation dimension is set accordingly and follows current default structure
