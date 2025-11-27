@@ -254,12 +254,19 @@ class Storage(SupportsMinMaxCharge):
                     -current_power * time_delta * self.efficiency_charge
                 ) / self.capacity
 
+            # TODO op_time calculation for storages
+            op_time = 1
+            self.outputs["energy_generation_costs"].at[t] += self.get_starting_costs(
+                op_time
+            )
+
             # update the values of the state of charge and the energy
             next_freq = t + self.index.freq
             if next_freq in self.index:
                 self.outputs["soc"].at[next_freq] = soc + delta_soc
             self.outputs["energy"].at[t] = current_power
 
+        self.calculate_generation_cost(start, end, "energy")
         return self.outputs["energy"].loc[start:end]
 
     @lru_cache(maxsize=256)
@@ -490,7 +497,7 @@ class Storage(SupportsMinMaxCharge):
 
         return power_charge
 
-    def get_starting_costs(self, op_time):
+    def get_starting_costs(self, op_time: int) -> float:
         """
         Calculates the starting costs of the unit depending on how long it was shut down
 
