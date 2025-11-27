@@ -544,6 +544,11 @@ class World:
                 # check if created cache has learning_strategy
                 if issubclass(self.bidding_strategies[strategy], LearningStrategy):
                     # add learning role to the strategy to have access to store training data etc
+                    if not hasattr(self, "learning_role") or self.learning_role is None:
+                        raise ValueError(
+                            f"Learning strategy '{strategy}' requires a configured 'learning_role', but none was found. "
+                            "Specify learning_config in config.yaml."
+                        )
                     strategy_instances[strategy] = self.bidding_strategies[strategy](
                         unit_id=unit_id,
                         learning_role=self.learning_role,
