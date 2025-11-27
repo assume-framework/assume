@@ -905,11 +905,11 @@ class LearningStrategy(BaseStrategy):
 
     def __init__(
         self,
+        learning_role,
         obs_dim: int,
         act_dim: int,
         unique_obs_dim: int,
         num_timeseries_obs_dim: int = 3,
-        learning_role=None,
         *args,
         **kwargs,
     ):

@@ -186,7 +186,7 @@ class World:
         simulation_id: str,
         save_frequency_hours,
         bidding_params: dict = {},
-        learning_config: dict | None = None,
+        learning_dict: dict = {},
         episode: int = 1,
         eval_episode: int = 1,
         manager_address=None,
@@ -222,12 +222,8 @@ class World:
         self.start = start
         self.end = end
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        self.learning_mode = (
-            learning_config.get("learning_mode") if learning_config else False
-        )
-        self.evaluation_mode = (
-            learning_config.get("evaluation_mode") if learning_config else False
-        )
+        self.learning_mode = learning_dict.get("learning_mode", False)
+        self.evaluation_mode = learning_dict.get("evaluation_mode", False)
 
         # initialize a config dictionary for the scenario data if not already present
         if not self.scenario_data.get("config"):
@@ -285,7 +281,7 @@ class World:
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
             self.setup_learning(
-                learning_config=learning_config,
+                learning_dict=learning_dict,
                 episode=episode,
                 eval_episode=eval_episode,
             )
@@ -301,7 +297,7 @@ class World:
             self.container.register(self.clock_manager)
 
     def setup_learning(
-        self, learning_config: dict, episode: int, eval_episode: int
+        self, learning_dict: dict, episode: int, eval_episode: int
     ) -> None:
         """
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
@@ -310,11 +306,11 @@ class World:
         """
 
         # do not create learning role if learning config is missing completely
-        if learning_config:
+        if learning_dict:
             from assume.reinforcement_learning.learning_role import Learning
 
             # create LearningConfig object
-            learning_config = LearningConfig(**learning_config)
+            learning_config = LearningConfig(**learning_dict)
 
             self.learning_role = Learning(
                 learning_config=learning_config, start=self.start, end=self.end

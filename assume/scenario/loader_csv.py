@@ -757,31 +757,29 @@ def setup_world(
 
     bidding_params = config.get("bidding_strategy_params", {})
 
-    learning_config = config.get("learning_config")
+    learning_dict = config.get("learning_config", {})
     # those settings need to be overridden before passing to the LearningConfig
-    if learning_config:
+    if learning_dict:
         # make sure that continue_learning implies learning_mode
-        if learning_config.get("continue_learning"):
-            learning_config["learning_mode"] = True
+        if learning_dict.get("continue_learning"):
+            learning_dict["learning_mode"] = True
         # determined by learning loop in run_learning()
-        learning_config["evaluation_mode"] = evaluation_mode
+        learning_dict["evaluation_mode"] = evaluation_mode
 
         if terminate_learning:
-            learning_config["learning_mode"] = False
-            learning_config["evaluation_mode"] = False
+            learning_dict["learning_mode"] = False
+            learning_dict["evaluation_mode"] = False
 
         # default path for saving trained policies is set here because
         # a) depends on the simulation_id
         # b) it is set relative to inputs_path in replace_paths() below
-        if not learning_config.get("trained_policies_save_path"):
-            learning_config["trained_policies_save_path"] = (
+        if not learning_dict.get("trained_policies_save_path"):
+            learning_dict["trained_policies_save_path"] = (
                 f"learned_strategies/{simulation_id}"
             )
 
     # learning mode always needed for reading units below
-    learning_mode = (
-        learning_config.get("learning_mode", False) if learning_config else False
-    )
+    learning_mode = learning_dict.get("learning_mode", False)
 
     # all paths should be relative to the inputs_path
     config = replace_paths(config, scenario_data["path"])
@@ -793,7 +791,7 @@ def setup_world(
         end=end,
         save_frequency_hours=save_frequency_hours,
         simulation_id=simulation_id,
-        learning_config=learning_config,
+        learning_dict=learning_dict,
         episode=episode,
         eval_episode=eval_episode,
         bidding_params=bidding_params,

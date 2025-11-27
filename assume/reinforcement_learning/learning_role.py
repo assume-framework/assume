@@ -11,7 +11,7 @@ import pandas as pd
 import torch as th
 from mango import Role
 
-from assume.common.base import LearningStrategy
+from assume.common.base import LearningConfig, LearningStrategy
 from assume.common.utils import (
     create_rrule,
     datetime2timestamp,
@@ -37,12 +37,14 @@ class Learning(Role):
 
     Args:
         learning_config (LearningConfig): The configuration for the learning process.
+        start (datetime.datetime): The start datetime for the simulation.
+        end (datetime.datetime): The end datetime for the simulation.
 
     """
 
     def __init__(
         self,
-        learning_config,
+        learning_config: LearningConfig,
         start: datetime,
         end: datetime,
     ):
@@ -54,18 +56,16 @@ class Learning(Role):
         self.critics = {}
         self.target_critics = {}
 
-        cuda_device = (
-            self.learning_config.device
-            if self.learning_config and "cuda" in self.learning_config.device
-            else "cpu"
-        )
-        # always use CPU in evaluation mode for performance reasons
         self.device = th.device(
-            cuda_device
-            if (th.cuda.is_available() and not self.learning_config.evaluation_mode)
+            self.learning_config.device
+            if (
+                self.learning_config
+                and "cuda" in self.learning_config.device
+                and th.cuda.is_available()
+                and not self.learning_config.evaluation_mode  # always use CPU in evaluation mode for performance reasons
+            )
             else "cpu"
         )
-
         # future: add option to choose between float16 and float32
         # float_type = learning_config.float_type
         self.float_type = th.float
