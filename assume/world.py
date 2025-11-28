@@ -223,7 +223,7 @@ class World:
         self.end = end
 
         if not learning_dict:
-            self.learning_config : LearningConfig = None
+            self.learning_config: LearningConfig = None
         else:
             self.learning_config = LearningConfig(**learning_dict)
 
@@ -239,7 +239,7 @@ class World:
         # use simulation_id of not in learning mode; use Episode ID if in learning mode
         # and use Evaluation Episode ID if in evaluation mode
         self.simulation_desc = simulation_id
-        
+
         # update simulation description when learning
         if self.learning_config:
             if self.learning_config.evaluation_mode:
@@ -303,18 +303,12 @@ class World:
             )
             self.container.register(self.clock_manager)
 
-    def setup_learning(
-        self, episode: int, eval_episode: int
-    ) -> None:
+    def setup_learning(self, episode: int, eval_episode: int) -> None:
         """
         Set up the learning process for the simulation, updating bidding parameters with the learning configuration
         and initializing the reinforcement learning (RL) learning role with the specified parameters. It also sets up
         the RL agent and adds the learning role to it for further processing.
         """
-
-        # do not create learning role if learning config is missing completely
-        if not self.learning_config:
-            raise ValueError("setup learning requires a learning Config")
 
         from assume.reinforcement_learning.learning_role import Learning
 
