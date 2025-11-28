@@ -62,7 +62,6 @@ class Learning(Role):
                 self.learning_config
                 and "cuda" in self.learning_config.device
                 and th.cuda.is_available()
-                and not self.learning_config.evaluation_mode  # always use CPU in evaluation mode for performance reasons
             )
             else "cpu"
         )
