@@ -1180,10 +1180,9 @@ def run_learning(
 
     world.reset()
 
-    # final simulation run with best policies
-    # TODO: discussion - in case of convergence towards lower rewards, should we use the last policies instead?
+    # latest policies for final simulation run
     world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
-        f"{world.learning_role.learning_config.trained_policies_save_path}/avg_reward_eval_policies"
+        f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
     )
 
     # load scenario for evaluation
