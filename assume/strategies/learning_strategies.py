@@ -82,7 +82,7 @@ class TorchLearningStrategy(LearningStrategy):
 
             self.learning_role.register_strategy(self)
 
-        # actor policies are only loaded from file if learning mode is off
+        # actor policies are only loaded here from file if learning mode is off (otherwise handled by learning_role)
         # i.e., when loading pre-trained strategies without training ("learning_mode: false" and "trained_policies_load_path" specified in config)
         # or final simulation run after training (terminate_learning == true)
         elif Path(self.learning_config.trained_policies_load_path).is_dir():
