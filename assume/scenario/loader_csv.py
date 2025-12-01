@@ -757,6 +757,7 @@ def setup_world(
 
     bidding_params = config.get("bidding_strategy_params", {})
 
+    # handle initial learning parameters before leanring_role exists
     learning_dict = config.get("learning_config", {})
     # those settings need to be overridden before passing to the LearningConfig
     if learning_dict:

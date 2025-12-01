@@ -549,7 +549,7 @@ class Learning(Role):
                         abs(min_reward), 1e-8
                     )  # Use small value to avoid zero-division
 
-                    avg_change = (max_reward - min_reward) / denominator
+                    avg_change = abs((max_reward - min_reward) / denominator)
 
                     if avg_change < self.learning_config.early_stopping_threshold:
                         logger.info(

@@ -755,8 +755,8 @@ class LearningConfig:
     Attributes:
         learning_mode (bool): Should we use learning mode at all? If False, the learning bidding strategy is
             loaded from trained_policies_load_path and no training occurs. Default is False.
-        evaluation_mode (bool): Whether to run in evaluation mode. If True, the agent uses the learned policy
-            without exploration noise and no training updates occur. This setting is modified internally. Default is False.
+        evaluation_mode (bool): This setting is modified internally. Whether to run in evaluation mode. If True, the agent uses the learned policy
+            without exploration noise and no training updates occur. Default is False.
         continue_learning (bool): Whether to use pre-learned strategies and then continue learning.
             If True, loads existing policies from trained_policies_load_path and continues training. Default is False.
         trained_policies_save_path (str | None): The directory path - relative to the scenario's inputs_path - where newly trained RL policies (actor and
@@ -783,7 +783,8 @@ class LearningConfig:
         train_freq (str): Defines the frequency in time steps at which the actor and critic networks are updated.
             Accepts time strings like "24h" for 24 hours or "1d" for 1 day. Default is "24h".
         batch_size (int): The batch size of experiences sampled from the replay buffer for each training update.
-            Larger batches provide more stable gradients but require more memory. Default is 128.
+            Larger batches provide more stable gradients but require more memory. In environments with many leanring agents we advise small batch sizes.
+            Default is 128.
         gradient_steps (int): The number of gradient descent steps performed during each training update.
             More steps can lead to better learning but increase computation time. Default is 100.
         learning_rate (float): The learning rate (step size) for the optimizer, which controls how much the
@@ -791,7 +792,7 @@ class LearningConfig:
         learning_rate_schedule (str | None): Which learning rate decay schedule to use. Currently only "linear"
             decay is available, which linearly decreases the learning rate over time. Default is None (constant learning rate).
         early_stopping_steps (int | None): The number of validation steps over which the moving average reward
-            is calculated for early stopping. If the reward doesn't improve by early_stopping_threshold over
+            is calculated for early stopping. If the reward doesn't change by early_stopping_threshold over
             this many steps, training stops. If None, defaults to training_episodes / validation_episodes_interval + 1.
         early_stopping_threshold (float): The minimum improvement in moving average reward required to avoid
             early stopping. If the reward improvement is less than this threshold over early_stopping_steps,
