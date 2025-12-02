@@ -186,7 +186,7 @@ class World:
         simulation_id: str,
         save_frequency_hours,
         bidding_params: dict = {},
-        learning_config: LearningConfig = {},
+        learning_dict: dict = {},
         episode: int = 1,
         eval_episode: int = 1,
         manager_address=None,
@@ -202,7 +202,7 @@ class World:
             simulation_id (str): The unique identifier for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
-            learning_config (LearningConfig, optional): Configuration for the learning process. Defaults to an empty configuration.
+            learning_config (dict | None, optional): Configuration for the learning process. Defaults to None.
             manager_address: The address of the manager.
             **kwargs: Additional keyword arguments.
 
@@ -221,10 +221,15 @@ class World:
         self.simulation_id = simulation_id
         self.start = start
         self.end = end
-        self.learning_config = learning_config
+
+        if not learning_dict:
+            self.learning_config: LearningConfig = None
+        else:
+            self.learning_config = LearningConfig(**learning_dict)
+
         # initiate learning if the learning mode is on and hence we want to learn new strategies
-        self.learning_mode = self.learning_config.get("learning_mode", False)
-        self.evaluation_mode = self.learning_config.get("evaluation_mode", False)
+        self.learning_mode = learning_dict.get("learning_mode", False)
+        self.evaluation_mode = learning_dict.get("evaluation_mode", False)
 
         # initialize a config dictionary for the scenario data if not already present
         if not self.scenario_data.get("config"):
@@ -233,13 +238,14 @@ class World:
         # make a descriptor for the tqdm progress bar
         # use simulation_id of not in learning mode; use Episode ID if in learning mode
         # and use Evaluation Episode ID if in evaluation mode
-        self.simulation_desc = (
-            simulation_id
-            if not self.learning_mode
-            else f"Training Episode {episode}"
-            if not self.evaluation_mode
-            else f"Evaluation Episode {eval_episode}"
-        )
+        self.simulation_desc = simulation_id
+
+        # update simulation description when learning
+        if self.learning_config:
+            if self.learning_config.evaluation_mode:
+                self.simulation_desc = f"Evaluation Episode {eval_episode}"
+            elif self.learning_mode:
+                self.simulation_desc = f"Training Episode {episode}"
 
         self.bidding_params = bidding_params
 
@@ -281,7 +287,11 @@ class World:
             # self.clock_agent.stopped.add_done_callback(stop)
             self.container.register(self.clock_agent, suggested_aid="clock_agent")
         else:
-            self.setup_learning(episode=episode, eval_episode=eval_episode)
+            if self.learning_config:
+                self.setup_learning(
+                    episode=episode,
+                    eval_episode=eval_episode,
+                )
 
             self.setup_output_agent(
                 save_frequency_hours=save_frequency_hours,
@@ -300,16 +310,15 @@ class World:
         the RL agent and adds the learning role to it for further processing.
         """
 
-        self.bidding_params.update(self.learning_config)
+        from assume.reinforcement_learning.learning_role import Learning
 
-        if self.learning_mode or self.evaluation_mode:
+        # create LearningConfig object
+        self.learning_role = Learning(
+            learning_config=self.learning_config, start=self.start, end=self.end
+        )
+
+        if self.learning_config.learning_mode or self.learning_config.evaluation_mode:
             # if so, we initiate the rl learning role with parameters
-            from assume.reinforcement_learning.learning_role import Learning
-
-            self.learning_role = Learning(
-                self.learning_config, start=self.start, end=self.end
-            )
-
             rl_agent = agent_composed_of(
                 self.learning_role,
                 register_in=self.container,
@@ -325,9 +334,6 @@ class World:
                 output_agent_addr=self.output_agent_addr,
                 train_start=self.start,
             )
-
-        else:
-            self.learning_role = None
 
     def setup_output_agent(
         self,
@@ -537,11 +543,13 @@ class World:
 
             if strategy not in strategy_instances:
                 # check if created cache has learning_strategy
-                if (
-                    issubclass(self.bidding_strategies[strategy], LearningStrategy)
-                    and self.learning_mode
-                ):
+                if issubclass(self.bidding_strategies[strategy], LearningStrategy):
                     # add learning role to the strategy to have access to store training data etc
+                    if self.learning_config is None:
+                        raise ValueError(
+                            f"Learning strategy '{strategy}' requires a configured 'learning_config', but none was set. "
+                            "Specify learning_config in config.yaml."
+                        )
                     strategy_instances[strategy] = self.bidding_strategies[strategy](
                         unit_id=unit_id,
                         learning_role=self.learning_role,

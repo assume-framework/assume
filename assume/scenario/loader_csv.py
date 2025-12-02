@@ -16,7 +16,6 @@ import pandas as pd
 import yaml
 from tqdm import tqdm
 
-from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
 from assume.common.forecast_initialisation import ForecastInitialisation
 from assume.common.forecaster import (
@@ -756,26 +755,34 @@ def setup_world(
                 "Disable CSV export to save data at regular intervals (export_csv_path = '')."
             )
 
-    learning_config: LearningConfig = config.get("learning_config", {})
     bidding_params = config.get("bidding_strategy_params", {})
 
-    learning_config["learning_mode"] = config.get("learning_mode", False)
-    learning_config["evaluation_mode"] = evaluation_mode
+    # handle initial learning parameters before leanring_role exists
+    learning_dict = config.get("learning_config", {})
+    # those settings need to be overridden before passing to the LearningConfig
+    if learning_dict:
+        # make sure that continue_learning implies learning_mode
+        if learning_dict.get("continue_learning"):
+            learning_dict["learning_mode"] = True
+        # determined by learning loop in run_learning()
+        learning_dict["evaluation_mode"] = evaluation_mode
 
-    if terminate_learning:
-        learning_config["learning_mode"] = False
-        learning_config["evaluation_mode"] = False
+        if terminate_learning:
+            learning_dict["learning_mode"] = False
+            learning_dict["evaluation_mode"] = False
 
-    if not learning_config.get("trained_policies_save_path"):
-        learning_config["trained_policies_save_path"] = (
-            f"learned_strategies/{simulation_id}"
-        )
+        # default path for saving trained policies is set here because
+        # a) depends on the simulation_id
+        # b) it is set relative to inputs_path in replace_paths() below
+        if not learning_dict.get("trained_policies_save_path"):
+            learning_dict["trained_policies_save_path"] = (
+                f"learned_strategies/{simulation_id}"
+            )
 
-    if not learning_config.get("trained_policies_load_path"):
-        learning_config["trained_policies_load_path"] = (
-            f"learned_strategies/{simulation_id}/avg_reward_eval_policies"
-        )
+    # learning mode always needed for reading units below
+    learning_mode = learning_dict.get("learning_mode", False)
 
+    # all paths should be relative to the inputs_path
     config = replace_paths(config, scenario_data["path"])
 
     world.reset()
@@ -785,7 +792,7 @@ def setup_world(
         end=end,
         save_frequency_hours=save_frequency_hours,
         simulation_id=simulation_id,
-        learning_config=learning_config,
+        learning_dict=learning_dict,
         episode=episode,
         eval_episode=eval_episode,
         bidding_params=bidding_params,
@@ -823,7 +830,7 @@ def setup_world(
         unit_type="power_plant",
         forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
-        learning_mode=learning_config["learning_mode"],
+        learning_mode=learning_mode,
     )
 
     storage_units = read_units(
@@ -831,7 +838,7 @@ def setup_world(
         unit_type="storage",
         forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
-        learning_mode=learning_config["learning_mode"],
+        learning_mode=learning_mode,
     )
 
     demand_units = read_units(
@@ -839,7 +846,7 @@ def setup_world(
         unit_type="demand",
         forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
-        learning_mode=learning_config["learning_mode"],
+        learning_mode=learning_mode,
     )
 
     exchange_units = read_units(
@@ -856,7 +863,7 @@ def setup_world(
                 unit_type=unit_type,
                 forecaster=unit_forecasts,
                 world_bidding_strategies=world.bidding_strategies,
-                learning_mode=learning_config["learning_mode"],
+                learning_mode=learning_mode,
             )
         for op, op_units in dsm_units.items():
             units[op].extend(op_units)
@@ -1047,8 +1054,8 @@ def run_learning(
     world.learning_role.rl_algorithm.initialize_policy()
 
     # check if we already stored policies for this simulation
-    save_path = world.learning_config["trained_policies_save_path"]
-    continue_learning = world.learning_config.get("continue_learning", False)
+    save_path = world.learning_role.learning_config.trained_policies_save_path
+    continue_learning = world.learning_role.learning_config.continue_learning
     confirm_learning_save_path(save_path, continue_learning)
 
     # also remove tensorboard logs
@@ -1060,7 +1067,7 @@ def run_learning(
     # Information that needs to be stored across episodes, aka one simulation run
     inter_episodic_data = {
         "buffer": ReplayBuffer(
-            buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
+            buffer_size=world.learning_role.learning_config.replay_buffer_size,
             obs_dim=world.learning_role.rl_algorithm.obs_dim,
             act_dim=world.learning_role.rl_algorithm.act_dim,
             n_rl_units=len(world.learning_role.rl_strats),
@@ -1077,10 +1084,9 @@ def run_learning(
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
-    validation_interval = world.learning_role.determine_validation_interval(
-        world.learning_config
-    )
+    validation_interval = world.learning_role.determine_validation_interval()
 
+    # sync train frequency with simulation horizon once at the beginning of training and overwrite scenario data
     world.scenario_data["config"]["learning_config"]["train_freq"] = (
         world.learning_role.sync_train_freq_with_simulation_horizon()
     )
@@ -1088,7 +1094,7 @@ def run_learning(
     eval_episode = 1
 
     for episode in tqdm(
-        range(1, world.learning_role.training_episodes + 1),
+        range(1, world.learning_role.learning_config.training_episodes + 1),
         desc="Training Episodes",
     ):
         # -----------------------------------------
@@ -1113,7 +1119,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            >= world.learning_role.episodes_collecting_initial_experience
+            >= world.learning_role.learning_config.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.reset()
@@ -1161,11 +1167,11 @@ def run_learning(
         # save the policies after each episode in case the simulation is stopped or crashes
         if (
             episode
-            >= world.learning_role.episodes_collecting_initial_experience
+            >= world.learning_role.learning_config.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.learning_role.rl_algorithm.save_params(
-                directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
+                directory=f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
             )
 
     # container shutdown implicitly with new initialisation
@@ -1175,11 +1181,9 @@ def run_learning(
 
     world.reset()
 
-    # Set 'trained_policies_load_path' to None in order to load the most recent policies,
-    # especially if previous strategies were loaded from an external source.
-    # This is useful when continuing from a previous learning session.
+    # latest policies for final simulation run
     world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
-        f"{world.learning_role.trained_policies_save_path}/avg_reward_eval_policies"
+        f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
     )
 
     # load scenario for evaluation

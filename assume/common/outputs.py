@@ -191,6 +191,8 @@ class WriteOutput(Role):
         )
 
     def on_ready(self):
+        super().on_ready()
+
         if self.db_uri:
             self.db = create_engine(self.db_uri)
         if self.db is not None:

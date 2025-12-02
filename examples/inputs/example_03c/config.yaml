@@ -6,10 +6,10 @@ base_case_2019_with_storage:
   start_date: 2019-03-01 00:00
   end_date: 2019-05-30 00:00
   time_step: 1h
-  learning_mode: true
   save_frequency_hours: null
 
   learning_config:
+    learning_mode: true
     continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100

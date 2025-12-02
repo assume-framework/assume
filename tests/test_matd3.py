@@ -4,10 +4,12 @@
 
 import json
 import os
-from copy import deepcopy
+from copy import copy, deepcopy
 from datetime import datetime
 
 import pytest
+
+from assume.common.base import LearningConfig
 
 try:
     import torch as th
@@ -27,49 +29,52 @@ end = datetime(2023, 7, 2)
 
 
 @pytest.fixture
-def base_learning_config():
+def base_learning_config() -> dict:
     return {
         "obs_dim": 10,
         "act_dim": 3,
-        "train_freq": "1h",
         "unique_obs_dim": 2,
-        "algorithm": "matd3",
-        "actor_architecture": "mlp",
-        "learning_mode": True,
-        "evaluation_mode": False,
-        "training_episodes": 1,
-        "episodes_collecting_initial_experience": 0,
-        "continue_learning": False,
-        "trained_policies_save_path": None,
-        "early_stopping_steps": 10,
-        "early_stopping_threshold": 0.05,
-        "learning_rate": 1e-4,
-        "batch_size": 100,
-        "tau": 0.005,
-        "gamma": 0.99,
-        "gradient_steps": 1,
-        "policy_delay": 2,
-        "target_policy_noise": 0.2,
-        "target_noise_clip": 0.5,
+        "num_timeseries_obs_dim": 4,
+        "learning_config": LearningConfig(
+            train_freq="1h",
+            algorithm="matd3",
+            actor_architecture="mlp",
+            learning_mode=True,
+            evaluation_mode=False,
+            training_episodes=1,
+            episodes_collecting_initial_experience=0,
+            continue_learning=False,
+            trained_policies_save_path=None,
+            early_stopping_steps=10,
+            early_stopping_threshold=0.05,
+            learning_rate=1e-4,
+            batch_size=100,
+            tau=0.005,
+            gamma=0.99,
+            gradient_steps=1,
+            policy_delay=2,
+            target_policy_noise=0.2,
+            target_noise_clip=0.5,
+        ),
     }
 
 
 @pytest.fixture(scope="function")
 def learning_role_n(base_learning_config):
-    config = base_learning_config.copy()
-    learn = Learning(config, start, end)
-    learn.rl_strats["agent_0"] = LearningStrategy(**config)
-    learn.rl_strats["agent_1"] = LearningStrategy(**config)
+    config = copy(base_learning_config)
+    learn = Learning(config["learning_config"], start, end)
+    learn.rl_strats["agent_0"] = LearningStrategy(**config, learning_role=learn)
+    learn.rl_strats["agent_1"] = LearningStrategy(**config, learning_role=learn)
     return learn
 
 
 @pytest.fixture(scope="function")
 def learning_role_n_plus_m(base_learning_config):
-    config = base_learning_config.copy()
-    learn = Learning(config, start, end)
-    learn.rl_strats["agent_0"] = LearningStrategy(**config)
-    learn.rl_strats["agent_1"] = LearningStrategy(**config)
-    learn.rl_strats["agent_2"] = LearningStrategy(**config)
+    config = copy(base_learning_config)
+    learn = Learning(config["learning_config"], start, end)
+    learn.rl_strats["agent_0"] = LearningStrategy(**config, learning_role=learn)
+    learn.rl_strats["agent_1"] = LearningStrategy(**config, learning_role=learn)
+    learn.rl_strats["agent_2"] = LearningStrategy(**config, learning_role=learn)
     return learn
 
 
@@ -214,10 +219,14 @@ def test_td3_save_params(learning_role_n, tmp_path):
 def test_td3_load_matching_n(base_learning_config, saved_n_agent_model):
     save_dir, original_states = saved_n_agent_model
 
-    config_n_new = base_learning_config.copy()
-    learn_n_new = Learning(config_n_new, start, end)
-    learn_n_new.rl_strats["agent_0"] = LearningStrategy(**config_n_new)
-    learn_n_new.rl_strats["agent_1"] = LearningStrategy(**config_n_new)
+    config_n_new = copy(base_learning_config)
+    learn_n_new = Learning(config_n_new["learning_config"], start, end)
+    learn_n_new.rl_strats["agent_0"] = LearningStrategy(
+        **config_n_new, learning_role=learn_n_new
+    )
+    learn_n_new.rl_strats["agent_1"] = LearningStrategy(
+        **config_n_new, learning_role=learn_n_new
+    )
     learn_n_new.initialize_policy()
 
     learn_n_new.rl_algorithm.load_params(directory=save_dir)
@@ -372,9 +381,9 @@ def test_td3_load_transfer_n_minus_m(
 
 @pytest.mark.require_learning
 def test_td3_load_corrupted_or_incomplete_critic(tmp_path, base_learning_config):
-    config = base_learning_config.copy()
-    learning = Learning(config, start, end)
-    learning.rl_strats["agent_0"] = LearningStrategy(**config)
+    config = copy(base_learning_config)
+    learning = Learning(config["learning_config"], start, end)
+    learning.rl_strats["agent_0"] = LearningStrategy(**config, learning_role=learning)
     learning.initialize_policy()
 
     original_state = deepcopy(learning.rl_strats["agent_0"].critics.state_dict())
@@ -417,17 +426,17 @@ def test_initialize_policy_dimension_mismatch(
     """
     Test that mismatches in observation/action/unique/timeseries dims raise ValueErrors.
     """
-    config = base_learning_config.copy()
+    config = copy(base_learning_config)
     config["num_timeseries_obs_dim"] = 1  # Ensure field exists for valid check
 
-    learn = Learning(config, start, end)
+    learn = Learning(config["learning_config"], start, end)
 
     # Create one agent with default config
-    strat_0 = LearningStrategy(**config)
+    strat_0 = LearningStrategy(**config, learning_role=learn)
     # Create second agent with mismatching value
-    config_mismatch = config.copy()
+    config_mismatch = copy(config)
     config_mismatch[mod_field] = mod_value
-    strat_1 = LearningStrategy(**config_mismatch)
+    strat_1 = LearningStrategy(**config_mismatch, learning_role=learn)
 
     learn.rl_strats["agent_0"] = strat_0
     learn.rl_strats["agent_1"] = strat_1
@@ -442,13 +451,13 @@ def test_initialize_policy_all_dimensions_match(base_learning_config):
     """
     Test that initialize_policy succeeds with all matching dimensions.
     """
-    config = base_learning_config.copy()
+    config = copy(base_learning_config)
     config["num_timeseries_obs_dim"] = 1  # Ensure the optional field is populated
 
-    learn = Learning(config, start, end)
-    learn.rl_strats["agent_0"] = LearningStrategy(**config)
-    learn.rl_strats["agent_1"] = LearningStrategy(**config)
-    learn.rl_strats["agent_2"] = LearningStrategy(**config)
+    learn = Learning(config["learning_config"], start, end)
+    learn.rl_strats["agent_0"] = LearningStrategy(**config, learning_role=learn)
+    learn.rl_strats["agent_1"] = LearningStrategy(**config, learning_role=learn)
+    learn.rl_strats["agent_2"] = LearningStrategy(**config, learning_role=learn)
 
     try:
         learn.rl_algorithm.initialize_policy()  # Should not raise
