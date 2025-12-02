@@ -46,7 +46,7 @@ class BusDepot(DSMFlex, SupportsMinMax):
     """
 
     required_technologies = ["electric_vehicle"]
-    optional_technologies = ["charging_station"]
+    optional_technologies = ["charging_station", "pv_plant"]
 
     def __init__(
         self,
@@ -200,6 +200,26 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 cs_config.pop("availability_profile", None)
                 cs_config.pop("charging_profile", None)  # Just in case
 
+        # Check for presence of PV component
+        self.has_pv = "pv_plant" in self.components.keys()
+
+        # Configure PV plant power profile based on availability (similar to steam_plant)
+        if self.has_pv:
+            profile_key = (
+                f"{self.id}_pv_power_profile"
+                if not str_to_bool(
+                    self.components["pv_plant"].get("uses_power_profile", "false")
+                )
+                else "availability_solar"
+            )
+            pv_profile = self.forecaster[profile_key]
+            # Assign the aligned profile
+            self.components["pv_plant"][
+                "power_profile"
+                if profile_key.endswith("power_profile")
+                else "availability_profile"
+            ] = pv_profile
+
         # Build EV property cache for efficient access
         self._build_ev_cache()
         self.is_prosumer = str_to_bool(is_prosumer)
@@ -276,6 +296,9 @@ class BusDepot(DSMFlex, SupportsMinMax):
 
         - `total_power_input`: Represents the total power input required at each time step.
         - `variable_cost`: Represents the variable cost associated with power usage at each time step.
+        - `grid_power`: Power drawn from the grid at each time step.
+        - `pv_used`: PV energy actually used on-site (if PV is present).
+        - `pv_curtail`: PV energy curtailed (if PV is present).
 
         Both variables are defined over the `time_steps` set and are continuous real numbers.
         """
@@ -284,6 +307,20 @@ class BusDepot(DSMFlex, SupportsMinMax):
         self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.Reals)
         self.model.variable_rev = pyo.Var(self.model.time_steps, within=pyo.Reals)
         self.model.net_income = pyo.Var(self.model.time_steps, within=pyo.Reals)
+
+        # Grid power supply
+        self.model.grid_power = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals, doc="Power from grid"
+        )
+
+        # PV integration variables (if PV is present)
+        if self.has_pv:
+            self.model.pv_used = pyo.Var(
+                self.model.time_steps, within=pyo.NonNegativeReals, doc="PV energy used on-site"
+            )
+            self.model.pv_curtail = pyo.Var(
+                self.model.time_steps, within=pyo.NonNegativeReals, doc="PV energy curtailed"
+            )
         #  1: EV-CS assignment variables
         # Represents whether an electric vehicle (EV) is assigned to a charging station (CS)
         self.model.is_assigned = pyo.Var(
@@ -418,6 +455,30 @@ class BusDepot(DSMFlex, SupportsMinMax):
         self._build_compatibility_matrix()
         
     def initialize_process_sequence(self):
+        # --- PV availability cap: pv_used <= PV generation ---
+        if self.has_pv:
+            @self.model.Constraint(self.model.time_steps)
+            def pv_use_cap(m, t):
+                # PV can be partially used or curtailed - not forced to use all
+                return m.pv_used[t] <= m.dsm_blocks["pv_plant"].power[t]
+
+        # --- Electricity balance: PV_used + grid == electric loads (CS discharge to EVs) ---
+        @self.model.Constraint(self.model.time_steps, doc="Electricity supply balance: grid + PV = CS loads")
+        def electricity_balance(m, t):
+            # Supply side: grid + PV (if present)
+            supply = m.grid_power[t]
+            if self.has_pv:
+                supply += m.pv_used[t]
+
+            # Load side: charging station power consumption to charge EVs
+            loads = sum(
+                m.dsm_blocks[cs].discharge[t]
+                for cs in m.dsm_blocks
+                if cs.startswith("charging_station")
+            )
+
+            return supply == loads
+
         for ev in self.model.dsm_blocks:
             if ev.startswith("electric_vehicle"):
                 constraint_name = f"charge_flow_constraint_{ev}"
@@ -521,12 +582,11 @@ class BusDepot(DSMFlex, SupportsMinMax):
 
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
-            cs_discharge = sum(
-                m.dsm_blocks[cs].discharge[t]
-                for cs in m.dsm_blocks
-                if cs.startswith("charging_station")
-            )
-            return m.total_power_input[t] == cs_discharge
+            """
+            Total power input = grid power drawn from external source.
+            CS discharge is balanced separately in electricity_balance constraint.
+            """
+            return m.total_power_input[t] == m.grid_power[t]
         
         @self.model.Constraint(self.model.time_steps)
         def total_power_output_constraint(m, t):
@@ -542,7 +602,8 @@ class BusDepot(DSMFlex, SupportsMinMax):
             """
             Calculates the variable cost associated with power usage at each time step.
 
-            This constraint multiplies the total variable power by the corresponding electricity price.
+            This constraint calculates cost based on grid power consumption.
+            Grid power is charged at electricity_price.
 
             Args:
                 m: Pyomo model reference.
@@ -551,7 +612,8 @@ class BusDepot(DSMFlex, SupportsMinMax):
             Returns:
                 Equality condition defining the variable cost.
             """
-            return m.variable_cost[t] == m.total_power_input[t] * m.electricity_price[t]
+            # Cost = grid power * electricity price (PV is free, battery has its own cost if needed)
+            return m.variable_cost[t] == m.grid_power[t] * m.electricity_price[t]
         #  9.1: Revenue calculation constraint
         # This constraint calculates the revenue generated from the total power input at each time step.
         # It is similar to the variable cost constraint but uses the flexible electricity price.  
@@ -644,11 +706,11 @@ class BusDepot(DSMFlex, SupportsMinMax):
             doc="Queue logic: EV is in queue if available and not assigned to any CS",
         )
         def enforce_queue_logic(m, ev, t):
-            # Skip queue logic if CS count >= EV count (no queue needed)
+            # If CS count >= EV count, no queue needed - set in_queue to 0
             total_cs_count = len(m.charging_stations)
             total_ev_count = len(m.evs)
             if total_cs_count >= total_ev_count:
-                return pyo.Constraint.Skip
+                return m.in_queue[ev, t] == 0
 
             ev_availability = getattr(m, f"{ev}_availability", None)
             if ev_availability is not None:
@@ -667,11 +729,12 @@ class BusDepot(DSMFlex, SupportsMinMax):
             Mathematical constraint: If we have N charging stations and M available EVs,
             then maximum queue size = max(0, M - N)
             """
-            # Skip queue logic if CS count >= EV count (no queue needed)
+            # If CS count >= EV count, no queue capacity constraint needed (already set to 0 above)
             total_cs_count = len(m.charging_stations)
             total_ev_count = len(m.evs)
             if total_cs_count >= total_ev_count:
-                return pyo.Constraint.Skip
+                # All in_queue vars already constrained to 0, so sum is also 0
+                return sum(m.in_queue[ev, t] for ev in m.evs) == 0
 
             # Count total available EVs
             total_available_evs = 0
