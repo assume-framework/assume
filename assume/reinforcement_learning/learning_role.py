@@ -48,6 +48,8 @@ class Learning(Role):
         start: datetime,
         end: datetime,
     ):
+        super().__init__()
+
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
         self.episodes_done = 0
