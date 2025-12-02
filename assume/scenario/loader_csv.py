@@ -757,7 +757,13 @@ def setup_world(
 
     bidding_params = config.get("bidding_strategy_params", {})
 
-    # handle initial learning parameters before leanring_role exists
+    if config.get("learning_mode"):
+        raise ValueError(
+            "The 'learning_mode' parameter in the top-level of the config.yaml has been moved to 'learning_config'. "
+            "Please adjust your config file accordingly."
+        )
+
+    # handle initial learning parameters before learning_role exists
     learning_dict = config.get("learning_config", {})
     # those settings need to be overridden before passing to the LearningConfig
     if learning_dict:
@@ -1030,15 +1036,13 @@ def run_learning(
 
     Args:
         world (World): An instance of the World class representing the simulation environment.
-        inputs_path (str): The path to the folder containing input files necessary for the simulation.
-        scenario (str): The name of the scenario for the simulation.
-        study_case (str): The specific study case for the simulation.
+        verbose (bool, optional): A flag indicating whether to enable verbose logging. Defaults to False.
 
     Note:
         - The function uses a ReplayBuffer to store experiences for training the DRL agents.
         - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
         - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
-        - Upon completion of training, the function performs an evaluation run using the best policy learned during training.
+        - Upon completion of training, the function performs an evaluation run using the last policy learned during training.
         - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
     from assume.reinforcement_learning.buffer import ReplayBuffer

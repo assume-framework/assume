@@ -6,10 +6,10 @@
 Reinforcement Learning Algorithms
 ##################################
 
-In the chapter :doc:`learning` we got a general overview of how RL is implemented for a multi-agent setting in Assume.
+In the chapter :doc:`learning` we got a general overview of how RL is implemented for a multi-agent setting in ASSUME.
 If you want to apply these RL algorithms to a new problem, you do not necessarily need to understand how the RL algorithms work in detail.
 All that is needed is to adapt the bidding strategies, which is covered in the tutorials.
-However, for the interested reader, we will give a brief overview of the RL algorithms used in Assume.
+However, for the interested reader, we will give a brief overview of the RL algorithms used in ASSUME.
 We start with the learning role, which is the core of the learning implementation.
 
 The Learning Role
@@ -29,28 +29,37 @@ The following table shows the options that can be adjusted and gives a short exp
  ======================================== ==========================================================================================================
   learning config item                    description
  ======================================== ==========================================================================================================
-  continue_learning                       Whether to use pre-learned strategies and then continue learning.
-  trained_policies_save_path              Where to store the newly trained rl strategies - only needed when learning_mode is set
-  trained_policies_load_path              If pre-learned strategies should be used, where are they stored? - only needed when continue_learning
-  max_bid_price                           The maximum bid price which limits the action of the actor to this price.
-  learning_mode                           Should we use learning mode at all? If not, the learning bidding strategy is overwritten with a default strategy.
-  algorithm                               Specifies which algorithm to use. Currently, only MATD3 is implemented.
-  actor_architecture                      The architecture of the neural networks used in the algorithm for the actors. The architecture is a list of names specifying the "policy" used e.g. multi layer perceptron (mlp).
-  learning_rate                           The learning rate, also known as step size, which specifies how much the new policy should be considered in the update.
-  learning_rate_schedule                  Which learning rate decay to use. Defaults to None. Currently only "linear" decay available.
-  training_episodes                       The number of training episodes, whereby one episode is the entire simulation horizon specified in the general config.
-  episodes_collecting_initial_experience  The number of episodes collecting initial experience, whereby this means that random actions are chosen instead of using the actor network
-  train_freq                              Defines the frequency in time steps at which the actor and critic are updated.
-  gradient_steps                          The number of gradient steps.
-  batch_size                              The batch size of experience considered from the buffer for an update.
-  gamma                                   The discount factor, with which future expected rewards are considered in the decision-making.
-  device                                  The device to use.
-  noise_sigma                             The standard deviation of the distribution used to draw the noise, which is added to the actions and forces exploration.
-  noise_dt                                Determines how quickly the noise weakens over time / used for noise scheduling.
-  noise_scale                             The scale of the noise, which is multiplied by the noise drawn from the distribution.
-  action_noise_schedule                   Which action noise decay to use. Defaults to None. Currently only "linear" decay available.
-  early_stopping_steps                    The number of steps considered for early stopping. If the moving average reward does not improve over this number of steps, the learning is stopped.
-  early_stopping_threshold                The value by which the average reward needs to improve to avoid early stopping.
+  learning_mode                           Should we use learning mode at all? If False, the learning bidding strategy is loaded from trained_policies_load_path and no training occurs. Default is False.
+  evaluation_mode                         This setting is modified internally. Whether to run in evaluation mode. If True, the agent uses the learned policy without exploration noise and no training updates occur. Default is False.
+  continue_learning                       Whether to use pre-learned strategies and then continue learning. If True, loads existing policies from trained_policies_load_path and continues training. Default is False.
+  trained_policies_save_path              The directory path - relative to the scenario's inputs_path - where newly trained RL policies (actor and critic networks) will be saved. Only needed when learning_mode is True. Value is set in setup_world(). Defaults otherwise to None.
+  trained_policies_load_path              The directory path - relative to the scenario's inputs_path - from which pre-trained policies should be loaded. Needed when continue_learning is True or using pre-trained strategies. Default is None.
+  min_bid_price                           The minimum bid price which limits the action of the actor to this price. Used to constrain the actor's output to a realistic price range. Default is -100.0.
+  max_bid_price                           The maximum bid price which limits the action of the actor to this price. Used to constrain the actor's output to a realistic price range. Default is 100.0.
+  device                                  The device to use for PyTorch computations. Options include "cpu", "cuda", or specific CUDA devices like "cuda:0". Default is "cpu".
+  episodes_collecting_initial_experience  The number of episodes at the start during which random actions are chosen instead of using the actor network. This helps populate the replay buffer with diverse experiences. Default is 5.
+  exploration_noise_std                   The standard deviation of Gaussian noise added to actions during exploration in the environment. Higher values encourage more exploration. Default is 0.2.
+  training_episodes                       The number of training episodes, where one episode is the entire simulation horizon specified in the general config. Default is 100.
+  validation_episodes_interval            The interval (in episodes) at which validation episodes are run to evaluate the current policy's performance without training updates. Default is 5.
+  train_freq                              Defines the frequency in time steps at which the actor and critic networks are updated. Accepts time strings like "24h" for 24 hours or "1d" for 1 day. Default is "24h".
+  batch_size                              The batch size of experiences sampled from the replay buffer for each training update. Larger batches provide more stable gradients but require more memory. In environments with many learning agents we advise small batch sizes. Default is 128.
+  gradient_steps                          The number of gradient descent steps performed during each training update. More steps can lead to better learning but increase computation time. Default is 100.
+  learning_rate                           The learning rate (step size) for the optimizer, which controls how much the policy and value networks are updated during training. Default is 0.001.
+  learning_rate_schedule                  Which learning rate decay schedule to use. Currently only "linear" decay is available, which linearly decreases the learning rate over time. Default is None (constant learning rate).
+  early_stopping_steps                    The number of validation steps over which the moving average reward is calculated for early stopping. If the reward doesn't change by early_stopping_threshold over this many steps, training stops. If None, defaults to training_episodes / validation_episodes_interval + 1.
+  early_stopping_threshold                The minimum improvement in moving average reward required to avoid early stopping. If the reward improvement is less than this threshold over early_stopping_steps, training is terminated early. Default is 0.05.
+  algorithm                               Specifies which reinforcement learning algorithm to use. Currently, only "matd3" (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient) is implemented. Default is "matd3".
+  replay_buffer_size                      The maximum number of transitions stored in the replay buffer for experience replay. Larger buffers allow for more diverse training samples. Default is 500000.
+  gamma                                   The discount factor for future rewards, ranging from 0 to 1. Higher values give more weight to long-term rewards in decision-making. Default is 0.99.
+  actor_architecture                      The architecture of the neural networks used for the actors. Options include "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
+  policy_delay                            The frequency (in gradient steps) at which the actor policy is updated. TD3 updates the critic more frequently than the actor to stabilize training. Default is 2.
+  noise_sigma                             The standard deviation of the Ornstein-Uhlenbeck or Gaussian noise distribution used to generate exploration noise added to actions. Default is 0.1.
+  noise_scale                             The scale factor multiplied by the noise drawn from the distribution. Larger values increase exploration. Default is 1.
+  noise_dt                                The time step parameter for the Ornstein-Uhlenbeck process, which determines how quickly the noise decays over time. Used for noise scheduling. Default is 1.
+  action_noise_schedule                   Which action noise decay schedule to use. Currently only "linear" decay is available, which linearly decreases exploration noise over training. Default is "linear".
+  tau                                     The soft update coefficient for updating target networks. Controls how slowly target networks track the main networks. Smaller values mean slower updates. Default is 0.005.
+  target_policy_noise                     The standard deviation of noise added to target policy actions during critic updates. This smoothing helps prevent overfitting to narrow policy peaks. Default is 0.2.
+  target_noise_clip                       The maximum absolute value for clipping the target policy noise. Prevents the noise from being too large. Default is 0.5.
  ======================================== ==========================================================================================================
 
 How to use continue learning
@@ -147,9 +156,9 @@ Overall, the replay buffer is instrumental in stabilizing the learning process i
 enhancing their robustness and performance by providing a diverse and non-correlated set of training samples.
 
 
-How are they used in Assume?
+How are they used in ASSUME?
 ============================
-In principal Assume allows for different buffers to be implemented. They just need to adhere to the structure presented in the base buffer. Here we will present the different buffers already implemented, which is only one, yet.
+In principal ASSUME allows for different buffers to be implemented. They just need to adhere to the structure presented in the base buffer. Here we will present the different buffers already implemented, which is only one, yet.
 
 
 The simple replay buffer

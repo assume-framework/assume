@@ -198,7 +198,7 @@ class LSTMActor(Actor):
         act_dim: int,
         float_type,
         unique_obs_dim: int,
-        num_timeseries_obs_dim: int = 3,
+        num_timeseries_obs_dim: int,
         *args,
         **kwargs,
     ):
