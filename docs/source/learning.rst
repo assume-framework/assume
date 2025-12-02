@@ -175,6 +175,12 @@ You can read more about the different algorithms and the learning role in :doc:`
 The Learning Results in ASSUME
 =====================================
 
+Learning results are note easy to understand and judge. Assume supports different visualisations to track the learning progress.
+Further we want to raise awarness for common pitfalls with learning result interpretation.
+
+Visualisations
+--------------
+
 Similarly to the other results, the learning progress is tracked in the database, either with postgresql or timescale. The latter enables the usage of the
 predefined dashboards to track the leanring process in the "Assume:Training Process" dashboard. The following pictures show the learning process of a simple reinforcement learning setting.
 A more detailed description is given in the dashboard itself.
@@ -207,3 +213,46 @@ After starting the server, open the following URL in your browser:
 
 TensorBoard will then display dashboards for scalars, histograms, graphs, projectors, and other relevant visualizations, depending on the metrics that
 the training pipeline currently exports.
+
+Interpretation
+--------------
+
+Once the environment and learning algorithm are specified, agents are trained and behaviours begin to emerge. The modeller (you) analyses the reward in the
+visualisations described above. This raises a basic modelling question:
+
+    *How can we judge whether what has been learned is meaningful?*
+
+Unlike supervised learning, we do not have a ground-truth target or an error metric that reliably decreases as behaviour improves. In multi-agent settings,
+the notion of an “optimal” solution is often unclear. What we *do* observe are rewards – signals chosen by the modeller. How informative these signals are
+depends heavily on the reward design and on how other agents behave. Therefore:
+
+    **Do not rely on rewards alone.** Behaviour itself must be examined carefully.
+
+**Why solely reward-based evaluation is problematic**
+
+Let :math:`R_i` denote the episodic return of agent :math:`i` under the joint policy :math:`\pi=(\pi_1,\dots,\pi_n)`. A common but potentially misleading
+heuristic is to evaluate behaviour by the total reward,
+
+.. math::
+
+    S(\pi) = \sum_{i=1}^n \mathbb{E}[R_i].
+
+A larger :math:`S(\pi)` does *not* imply that the learned behaviour is better or more stable. In a multi-agent environment, each agent’s learning alters the
+effective environment faced by the others. The same policy can therefore earn very different returns depending on which opponent snapshot it encounters. High
+aggregate rewards can arise from:
+
+* temporary exploitation of weaknesses of other agents,
+* coordination effects that occur by chance rather than by design,
+* behaviour that works against training opponents but fails in other situations.
+
+Rewards are thus, at best, an indirect proxy for “good behaviour.” They measure how well a policy performs *under the specific reward function and opponent
+behaviour*, not whether it is robust, interpretable, or aligned with the modeller’s intent.
+
+**Implications for policy selection**
+
+This issue becomes visible when deciding which policy to evaluate at the end of training. We generally store (i) the policy with the highest average reward and
+(ii) the final policy. However, these two can differ substantially in their behaviour. The framework therefore uses the **final policy** for evaluation to
+avoid selecting a high-reward snapshot that may be far from stable.
+
+The most robust learning performance can be achieved through **early stopping** with a very large number of episodes. In that case, training halts once results
+are stable, and the final policy is likely also the stable one. This behaviour should be monitored by the modeller in TensorBoard.
