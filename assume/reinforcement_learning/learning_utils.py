@@ -212,7 +212,9 @@ def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
         for values in unit_data.values():
             if values:
                 val = values[0]
-                feature_dim = 1 if val.ndim == 0 else len(val)
+                feature_dim = (
+                    1 if isinstance(val, (int | float)) or val.ndim == 0 else len(val)
+                )
                 break
         if feature_dim is not None:
             break
