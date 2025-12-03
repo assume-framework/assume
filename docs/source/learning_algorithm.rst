@@ -73,7 +73,7 @@ The learning process will then start from these pre-trained networks instead of 
 
 In other words, the input layer of the critics will vary depending on the number of agents. To enable the use of continue learning between simulations with varying agent sizes, a mapping is implemented that ensures the loaded critics are adapted to match the new number of agents.
 
-This process will fail, when the number of hidden layers differs between the loaded critic and the new critic. In this case, you will need to retrain the networks from scratch. Further, different chosen neural network arhcitectures for the critic (or actor) between the loaded and new networks will also lead to a failure of the continue learning process.
+This process will fail, when the number of hidden layers differs between the loaded critic and the new critic. In this case, you will need to retrain the networks from scratch. Further, different chosen neural network architectures for the critic (or actor) between the loaded and new networks will also lead to a failure of the continue learning process.
 
 
 The Algorithms
@@ -121,7 +121,7 @@ at the beginning of each episode. For more information regarding the buffer see 
 The core of the algorithm is embodied by the :func:`assume.reinforcement_learning.algorithms.matd3.TD3.update_policy` in the learning algorithms. Here, the critic and the actor are updated according to the algorithm.
 
 The network architecture for the actor in the RL algorithm can be customized by specifying the network architecture used.
-In stablebaselines3 they are also referred to as "policies". The architecture is defined as a list of names that represent the layers of the neural network.
+In Stable Baselines3 they are also referred to as "policies". The architecture is defined as a list of names that represent the layers of the neural network.
 For example, to implement a multi-layer perceptron (MLP) architecture for the actor, you can set the "actor_architecture" config item to ["mlp"].
 This will create a neural network with multiple fully connected layers.
 
