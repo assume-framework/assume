@@ -70,7 +70,6 @@ Documentation
    examples_basic
    example_simulations
 
-**User Guide**
 
 User Guide
 ==========
@@ -115,8 +114,7 @@ User Guide
    assume
 
 
-Indices and tables
-==================
+**Indices & Tables**
 
 * :ref:`genindex`
 * :ref:`modindex`
