@@ -10,9 +10,11 @@ import pandas as pd
 import pyomo.environ as pyo
 from mango import AgentAddress
 from pyomo.opt import SolverFactory, TerminationCondition
+import pypsa
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import create_incidence_matrix, get_supported_solver
+from assume.common.grid_utils import calculate_ptdf_matrix
 from assume.markets.base_market import MarketRole
 
 # Set the log level to WARNING
@@ -31,6 +33,7 @@ def market_clearing_opt_constraints(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame,
     lines: pd.DataFrame,
+    ptdf_matrix: pd.DataFrame = None,
 ):
     """
     Adds the constraints to the model.
@@ -170,20 +173,103 @@ def market_clearing_opt_constraints(
 
         return balance_expr == 0
 
-    # Add the energy balance constraints for each node and time period using the rule
-    # Define the energy balance constraint using two indices (node and time)
-    model.energy_balance = pyo.Constraint(
-        model.nodes, model.T, rule=energy_balance_rule
-    )
+    # depending on if we have a OPF with PTDF or just NTCs, we need different constraints
+    # in the NTC case the energy balance is for each node
+    # in case of PTDF, the energy balance is only for non-slack nodes
+    if ptdf_matrix is None:
+        # Add the energy balance constraints for each node and time period using the rule
+        # Define the energy balance constraint using two indices (node and time)
+        model.energy_balance = pyo.Constraint(
+            model.nodes, model.T, rule=energy_balance_rule
+        )
+    else:
+        # Identify slack nodes (nodes with all entries == 0 in PTDF columns)
+        # assuming there is only one slack node
+        slack_node = ptdf_matrix.columns[(ptdf_matrix == 0).all()][0]
+
+        # Define the nodal energy balance constraint excluding slack nodes for each time period
+        non_slack_nodes = [node for node in model.nodes if node != slack_node]
+        model.non_slack_nodes = pyo.Set(initialize=non_slack_nodes)
+        model.energy_balance = pyo.Constraint(
+            model.non_slack_nodes, model.T, rule=energy_balance_rule
+        )
+        # Define a system wide energy balance constraint for each time period including the injection/withdrawal at the slack node
+        model.system_wide_energy_balance = pyo.Constraint(
+            model.T,
+            rule=lambda model, t: sum(
+                order["volume"] * model.xs[order["bid_id"]]
+                for order in orders
+                if order["bid_type"] == "SB" and order["start_time"] == t
+            )
+            + sum(
+                volume * model.xb[order["bid_id"]]
+                for order in orders
+                if order["bid_type"] in ["BB", "LB"]
+                for start_time, volume in order["volume"].items()
+                if start_time == t
+            )
+            == 0,
+        )
 
     if incidence_matrix is not None:
         model.transmission_constr = pyo.ConstraintList()
-        for t in model.T:
-            for line in model.lines:
-                capacity = lines.at[line, "s_nom"]
-                # Limit the flow on each line
-                model.transmission_constr.add(model.flows[t, line] <= capacity)
-                model.transmission_constr.add(model.flows[t, line] >= -capacity)
+        if ptdf_matrix is None:
+            print("Warning: No PTDF matrix provided. Clearing will be based on NTCs only.\nInclude a column 'x' with reactances in lines.csv for PTDF calculation.")
+            # clear based on Net Transfer Capacities (NTC) if PTDF matrix is not defined
+            # this is the old behavior of complex_clearing, neglecting reactances x of the lines
+            for t in model.T:
+                for line in model.lines:
+                    # s_max_pu might also be time variant. but for now we assume it is static
+                    s_max_pu = (
+                        lines.at[line, "s_max_pu"]
+                        if "s_max_pu" in lines.columns and not pd.isna(lines.at[line, "s_max_pu"])
+                        else 1.0
+                    )
+                    capacity = lines.at[line, "s_nom"] * s_max_pu
+                    # Limit the flow on each line
+                    model.transmission_constr.add(model.flows[t, line] <= capacity)
+                    model.transmission_constr.add(model.flows[t, line] >= -capacity)
+        else:
+            # clear based on PTDFs if PTDF matrix is defined
+            for t in model.T:
+                for line in model.lines:
+                    # s_max_pu might also be time variant. but for now we assume it is static
+                    s_max_pu = (
+                        lines.at[line, "s_max_pu"]
+                        if "s_max_pu" in lines.columns and not pd.isna(lines.at[line, "s_max_pu"])
+                        else 1.0
+                    )
+                    capacity = lines.at[line, "s_nom"] * s_max_pu
+                    # Limit the flow on each line based on PTDFs
+                    ptdf_values = ptdf_matrix.loc[line]
+                    slack_node = ptdf_matrix.columns[(ptdf_matrix == 0).all()][0]
+                    # l lines, n nodes, t timesteps
+                    # flow_expr = sum(PTDF_l,n * P_net_n) for all n nodes
+                    # P_net is the net injection/withdrawal at one node (sometimes referred to as nodal imbalance Z_n)
+                    # P_net is the sum of positive supply and negative demand at each node
+                    flow_expr = sum(
+                        ptdf_values[node] * sum(
+                            order["volume"] * model.xs[order["bid_id"]]
+                            for order in orders
+                            if order["bid_type"] == "SB"
+                            and order["node"] == node
+                            and order["start_time"] == t
+                        )
+                        + ptdf_values[node] * sum(
+                            volume * model.xb[order["bid_id"]]
+                            for order in orders
+                            if order["bid_type"] in ["BB", "LB"]
+                            and order["node"] == node
+                            for start_time, volume in order["volume"].items()
+                            if start_time == t
+                        )
+                        for node in model.nodes
+                        if node != slack_node # only consider non-slack nodes
+                    )
+                    
+                    model.transmission_constr.add(flow_expr <= capacity)
+                    model.transmission_constr.add(flow_expr >= -capacity)
+                    
 
 
 def market_clearing_opt_objective(model: pyo.ConcreteModel, orders: Orderbook):
@@ -209,6 +295,7 @@ def market_clearing_opt(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame = None,
     lines: pd.DataFrame = None,
+    ptdf_matrix: pd.DataFrame = None,
     solver: str = "appsi_highs",
     solver_options: dict = {},
     func_constraints=market_clearing_opt_constraints,
@@ -256,7 +343,7 @@ def market_clearing_opt(
     model = pyo.ConcreteModel()
 
     func_constraints(
-        model, orders, market_products, mode, with_linked_bids, incidence_matrix, lines
+        model, orders, market_products, mode, with_linked_bids, incidence_matrix, lines, ptdf_matrix,
     )
 
     func_objective(model, orders)
@@ -343,7 +430,7 @@ class ComplexClearingRole(MarketRole):
         if self.grid_data:
             self.lines = self.grid_data["lines"]
             buses = self.grid_data["buses"]
-
+            self.network = pypsa.Network(self.marketconfig.param_dict.get("network_path"))
             self.zones_id = self.marketconfig.param_dict.get("zones_identifier")
             self.node_to_zone = None
 
@@ -359,7 +446,14 @@ class ComplexClearingRole(MarketRole):
                 # Nodal Case
                 self.incidence_matrix = create_incidence_matrix(self.lines, buses)
                 self.nodes = buses.index.values
-
+            
+            # TODO: not sure if we need to differentiate between nodal and zonal for PTDF calculation
+            self.ptdf_matrix = None
+            if 'x' in self.lines.columns and not self.lines['x'].isnull().all():
+                self.ptdf_matrix = calculate_ptdf_matrix(self.network)
+                # assuming there is only one slack bus
+                self.slack_bus = self.ptdf_matrix.columns[(self.ptdf_matrix == 0).all()][0]
+        
         self.log_flows = self.marketconfig.param_dict.get("log_flows", False)
         self.pricing_mechanism = self.marketconfig.param_dict.get(
             "pricing_mechanism", "pay_as_clear"
@@ -508,6 +602,7 @@ class ComplexClearingRole(MarketRole):
                 with_linked_bids=with_linked_bids,
                 incidence_matrix=self.incidence_matrix,
                 lines=self.lines,
+                ptdf_matrix=self.ptdf_matrix,
                 solver=self.solver,
                 solver_options=self.solver_options,
             )
@@ -518,11 +613,19 @@ class ComplexClearingRole(MarketRole):
             # extract dual from model.energy_balance
             market_clearing_prices = {}
             for node in self.nodes:
-                market_clearing_prices[node] = {
-                    t: instance.dual[instance.energy_balance[node, t]]
-                    for t in instance.T
-                }
-
+                if node != self.slack_bus:
+                    # get the LMP of each node as the dual of the nodal energy balance constraint
+                    market_clearing_prices[node] = {
+                        t: instance.dual[instance.energy_balance[node, t]]
+                        for t in instance.T
+                    }
+                else:
+                    # get the LMP of the slack bus as the dual of the system wide energy balance constraint
+                    # the injection P_net at the slack bus is coupled to the other P_net through the PTDF matrix
+                    market_clearing_prices[node] = {
+                        t: instance.dual[instance.system_wide_energy_balance[t]]
+                        for t in instance.T
+                    }
             # check the surplus of each order and remove those with negative surplus
             orders_surplus = []
             for order in orderbook:
