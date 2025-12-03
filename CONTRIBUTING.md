@@ -85,9 +85,26 @@ The upload to PyPi has to be confirmed by one of the core developers.
 
 First, create an environment that includes the documentation dependencies:
 
+
+### Conda
+
+Conda installs the required dependencies and pandoc as well:
+
 ```bash
 conda env create -f environment_docs.yaml
 ```
+
+### Venv
+
+To use a venv without conda, a system installation of pandoc is required: https://pandoc.org/installing.html
+
+You then need to install the dependencies into your venv using:
+
+```bash
+pip install -e .[docs]
+```
+
+### Building Docs
 
 To generate or update the automatically created docs in `docs/source/assume*`, run:
 
