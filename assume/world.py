@@ -202,7 +202,7 @@ class World:
             simulation_id (str): The unique identifier for the simulation.
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
-            learning_config (dict | None, optional): Configuration for the learning process. Defaults to None.
+            learning_dict (dict, optional): Configuration for the learning process. Defaults to an empty dictionary.
             manager_address: The address of the manager.
             **kwargs: Additional keyword arguments.
 
