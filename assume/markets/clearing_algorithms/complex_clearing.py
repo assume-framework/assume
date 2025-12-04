@@ -612,20 +612,28 @@ class ComplexClearingRole(MarketRole):
 
             # extract dual from model.energy_balance
             market_clearing_prices = {}
-            for node in self.nodes:
-                if node != self.slack_bus:
+            if self.ptdf_matrix is None:
+                for node in self.nodes:
                     # get the LMP of each node as the dual of the nodal energy balance constraint
                     market_clearing_prices[node] = {
                         t: instance.dual[instance.energy_balance[node, t]]
                         for t in instance.T
                     }
-                else:
-                    # get the LMP of the slack bus as the dual of the system wide energy balance constraint
-                    # the injection P_net at the slack bus is coupled to the other P_net through the PTDF matrix
-                    market_clearing_prices[node] = {
-                        t: instance.dual[instance.system_wide_energy_balance[t]]
-                        for t in instance.T
-                    }
+            else:
+                for node in self.nodes:
+                    if node != self.slack_bus:
+                        # get the LMP of each non-slack node as the dual of the nodal energy balance constraint
+                        market_clearing_prices[node] = {
+                            t: instance.dual[instance.energy_balance[node, t]]
+                            for t in instance.T
+                        }
+                    else:
+                        # get the LMP of the slack bus as the dual of the system wide energy balance constraint
+                        # the injection P_net at the slack bus is coupled to the other P_net through the PTDF matrix
+                        market_clearing_prices[node] = {
+                            t: instance.dual[instance.system_wide_energy_balance[t]]
+                            for t in instance.T
+                        }
 
             # example code to extract dispatched volumes and flows directly without using the LMPs
             # TODO: check if and how this works for block bids and linked bids
