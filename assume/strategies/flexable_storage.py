@@ -463,7 +463,6 @@ class flexableNegCRMStorage(BaseStrategy):
         bids = self.remove_empty_bids(bids)
 
         return bids
-
 class flexableRedispatchStorage(BaseStrategy):
     """
     Redispatch for storage, flexABLE-style but robust to forecast/index shapes.
@@ -592,6 +591,11 @@ class flexableRedispatchStorage(BaseStrategy):
         # Forecast series on our DatetimeIndex
         price_series = self._select_forecast(unit, market_config)
 
+        # Try to read technical limits from the unit object
+        # (these should correspond to your storage_units.csv columns)
+        max_p_dis_nom = float(getattr(unit, "max_power_discharge", np.nan))
+        max_p_ch_nom  = float(getattr(unit, "max_power_charge", np.nan))
+
         for (product, max_dis_i, min_dis_i, max_ch_i, min_ch_i) in zip(
             product_tuples, max_dis, min_dis, max_ch, min_ch
         ):
@@ -627,7 +631,14 @@ class flexableRedispatchStorage(BaseStrategy):
 
             # Prices consistent with flexABLE storage logic
             ask_up = max(0.0, avg_p / max(unit.efficiency_discharge, 1e-9))  # discharge
-            bid_down = max(0.0, avg_p * unit.efficiency_charge)               # charge
+            bid_down = max(0.0, avg_p * unit.efficiency_charge)              # charge
+
+            # Fallback: if attributes are missing, derive limits from envelopes
+            # These are *nominal* bounds, not the actual ramp-feasible volume
+            if not np.isfinite(max_p_dis_nom):
+                max_p_dis_nom = max(0.0, float(max_dis_i))
+            if not np.isfinite(max_p_ch_nom):
+                max_p_ch_nom = max(0.0, float(max_ch_i))
 
             # Create bids only if feasible non-zero
             if feas_up > 0.0:
@@ -636,8 +647,12 @@ class flexableRedispatchStorage(BaseStrategy):
                     "end_time": t1,
                     "only_hours": only_hours,
                     "price": float(ask_up),
-                    "volume": float(feas_up),   # +MW (discharge)
+                    "volume": float(feas_up),     # +MW (discharge)
                     "node": unit.node,
+                    # bounds required by redispatch.py
+                    # upward redispatch can move between [0, max_discharge]
+                    "max_power": float(max_p_dis_nom),
+                    "min_power": 0.0,
                 })
 
             if feas_down < 0.0:
@@ -646,8 +661,11 @@ class flexableRedispatchStorage(BaseStrategy):
                     "end_time": t1,
                     "only_hours": only_hours,
                     "price": float(bid_down),
-                    "volume": float(feas_down), # −MW (charge)
+                    "volume": float(feas_down),   # −MW (charge)
                     "node": unit.node,
+                    # downward redispatch can move between [-max_charge, 0]
+                    "max_power": 0.0,
+                    "min_power": float(-max_p_ch_nom),
                 })
 
             # advance theoretical SoC by base profile only
@@ -663,6 +681,7 @@ class flexableRedispatchStorage(BaseStrategy):
             previous_power = base_p
 
         return self.remove_empty_bids(bids)
+
 
 def calculate_price_average(current_time, foresight, price_forecast):
     """
