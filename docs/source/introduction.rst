@@ -21,7 +21,7 @@ Architecture
 In the following figure the architecture of the framework is depicted. It can be roughly divided into two parts.
 On the left side of the world class the markets are located and on the right side the market participants,
 which are here named units. Both world are connected via the orders that market participants place on the markets.
-The learning capacbility is sketched out with the yellow classes on the right side, namely the units side.
+The learning capability is sketched out with the yellow classes on the right side, namely the units side.
 
 .. image:: img/architecture.svg
     :align: center
@@ -79,7 +79,7 @@ Market Participants
 ===================
 
 The market participants, here labeled units, comprise all entities acting in the respective markets and are at
-the core of any agent-based simulation model. The entirety of their behaviour leads to the market and system
+the core of any agent-based simulation model. The entirety of their behavior leads to the market and system
 outcome as a bottom-up simulation model, respectively.
 
 Modularity of Units
