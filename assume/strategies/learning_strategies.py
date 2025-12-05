@@ -63,7 +63,7 @@ class BaseLearningStrategy(LearningStrategy):
         self.float_type = th.float
 
         # define standard deviation for the initial exploration noise
-        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
+        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.1)
 
         if self.learning_mode or self.evaluation_mode:
             self.collect_initial_experience_mode = bool(

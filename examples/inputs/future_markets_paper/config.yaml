@@ -100,24 +100,24 @@ base_case_2013_pp_all:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
   time_step: 1h
-  learning_mode: True
+  learning_mode: False
   save_frequency_hours: Null
 
   learning_config:
-    continue_learning: True
+    continue_learning: False
     trained_policies_save_path: null
     trained_policies_load_path:  examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_all/last_policies
     max_bid_price: 300
     algorithm: matd3
     learning_rate: 0.0001
-    training_episodes: 300
-    episodes_collecting_initial_experience: 2
+    training_episodes: 200
+    episodes_collecting_initial_experience: 80
     train_freq: 24h
-    gradient_steps: 1
+    gradient_steps: 10
     batch_size: 256
     gamma: 0
     device: cpu
-    noise_sigma: 0.4
+    noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
     action_noise_schedule: linear
@@ -147,13 +147,13 @@ base_case_2013_pp_single:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
   time_step: 1h
-  learning_mode: True
+  learning_mode: False
   save_frequency_hours: Null
 
   learning_config:
-    continue_learning: False
+    continue_learning: True
     trained_policies_save_path: null
-    trained_policies_load_path:  null
+    trained_policies_load_path:  examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_single/last_policies
     max_bid_price: 300
     algorithm: matd3
     learning_rate: 0.001
@@ -163,13 +163,13 @@ base_case_2013_pp_single:
     gradient_steps: 10
     batch_size: 256
     gamma: 0
-    device: cpu
-    noise_sigma: 0.4
+    device: gpu
+    noise_sigma: 0.6
     noise_scale: 1
     noise_dt: 1
     action_noise_schedule: linear
     validation_episodes_interval: 5
-    early_stopping_steps: 20
+    early_stopping_steps: 100
     early_stopping_threshold: 0.05
 
   markets_config:
