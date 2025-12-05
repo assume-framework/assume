@@ -120,15 +120,15 @@ def test_pv_plant_availability_profile_with_price(
 
         # No production if price is negative or availability is zero
         if price < 0 or availability == 0:
-            assert (
-                power_output == 0
-            ), f"Power output should be zero at time {t} due to negative price or zero availability"
+            assert power_output == 0, (
+                f"Power output should be zero at time {t} due to negative price or zero availability"
+            )
 
         # Production allowed if price is positive and availability is 1
         else:
-            assert (
-                power_output <= model.pv_plant.max_power * availability
-            ), f"Power output should not exceed max power at time {t}"
+            assert power_output <= model.pv_plant.max_power * availability, (
+                f"Power output should not exceed max power at time {t}"
+            )
 
 
 # Test for PV plant with power profile, ensuring it follows the profile regardless of price
@@ -148,6 +148,6 @@ def test_pv_plant_power_profile_with_price(
         power_output = pyo.value(model.pv_plant.power[t])
 
         # Ensure the power output follows the power profile exactly
-        assert (
-            power_output == pytest.approx(expected_power_output, rel=1e-2)
-        ), f"Power output should follow the power profile at time {t} regardless of price"
+        assert power_output == pytest.approx(expected_power_output, rel=1e-2), (
+            f"Power output should follow the power profile at time {t} regardless of price"
+        )

@@ -118,17 +118,17 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             # Assert the bid price is correctly scaled
             expected_bid_price = sell_action[0] * strategy.max_bid_price  # 20.0
-            assert (
-                bid["price"] == expected_bid_price
-            ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
+            assert bid["price"] == expected_bid_price, (
+                f"Expected bid price {expected_bid_price}, got {bid['price']}"
+            )
 
             # Assert the bid direction is 'sell' and volume is max_power_discharge
             expected_volume = (
                 storage_unit.max_power_discharge * storage_unit.efficiency_discharge
             )  # 500
-            assert (
-                bid["volume"] == expected_volume
-            ), f"Expected bid volume {expected_volume}, got {bid['volume']}"
+            assert bid["volume"] == expected_volume, (
+                f"Expected bid volume {expected_volume}, got {bid['volume']}"
+            )
 
             # Simulate bid acceptance by setting accepted_price and accepted_volume
             bid["accepted_price"] = expected_bid_price  # 20.0
@@ -170,19 +170,19 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             ) * scaling_factor  # (10000 - 5000) * 0.0002 = 1.0
 
             # Assert the calculated reward
-            assert (
-                reward == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward}"
+            assert reward == expected_reward, (
+                f"Expected reward {expected_reward}, got {reward}"
+            )
 
             # Assert the calculated profit
-            assert (
-                profit == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit}"
+            assert profit == expected_profit - expected_costs, (
+                f"Expected profit {expected_profit}, got {profit}"
+            )
 
             # Assert the calculated costs
-            assert (
-                costs[0] == expected_costs
-            ), f"Expected costs {expected_costs}, got {costs[0]}"
+            assert costs[0] == expected_costs, (
+                f"Expected costs {expected_costs}, got {costs[0]}"
+            )
 
 
 @pytest.mark.require_learning
@@ -224,15 +224,15 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             # Assert the bid price is correctly scaled
             expected_bid_price = abs(buy_action[0]) * strategy.max_bid_price  # 30.0
-            assert math.isclose(
-                bid["price"], expected_bid_price, abs_tol=1e3
-            ), f"Expected bid price {expected_bid_price}, got {bid['price']}"
+            assert math.isclose(bid["price"], expected_bid_price, abs_tol=1e3), (
+                f"Expected bid price {expected_bid_price}, got {bid['price']}"
+            )
 
             # Assert the bid direction is 'buy' and volume is abs(max_power_charge)
             expected_volume = storage_unit.max_power_charge  # 500
-            assert (
-                bid["volume"] == expected_volume
-            ), f"Expected bid volume {expected_volume}, got {bid['volume']}"
+            assert bid["volume"] == expected_volume, (
+                f"Expected bid volume {expected_volume}, got {bid['volume']}"
+            )
 
             # Simulate bid acceptance by setting accepted_price and accepted_volume
             bid["accepted_price"] = expected_bid_price  # 30.0
@@ -274,19 +274,19 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             ) * scaling_factor  # (15000 - 7500) * 0.0002 = 1.5
 
             # Assert the calculated reward
-            assert (
-                reward == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward}"
+            assert reward == expected_reward, (
+                f"Expected reward {expected_reward}, got {reward}"
+            )
 
             # Assert the calculated profit
-            assert (
-                profit == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit}"
+            assert profit == expected_profit - expected_costs, (
+                f"Expected profit {expected_profit}, got {profit}"
+            )
 
             # Assert the calculated costs
-            assert (
-                costs[0] == expected_costs
-            ), f"Expected costs {expected_costs}, got {costs[0]}"
+            assert costs[0] == expected_costs, (
+                f"Expected costs {expected_costs}, got {costs[0]}"
+            )
 
 
 @pytest.mark.require_learning
@@ -353,18 +353,18 @@ def test_storage_rl_strategy_cost_stored_energy(mock_market_config, storage_unit
         # Initial state: 500 MWh at default energy costs of 0 €/MWh
         # 1. Charge 500 MWh at 30 €/MWh): cost_stored_energy_t1 = (0 €/MWh * 500 MWh - ((30 €/MWh + 5 €/MWh) * - 500 MW * 1h)) / 950 MWh = 18.41 €/MWh
         expected_cost_t1 = (500 * 35) / 950
-        assert math.isclose(
-            cost_stored_energy[1], expected_cost_t1, rel_tol=1e-3
-        ), f"Expected energy cost at t=1 to be {expected_cost_t1}, got {cost_stored_energy[1]}"
+        assert math.isclose(cost_stored_energy[1], expected_cost_t1, rel_tol=1e-3), (
+            f"Expected energy cost at t=1 to be {expected_cost_t1}, got {cost_stored_energy[1]}"
+        )
         # 2. Discharge 500 MWh at 60 €/MWh: cost_stored_energy_t2 = 18.41 €/MWh unchanged
         expected_cost_t2 = expected_cost_t1
-        assert math.isclose(
-            cost_stored_energy[2], expected_cost_t2, rel_tol=1e-3
-        ), f"Expected energy cost at t=2 to be {expected_cost_t2}, got {cost_stored_energy[2]}"
+        assert math.isclose(cost_stored_energy[2], expected_cost_t2, rel_tol=1e-3), (
+            f"Expected energy cost at t=2 to be {expected_cost_t2}, got {cost_stored_energy[2]}"
+        )
         # 3. Discharge remaining 355 MWh at 80 €/Mwh: SoC < 1 --> cost_stored_energy_t3 = 0 €/MWh
         expected_cost_t3 = 0
-        assert math.isclose(
-            cost_stored_energy[3], expected_cost_t3, rel_tol=1e-3
-        ), f"Expected energy cost at t=3 to be {expected_cost_t3}, got {cost_stored_energy[3]}"
+        assert math.isclose(cost_stored_energy[3], expected_cost_t3, rel_tol=1e-3), (
+            f"Expected energy cost at t=3 to be {expected_cost_t3}, got {cost_stored_energy[3]}"
+        )
 
         print("Energy cost series:\n", cost_stored_energy)

@@ -114,9 +114,9 @@ def test_state_of_charge_constraints(generic_storage_model, generic_storage_conf
 
         if i == 0:
             # Initial SOC at first time step
-            assert (
-                abs(current_soc - previous_soc) < 1e-4
-            ), f"Initial SOC at time {t} is {current_soc}, expected {previous_soc}."
+            assert abs(current_soc - previous_soc) < 1e-4, (
+                f"Initial SOC at time {t} is {current_soc}, expected {previous_soc}."
+            )
         else:
             prev_t = time_steps[i - 1]
             prev_charge = pyo.value(model.storage.charge[prev_t])
@@ -127,9 +127,9 @@ def test_state_of_charge_constraints(generic_storage_model, generic_storage_conf
                 - (prev_discharge / efficiency_discharge)
                 - (storage_loss_rate * previous_soc)
             )
-            assert (
-                abs(current_soc - expected_soc) < 1e-4
-            ), f"SOC at time {t} is {current_soc}, but expected {expected_soc} based on charging, discharging, and losses."
+            assert abs(current_soc - expected_soc) < 1e-4, (
+                f"SOC at time {t} is {current_soc}, but expected {expected_soc} based on charging, discharging, and losses."
+            )
 
         previous_soc = current_soc
 
@@ -146,12 +146,12 @@ def test_power_bounds(generic_storage_model, generic_storage_config):
         charge = pyo.value(model.storage.charge[t])
         discharge = pyo.value(model.storage.discharge[t])
 
-        assert (
-            0 <= charge <= max_charge + 1e-5
-        ), f"Charging power at time {t} is {charge}, which exceeds the maximum limit of {max_charge}."
-        assert (
-            0 <= discharge <= max_discharge + 1e-5
-        ), f"Discharging power at time {t} is {discharge}, which exceeds the maximum limit of {max_discharge}."
+        assert 0 <= charge <= max_charge + 1e-5, (
+            f"Charging power at time {t} is {charge}, which exceeds the maximum limit of {max_charge}."
+        )
+        assert 0 <= discharge <= max_discharge + 1e-5, (
+            f"Discharging power at time {t} is {discharge}, which exceeds the maximum limit of {max_discharge}."
+        )
 
 
 def test_ramping_constraints(generic_storage_model, generic_storage_config):
@@ -209,9 +209,9 @@ def test_storage_loss_rate(generic_storage_model, generic_storage_config):
         actual_soc = pyo.value(model.storage.soc[t])
         if i == 0:
             # Initial SOC at first time step
-            assert (
-                abs(actual_soc - previous_soc) < 1e-4
-            ), f"Initial SOC at time {t} is {actual_soc}, expected {previous_soc}."
+            assert abs(actual_soc - previous_soc) < 1e-4, (
+                f"Initial SOC at time {t} is {actual_soc}, expected {previous_soc}."
+            )
         else:
             prev_t = time_steps[i - 1]
             prev_charge = pyo.value(model.storage.charge[prev_t])
@@ -222,9 +222,9 @@ def test_storage_loss_rate(generic_storage_model, generic_storage_config):
                 - (prev_discharge / efficiency_discharge)
                 - (storage_loss_rate * previous_soc)
             )
-            assert (
-                abs(actual_soc - expected_soc) < 1e-4
-            ), f"SOC at time {t} is {actual_soc}, but expected {expected_soc} based on storage losses."
+            assert abs(actual_soc - expected_soc) < 1e-4, (
+                f"SOC at time {t} is {actual_soc}, but expected {expected_soc} based on storage losses."
+            )
         previous_soc = actual_soc
 
 
@@ -237,9 +237,9 @@ def test_min_capacity_enforcement(generic_storage_model, generic_storage_config)
 
     for t in model.time_steps:
         soc = pyo.value(model.storage.soc[t])
-        assert (
-            soc >= min_capacity - 1e-5
-        ), f"SOC at time {t} is {soc}, which is below the minimum capacity of {min_capacity}."
+        assert soc >= min_capacity - 1e-5, (
+            f"SOC at time {t} is {soc}, which is below the minimum capacity of {min_capacity}."
+        )
 
 
 def test_max_capacity_enforcement(generic_storage_model, generic_storage_config):
@@ -251,9 +251,9 @@ def test_max_capacity_enforcement(generic_storage_model, generic_storage_config)
 
     for t in model.time_steps:
         soc = pyo.value(model.storage.soc[t])
-        assert (
-            soc <= max_capacity + 1e-5
-        ), f"SOC at time {t} is {soc}, which exceeds the maximum capacity of {max_capacity}."
+        assert soc <= max_capacity + 1e-5, (
+            f"SOC at time {t} is {soc}, which exceeds the maximum capacity of {max_capacity}."
+        )
 
 
 if __name__ == "__main__":
