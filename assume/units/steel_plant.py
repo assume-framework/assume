@@ -7,7 +7,7 @@ import logging
 import pyomo.environ as pyo
 
 from assume.common.base import SupportsMinMax
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import SteelplantForecaster
 from assume.units.dsm_load_shift import DSMFlex
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
-        forecaster: Forecaster,
+        forecaster: SteelplantForecaster,
         components: dict[str, dict] = None,
         technology: str = "steel_plant",
         objective: str = "min_variable_cost",
@@ -79,6 +79,10 @@ class SteelPlant(DSMFlex, SupportsMinMax):
             location=location,
             **kwargs,
         )
+        if not isinstance(forecaster, SteelplantForecaster):
+            raise TypeError(
+                f"forecaster must be of type {SteelplantForecaster.__name__}"
+            )
 
         # check if the required components are present in the components dictionary
         for component in self.required_technologies:
@@ -97,20 +101,21 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                     f"Components {component} is not a valid component for the steel plant unit."
                 )
 
-        self.natural_gas_price = self.forecaster["fuel_price_natural_gas"]
-        self.hydrogen_price = self.forecaster["price_hydrogen"]
-        self.electricity_price = self.forecaster["price_EOM"]
-        self.iron_ore_price = self.forecaster.get_price("iron_ore")
+        # FIXME assuming only one market
+        self.market_id = list(bidding_strategies.keys())[0]
+
+        self.electricity_price = forecaster.electricity_price
         self.steel_demand = demand
+        self.natural_gas_price = self.forecaster.get_price("natural_gas")
+        self.hydrogen_price = self.forecaster.get_price("hydrogen")
+        self.iron_ore_price = self.forecaster.get_price("iron_ore")
         self.steel_price = self.forecaster.get_price("steel")
         self.lime_price = self.forecaster.get_price("lime")
         self.co2_price = self.forecaster.get_price("co2")
 
         # Calculate congestion forecast and set it as a forecast column in the forecaster
-        self.congestion_signal = self.forecaster[f"{node}_congestion_severity"]
-        self.renewable_utilisation_signal = self.forecaster[
-            f"{node}_renewable_utilisation"
-        ]
+        self.congestion_signal = forecaster.congestion_signal
+        self.renewable_utilisation_signal = forecaster.renewable_utilisation_signal
 
         self.objective = objective
         self.flexibility_measure = flexibility_measure

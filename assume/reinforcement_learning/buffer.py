@@ -122,9 +122,9 @@ class ReplayBuffer:
 
     def add(
         self,
-        obs: np.array,
-        actions: np.array,
-        reward: np.array,
+        obs: np.ndarray,
+        actions: np.ndarray,
+        reward: np.ndarray,
     ):
         """
         Adds an observation, action, and reward of all agents to the replay buffer.
@@ -138,7 +138,7 @@ class ReplayBuffer:
         len_obs = obs.shape[0]
         self.observations[self.pos : self.pos + len_obs] = obs.copy()
         self.actions[self.pos : self.pos + len_obs] = actions.copy()
-        self.rewards[self.pos : self.pos + len_obs] = reward.copy()
+        self.rewards[self.pos : self.pos + len_obs] = np.squeeze(reward.copy(), axis=-1)
 
         self.pos += len_obs
         if self.pos + len_obs >= self.buffer_size:

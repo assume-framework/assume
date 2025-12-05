@@ -6,12 +6,12 @@ from datetime import timedelta
 
 import numpy as np
 
-from assume.common.base import BaseStrategy, SupportsMinMaxCharge
+from assume.common.base import MinMaxChargeStrategy, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import parse_duration
 
 
-class flexableEOMStorage(BaseStrategy):
+class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.
 
@@ -119,7 +119,7 @@ class flexableEOMStorage(BaseStrategy):
                 current_power_charge,
                 min_power_charge,
             )
-            price_forecast = unit.forecaster[f"price_{market_config.market_id}"]
+            price_forecast = unit.forecaster.price[market_config.market_id]
 
             # calculate average price
             average_price = calculate_price_average(
@@ -209,7 +209,7 @@ class flexableEOMStorage(BaseStrategy):
             unit.outputs["total_costs"].loc[start:end_excl] = costs
 
 
-class flexablePosCRMStorage(BaseStrategy):
+class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.
 
@@ -290,7 +290,7 @@ class flexablePosCRMStorage(BaseStrategy):
                 marginal_cost=marginal_cost,
                 t=start,
                 foresight=self.foresight,
-                price_forecast=unit.forecaster[f"price_{market_config.market_id}"],
+                price_forecast=unit.forecaster.price[market_config.market_id],
             )
 
             # if specific revenue is positive, bid specific_revenue
@@ -347,7 +347,7 @@ class flexablePosCRMStorage(BaseStrategy):
         return bids
 
 
-class flexableNegCRMStorage(BaseStrategy):
+class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
     """
     A strategy that bids the energy_price or the capacity_price of the unit on the negative CRM(reserve market).
 

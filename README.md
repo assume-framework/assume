@@ -35,7 +35,7 @@ This approach is practical for modeling interactions among competing market part
 To support market design analysis in transforming electricity systems, we developed the ASSUME framework - a flexible and modular agent-based modeling tool for electricity market research.
 ASSUME enables researchers to customize components such as agent representations, market configurations, and bidding strategies, utilizing pre-built modules for standard operations.
 With the setup in ASSUME, researchers can simulate strategic interactions in electricity markets under a wide range of scenarios, from comparing market designs and modeling congestion management to analyzing the behavior of learning storage operators and renewable producers.
-The framework supports studies on bidding under uncertainty, regulatory interventions, and multi-agent dynamics, making it ideal for exploring emergent behaviour and testing new market mechanisms.
+The framework supports studies on bidding under uncertainty, regulatory interventions, and multi-agent dynamics, making it ideal for exploring emergent behavior and testing new market mechanisms.
 ASSUME has been utilized in research studies addressing diverse questions in electricity market design and operation.
 It has explored the role of complex bids, demonstrated the effects of industrial demand-side flexibility for congestion management, and advanced the explainability of emergent strategies in learning agents.
 
@@ -102,7 +102,7 @@ cd assume
 2. Start the database and Grafana using the following command:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 This will launch a container for TimescaleDB and Grafana with preconfigured dashboards for analysis.

@@ -157,7 +157,8 @@ if __name__ == "__main__":
         study_case=available_examples[example]["study_case"],
     )
 
-    if world.learning_config.get("learning_mode", False):
+
+    if world.learning_mode:
         # run learning if learning mode is enabled
         run_learning(world)
 

@@ -4,7 +4,7 @@
 
 
 from assume.common.base import BaseUnit
-from assume.common.forecasts import Forecaster
+from assume.common.forecaster import ExchangeForecaster
 
 
 class Exchange(BaseUnit):
@@ -14,12 +14,11 @@ class Exchange(BaseUnit):
     Attributes:
         id (str): The unique identifier of the unit.
         unit_operator (str): The operator of the unit.
-        direction (str): The exchange-direction ("import" or "export") of the unit.
         bidding_strategies (dict): The bidding strategies of the unit.
-        max_power (float): The max. power value of the unit in MW.
-        min_power (float): The min. power value of the unit in MW.
+        forecaster: The forecaster containing the import and export volume time series
         node (str, optional): The node of the unit. Defaults to "node0".
-        price (float): The price of the unit.
+        price_import (float): The price for import of the unit.
+        price_export (float): The price for export of the unit.
         location (tuple[float, float], optional): The location of the unit. Defaults to (0.0, 0.0).
 
     Methods
@@ -31,7 +30,7 @@ class Exchange(BaseUnit):
         id: str,
         unit_operator: str,
         bidding_strategies: dict,
-        forecaster: Forecaster,
+        forecaster: ExchangeForecaster,
         node: str = "node0",
         price_import: float = 0.0,
         price_export: float = 2999.0,
@@ -49,12 +48,15 @@ class Exchange(BaseUnit):
             **kwargs,
         )
 
-        self.volume_import = abs(
-            self.forecaster[f"{self.id}_import"]
-        )  # import is positive
-        self.volume_export = -abs(
-            self.forecaster[f"{self.id}_export"]
-        )  # export is negative
+        if not isinstance(forecaster, ExchangeForecaster):
+            raise ValueError(
+                f"forecaster must be of type {ExchangeForecaster.__name__}"
+            )
+
+        # import is positive
+        self.volume_import = abs(forecaster.volume_import)
+        # export is negative
+        self.volume_export = -abs(forecaster.volume_export)
 
         self.price_import = price_import
         self.price_export = price_export

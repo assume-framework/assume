@@ -11,7 +11,7 @@ name = "assume-framework"
 version = "0.5.5"
 description = "ASSUME - Agent-Based Electricity Markets Simulation Toolbox"
 authors = [{ name = "ASSUME Developers", email = "contact@assume-project.de"}]
-license = {text = "AGPL-3.0-or-later"}
+license = "AGPL-3.0-or-later"
 readme = "README.md"
 keywords = ["agent based simulation", "energy market", "reinforcement learning", "market simulation", "simulation"]
 
@@ -42,7 +42,7 @@ dependencies = [
     "pyyaml >=6.0",
     "pyyaml-include >=2.2a",
     "pyomo >=6.8.0",
-    "xarray <2025.7.0", # https://github.com/PyPSA/linopy/issues/470
+    "xarray",
     "highspy",
 ]
 
@@ -52,7 +52,7 @@ learning = [
     "tensorboard >=2.7.0",
 ]
 network = [
-    "pypsa <0.33",
+    "pypsa",
 ]
 oeds = [
     "demandlib >=0.1.9",
@@ -65,12 +65,20 @@ test = [
     "ruff >=0.4.9",
     "mypy >=1.1.1",
     "matplotlib >=3.7.2",
-    "pytest >=7.2.2",
-    "pytest-cov >=4.1.0",
-    "pytest-asyncio >=0.21.1",
+    "pytest >=9",
+    "pytest-cov >=7.0.0",
+    "pytest-asyncio >=1.3.0",
 ]
 all = [
     "assume-framework[oeds, network, learning]",
+]
+docs = [
+  "sphinx <8.2",
+  "sphinx-book-theme >=1.1.4",
+  "nbsphinx >=0.9.7",
+  "nbsphinx-link >= 1.3.1",
+  "sphinx-argparse >= 0.5.2",
+  "sphinxcontrib-mermaid >=1.0.0",
 ]
 
 [project.urls]
@@ -83,8 +91,9 @@ Changelog = "https://assume.readthedocs.io/en/latest/release_notes.html"
 [project.scripts]
 assume = "assume_cli.cli:cli"
 
-[tool.setuptools]
-packages = {find = {}}
+[tool.setuptools.packages.find]
+include = ["assume*", "assume_cli*"]
+exclude = ["assume-db*"]
 
 [tool.ruff]
 
@@ -110,9 +119,7 @@ ignore = ["E501", "G004", "E731"]
 ]
 
 [tool.pytest]
-testpaths = "tests"
-
-[tool.pytest.ini_options]
+testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
@@ -125,8 +132,9 @@ filterwarnings = [
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "require_learning",
+    "require_network",
 ]
-addopts = "--ignore=assume-db"
+addopts = ["--ignore=assume-db"]
 
 [tool.coverage.run]
 omit = ["tests/*"]

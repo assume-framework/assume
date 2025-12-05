@@ -1,0 +1,3 @@
+name,technology,bidding_EOM,bidding_redispatch,bidding_nodal,bidding_DAM,max_power,min_power,unit_operator,node
+demand_north_1,inflex_demand,naive_eom,naive_redispatch,naive_eom,naive_eom,100000,0,eom_de,north_1
+demand_north_2,inflex_demand,naive_eom,naive_redispatch,naive_eom,naive_eom,100000,0,eom_de,north_2

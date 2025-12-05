@@ -7,11 +7,11 @@ base_case_2019:
   start_date: 2019-03-01 00:00
   end_date: 2019-05-30 00:00
   time_step: 1h
-  learning_mode: true
   save_frequency_hours: null
 
   learning_config:
-    continue_learning: true
+    learning_mode: true
+    continue_learning: false
     trained_policies_save_path: null
     trained_policies_load_path: learned_strategies\example_03a_with_storage\avg_reward_eval_policies
     max_bid_price: 100

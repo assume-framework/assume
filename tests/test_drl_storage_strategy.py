@@ -1,5 +1,3 @@
-# tests/test_drl_storage_strategy.py
-
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
@@ -10,15 +8,17 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
+from assume.common.base import LearningConfig
+from assume.common.forecaster import UnitForecaster
+
 try:
     import torch as th
 
-    from assume.reinforcement_learning.learning_role import LearningConfig
-    from assume.strategies.learning_strategies import StorageRLStrategy
+    from assume.reinforcement_learning import Learning
+    from assume.strategies.learning_strategies import StorageEnergyLearningStrategy
 except ImportError:
     th = None
 
-from assume.common.forecasts import NaiveForecast
 from assume.common.market_objects import MarketConfig
 from assume.units import Storage
 
@@ -29,25 +29,32 @@ def storage_unit() -> Storage:
     Fixture to create a Storage unit instance with example parameters.
     """
     # Define the learning configuration for the StorageRLStrategy
-    learning_config: LearningConfig = {
-        "observation_dimension": 50,
-        "action_dimension": 2,
-        "algorithm": "matd3",
-        "learning_mode": True,
-        "training_episodes": 3,
+    config = {
+        "obs_dim": 50,
+        "act_dim": 2,
         "unit_id": "test_storage",
-        "max_bid_price": 100,
         "max_demand": 1000,
+        "learning_config": LearningConfig(
+            algorithm="matd3",
+            learning_mode=True,
+            training_episodes=3,
+            max_bid_price=100,
+        ),
     }
 
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
-    ff = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    ff = UnitForecaster(index, market_prices={"test_market": 50})
+    learning_role = Learning(config["learning_config"], index[0], index[-1])
     return Storage(
         id="test_storage",
         unit_operator="test_operator",
         technology="storage",
-        bidding_strategies={"EOM": StorageRLStrategy(**learning_config)},
-        max_power_charge=500,  # Negative for charging
+        bidding_strategies={
+            "test_market": StorageEnergyLearningStrategy(
+                learning_role=learning_role, **config
+            )
+        },
+        max_power_charge=-500,  # Negative for charging
         max_power_discharge=500,
         max_soc=1000,
         min_soc=0,
@@ -74,7 +81,7 @@ def mock_market_config():
 @pytest.mark.require_learning
 def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
     """
-    Test the StorageRLStrategy for a 'sell' bid action.
+    Test the StorageEnergyLearningStrategy for a 'sell' bid action.
     """
 
     # Define the product index and tuples
@@ -85,21 +92,21 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
     ]
 
     # get the strategy
-    strategy = storage_unit.bidding_strategies["EOM"]
+    strategy = storage_unit.bidding_strategies["test_market"]
 
     # Define the 'sell' action: [0.2, 0.5] -> price=20, direction='sell'
     sell_action = [0.2, 0.5]
 
     # Mock the get_actions method to return the sell action
     with patch.object(
-        StorageRLStrategy,
+        StorageEnergyLearningStrategy,
         "get_actions",
         return_value=(th.tensor(sell_action), th.tensor(0.0)),
     ):
         # Mock the calculate_marginal_cost method to return a fixed marginal cost
         with patch.object(Storage, "calculate_marginal_cost", return_value=10.0):
             # Calculate bids using the strategy
-            bids = strategy.calculate_bids(
+            bids = strategy.calculate_bids(  # TODO
                 storage_unit, mc, product_tuples=product_tuples
             )
 
@@ -130,9 +137,21 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)
 
-            # Extract outputs
-            reward = storage_unit.outputs["reward"].loc[product_index]
-            profit = storage_unit.outputs["profit"].loc[product_index]
+            # Fetch reward, profit, costs from learning_role cache
+            learning_role = strategy.learning_role
+            reward_cache = learning_role.all_rewards
+            profit_cache = learning_role.all_profits
+
+            # Use the last timestamp
+            last_ts = sorted(reward_cache.keys())[-1]
+            unit_id = (
+                storage_unit.id
+                if storage_unit.id in reward_cache[last_ts]
+                else list(reward_cache[last_ts].keys())[0]
+            )
+
+            reward = reward_cache[last_ts][unit_id][0]
+            profit = profit_cache[last_ts][unit_id][0]
             costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
@@ -152,13 +171,13 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward[0]}"
+                reward == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward}"
 
             # Assert the calculated profit
             assert (
-                profit[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit[0]}"
+                profit == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit}"
 
             # Assert the calculated costs
             assert (
@@ -169,7 +188,7 @@ def test_storage_rl_strategy_sell_bid(mock_market_config, storage_unit):
 @pytest.mark.require_learning
 def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
     """
-    Test the StorageRLStrategy for a 'buy' bid action.
+    Test the StorageEnergyLearningStrategy for a 'buy' bid action.
     """
     # Define the product index and tuples
     product_index = pd.date_range("2023-07-01", periods=1, freq="h")
@@ -178,15 +197,15 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
 
-    # Instantiate the StorageRLStrategy
-    strategy = storage_unit.bidding_strategies["EOM"]
+    # Instantiate the StorageEnergyLearningStrategy
+    strategy = storage_unit.bidding_strategies["test_market"]
 
     # Define the 'buy' action: [-0.3] -> price=30, direction='buy'
     buy_action = [-0.3]
 
     # Mock the get_actions method to return the buy action
     with patch.object(
-        StorageRLStrategy,
+        StorageEnergyLearningStrategy,
         "get_actions",
         return_value=(th.tensor(buy_action), th.tensor(0.0)),
     ):
@@ -222,9 +241,21 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
             # Calculate rewards based on the accepted bids
             strategy.calculate_reward(storage_unit, mc, orderbook=bids)
 
-            # Extract outputs
-            reward = storage_unit.outputs["reward"].loc[product_index]
-            profit = storage_unit.outputs["profit"].loc[product_index]
+            # Fetch reward, profit, costs from learning_role cache
+            learning_role = strategy.learning_role
+            reward_cache = learning_role.all_rewards
+            profit_cache = learning_role.all_profits
+
+            # Use the last timestamp
+            last_ts = sorted(reward_cache.keys())[-1]
+            unit_id = (
+                storage_unit.id
+                if storage_unit.id in reward_cache[last_ts]
+                else list(reward_cache[last_ts].keys())[0]
+            )
+
+            reward = reward_cache[last_ts][unit_id][0]
+            profit = profit_cache[last_ts][unit_id][0]
             costs = storage_unit.outputs["total_costs"].loc[product_index]
 
             # Calculate expected values
@@ -244,13 +275,13 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 
             # Assert the calculated reward
             assert (
-                reward[0] == expected_reward
-            ), f"Expected reward {expected_reward}, got {reward[0]}"
+                reward == expected_reward
+            ), f"Expected reward {expected_reward}, got {reward}"
 
             # Assert the calculated profit
             assert (
-                profit[0] == expected_profit - expected_costs
-            ), f"Expected profit {expected_profit}, got {profit[0]}"
+                profit == expected_profit - expected_costs
+            ), f"Expected profit {expected_profit}, got {profit}"
 
             # Assert the calculated costs
             assert (
@@ -261,7 +292,7 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
 @pytest.mark.require_learning
 def test_storage_rl_strategy_cost_stored_energy(mock_market_config, storage_unit):
     """
-    Test the StorageRLStrategy if unique observations are created as expected.
+    Test the StorageEnergyLearningStrategy if unique observations are created as expected.
     """
     # Define the product index and tuples
     product_index = pd.date_range("2023-07-01", periods=3, freq="h")
@@ -270,8 +301,8 @@ def test_storage_rl_strategy_cost_stored_energy(mock_market_config, storage_unit
         (start, start + pd.Timedelta(hours=1), None) for start in product_index
     ]
 
-    # Instantiate the StorageRLStrategy
-    strategy = storage_unit.bidding_strategies["EOM"]
+    # Instantiate the StorageEnergyLearningStrategy
+    strategy = storage_unit.bidding_strategies["test_market"]
 
     # Define sequence of actions over 3 hours: [charge, sell, sell]
     # Format: [normalized_price (-1, 1), direction indicated by sign (negative: buy bid, positive: sell bid)]
@@ -282,7 +313,7 @@ def test_storage_rl_strategy_cost_stored_energy(mock_market_config, storage_unit
     ]
 
     # Patch get_actions to return one action at a time
-    get_actions_patch = patch.object(StorageRLStrategy, "get_actions")
+    get_actions_patch = patch.object(StorageEnergyLearningStrategy, "get_actions")
     calc_cost_patch = patch.object(Storage, "calculate_marginal_cost")
 
     with get_actions_patch as mock_get_actions, calc_cost_patch as mock_cost:

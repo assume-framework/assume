@@ -8,12 +8,13 @@ import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory, check_available_solvers
+from pyomo.opt.base.solvers import SolverFactoryClass
 
-from assume.common.base import BaseStrategy, SupportsMinMaxCharge
+from assume.common.base import MinMaxChargeStrategy, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
-def shift(prc, type_: str = "first"):
+def shift(prc, type_: str = "first") -> np.ndarray:
     """
     Shifts the price curve up or down
 
@@ -23,7 +24,7 @@ def shift(prc, type_: str = "first"):
       type_: str:  (Default value = "first")
 
     Returns:
-      np.array: shifted price curve
+      np.ndarray: shifted price curve
 
     """
     new_prices, num_prices = ([], len(prc))
@@ -40,7 +41,7 @@ def shift(prc, type_: str = "first"):
     return np.asarray(new_prices)
 
 
-def shaping(prc, type_: str = "peak"):
+def shaping(prc, type_: str = "peak") -> np.ndarray:
     """
     Shifts the price curve up or down
 
@@ -50,7 +51,7 @@ def shaping(prc, type_: str = "peak"):
       type_: str:  (Default value = "peak")
 
     Returns:
-      np.array: shifted price curve
+      np.ndarray: shifted price curve
 
     """
     if type_ == "peak":
@@ -82,8 +83,8 @@ PRICE_FUNCS = {
 
 
 def get_solver_factory(
-    solvers_str=["appsi_highs", "gurobi", "glpk", "cbc", "cplex"],
-) -> SolverFactory:
+    solvers_str=None,
+) -> SolverFactoryClass:
     """
     Returns the first available solver from the list of solvers
 
@@ -96,13 +97,15 @@ def get_solver_factory(
     Returns:
         SolverFactory: the first working solver
     """
+    if solvers_str is None:
+        solvers_str = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
     solvers = check_available_solvers(*solvers_str)
     if len(solvers) < 1:
         raise Exception(f"None of {solvers_str} are available")
     return SolverFactory(solvers[0])
 
 
-class DmasStorageStrategy(BaseStrategy):
+class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
     """Strategy for a storage unit that uses DMAS to optimize its operation"""
 
     def __init__(self, *args, **kwargs):
@@ -111,7 +114,9 @@ class DmasStorageStrategy(BaseStrategy):
         self.model = pyo.ConcreteModel("storage")
         self.opt = get_solver_factory()
 
-    def build_model(self, unit: SupportsMinMaxCharge, start: datetime, hour_count: int):
+    def build_model(
+        self, unit: SupportsMinMaxCharge, start: datetime, hour_count: int
+    ) -> np.ndarray:
         """
         Builds the optimization model
 
@@ -121,7 +126,7 @@ class DmasStorageStrategy(BaseStrategy):
             hour_count (int): number of hours to optimize
 
         Returns:
-            np.array: power
+            np.ndarray: power
 
         """
         self.model.clear()
@@ -137,11 +142,13 @@ class DmasStorageStrategy(BaseStrategy):
             time_range, within=pyo.NonNegativeReals, bounds=(0, unit.max_soc)
         )
 
-        self.power = [
-            -self.model.p_minus[t] / unit.efficiency_discharge
-            + self.model.p_plus[t] * unit.efficiency_charge
-            for t in time_range
-        ]
+        self.power = np.array(
+            [
+                -self.model.p_minus[t] / unit.efficiency_discharge
+                + self.model.p_plus[t] * unit.efficiency_charge
+                for t in time_range
+            ]
+        )
 
         self.model.vol_con = pyo.ConstraintList()
         v0 = unit.outputs["soc"].at[start]
@@ -164,7 +171,7 @@ class DmasStorageStrategy(BaseStrategy):
         market_id: str,
         start: datetime,
         hour_count: int,
-    ):
+    ) -> dict[str, np.ndarray]:
         """
         Optimizes the unit operation
 
@@ -179,7 +186,7 @@ class DmasStorageStrategy(BaseStrategy):
         opt_results = {key: np.zeros(hour_count) for key in PRICE_FUNCS.keys()}
         time_range = range(hour_count)
 
-        base_price = unit.forecaster[f"price_{market_id}"][
+        base_price = unit.forecaster.price[market_id][
             start : start + timedelta(hours=hour_count)
         ]
 
@@ -248,7 +255,7 @@ class DmasStorageStrategy(BaseStrategy):
         )
         total_orders = {}
         block_id = 0
-        power_prices = unit.forecaster[f"price_{market_config.market_id}"][
+        power_prices = unit.forecaster.price[market_config.market_id][
             start : start + timedelta(hours=hour_count)
         ]
         for key, power in opt_results.items():

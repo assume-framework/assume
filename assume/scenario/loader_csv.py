@@ -16,12 +16,23 @@ import pandas as pd
 import yaml
 from tqdm import tqdm
 
-from assume.common.base import LearningConfig
 from assume.common.exceptions import AssumeException
-from assume.common.forecasts import CsvForecaster, Forecaster
+from assume.common.forecast_initialisation import ForecastInitialisation
+from assume.common.forecaster import (
+    BuildingForecaster,
+    CustomUnitForecaster,
+    DemandForecaster,
+    ExchangeForecaster,
+    HydrogenForecaster,
+    PowerplantForecaster,
+    SteamgenerationForecaster,
+    SteelplantForecaster,
+    UnitForecaster,
+)
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
     adjust_unit_operator_for_learning,
+    confirm_learning_save_path,
     convert_to_rrule_freq,
     normalize_availability,
 )
@@ -29,6 +40,14 @@ from assume.strategies import BaseStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
+
+
+def bidding_strategies_from_param_dict(param_dict: dict):
+    return {
+        ident.split("bidding_")[1]: strategy
+        for ident, strategy in param_dict.items()
+        if ident.startswith("bidding_")
+    }
 
 
 def load_file(
@@ -59,8 +78,6 @@ def load_file(
     Raises:
         FileNotFoundError: If the specified file is not found, returns None.
     """
-    df = None
-
     if file_name in config:
         if config[file_name] is None:
             return None
@@ -122,7 +139,7 @@ def load_file(
             duplicates = df.index[df.index.duplicated()].unique()
 
             if len(duplicates) > 0:
-                duplicate_names = ", ".join(duplicates)
+                duplicate_names = ", ".join(map(str, duplicates))
                 raise ValueError(
                     f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
                 )
@@ -145,7 +162,7 @@ def load_dsm_units(
     handle different technologies, and organizes the data into a structured DataFrame. It then splits the DataFrame
     based on unique unit_types.
 
-    Parameters:
+    Args:
         path (str): The directory path where the CSV file is located.
         config (dict): Configuration dictionary, potentially used for specifying additional options or behaviors
                        (not used in the current implementation but provides flexibility for future enhancements).
@@ -155,7 +172,7 @@ def load_dsm_units(
         dict: A dictionary where each key is a unique unit_type and the value is a DataFrame containing
               the corresponding DSM units of that type.
 
-    Notes:
+    Note:
         - The CSV file is expected to have columns such as 'name', 'technology', 'unit_type', and other operational parameters.
         - The function assumes that the first non-null value in common and bidding columns is representative if multiple
           entries exist for the same plant.
@@ -346,7 +363,7 @@ def add_units(
     units_df: pd.DataFrame,
     unit_type: str,
     world: World,
-    forecaster: Forecaster,
+    forecaster: UnitForecaster,
 ) -> None:
     """
     Add units to the world from a given dataframe.
@@ -365,11 +382,7 @@ def add_units(
 
     units_df = units_df.fillna(0)
     for unit_name, unit_params in units_df.iterrows():
-        bidding_strategies = {
-            key.split("bidding_")[1]: unit_params[key]
-            for key in unit_params.keys()
-            if key.startswith("bidding_")
-        }
+        bidding_strategies = bidding_strategies_from_param_dict(unit_params)
         unit_params["bidding_strategies"] = bidding_strategies
         operator_id = unit_params["unit_operator"]
         del unit_params["unit_operator"]
@@ -385,7 +398,7 @@ def add_units(
 def read_units(
     units_df: pd.DataFrame,
     unit_type: str,
-    forecaster: Forecaster,
+    forecaster: dict[str, UnitForecaster],
     world_bidding_strategies: dict[str, BaseStrategy],
     learning_mode: bool = False,
 ) -> dict[str, list[dict]]:
@@ -432,7 +445,7 @@ def read_units(
                 unit_type=unit_type,
                 unit_operator_id=operator_id,
                 unit_params=unit_params.to_dict(),
-                forecaster=forecaster,
+                forecaster=forecaster[unit_name],
             )
         )
     return units_dict
@@ -479,10 +492,29 @@ def load_config_and_create_forecaster(
         freq=config["time_step"],
     )
 
+    unit_operators = load_file(path=path, config=config, file_name="unit_operators")
     powerplant_units = load_file(path=path, config=config, file_name="powerplant_units")
     storage_units = load_file(path=path, config=config, file_name="storage_units")
     demand_units = load_file(path=path, config=config, file_name="demand_units")
     exchange_units = load_file(path=path, config=config, file_name="exchange_units")
+
+    if powerplant_units is None or demand_units is None:
+        raise ValueError("No power plant or no demand units were provided!")
+
+    if ((demand_units["min_power"] < 0) & (demand_units["max_power"] > 0)).any() or (
+        (demand_units["min_power"] > 0) & (demand_units["max_power"] < 0)
+    ).any():
+        raise ValueError(
+            "min_power and max_power must both be either negative or positive"
+        )
+    demand_units["min_power"] = -abs(demand_units["min_power"])
+    demand_units["max_power"] = -abs(demand_units["max_power"])
+
+    if storage_units is not None:
+        if "max_power_charge" in storage_units.columns:
+            storage_units["max_power_charge"] = -abs(storage_units["max_power_charge"])
+        if "min_power_charge" in storage_units.columns:
+            storage_units["min_power_charge"] = -abs(storage_units["min_power_charge"])
 
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
@@ -494,9 +526,6 @@ def load_config_and_create_forecaster(
         )
         if units is not None:
             dsm_units.update(units)
-
-    if powerplant_units is None or demand_units is None:
-        raise ValueError("No power plant or no demand units were provided!")
 
     forecasts_df = load_file(
         path=path, config=config, file_name="forecasts_df", index=index
@@ -532,62 +561,131 @@ def load_config_and_create_forecaster(
     buses = load_file(path=path, config=config, file_name="buses")
     lines = load_file(path=path, config=config, file_name="lines")
 
-    learning_config: LearningConfig = config.get("learning_config", {})
-
-    # Check if simulation length is divisible by train_freq in learning config and adjust if not
-    if config.get("learning_mode"):
-        train_freq_str = learning_config.get("train_freq", "24h")
-        train_freq = pd.Timedelta(train_freq_str)
-        total_length = end - start
-
-        # Compute remainder and determine the required intervals
-        quotient, remainder = divmod(total_length, train_freq)
-
-        if remainder != pd.Timedelta(0):
-            # Adjust train_freq so that it evenly divides total_length
-            n_intervals = quotient + 1
-            new_train_freq = (total_length / n_intervals).total_seconds() / 3600
-            new_train_freq_str = f"{int(new_train_freq)}h"  # Directly accessing hours
-
-            # Update the configuration
-            learning_config["train_freq"] = new_train_freq_str
-
-            logger.warning(
-                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). This will lead to a loss of training experience."
-                f"Adjusting train_freq to {new_train_freq_str}. Consider modifying simulation length or train_freq in the config to avoid this adjustment."
-            )
-
-    forecaster = CsvForecaster(
+    initializer = ForecastInitialisation(
         index=index,
-        powerplants_units=powerplant_units,
         demand_units=demand_units,
         exchange_units=exchange_units,
-        market_configs=config["markets_config"],
+        powerplants_units=powerplant_units,
         buses=buses,
         lines=lines,
+        fuel_prices=fuel_prices_df,
+        market_configs=config["markets_config"],
+        forecasts=forecasts_df,
+        demand=demand_df,
+        availability=availability,
+        exchanges=exchanges_df,
     )
 
-    forecaster.set_forecast(forecasts_df)
-    forecaster.set_forecast(demand_df)
-    forecaster.set_forecast(exchanges_df)
-    forecaster.set_forecast(availability, prefix="availability_")
-    forecaster.set_forecast(fuel_prices_df, prefix="fuel_price_")
-    forecaster.calc_forecast_if_needed()
-
-    forecaster.convert_forecasts_to_fast_series()
-
+    unit_forecasts: dict[str, UnitForecaster] = {}
+    market_prices, residual_loads = initializer.calculate_market_forecasts()
+    congestion_signal, renewable_utilization = initializer.calc_node_forecasts()
+    if powerplant_units is not None:
+        for id, plant in powerplant_units.iterrows():
+            unit_forecasts[id] = PowerplantForecaster(
+                index=index,
+                availability=initializer.availability(id),
+                fuel_prices=initializer.fuel_prices,
+                market_prices=market_prices,
+                residual_load=residual_loads,
+            )
+    if demand_units is not None:
+        for id, demand in demand_units.iterrows():
+            unit_forecasts[id] = DemandForecaster(
+                index=index,
+                availability=initializer.availability(id),
+                demand=-demand_df[id].abs(),
+                market_prices=market_prices,
+                residual_load=residual_loads,
+            )
+    if storage_units is not None:
+        for id, storage in storage_units.iterrows():
+            unit_forecasts[id] = UnitForecaster(
+                index=index,
+                availability=initializer.availability(id),
+                market_prices=market_prices,
+                residual_load=residual_loads,
+            )
+    if exchange_units is not None:
+        for id, exchange in exchange_units.iterrows():
+            unit_forecasts[id] = ExchangeForecaster(
+                index=index,
+                availability=initializer.availability(id),
+                market_prices=market_prices,
+                volume_export=exchanges_df[f"{id}_export"],
+                volume_import=exchanges_df[f"{id}_import"],
+                residual_load=residual_loads,
+            )
+    if dsm_units is not None:
+        for type, dsm in dsm_units.items():
+            for id, unit in dsm.iterrows():
+                if type == "building":
+                    unit_forecasts[id] = BuildingForecaster(
+                        index=index,
+                        availability=initializer.availability(id),
+                        market_prices=market_prices,
+                        fuel_prices=initializer.fuel_prices,
+                        residual_load=residual_loads,
+                        # TODO how to handle other markets?
+                        electricity_price=initializer.forecasts("price_EOM"),
+                        load_profile=0,  # TODO
+                        ev_load_profile=0,  # TODO
+                        heat_demand=0,  # TODO
+                        battery_load_profile=0,  # TODO
+                        pv_profile=0,  # TODO
+                    )
+                if type == "steel_plant":
+                    unit_forecasts[id] = SteelplantForecaster(
+                        index=index,
+                        availability=initializer.availability(id),
+                        market_prices=market_prices,
+                        fuel_prices=initializer.fuel_prices,
+                        residual_load=residual_loads,
+                        # TODO how to handle other markets?
+                        electricity_price=initializer.forecasts("price_EOM"),
+                        congestion_signal=congestion_signal,
+                        renewable_utilisation_signal=renewable_utilization,
+                    )
+                if type == "hydrogen_plant":
+                    unit_forecasts[id] = HydrogenForecaster(
+                        index=index,
+                        availability=initializer.availability(id),
+                        market_prices=market_prices,
+                        hydrogen_demand=unit["demand"],
+                        residual_load=residual_loads,
+                        # TODO how to handle other markets?
+                        electricity_price=initializer.forecasts("price_EOM"),
+                        seasonal_storage_schedule=0,  # TODO
+                    )
+                if type == "steam_plant":
+                    unit_forecasts[id] = SteamgenerationForecaster(
+                        index=index,
+                        availability=initializer.availability(id),
+                        demand=unit["demand"],
+                        market_prices=market_prices,
+                        fuel_prices=initializer.fuel_prices,
+                        residual_load=residual_loads,
+                        # TODO how to handle other markets?
+                        electricity_price=initializer.forecasts("price_EOM"),
+                        congestion_signal=congestion_signal,
+                        renewable_utilisation_signal=renewable_utilization,
+                        electricity_price_flex=0,  # TODO
+                        thermal_storage_schedule=0,  # TODO
+                        thermal_demand=0,  # TODO
+                    )
     return {
         "config": config,
         "simulation_id": simulation_id,
         "path": path,
         "start": start,
         "end": end,
+        "unit_operators": unit_operators,
         "powerplant_units": powerplant_units,
         "storage_units": storage_units,
         "demand_units": demand_units,
         "exchange_units": exchange_units,
         "dsm_units": dsm_units,
-        "forecaster": forecaster,
+        "unit_forecasts": unit_forecasts,
+        "index": index,
     }
 
 
@@ -605,7 +703,6 @@ def setup_world(
 
     Args:
         world (World): An instance of the World class representing the simulation environment.
-        scenario_data (dict): A dictionary containing the configuration and loaded files for the scenario and study case.
         evaluation_mode (bool, optional): A flag indicating whether evaluation should be performed. Defaults to False.
         terminate_learning (bool, optional): An automatically set flag indicating that we terminated the learning process now, either because we reach the end of the episode iteration or because we triggered an early stopping.
         episode (int, optional): The episode number for learning. Defaults to 1.
@@ -622,12 +719,13 @@ def setup_world(
     config = scenario_data["config"]
     start = scenario_data["start"]
     end = scenario_data["end"]
+    unit_operators = scenario_data["unit_operators"]
     powerplant_units = scenario_data["powerplant_units"]
     storage_units = scenario_data["storage_units"]
     demand_units = scenario_data["demand_units"]
     exchange_units = scenario_data["exchange_units"]
     dsm_units = scenario_data["dsm_units"]
-    forecaster = scenario_data["forecaster"]
+    unit_forecasts = scenario_data["unit_forecasts"]
 
     # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -657,26 +755,40 @@ def setup_world(
                 "Disable CSV export to save data at regular intervals (export_csv_path = '')."
             )
 
-    learning_config: LearningConfig = config.get("learning_config", {})
-    bidding_strategy_params = config.get("bidding_strategy_params", {})
+    bidding_params = config.get("bidding_strategy_params", {})
 
-    learning_config["learning_mode"] = config.get("learning_mode", False)
-    learning_config["evaluation_mode"] = evaluation_mode
-
-    if terminate_learning:
-        learning_config["learning_mode"] = False
-        learning_config["evaluation_mode"] = False
-
-    if not learning_config.get("trained_policies_save_path"):
-        learning_config["trained_policies_save_path"] = (
-            f"learned_strategies/{simulation_id}"
+    if config.get("learning_mode"):
+        raise ValueError(
+            "The 'learning_mode' parameter in the top-level of the config.yaml has been moved to 'learning_config'. "
+            "Please adjust your config file accordingly."
         )
 
-    if not learning_config.get("trained_policies_load_path"):
-        learning_config["trained_policies_load_path"] = (
-            f"learned_strategies/{simulation_id}/avg_reward_eval_policies"
-        )
+    # handle initial learning parameters before learning_role exists
+    learning_dict = config.get("learning_config", {})
+    # those settings need to be overridden before passing to the LearningConfig
+    if learning_dict:
+        # make sure that continue_learning implies learning_mode
+        if learning_dict.get("continue_learning"):
+            learning_dict["learning_mode"] = True
+        # determined by learning loop in run_learning()
+        learning_dict["evaluation_mode"] = evaluation_mode
 
+        if terminate_learning:
+            learning_dict["learning_mode"] = False
+            learning_dict["evaluation_mode"] = False
+
+        # default path for saving trained policies is set here because
+        # a) depends on the simulation_id
+        # b) it is set relative to inputs_path in replace_paths() below
+        if not learning_dict.get("trained_policies_save_path"):
+            learning_dict["trained_policies_save_path"] = (
+                f"learned_strategies/{simulation_id}"
+            )
+
+    # learning mode always needed for reading units below
+    learning_mode = learning_dict.get("learning_mode", False)
+
+    # all paths should be relative to the inputs_path
     config = replace_paths(config, scenario_data["path"])
 
     world.reset()
@@ -686,11 +798,11 @@ def setup_world(
         end=end,
         save_frequency_hours=save_frequency_hours,
         simulation_id=simulation_id,
-        learning_config=learning_config,
+        learning_dict=learning_dict,
         episode=episode,
         eval_episode=eval_episode,
-        bidding_params=bidding_strategy_params,
-        forecaster=forecaster,
+        bidding_params=bidding_params,
+        index=scenario_data["index"],
     )
 
     # get the market config from the config file and add the markets
@@ -716,37 +828,37 @@ def setup_world(
         )
 
     # create list of units from dataframes before adding actual operators
-    logger.info("Read units from file")
+    logger.info("Read units from dataframe")
 
     units = defaultdict(list)
     powerplant_units = read_units(
         units_df=powerplant_units,
         unit_type="power_plant",
-        forecaster=forecaster,
+        forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
-        learning_mode=learning_config["learning_mode"],
+        learning_mode=learning_mode,
     )
 
     storage_units = read_units(
         units_df=storage_units,
         unit_type="storage",
-        forecaster=forecaster,
+        forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
-        learning_mode=learning_config["learning_mode"],
+        learning_mode=learning_mode,
     )
 
     demand_units = read_units(
         units_df=demand_units,
         unit_type="demand",
-        forecaster=forecaster,
+        forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
-        learning_mode=learning_config["learning_mode"],
+        learning_mode=learning_mode,
     )
 
     exchange_units = read_units(
         units_df=exchange_units,
         unit_type="exchange",
-        forecaster=forecaster,
+        forecaster=unit_forecasts,
         world_bidding_strategies=world.bidding_strategies,
     )
 
@@ -755,9 +867,9 @@ def setup_world(
             dsm_units = read_units(
                 units_df=units_df,
                 unit_type=unit_type,
-                forecaster=forecaster,
+                forecaster=unit_forecasts,
                 world_bidding_strategies=world.bidding_strategies,
-                learning_mode=learning_config["learning_mode"],
+                learning_mode=learning_mode,
             )
         for op, op_units in dsm_units.items():
             units[op].extend(op_units)
@@ -771,27 +883,34 @@ def setup_world(
     for op, op_units in exchange_units.items():
         units[op].extend(op_units)
 
+    if unit_operators is not None:
+        logger.info("Create unit_operators for portfolio strategies")
+        unit_operators_strategies = unit_operators.to_dict("index")
+        # remove starting "bidding_" string from market names
+        for operator in unit_operators_strategies.keys():
+            raw_strategies = unit_operators_strategies[operator]
+            converted_strategies = bidding_strategies_from_param_dict(raw_strategies)
+            unit_operators_strategies[operator] = converted_strategies
+    else:
+        unit_operators_strategies = {}
+
     # if distributed_role is true - there is a manager available
     # and we can add each units_operator as a separate process
     if world.distributed_role is True:
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
-            world.add_units_with_operator_subprocess(op, op_units)
+            strategies = unit_operators_strategies.get(op, {})
+            world.add_units_with_operator_subprocess(op, op_units, strategies)
     else:
         logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
-            if company_name == "Operator-RL" and world.learning_mode:
-                world.add_rl_unit_operator(id="Operator-RL")
-            else:
-                world.add_unit_operator(id=str(company_name))
+            strategies = unit_operators_strategies.get(company_name, {})
+            world.add_unit_operator(id=str(company_name), strategies=strategies)
 
         # add the units to corresponding unit operators
         for op, op_units in units.items():
             for unit in op_units:
                 world.add_unit(**unit)
-
-    if world.learning_mode or world.evaluation_mode:
-        world.add_learning_strategies_to_learning_role()
 
     if (
         world.learning_mode
@@ -821,7 +940,7 @@ def load_scenario_folder(
     Raises:
         ValueError: If the specified scenario or study case is not found in the provided inputs.
 
-    Notes:
+    Note:
         - The function sets up the world environment based on the provided inputs and configuration files.
         - The function utilizes the specified inputs to configure the simulation environment, including market parameters, unit operators, and forecasting data.
         - After calling this function, the world environment is prepared for further simulation and analysis.
@@ -840,6 +959,7 @@ def load_custom_units(
     inputs_path: str,
     scenario: str,
     file_name: str,
+    forecast_file_name: str,
     unit_type: str,
 ) -> None:
     """
@@ -863,7 +983,7 @@ def load_custom_units(
             unit_type="custom_type"
         )
 
-    Notes:
+    Note:
         - The function loads custom units from the specified file within the given scenario and adds them to the world environment for simulation.
         - If the specified custom units file is not found, a warning is logged.
         - Each unique unit operator in the custom units is added to the world's unit operators.
@@ -880,16 +1000,28 @@ def load_custom_units(
     if custom_units is None:
         logger.warning(f"No {file_name} units were provided!")
 
+    forecasts = load_file(
+        path=path,
+        config={},
+        file_name=forecast_file_name,
+    )
+    if forecasts is None:
+        logger.warning(f"No {forecast_file_name} forecasts were provided!")
+
     operators = custom_units.unit_operator.unique()
     for operator in operators:
         if operator not in world.unit_operators:
             world.add_unit_operator(id=str(operator))
 
+    kwargs = {}
+    for k, v in forecasts.items():
+        kwargs[k] = v
+    forecaster = CustomUnitForecaster(forecasts.index, **kwargs)
     add_units(
         units_df=custom_units,
         unit_type=unit_type,
         world=world,
-        forecaster=world.forecaster,
+        forecaster=forecaster,
     )
 
 
@@ -904,15 +1036,13 @@ def run_learning(
 
     Args:
         world (World): An instance of the World class representing the simulation environment.
-        inputs_path (str): The path to the folder containing input files necessary for the simulation.
-        scenario (str): The name of the scenario for the simulation.
-        study_case (str): The specific study case for the simulation.
+        verbose (bool, optional): A flag indicating whether to enable verbose logging. Defaults to False.
 
     Note:
         - The function uses a ReplayBuffer to store experiences for training the DRL agents.
         - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
         - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
-        - Upon completion of training, the function performs an evaluation run using the best policy learned during training.
+        - Upon completion of training, the function performs an evaluation run using the last policy learned during training.
         - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
     from assume.reinforcement_learning.buffer import ReplayBuffer
@@ -928,39 +1058,9 @@ def run_learning(
     world.learning_role.rl_algorithm.initialize_policy()
 
     # check if we already stored policies for this simulation
-    save_path = world.learning_config["trained_policies_save_path"]
-
-    if Path(save_path).is_dir():
-        if world.learning_config.get("continue_learning", False):
-            logger.warning(
-                f"Save path '{save_path}' exists.\n"
-                "You are in continue learning mode. New strategies may overwrite previous ones.\n"
-                "It is recommended to use a different save path to avoid unintended overwrites.\n"
-                "You can set 'trained_policies_save_path' in the config."
-            )
-            proceed = input(
-                "Do you still want to proceed with the existing save path? (y/N) "
-            )
-            if not proceed.lower().startswith("y"):
-                raise AssumeException(
-                    "Simulation aborted by user to avoid overwriting previous learned strategies. "
-                    "Consider setting a new 'simulation_id' or 'trained_policies_save_path' in the config."
-                )
-        else:
-            logger.warning(
-                f"Save path '{save_path}' exists. Previous training data will be deleted to start fresh."
-            )
-            accept = input("Do you want to overwrite and start fresh? (y/N) ")
-            if accept.lower().startswith("y"):
-                shutil.rmtree(save_path, ignore_errors=True)
-                logger.info(
-                    f"Previous strategies at '{save_path}' deleted. Starting fresh training."
-                )
-            else:
-                raise AssumeException(
-                    "Simulation aborted by user not to overwrite existing learned strategies. "
-                    "You can set a different 'simulation_id' or 'trained_policies_save_path' in the config."
-                )
+    save_path = world.learning_role.learning_config.trained_policies_save_path
+    continue_learning = world.learning_role.learning_config.continue_learning
+    confirm_learning_save_path(save_path, continue_learning)
 
     # also remove tensorboard logs
     tensorboard_path = f"tensorboard/{world.scenario_data['simulation_id']}"
@@ -971,7 +1071,7 @@ def run_learning(
     # Information that needs to be stored across episodes, aka one simulation run
     inter_episodic_data = {
         "buffer": ReplayBuffer(
-            buffer_size=int(world.learning_config.get("replay_buffer_size", 5e5)),
+            buffer_size=world.learning_role.learning_config.replay_buffer_size,
             obs_dim=world.learning_role.rl_algorithm.obs_dim,
             act_dim=world.learning_role.rl_algorithm.act_dim,
             n_rl_units=len(world.learning_role.rl_strats),
@@ -988,27 +1088,17 @@ def run_learning(
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
-    # -----------------------------------------
+    validation_interval = world.learning_role.determine_validation_interval()
 
-    validation_interval = min(
-        world.learning_role.training_episodes,
-        world.learning_config.get("validation_episodes_interval", 5),
+    # sync train frequency with simulation horizon once at the beginning of training and overwrite scenario data
+    world.scenario_data["config"]["learning_config"]["train_freq"] = (
+        world.learning_role.sync_train_freq_with_simulation_horizon()
     )
-
-    # Ensure training episodes exceed the sum of initial experience and one evaluation interval
-    min_required_episodes = (
-        world.learning_role.episodes_collecting_initial_experience + validation_interval
-    )
-
-    if world.learning_role.training_episodes < min_required_episodes:
-        raise ValueError(
-            f"Training episodes ({world.learning_role.training_episodes}) must be greater than the sum of initial experience episodes ({world.learning_role.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
-        )
 
     eval_episode = 1
 
     for episode in tqdm(
-        range(1, world.learning_role.training_episodes + 1),
+        range(1, world.learning_role.learning_config.training_episodes + 1),
         desc="Training Episodes",
     ):
         # -----------------------------------------
@@ -1033,7 +1123,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            >= world.learning_role.episodes_collecting_initial_experience
+            >= world.learning_role.learning_config.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.reset()
@@ -1051,6 +1141,9 @@ def run_learning(
             world.run()
 
             world.learning_role.tensor_board_logger.update_tensorboard()
+
+            if not world.db_uri:
+                raise AssumeException("No learning rewards as no database was given")
 
             total_rewards = world.output_role.get_sum_reward(episode=eval_episode)
 
@@ -1078,11 +1171,11 @@ def run_learning(
         # save the policies after each episode in case the simulation is stopped or crashes
         if (
             episode
-            >= world.learning_role.episodes_collecting_initial_experience
+            >= world.learning_role.learning_config.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.learning_role.rl_algorithm.save_params(
-                directory=f"{world.learning_role.trained_policies_save_path}/last_policies"
+                directory=f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
             )
 
     # container shutdown implicitly with new initialisation
@@ -1092,11 +1185,9 @@ def run_learning(
 
     world.reset()
 
-    # Set 'trained_policies_load_path' to None in order to load the most recent policies,
-    # especially if previous strategies were loaded from an external source.
-    # This is useful when continuing from a previous learning session.
+    # latest policies for final simulation run
     world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
-        f"{world.learning_role.trained_policies_save_path}/avg_reward_eval_policies"
+        f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
     )
 
     # load scenario for evaluation

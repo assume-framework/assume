@@ -18,11 +18,11 @@ from mango import (
 )
 from mango.util.clock import ExternalClock
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import DemandForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.markets.base_market import MarketRole
-from assume.strategies.naive_strategies import NaiveSingleBidStrategy
+from assume.strategies.naive_strategies import EnergyNaiveStrategy
 from assume.units.demand import Demand
 
 start = datetime(2020, 1, 1)
@@ -75,12 +75,12 @@ async def test_request_messages():
     units_agent.add_role(units_role)
 
     index = pd.date_range(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
-    forecaster = NaiveForecast(index, demand=1000)
+    forecaster = DemandForecaster(index, demand=-1000)
     params_dict = {
-        "bidding_strategies": {"EOM": NaiveSingleBidStrategy()},
+        "bidding_strategies": {"EOM": EnergyNaiveStrategy()},
         "technology": "energy",
         "unit_operator": "test_operator",
-        "max_power": 1000,
+        "max_power": -1000,
         "min_power": 0,
         "forecaster": forecaster,
     }

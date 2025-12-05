@@ -191,6 +191,8 @@ class WriteOutput(Role):
         )
 
     def on_ready(self):
+        super().on_ready()
+
         if self.db_uri:
             self.db = create_engine(self.db_uri)
         if self.db is not None:
@@ -266,6 +268,11 @@ class WriteOutput(Role):
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
 
+        # check for tensors and convert them to floats
+        # apply per column to ensure correct restructering after conversion
+        for col in df.columns:
+            df[col] = df[col].apply(convert_tensors)
+
         return df
 
     def convert_rl_grad_params(self, rl_grad_params: list[dict]):
@@ -280,6 +287,9 @@ class WriteOutput(Role):
         df["simulation"] = self.simulation_id
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
+
+        # check for tensors and convert them to floats
+        df = df.apply(convert_tensors)
 
         return df
 
@@ -497,8 +507,6 @@ class WriteOutput(Role):
             if df is None or df.empty:
                 continue
 
-            # check for tensors and convert them to floats
-            df = df.apply(convert_tensors)
             # sort dataframes by column names for consistent CSVs
             df = df.reindex(sorted(df.columns), axis=1)
 
@@ -700,7 +708,7 @@ class WriteOutput(Role):
         Retrieves the total reward for each learning unit.
 
         Returns:
-            np.array: The total reward for each learning unit.
+            np.ndarray: The total reward for each learning unit.
         """
         query = text(
             f"SELECT unit, SUM(reward) FROM rl_params "

@@ -8,11 +8,11 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from assume.common.forecasts import NaiveForecast
+from assume.common.forecaster import PowerplantForecaster
 from assume.strategies import (
-    flexableEOM,
-    flexableNegCRM,
-    flexablePosCRM,
+    CapacityHeuristicBalancingNegStrategy,
+    CapacityHeuristicBalancingPosStrategy,
+    EnergyHeuristicFlexableStrategy,
 )
 from assume.units import PowerPlant
 
@@ -24,7 +24,10 @@ end = datetime(2023, 7, 2)
 def power_plant() -> PowerPlant:
     # Create a PowerPlant instance with some example parameters
     index = pd.date_range("2023-07-01", periods=48, freq="h")
-    forecaster = NaiveForecast(index, availability=1, fuel_price=10, co2_price=10)
+    forecaster = PowerplantForecaster(
+        index,
+        fuel_prices={"lignite": 10, "co2": 10},
+    )
     return PowerPlant(
         id="test_pp",
         unit_operator="test_operator",
@@ -43,7 +46,7 @@ def power_plant() -> PowerPlant:
 
 def test_flexable_eom(mock_market_config, power_plant):
     end = datetime(2023, 7, 1, 1)
-    strategy = flexableEOM()
+    strategy = EnergyHeuristicFlexableStrategy()
     mc = mock_market_config
     product_tuples = [(start, end, None)]
     bids = strategy.calculate_bids(power_plant, mc, product_tuples=product_tuples)
@@ -74,7 +77,7 @@ def test_flexable_eom(mock_market_config, power_plant):
 
 def test_flexable_pos_reserve(mock_market_config, power_plant):
     end = datetime(2023, 7, 1, 4, 0, 0)
-    strategy = flexablePosCRM()
+    strategy = CapacityHeuristicBalancingPosStrategy()
     mc = mock_market_config
     mc.product_type = "energy_pos"
     product_tuples = [(start, end, None)]
@@ -99,7 +102,7 @@ def test_flexable_pos_reserve(mock_market_config, power_plant):
 
 def test_flexable_neg_reserve(mock_market_config, power_plant):
     end = datetime(2023, 7, 1, 4, 0, 0)
-    strategy = flexableNegCRM()
+    strategy = CapacityHeuristicBalancingNegStrategy()
     mc = mock_market_config
     # Calculations for negative energy
     mc.product_type = "energy_neg"

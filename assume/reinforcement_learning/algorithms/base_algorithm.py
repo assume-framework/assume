@@ -17,52 +17,25 @@ class RLAlgorithm:
 
     Args:
         learning_role (Learning Role object): Learning object
-        learning_rate (float): learning rate for adam optimizer
-        batch_size (int): Minibatch size for each gradient update
-        tau (float): the soft update coefficient ("Polyak update", between 0 and 1)
-        gamma (float): the discount factor
-        gradient_steps (int): how many gradient steps to do after each rollout
-        policy_delay (int): Policy and target networks will only be updated once every policy_delay steps per training steps. The Q values will be updated policy_delay more often (update every training step)
-        target_policy_noise (float): Standard deviation of Gaussian noise added to target policy (smoothing noise)
-        target_noise_clip (float): Limit for absolute value of target policy smoothing noise
-        actor_architecture (str): type of Actor neural network
     """
 
     def __init__(
         self,
         # init learning_role as object of Learning class
         learning_role,
-        learning_rate=1e-4,
-        batch_size=1024,
-        tau=0.005,
-        gamma=0.99,
-        gradient_steps=100,
-        policy_delay=2,
-        target_policy_noise=0.2,
-        target_noise_clip=0.5,
-        actor_architecture="mlp",
     ):
         super().__init__()
 
         self.learning_role = learning_role
-        self.learning_rate = learning_rate
-        self.batch_size = batch_size
-        self.gamma = gamma
-        self.tau = tau
+        self.learning_config = learning_role.learning_config
 
-        self.gradient_steps = gradient_steps
-
-        self.policy_delay = policy_delay
-        self.target_noise_clip = target_noise_clip
-        self.target_policy_noise = target_policy_noise
-
-        if actor_architecture in actor_architecture_aliases.keys():
+        if self.learning_config.actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
-                actor_architecture
+                self.learning_config.actor_architecture
             ]
         else:
             raise ValueError(
-                f"Policy '{actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
+                f"Policy '{self.learning_config.actor_architecture}' unknown. Supported architectures are {list(actor_architecture_aliases.keys())}"
             )
 
         self.device = self.learning_role.device

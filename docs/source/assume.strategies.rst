@@ -72,6 +72,22 @@ assume.strategies.naive\_strategies module
    :undoc-members:
    :show-inheritance:
 
+assume.strategies.interactive\_strategies module
+------------------------------------------------
+
+.. automodule:: assume.strategies.interactive_strategies
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+assume.strategies.portfolio\_strategies module
+----------------------------------------------
+
+.. automodule:: assume.strategies.portfolio_strategies
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Module contents
 ---------------
 

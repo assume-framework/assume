@@ -11,7 +11,7 @@ its primary objectives are to ensure usability and customizability for a wide ra
 users and use cases in the energy system modeling community.
 
 The unique feature of the ASSUME tool-box is the integration of **Deep Reinforcement
-Learning** methods into the behavioural strategies of market agents.
+Learning** methods into the behavioral strategies of market agents.
 The model offers various predefined agent representations for both the demand and
 generation sides, which can be used as plug-and-play modules, simplifying the
 reinforcement of learning strategies. This setup enables research into new market
@@ -19,13 +19,13 @@ designs and dynamics in energy markets.
 
 Developers
 ----------
-The project is `developed by <https://assume.readthedocs.io/en/latest/developers.html>`_
+The project is :doc:`developed by <developers>`
 a collaborative team of researchers from INATECH at the University of Freiburg,
 IISM at Karlsruhe Institute of Technology, Fraunhofer Institute for Systems and Innovation Research,
 Fraunhofer Institution for Energy Infrastructures and Geothermal Energy,
-and FH Aachen - University of Applied Sciences. Each contributor brings valuable
-expertise in electricity market modeling, deep reinforcement learning, demand side
-flexibility, and infrastructure modeling.
+and FH Aachen - University of Applied Sciences.
+Each contributor brings valuable expertise in electricity market modeling, deep reinforcement learning,
+demand side flexibility, and infrastructure modeling.
 
 Funding
 -------
@@ -70,7 +70,6 @@ Documentation
    examples_basic
    example_simulations
 
-**User Guide**
 
 User Guide
 ==========
@@ -81,6 +80,8 @@ User Guide
 * :doc:`outputs`
 * :doc:`unit_operator`
 * :doc:`units`
+* :doc:`unit_forecasts`
+* :doc:`bidding_strategies`
 * :doc:`learning`
 * :doc:`learning_algorithm`
 * :doc:`support_policies`
@@ -101,6 +102,8 @@ User Guide
    outputs
    unit_operator
    units
+   unit_forecasts
+   bidding_strategies
    learning
    learning_algorithm
    support_policies
@@ -111,8 +114,7 @@ User Guide
    assume
 
 
-Indices and tables
-==================
+**Indices & Tables**
 
 * :ref:`genindex`
 * :ref:`modindex`

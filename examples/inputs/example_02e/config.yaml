@@ -7,9 +7,9 @@ base:
   end_date: 2019-04-30 00:00
   time_step: 1h
   save_frequency_hours: null
-  learning_mode: true
 
   learning_config:
+    learning_mode: true
     continue_learning: false
     trained_policies_save_path: null
     trained_policies_load_path: null
@@ -54,9 +54,9 @@ tiny:
   end_date: 2019-01-05 00:00
   time_step: 1h
   save_frequency_hours: null
-  learning_mode: True
 
   learning_config:
+    learning_mode: True
     continue_learning: False
     trained_policies_save_path: null
     max_bid_price: 50

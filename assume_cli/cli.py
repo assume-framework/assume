@@ -159,17 +159,19 @@ def cli(args=None):
 
         logging.info(f"loaded {args.scenario} - {args.case_study}")
 
-        if world.learning_config.get("learning_mode", False):
+        if world.learning_mode:
             run_learning(world)
 
         world.run()
 
     except KeyboardInterrupt:
-        pass
+        sys.exit(1)
     except AssumeException as e:
         logging.error(f"Stopping: {e}")
+        sys.exit(1)
     except Exception:
         logging.exception("Simulation aborted")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

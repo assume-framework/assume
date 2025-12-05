@@ -6,7 +6,7 @@ Unit Operator
 ==============
 
 Assume is created using flexible and usable abstractions, while still providing flexibility to cover most use cases of market modeling. This is also true for the unit operator class.
-In general the task of this calls can range from simple passing the bids of the technical units through to complex portfolio optimisation of all units assigned to one operator. This text aims
+In general the task of this calls can range from simple passing the bids of the technical units through to complex portfolio optimization of all units assigned to one operator. This text aims
 to explain its current functionalities and the possibilities the unit
 
 
@@ -25,10 +25,10 @@ The unit operator is responsible for the following tasks:
 As one can see from all the task the unit oporator covers, that it orchestrates and coordinates the technical units and the markets.
 
 
-Portfolio Optimisation
+Portfolio Optimization
 ----------------------
 
 The main felxibility a unit oporator is, that we can process all the bids and technical constraints a the unit oporator gets from its technical units
-however we want, before sending them to the market. This allows us to implement a portfolio optimisation for the technical units assigned to the unit operator.
+however we want, before sending them to the market. This allows us to implement a portfolio optimization for the technical units assigned to the unit operator.
 A respective function is in place for that. Yet, it is not used in the current version of the unit operator. The function is called :func:`assume.common.units_operator.UnitsOperator.formulate_bids`.
 For example, one could think of coordinating the bids of a battery and a PV unit to maximise the self-consumption of the PV unit under one unit operator.

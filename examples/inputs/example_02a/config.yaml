@@ -3,8 +3,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base:
-  end_date: 2019-07-31 00:00
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-31 00:00
+  time_step: 1h
+  save_frequency_hours: null
+
   learning_config:
+    learning_mode: true
     continue_learning: false
     trained_policies_save_path: null
     trained_policies_load_path: null
@@ -34,86 +39,91 @@ base:
   learning_mode: false
   markets_config:
     EOM:
-      market_mechanism: pay_as_clear
-      maximum_bid_price: 3000
-      maximum_bid_volume: 100000
-      minimum_bid_price: -500
-      opening_duration: 1h
-      opening_frequency: 1h
       operator: EOM_operator
-      price_unit: EUR/MWh
       product_type: energy
-      products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
       start_date: 2019-03-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
       volume_unit: MWh
-  save_frequency_hours: null
-  start_date: 2019-03-01 00:00
-  time_step: 1h
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
 base_lstm:
+  start_date: 2019-03-01 00:00
   end_date: 2019-03-31 00:00
+  time_step: 1h
+  save_frequency_hours: null
+
   learning_config:
-    actor_architecture: lstm
-    algorithm: matd3
-    batch_size: 256
+    learning_mode: true
     continue_learning: false
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 50
+    episodes_collecting_initial_experience: 5
+    train_freq: 24h
+    gradient_steps: 24
+    batch_size: 256
+    gamma: 0.99
     device: cpu
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
-    episodes_collecting_initial_experience: 5
-    gamma: 0.99
-    gradient_steps: 24
-    learning_rate: 0.001
-    max_bid_price: 100
-    noise_dt: 1
-    noise_scale: 1
-    noise_sigma: 0.1
-    train_freq: 24h
-    trained_policies_save_path: null
-    training_episodes: 50
-    validation_episodes_interval: 5
-  learning_mode: true
+    actor_architecture: lstm
+
   markets_config:
     EOM:
-      market_mechanism: pay_as_clear
-      maximum_bid_price: 3000
-      maximum_bid_volume: 100000
-      minimum_bid_price: -500
-      opening_duration: 1h
-      opening_frequency: 1h
       operator: EOM_operator
-      price_unit: EUR/MWh
       product_type: energy
-      products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
       start_date: 2019-03-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
       volume_unit: MWh
-  save_frequency_hours: null
-  start_date: 2019-03-01 00:00
-  time_step: 1h
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
 tiny:
+  start_date: 2019-01-01 00:00
   end_date: 2019-01-05 00:00
+  time_step: 1h
+  save_frequency_hours: null
+
   learning_config:
-    actor_architecture: mlp
-    algorithm: matd3
-    batch_size: 64
+    learning_mode: true
     continue_learning: false
-    device: cpu
-    episodes_collecting_initial_experience: 3
-    gamma: 0.99
-    gradient_steps: 24
-    learning_rate: 0.001
-    max_bid_price: 100
-    noise_dt: 1
-    noise_scale: 1
-    noise_sigma: 0.1
-    train_freq: 24h
     trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
     training_episodes: 10
+    episodes_collecting_initial_experience: 3
+    train_freq: 24h
+    gradient_steps: 24
+    batch_size: 64
+    gamma: 0.99
+    device: cpu
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
     validation_episodes_interval: 5
   learning_mode: true
   markets_config:
@@ -128,54 +138,16 @@ tiny:
       price_unit: EUR/MWh
       product_type: energy
       products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
-      start_date: 2019-01-01 00:00
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
       volume_unit: MWh
-  save_frequency_hours: null
-  start_date: 2019-01-01 00:00
-  time_step: 1h
-base_dispatch:
-  end_date: 2019-07-31 00:00
-  learning_config:
-    action_noise_schedule: linear
-    algorithm: matd3
-    batch_size: 256
-    continue_learning: false
-    device: cpu
-    episodes_collecting_initial_experience: 0
-    gamma: 0.99
-    gradient_steps: 24
-    learning_rate: 0.001
-    learning_rate_schedule: linear
-    max_bid_price: 100
-    noise_dt: 1
-    noise_scale: 1
-    noise_sigma: 0.1
-    train_freq: 24h
-    trained_policies_load_path: learned_strategies/base_dispatch/avg_reward_eval_policies
-    trained_policies_save_path: learned_strategies/base_dispatch/last_policies
-    training_episodes: 0
-    validation_episodes_interval: 5
-  learning_mode: false
-  markets_config:
-    EOM:
-      market_mechanism: pay_as_clear
-      maximum_bid_price: 3000
       maximum_bid_volume: 100000
       minimum_bid_price: -500
       opening_duration: 1h
       opening_frequency: 1h
       operator: EOM_operator
       price_unit: EUR/MWh
-      product_type: energy
-      products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
-      start_date: 2019-03-01 00:00
-      volume_unit: MWh
-  save_frequency_hours: null
-  start_date: 2019-03-01 00:00
-  time_step: 1h
+      market_mechanism: pay_as_clear

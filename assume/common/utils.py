@@ -5,13 +5,16 @@
 import calendar
 import inspect
 import logging
+import os
 import re
+import shutil
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from itertools import groupby
 from operator import itemgetter
+from pathlib import Path
 
 import dateutil.rrule as rr
 import numpy as np
@@ -20,6 +23,7 @@ import yaml
 from pyomo.opt import check_available_solvers
 
 from assume.common.base import BaseStrategy, LearningStrategy
+from assume.common.exceptions import AssumeException
 from assume.common.market_objects import MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
@@ -347,7 +351,7 @@ def separate_orders(orderbook: Orderbook):
     Returns:
         list: The updated orderbook.
 
-    Notes:
+    Note:
         This function separates orders with several hours into single hour orders and modifies the orderbook in place.
     """
 
@@ -607,27 +611,103 @@ def convert_tensors(data):
     try:
         import torch as th
 
-        if isinstance(data, pd.Series):
-            # Vectorized conversion
-            return data.map(lambda x: x.tolist() if isinstance(x, th.Tensor) else x)
+        def convert_tensor_batch(tensors):
+            # stack all tensors and push them over to CPU together to avoid unperformed multiple GPU-CPU transfers
+            batch = th.stack(tensors, dim=0).cpu()
+            return batch.tolist()
 
-        elif isinstance(data, dict):
-            # Recursively convert tensors in a dictionary
-            return {k: convert_tensors(v) for k, v in data.items()}
+        def collect_tensors_with_paths(data, path=None, collected=None):
+            """
+            Recursively collect all torch.Tensors from nested data structures,
+            storing both the tensor and its location path.
+            Returns a copy of the structure with placeholders for tensors.
+            """
+            if collected is None:
+                collected = []
+            if path is None:
+                path = []
 
-        elif isinstance(data, list):
-            # Recursively convert tensors in a list
-            return [convert_tensors(item) for item in data]
+            if isinstance(data, pd.Series):
+                new_series = pd.Series(index=data.index, name=data.name, dtype=object)
+                for idx, x in data.items():
+                    new_val, collected = collect_tensors_with_paths(
+                        x, path + [idx], collected
+                    )
+                    new_series[idx] = new_val
+                return new_series, collected
 
-        elif isinstance(data, th.Tensor):
-            # Handles both scalars and multi-dimensional tensors
-            return data.tolist()  # Converts to Python-native lists/ints/floats
+            elif isinstance(data, dict):
+                new_dict = {}
+                for k, v in data.items():
+                    new_dict[k], collected = collect_tensors_with_paths(
+                        v, path + [k], collected
+                    )
+                return new_dict, collected
+
+            elif isinstance(data, list):
+                new_list = []
+                for i, item in enumerate(data):
+                    new_item, collected = collect_tensors_with_paths(
+                        item, path + [i], collected
+                    )
+                    new_list.append(new_item)
+                return new_list, collected
+
+            elif isinstance(data, th.Tensor):
+                # Store the path and tensor
+                collected.append((path, data))
+                # Return a placeholder (will be replaced later)
+                return None, collected
+
+            else:
+                # Non-tensor data, return as-is
+                return data, collected
+
+        def reconstruct_data(structure, tensor_paths, new_values):
+            """
+            Inserts the converted tensors (new_values) back into the structure
+            at the positions described by tensor_paths.
+            """
+            for path, val in zip(tensor_paths, new_values):
+                if not path:  # Empty path means the root is a tensor
+                    return val
+
+                target = structure
+                # Navigate to the parent of the target location
+                for p in path[:-1]:
+                    target = target[p]
+
+                # Set the final value
+                final_key = path[-1]
+                if isinstance(target, (list | pd.Series | dict)):
+                    target[final_key] = val
+
+            return structure
+
+        # Handle the case where data itself is a tensor
+        if isinstance(data, th.Tensor):
+            return data.cpu().tolist()
+
+        # 1. Collect tensors with their paths
+        structure, tensor_info = collect_tensors_with_paths(data)
+
+        if not tensor_info:
+            # No tensors found, return original data
+            return data
+
+        tensor_paths, tensors = zip(*tensor_info)
+
+        # 2. Process batch from GPU to CPU and convert to list
+        converted = convert_tensor_batch(list(tensors))
+
+        # 3. Reconstruct initial data structure
+        final_data = reconstruct_data(structure, tensor_paths, converted)
+
+        return final_data
 
     except ImportError:
         # If torch is not installed, return the data unchanged
-        pass
-
-    return data
+        return data
 
 
 # Function to parse the duration string
@@ -712,3 +792,54 @@ def get_supported_solver(default_solver: str | None = None):
         solver = solvers[0]
 
     return solver
+
+
+def interactive_input(prompt: str, default: str = "") -> str:
+    if os.getenv("NON_INTERACTIVE"):
+        return default
+    else:
+        return input(prompt)
+
+
+def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
+    """
+    Check save_path and ask user how to proceed if it exists.
+    Raises AssumeException if user declines to proceed.
+    """
+    if not Path(save_path).is_dir():
+        return
+
+    if continue_learning:
+        logger.warning(
+            f"Save path '{save_path}' exists.\n"
+            "You are in continue learning mode. New strategies may overwrite previous ones.\n"
+            "It is recommended to use a different save path to avoid unintended overwrites.\n"
+            "You can set 'trained_policies_save_path' in the config."
+        )
+        proceed = interactive_input(
+            "Do you still want to proceed with the existing save path? (y/N) ",
+            default="y",
+        )
+        if not proceed.lower().startswith("y"):
+            raise AssumeException(
+                "Simulation aborted by user to avoid overwriting previous learned strategies. "
+                "Consider setting a new 'simulation_id' or 'trained_policies_save_path' in the config."
+            )
+    else:
+        logger.warning(
+            f"Save path '{save_path}' exists. Previous training data will be deleted to start fresh."
+        )
+        accept = interactive_input(
+            "Do you want to overwrite and start fresh? (y/N) ", default="y"
+        )
+
+        if accept.lower().startswith("y"):
+            shutil.rmtree(save_path, ignore_errors=True)
+            logger.info(
+                f"Previous strategies at '{save_path}' deleted. Starting fresh training."
+            )
+        else:
+            raise AssumeException(
+                "Simulation aborted by user not to overwrite existing learned strategies. "
+                "You can set a different 'simulation_id' or 'trained_policies_save_path' in the config."
+            )
