@@ -73,7 +73,7 @@ all = [
     "assume-framework[oeds, network, learning]",
 ]
 docs = [
-  "sphinx <8.2",
+  "sphinx <9",
   "sphinx-book-theme >=1.1.4",
   "nbsphinx >=0.9.7",
   "nbsphinx-link >= 1.3.1",
