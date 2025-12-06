@@ -20,6 +20,7 @@ dependencies:
 - pip:
   - .[all]
   - sphinx<8.2
+  - setuptools-scm
   - sphinx-book-theme
   - nbsphinx
   - nbsphinx-link

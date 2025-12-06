@@ -752,7 +752,7 @@ class LearningConfig:
     """
     A class for the learning configuration.
 
-    Attributes:
+    Parameters:
         learning_mode (bool): Should we use learning mode at all? If False, the learning bidding strategy is
             loaded from trained_policies_load_path and no training occurs. Default is False.
         evaluation_mode (bool): This setting is modified internally. Whether to run in evaluation mode. If True, the agent uses the learned policy
