@@ -177,10 +177,20 @@ def market_clearing_opt_constraints(
     )
 
     if incidence_matrix is not None:
+        if 'x' in lines.columns:
+            print("Warning: 'lines.csv' contains reactances 'x' but this clearing is based on Net Transfer Capacities only (Transport model). Use 'nodal_clearing' to include a linear OPF.")
+        # add NTCs
         model.transmission_constr = pyo.ConstraintList()
         for t in model.T:
             for line in model.lines:
-                capacity = lines.at[line, "s_nom"]
+                # s_max_pu might also be time variant. but for now we assume it is static
+                s_max_pu = (
+                    lines.at[line, "s_max_pu"]
+                    if "s_max_pu" in lines.columns and not
+                    pd.isna(lines.at[line, "s_max_pu"])
+                    else 1.0
+                )
+                capacity = lines.at[line, "s_nom"] * s_max_pu
                 # Limit the flow on each line
                 model.transmission_constr.add(model.flows[t, line] <= capacity)
                 model.transmission_constr.add(model.flows[t, line] >= -capacity)
