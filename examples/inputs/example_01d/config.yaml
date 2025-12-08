@@ -24,12 +24,16 @@ base:
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
-      market_mechanism: complex_clearing
+      market_mechanism: nodal_clearing
+      additional_fields:
+        - node
+        - max_power
       param_dict:
         network_path: .
         solver: highs
         zones_identifier: zone_id
         pricing_mechanism: pay_as_clear
+        log_flows: true
 
     redispatch:
       start_date: 2019-01-01 21:00
