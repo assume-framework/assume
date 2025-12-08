@@ -333,20 +333,3 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
         )
 
     return meta
-
-def calculate_ptdf_matrix(network: pypsa.Network) -> pd.DataFrame:
-    """
-    This function calculates the PTDF matrix for the given PyPSA network.
-
-    Args:
-        network (pypsa.Network): The PyPSA network for which to calculate the PTDF matrix.
-    Returns:
-        pd.DataFrame: The PTDF matrix with branches as rows and buses as columns.
-    """
-    network.determine_network_topology()
-    sn = network.sub_networks.obj["0"]
-    sn.calculate_PTDF()
-    ptdf_df = pd.DataFrame(
-        sn.PTDF, index=sn.branches_i(), columns=sn.buses_i()
-    ).droplevel(0)
-    return ptdf_df
