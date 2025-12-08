@@ -348,7 +348,7 @@ def create_gens_df(pp_units, dispatch_df):
     mc = dispatch_df.groupby("unit")["marginal_cost"].mean()
 
     # based on name and unit column join mc into gens_df
-    gens_df = gens_df.merge(mc, left_on="name", right_on="unit", how="left")
+    gens_df = gens_df.merge(mc, left_on="unit", right_on="unit", how="left")
     gens_df = gens_df.rename(columns={"marginal_cost": "mc"})
     return gens_df
 
@@ -428,7 +428,7 @@ def join_demand_market_orders(demand_df, market_orders_df):
 
 
 def obtain_k_values(k_df, gens_df):
-    mc_mapping = dict(zip(gens_df["name"], gens_df["mc"]))
+    mc_mapping = dict(zip(gens_df["index"], gens_df["mc"]))
     k_df["gens_df_mc"] = k_df["unit_id"].map(mc_mapping)
 
     # transformed actions into k_values, one per generator

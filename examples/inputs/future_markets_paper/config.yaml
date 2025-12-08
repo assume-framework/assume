@@ -1,17 +1,13 @@
-# SPDX-FileCopyrightText: ASSUME Developers
-#
-# SPDX-License-Identifier: AGPL-3.0-or-later
 base_case_2013:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
   time_step: 1h
-  learning_mode: False
-  save_frequency_hours: Null
-
+  save_frequency_hours: null
   learning_config:
-    continue_learning: True
+    learning_mode: false
+    continue_learning: true
     trained_policies_save_path: null
-    trained_policies_load_path:  learned_strategies/future_markets_paper_base_case_2013_pp_all/avg_reward_eval_policies
+    trained_policies_load_path: learned_strategies/future_markets_paper_base_case_2013_pp_all/avg_reward_eval_policies
     max_bid_price: 500
     algorithm: matd3
     learning_rate: 0.0001
@@ -29,16 +25,15 @@ base_case_2013:
     validation_episodes_interval: 5
     early_stopping_steps: 20
     early_stopping_threshold: 0.05
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       start_date: 2013-01-01 00:00
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -47,17 +42,14 @@ base_case_2013:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
-
-
 base_case_2013_pp_bat:
   start_date: 2013-01-01 00:00
-  end_date:  2013-02-28 00:00
+  end_date: 2013-02-28 00:00
   time_step: 1h
-  learning_mode: True
-  save_frequency_hours: Null
-
+  save_frequency_hours: null
   learning_config:
-    continue_learning: True
+    learning_mode: true
+    continue_learning: true
     trained_policies_save_path: null
     trained_policies_load_path: learned_strategies/future_markets_paper_base_case_2013_pp_bat/avg_reward_eval_policies
     max_bid_price: 300
@@ -77,16 +69,15 @@ base_case_2013_pp_bat:
     validation_episodes_interval: 5
     early_stopping_steps: 20
     early_stopping_threshold: 0.02
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       start_date: 2013-01-01 00:00
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -95,18 +86,16 @@ base_case_2013_pp_bat:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
-
 base_case_2013_pp_all:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
   time_step: 1h
-  learning_mode: False
-  save_frequency_hours: Null
-
+  save_frequency_hours: null
   learning_config:
-    continue_learning: False
+    learning_mode: false
+    continue_learning: false
     trained_policies_save_path: null
-    trained_policies_load_path:  examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_all/last_policies
+    trained_policies_load_path: examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_all/last_policies
     max_bid_price: 300
     algorithm: matd3
     learning_rate: 0.0001
@@ -124,16 +113,15 @@ base_case_2013_pp_all:
     validation_episodes_interval: 5
     early_stopping_steps: 20
     early_stopping_threshold: 0.05
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       start_date: 2013-01-01 00:00
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -142,18 +130,16 @@ base_case_2013_pp_all:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
-
 base_case_2013_pp_single:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
   time_step: 1h
-  learning_mode: False
-  save_frequency_hours: Null
-
+  save_frequency_hours: null
   learning_config:
-    continue_learning: True
+    learning_mode: false
+    continue_learning: true
     trained_policies_save_path: null
-    trained_policies_load_path:  examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_single/last_policies
+    trained_policies_load_path: examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_single/last_policies
     max_bid_price: 300
     algorithm: matd3
     learning_rate: 0.001
@@ -171,16 +157,15 @@ base_case_2013_pp_single:
     validation_episodes_interval: 5
     early_stopping_steps: 100
     early_stopping_threshold: 0.05
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       start_date: 2013-01-01 00:00
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
@@ -189,17 +174,14 @@ base_case_2013_pp_single:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
-
-
 base_case_2013_bat:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
   time_step: 1h
-  learning_mode: True
-  save_frequency_hours: Null
-
+  save_frequency_hours: null
   learning_config:
-    continue_learning: False
+    learning_mode: true
+    continue_learning: false
     trained_policies_save_path: null
     trained_policies_load_path: null
     max_bid_price: 300
@@ -219,16 +201,59 @@ base_case_2013_bat:
     validation_episodes_interval: 5
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
-
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
       start_date: 2013-01-01 00:00
       products:
-        - duration: 1h
-          count: 1
-          first_delivery: 1h
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: complex_clearing
+base_case_2013_pp_all_dispatch:
+  start_date: 2013-01-01 00:00
+  end_date: 2013-02-28 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  learning_config:
+    learning_mode: false
+    continue_learning: false
+    trained_policies_save_path: examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_all/last_policies
+    trained_policies_load_path: examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_all/last_policies
+    max_bid_price: 300
+    algorithm: matd3
+    learning_rate: 0.0001
+    training_episodes: 0
+    episodes_collecting_initial_experience: 0
+    train_freq: 24h
+    gradient_steps: 10
+    batch_size: 256
+    gamma: 0
+    device: cpu
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    action_noise_schedule: linear
+    validation_episodes_interval: 5
+    early_stopping_steps: 20
+    early_stopping_threshold: 0.05
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2013-01-01 00:00
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
       volume_unit: MWh
