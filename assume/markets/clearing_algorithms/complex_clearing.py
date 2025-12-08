@@ -626,18 +626,6 @@ class ComplexClearingRole(MarketRole):
                         t: instance.dual[instance.system_wide_energy_balance[t]]
                         for t in instance.T
                     }
-
-            # example code to extract dispatched volumes and flows directly without using the LMPs
-            # TODO: check if and how this works for block bids and linked bids
-            acceptance = acceptance = {index: disp.value for index, disp in instance.xs.items()}
-            bid_volume = {order['bid_id']: order['volume'] for order in orderbook}
-            dispatch = {
-                        order['bid_id']: bid_volume.get(order['bid_id']) * acceptance.get(order['bid_id'])
-                        for order in orderbook
-                        }
-            flows = {index: flow.value for index, flow in instance.flows.items()}
-            # continue with finding the dispatch based on LMPs
-            
             # check the surplus of each order and remove those with negative surplus
             orders_surplus = []
             for order in orderbook:
