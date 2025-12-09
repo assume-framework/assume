@@ -67,9 +67,9 @@ def test_complex_clearing():
     assert rejected_orders == []
     assert accepted_orders[0]["agent_addr"] == "dem1"
     assert math.isclose(accepted_orders[0]["accepted_volume"], -1000, abs_tol=eps)
-    assert accepted_orders[1]["agent_addr"] == f"gen{h+1}"
+    assert accepted_orders[1]["agent_addr"] == f"gen{h + 1}"
     assert math.isclose(accepted_orders[1]["accepted_volume"], 100, abs_tol=eps)
-    assert accepted_orders[2]["agent_addr"] == f"gen{2*h+1}"
+    assert accepted_orders[2]["agent_addr"] == f"gen{2 * h + 1}"
     assert math.isclose(accepted_orders[2]["volume"], 900, abs_tol=eps)
 
 
