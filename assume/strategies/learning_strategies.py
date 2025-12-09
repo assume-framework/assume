@@ -308,11 +308,11 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     on an Energy-Only Market.
 
     The agent submits two price bids: one for the inflexible component (P_min) and another for
-    the flexible component (P_max - P_min) of its capacity. This strategy utilizes a set of 50
+    the flexible component (P_max - P_min) of its capacity. This strategy utilizes a set of 38
     observations to generate actions, which are then transformed into market bids. The observation
     space comprises two unique values: the marginal cost and the current capacity of the unit.
 
-    The observation space for this strategy consists of 50 elements, drawn from both the forecaster
+    The observation space for this strategy consists of 38 elements, drawn from both the forecaster
     and the unit's internal state. Observations include the following components:
 
     - **Forecasted Residual Load**: Forecasted load over the foresight period, scaled by the maximum
@@ -344,7 +344,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     Attributes
     ----------
     foresight : int
-        Number of time steps for which the agent forecasts market conditions. Defaults to 24.
+        Number of time steps for which the agent forecasts market conditions. Defaults to 12.
     max_bid_price : float
         Maximum allowable bid price. Defaults to 100.
     max_demand : float
@@ -682,8 +682,8 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         # scaling factor to normalize the reward to the range [-1,1]
         scaling = 1 / (self.max_bid_price * unit.max_power)
-        reward = scaling * (profit - regret_scale * opportunity_cost)
         regret = regret_scale * opportunity_cost
+        reward = scaling * (profit - regret)
 
         # Store results in unit outputs
         # Note: these are not learning-specific results but stored for all units for analysis
@@ -807,7 +807,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
 
-    The observation space for this strategy consists of 50 elements. Key components include:
+    The observation space for this strategy consists of 74 elements. Key components include:
 
     - **State of Charge**: Represents the current level of energy in the storage unit,
       influencing the bid direction and capacity.
@@ -1308,11 +1308,12 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
 
         profit = income - operational_cost
 
-        # Stabilizing learning: Limit positive profit to 10% of its absolute value.
+        # Stabilizing learning: Limit positive profit to 50% of its absolute value.
         # This reduces variance in rewards and prevents overfitting to extreme profit-seeking behavior.
         # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
         # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
         # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
+        # IMPORTANT: This is a clear case of reward_tuning to stabilize learning - Use with caution!
         profit = min(profit, 0.5 * abs(profit))
 
         # get potential maximum infeed according to availability from order volume
