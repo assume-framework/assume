@@ -375,23 +375,19 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 38)
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations.
+        foresight = kwargs.pop("foresight", 12)  
         act_dim = kwargs.pop("act_dim", 2)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
-            obs_dim=obs_dim,
+            foresight=foresight,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
 
-        # 'foresight' represents the number of time steps into the future that we will consider
-        # when constructing the observations. This value is fixed for each strategy, as the
-        # neural network architecture is predefined, and the size of the observations must remain consistent.
-        # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
-        # as the observation dimension depends on the foresight value.
-        self.foresight = 12
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -722,19 +718,17 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 74)
+        # we select 24 to be in line with the storage strategies
+        foresight = kwargs.pop("foresight", 24)  
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
-            obs_dim=obs_dim,
+            foresight=foresight,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
-
-        # we select 24 to be in line with the storage strategies
-        self.foresight = 24
 
     def calculate_bids(
         self,
@@ -868,23 +862,18 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 74)
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations. 
+        foresight = kwargs.pop("foresight", 24) 
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
-            obs_dim=obs_dim,
+            foresight=foresight,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
-
-        # 'foresight' represents the number of time steps into the future that we will consider
-        # when constructing the observations. This value is fixed for each strategy, as the
-        # neural network architecture is predefined, and the size of the observations must remain consistent.
-        # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
-        # as the observation dimension depends on the foresight value.
-        self.foresight = 24
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -1168,23 +1157,18 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 75)
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations.
+        foresight = kwargs.pop("foresight", 24)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 3)
         super().__init__(
-            obs_dim=obs_dim,
+            foresight=foresight,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
-
-        # 'foresight' represents the number of time steps into the future that we will consider
-        # when constructing the observations. This value is fixed for each strategy, as the
-        # neural network architecture is predefined, and the size of the observations must remain consistent.
-        # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
-        # as the observation dimension depends on the foresight value.
-        self.foresight = 24
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])

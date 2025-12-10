@@ -893,7 +893,7 @@ class LearningStrategy(BaseStrategy):
     convention when designing your create_observation method and the observation space.
 
     Attributes:
-        obs_dim (int): The observation dimension.
+        foresight (int): Number of steps of for- and backwards looking in observations.
         act_dim (int): The action dimension.
         unique_obs_dim (int): The unique observation dimension.
         num_timeseries_obs_dim (int): The number of observation timeseries dimension.
@@ -907,7 +907,7 @@ class LearningStrategy(BaseStrategy):
     def __init__(
         self,
         learning_role,
-        obs_dim: int,
+        foresight: int,
         act_dim: int,
         unique_obs_dim: int,
         num_timeseries_obs_dim: int = 3,
@@ -923,8 +923,9 @@ class LearningStrategy(BaseStrategy):
         self.learning_role = learning_role
         self.learning_config = learning_role.learning_config
 
-        self.obs_dim = obs_dim
+        self.foresight = foresight
         self.act_dim = act_dim
+        self.obs_dim = 3 * foresight + unique_obs_dim
 
         # this defines the number of unique observations, which are not the same for all units
         # this is used by the centralised critic and will return an error if not matched
