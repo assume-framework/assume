@@ -22,13 +22,13 @@ def price_profile():
 @pytest.fixture
 def generic_storage_config():
     return {
-        "max_capacity": 100,  # Maximum energy capacity in MWh
-        "min_capacity": 0,  # Minimum SOC in MWh
+        "capacity": 100,  # energy capacity in MWh
+        "min_soc": 0,  # Minimum SOC
         "max_power_charge": 0,  # Maximum charging power in MW
         "max_power_discharge": 0,  # Maximum discharging power in MW
         "efficiency_charge": 0.9,  # Charging efficiency
         "efficiency_discharge": 0.9,  # Discharging efficiency
-        "initial_soc": 0,  # Initial SOC in MWh
+        "initial_soc": 0,  # Initial SOC
         "ramp_up": 50,  # Maximum ramp-up rate in MW
         "ramp_down": 50,  # Maximum ramp-down rate in MW
         "storage_loss_rate": 0.01,  # 1% storage loss per time step
@@ -93,15 +93,15 @@ def test_state_of_charge_constraints(generic_storage_model, generic_storage_conf
     and evolves correctly based on charging, discharging, and storage losses.
     """
     model, _ = generic_storage_model
-    min_soc = generic_storage_config["min_capacity"]
-    max_soc = generic_storage_config["max_capacity"]
+    min_soc = generic_storage_config["min_soc"]
+    max_soc = generic_storage_config["max_soc"]
     efficiency_charge = generic_storage_config["efficiency_charge"]
     efficiency_discharge = generic_storage_config["efficiency_discharge"]
     storage_loss_rate = generic_storage_config["storage_loss_rate"]
     initial_soc = generic_storage_config["initial_soc"]
 
     time_steps = sorted(model.time_steps)
-    previous_soc = initial_soc * generic_storage_config["max_capacity"]
+    previous_soc = initial_soc
 
     for i, t in enumerate(time_steps):
         current_soc = pyo.value(model.storage.soc[t])
@@ -228,31 +228,31 @@ def test_storage_loss_rate(generic_storage_model, generic_storage_config):
         previous_soc = actual_soc
 
 
-def test_min_capacity_enforcement(generic_storage_model, generic_storage_config):
+def test_min_soc_enforcement(generic_storage_model, generic_storage_config):
     """
-    Test that the state of charge does not go below the minimum capacity.
+    Test that the state of charge does not go below the minimum soc.
     """
     model, _ = generic_storage_model
-    min_capacity = generic_storage_config["min_capacity"]
+    min_soc = generic_storage_config["min_soc"]
 
     for t in model.time_steps:
         soc = pyo.value(model.storage.soc[t])
-        assert soc >= min_capacity - 1e-5, (
-            f"SOC at time {t} is {soc}, which is below the minimum capacity of {min_capacity}."
+        assert soc >= min_soc - 1e-5, (
+            f"SOC at time {t} is {soc}, which is below the minimum soc of {min_soc}."
         )
 
 
-def test_max_capacity_enforcement(generic_storage_model, generic_storage_config):
+def test_max_soc_enforcement(generic_storage_model, generic_storage_config):
     """
-    Test that the state of charge does not exceed the maximum capacity.
+    Test that the state of charge does not exceed the maximum soc.
     """
     model, _ = generic_storage_model
-    max_capacity = generic_storage_config["max_capacity"]
+    max_soc = generic_storage_config["max_soc"]
 
     for t in model.time_steps:
         soc = pyo.value(model.storage.soc[t])
-        assert soc <= max_capacity + 1e-5, (
-            f"SOC at time {t} is {soc}, which exceeds the maximum capacity of {max_capacity}."
+        assert soc <= max_soc + 1e-5, (
+            f"SOC at time {t} is {soc}, which exceeds the maximum soc of {max_soc}."
         )
 
 

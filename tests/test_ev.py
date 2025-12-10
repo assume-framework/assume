@@ -15,13 +15,13 @@ use_solver = "appsi_highs"
 @pytest.fixture
 def ev_config():
     return {
-        "max_capacity": 10.0,
-        "min_capacity": 0,
+        "capacity": 10.0,
+        "min_soc": 0,
         "max_power_charge": 3,  # Charge values will reflect a fraction of the capacity
         "max_power_discharge": 2,  # Discharge values will also be a fraction of the capacity
         "efficiency_charge": 0.95,
         "efficiency_discharge": 0.9,
-        "initial_soc": 0,  # SOC initialized to 50% of capacity
+        "initial_soc": 0,  # initial SOC
     }
 
 
@@ -138,7 +138,7 @@ def test_ev_charging_profile(ev_model_with_charging_profile, ev_config):
     # Check if SOC stays within 0 and 1
     for t in model.time_steps:
         soc = pyo.value(model.ev.soc[t])
-        assert ev_config["min_capacity"] <= soc <= ev_config["max_capacity"]
+        assert ev_config["min_soc"] <= soc <= ev_config["max_soc"]
 
 
 if __name__ == "__main__":

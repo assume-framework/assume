@@ -17,13 +17,14 @@ from assume.units.building import Building
 @pytest.fixture
 def generic_storage_config():
     return {
-        "max_capacity": 100,  # Maximum energy capacity in MWh
-        "min_capacity": 0,  # Minimum SOC in MWh
+        "capacity": 100,  # Maximum energy capacity in MWh
+        "min_soc": 0,  # Minimum SOC
+        "max_soc":1,  # Maximum SOC
         "max_power_charge": 100,  # Maximum charging power in MW
         "max_power_discharge": 100,  # Maximum discharging power in MW
         "efficiency_charge": 0.9,  # Charging efficiency
         "efficiency_discharge": 0.9,  # Discharging efficiency
-        "initial_soc": 0,  # Initial SOC in MWh
+        "initial_soc": 0,  # Initial SOC
         "ramp_up": 10,  # Maximum ramp-up rate in MW
         "ramp_down": 10,  # Maximum ramp-down rate in MW
         "storage_loss_rate": 0.01,  # 1% storage loss per time step
@@ -38,13 +39,14 @@ def thermal_storage_config(generic_storage_config):
 @pytest.fixture
 def ev_config():
     return {
-        "max_capacity": 10.0,
-        "min_capacity": 0,
+        "capacity": 10.0, # EV battery capacity in MWh
+        "min_soc": 0,
+        "max_soc": 1,
         "max_power_charge": 3,  # Charge values will reflect a fraction of the capacity
         "max_power_discharge": 2,  # Discharge values will also be a fraction of the capacity
         "efficiency_charge": 0.95,
         "efficiency_discharge": 0.9,
-        "initial_soc": 0,  # SOC initialized to 50% of capacity
+        "initial_soc": 0,  # initial SOC
     }
 
 

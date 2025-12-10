@@ -25,8 +25,8 @@ def hydrogen_components():
             "min_down_time": 0,
         },
         "hydrogen_seasonal_storage": {
-            "max_capacity": 200,
-            "min_capacity": 20,
+            "capacity": 200,
+            "min_soc": 0.1,
             "max_power_charge": 40,
             "max_power_discharge": 40,
             "efficiency_charge": 0.95,
@@ -139,10 +139,10 @@ def test_ramping_constraints_without_flex(hydrogen_plant):
             )
 
 
-def test_initial_soc_greater_than_capacity(hydrogen_plant):
+def test_initial_soc_greater_than_max_soc(hydrogen_plant):
     storage = hydrogen_plant.components["hydrogen_seasonal_storage"]
-    assert storage.initial_soc <= storage.max_capacity, (
-        f"Initial SOC should be capped at max_capacity. Got {storage.initial_soc} > {storage.max_capacity}"
+    assert storage.initial_soc <= storage.max_soc, (
+        f"Initial SOC should be capped at max_soc. Got {storage.initial_soc} > {storage.max_soc}"
     )
 
 

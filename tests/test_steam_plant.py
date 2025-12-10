@@ -259,8 +259,8 @@ def steam_plant_components_with_hp_b_ts():
             "ramp_down": 50,
         },
         "thermal_storage": {
-            "max_capacity": 100,
-            "min_capacity": 0,
+            "capacity": 100,
+            "min_soc": 0,
             "max_power_charge": 50,
             "max_power_discharge": 50,
             "efficiency_charge": 1,
