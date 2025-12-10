@@ -4342,7 +4342,7 @@
       "id": 47,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\nUnit Operator: {{unit_operator}}\n\n### Technical Specifications\nMaximum Capacity: {{max_soc}} MWh <br>\nMinimum Capacity: {{min_soc}} MWh <br>\n\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} % <br>  ",
+        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\nUnit Operator: {{unit_operator}}\n\n### Technical Specifications\nCapacity: {{capacity}} MWh <br>\nMaximum State of Charge: {{max_soc}} <br>\nMinimum State of Charge: {{min_soc}} <br>\n\nMaximum Power Discharge: {{max_power_discharge}} MW <br>\nMinimum Power Discharge: {{min_power_discharge}} MW <br>\nEfficiency Discharge: {{efficiency_discharge}} <br>\n\nMaximum Power Charge: {{max_power_charge}} MW <br>\nMinimum Power Charge: {{min_power_charge}} MW <br>\nEfficiency Charge: {{efficiency_charge}} % <br>  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {
