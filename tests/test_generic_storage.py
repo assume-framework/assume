@@ -24,6 +24,7 @@ def generic_storage_config():
     return {
         "capacity": 100,  # energy capacity in MWh
         "min_soc": 0,  # Minimum SOC
+        "max_soc": 1,  # Maximum SOC
         "max_power_charge": 0,  # Maximum charging power in MW
         "max_power_discharge": 0,  # Maximum discharging power in MW
         "efficiency_charge": 0.9,  # Charging efficiency

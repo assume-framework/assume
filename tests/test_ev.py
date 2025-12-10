@@ -17,6 +17,7 @@ def ev_config():
     return {
         "capacity": 10.0,
         "min_soc": 0,
+        "max_soc": 1,
         "max_power_charge": 3,  # Charge values will reflect a fraction of the capacity
         "max_power_discharge": 2,  # Discharge values will also be a fraction of the capacity
         "efficiency_charge": 0.95,

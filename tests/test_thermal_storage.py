@@ -21,6 +21,7 @@ def storage_config():
     return {
         "capacity": 200,
         "min_soc": 0,
+        "max_soc": 1,
         "max_power_charge": 40,
         "max_power_discharge": 40,
         "efficiency_charge": 0.95,
