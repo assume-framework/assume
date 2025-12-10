@@ -56,9 +56,9 @@ def storage_unit() -> Storage:
         },
         max_power_charge=-500,  # Negative for charging
         max_power_discharge=500,
-        max_soc=1000,
+        capacity=1000,
         min_soc=0,
-        initial_soc=500,
+        initial_soc=0.5,
         efficiency_charge=0.9,
         efficiency_discharge=0.9,
         additional_cost_charge=5,

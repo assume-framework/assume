@@ -25,7 +25,7 @@ def storage_unit() -> Storage:
         forecaster=forecaster,
         max_power_charge=-100,
         max_power_discharge=100,
-        max_soc=1000,
+        capacity=1000,
         efficiency_charge=0.9,
         efficiency_discharge=0.95,
         ramp_down_charge=-50,
@@ -51,7 +51,7 @@ def test_init_function(storage_unit):
     assert storage_unit.ramp_down_discharge == 50
     assert storage_unit.ramp_up_charge == -60
     assert storage_unit.ramp_up_discharge == 60
-    assert storage_unit.initial_soc == 500
+    assert storage_unit.initial_soc == 0.5
 
 
 def test_reset_function(storage_unit):
@@ -74,7 +74,7 @@ def test_reset_function(storage_unit):
     # check if state of charge (soc) is reset correctly
     assert (
         storage_unit.outputs["soc"]
-        == pd.Series(500.0, index=pd.date_range("2022-01-01", periods=4, freq="h"))
+        == pd.Series(0.5, index=pd.date_range("2022-01-01", periods=4, freq="h"))
     ).all()
 
 
@@ -130,11 +130,11 @@ def test_soc_constraint(storage_unit):
     storage_unit.outputs["capacity_pos"][start] = 30
 
     storage_unit.outputs["soc"][start - timedelta(hours=1)] = (
-        0.05 * storage_unit.max_soc
+        0.05 * storage_unit.capacity
     )
     assert (
         storage_unit.outputs["soc"][start - storage_unit.index.freq]
-        == 0.05 * storage_unit.max_soc
+        == 0.05 * storage_unit.capacity
     )
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
@@ -142,7 +142,7 @@ def test_soc_constraint(storage_unit):
     assert min_power_discharge[0] == 40
     assert max_power_discharge[0] == 60
 
-    storage_unit.outputs["soc"][start] = 0.95 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.95
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
@@ -270,35 +270,35 @@ def test_execute_dispatch(storage_unit):
     end = datetime(2022, 1, 1, 2)
 
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.5
 
     # dispatch full discharge
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == 100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        500 - 100 / storage_unit.efficiency_discharge,
+        500 - 100 / storage_unit.efficiency_discharge / storage_unit.capacity,
     )
 
     # dispatch full charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.5
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert dispatched_energy[0] == -100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        500 + 100 * storage_unit.efficiency_charge,
+        500 + 100 * storage_unit.efficiency_charge / storage_unit.capacity,
     )
     # adjust dispatch to soc limit for discharge
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.05 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.05
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
         dispatched_energy[0], 50 * storage_unit.efficiency_discharge, abs_tol=0.1
     )
     # adjust dispatch to soc limit for charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.95 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.95
     dispatched_energy = storage_unit.execute_current_dispatch(start, end)
     assert math.isclose(
         dispatched_energy[0], -50 / storage_unit.efficiency_charge, abs_tol=0.1
@@ -328,7 +328,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     product_tuples = [(start, end, None)]
 
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.5
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
     assert len(bids) == 0
@@ -340,11 +340,11 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     assert storage_unit.outputs["energy"][start] == 100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        500 - 100 / storage_unit.efficiency_discharge,
+        500 - 100 / storage_unit.efficiency_discharge / storage_unit.capacity,
     )
     # dispatch full charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.5
 
     storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
@@ -352,23 +352,23 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     assert storage_unit.outputs["energy"][start] == -100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        500 + 100 * storage_unit.efficiency_charge,
+        500 + 100 * storage_unit.efficiency_charge / storage_unit.capacity,
     )
     # adjust dispatch to soc limit for discharge
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.05 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.05
 
     storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
 
     assert math.isclose(
         storage_unit.outputs["energy"][start],
-        50 * storage_unit.efficiency_discharge,
+        50 * storage_unit.efficiency_discharge / storage_unit.capacity,
         abs_tol=0.1,
     )
     # adjust dispatch to soc limit for charging
     storage_unit.outputs["energy"][start] = -100
-    storage_unit.outputs["soc"][start] = 0.95 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.95
 
     storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
@@ -407,7 +407,7 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     strategy = StorageEnergyHeuristicFlexableStrategy()
 
     storage_unit.outputs["energy"][start] = 100
-    storage_unit.outputs["soc"][start] = 0.5 * storage_unit.max_soc
+    storage_unit.outputs["soc"][start] = 0.5
 
     bids = strategy.calculate_bids(storage_unit, mc, product_tuples=product_tuples)
     assert len(bids) == 2
@@ -477,6 +477,7 @@ def test_initialising_invalid_storages():
         "max_power_charge": 0.0,
         "max_power_discharge": 0.0,
         "max_soc": 0.0,
+        "capacity": 0.0,
     }
     with pytest.raises(
         ValueError, match="max_power_charge=10 must be <= 0 for unit id"
