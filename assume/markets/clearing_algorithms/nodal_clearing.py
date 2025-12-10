@@ -9,17 +9,17 @@ from operator import itemgetter
 import pandas as pd
 import pypsa
 
+from assume.common.grid_utils import read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import create_incidence_matrix
 from assume.markets.base_market import MarketRole
-
-from assume.common.grid_utils import read_pypsa_grid
 
 logger = logging.getLogger(__name__)
 
 # Set the log level to WARNING
 logging.getLogger("linopy").setLevel(logging.WARNING)
 logging.getLogger("pypsa").setLevel(logging.WARNING)
+
 
 def calculate_meta(accepted_demand_orders, accepted_supply_orders, product):
     supply_volume = sum(map(itemgetter("accepted_volume"), accepted_supply_orders))
@@ -48,10 +48,12 @@ def calculate_meta(accepted_demand_orders, accepted_supply_orders, product):
         "only_hours": product[2],
     }
 
+
 class NodalClearingRole(MarketRole):
     """
     This class implements a nodal market clearing mechanism using a linear optimal power flow (OPF) approach.
     """
+
     required_fields = ["node", "max_power"]
 
     def __init__(self, marketconfig: MarketConfig):
@@ -95,7 +97,7 @@ class NodalClearingRole(MarketRole):
                 f"Market '{marketconfig.market_id}': Invalid payment mechanism '{self.pricing_mechanism}'."
             )
             raise ValueError("Invalid payment mechanism.")
-        
+
         read_pypsa_grid(
             network=self.network,
             grid_dict=self.grid_data,
@@ -103,21 +105,23 @@ class NodalClearingRole(MarketRole):
 
         # add all units to the PyPSA network as generators with p_nom their absolute max power
         # generators have p_min_pu - p_max_pu 0 to 1
-        self.network.add("Generator",
-                         self.grid_data['generators'].index,
-                         bus=self.grid_data['generators']['node'],
-                         p_nom=self.grid_data['generators']['max_power'],
-                         p_min_pu=0,
-                         p_max_pu=1,
-                         )
+        self.network.add(
+            "Generator",
+            self.grid_data["generators"].index,
+            bus=self.grid_data["generators"]["node"],
+            p_nom=self.grid_data["generators"]["max_power"],
+            p_min_pu=0,
+            p_max_pu=1,
+        )
         # demand units have p_min_pu - p_max_pu -1 to 0
-        self.network.add("Generator",
-                         self.grid_data['loads'].index,
-                         bus=self.grid_data['loads']['node'],
-                         p_nom=self.grid_data['loads']['max_power'],
-                         p_min_pu=-1,
-                         p_max_pu=0,
-                         )
+        self.network.add(
+            "Generator",
+            self.grid_data["loads"].index,
+            bus=self.grid_data["loads"]["node"],
+            p_nom=self.grid_data["loads"]["max_power"],
+            p_min_pu=-1,
+            p_max_pu=0,
+        )
         # storage units
         # TODO: how are storages included in grid data dict?
         # also add them as generators, as we only regard bids here
@@ -129,7 +133,7 @@ class NodalClearingRole(MarketRole):
             self.solver_options = {"output_flag": False, "log_to_console": False}
         else:
             self.solver_options = {}
-    
+
     def clear(
         self, orderbook: Orderbook, market_products
     ) -> tuple[Orderbook, Orderbook, list[dict], dict[tuple, float]]:
@@ -152,19 +156,20 @@ class NodalClearingRole(MarketRole):
         orderbook_df["accepted_price"] = 0.0
         # snapshots = range(self.marketconfig.market_products[0].count)
         snapshots = pd.date_range(
-            start=market_products[0][0], # start time
-            end=market_products[-1][0], # end time
-            freq=self.marketconfig.market_products[0].duration)
+            start=market_products[0][0],  # start time
+            end=market_products[-1][0],  # end time
+            freq=self.marketconfig.market_products[0].duration,
+        )
 
         # Now you can pivot the DataFrame
         volume_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="volume"
         )
-        #volume_pivot.index = snapshots
+        # volume_pivot.index = snapshots
         price_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="price"
         )
-        #price_pivot.index = snapshots
+        # price_pivot.index = snapshots
         # Copy the network
         n = self.network.copy()
 
@@ -176,39 +181,51 @@ class NodalClearingRole(MarketRole):
 
         # Update p_max_pu for all units based on their bids in the actual snapshots
         # generators
-        gen_idx = self.grid_data['generators'].index
-        n.generators_t.p_max_pu.loc[snapshots, gen_idx] = volume_pivot[gen_idx] / n.generators.loc[gen_idx, 'p_nom'].values
+        gen_idx = self.grid_data["generators"].index
+        n.generators_t.p_max_pu.loc[snapshots, gen_idx] = (
+            volume_pivot[gen_idx] / n.generators.loc[gen_idx, "p_nom"].values
+        )
         n.generators_t.marginal_cost.loc[snapshots, gen_idx] = price_pivot[gen_idx]
         # demand
-        demand_idx = self.grid_data['loads'].index
-        n.generators_t.p_min_pu.loc[snapshots, demand_idx] = volume_pivot[demand_idx] / n.generators.loc[demand_idx, 'p_nom'].values
-        n.generators_t.marginal_cost.loc[snapshots, demand_idx] = price_pivot[demand_idx]
+        demand_idx = self.grid_data["loads"].index
+        n.generators_t.p_min_pu.loc[snapshots, demand_idx] = (
+            volume_pivot[demand_idx] / n.generators.loc[demand_idx, "p_nom"].values
+        )
+        n.generators_t.marginal_cost.loc[snapshots, demand_idx] = price_pivot[
+            demand_idx
+        ]
 
         # run linear optimal powerflow
         n.optimize.fix_optimal_capacities()
-        n.optimize(#snapshots=volume_pivot.index,
-                   solver=self.solver,
-                   solver_options=self.solver_options,
-                   )
+        n.optimize(  # snapshots=volume_pivot.index,
+            solver=self.solver,
+            solver_options=self.solver_options,
+        )
 
         # Find intersection of unit_ids in orderbook_df and columns in n.generators_t.p
         valid_units = orderbook_df["unit_id"].unique()
         dispatch = n.generators_t.p
-        
+
         for unit in valid_units:
             if unit in dispatch.columns:
                 # get accepted volume and price for each time snapshot
                 accepted_volumes = dispatch[unit]
                 if self.pricing_mechanism == "pay_as_clear":
-                    accepted_prices = n.buses_t.marginal_price.loc[:, n.generators.loc[unit, 'bus']]
+                    accepted_prices = n.buses_t.marginal_price.loc[
+                        :, n.generators.loc[unit, "bus"]
+                    ]
                 elif self.pricing_mechanism == "pay_as_bid":
                     accepted_prices = price_pivot[unit]
                 else:
                     raise ValueError("Invalid pricing mechanism.")
-                
+
                 # update orderbook_df with accepted volumes and prices
-                for t, (vol, price) in enumerate(zip(accepted_volumes, accepted_prices)):
-                    mask = (orderbook_df["unit_id"] == unit) & (orderbook_df["start_time"] == snapshots[t])
+                for t, (vol, price) in enumerate(
+                    zip(accepted_volumes, accepted_prices)
+                ):
+                    mask = (orderbook_df["unit_id"] == unit) & (
+                        orderbook_df["start_time"] == snapshots[t]
+                    )
                     orderbook_df.loc[mask, "accepted_volume"] = vol
                     orderbook_df.loc[mask, "accepted_price"] = price
 
@@ -260,9 +277,13 @@ def extract_results(
 
     """
     meta = []
-    supply_volume_dict = {node: {t: 0.0 for t in network.snapshots} for node in network.buses.index}
-    demand_volume_dict = {node: {t: 0.0 for t in network.snapshots} for node in network.buses.index}
-    
+    supply_volume_dict = {
+        node: {t: 0.0 for t in network.snapshots} for node in network.buses.index
+    }
+    demand_volume_dict = {
+        node: {t: 0.0 for t in network.snapshots} for node in network.buses.index
+    }
+
     for order in accepted_orders:
         node = order["node"]
         t = order["start_time"]
@@ -270,7 +291,6 @@ def extract_results(
             supply_volume_dict[node][t] += order["accepted_volume"]
         else:
             demand_volume_dict[node][t] += order["accepted_volume"]
-
 
     # write the meta information for each hour of the clearing period
     for node in market_clearing_prices.keys():
@@ -300,7 +320,6 @@ def extract_results(
     flows = {}
     if log_flows:
         # extract flows
-        flows = network.lines_t.p0
-        # flows = network.lines_t.p0.to_dict()
+        flows = network.lines_t.p0.stack(dropna=True).to_dict()
 
     return accepted_orders, rejected_orders, meta, flows
