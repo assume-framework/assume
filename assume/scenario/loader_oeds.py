@@ -302,8 +302,9 @@ def load_oeds(
                     {
                         "max_power_charge": storage["max_power_charge"] / 1e3,
                         "max_power_discharge": storage["max_power_discharge"] / 1e3,
-                        "max_soc": storage["max_soc"] / 1e3,
-                        "min_soc": storage["min_soc"] / 1e3,
+                        "capacity": storage["capacity"] / 1e3,
+                        "max_soc": storage["max_soc"],
+                        "min_soc": storage["min_soc"],
                         "efficiency_charge": storage["efficiency_charge"],
                         "efficiency_discharge": storage["efficiency_discharge"],
                         "bidding_strategies": bidding_strategies["storage"],
