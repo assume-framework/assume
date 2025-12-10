@@ -31,7 +31,7 @@ end = datetime(2023, 7, 2)
 @pytest.fixture
 def base_learning_config() -> dict:
     return {
-        "obs_dim": 10,
+        "foresight": 2,
         "act_dim": 3,
         "unique_obs_dim": 2,
         "num_timeseries_obs_dim": 4,

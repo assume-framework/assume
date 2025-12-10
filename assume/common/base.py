@@ -925,7 +925,6 @@ class LearningStrategy(BaseStrategy):
 
         self.foresight = foresight
         self.act_dim = act_dim
-        self.obs_dim = 3 * foresight + unique_obs_dim
 
         # this defines the number of unique observations, which are not the same for all units
         # this is used by the centralised critic and will return an error if not matched
@@ -934,6 +933,8 @@ class LearningStrategy(BaseStrategy):
         # defines the number of provided timeseries, this is necessary for correctly splitting
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
+
+        self.obs_dim = num_timeseries_obs_dim * foresight + unique_obs_dim
 
 
 class MinMaxStrategy(BaseStrategy):
