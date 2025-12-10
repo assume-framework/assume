@@ -473,6 +473,7 @@ class SupportsMinMaxCharge(BaseUnit):
     """
 
     initial_soc: float
+    # float between 0 and 1 - initial state of charge
     min_power_charge: float
     # negative float - if this storage is charging, what is the minimum charging power (the negative non-zero power closest to zero) (resulting in negative current power)
     max_power_charge: float
@@ -489,7 +490,7 @@ class SupportsMinMaxCharge(BaseUnit):
     # negative
     ramp_down_charge: float | None
     # ramp_down_charge is negative
-    max_soc: float
+    capacity: float
     efficiency_charge: float
     efficiency_discharge: float
 
@@ -509,7 +510,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             start (datetime.datetime): The start time of the dispatch.
             end (datetime.datetime): The end time of the dispatch.
-            soc (float, optional): The current state-of-charge. Defaults to None.
+            soc (float, optional): The current state-of-charge (between 0 and 1). Defaults to None.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: The min and max charging power for the given time period.
@@ -524,7 +525,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             start (datetime.datetime): The start time of the dispatch.
             end (datetime.datetime): The end time of the dispatch.
-            soc (float, optional): The current state-of-charge. Defaults to None.
+            soc (float, optional): The current state-of-charge (between 0 and 1). Defaults to None.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: The min and max discharging power for the given time period.

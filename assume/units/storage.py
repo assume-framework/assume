@@ -28,9 +28,10 @@ class Storage(SupportsMinMaxCharge):
         min_power_charge (float): The minimum power input of the storage unit in MW (negative value).
         max_power_discharge (float): The maximum power output of the storage unit in MW.
         min_power_discharge (float): The minimum power output of the storage unit in MW.
-        max_soc (float): The maximum state of charge of the storage unit in MWh (equivalent to capacity).
-        min_soc (float): The minimum state of charge of the storage unit in MWh.
-        initial_soc (float): The initial state of charge of the storage unit in MWh.
+        capacity (float): The capacity of the storage unit in MWh.
+        max_soc (float): The maximum state of charge of the storage unit as a fraction (typically 1).
+        min_soc (float): The minimum state of charge of the storage unit as a fraction (typically 0).
+        initial_soc (float): The initial state of charge of the storage unit as a fraction (between 0 and 1).
         efficiency_charge (float): The efficiency of the storage unit while charging.
         efficiency_discharge (float): The efficiency of the storage unit while discharging.
         additional_cost_charge (float, optional): Additional costs associated with power consumption, in EUR/MWh. Defaults to 0.
@@ -60,10 +61,11 @@ class Storage(SupportsMinMaxCharge):
         forecaster: UnitForecaster,
         max_power_charge: float,
         max_power_discharge: float,
-        max_soc: float,
+        capacity: float,
         min_power_charge: float = 0.0,
         min_power_discharge: float = 0.0,
         min_soc: float = 0.0,
+        max_soc: float = 1.0,
         initial_soc: float | None = 0.0,
         soc_tick: float = 0.01,
         efficiency_charge: float = 1,
@@ -95,18 +97,21 @@ class Storage(SupportsMinMaxCharge):
             location=location,
             **kwargs,
         )
-        if max_soc < 0:
-            raise ValueError(f"{max_soc=} must be >= 0 for unit {self.id}")
-        if min_soc < 0:
-            raise ValueError(f"{min_soc=} must be >= 0 for unit {self.id}")
+        if capacity < 0:
+            raise ValueError(f"{capacity=} must be >= 0 for unit {self.id}")
+        if not 0 <= min_soc <= 1:
+            raise ValueError(f"{min_soc=} must be between 0 and 1 for unit {self.id}")
+        if not 0 <= max_soc <= 1:
+            raise ValueError(f"{max_soc=} must be between 0 and 1 for unit {self.id}")
         if max_soc < min_soc:
             raise ValueError(f"{max_soc=} must be >= {min_soc=} for unit {self.id}")
+        self.capacity = capacity
         self.max_soc = max_soc
         self.min_soc = min_soc
         if initial_soc is None:
-            initial_soc = max_soc / 2
-        if initial_soc < 0:
-            raise ValueError(f"{initial_soc=} must be >= 0 for unit {self.id}")
+            initial_soc = 0.5
+        if not 0 <= initial_soc <= 1:
+            raise ValueError(f"{initial_soc=} must be between 0 and 1 for unit {self.id}")
         self.initial_soc = initial_soc
 
         if max_power_charge > 0:
@@ -283,15 +288,15 @@ class Storage(SupportsMinMaxCharge):
         Calculates the maximum discharge power depending on the current state of charge.
 
         Args:
-            soc (float): The current state of charge.
+            soc (float): The current state of charge (between 0 and 1).
 
         Returns:
-            float: The maximum discharge power.
+            float: The maximum discharge power in MW.
         """
         duration = self.index.freq / timedelta(hours=1)
         power = max(
             0,
-            ((soc - self.min_soc) * self.efficiency_discharge / duration),
+            ((soc - self.min_soc) * self.capacity * self.efficiency_discharge / duration),
         )
         return power
 
@@ -303,15 +308,15 @@ class Storage(SupportsMinMaxCharge):
         Calculates the maximum charge power depending on the current state of charge.
 
         Args:
-            soc (float): The current state of charge.
+            soc (float): The current state of charge (between 0 and 1).
 
         Returns:
-            float: The maximum charge power.
+            float: The maximum charge power in MW.
         """
         duration = self.index.freq / timedelta(hours=1)
         power = min(
             0,
-            ((soc - self.max_soc) / self.efficiency_charge / duration),
+            ((soc - self.max_soc) * self.capacity / self.efficiency_charge / duration),
         )
         return power
 
@@ -326,7 +331,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             start (datetime.datetime): The start of the current dispatch.
             end (datetime.datetime): The end of the current dispatch.
-            soc (float): The current state-of-charge. Defaults to None, then using soc at given start time.
+            soc (float): The current state-of-charge (between 0 and 1). Defaults to None, then using soc at given start time.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: The minimum and maximum charge power levels of the storage unit in MW.
@@ -368,7 +373,7 @@ class Storage(SupportsMinMaxCharge):
         Args:
             start (datetime.datetime): The start of the current dispatch.
             end (datetime.datetime): The end of the current dispatch.
-            soc (float): The current state-of-charge. Defaults to None, then using soc at given start time.
+            soc (float): The current state-of-charge (between 0 and 1). Defaults to None, then using soc at given start time.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: The minimum and maximum discharge power levels of the storage unit in MW.
@@ -415,7 +420,7 @@ class Storage(SupportsMinMaxCharge):
         Adjusts the discharging power to the ramping constraints.
 
         Args:
-            soc (float): The current state of charge.
+            soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
             power_discharge (float): The discharging power output of the unit.
             current_power (float, optional): The current power output of the unit. Defaults to 0.
@@ -450,7 +455,7 @@ class Storage(SupportsMinMaxCharge):
         Adjusts the charging power to the ramping constraints.
 
         Args:
-            soc (float): The current state of charge.
+            soc (float): The current state of charge (between 0 and 1).
             previous_power (float): The previous power output of the unit.
             power_charge (float): The charging power output of the unit.
             current_power (float, optional): The current power output of the unit. Defaults to 0.
@@ -504,6 +509,7 @@ class Storage(SupportsMinMaxCharge):
         unit_dict = super().as_dict()
         unit_dict.update(
             {
+                "capacity": self.capacity,
                 "max_soc": self.max_soc,
                 "min_soc": self.min_soc,
                 "max_power_charge": self.max_power_charge,
