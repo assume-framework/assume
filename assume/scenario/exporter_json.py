@@ -133,7 +133,7 @@ def to_json(w: World) -> str:
                     "type": "market",
                     "data": {
                         "name": market.market_id,
-                        "opening_duration": str(market.opening_duration),
+                        "opening_duration": str(market.opening_duration.seconds // 60),
                         "market_mechanism": market.market_mechanism,
                     },
                     "position": position_left(2),
@@ -158,9 +158,9 @@ def to_json(w: World) -> str:
                         "type": "marketProduct",
                         "data": {
                             "name": id,
-                            "duration": str(product.duration),
+                            "duration": str(product.duration.seconds // 60),
                             "count": product.count,
-                            "first_delivery": str(product.first_delivery),
+                            "first_delivery": str(product.first_delivery.seconds // 60),
                             "eligible_lambda_function": lambda_fn(
                                 product.eligible_lambda_function
                             ),
