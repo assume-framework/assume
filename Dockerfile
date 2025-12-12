@@ -9,8 +9,7 @@ RUN useradd -m -s /bin/bash admin
 RUN mkdir /src
 WORKDIR /src
 COPY README.md pyproject.toml .
-# https://github.com/jazzband/pip-tools/pull/2221
-RUN pip install "pip-tools<7.5.0"
+RUN pip install pip-tools
 RUN mkdir assume assume_cli
 RUN touch assume/__init__.py
 RUN pip-compile --resolver=backtracking -o requirements.txt ./pyproject.toml
