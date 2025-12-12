@@ -125,6 +125,8 @@ def add_units(world: World, edges: dict, nodes: dict, index):
                     "max_power_charge": int(unitData.get("max_power_charge", 0)),
                     "max_power_discharge": int(unitData.get("max_power_discharge", 0)),
                     "max_soc": int(unitData.get("max_soc", 0)),
+                    "volume_import": int(unitData.get("volume_import", 0)),
+                    "volume_export": int(unitData.get("volume_export", 0)),
                 },
                 forecaster=forecaster_for_type(unitData, index),
             )
