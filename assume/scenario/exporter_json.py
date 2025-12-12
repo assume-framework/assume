@@ -24,7 +24,7 @@ def position_right(depth=0) -> dict:
     return {"x": 500, "y": depth * 100}
 
 
-def to_json(w: World) -> str:
+def to_gui_json(w: World) -> str:
     nodes, edges = [], []
     nodes.append(
         {
@@ -181,8 +181,3 @@ def to_json(w: World) -> str:
                 )
 
     return json.dumps({"nodes": nodes, "edges": edges})
-
-
-def __main():
-    w = World()
-    to_json(w)
