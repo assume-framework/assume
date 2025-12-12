@@ -6,10 +6,41 @@ import uuid
 
 from assume import MarketConfig, World
 from assume.common.base import BaseUnit
+from assume.strategies import bidding_strategies
+from assume.units import (
+    Building,
+    Demand,
+    Exchange,
+    HydrogenPlant,
+    PowerPlant,
+    SteelPlant,
+)
+
+
+def identify_strategy(strategy: type) -> str:
+    for name, s in bidding_strategies.items():
+        if strategy is type(s):
+            return name
+    return ""
 
 
 def unit_type(u: BaseUnit) -> str:
-    return ""  # TODO
+    match type(u):
+        case BaseUnit():
+            return "storage"
+        case Demand():
+            return "demand"
+        case PowerPlant():
+            return "powerplant"
+        case Building():
+            return "building"
+        case HydrogenPlant():
+            return "hydrogen_plant"
+        case SteelPlant():
+            return "steel_plant"
+        case Exchange():
+            return "exchange"
+    return ""
 
 
 def lambda_fn(fn) -> str:
@@ -99,7 +130,7 @@ def to_gui_json(w: World) -> str:
                         "type": "unit-market",
                         "data": {
                             "name": f"{unit.id}-{market}",
-                            "strategy": str(strategy),
+                            "strategy": identify_strategy(type(strategy)),
                         },
                     }
                 )
