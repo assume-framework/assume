@@ -1,11 +1,13 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
+import base64
 import json
-import uuid
+from random import randbytes
 
-from assume import MarketConfig, World
-from assume.common.base import BaseUnit
+from assume import World
+from assume.common.base import BaseStrategy, BaseUnit
+from assume.common.market_objects import lambda_functions
 from assume.strategies import bidding_strategies
 from assume.units import (
     Building,
@@ -17,34 +19,34 @@ from assume.units import (
 )
 
 
-def identify_strategy(strategy: type) -> str:
+def identify_strategy(strategy: BaseStrategy) -> str:
     for name, s in bidding_strategies.items():
-        if strategy is type(s):
+        if isinstance(strategy, s):
             return name
     return ""
 
 
 def unit_type(u: BaseUnit) -> str:
-    match type(u):
-        case BaseUnit():
-            return "storage"
-        case Demand():
-            return "demand"
-        case PowerPlant():
-            return "powerplant"
-        case Building():
-            return "building"
-        case HydrogenPlant():
-            return "hydrogen_plant"
-        case SteelPlant():
-            return "steel_plant"
-        case Exchange():
-            return "exchange"
-    return ""
+    if isinstance(u, Demand):
+        return "demand"
+    if isinstance(u, PowerPlant):
+        return "powerplant"
+    if isinstance(u, Building):
+        return "building"
+    if isinstance(u, HydrogenPlant):
+        return "hydrogen_plant"
+    if isinstance(u, SteelPlant):
+        return "steel_plant"
+    if isinstance(u, Exchange):
+        return "exchange"
+    return "storage"
 
 
 def lambda_fn(fn) -> str:
-    return ""  # TODO
+    for k, v in lambda_functions.items():
+        if fn == v:
+            return k
+    return ""
 
 
 def position_left(depth=0) -> dict:
@@ -55,8 +57,22 @@ def position_right(depth=0) -> dict:
     return {"x": 500, "y": depth * 100}
 
 
+def get_id(node_type: str) -> str:
+    bytes = randbytes(3)
+    return f"{node_type}_{base64.b64encode(bytes).decode('ascii')}"
+
+
+def _val(field):
+    if field is None:
+        return None
+    if isinstance(field, str) or isinstance(field, int) or isinstance(field, float):
+        return field
+    return "TODO"
+
+
 def to_gui_json(w: World) -> str:
     nodes, edges = [], []
+    tmp_edges = {}
     nodes.append(
         {
             "id": "world",
@@ -72,13 +88,14 @@ def to_gui_json(w: World) -> str:
             "position": {"x": 250, "y": 0},
         }
     )
-    for operator_id, operator in w.unit_operators.items():
+    for operator_name, operator in w.unit_operators.items():
+        operator_id = get_id("unitOperator")
         nodes.append(
             {
                 "id": operator_id,
                 "type": "unitOperator",
                 "data": {
-                    "name": operator_id,
+                    "name": operator_name,
                 },
                 "position": position_right(1),
             }
@@ -95,49 +112,62 @@ def to_gui_json(w: World) -> str:
             }
         )
         for unit in operator.units.values():
+            unit_id = get_id("unit")
             nodes.append(
                 {
-                    "id": unit.id,
+                    "id": unit_id,
                     "type": "unit",
                     "data": {
                         "name": unit.id,
-                        "unit_type": unit_type(unit),
-                        "unit_operator": unit.unit_operator,
-                        "technology": unit.unit_operator,
+                        "unitType": unit_type(unit),
+                        "technology": unit.technology,
+                        "min_power": _val(getattr(unit, "min_power", 0)),
+                        "max_power": _val(getattr(unit, "max_power", 0)),
+                        "price": _val(getattr(unit, "price", 0)),
+                        "efficiency": _val(getattr(unit, "efficiency", 1.0)),
+                        "ramp_up": _val(getattr(unit, "ramp_up", 0)),
+                        "ramp_down": _val(getattr(unit, "ramp_down", 0)),
+                        "emission_factor": _val(getattr(unit, "emission_factor", 0)),
+                        "min_operating_time": _val(
+                            getattr(unit, "min_operating_time", 0)
+                        ),
+                        "min_downtime": _val(getattr(unit, "min_downtime", 0)),
+                        "max_power_charge": _val(getattr(unit, "max_power_charge", 0)),
+                        "max_power_discharge": _val(
+                            getattr(unit, "max_power_discharge", 0)
+                        ),
+                        "max_soc": _val(getattr(unit, "max_soc", 0)),
+                        "volume_import": _val(getattr(unit, "volume_import", 0)),
+                        "volume_export": _val(getattr(unit, "volume_export", 0)),
                     },
                     "position": position_right(2),
                 }
             )
             edges.append(
                 {
-                    "id": f"{unit.unit_operator}#unit_handle#{unit.id}#unitOperator_handle",
-                    "source": unit.unit_operator,
+                    "id": f"{operator_id}#unit_handle#{unit_id}#unitOperator_handle",
+                    "source": operator_id,
                     "sourceHandle": "unit_handle",
-                    "target": unit.id,
+                    "target": unit_id,
                     "targetHandle": "unitOperator_handle",
                     "type": "default",
-                    "data": {"name": f"{unit.unit_operator}-{unit.id}"},
+                    "data": {"name": f"{operator_id}-{unit_id}"},
                 }
             )
             for market, strategy in unit.bidding_strategies.items():
-                edges.append(
+                e = tmp_edges.get(market, [])
+                e.append(
                     {
-                        "id": f"{unit.id}#market_handle#{market}#unit_handle",
-                        "source": unit.id,
-                        "sourceHandle": "market_handle",
-                        "target": market,
-                        "targetHandle": "unit_handle",
-                        "type": "unit-market",
-                        "data": {
-                            "name": f"{unit.id}-{market}",
-                            "strategy": identify_strategy(type(strategy)),
-                        },
+                        "unit_id": unit_id,
+                        "strategy": identify_strategy(strategy),
                     }
                 )
+                tmp_edges[market] = e
     for provider_name, provider in w.market_operators.items():
+        provider_id = get_id("marketProvider")
         nodes.append(
             {
-                "id": provider_name,
+                "id": provider_id,
                 "type": "marketProvider",
                 "data": {
                     "name": provider_name,
@@ -147,20 +177,20 @@ def to_gui_json(w: World) -> str:
         )
         edges.append(
             {
-                "id": f"world#marketProvider_handle#{provider_name}#world_handle",
+                "id": f"world#marketProvider_handle#{provider_id}#world_handle",
                 "source": "world",
                 "sourceHandle": "marketProvider_handle",
-                "target": provider_name,
+                "target": provider_id,
                 "targetHandle": "world_handle",
                 "type": "default",
-                "data": {"name": f"world-{provider_name}"},
+                "data": {"name": f"world-{provider_id}"},
             }
         )
         for market in provider.markets:
-            market: MarketConfig
+            market_id = get_id(market.market_id)
             nodes.append(
                 {
-                    "id": market.market_id,
+                    "id": market_id,
                     "type": "market",
                     "data": {
                         "name": market.market_id,
@@ -172,17 +202,32 @@ def to_gui_json(w: World) -> str:
             )
             edges.append(
                 {
-                    "id": f"{provider_name}#market_handle#{market.market_id}#marketProvider_handle",
-                    "source": provider_name,
+                    "id": f"{provider_id}#market_handle#{market_id}#marketProvider_handle",
+                    "source": provider_id,
                     "sourceHandle": "market_handle",
-                    "target": market.market_id,
+                    "target": market_id,
                     "targetHandle": "marketProvider_handle",
                     "type": "default",
-                    "data": {"name": f"{provider_name}-{market.market_id}"},
+                    "data": {"name": f"{provider_id}-{market_id}"},
                 }
             )
+            for t in tmp_edges.get(market.market_id, []):
+                edges.append(
+                    {
+                        "id": f"{t['unit_id']}#market_handle#{market_id}#unit_handle",
+                        "source": t["unit_id"],
+                        "sourceHandle": "market_handle",
+                        "target": market_id,
+                        "targetHandle": "unit_handle",
+                        "type": "unit-market",
+                        "data": {
+                            "name": f"{t['unit_id']}-{market_id}",
+                            "strategy": t["strategy"],
+                        },
+                    }
+                )
             for product in market.market_products:
-                id = str(uuid.uuid4())
+                id = get_id("marketProduct")
                 nodes.append(
                     {
                         "id": id,
@@ -201,13 +246,13 @@ def to_gui_json(w: World) -> str:
                 )
                 edges.append(
                     {
-                        "id": f"{market.market_id}#marketProduct_handle#{id}#market_handle",
-                        "source": market.market_id,
+                        "id": f"{market_id}#marketProduct_handle#{id}#market_handle",
+                        "source": market_id,
                         "sourceHandle": "marketProduct_handle",
                         "target": id,
                         "targetHandle": "market_handle",
                         "type": "default",
-                        "data": {"name": f"{market.market_id}-{id}"},
+                        "data": {"name": f"{market_id}-{id}"},
                     }
                 )
 
