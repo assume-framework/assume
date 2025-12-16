@@ -237,7 +237,7 @@ class Storage(SupportsMinMaxCharge):
                 if current_power > max_soc_discharge:
                     current_power = max_soc_discharge
 
-                delta_soc = -current_power * time_delta / self.efficiency_discharge
+                delta_soc = (-current_power * time_delta / self.efficiency_discharge) / self.capacity
 
             # charging
             elif current_power < 0:
@@ -246,7 +246,7 @@ class Storage(SupportsMinMaxCharge):
                 if current_power < max_soc_charge:
                     current_power = max_soc_charge
 
-                delta_soc = -current_power * time_delta * self.efficiency_charge
+                delta_soc = (-current_power * time_delta * self.efficiency_charge) / self.capacity
 
             # update the values of the state of charge and the energy
             next_freq = t + self.index.freq
