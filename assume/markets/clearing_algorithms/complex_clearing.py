@@ -302,8 +302,8 @@ class ComplexClearingRole(MarketRole):
     """
     This class defines an optimization-based market clearing algorithm with support for complex bid types,
     including block bids, linked bids, minimum acceptance ratios, and profiled volumes. It supports network
-    representations with either zonal or nodal configurations, enabling the modeling of complex markets with
-    multiple zones and power flow constraints.
+    representations (through Net Transfer Capacities) with either zonal or nodal configurations, enabling the modeling of complex markets with
+    multiple zones based on a transport model.
 
     The market clearing algorithm accepts additional arguments via the ``param_dict`` in the market configuration.
 
