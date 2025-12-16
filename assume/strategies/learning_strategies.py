@@ -377,7 +377,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     def __init__(self, *args, **kwargs):
         # 'foresight' represents the number of time steps into the future that we will consider
         # when constructing the observations.
-        foresight = kwargs.pop("foresight", 12)  
+        foresight = kwargs.pop("foresight", 12)
         act_dim = kwargs.pop("act_dim", 2)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
@@ -387,7 +387,6 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
             *args,
             **kwargs,
         )
-
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -719,7 +718,7 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
 
     def __init__(self, *args, **kwargs):
         # we select 24 to be in line with the storage strategies
-        foresight = kwargs.pop("foresight", 24)  
+        foresight = kwargs.pop("foresight", 24)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
@@ -863,8 +862,8 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
 
     def __init__(self, *args, **kwargs):
         # 'foresight' represents the number of time steps into the future that we will consider
-        # when constructing the observations. 
-        foresight = kwargs.pop("foresight", 24) 
+        # when constructing the observations.
+        foresight = kwargs.pop("foresight", 24)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
