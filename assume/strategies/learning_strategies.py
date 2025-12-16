@@ -1297,7 +1297,10 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
         # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
         # IMPORTANT: This is a clear case of reward_tuning to stabilize learning - Use with caution!
-        profit = min(profit, 0.5 * abs(profit))
+        # profit_scale = 0.5
+
+        profit_scale = 1
+        profit = min(profit, profit_scale * abs(profit))
 
         # get potential maximum infeed according to availability from order volume
         # Note: this will only work as the correct reference point when the volume is not defined by an action
