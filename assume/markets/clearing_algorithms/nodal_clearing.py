@@ -123,8 +123,16 @@ class NodalClearingRole(MarketRole):
             p_max_pu=0,
         )
         # storage units
-        # TODO: how are storages included in grid data dict?
-        # also add them as generators, as we only regard bids here
+        # also add them as generators, as we only regard bids here and are not interested in their internal state
+        # we take the max of discharging and charging power as p_nom for PyPSA. Bids are later used to set p_min_pu and p_max_pu accordingly.
+        self.network.add(
+            "Generator",
+            self.grid_data["storage_units"].index,
+            bus=self.grid_data["storage_units"]["node"],
+            p_nom=max(self.grid_data["storage_units"]["max_power_discharge"].values, self.grid_data["storage_units"]["max_power_charge"].values),
+            p_min_pu=-1,
+            p_max_pu=1,
+        )
 
         self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
@@ -191,9 +199,26 @@ class NodalClearingRole(MarketRole):
         n.generators_t.p_min_pu.loc[snapshots, demand_idx] = (
             volume_pivot[demand_idx] / n.generators.loc[demand_idx, "p_nom"].values
         )
-        n.generators_t.marginal_cost.loc[snapshots, demand_idx] = price_pivot[
-            demand_idx
-        ]
+        n.generators_t.marginal_cost.loc[snapshots, demand_idx] = price_pivot[demand_idx]
+        
+        # storage
+        storage_idx = self.grid_data["storage_units"].index
+        # discharging (positive bids)
+        n.generators_t.p_max_pu.loc[snapshots, storage_idx] = (
+            volume_pivot[storage_idx]
+            .clip(lower=0)
+            .fillna(0)
+            / n.generators.loc[storage_idx, "p_nom"].values
+        )
+        # charging (negative bids)
+        n.generators_t.p_min_pu.loc[snapshots, storage_idx] = (
+            volume_pivot[storage_idx]
+            .clip(upper=0)
+            .fillna(0)
+            / n.generators.loc[storage_idx, "p_nom"].values
+        )
+        # set bid price as marginal costs in the respective hours
+        n.generators_t.marginal_cost.loc[snapshots, storage_idx] = price_pivot[storage_idx].fillna(0)
 
         # run linear optimal powerflow
         n.optimize.fix_optimal_capacities()

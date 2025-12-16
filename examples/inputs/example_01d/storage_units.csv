@@ -1,0 +1,2 @@
+name,technology,bidding_EOM,bidding_redispatch,bidding_nodal,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,additional_cost_charge,additional_cost_discharge,node,natural_inflow,unit_operator
+Storage 1,PSPP,storage_energy_heuristic_flexable,storage_energy_heuristic_flexable,storage_energy_heuristic_flexable,1000.0,992.0,1,1,0.0,6076.0,0.28,0.28,south,0.0,Operator 1
