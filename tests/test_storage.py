@@ -129,12 +129,10 @@ def test_soc_constraint(storage_unit):
     storage_unit.outputs["capacity_neg"][start] = -50
     storage_unit.outputs["capacity_pos"][start] = 30
 
-    storage_unit.outputs["soc"][start - timedelta(hours=1)] = (
-        0.05 * storage_unit.capacity
-    )
+    storage_unit.outputs["soc"][start - timedelta(hours=1)] = 0.05
     assert (
         storage_unit.outputs["soc"][start - storage_unit.index.freq]
-        == 0.05 * storage_unit.capacity
+        == 0.05
     )
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
@@ -227,9 +225,9 @@ def test_storage_ramping(storage_unit):
     assert max_power_discharge[0] == 100
 
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
-        500, 0, max_power_discharge[0]
+        0.5, 0, max_power_discharge[0]
     )
-    max_ramp_charge = storage_unit.calculate_ramp_charge(500, 0, max_power_charge[0])
+    max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, 0, max_power_charge[0])
 
     assert max_ramp_discharge == 60
     assert max_ramp_charge == -60
@@ -242,9 +240,11 @@ def test_storage_ramping(storage_unit):
     end = datetime(2022, 1, 1, 2)
 
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
-        500, 60, max_power_discharge[0]
+        0.5, 60, max_power_discharge[0]
     )
-    max_ramp_charge = storage_unit.calculate_ramp_charge(500, 60, max_power_charge[0])
+    max_ramp_charge = storage_unit.calculate_ramp_charge(
+        0.5, 60, max_power_charge[0]
+    )
 
     assert max_ramp_discharge == 100
     assert max_ramp_charge == -60
@@ -257,9 +257,11 @@ def test_storage_ramping(storage_unit):
     end = datetime(2022, 1, 1, 3)
 
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
-        500, -60, max_power_discharge[0]
+        0.5, -60, max_power_discharge[0]
     )
-    max_ramp_charge = storage_unit.calculate_ramp_charge(500, -60, max_power_charge[0])
+    max_ramp_charge = storage_unit.calculate_ramp_charge(
+        0.5, -60, max_power_charge[0]
+    )
 
     assert max_ramp_discharge == 60
     assert max_ramp_charge == -100
@@ -277,7 +279,7 @@ def test_execute_dispatch(storage_unit):
     assert dispatched_energy[0] == 100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        500 - 100 / storage_unit.efficiency_discharge / storage_unit.capacity,
+        (500 - 100 / storage_unit.efficiency_discharge) / storage_unit.capacity,
     )
 
     # dispatch full charging
@@ -287,7 +289,7 @@ def test_execute_dispatch(storage_unit):
     assert dispatched_energy[0] == -100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        500 + 100 * storage_unit.efficiency_charge / storage_unit.capacity,
+        (500 + 100 * storage_unit.efficiency_charge) / storage_unit.capacity,
     )
     # adjust dispatch to soc limit for discharge
     storage_unit.outputs["energy"][start] = 100
@@ -340,7 +342,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     assert storage_unit.outputs["energy"][start] == 100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        500 - 100 / storage_unit.efficiency_discharge / storage_unit.capacity,
+        (500 - 100 / storage_unit.efficiency_discharge) / storage_unit.capacity,
     )
     # dispatch full charging
     storage_unit.outputs["energy"][start] = -100
@@ -352,7 +354,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     assert storage_unit.outputs["energy"][start] == -100
     assert math.isclose(
         storage_unit.outputs["soc"][end],
-        500 + 100 * storage_unit.efficiency_charge / storage_unit.capacity,
+        (500 + 100 * storage_unit.efficiency_charge) / storage_unit.capacity,
     )
     # adjust dispatch to soc limit for discharge
     storage_unit.outputs["energy"][start] = 100
@@ -363,7 +365,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
 
     assert math.isclose(
         storage_unit.outputs["energy"][start],
-        50 * storage_unit.efficiency_discharge / storage_unit.capacity,
+        50 * storage_unit.efficiency_discharge,
         abs_tol=0.1,
     )
     # adjust dispatch to soc limit for charging
