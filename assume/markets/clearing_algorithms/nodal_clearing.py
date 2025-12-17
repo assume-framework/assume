@@ -8,6 +8,7 @@ from operator import itemgetter
 
 import pandas as pd
 import pypsa
+from mango import AgentAddress
 
 from assume.common.grid_utils import read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
@@ -141,6 +142,66 @@ class NodalClearingRole(MarketRole):
             self.solver_options = {"output_flag": False, "log_to_console": False}
         else:
             self.solver_options = {}
+
+    def validate_orderbook(
+        self, orderbook: Orderbook, agent_addr: AgentAddress
+    ) -> None:
+        """
+        Checks whether the bid types are valid and whether the volumes are within the maximum bid volume.
+
+        Args:
+            orderbook (Orderbook): The orderbook to be validated.
+            agent_addr (AgentAddress): The agent address of the market.
+
+        Raises:
+            ValueError: If the bid type is invalid.
+        """
+        market_id = self.marketconfig.market_id
+        max_volume = self.marketconfig.maximum_bid_volume
+
+        for order in orderbook:
+            # if bid_type is None, set to default bid_type
+            if order.get("bid_type") is None:
+                order["bid_type"] = "SB"
+            # Validate bid_type
+            elif order["bid_type"] in ["BB", "LB"]:
+                raise ValueError(
+                    f"Market '{market_id}': Invalid bid_type '{order['bid_type']}' in order {order}. Nodal clearing nly supports 'SB' bid type. Use 'complex_clearing' for BB and LB bid types."
+                )
+
+        super().validate_orderbook(orderbook, agent_addr)
+
+        for order in orderbook:
+            # Validate volumes
+            volume = order.get("volume", {})
+            if abs(volume) > max_volume:
+                logger.warning(
+                    f"Market '{market_id}': Volume '{volume}' exceeds max_volume {max_volume} in order {order}. Setting to max_volume."
+                )
+                order["volume"] = max_volume if volume > 0 else -max_volume
+
+            # Node validation
+            node = order.get("node")
+            if node:
+                if self.zones_id:
+                    node = self.node_to_zone.get(node, self.nodes[0])
+                    order["node"] = node
+                if node not in self.nodes:
+                    logger.warning(
+                        f"Market '{market_id}': Node '{node}' not in nodes list {self.nodes}. Setting to first node '{self.nodes[0]}'. Order details: {order}"
+                    )
+                    order["node"] = self.nodes[0]
+            else:
+                if self.incidence_matrix is not None:
+                    logger.warning(
+                        f"Market '{market_id}': Order without a node, setting node to the first node '{self.nodes[0]}'. Please check the bidding strategy if correct node is set. Order details: {order}"
+                    )
+                    order["node"] = self.nodes[0]
+                else:
+                    logger.warning(
+                        f"Market '{market_id}': Order without a node and no incidence matrix, setting node to 'node0'. Order details: {order}"
+                    )
+                    order["node"] = "node0"
 
     def clear(
         self, orderbook: Orderbook, market_products
