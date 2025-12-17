@@ -168,18 +168,10 @@ class NodalClearingRole(MarketRole):
                 raise ValueError(
                     f"Market '{market_id}': Invalid bid_type '{order['bid_type']}' in order {order}. Nodal clearing nly supports 'SB' bid type. Use 'complex_clearing' for BB and LB bid types."
                 )
-
+        # validate prices and volumes using base market role validation
         super().validate_orderbook(orderbook, agent_addr)
 
         for order in orderbook:
-            # Validate volumes
-            volume = order.get("volume", {})
-            if abs(volume) > max_volume:
-                logger.warning(
-                    f"Market '{market_id}': Volume '{volume}' exceeds max_volume {max_volume} in order {order}. Setting to max_volume."
-                )
-                order["volume"] = max_volume if volume > 0 else -max_volume
-
             # Node validation
             node = order.get("node")
             if node:
