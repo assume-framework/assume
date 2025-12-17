@@ -54,6 +54,10 @@ available_examples = {
         "scenario": "example_01d",
         "study_case": "zonal_case",
     },
+    "small_with_nodal_clearing": {
+        "scenario": "example_01d",
+        "study_case": "nodal_case",
+    },
     # example_01e is used in the tutorial notebook #3: Custom unit and bidding strategy example
     "market_study_eom": {
         "scenario": "example_01f",
@@ -117,7 +121,7 @@ if __name__ == "__main__":
     data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_with_redispatch"
+    example = "small_with_nodal_clearing"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
