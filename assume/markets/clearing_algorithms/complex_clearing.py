@@ -177,10 +177,6 @@ def market_clearing_opt_constraints(
     )
 
     if incidence_matrix is not None:
-        if "x" in lines.columns:
-            print(
-                "Warning: 'lines.csv' contains reactances 'x' but this clearing is based on Net Transfer Capacities only (Transport model). Use 'nodal_clearing' to include a linear OPF."
-            )
         # add NTCs
         model.transmission_constr = pyo.ConstraintList()
         for t in model.T:
@@ -355,6 +351,11 @@ class ComplexClearingRole(MarketRole):
         if self.grid_data:
             self.lines = self.grid_data["lines"]
             buses = self.grid_data["buses"]
+
+            if "x" in self.lines.columns:
+                logger.warning(
+                    "Warning: 'lines.csv' contains reactances 'x' but this clearing is based on Net Transfer Capacities only (Transport model). Use 'nodal_clearing' to include a linear OPF."
+                )
 
             self.zones_id = self.marketconfig.param_dict.get("zones_identifier")
             self.node_to_zone = None
