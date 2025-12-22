@@ -117,6 +117,8 @@ class TorchLearningStrategy(LearningStrategy):
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
+        # Note: These scaling factors could be interpreted as information leakage. However as we are in a simulation environment and not a purley forecasting setting
+        # we assume that the agent has access to this information already
         upper_scaling_factor_price = max(unit.forecaster.price[market_id])
         lower_scaling_factor_price = min(unit.forecaster.price[market_id])
         residual_load = unit.forecaster.residual_load.get(
@@ -185,6 +187,8 @@ class TorchLearningStrategy(LearningStrategy):
         )
 
         # --- 2. Historical actual prices (backward-looking) ---
+        # Note: We scale with the max_bid_price here in comparison to the scaling of the forecast where we use the max price of the forecast period
+        # this is not consistent but has worked well so far. Future work could look into this in more detail.
         scaled_price_history = (
             unit.outputs["energy_accepted_price"].window(
                 start, self.foresight, direction="backward"
