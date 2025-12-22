@@ -37,6 +37,9 @@ from assume.strategies.portfolio_strategies import (
     UnitsOperatorDirectStrategy,
     UnitsOperatorEnergyHeuristicCournotStrategy,
 )
+from assume.strategies.multi_market_strategies import (
+    EnergyHeuristicRedispatchStrategy,
+)
 
 # TODO remove after a few releases
 deprecated_bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
