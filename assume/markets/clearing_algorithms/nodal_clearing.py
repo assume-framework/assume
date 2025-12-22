@@ -102,15 +102,22 @@ class NodalClearingRole(MarketRole):
 
         # if we have multiple hours (count >1), we cannot handle storage units bids yet
         # this is because the storage bids would be linked bids
+        if self.grid_data.get("storage_units") is not None:
+            storage_idx = self.grid_data["storage_units"].index
         storage_units = self.grid_data.get("storage_units", pd.DataFrame())
         if not storage_units.empty:
             if self.marketconfig.market_products[0].count > 1:
-                logger.error(
-                    f"Market '{marketconfig.market_id}': Nodal clearing with multiple product counts does not support storage unit bids yet."
-                )
-                raise NotImplementedError(
-                    "Nodal clearing with multiple product counts does not support storage unit bids yet."
-                )
+                # make sure storages potentially present in the grid do not participate in this market
+                if not (
+                    self.grid_data["storage_units"][f"bidding_{self.marketconfig.market_id}"].isin(["-", ""])
+                    | self.grid_data["storage_units"][f"bidding_{self.marketconfig.market_id}"].isna()
+                ).all():
+                    logger.error(
+                        f"Market '{marketconfig.market_id}': Nodal clearing with multiple product counts does not support storage unit bids yet."
+                    )
+                    raise NotImplementedError(
+                        "Nodal clearing with multiple product counts does not support storage unit bids yet."
+                    )
 
         read_pypsa_grid(
             network=self.network,
