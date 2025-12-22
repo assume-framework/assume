@@ -9,6 +9,7 @@ from operator import itemgetter
 import pandas as pd
 import pypsa
 from mango import AgentAddress
+import numpy as np
 
 from assume.common.grid_utils import read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
@@ -99,6 +100,18 @@ class NodalClearingRole(MarketRole):
             )
             raise ValueError("Invalid payment mechanism.")
 
+        # if we have multiple hours (count >1), we cannot handle storage units bids yet
+        # this is because the storage bids would be linked bids
+        storage_units = self.grid_data.get("storage_units", pd.DataFrame())
+        if not storage_units.empty:
+            if self.marketconfig.market_products[0].count > 1:
+                logger.error(
+                    f"Market '{marketconfig.market_id}': Nodal clearing with multiple product counts does not support storage unit bids yet."
+                )
+                raise NotImplementedError(
+                    "Nodal clearing with multiple product counts does not support storage unit bids yet."
+                )
+
         read_pypsa_grid(
             network=self.network,
             grid_dict=self.grid_data,
@@ -126,14 +139,15 @@ class NodalClearingRole(MarketRole):
         # storage units
         # also add them as generators, as we only regard bids here and are not interested in their internal state
         # we take the max of discharging and charging power as p_nom for PyPSA. Bids are later used to set p_min_pu and p_max_pu accordingly.
-        self.network.add(
-            "Generator",
-            self.grid_data["storage_units"].index,
-            bus=self.grid_data["storage_units"]["node"],
-            p_nom=max(self.grid_data["storage_units"]["max_power_discharge"].values, self.grid_data["storage_units"]["max_power_charge"].values),
-            p_min_pu=-1,
-            p_max_pu=1,
-        )
+        if not storage_units.empty:
+            self.network.add(
+                "Generator",
+                self.grid_data["storage_units"].index,
+                bus=self.grid_data["storage_units"]["node"],
+                p_nom=np.maximum(self.grid_data["storage_units"]["max_power_discharge"].values, self.grid_data["storage_units"]["max_power_charge"].values),
+                p_min_pu=-1,
+                p_max_pu=1,
+            )
 
         self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
@@ -215,7 +229,7 @@ class NodalClearingRole(MarketRole):
         orderbook_df = pd.DataFrame(orderbook)
         orderbook_df["accepted_volume"] = 0.0
         orderbook_df["accepted_price"] = 0.0
-        # snapshots = range(self.marketconfig.market_products[0].count)
+
         snapshots = pd.date_range(
             start=market_products[0][0],  # start time
             end=market_products[-1][0],  # end time
@@ -230,14 +244,9 @@ class NodalClearingRole(MarketRole):
         price_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="price"
         )
-        # price_pivot.index = snapshots
         # Copy the network
         n = self.network.copy()
 
-        # set snapshots as the products start time, end time and freq = duration of the products
-        # snapshots = pd.date_range(self.marketconfig.opening_hours._dtstart,
-        #                          self.marketconfig.opening_hours._until,
-        #                          freq=self.marketconfig.market_products[0].duration)
         n.set_snapshots(snapshots)
 
         # Update p_max_pu for all units based on their bids in the actual snapshots
@@ -255,27 +264,28 @@ class NodalClearingRole(MarketRole):
         n.generators_t.marginal_cost.loc[snapshots, demand_idx] = price_pivot[demand_idx]
         
         # storage
-        storage_idx = self.grid_data["storage_units"].index
-        # discharging (positive bids)
-        n.generators_t.p_max_pu.loc[snapshots, storage_idx] = (
-            volume_pivot[storage_idx]
-            .clip(lower=0)
-            .fillna(0)
-            / n.generators.loc[storage_idx, "p_nom"].values
-        )
-        # charging (negative bids)
-        n.generators_t.p_min_pu.loc[snapshots, storage_idx] = (
-            volume_pivot[storage_idx]
-            .clip(upper=0)
-            .fillna(0)
-            / n.generators.loc[storage_idx, "p_nom"].values
-        )
-        # set bid price as marginal costs in the respective hours
-        n.generators_t.marginal_cost.loc[snapshots, storage_idx] = price_pivot[storage_idx].fillna(0)
+        if self.grid_data.get("storage_units") is not None:
+            storage_idx = self.grid_data["storage_units"].index
+            # discharging (positive bids)
+            n.generators_t.p_max_pu.loc[snapshots, storage_idx] = (
+                volume_pivot[storage_idx]
+                .clip(lower=0)
+                .fillna(0)
+                / n.generators.loc[storage_idx, "p_nom"].values
+            )
+            # charging (negative bids)
+            n.generators_t.p_min_pu.loc[snapshots, storage_idx] = (
+                volume_pivot[storage_idx]
+                .clip(upper=0)
+                .fillna(0)
+                / n.generators.loc[storage_idx, "p_nom"].values
+            )
+            # set bid price as marginal costs in the respective hours
+            n.generators_t.marginal_cost.loc[snapshots, storage_idx] = price_pivot[storage_idx].fillna(0)
 
         # run linear optimal powerflow
         n.optimize.fix_optimal_capacities()
-        n.optimize(  # snapshots=volume_pivot.index,
+        n.optimize(
             solver=self.solver,
             solver_options=self.solver_options,
         )
@@ -314,6 +324,10 @@ class NodalClearingRole(MarketRole):
         rejected_orders = orderbook_df[orderbook_df["accepted_volume"] == 0].to_dict(
             "records"
         )
+        for order in rejected_orders:
+            # set the accepted price for each rejected order to zero#
+            # this is not yet done concisely across the framework
+            order["accepted_price"] = 0
         market_clearing_prices = n.buses_t.marginal_price.to_dict()
 
         meta = []
@@ -371,7 +385,7 @@ def extract_results(
             demand_volume_dict[node][t] += order["accepted_volume"]
 
     # write the meta information for each hour of the clearing period
-    for node in market_clearing_prices.keys():
+    for node in network.buses.index:
         for product in market_products:
             t = product[0]
             clear_price = market_clearing_prices[node][t]
