@@ -289,8 +289,11 @@ def test_storage_rl_strategy_buy_bid(mock_market_config, storage_unit):
                 f"Expected costs {expected_costs}, got {costs[0]}"
             )
 
+
 @pytest.mark.require_learning
-def test_storage_rl_strategy_soc_and_cost_stored_energy(mock_market_config, storage_unit):
+def test_storage_rl_strategy_soc_and_cost_stored_energy(
+    mock_market_config, storage_unit
+):
     """
     Test the StorageEnergyLearningStrategy if unique observations are created as expected.
     """

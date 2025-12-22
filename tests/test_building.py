@@ -19,7 +19,7 @@ def generic_storage_config():
     return {
         "capacity": 100,  # Maximum energy capacity in MWh
         "min_soc": 0,  # Minimum SOC
-        "max_soc":1,  # Maximum SOC
+        "max_soc": 1,  # Maximum SOC
         "max_power_charge": 100,  # Maximum charging power in MW
         "max_power_discharge": 100,  # Maximum discharging power in MW
         "efficiency_charge": 0.9,  # Charging efficiency
@@ -39,7 +39,7 @@ def thermal_storage_config(generic_storage_config):
 @pytest.fixture
 def ev_config():
     return {
-        "capacity": 10.0, # EV battery capacity in MWh
+        "capacity": 10.0,  # EV battery capacity in MWh
         "min_soc": 0,
         "max_soc": 1,
         "max_power_charge": 3,  # Charge values will reflect a fraction of the capacity

@@ -1083,7 +1083,9 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
             # increase costs of current SoC by price for buying energy
             # not fully representing the true cost per MWh (e.g. omitting discharge efficiency losses), but serving as a proxy for it
             unit.outputs["cost_stored_energy"].at[next_time] = (
-                unit.outputs["cost_stored_energy"].at[start] * current_soc * unit.capacity
+                unit.outputs["cost_stored_energy"].at[start]
+                * current_soc
+                * unit.capacity
                 - (accepted_price + marginal_cost) * accepted_volume * duration_hours
             ) / (next_soc * unit.capacity)
         else:

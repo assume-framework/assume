@@ -520,7 +520,9 @@ class GenericStorage:
         model_block.max_power_charge = pyo.Param(initialize=self.max_power_charge)
         model_block.max_power_discharge = pyo.Param(initialize=self.max_power_discharge)
         model_block.efficiency_charge = pyo.Param(initialize=self.efficiency_charge)
-        model_block.efficiency_discharge = pyo.Param(initialize=self.efficiency_discharge)
+        model_block.efficiency_discharge = pyo.Param(
+            initialize=self.efficiency_discharge
+        )
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.initial_soc = pyo.Param(initialize=self.initial_soc)
@@ -556,10 +558,11 @@ class GenericStorage:
             return b.soc[t] == (
                 prev_soc
                 + (
-                b.efficiency_charge * b.charge[t]
-                - (1 / b.efficiency_discharge) * b.discharge[t]
-                - b.storage_loss_rate * prev_soc * b.capacity
-                ) / b.capacity
+                    b.efficiency_charge * b.charge[t]
+                    - (1 / b.efficiency_discharge) * b.discharge[t]
+                    - b.storage_loss_rate * prev_soc * b.capacity
+                )
+                / b.capacity
             )
 
         # Apply ramp-up constraints if ramp_up is specified

@@ -111,7 +111,9 @@ class Storage(SupportsMinMaxCharge):
         if initial_soc is None:
             initial_soc = 0.5
         if not 0 <= initial_soc <= 1:
-            raise ValueError(f"{initial_soc=} must be between 0 and 1 for unit {self.id}")
+            raise ValueError(
+                f"{initial_soc=} must be between 0 and 1 for unit {self.id}"
+            )
         self.initial_soc = initial_soc
 
         if max_power_charge > 0:
@@ -237,7 +239,9 @@ class Storage(SupportsMinMaxCharge):
                 if current_power > max_soc_discharge:
                     current_power = max_soc_discharge
 
-                delta_soc = (-current_power * time_delta / self.efficiency_discharge) / self.capacity
+                delta_soc = (
+                    -current_power * time_delta / self.efficiency_discharge
+                ) / self.capacity
 
             # charging
             elif current_power < 0:
@@ -246,7 +250,9 @@ class Storage(SupportsMinMaxCharge):
                 if current_power < max_soc_charge:
                     current_power = max_soc_charge
 
-                delta_soc = (-current_power * time_delta * self.efficiency_charge) / self.capacity
+                delta_soc = (
+                    -current_power * time_delta * self.efficiency_charge
+                ) / self.capacity
 
             # update the values of the state of charge and the energy
             next_freq = t + self.index.freq
@@ -296,7 +302,12 @@ class Storage(SupportsMinMaxCharge):
         duration = self.index.freq / timedelta(hours=1)
         power = max(
             0,
-            ((soc - self.min_soc) * self.capacity * self.efficiency_discharge / duration),
+            (
+                (soc - self.min_soc)
+                * self.capacity
+                * self.efficiency_discharge
+                / duration
+            ),
         )
         return power
 
