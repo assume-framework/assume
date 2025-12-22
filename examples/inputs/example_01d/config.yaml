@@ -105,7 +105,7 @@ nodal_case:
       product_type: energy
       products:
         - duration: 1h
-          count: 1
+          count: 24
           first_delivery: 1h
       opening_frequency: 1h
       opening_duration: 1h
