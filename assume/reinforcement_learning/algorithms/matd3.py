@@ -32,31 +32,9 @@ class TD3(RLAlgorithm):
     Original paper: https://arxiv.org/pdf/1802.09477.pdf
     """
 
-    def __init__(
-        self,
-        learning_role,
-        learning_rate=1e-4,
-        batch_size=1024,
-        tau=0.005,
-        gamma=0.99,
-        gradient_steps=100,
-        policy_delay=2,
-        target_policy_noise=0.2,
-        target_noise_clip=0.5,
-        actor_architecture="mlp",
-    ):
-        super().__init__(
-            learning_role,
-            learning_rate,
-            batch_size,
-            tau,
-            gamma,
-            gradient_steps,
-            policy_delay,
-            target_policy_noise,
-            target_noise_clip,
-            actor_architecture,
-        )
+    def __init__(self, learning_role):
+        super().__init__(learning_role)
+
         self.n_updates = 0
         self.grad_clip_norm = 1.0
 
@@ -487,7 +465,7 @@ class TD3(RLAlgorithm):
                 }
                 for u_id in self.learning_role.rl_strats.keys()
             }
-            for _ in range(self.gradient_steps)
+            for _ in range(self.learning_config.gradient_steps)
         ]
 
         # update noise decay and learning rate
@@ -510,10 +488,12 @@ class TD3(RLAlgorithm):
             )
             strategy.action_noise.update_noise_decay(updated_noise_decay)
 
-        for step in range(self.gradient_steps):
+        for step in range(self.learning_config.gradient_steps):
             self.n_updates += 1
 
-            transitions = self.learning_role.buffer.sample(self.batch_size)
+            transitions = self.learning_role.buffer.sample(
+                self.learning_config.batch_size
+            )
             states, actions, next_states, rewards = (
                 transitions.observations,
                 transitions.actions,
@@ -523,8 +503,13 @@ class TD3(RLAlgorithm):
 
             with th.no_grad():
                 # Select action according to policy and add clipped noise
-                noise = th.randn_like(actions) * self.target_policy_noise
-                noise = noise.clamp(-self.target_noise_clip, self.target_noise_clip)
+                noise = (
+                    th.randn_like(actions) * self.learning_config.target_policy_noise
+                )
+                noise = noise.clamp(
+                    -self.learning_config.target_noise_clip,
+                    self.learning_config.target_noise_clip,
+                )
 
                 # Select next actions for all agents
                 next_actions = th.stack(
@@ -538,15 +523,15 @@ class TD3(RLAlgorithm):
                 next_actions = next_actions.transpose(0, 1).contiguous()
                 next_actions = next_actions.view(-1, n_rl_agents * self.act_dim)
 
-            all_actions = actions.view(self.batch_size, -1)
+            all_actions = actions.view(self.learning_config.batch_size, -1)
 
             # Precompute unique observation parts for all agents
             unique_obs_from_others = states[
                 :, :, self.obs_dim - self.unique_obs_dim :
-            ].reshape(self.batch_size, n_rl_agents, -1)
+            ].reshape(self.learning_config.batch_size, n_rl_agents, -1)
             next_unique_obs_from_others = next_states[
                 :, :, self.obs_dim - self.unique_obs_dim :
-            ].reshape(self.batch_size, n_rl_agents, -1)
+            ].reshape(self.learning_config.batch_size, n_rl_agents, -1)
 
             #####################################################################
             # CRITIC UPDATE: Accumulate losses for all agents, then backprop once
@@ -580,15 +565,19 @@ class TD3(RLAlgorithm):
                 # Construct final state representations
                 all_states = th.cat(
                     (
-                        states[:, i, :].reshape(self.batch_size, -1),
-                        other_unique_obs.reshape(self.batch_size, -1),
+                        states[:, i, :].reshape(self.learning_config.batch_size, -1),
+                        other_unique_obs.reshape(self.learning_config.batch_size, -1),
                     ),
                     dim=1,
                 )
                 all_next_states = th.cat(
                     (
-                        next_states[:, i, :].reshape(self.batch_size, -1),
-                        other_next_unique_obs.reshape(self.batch_size, -1),
+                        next_states[:, i, :].reshape(
+                            self.learning_config.batch_size, -1
+                        ),
+                        other_next_unique_obs.reshape(
+                            self.learning_config.batch_size, -1
+                        ),
                     ),
                     dim=1,
                 )
@@ -600,7 +589,8 @@ class TD3(RLAlgorithm):
                     )
                     next_q_values, _ = th.min(next_q_values, dim=1, keepdim=True)
                     target_Q_values = (
-                        rewards[:, i].unsqueeze(1) + self.gamma * next_q_values
+                        rewards[:, i].unsqueeze(1)
+                        + self.learning_config.gamma * next_q_values
                     )
 
                 # Get current Q-values estimates for each critic network
@@ -643,7 +633,7 @@ class TD3(RLAlgorithm):
             ######################################################################
             # ACTOR UPDATE (DELAYED): Accumulate losses for all agents in one pass
             ######################################################################
-            if self.n_updates % self.policy_delay == 0:
+            if self.n_updates % self.learning_config.policy_delay == 0:
                 # Zero-grad for all actors first
                 for strategy in strategies:
                     strategy.actor.optimizer.zero_grad(set_to_none=True)
@@ -669,8 +659,10 @@ class TD3(RLAlgorithm):
                     )
                     all_states_i = th.cat(
                         (
-                            state_i.reshape(self.batch_size, -1),
-                            other_unique_obs.reshape(self.batch_size, -1),
+                            state_i.reshape(self.learning_config.batch_size, -1),
+                            other_unique_obs.reshape(
+                                self.learning_config.batch_size, -1
+                            ),
                         ),
                         dim=1,
                     )
@@ -680,7 +672,9 @@ class TD3(RLAlgorithm):
                     all_actions_clone[:, i, :] = action_i
 
                     # Flatten again for the critic
-                    all_actions_clone = all_actions_clone.view(self.batch_size, -1)
+                    all_actions_clone = all_actions_clone.view(
+                        self.learning_config.batch_size, -1
+                    )
 
                     # Calculate actor loss (negative Q1 of the updated action)
                     actor_loss = -critic.q1_forward(
@@ -736,7 +730,13 @@ class TD3(RLAlgorithm):
                     all_target_actor_params.extend(strategy.actor_target.parameters())
 
                 # Perform batch-wise Polyak update (NO LOOPS)
-                polyak_update(all_critic_params, all_target_critic_params, self.tau)
-                polyak_update(all_actor_params, all_target_actor_params, self.tau)
+                polyak_update(
+                    all_critic_params,
+                    all_target_critic_params,
+                    self.learning_config.tau,
+                )
+                polyak_update(
+                    all_actor_params, all_target_actor_params, self.learning_config.tau
+                )
 
         self.learning_role.write_rl_grad_params_to_output(learning_rate, unit_params)

@@ -37,17 +37,18 @@ class TorchLearningStrategy(LearningStrategy):
         self.unit_id = kwargs["unit_id"]
 
         # defines bounds of actions space
-        self.min_bid_price = kwargs.get("min_bid_price", -100)
-        self.max_bid_price = kwargs.get("max_bid_price", 100)
+        self.min_bid_price = self.learning_config.min_bid_price
+        self.max_bid_price = self.learning_config.max_bid_price
 
         # tells us whether we are training the agents or just executing per-learning strategies
-        self.learning_mode = kwargs.get("learning_mode", False)
-        self.evaluation_mode = kwargs.get("evaluation_mode", False)
+        self.learning_mode = self.learning_config.learning_mode
+        self.evaluation_mode = self.learning_config.evaluation_mode
 
         # based on learning config
-        self.algorithm = kwargs.get("algorithm", "matd3")
-        self.actor_architecture = kwargs.get("actor_architecture", "mlp")
+        self.algorithm = self.learning_config.algorithm
+        self.actor_architecture = self.learning_config.actor_architecture
 
+        # check if actor architecture is available
         if self.actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
                 self.actor_architecture
@@ -58,36 +59,39 @@ class TorchLearningStrategy(LearningStrategy):
             )
 
         # sets the device of the actor network
-        device = kwargs.get("device", "cpu")
-        self.device = th.device(device if th.cuda.is_available() else "cpu")
-        if not self.learning_mode:
-            self.device = th.device("cpu")
+        self.device = self.learning_role.device
 
         # future: add option to choose between float16 and float32
         # float_type = kwargs.get("float_type", "float32")
         self.float_type = th.float
 
         # define standard deviation for the initial exploration noise
-        self.exploration_noise_std = kwargs.get("exploration_noise_std", 0.2)
+        self.exploration_noise_std = self.learning_config.exploration_noise_std
 
         if self.learning_mode or self.evaluation_mode:
-            self.collect_initial_experience_mode = bool(
-                kwargs.get("episodes_collecting_initial_experience", True)
-            )
+            # learning role overwrites this if loaded from file or after initial experience episodes
+            self.collect_initial_experience_mode = True
 
             self.action_noise = NormalActionNoise(
                 mu=0.0,
-                sigma=kwargs.get("noise_sigma", 0.1),
+                sigma=self.learning_config.noise_sigma,
                 action_dimension=self.act_dim,
-                scale=kwargs.get("noise_scale", 1.0),
-                dt=kwargs.get("noise_dt", 1.0),
+                scale=self.learning_config.noise_scale,
+                dt=self.learning_config.noise_dt,
             )
 
-        elif Path(kwargs["trained_policies_load_path"]).is_dir():
-            self.load_actor_params(load_path=kwargs["trained_policies_load_path"])
+            self.learning_role.register_strategy(self)
+
+        # actor policies are only loaded here from file if learning mode is off (otherwise handled by learning_role)
+        # i.e., when loading pre-trained strategies without training ("learning_mode: false" and "trained_policies_load_path" specified in config)
+        # or final simulation run after training (terminate_learning == true)
+        elif Path(self.learning_config.trained_policies_load_path).is_dir():
+            self.load_actor_params(
+                load_path=self.learning_config.trained_policies_load_path
+            )
         else:
             raise FileNotFoundError(
-                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies."
+                f"No policies were provided for DRL unit {self.unit_id}!. Please provide a valid path to the trained policies. Expected them under filepath '{self.learning_config.trained_policies_load_path}'."
             )
 
     def load_actor_params(self, load_path):
@@ -205,6 +209,11 @@ class TorchLearningStrategy(LearningStrategy):
         observation = th.as_tensor(
             observation, dtype=self.float_type, device=self.device
         ).flatten()
+
+        if self.learning_mode:
+            self.learning_role.add_observation_to_cache(
+                self.unit_id, start, observation
+            )
 
         return observation
 
@@ -483,13 +492,8 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
             },
         ]
 
-        # store results in unit outputs as lists to be written to the buffer for learning
-        unit.outputs["rl_observations"].append(next_observation)
-        unit.outputs["rl_actions"].append(actions)
-
-        # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"].at[start] = actions
-        unit.outputs["exploration_noise"].at[start] = noise
+        if self.learning_mode:
+            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
 
         return bids
 
@@ -597,7 +601,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         start = orderbook[0]["start_time"]
         end = orderbook[0]["end_time"]
-        # `end_excl` marks the last product's start time by subtracting one frequency interval.
+        # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - unit.index.freq
 
         # Depending on how the unit calculates marginal costs, retrieve cost values.
@@ -644,11 +648,17 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         profit = income - operational_cost
 
         # Stabilizing learning: Limit positive profit to 10% of its absolute value.
-        # This reduces variance in rewards and prevents overfitting to extreme profit-seeking behavior.
+        # This reduces variance in rewards and avoids extreme profit-seeking behavior.
         # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
-        # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
-        # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
-        profit = min(profit, 0.1 * abs(profit))
+        # This leads to the agent learning to bid close to marginal costs to ensure acceptance,
+        # while still being able to capitalize on any market inefficiencies that may arise.
+        # However this will lead the learning agents to converge to the market price they should bid from below marginal costs.
+        # We only advise using this if profits can spike extremely high due to market conditions, or many learning units enter tactic collusion.
+        # IMPORTANT: This is a clear case of reward_tuning to stabilize learning - Use with caution!
+        # profit_scale= 0.1
+
+        profit_scale = 1
+        profit = min(profit, profit_scale * abs(profit))
 
         # Opportunity cost: The income lost due to not operating at full capacity.
         opportunity_cost = (
@@ -672,16 +682,19 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         # scaling factor to normalize the reward to the range [-1,1]
         scaling = 1 / (self.max_bid_price * unit.max_power)
-
         reward = scaling * (profit - regret_scale * opportunity_cost)
+        regret = regret_scale * opportunity_cost
 
-        # Store results in unit outputs, which are later written to the database by the unit operator.
+        # Store results in unit outputs
+        # Note: these are not learning-specific results but stored for all units for analysis
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
-        unit.outputs["total_costs"].loc[start:end_excl] = operational_cost
+        unit.outputs["total_costs"].loc[start:end_excl] += operational_cost
 
-        unit.outputs["rl_rewards"].append(reward)
+        # write rl-rewards to buffer
+        if self.learning_mode:
+            self.learning_role.add_reward_to_cache(
+                unit.id, start, reward, regret, profit
+            )
 
 
 class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
@@ -783,13 +796,8 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
             },
         ]
 
-        # store results in unit outputs as lists to be written to the buffer for learning
-        unit.outputs["rl_observations"].append(next_observation)
-        unit.outputs["rl_actions"].append(actions)
-
-        # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"].at[start] = actions
-        unit.outputs["exploration_noise"].at[start] = noise
+        if self.learning_mode:
+            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
 
         return bids
 
@@ -1003,12 +1011,8 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
                 }
             )
 
-        unit.outputs["rl_observations"].append(next_observation)
-        unit.outputs["rl_actions"].append(actions)
-
-        # store results in unit outputs as series to be written to the database by the unit operator
-        unit.outputs["actions"].at[start] = actions
-        unit.outputs["exploration_noise"].at[start] = noise
+        if self.learning_mode:
+            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
 
         return bids
 
@@ -1101,10 +1105,13 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         reward += scaling_factor * profit
 
         # Store results in unit outputs
+        # Note: these are not learning-specific results but stored for all units for analysis
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["total_costs"].loc[start:end_excl] = order_cost
-        unit.outputs["rl_rewards"].append(reward)
+        unit.outputs["total_costs"].loc[start:end_excl] += order_cost
+
+        # write rl-rewards to buffer
+        if self.learning_mode:
+            self.learning_role.add_reward_to_cache(unit.id, start, reward, 0, profit)
 
 
 class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
@@ -1339,12 +1346,16 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         else:
             scaling = 1 / (self.max_bid_price * available_power)
 
-        reward = scaling * (profit - regret_scale * opportunity_cost)
+        regret = regret_scale * opportunity_cost
+        reward = scaling * (profit - regret)
 
-        # Store results in unit outputs, which are later written to the database by the unit operator.
+        # Store results in unit outputs
+        # Note: these are not learning-specific results but stored for all units for analysis
         unit.outputs["profit"].loc[start:end_excl] += profit
-        unit.outputs["reward"].loc[start:end_excl] = reward
-        unit.outputs["regret"].loc[start:end_excl] = regret_scale * opportunity_cost
-        unit.outputs["total_costs"].loc[start:end_excl] = operational_cost
+        unit.outputs["total_costs"].loc[start:end_excl] += operational_cost
 
-        unit.outputs["rl_rewards"].append(reward)
+        # write rl-rewards to buffer
+        if self.learning_mode:
+            self.learning_role.add_reward_to_cache(
+                unit.id, start, reward, regret, profit
+            )
