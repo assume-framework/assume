@@ -6,10 +6,10 @@ import logging
 from datetime import timedelta
 from operator import itemgetter
 
+import numpy as np
 import pandas as pd
 import pypsa
 from mango import AgentAddress
-import numpy as np
 
 from assume.common.grid_utils import read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
@@ -27,7 +27,7 @@ def calculate_meta(accepted_demand_orders, accepted_supply_orders, product):
     supply_volume = sum(map(itemgetter("accepted_volume"), accepted_supply_orders))
     demand_volume = -sum(map(itemgetter("accepted_volume"), accepted_demand_orders))
     prices = list(map(itemgetter("accepted_price"), accepted_supply_orders)) or [0]
-    
+
     duration_hours = (product[1] - product[0]) / timedelta(hours=1)
     avg_price = 0
     if supply_volume:
@@ -107,8 +107,12 @@ class NodalClearingRole(MarketRole):
             if self.marketconfig.market_products[0].count > 1:
                 # make sure storages potentially present in the grid do not participate in this market
                 if not (
-                    self.grid_data["storage_units"][f"bidding_{self.marketconfig.market_id}"].isin(["-", ""])
-                    | self.grid_data["storage_units"][f"bidding_{self.marketconfig.market_id}"].isna()
+                    self.grid_data["storage_units"][
+                        f"bidding_{self.marketconfig.market_id}"
+                    ].isin(["-", ""])
+                    | self.grid_data["storage_units"][
+                        f"bidding_{self.marketconfig.market_id}"
+                    ].isna()
                 ).all():
                     logger.error(
                         f"Market '{marketconfig.market_id}': Nodal clearing with multiple product counts does not support storage unit bids yet."
@@ -149,7 +153,10 @@ class NodalClearingRole(MarketRole):
                 "Generator",
                 self.grid_data["storage_units"].index,
                 bus=self.grid_data["storage_units"]["node"],
-                p_nom=np.maximum(self.grid_data["storage_units"]["max_power_discharge"].values, self.grid_data["storage_units"]["max_power_charge"].values),
+                p_nom=np.maximum(
+                    self.grid_data["storage_units"]["max_power_discharge"].values,
+                    self.grid_data["storage_units"]["max_power_charge"].values,
+                ),
                 p_min_pu=-1,
                 p_max_pu=1,
             )
@@ -268,28 +275,28 @@ class NodalClearingRole(MarketRole):
         n.generators_t.p_min_pu.loc[snapshots, demand_idx] = (
             volume_pivot[demand_idx] / n.generators.loc[demand_idx, "p_nom"].values
         )
-        n.generators_t.marginal_cost.loc[snapshots, demand_idx] = price_pivot[demand_idx]
-        
+        n.generators_t.marginal_cost.loc[snapshots, demand_idx] = price_pivot[
+            demand_idx
+        ]
+
         # storage
         if self.grid_data.get("storage_units") is not None:
             storage_idx = self.grid_data["storage_units"].index
             storage_idx = storage_idx.intersection(volume_pivot.columns)
             # discharging (positive bids)
             n.generators_t.p_max_pu.loc[snapshots, storage_idx] = (
-                volume_pivot[storage_idx]
-                .clip(lower=0)
-                .fillna(0)
+                volume_pivot[storage_idx].clip(lower=0).fillna(0)
                 / n.generators.loc[storage_idx, "p_nom"].values
             )
             # charging (negative bids)
             n.generators_t.p_min_pu.loc[snapshots, storage_idx] = (
-                volume_pivot[storage_idx]
-                .clip(upper=0)
-                .fillna(0)
+                volume_pivot[storage_idx].clip(upper=0).fillna(0)
                 / n.generators.loc[storage_idx, "p_nom"].values
             )
             # set bid price as marginal costs in the respective hours
-            n.generators_t.marginal_cost.loc[snapshots, storage_idx] = price_pivot[storage_idx].fillna(0)
+            n.generators_t.marginal_cost.loc[snapshots, storage_idx] = price_pivot[
+                storage_idx
+            ].fillna(0)
 
         # run linear optimal powerflow
         n.optimize.fix_optimal_capacities()

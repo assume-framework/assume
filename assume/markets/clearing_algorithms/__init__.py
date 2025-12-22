@@ -22,6 +22,7 @@ clearing_mechanisms: dict[str, MarketRole] = {
 try:
     from .redispatch import RedispatchMarketRole
     from .nodal_clearing import NodalClearingRole
+
     clearing_mechanisms["redispatch"] = RedispatchMarketRole
     clearing_mechanisms["nodal_clearing"] = NodalClearingRole
 except ImportError:

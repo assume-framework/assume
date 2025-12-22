@@ -12,9 +12,6 @@ from assume.common.market_objects import MarketConfig, MarketProduct, Order
 from assume.common.utils import get_available_products
 from assume.markets.clearing_algorithms import NodalClearingRole
 
-
-from .utils import extend_orderbook
-
 simple_nodal_auction_config = MarketConfig(
     market_id="simple_nodal_auction",
     market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
@@ -33,7 +30,6 @@ simple_nodal_auction_config = MarketConfig(
     market_mechanism="nodal_clearing",
 )
 eps = 1e-4
-
 
 
 def test_nodal_clearing_two_hours():
@@ -81,7 +77,12 @@ def test_nodal_clearing_two_hours():
     }
     loads = pd.DataFrame(loads).set_index("name")
 
-    grid_data = {"buses": nodes, "lines": lines, "generators": generators, "loads": loads}
+    grid_data = {
+        "buses": nodes,
+        "lines": lines,
+        "generators": generators,
+        "loads": loads,
+    }
     market_config.param_dict["grid_data"] = grid_data
     market_config.param_dict["log_flows"] = True
     next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
@@ -90,20 +91,20 @@ def test_nodal_clearing_two_hours():
 
     orderbook = []
     order: Order = {
-            "start_time": products[0][0],
-            "end_time": products[0][1],
-            "unit_id": "dem1",
-            "bid_id": "bid1",
-            "volume": 0,
-            "price": 0,
-            "only_hours": None,
-            "node": 0,
-        }
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "unit_id": "dem1",
+        "bid_id": "bid1",
+        "volume": 0,
+        "price": 0,
+        "only_hours": None,
+        "node": 0,
+    }
     i = 0
     for v, p in zip([-2400, -4400], [3000, 3000]):
         new_order = order.copy()
         new_order["start_time"] = products[0][i]
-        new_order["end_time"] = products[0][i+1]
+        new_order["end_time"] = products[0][i + 1]
         new_order["volume"] = v
         new_order["price"] = p
         new_order["node"] = "node1"
@@ -111,12 +112,12 @@ def test_nodal_clearing_two_hours():
         new_order["unit_id"] = "dem1"
         orderbook.append(new_order)
         i += 1
-    
+
     i = 0
     for v, p in zip([-2400, -4400], [3000, 3000]):
         new_order = order.copy()
         new_order["start_time"] = products[0][i]
-        new_order["end_time"] = products[0][i+1]
+        new_order["end_time"] = products[0][i + 1]
         new_order["volume"] = v
         new_order["price"] = p
         new_order["node"] = "node2"
@@ -129,7 +130,7 @@ def test_nodal_clearing_two_hours():
     for v, p in zip([-17400, -14400], [3000, 3000]):
         new_order = order.copy()
         new_order["start_time"] = products[0][i]
-        new_order["end_time"] = products[0][i+1]
+        new_order["end_time"] = products[0][i + 1]
         new_order["volume"] = v
         new_order["price"] = p
         new_order["node"] = "node3"
@@ -137,12 +138,12 @@ def test_nodal_clearing_two_hours():
         new_order["unit_id"] = "dem3"
         orderbook.append(new_order)
         i += 1
-    
+
     for i in range(h):
         for p in range(5, 15):
             new_order = order.copy()
             new_order["start_time"] = products[0][i]
-            new_order["end_time"] = products[0][i+1]
+            new_order["end_time"] = products[0][i + 1]
             new_order["volume"] = 1000
             new_order["price"] = p
             new_order["node"] = "node1"
@@ -152,7 +153,7 @@ def test_nodal_clearing_two_hours():
         for p in range(15, 25):
             new_order = order.copy()
             new_order["start_time"] = products[0][i]
-            new_order["end_time"] = products[0][i+1]
+            new_order["end_time"] = products[0][i + 1]
             new_order["volume"] = 1000
             new_order["price"] = p
             new_order["node"] = "node2"
@@ -162,39 +163,39 @@ def test_nodal_clearing_two_hours():
         for p in range(25, 35):
             new_order = order.copy()
             new_order["start_time"] = products[0][i]
-            new_order["end_time"] = products[0][i+1]
+            new_order["end_time"] = products[0][i + 1]
             new_order["volume"] = 1000
             new_order["price"] = p
             new_order["node"] = "node3"
             new_order["bid_id"] = f"gen{p}_{i}"
             new_order["unit_id"] = f"gen{p}"
             orderbook.append(new_order)
-    
+
     mr = NodalClearingRole(market_config)
     accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert meta[0]["node"] == "node1"
     assert meta[2]["node"] == "node2"
     assert meta[4]["node"] == "node3"
-    assert math.isclose(meta[0]["supply_volume"], 7600, abs_tol=eps) # node1 hour 0
-    assert math.isclose(meta[1]["supply_volume"], 10000, abs_tol=eps)# node1 hour 1
-    assert math.isclose(meta[2]["supply_volume"], 7000, abs_tol=eps) # node2 hour 0
-    assert math.isclose(meta[3]["supply_volume"], 8200, abs_tol=eps) # node2 hour 1
-    assert math.isclose(meta[4]["supply_volume"], 7600, abs_tol=eps) # node3 hour 0
-    assert math.isclose(meta[5]["supply_volume"], 5000, abs_tol=eps) # node3 hour 1
-    assert math.isclose(meta[0]["demand_volume"], 2400, abs_tol=eps) # node1 hour 0
-    assert math.isclose(meta[1]["demand_volume"], 4400, abs_tol=eps) # node1 hour 1
-    assert math.isclose(meta[2]["demand_volume"], 2400, abs_tol=eps) # node2 hour 0
-    assert math.isclose(meta[3]["demand_volume"], 4400, abs_tol=eps) # node2 hour 1
-    assert math.isclose(meta[4]["demand_volume"], 17400, abs_tol=eps) # node3 hour 0
-    assert math.isclose(meta[5]["demand_volume"], 14400, abs_tol=eps) # node3 hour 1
+    assert math.isclose(meta[0]["supply_volume"], 7600, abs_tol=eps)  # node1 hour 0
+    assert math.isclose(meta[1]["supply_volume"], 10000, abs_tol=eps)  # node1 hour 1
+    assert math.isclose(meta[2]["supply_volume"], 7000, abs_tol=eps)  # node2 hour 0
+    assert math.isclose(meta[3]["supply_volume"], 8200, abs_tol=eps)  # node2 hour 1
+    assert math.isclose(meta[4]["supply_volume"], 7600, abs_tol=eps)  # node3 hour 0
+    assert math.isclose(meta[5]["supply_volume"], 5000, abs_tol=eps)  # node3 hour 1
+    assert math.isclose(meta[0]["demand_volume"], 2400, abs_tol=eps)  # node1 hour 0
+    assert math.isclose(meta[1]["demand_volume"], 4400, abs_tol=eps)  # node1 hour 1
+    assert math.isclose(meta[2]["demand_volume"], 2400, abs_tol=eps)  # node2 hour 0
+    assert math.isclose(meta[3]["demand_volume"], 4400, abs_tol=eps)  # node2 hour 1
+    assert math.isclose(meta[4]["demand_volume"], 17400, abs_tol=eps)  # node3 hour 0
+    assert math.isclose(meta[5]["demand_volume"], 14400, abs_tol=eps)  # node3 hour 1
 
-    assert math.isclose(meta[0]["price"], 12, abs_tol=eps) # node1 hour 0
-    assert math.isclose(meta[1]["price"], 17, abs_tol=eps) # node1 hour 1
-    assert math.isclose(meta[2]["price"], 22, abs_tol=eps) # node2 hour 0
-    assert math.isclose(meta[3]["price"], 23, abs_tol=eps) # node2 hour 1
-    assert math.isclose(meta[4]["price"], 32, abs_tol=eps) # node3 hour 0
-    assert math.isclose(meta[5]["price"], 29, abs_tol=eps) # node3 hour 1
+    assert math.isclose(meta[0]["price"], 12, abs_tol=eps)  # node1 hour 0
+    assert math.isclose(meta[1]["price"], 17, abs_tol=eps)  # node1 hour 1
+    assert math.isclose(meta[2]["price"], 22, abs_tol=eps)  # node2 hour 0
+    assert math.isclose(meta[3]["price"], 23, abs_tol=eps)  # node2 hour 1
+    assert math.isclose(meta[4]["price"], 32, abs_tol=eps)  # node3 hour 0
+    assert math.isclose(meta[5]["price"], 29, abs_tol=eps)  # node3 hour 1
 
     flows_df = pd.Series(flows).unstack()
     assert math.isclose(flows_df.loc[products[0][0], "line_1_2"], 200, abs_tol=eps)
@@ -203,6 +204,7 @@ def test_nodal_clearing_two_hours():
     assert math.isclose(flows_df.loc[products[0][1], "line_1_3"], 5000, abs_tol=eps)
     assert math.isclose(flows_df.loc[products[0][0], "line_2_3"], 4800, abs_tol=eps)
     assert math.isclose(flows_df.loc[products[0][1], "line_2_3"], 4400, abs_tol=eps)
+
 
 def test_nodal_clearing_with_storage_single_hour():
     market_config = simple_nodal_auction_config
@@ -257,7 +259,13 @@ def test_nodal_clearing_with_storage_single_hour():
     }
     storage_units = pd.DataFrame(storage_units).set_index("name")
 
-    grid_data = {"buses": nodes, "lines": lines, "generators": generators, "loads": loads, "storage_units": storage_units}
+    grid_data = {
+        "buses": nodes,
+        "lines": lines,
+        "generators": generators,
+        "loads": loads,
+        "storage_units": storage_units,
+    }
     market_config.param_dict["grid_data"] = grid_data
     market_config.param_dict["log_flows"] = True
     next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
@@ -266,16 +274,16 @@ def test_nodal_clearing_with_storage_single_hour():
 
     orderbook = []
     order: Order = {
-            "start_time": products[0][0],
-            "end_time": products[0][1],
-            "unit_id": "dem1",
-            "bid_id": "bid1",
-            "volume": 0,
-            "price": 0,
-            "only_hours": None,
-            "node": 0,
-        }
-    
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "unit_id": "dem1",
+        "bid_id": "bid1",
+        "volume": 0,
+        "price": 0,
+        "only_hours": None,
+        "node": 0,
+    }
+
     new_order = order.copy()
     new_order["start_time"] = products[0][0]
     new_order["end_time"] = products[0][1]
@@ -285,7 +293,7 @@ def test_nodal_clearing_with_storage_single_hour():
     new_order["bid_id"] = f"dem1_{0}"
     new_order["unit_id"] = "dem1"
     orderbook.append(new_order)
-    
+
     new_order = order.copy()
     new_order["start_time"] = products[0][0]
     new_order["end_time"] = products[0][1]
@@ -295,7 +303,7 @@ def test_nodal_clearing_with_storage_single_hour():
     new_order["bid_id"] = f"dem2_{0}"
     new_order["unit_id"] = "dem2"
     orderbook.append(new_order)
-    
+
     new_order = order.copy()
     new_order["start_time"] = products[0][0]
     new_order["end_time"] = products[0][1]
@@ -357,23 +365,23 @@ def test_nodal_clearing_with_storage_single_hour():
     new_order["bid_id"] = f"charge{50}_{0}"
     new_order["unit_id"] = f"storage{50}"
     orderbook.append(new_order)
-    
+
     mr = NodalClearingRole(market_config)
     accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
 
     assert meta[0]["node"] == "node1"
     assert meta[1]["node"] == "node2"
     assert meta[2]["node"] == "node3"
-    assert math.isclose(meta[0]["supply_volume"], 7600, abs_tol=eps) # node1 hour 0
-    assert math.isclose(meta[1]["supply_volume"], 7000, abs_tol=eps) # node2 hour 0
-    assert math.isclose(meta[2]["supply_volume"], 7600, abs_tol=eps) # node3 hour 0
-    assert math.isclose(meta[0]["demand_volume"], 2400, abs_tol=eps) # node1 hour 0
-    assert math.isclose(meta[1]["demand_volume"], 2400, abs_tol=eps) # node2 hour 0
-    assert math.isclose(meta[2]["demand_volume"], 17400, abs_tol=eps) # node3 hour 0
+    assert math.isclose(meta[0]["supply_volume"], 7600, abs_tol=eps)  # node1 hour 0
+    assert math.isclose(meta[1]["supply_volume"], 7000, abs_tol=eps)  # node2 hour 0
+    assert math.isclose(meta[2]["supply_volume"], 7600, abs_tol=eps)  # node3 hour 0
+    assert math.isclose(meta[0]["demand_volume"], 2400, abs_tol=eps)  # node1 hour 0
+    assert math.isclose(meta[1]["demand_volume"], 2400, abs_tol=eps)  # node2 hour 0
+    assert math.isclose(meta[2]["demand_volume"], 17400, abs_tol=eps)  # node3 hour 0
 
-    assert math.isclose(meta[0]["price"], 11, abs_tol=eps) # node1 hour 0
-    assert math.isclose(meta[1]["price"], 21.5, abs_tol=eps) # node2 hour 0
-    assert math.isclose(meta[2]["price"], 32, abs_tol=eps) # node3 hour 0
+    assert math.isclose(meta[0]["price"], 11, abs_tol=eps)  # node1 hour 0
+    assert math.isclose(meta[1]["price"], 21.5, abs_tol=eps)  # node2 hour 0
+    assert math.isclose(meta[2]["price"], 32, abs_tol=eps)  # node3 hour 0
 
     flows_df = pd.Series(flows).unstack()
     assert math.isclose(flows_df.loc[products[0][0], "line_1_2"], 200, abs_tol=eps)

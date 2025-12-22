@@ -182,8 +182,8 @@ class RedispatchMarketRole(MarketRole):
         redispatch_network.lpf()
 
         # check lines for congestion where power flow is larger than s_nom
-        line_loading = (
-            redispatch_network.lines_t.p0.abs() / (redispatch_network.lines.s_nom * redispatch_network.lines.s_max_pu)
+        line_loading = redispatch_network.lines_t.p0.abs() / (
+            redispatch_network.lines.s_nom * redispatch_network.lines.s_max_pu
         )
 
         # if any line is congested, perform redispatch
