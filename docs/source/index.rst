@@ -11,7 +11,7 @@ its primary objectives are to ensure usability and customizability for a wide ra
 users and use cases in the energy system modeling community.
 
 The unique feature of the ASSUME tool-box is the integration of **Deep Reinforcement
-Learning** methods into the behavioural strategies of market agents.
+Learning** methods into the behavioral strategies of market agents.
 The model offers various predefined agent representations for both the demand and
 generation sides, which can be used as plug-and-play modules, simplifying the
 reinforcement of learning strategies. This setup enables research into new market
@@ -70,7 +70,6 @@ Documentation
    examples_basic
    example_simulations
 
-**User Guide**
 
 User Guide
 ==========
@@ -115,8 +114,7 @@ User Guide
    assume
 
 
-Indices and tables
-==================
+**Indices & Tables**
 
 * :ref:`genindex`
 * :ref:`modindex`

@@ -75,9 +75,9 @@ We'll now take a look at the different Bidding Strategies within each methodolog
 Naive
 -----
 
-==================================  =======================  =====================================================================================================================
+==================================  =======================  ==================================================================================================================================
 bidding_strategy_id                 For Market Types         Description
-==================================  =======================  =====================================================================================================================
+==================================  =======================  ==================================================================================================================================
 powerplant_energy_naive             EOM, CRM_pos, CRM_neg    Basic strategy for merit order markets at a single timepoint (hour). Uses marginal cost as bid price and the maximum feasible
                                                              power (respecting ramping constraints) as bid volume.
 demand_energy_naive                 EOM, CRM_pos, CRM_neg    Basic naive strategy for demand units. Can realise a price-inelastic demand by setting a very high bid price and volume equal
@@ -92,11 +92,11 @@ demand_energy_naive_redispatch      redispatch               Submits unit info a
                                                              and dispatch information).
 household_energy_naive_redispatch   redispatch               Naive DSM strategy for industry/household units; bids available flexibility on redispatch. Volume equals flexible power at product
                                                              start; price equals marginal cost at product start.
-industry_energy_naive_redispatch   redispatch                Naive DSM strategy for industry/household units; bids available flexibility on redispatch. Volume equals flexible power at product
+industry_energy_naive_redispatch    redispatch               Naive DSM strategy for industry/household units; bids available flexibility on redispatch. Volume equals flexible power at product
                                                              start; price equals marginal cost at product start.
 exchange_energy_naive               EOM                      Incorporates cross-border trading: submits export (negative volume) and import bids. Exports are treated as demand with very high
                                                              bid price; imports as supply with a very low bid price to virtually guarantee acceptance.
-==================================  =======================  =====================================================================================================================
+==================================  =======================  ==================================================================================================================================
 
 Naive method API references:
 

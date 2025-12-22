@@ -4,12 +4,11 @@
 
 from datetime import datetime
 
-import numpy as np
 import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from mango import RoleAgent, activate, addr, create_tcp_container
+from mango import RoleAgent, activate, create_tcp_container
 from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
@@ -24,12 +23,6 @@ from assume.strategies.portfolio_strategies import (
 )
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
-
-try:
-    from assume.reinforcement_learning.learning_unit_operator import RLUnitsOperator
-except ImportError:
-    # to suffice the type hint as best as possible
-    from assume.common.units_operator import UnitsOperator as RLUnitsOperator
 
 start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
@@ -67,54 +60,6 @@ async def units_operator() -> UnitsOperator:
 
     start_ts = datetime2timestamp(start)
     clock.set_time(start_ts)
-
-    async with activate(container):
-        yield units_role
-        end_ts = datetime2timestamp(end)
-        clock.set_time(end_ts)
-        await tasks_complete_or_sleeping(container)
-
-
-@pytest.fixture
-async def rl_units_operator() -> RLUnitsOperator:
-    market_id = "EOM"
-    marketconfig = MarketConfig(
-        market_id=market_id,
-        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
-        opening_duration=rd(hours=1),
-        market_mechanism="pay_as_clear",
-        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
-    )
-    clock = ExternalClock(0)
-    container = create_tcp_container(addr=("0.0.0.0", 9098), clock=clock)
-    units_agent = RoleAgent()
-    units_role = RLUnitsOperator(available_markets=[marketconfig])
-    units_agent.add_role(units_role)
-    agent_id = container.register(units_agent)
-
-    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
-
-    params_dict = {
-        "bidding_strategies": {"EOM": EnergyNaiveStrategy()},
-        "technology": "energy",
-        "unit_operator": agent_id,
-        "max_power": -1000,
-        "min_power": 0,
-        "forecaster": DemandForecaster(index, demand=-1000),
-    }
-    unit = Demand("testdemand", **params_dict)
-    units_role.add_unit(unit)
-
-    start_ts = datetime2timestamp(start)
-    clock.set_time(start_ts)
-
-    units_role.context.data.update(
-        {
-            "train_start": start,
-            "train_end": end,
-            "train_freq": "24h",
-        }
-    )
 
     async with activate(container):
         yield units_role
@@ -164,79 +109,6 @@ async def test_independent_bids_portfolio(units_operator: UnitsOperator):
 
     assert orderbook[0]["volume"] == -1000
     assert orderbook[0]["price"] == 3000
-
-
-@pytest.mark.require_learning
-async def test_write_learning_params(rl_units_operator: RLUnitsOperator):
-    from assume.strategies.learning_strategies import EnergyLearningStrategy
-
-    marketconfig = rl_units_operator.available_markets[0]
-    start = datetime(2020, 1, 1)
-    end = datetime(2020, 1, 2)
-    index = FastIndex(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
-
-    params_dict = {
-        "bidding_strategies": {
-            "EOM": EnergyLearningStrategy(
-                unit_id="testplant",
-                learning_mode=True,
-            )
-        },
-        "technology": "energy",
-        "unit_operator": "test_operator",
-        "max_power": 1000,
-        "min_power": 0,
-        "forecaster": PowerplantForecaster(
-            index, fuel_prices={"others": 1000, "co2": 10}, residual_load={"EOM": 0}
-        ),
-    }
-    unit = PowerPlant("testplant", **params_dict)
-    rl_units_operator.add_unit(unit)
-
-    rl_units_operator.learning_mode = True
-    rl_units_operator.learning_data = {"test": 1}
-
-    rl_units_operator.context.data.update(
-        {
-            "learning_output_agent_addr": addr("world", "export_agent_1"),
-            "learning_agent_addr": addr("world_0", "learning_agent"),
-        }
-    )
-
-    from assume.common.utils import get_available_products
-
-    products = get_available_products(marketconfig.market_products, start)
-    orderbook = await rl_units_operator.formulate_bids(marketconfig, products)
-
-    open_tasks = len(rl_units_operator.context.scheduler._scheduled_tasks)
-
-    rl_units_operator.write_learning_to_output(
-        orderbook, market_id=marketconfig.market_id
-    )
-
-    assert len(rl_units_operator.context.scheduler._scheduled_tasks) == open_tasks + 1
-
-    rl_units_operator.units["testplant"].bidding_strategies[
-        "EOM"
-    ].bidding_strategies = EnergyLearningStrategy(
-        unit_id="testplant",
-        learning_mode=True,
-        observation_dimension=50,
-        action_dimension=2,
-    )
-
-    rl_units_operator.learning_data = {"test": 2}
-
-    products = get_available_products(marketconfig.market_products, start)
-    orderbook = await rl_units_operator.formulate_bids(marketconfig, products)
-
-    open_tasks = len(rl_units_operator.context.scheduler._scheduled_tasks)
-
-    rl_units_operator.write_learning_to_output(
-        orderbook, market_id=marketconfig.market_id
-    )
-
-    assert len(rl_units_operator.context.scheduler._scheduled_tasks) == open_tasks + 1
 
 
 async def test_get_actual_dispatch(units_operator: UnitsOperator):
@@ -407,136 +279,3 @@ def test_participate_custom_lambda():
     units_role.add_unit(unit)
 
     assert units_role.participate(marketconfig)
-
-
-@pytest.mark.require_learning
-async def test_collecting_rl_values(rl_units_operator: RLUnitsOperator):
-    """Test that learning data from two RL units is correctly formatted and sent."""
-    import torch as th
-
-    from assume.strategies.learning_strategies import EnergyLearningStrategy
-
-    # Constants
-    obs_dim = 2
-    act_dim = 1
-    num_timesteps = 3
-    start = datetime(2020, 1, 1)
-    end = datetime(2020, 1, 2)
-
-    # Monkey-patch schedule_instant_message to capture the scheduled message.
-    scheduled_messages = []
-
-    def dummy_schedule_instant_message(content, receiver_addr):
-        scheduled_messages.append((content, receiver_addr))
-
-    rl_units_operator.context.schedule_instant_message = dummy_schedule_instant_message
-
-    # Set required addresses in the context.
-    rl_units_operator.context.data.update(
-        {
-            "learning_output_agent_addr": addr("world", "export_agent_1"),
-            "learning_agent_addr": addr("world_0", "learning_agent"),
-        }
-    )
-
-    # Create index for forecasting
-    index = FastIndex(start=start, end=end + pd.Timedelta(hours=24), freq="1h")
-
-    # --- Add two RL-enabled PowerPlant units ---
-    params_dict = {
-        "bidding_strategies": {
-            "EOM": EnergyLearningStrategy(unit_id="testplant1", learning_mode=True),
-        },
-        "technology": "energy",
-        "unit_operator": "test_operator",
-        "max_power": 1000,
-        "min_power": 0,
-        "forecaster": PowerplantForecaster(
-            index, fuel_prices={"others": 1000, "co2": 10}
-        ),
-    }
-
-    unit1 = PowerPlant("testplant1", **params_dict)
-    rl_units_operator.add_unit(unit1)
-
-    # Clone params_dict and update for the second unit
-    params_dict["bidding_strategies"]["EOM"] = EnergyLearningStrategy(
-        unit_id="testplant2", learning_mode=True
-    )
-    unit2 = PowerPlant("testplant2", **params_dict)
-    rl_units_operator.add_unit(unit2)
-
-    # Set learning mode and strategy details
-    rl_units_operator.learning_mode = True
-    rl_units_operator.learning_data = {"test": 1}
-    rl_units_operator.learning_strategies.update(
-        {
-            "obs_dim": obs_dim,
-            "act_dim": act_dim,
-        }
-    )
-
-    # Get units from the operator
-    unit1 = rl_units_operator.units["testplant1"]
-    unit2 = rl_units_operator.units["testplant2"]
-
-    # Define sample outputs
-    unit1.outputs["rl_observations"] = [
-        th.tensor([1.0, 2.0]),
-        th.tensor([3.0, 4.0]),
-        th.tensor([5.0, 6.0]),
-    ]
-    unit1.outputs["rl_actions"] = [
-        th.tensor([10.0]),
-        th.tensor([20.0]),
-        th.tensor([30.0]),
-    ]
-    unit1.outputs["rl_rewards"] = pd.Series([100, 200, 300])
-
-    unit2.outputs["rl_observations"] = [
-        th.tensor([7.0, 8.0]),
-        th.tensor([9.0, 10.0]),
-        th.tensor([11.0, 12.0]),
-    ]
-    unit2.outputs["rl_actions"] = [
-        th.tensor([40.0]),
-        th.tensor([50.0]),
-        th.tensor([60.0]),
-    ]
-    unit2.outputs["rl_rewards"] = pd.Series([400, 500, 600])
-
-    # --- Call the function under test ---
-    await rl_units_operator.write_to_learning_role()
-
-    # Verify that a message was scheduled.
-    assert len(scheduled_messages) == 1
-    content, receiver_addr = scheduled_messages[0]
-    assert receiver_addr == addr("world_0", "learning_agent")
-
-    # Unpack the data tuple: (observations, actions, rewards)
-    all_observations, all_actions, all_rewards = content["data"]
-
-    # Validate array shapes
-    assert all_observations.shape == (num_timesteps, 2, obs_dim)
-    assert all_actions.shape == (num_timesteps, 2, act_dim)
-    assert all_rewards.shape == (num_timesteps, 2)
-
-    # Expected values for validation
-    expected_observations = np.array(
-        [
-            [[1.0, 2.0], [7.0, 8.0]],
-            [[3.0, 4.0], [9.0, 10.0]],
-            [[5.0, 6.0], [11.0, 12.0]],
-        ]
-    )
-    expected_actions = np.array([[[10.0], [40.0]], [[20.0], [50.0]], [[30.0], [60.0]]])
-    expected_rewards = np.array([[100, 400], [200, 500], [300, 600]])
-
-    # Validate observations, actions, and rewards
-    np.testing.assert_array_equal(all_observations, expected_observations)
-    np.testing.assert_array_equal(all_actions, expected_actions)
-    np.testing.assert_array_equal(all_rewards, expected_rewards)
-
-    # Confirm that unit outputs have been reset
-    assert unit1.outputs["rl_rewards"] == []
-    assert unit2.outputs["rl_rewards"] == []

@@ -91,7 +91,7 @@ jobs:
 
     - name: Test pytest with torch & integration tests
       run: |
-        pytest -m "require_learning" --cov --cov-report=xml --junitxml="result.xml"
+        pytest --cov --cov-report=xml --junitxml="result.xml"
 
     - name: Upload tests results
       uses: actions/upload-artifact@v4

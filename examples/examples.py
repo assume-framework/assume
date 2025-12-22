@@ -159,7 +159,7 @@ if __name__ == "__main__":
     #     unit_type="custom_unit",
     # )
 
-    if world.learning_config.get("learning_mode", False):
+    if world.learning_mode:
         # run learning if learning mode is enabled
         run_learning(world)
 

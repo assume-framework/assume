@@ -97,7 +97,7 @@ class UnitsOperatorDirectStrategy(UnitOperatorStrategy):
                 if market_config.price_tick:
                     order["price"] = round(order["price"] / market_config.price_tick)
                 if "bid_id" not in order.keys() or order["bid_id"] is None:
-                    order["bid_id"] = f"{unit_id}_{i+1}"
+                    order["bid_id"] = f"{unit_id}_{i + 1}"
                 order["unit_id"] = unit_id
                 bids.append(order)
 

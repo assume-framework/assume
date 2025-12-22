@@ -45,9 +45,30 @@ def test_replay_buffer_add():
         device=th.device("cpu"),
         float_type=th.float,
     )
-    obs = np.ones((n_steps, n_rl_units, obs_dim))
-    actions = np.ones((n_steps, n_rl_units, act_dim))
-    reward = np.ones((n_steps, n_rl_units))
+
+    # Simulate cache dicts as in LearningRole
+    timestamp = "2024-01-01 00:00:00"
+    unit_ids = list(range(1, n_rl_units + 1))
+    obs_cache = {timestamp: {u: [np.ones(obs_dim)] for u in unit_ids}}
+    actions_cache = {timestamp: {u: [np.ones(act_dim)] for u in unit_ids}}
+    rewards_cache = {timestamp: {u: [1.0] for u in unit_ids}}
+
+    # Transform cache dicts to numpy arrays for buffer
+    def transform_cache(cache, shape):
+        arr = np.zeros((n_steps, n_rl_units, shape))
+        for t_idx, t in enumerate([timestamp]):
+            for u_idx, u in enumerate(unit_ids):
+                arr[t_idx, u_idx] = cache[t][u][0]
+        return arr
+
+    obs = transform_cache(obs_cache, obs_dim)
+    actions = transform_cache(actions_cache, act_dim)
+    # reward shape should be (n_steps, n_rl_units, 1)
+    reward = np.zeros((n_steps, n_rl_units, 1))
+    for t_idx, t in enumerate([timestamp]):
+        for u_idx, u in enumerate(unit_ids):
+            reward[t_idx, u_idx, 0] = rewards_cache[t][u][0]
+
     buffer.add(obs, actions, reward)
     # can't sample with only one entry
     with pytest.raises(Exception):
