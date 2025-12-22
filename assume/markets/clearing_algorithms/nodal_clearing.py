@@ -27,7 +27,7 @@ def calculate_meta(accepted_demand_orders, accepted_supply_orders, product):
     supply_volume = sum(map(itemgetter("accepted_volume"), accepted_supply_orders))
     demand_volume = -sum(map(itemgetter("accepted_volume"), accepted_demand_orders))
     prices = list(map(itemgetter("accepted_price"), accepted_supply_orders)) or [0]
-    # can also be self.marketconfig.maximum_bid..?
+    
     duration_hours = (product[1] - product[0]) / timedelta(hours=1)
     avg_price = 0
     if supply_volume:
@@ -252,12 +252,14 @@ class NodalClearingRole(MarketRole):
         # Update p_max_pu for all units based on their bids in the actual snapshots
         # generators
         gen_idx = self.grid_data["generators"].index
+        gen_idx = gen_idx.intersection(volume_pivot.columns)
         n.generators_t.p_max_pu.loc[snapshots, gen_idx] = (
             volume_pivot[gen_idx] / n.generators.loc[gen_idx, "p_nom"].values
         )
         n.generators_t.marginal_cost.loc[snapshots, gen_idx] = price_pivot[gen_idx]
         # demand
         demand_idx = self.grid_data["loads"].index
+        demand_idx = demand_idx.intersection(volume_pivot.columns)
         n.generators_t.p_min_pu.loc[snapshots, demand_idx] = (
             volume_pivot[demand_idx] / n.generators.loc[demand_idx, "p_nom"].values
         )
@@ -266,6 +268,7 @@ class NodalClearingRole(MarketRole):
         # storage
         if self.grid_data.get("storage_units") is not None:
             storage_idx = self.grid_data["storage_units"].index
+            storage_idx = storage_idx.intersection(volume_pivot.columns)
             # discharging (positive bids)
             n.generators_t.p_max_pu.loc[snapshots, storage_idx] = (
                 volume_pivot[storage_idx]
