@@ -227,6 +227,7 @@ the notion of an “optimal” solution is often unclear. What we *do* observe a
 depends heavily on the reward design and on how other agents behave. Therefore:
 
     **Do not rely on rewards alone.** Behavior itself must be examined carefully.
+
 **Why solely reward-based evaluation is problematic**
 
 Let :math:`R_i` denote the episodic return of agent :math:`i` under the joint policy :math:`\pi=(\pi_1,\dots,\pi_n)`. A common but potentially misleading

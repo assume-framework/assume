@@ -124,10 +124,10 @@ class PowerPlant(SupportsMinMax):
         self.ramp_down = None if ramp_down == 0 else ramp_down
         self.ramp_up = None if ramp_up == 0 else ramp_up
 
-        if min_operating_time <= 0:
+        if min_operating_time < 0:
             raise ValueError(f"{min_operating_time=} must be > 0 for unit {self.id}")
         self.min_operating_time = min_operating_time
-        if min_down_time <= 0:
+        if min_down_time < 0:
             raise ValueError(f"{min_down_time=} must be > 0 for unit {self.id}")
         self.min_down_time = min_down_time
         self.downtime_hot_start = downtime_hot_start / (
