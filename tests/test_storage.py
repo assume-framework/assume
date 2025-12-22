@@ -130,10 +130,7 @@ def test_soc_constraint(storage_unit):
     storage_unit.outputs["capacity_pos"][start] = 30
 
     storage_unit.outputs["soc"][start - timedelta(hours=1)] = 0.05
-    assert (
-        storage_unit.outputs["soc"][start - storage_unit.index.freq]
-        == 0.05
-    )
+    assert storage_unit.outputs["soc"][start - storage_unit.index.freq] == 0.05
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
@@ -242,9 +239,7 @@ def test_storage_ramping(storage_unit):
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
         0.5, 60, max_power_discharge[0]
     )
-    max_ramp_charge = storage_unit.calculate_ramp_charge(
-        0.5, 60, max_power_charge[0]
-    )
+    max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, 60, max_power_charge[0])
 
     assert max_ramp_discharge == 100
     assert max_ramp_charge == -60
@@ -259,9 +254,7 @@ def test_storage_ramping(storage_unit):
     max_ramp_discharge = storage_unit.calculate_ramp_discharge(
         0.5, -60, max_power_discharge[0]
     )
-    max_ramp_charge = storage_unit.calculate_ramp_charge(
-        0.5, -60, max_power_charge[0]
-    )
+    max_ramp_charge = storage_unit.calculate_ramp_charge(0.5, -60, max_power_charge[0])
 
     assert max_ramp_discharge == 60
     assert max_ramp_charge == -100
@@ -442,7 +435,9 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
             delta_set_dispatch = (
                 storage_unit.outputs["energy"][s] / storage_unit.efficiency_discharge
             )
-        assert math.isclose(delta_set_dispatch, delta_soc_set_dispatch)
+        assert math.isclose(
+            delta_set_dispatch / storage_unit.capacity, delta_soc_set_dispatch
+        )
 
     # test if it is executed correctly, which should be the same with the mock market config only covering one market
     storage_unit.execute_current_dispatch(start, end)
@@ -458,7 +453,7 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
             delta = (
                 storage_unit.outputs["energy"][s] / storage_unit.efficiency_discharge
             )
-        assert math.isclose(delta, delta_soc)
+        assert math.isclose(delta / storage_unit.capacity, delta_soc)
 
     # check that deltas are the same, which again must be due to only one considered market
     assert math.isclose(delta_soc_set_dispatch, delta_soc)
