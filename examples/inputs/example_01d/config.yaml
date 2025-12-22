@@ -107,7 +107,7 @@ nodal_case:
         - duration: 1h
           count: 24
           first_delivery: 1h
-      opening_frequency: 1h
+      opening_frequency: 24h
       opening_duration: 1h
       volume_unit: MWh
       maximum_bid_volume: 100000
