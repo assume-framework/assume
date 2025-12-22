@@ -102,8 +102,6 @@ class NodalClearingRole(MarketRole):
 
         # if we have multiple hours (count >1), we cannot handle storage units bids yet
         # this is because the storage bids would be linked bids
-        if self.grid_data.get("storage_units") is not None:
-            storage_idx = self.grid_data["storage_units"].index
         storage_units = self.grid_data.get("storage_units", pd.DataFrame())
         if not storage_units.empty:
             if self.marketconfig.market_products[0].count > 1:
@@ -295,10 +293,15 @@ class NodalClearingRole(MarketRole):
 
         # run linear optimal powerflow
         n.optimize.fix_optimal_capacities()
-        n.optimize(
+        status, termination_condition = n.optimize(
             solver=self.solver,
             solver_options=self.solver_options,
+            progress=False,
         )
+
+        if status != "ok":
+            logger.error(f"Solver exited with {termination_condition}")
+            raise Exception("Solver in nodal clearing did not converge")
 
         # Find intersection of unit_ids in orderbook_df and columns in n.generators_t.p
         valid_units = orderbook_df["unit_id"].unique()
@@ -422,6 +425,6 @@ def extract_results(
     flows = {}
     if log_flows:
         # extract flows
-        flows = network.lines_t.p0.stack(dropna=True).to_dict()
+        flows = network.lines_t.p0.stack(future_stack=True).to_dict()
 
     return accepted_orders, rejected_orders, meta, flows
