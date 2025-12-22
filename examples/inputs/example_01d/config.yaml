@@ -99,7 +99,7 @@ nodal_case:
   save_frequency_hours: 24
 
   markets_config:
-    EOM:
+    nodal:
       start_date: 2019-01-01 00:00
       operator: EOM_operator
       product_type: energy
