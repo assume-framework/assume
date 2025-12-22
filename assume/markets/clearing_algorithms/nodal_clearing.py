@@ -183,7 +183,6 @@ class NodalClearingRole(MarketRole):
             ValueError: If the bid type is invalid.
         """
         market_id = self.marketconfig.market_id
-        max_volume = self.marketconfig.maximum_bid_volume
 
         for order in orderbook:
             # if bid_type is None, set to default bid_type
