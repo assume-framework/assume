@@ -108,7 +108,7 @@ In our market trading system, we follow this convention for representing the vol
 
 This convention ensures clarity and consistency in how trades are represented and interpreted within the market. By using positive and negative volumes to indicate the direction of trades, we can easily distinguish between buying and selling activities while maintaining a straightforward and unambiguous pricing structure.
 
-Please note the following Limitation
+Please note the following limitation
 ------------------------------------
 
 All currently implemented `bidding_strategies` in ASSUME do not handle feasibility constraints with regard to the dispatch in market mechanisms with multiple products (count > 1).
