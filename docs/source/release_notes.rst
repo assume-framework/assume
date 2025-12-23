@@ -25,13 +25,11 @@ Upcoming Release
 - **Application of new naming convention for bidding strategies**: [unit]_[market]_[method]_[comment] for bidding strategy keys (in snake_case) and [Unit][Market][Method][Comment]Strategy for bidding strategy classes (in PascalCase for classes)
 - **Changed SoC Definition**: The state of charge (SoC) for storage units is now defined to take values between 0 and 1, instead of absolute energy content (MWh). This change ensures consistency with other models and standard definition. The absolute energy content can still be calculated by multiplying SoC with the unit's capacity. The previous 'max_soc' is renamed to 'capacity'.
 - **Restructured learning_role tasks**: Major learning changes that make learning application more generalizable across the framework.
-
   - **Simplified learning data flow:** Removed the special ``learning_unit_operator`` that previously aggregated unit data and forwarded it to the learning role. Eliminates the single-sender dependency and avoids double bookkeeping across units and operators.
   - **Direct write access:** All learning-capable entities (units, unit operators, market agents) now write learning data directly to the learning role.
   - **Centralized logic:** Learning-related functionality is now almost always contained within the learning role, improving maintainability.
-  .. note::
-    Distributed learning across multiple machines is no longer supported, but this feature was not in active use.
-
+  - **Automatic calculation of obs_dim:** The observation dimension is now automatically calculated based on the definition of the foresight, num_timeseries_obs_dim and unique_obs_dim in the learning configuration. This avoids inconsistencies between the defined observation space and the actual observation dimension used in the actor network. However, if assumes the rational that 'self.obs_dim = num_timeseries_obs_dim * foresight + unique_obs_dim', if this is not the case the calculation of obs_dim needs to be adjusted in the learning strategy.
+  - **Note:** Distributed learning across multiple machines is no longer supported, but this feature was not in active use.
 - **Restructured learning configuration**: All learning-related configuration parameters are now contained within a single `learning_config` dictionary in the `config.yaml` file. This change simplifies configuration management and avoids ambiguous setting of defaults.
 
   .. note::
@@ -39,6 +37,7 @@ Upcoming Release
 
 - **Learning_role in all cases involving DRL**: The `learning_role` is now available in all simulations involving DRL, also if pre-trained strategies are loaded and no policy updates are performed. This change ensures consistent handling of learning configurations and simplifies the codebase by removing special cases.
 - **Final DRL simulation with last policies**: After training, the final simulation now uses the last trained policies instead of the best policies. This change provides a more accurate representation of the learned behavior, as the last policies reflect the most recent training state. Additionally, multi-agent simulations do not always converge to the maximum reward. E.g. competing agents may underbid each other to gain market share, leading to lower overall rewards while reaching a stable state nevertheless.
+
 
 **New Features:**
 
