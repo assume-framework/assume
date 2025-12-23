@@ -26,7 +26,7 @@ end = datetime(2023, 7, 2)
 @pytest.mark.require_learning
 def test_learning_init():
     config = {
-        "obs_dim": 3,
+        "foresight": 1,
         "act_dim": 2,
         "unique_obs_dim": 0,
         "learning_config": LearningConfig(
