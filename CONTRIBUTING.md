@@ -68,17 +68,8 @@ pip install -e ".[testing]"
 
 ### Creating a new release
 
-To release a new version, increase the version in `pyproject.toml` and create a git tag of the release commit and release notes in GitHub.
-To push to PyPi run:
-
-```
-rm -r dist
-python -m build .
-twine upload --repository pypi dist/*
-```
-
-See also: https://twine.readthedocs.io/en/stable/index.html#using-twine
-
+To release a new version, create a git tag of the release commit and release notes in GitHub (also possible via `Draft new release` function of Github). No adjusted toml file necessary anymore.
+A github action automatically uploads the release to PyPI.
 The upload to PyPi has to be confirmed by one of the core developers.
 
 ## Building documentation
