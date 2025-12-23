@@ -9,8 +9,7 @@ RUN useradd -m -s /bin/bash admin
 RUN mkdir /src
 WORKDIR /src
 COPY README.md pyproject.toml .
-# https://github.com/jazzband/pip-tools/pull/2221
-RUN pip install "pip-tools<7.5.0"
+RUN pip install pip-tools
 RUN mkdir assume assume_cli
 RUN touch assume/__init__.py
 RUN pip-compile --resolver=backtracking -o requirements.txt ./pyproject.toml
@@ -23,7 +22,8 @@ COPY examples /src/examples
 ENV PATH=/home/admin/.local/bin:$PATH
 RUN chown -R admin /src /home/admin
 USER admin
-RUN pip install -e .
+ARG PSEUDO_VERSION=0.1
+RUN SETUPTOOLS_SCM_PRETEND_VERSION_FOR_ASSUME_FRAMEWORK=${PSEUDO_VERSION} pip install -e .
 ENV PYTHONUNBUFFERED=1
 EXPOSE 9099
 ENTRYPOINT ["assume"]
