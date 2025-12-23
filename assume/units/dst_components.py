@@ -451,7 +451,7 @@ class GenericStorage:
         # check if initial_soc is within the bounds [0, 1] and fix it if not
         if initial_soc > 1:
             logger.warning(
-                f"Initial SOC is greater than 1.0 but SOC must be between 0 and 1."
+                "Initial SOC is greater than 1.0 but SOC must be between 0 and 1."
             )
             raise ValueError("Initial SOC must be between 0 and 1.")
 
