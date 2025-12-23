@@ -72,7 +72,7 @@ pip install 'assume-framework[learning]'
 Please keep in mind, that the above installation method will install pytorch package without CUDA support.
 If you want to make use of your GPU with CUDA cores, please install pytorch with GPU support separately as described [here](https://pytorch.org/get-started/locally/).
 
-We also include **network-based market clearing algorithms** such as for the re-dispatch or nodal market clearing, which requires the PyPSA library.
+We also include **network-based market clearing algorithms** such as for the re-dispatch, zonal clearing with NTCs and nodal market clearing, which all require the PyPSA library.
 To install the package with these capabilities, use:
 
 ```bash

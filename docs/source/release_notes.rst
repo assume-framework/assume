@@ -42,6 +42,7 @@ Upcoming Release
 **New Features:**
 
 - **Unit Operator Portfolio Strategy**: A new bidding strategy type that enables portfolio optimization, where the default is called `UnitsOperatorEnergyNaiveDirectStrategy`. This strategy simply passes through bidding decisions of individual units within a portfolio, which was the default behavior beforehand as well. Further we added 'UnitsOperatorEnergyHeuristicCournotStrategy' which allows to model bidding behavior of a portfolio of units in a day-ahead market. The strategy calculates the optimal bid price and quantity for each unit in the portfolio, taking into account markup and the production costs of the units. This enables users to simulate and analyze the impact of strategic portfolio bidding on market outcomes and unit profitability.
+- **Nodal Market Clearing Algorithm**: A new market clearing algorithm that performs electricity market clearing using an optimal power flow (OPF) approach, considering grid constraints and nodal pricing. This algorithm utilizes PyPSA to solve the OPF problem, allowing for a physics based representation of network constraints.
 
 0.5.5 - (13th August 2025)
 ==========================
