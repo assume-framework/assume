@@ -515,6 +515,8 @@ def load_config_and_create_forecaster(
             storage_units["max_power_charge"] = -abs(storage_units["max_power_charge"])
         if "min_power_charge" in storage_units.columns:
             storage_units["min_power_charge"] = -abs(storage_units["min_power_charge"])
+        if not "capacity" in storage_units.columns:
+            raise ValueError("No capacity column provided for storage units!")
 
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
