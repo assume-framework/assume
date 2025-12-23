@@ -589,6 +589,7 @@ def load_config_and_create_forecaster(
         demand=demand_df,
         availability=availability,
         exchanges=exchanges_df,
+        storage_units=storage_units,
     )
 
     unit_forecasts: dict[str, UnitForecaster] = {}
