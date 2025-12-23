@@ -473,6 +473,7 @@ class SupportsMinMaxCharge(BaseUnit):
     """
 
     initial_soc: float
+    # float between 0 and 1 - initial state of charge
     min_power_charge: float
     # negative float - if this storage is charging, what is the minimum charging power (the negative non-zero power closest to zero) (resulting in negative current power)
     max_power_charge: float
@@ -489,7 +490,7 @@ class SupportsMinMaxCharge(BaseUnit):
     # negative
     ramp_down_charge: float | None
     # ramp_down_charge is negative
-    max_soc: float
+    capacity: float
     efficiency_charge: float
     efficiency_discharge: float
 
@@ -509,7 +510,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             start (datetime.datetime): The start time of the dispatch.
             end (datetime.datetime): The end time of the dispatch.
-            soc (float, optional): The current state-of-charge. Defaults to None.
+            soc (float, optional): The current state-of-charge (between 0 and 1). Defaults to None.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: The min and max charging power for the given time period.
@@ -524,7 +525,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             start (datetime.datetime): The start time of the dispatch.
             end (datetime.datetime): The end time of the dispatch.
-            soc (float, optional): The current state-of-charge. Defaults to None.
+            soc (float, optional): The current state-of-charge (between 0 and 1). Defaults to None.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: The min and max discharging power for the given time period.
@@ -660,7 +661,9 @@ class SupportsMinMaxCharge(BaseUnit):
                 if current_power > max_soc_discharge:
                     current_power = max_soc_discharge
 
-                delta_soc = -current_power * time_delta / self.efficiency_discharge
+                delta_soc = (
+                    -current_power * time_delta / self.efficiency_discharge
+                ) / self.capacity
 
             # charging
             elif current_power < 0:
@@ -669,7 +672,9 @@ class SupportsMinMaxCharge(BaseUnit):
                 if current_power < max_soc_charge:
                     current_power = max_soc_charge
 
-                delta_soc = -current_power * time_delta * self.efficiency_charge
+                delta_soc = (
+                    -current_power * time_delta * self.efficiency_charge
+                ) / self.capacity
 
             # update the values of the state of charge and the energy
             self.outputs["soc"].at[next_t] = soc + delta_soc
@@ -893,7 +898,7 @@ class LearningStrategy(BaseStrategy):
     convention when designing your create_observation method and the observation space.
 
     Attributes:
-        obs_dim (int): The observation dimension.
+        foresight (int): Number of steps of for- and backwards looking in observations.
         act_dim (int): The action dimension.
         unique_obs_dim (int): The unique observation dimension.
         num_timeseries_obs_dim (int): The number of observation timeseries dimension.
@@ -907,7 +912,7 @@ class LearningStrategy(BaseStrategy):
     def __init__(
         self,
         learning_role,
-        obs_dim: int,
+        foresight: int,
         act_dim: int,
         unique_obs_dim: int,
         num_timeseries_obs_dim: int = 3,
@@ -923,7 +928,7 @@ class LearningStrategy(BaseStrategy):
         self.learning_role = learning_role
         self.learning_config = learning_role.learning_config
 
-        self.obs_dim = obs_dim
+        self.foresight = foresight
         self.act_dim = act_dim
 
         # this defines the number of unique observations, which are not the same for all units
@@ -933,6 +938,8 @@ class LearningStrategy(BaseStrategy):
         # defines the number of provided timeseries, this is necessary for correctly splitting
         # them into suitable format for recurrent neural networks
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
+
+        self.obs_dim = num_timeseries_obs_dim * foresight + unique_obs_dim
 
 
 class MinMaxStrategy(BaseStrategy):
