@@ -473,6 +473,7 @@ class SupportsMinMaxCharge(BaseUnit):
     """
 
     initial_soc: float
+    # float between 0 and 1 - initial state of charge
     min_power_charge: float
     # negative float - if this storage is charging, what is the minimum charging power (the negative non-zero power closest to zero) (resulting in negative current power)
     max_power_charge: float
@@ -489,7 +490,7 @@ class SupportsMinMaxCharge(BaseUnit):
     # negative
     ramp_down_charge: float | None
     # ramp_down_charge is negative
-    max_soc: float
+    capacity: float
     efficiency_charge: float
     efficiency_discharge: float
 
@@ -509,7 +510,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             start (datetime.datetime): The start time of the dispatch.
             end (datetime.datetime): The end time of the dispatch.
-            soc (float, optional): The current state-of-charge. Defaults to None.
+            soc (float, optional): The current state-of-charge (between 0 and 1). Defaults to None.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: The min and max charging power for the given time period.
@@ -524,7 +525,7 @@ class SupportsMinMaxCharge(BaseUnit):
         Args:
             start (datetime.datetime): The start time of the dispatch.
             end (datetime.datetime): The end time of the dispatch.
-            soc (float, optional): The current state-of-charge. Defaults to None.
+            soc (float, optional): The current state-of-charge (between 0 and 1). Defaults to None.
 
         Returns:
             tuple[np.ndarray, np.ndarray]: The min and max discharging power for the given time period.
@@ -660,7 +661,9 @@ class SupportsMinMaxCharge(BaseUnit):
                 if current_power > max_soc_discharge:
                     current_power = max_soc_discharge
 
-                delta_soc = -current_power * time_delta / self.efficiency_discharge
+                delta_soc = (
+                    -current_power * time_delta / self.efficiency_discharge
+                ) / self.capacity
 
             # charging
             elif current_power < 0:
@@ -669,7 +672,9 @@ class SupportsMinMaxCharge(BaseUnit):
                 if current_power < max_soc_charge:
                     current_power = max_soc_charge
 
-                delta_soc = -current_power * time_delta * self.efficiency_charge
+                delta_soc = (
+                    -current_power * time_delta * self.efficiency_charge
+                ) / self.capacity
 
             # update the values of the state of charge and the energy
             self.outputs["soc"].at[next_t] = soc + delta_soc

@@ -417,13 +417,14 @@ class GenericStorage:
     ramp rates, and storage losses.
 
     Args:
-        max_capacity (float): Maximum energy storage capacity of the storage unit.
-        min_capacity (float, optional): Minimum allowable state of charge (SOC). Defaults to 0.0.
-        max_power_charge (float, optional): Maximum charging power of the storage unit. Defaults to `max_capacity` if not provided.
-        max_power_discharge (float, optional): Maximum discharging power of the storage unit. Defaults to `max_capacity` if not provided.
+        capacity (float): Energy storage capacity of the storage unit.
+        min_soc (float, optional): Minimum allowable state of charge (SOC). Defaults to 0.0.
+        max_soc (float, optional): Maximum allowable state of charge (SOC). Defaults to 1.0.
+        max_power_charge (float, optional): Maximum charging power of the storage unit. Defaults to `capacity` if not provided.
+        max_power_discharge (float, optional): Maximum discharging power of the storage unit. Defaults to `capacity` if not provided.
         efficiency_charge (float, optional): Efficiency of the charging process. Defaults to 1.0.
         efficiency_discharge (float, optional): Efficiency of the discharging process. Defaults to 1.0.
-        initial_soc (float, optional): Initial state of charge as a fraction of `max_capacity`. Defaults to 1.0.
+        initial_soc (float, optional): Initial state of charge as a fraction of `capacity`. Defaults to 1.0.
         ramp_up (float, optional): Maximum allowed increase in charging/discharging power per time step. Defaults to None (no ramp constraint).
         ramp_down (float, optional): Maximum allowed decrease in charging/discharging power per time step. Defaults to None (no ramp constraint).
         storage_loss_rate (float, optional): Fraction of energy lost per time step due to storage inefficiencies. Defaults to 0.0.
@@ -431,9 +432,10 @@ class GenericStorage:
 
     def __init__(
         self,
-        max_capacity: float,
+        capacity: float,
         time_steps: list[int],
-        min_capacity: float = 0.0,
+        min_soc: float = 0.0,
+        max_soc: float = 1.0,
         max_power_charge: float | None = None,
         max_power_discharge: float | None = None,
         efficiency_charge: float = 1.0,
@@ -448,23 +450,24 @@ class GenericStorage:
 
         # check if initial_soc is within the bounds [0, 1] and fix it if not
         if initial_soc > 1:
-            initial_soc /= max_capacity
             logger.warning(
-                f"Initial SOC is greater than 1.0. Setting it to {initial_soc}."
+                "Initial SOC is greater than 1.0 but SOC must be between 0 and 1."
             )
+            raise ValueError("Initial SOC must be between 0 and 1.")
 
-        self.max_capacity = max_capacity
-        self.min_capacity = min_capacity
+        self.capacity = capacity
+        self.min_soc = min_soc
+        self.max_soc = max_soc
         self.time_steps = time_steps
         self.max_power_charge = (
-            max_capacity if max_power_charge is None else max_power_charge
+            capacity if max_power_charge is None else max_power_charge
         )
         self.max_power_discharge = (
-            max_capacity if max_power_discharge is None else max_power_discharge
+            capacity if max_power_discharge is None else max_power_discharge
         )
         self.efficiency_charge = efficiency_charge
         self.efficiency_discharge = efficiency_discharge
-        self.initial_soc = initial_soc * max_capacity
+        self.initial_soc = initial_soc
         self.ramp_up = max_power_charge if ramp_up is None else ramp_up
         self.ramp_down = max_power_charge if ramp_down is None else ramp_down
         self.storage_loss_rate = storage_loss_rate
@@ -478,8 +481,9 @@ class GenericStorage:
 
         Pyomo Components:
             - **Parameters**:
-                - `max_capacity`: Maximum capacity of the storage unit.
-                - `min_capacity`: Minimum state of charge (SOC).
+                - `capacity`: Capacity of the storage unit.
+                - `min_soc`: Minimum state of charge (SOC, between 0 and 1).
+                - `max_soc`: Maximum state of charge (SOC, between 0 and 1).
                 - `max_power_charge`: Maximum charging power.
                 - `max_power_discharge`: Maximum discharging power.
                 - `efficiency_charge`: Charging efficiency.
@@ -510,8 +514,9 @@ class GenericStorage:
         """
 
         # Define parameters
-        model_block.max_capacity = pyo.Param(initialize=self.max_capacity)
-        model_block.min_capacity = pyo.Param(initialize=self.min_capacity)
+        model_block.capacity = pyo.Param(initialize=self.capacity)
+        model_block.min_soc = pyo.Param(initialize=self.min_soc)
+        model_block.max_soc = pyo.Param(initialize=self.max_soc)
         model_block.max_power_charge = pyo.Param(initialize=self.max_power_charge)
         model_block.max_power_discharge = pyo.Param(initialize=self.max_power_discharge)
         model_block.efficiency_charge = pyo.Param(initialize=self.efficiency_charge)
@@ -520,16 +525,14 @@ class GenericStorage:
         )
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
-        model_block.initial_soc = pyo.Param(
-            initialize=self.initial_soc * self.max_capacity
-        )
+        model_block.initial_soc = pyo.Param(initialize=self.initial_soc)
         model_block.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
 
         # Define variables
         model_block.soc = pyo.Var(
             self.time_steps,
             within=pyo.NonNegativeReals,
-            bounds=(model_block.min_capacity, model_block.max_capacity),
+            bounds=(model_block.min_soc, model_block.max_soc),
             doc="State of Charge at each time step",
         )
         model_block.charge = pyo.Var(
@@ -554,9 +557,12 @@ class GenericStorage:
                 prev_soc = b.soc[t - 1]
             return b.soc[t] == (
                 prev_soc
-                + b.efficiency_charge * b.charge[t]
-                - (1 / b.efficiency_discharge) * b.discharge[t]
-                - b.storage_loss_rate * prev_soc
+                + (
+                    b.efficiency_charge * b.charge[t]
+                    - (1 / b.efficiency_discharge) * b.discharge[t]
+                    - b.storage_loss_rate * prev_soc * b.capacity
+                )
+                / b.capacity
             )
 
         # Apply ramp-up constraints if ramp_up is specified
@@ -1394,15 +1400,16 @@ class ElectricVehicle(GenericStorage):
     and predefined charging profiles.
 
     Args:
-        max_capacity (float): Maximum capacity of the EV battery.
-        min_capacity (float): Minimum capacity of the EV battery.
+        capacity (float): Energy capacity of the EV battery in MWh.
+        min_soc (float): Minimum soc of the EV battery (between 0 and 1).
+        max_soc (float): Maximum soc of the EV battery (between 0 and 1).
         max_power_charge (float): Maximum allowable charging power.
         max_power_discharge (float): Maximum allowable discharging power. Defaults to 0 (no discharging allowed).
         availability_profile (pd.Series): A pandas Series indicating the EV's availability, where 1 means available and 0 means unavailable.
         time_steps (list[int]): A list of time steps over which the EV operates.
         efficiency_charge (float, optional): Charging efficiency of the EV. Defaults to 1.0.
         efficiency_discharge (float, optional): Discharging efficiency of the EV. Defaults to 1.0.
-        initial_soc (float, optional): Initial state of charge (SOC) of the EV, represented as a fraction of `max_capacity`. Defaults to 1.0.
+        initial_soc (float, optional): Initial state of charge (SOC) of the EV, represented as a fraction of `capacity`. Defaults to 1.0.
         ramp_up (float, optional): Maximum allowed increase in charging power per time step. Defaults to None (no ramp constraint).
         ramp_down (float, optional): Maximum allowed decrease in charging power per time step. Defaults to None (no ramp constraint).
         charging_profile (pd.Series | None, optional): A predefined charging profile. If provided, the EV follows this profile instead of optimizing the charge. Defaults to None.
@@ -1410,11 +1417,12 @@ class ElectricVehicle(GenericStorage):
 
     def __init__(
         self,
-        max_capacity: float,
+        capacity: float,
         time_steps: list[int],
         availability_profile: pd.Series,
         max_power_charge: float,
-        min_capacity: float = 0.0,
+        min_soc: float = 0.0,
+        max_soc: float = 1.0,
         max_power_discharge: float = 0,
         efficiency_charge: float = 1.0,
         efficiency_discharge: float = 1.0,
@@ -1427,9 +1435,10 @@ class ElectricVehicle(GenericStorage):
     ):
         # Call the parent class (GenericStorage) __init__ method
         super().__init__(
-            max_capacity=max_capacity,
+            capacity=capacity,
             time_steps=time_steps,
-            min_capacity=min_capacity,
+            min_soc=min_soc,
+            max_soc=max_soc,
             max_power_charge=max_power_charge,
             max_power_discharge=max_power_discharge,
             efficiency_charge=efficiency_charge,
@@ -1453,8 +1462,9 @@ class ElectricVehicle(GenericStorage):
 
         Pyomo Components:
             - **Parameters**:
-                - `max_capacity`: Maximum battery capacity of the EV.
-                - `min_capacity`: Minimum allowable battery capacity.
+                - `capacity`: Energy capacity of the EV battery in MWh.
+                - `min_soc`: Minimum allowable state of charge (SOC) of the EV battery (between 0 and 1).
+                - `max_soc`: Maximum allowable state of charge (SOC) of the EV battery (between 0 and 1).
                 - `max_power_charge`: Maximum charging power.
                 - `max_power_discharge`: Maximum discharging power.
                 - `efficiency_charge`: Charging efficiency.
@@ -1468,7 +1478,7 @@ class ElectricVehicle(GenericStorage):
             - **Constraints**:
                 - `availability_constraints`: Ensures charging and discharging occur only during available periods.
                 - `charging_profile_constraints`: Enforces predefined charging profiles if provided.
-                - `soc_constraints`: Keeps SOC between `min_capacity` and `max_capacity`.
+                - `soc_constraints`: Keeps SOC between `min_soc` and `max_soc`.
                 - `ramp_constraints`: Limits ramp-up and ramp-down rates for charging.
 
         Args:
@@ -1526,9 +1536,10 @@ class HydrogenBufferStorage(GenericStorage):
 
     def __init__(
         self,
-        max_capacity: float,
+        capacity: float,
         time_steps: list[int],
-        min_capacity: float = 0.0,
+        min_soc: float = 0.0,
+        max_soc: float = 1.0,
         max_power_charge: float | None = None,
         max_power_discharge: float | None = None,
         efficiency_charge: float = 1.0,
@@ -1540,9 +1551,10 @@ class HydrogenBufferStorage(GenericStorage):
         **kwargs,
     ):
         super().__init__(
-            max_capacity=max_capacity,
+            capacity=capacity,
             time_steps=time_steps,
-            min_capacity=min_capacity,
+            min_soc=min_soc,
+            max_soc=max_soc,
             max_power_charge=max_power_charge,
             max_power_discharge=max_power_discharge,
             efficiency_charge=efficiency_charge,
@@ -1681,9 +1693,10 @@ class DRIStorage(GenericStorage):
 
     def __init__(
         self,
-        max_capacity: float,
+        capacity: float,
         time_steps: list[int],
-        min_capacity: float = 0.0,
+        min_soc: float = 0.0,
+        max_soc: float = 1.0,
         max_power_charge: float | None = None,
         max_power_discharge: float | None = None,
         efficiency_charge: float = 1.0,
@@ -1695,9 +1708,10 @@ class DRIStorage(GenericStorage):
         **kwargs,
     ):
         super().__init__(
-            max_capacity=max_capacity,
+            capacity=capacity,
             time_steps=time_steps,
-            min_capacity=min_capacity,
+            min_soc=min_soc,
+            max_soc=max_soc,
             max_power_charge=max_power_charge,
             max_power_discharge=max_power_discharge,
             efficiency_charge=efficiency_charge,
