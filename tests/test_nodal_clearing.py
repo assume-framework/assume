@@ -11,7 +11,10 @@ from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order
 from assume.common.utils import get_available_products
-from assume.markets.clearing_algorithms import NodalClearingRole
+try:
+    from assume.markets.clearing_algorithms import NodalClearingRole
+except ImportError:
+    pass
 
 simple_nodal_auction_config = MarketConfig(
     market_id="simple_nodal_auction",
