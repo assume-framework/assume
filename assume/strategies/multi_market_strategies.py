@@ -1,6 +1,21 @@
+import logging
+from datetime import datetime, timedelta
+from pathlib import Path
 
+import numpy as np
+import torch as th
 
-from assume.common.base import MinMaxStrategy
+from assume.common.base import (
+    BaseUnit,
+    LearningStrategy,
+    MinMaxChargeStrategy,
+    MinMaxStrategy,
+    SupportsMinMax,
+    SupportsMinMaxCharge,
+)
+from assume.common.fast_pandas import FastSeries
+from assume.common.market_objects import MarketConfig, Orderbook, Product
+from assume.common.utils import min_max_scale
 
 
 class GenericEnergyMultiMarketStrategy:
@@ -98,6 +113,17 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
         # 2. Create bids, based on the forecasted LMPs
         # =============================================================================
         # decide wether to take part in inc dec or not and for which hours
+        # assuming a eom with pay-as-clear and a redispatch market with pay-as-bid
+        # assuming bid_price_eom = bid_price_redispatch
+        # mc: own marginal cost
+        # LMP_n: forecasted LMP at own node n
+        # LMP_Nm: forecasted LMP at neighboring nodes m
+        # if mc > LMP_n and LMP_n < LMP_Nm -> generation pocket at own node, inc-dec could work -> offer own LMP_n
+        # if mc > LMP_n and LMP_n > LMP_Nm -> load pocket at own node, no inc-dec opportunity -> bid mc
+        # if mc < LMP_n and LMP_n < LMP_Nm -> generation pocket at own node and bidding mc would result in eom dispatch, no inc-dec opportunity -> offer own mc
+        # if mc < LMP_n and LMP_n > LMP_Nm -> bid own LMP_n
+        # else -> bid mc
+
 
         # actually formulate bids in orderbook format
         bids = [
