@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 6,
+  "id": 2,
   "links": [],
   "panels": [
     {
@@ -2041,7 +2041,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.7.0",
+      "pluginVersion": "6.2.0",
       "targets": [
         {
           "datasource": {
@@ -3125,7 +3125,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.7.0",
+      "pluginVersion": "6.2.0",
       "targets": [
         {
           "datasource": {
@@ -4358,7 +4358,7 @@
         "styles": "",
         "wrap": true
       },
-      "pluginVersion": "5.7.0",
+      "pluginVersion": "6.2.0",
       "targets": [
         {
           "datasource": {
@@ -4453,7 +4453,7 @@
               }
             ]
           },
-          "unit": "mwatth"
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -5420,8 +5420,8 @@
       {
         "current": {
           "selected": false,
-          "text": "2019-01-01 01:00:00",
-          "value": "2019-01-01 01:00:00"
+          "text": "2019-01-01 02:00:00",
+          "value": "2019-01-01 02:00:00"
         },
         "datasource": {
           "type": "grafana-postgresql-datasource",
@@ -5444,8 +5444,8 @@
     ]
   },
   "time": {
-    "from": "2019-01-01T00:00:00.000Z",
-    "to": "2019-12-01T23:59:59.000Z"
+    "from": "2019-01-01T01:11:53.495Z",
+    "to": "2019-01-31T18:05:53.940Z"
   },
   "timeRangeUpdatedDuringEditOrView": false,
   "timepicker": {
@@ -5461,6 +5461,6 @@
   "timezone": "utc",
   "title": "ASSUME: Main overview",
   "uid": "aemnxld4ukgsga",
-  "version": 2,
+  "version": 5,
   "weekStart": ""
 }
