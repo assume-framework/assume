@@ -13,7 +13,7 @@ Upcoming Release
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
 0.5.6 - (23th December 2025)
-==========================
+============================
 
 **Bug Fixes:**
 
