@@ -102,8 +102,8 @@ class NodalClearingRole(MarketRole):
 
         # if we have multiple hours (count >1), we cannot handle storage units bids yet
         # this is because the storage bids would be linked bids
-        storage_units = self.grid_data.get("storage_units", pd.DataFrame())
-        if not storage_units.empty:
+        storage_units = self.grid_data.get("storage_units") or pd.DataFrame()
+        if storage_units is not None and not storage_units.empty:
             if self.marketconfig.market_products[0].count > 1:
                 # make sure storages potentially present in the grid do not participate in this market
                 if not (
