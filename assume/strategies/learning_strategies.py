@@ -906,12 +906,12 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         the agent's action selection.
         """
         # get the current soc and energy cost value
-        soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
+        soc = unit.outputs["soc"].at[start]
         cost_stored_energy_scaled = (
             unit.outputs["cost_stored_energy"].at[start] / self.max_bid_price
         )
 
-        individual_observations = np.array([soc_scaled, cost_stored_energy_scaled])
+        individual_observations = np.array([soc, cost_stored_energy_scaled])
 
         return individual_observations
 
@@ -1069,15 +1069,17 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
 
         # Calculate and clip the energy cost for the start time
         # cost_stored_energy = average volume-weighted procurement costs of the currently stored energy
-        if next_soc < 1:
+        if next_soc * unit.capacity < 1:
             unit.outputs["cost_stored_energy"].at[next_time] = 0
         elif accepted_volume < 0:
             # increase costs of current SoC by price for buying energy
             # not fully representing the true cost per MWh (e.g. omitting discharge efficiency losses), but serving as a proxy for it
             unit.outputs["cost_stored_energy"].at[next_time] = (
-                unit.outputs["cost_stored_energy"].at[start] * current_soc
+                unit.outputs["cost_stored_energy"].at[start]
+                * current_soc
+                * unit.capacity
                 - (accepted_price + marginal_cost) * accepted_volume * duration_hours
-            ) / next_soc
+            ) / (next_soc * unit.capacity)
         else:
             unit.outputs["cost_stored_energy"].at[next_time] = unit.outputs[
                 "cost_stored_energy"

@@ -23,6 +23,7 @@ Upcoming Release
 **Improvements:**
 
 - **Application of new naming convention for bidding strategies**: [unit]_[market]_[method]_[comment] for bidding strategy keys (in snake_case) and [Unit][Market][Method][Comment]Strategy for bidding strategy classes (in PascalCase for classes)
+- **Changed SoC Definition**: The state of charge (SoC) for storage units is now defined to take values between 0 and 1, instead of absolute energy content (MWh). This change ensures consistency with other models and standard definition. The absolute energy content can still be calculated by multiplying SoC with the unit's capacity. The previous 'max_soc' is renamed to 'capacity'. 'max_soc' and 'min_soc' can still be used to model allowed SoC ranges, but are now defined between 0 and 1 as well.
 - **Restructured learning_role tasks**: Major learning changes that make learning application more generalizable across the framework.
   - **Simplified learning data flow:** Removed the special ``learning_unit_operator`` that previously aggregated unit data and forwarded it to the learning role. Eliminates the single-sender dependency and avoids double bookkeeping across units and operators.
   - **Direct write access:** All learning-capable entities (units, unit operators, market agents) now write learning data directly to the learning role.
