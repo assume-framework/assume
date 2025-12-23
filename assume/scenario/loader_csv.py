@@ -346,11 +346,22 @@ def make_market_config(
 
 def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
     network_path = Path(network_path)
-    buses = pd.read_csv(network_path / "buses.csv", index_col=0)
-    lines = pd.read_csv(network_path / "lines.csv", index_col=0)
-    generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
-    loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
-    storage_units = pd.read_csv(network_path / "storage_units.csv", index_col=0)
+    buses = None
+    lines = None
+    generators = None
+    loads = None
+    storage_units = None
+    
+    if (network_path / "buses.csv").exists():
+        buses = pd.read_csv(network_path / "buses.csv", index_col=0)
+    if (network_path / "lines.csv").exists():
+        lines = pd.read_csv(network_path / "lines.csv", index_col=0)
+    if (network_path / "powerplant_units.csv").exists():
+        generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
+    if (network_path / "demand_units.csv").exists():
+        loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
+    if (network_path / "storage_units.csv").exists():
+        storage_units = pd.read_csv(network_path / "storage_units.csv", index_col=0)
 
     return {
         "buses": buses,

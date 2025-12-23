@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 from dateutil import rrule as rr
+import pytest
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order
 from assume.common.utils import get_available_products
@@ -31,7 +32,7 @@ simple_nodal_auction_config = MarketConfig(
 )
 eps = 1e-4
 
-
+@pytest.mark.require_network
 def test_nodal_clearing_two_hours():
     market_config = simple_nodal_auction_config
     h = 2
@@ -205,7 +206,7 @@ def test_nodal_clearing_two_hours():
     assert math.isclose(flows_df.loc[products[0][0], "line_2_3"], 4800, abs_tol=eps)
     assert math.isclose(flows_df.loc[products[0][1], "line_2_3"], 4400, abs_tol=eps)
 
-
+@pytest.mark.require_network
 def test_nodal_clearing_with_storage_single_hour():
     market_config = simple_nodal_auction_config
     h = 1
