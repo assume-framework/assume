@@ -58,9 +58,9 @@ class flexableEOMStorage(BaseStrategy):
             The strategy is analogue to flexABLE
         """
 
-        # =============================================================================
+
         # Storage Unit is either charging, discharging, or off
-        # =============================================================================
+
         start = product_tuples[0][0]
         end_all = product_tuples[-1][1]
 
@@ -77,9 +77,6 @@ class flexableEOMStorage(BaseStrategy):
             unit.calculate_min_max_discharge(start, end_all, soc=theoretic_SOC)
         )
 
-        # =============================================================================
-        # Calculate bids
-        # =============================================================================
         bids = []
 
         for (
@@ -463,30 +460,28 @@ class flexableNegCRMStorage(BaseStrategy):
         bids = self.remove_empty_bids(bids)
 
         return bids
+    
 class flexableRedispatchStorage(BaseStrategy):
     """
-    Redispatch for storage, flexABLE-style but robust to forecast/index shapes.
+    Redispatch strategy for storage, flexABLE-style, aligned with redispatch.py:
 
-    - Aligns all time series to unit.outputs.index (a pandas DatetimeIndex).
-    - Two bids per hour if feasible:
-        * UP   (discharge, +MW) at price ≈ avg_price / efficiency_discharge
-        * DOWN (charge,    −MW) at price ≈ avg_price * efficiency_charge
-    - Respects SoC, limits, and ramps; advances a theoretical SoC only by the base profile.
-    - Sign convention: +MW = discharge (supply), −MW = charge (demand).
+    - Uses the EOM/base schedule from unit.outputs["energy"] as the reference.
+    - Produces ONE bid per unit & timestep with:
+        * volume   = base power (MW) from EOM
+        * min_power, max_power = ramp- and SoC-feasible absolute bounds (MW)
+        * price    = symmetric redispatch price (one value for up & down)
+
+    redispatch.py then converts (volume, min_power, max_power) into
+    up/down headroom for the _up/_down generators created in grid_utils.add_redispatch_storage_units.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.foresight = parse_duration(kwargs.get("eom_foresight", "3h"))
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "24h"))
         self.lookahead = parse_duration(kwargs.get("lookahead", "0h"))
 
-    # ---------- helpers ----------
 
     def _unit_dt_index(self, unit):
-        """
-        Always use a pandas.DatetimeIndex.
-        Prefer unit.outputs.index (flexABLE style); fall back sensibly.
-        """
         try:
             idx = unit.outputs.index
             if isinstance(idx, pd.DatetimeIndex):
@@ -494,55 +489,39 @@ class flexableRedispatchStorage(BaseStrategy):
         except Exception:
             pass
 
-        # Try to coerce other index-like attributes
         for candidate in (getattr(unit, "index", None),
                           getattr(unit, "snapshots", None)):
             if candidate is None:
                 continue
             try:
-                idx = pd.DatetimeIndex(candidate)
-                return idx
+                return pd.DatetimeIndex(candidate)
             except Exception:
                 continue
 
-        # Last resort: try the energy series index
         try:
             return pd.DatetimeIndex(unit.outputs["energy"].index)
         except Exception:
-            # Absolute fallback to avoid crashing (empty index)
             return pd.DatetimeIndex([])
 
     def _as_series(self, unit, price_like):
-        """
-        Coerce any forecast (Series/list/ndarray/scalar) to a float Series
-        on the unit's DatetimeIndex.
-        """
         idx = self._unit_dt_index(unit)
         if price_like is None:
             return pd.Series(0.0, index=idx)
 
-        # If it's already a pandas object, reindex onto our idx
         if hasattr(price_like, "reindex"):
             try:
                 ser = price_like.reindex(idx)
             except Exception:
                 ser = pd.Series(price_like, index=idx)
         else:
-            # list/ndarray/scalar → Series; if length mismatch, fall back to zeros
             try:
                 ser = pd.Series(price_like, index=idx)
             except Exception:
                 ser = pd.Series(0.0, index=idx)
 
-        # Ensure floats, no NaNs
-        ser = pd.to_numeric(ser, errors="coerce").fillna(0.0)
-        return ser
+        return pd.to_numeric(ser, errors="coerce").fillna(0.0)
 
     def _select_forecast(self, unit, market_config):
-        """
-        Prefer price_{market_id}; fall back to price_EOM. Always return a Series on unit index.
-        """
-        raw = None
         try:
             raw = unit.forecaster[f"price_{market_config.market_id}"]
         except Exception:
@@ -553,9 +532,6 @@ class flexableRedispatchStorage(BaseStrategy):
         return self._as_series(unit, raw)
 
     def _avg_price(self, series, t, window):
-        """
-        Mean of `series` over [t - window, t + window], clipped to index.
-        """
         if series is None or series.empty:
             return 0.0
         left = max(t - window, series.index[0])
@@ -564,7 +540,7 @@ class flexableRedispatchStorage(BaseStrategy):
             return float(series.get(t, 0.0))
         return float(series.loc[left:right].mean())
 
-    # ---------- main ----------
+    # ---------- main: used ONLY in redispatch market ----------
 
     def calculate_bids(
         self,
@@ -573,102 +549,113 @@ class flexableRedispatchStorage(BaseStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        bids = []
+        bids: list[dict] = []
 
-        # Proper aligned index
-        idx = self._unit_dt_index(unit)
-
-        # Seeds (flexABLE-style)
+        # Redispatch horizon
         start0 = product_tuples[0][0]
         end_all = product_tuples[-1][1]
-        previous_power = unit.get_output_before(start0)
-        soc_theory = unit.get_soc_before(start0)
 
-        # Envelopes over horizon
-        min_ch, max_ch = unit.calculate_min_max_charge(start0, end_all)
-        min_dis, max_dis = unit.calculate_min_max_discharge(start0, end_all, soc=soc_theory)
+        # Seeds from (already run) EOM
+        previous_power = unit.get_output_before(start0)  # MW
+        soc_theory = unit.get_soc_before(start0)         # MWh
 
-        # Forecast series on our DatetimeIndex
+        # SoC- and power-feasible envelopes (no ramp yet)
+        min_power_charge_values, max_power_charge_values = (
+            unit.calculate_min_max_charge(start0, end_all)
+        )
+        min_power_discharge_values, max_power_discharge_values = (
+            unit.calculate_min_max_discharge(start0, end_all, soc=soc_theory)
+        )
+
         price_series = self._select_forecast(unit, market_config)
 
-        # Try to read technical limits from the unit object
-        # (these should correspond to your storage_units.csv columns)
-        max_p_dis_nom = float(getattr(unit, "max_power_discharge", np.nan))
-        max_p_ch_nom  = float(getattr(unit, "max_power_charge", np.nan))
-
-        for (product, max_dis_i, min_dis_i, max_ch_i, min_ch_i) in zip(
-            product_tuples, max_dis, min_dis, max_ch, min_ch
+        for (
+            product,
+            max_power_discharge,
+            min_power_discharge,
+            max_power_charge,
+            min_power_charge,
+        ) in zip(
+            product_tuples,
+            max_power_discharge_values,
+            min_power_discharge_values,
+            max_power_charge_values,
+            min_power_charge_values,
         ):
-            t0 = product[0]
-            t1 = product[1]
+            t0, t1 = product[0], product[1]
             only_hours = product[2] if len(product) > 2 else None
 
-            # base profile (+discharge, −charge)
-            base_p = float(unit.outputs["energy"].at[t0])
+            # 1) base power from EOM / base schedule
+            base_p = float(unit.outputs["energy"].at[t0])  # +MW disch, −MW charge
+            current_power_discharge = max(base_p, 0.0)
+            current_power_charge = min(base_p, 0.0)
 
-            # ramp-feasible headroom (discharge, ≥0)
-            feas_up = unit.calculate_ramp_discharge(
+            # 2) apply ramping to the physical envelopes
+            # Discharge side
+            max_power_discharge_ramp = unit.calculate_ramp_discharge(
                 soc_theory,
                 previous_power,
-                power_discharge=max(0.0, float(max_dis_i)),
-                current_power=max(base_p, 0.0),
-                min_power_discharge=float(min_dis_i),
+                float(max_power_discharge),
+                current_power_discharge,
+                float(min_power_discharge),
             )
-            feas_up = max(0.0, float(feas_up))
-
-            # ramp-feasible headroom (charge, ≤0)
-            feas_down = unit.calculate_ramp_charge(
+            min_power_discharge_ramp = unit.calculate_ramp_discharge(
                 soc_theory,
                 previous_power,
-                power_charge=float(max_ch_i),
-                current_power=min(base_p, 0.0),
-                min_power_charge=float(min_ch_i),
+                float(min_power_discharge),
+                current_power_discharge,
+                float(min_power_discharge),
             )
-            feas_down = min(0.0, float(feas_down))
 
-            # Average price around t0
+            # Charge side (negative powers)
+            max_power_charge_ramp = unit.calculate_ramp_charge(
+                soc_theory,
+                previous_power,
+                float(max_power_charge),
+                current_power_charge,
+                float(min_power_charge),
+            )
+            min_power_charge_ramp = unit.calculate_ramp_charge(
+                soc_theory,
+                previous_power,
+                float(min_power_charge),
+                current_power_charge,
+                float(min_power_charge),
+            )
+
+            # 3) combine to a single [min_power, max_power] interval around base_p
+            # discharging bounds are ≥ 0, charging bounds ≤ 0
+            p_max_eff = max(0.0, float(max_power_discharge_ramp))
+            p_min_eff = min(0.0, float(max_power_charge_ramp))
+
+            # Ensure the base point lies in the feasible interval
+            p_max_eff = max(p_max_eff, base_p)
+            p_min_eff = min(p_min_eff, base_p)
+
+            if p_min_eff > p_max_eff:
+                # degenerate interval if something went wrong
+                p_min_eff = p_max_eff = base_p
+
+            # 4) symmetric redispatch price
             avg_p = self._avg_price(price_series, t0, self.foresight)
+            price = float(avg_p)
 
-            # Prices consistent with flexABLE storage logic
-            ask_up = max(0.0, avg_p / max(unit.efficiency_discharge, 1e-9))  # discharge
-            bid_down = max(0.0, avg_p * unit.efficiency_charge)              # charge
-
-            # Fallback: if attributes are missing, derive limits from envelopes
-            # These are *nominal* bounds, not the actual ramp-feasible volume
-            if not np.isfinite(max_p_dis_nom):
-                max_p_dis_nom = max(0.0, float(max_dis_i))
-            if not np.isfinite(max_p_ch_nom):
-                max_p_ch_nom = max(0.0, float(max_ch_i))
-
-            # Create bids only if feasible non-zero
-            if feas_up > 0.0:
-                bids.append({
+            # 5) one bid row per unit & timestep for redispatch.py
+            bids.append(
+                {
                     "start_time": t0,
                     "end_time": t1,
                     "only_hours": only_hours,
-                    "price": float(ask_up),
-                    "volume": float(feas_up),     # +MW (discharge)
+                    "unit_id": unit.id,
                     "node": unit.node,
-                    # bounds required by redispatch.py
-                    # upward redispatch can move between [0, max_discharge]
-                    "max_power": float(max_p_dis_nom),
-                    "min_power": 0.0,
-                })
+                    "volume": float(base_p),       # base schedule (EOM result)
+                    "max_power": float(p_max_eff), # absolute upper bound (MW)
+                    "min_power": float(p_min_eff), # absolute lower bound (MW)
+                    "price": price,
+                }
+            )
 
-            if feas_down < 0.0:
-                bids.append({
-                    "start_time": t0,
-                    "end_time": t1,
-                    "only_hours": only_hours,
-                    "price": float(bid_down),
-                    "volume": float(feas_down),   # −MW (charge)
-                    "node": unit.node,
-                    # downward redispatch can move between [-max_charge, 0]
-                    "max_power": 0.0,
-                    "min_power": float(-max_p_ch_nom),
-                })
-
-            # advance theoretical SoC by base profile only
+            # 6) advance theoretic SoC with base profile only (MWh)
             dt_h = (t1 - t0) / timedelta(hours=1)
             if base_p > 0.0:   # discharging
                 d_soc = -(base_p * dt_h) / max(unit.efficiency_discharge, 1e-9)
@@ -680,7 +667,7 @@ class flexableRedispatchStorage(BaseStrategy):
             soc_theory += float(d_soc)
             previous_power = base_p
 
-        return self.remove_empty_bids(bids)
+        return bids
 
 
 def calculate_price_average(current_time, foresight, price_forecast):
