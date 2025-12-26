@@ -127,11 +127,6 @@ available_examples = {
         "scenario": "example_06b",  
         "study_case": "base",
     },
-    "use_case_O45strom_ES10": {"scenario": "example_06a_ES10", "study_case": "base"},
-    "use_case_O45H2_HS10": {
-        "scenario": "example_06b_HS10",
-        "study_case": "base",
-    },
 }
 
 
