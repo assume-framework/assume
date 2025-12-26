@@ -50,6 +50,11 @@ class RedispatchMarketRole(MarketRole):
             logger.error(f"Market '{marketconfig.market_id}': grid_data is missing.")
             raise ValueError("grid_data is missing.")
 
+        self._rd_snapshots = []
+        self._rd_generators_p = []
+        self._rd_lines_p0 = []
+        self._rd_buses_mp = []
+
         # base network (lines, buses, etc.)
         read_pypsa_grid(
             network=self.network,
@@ -89,6 +94,22 @@ class RedispatchMarketRole(MarketRole):
                 network=self.network,
                 industrial_dsm_units=self.grid_data["industrial_dsm_units"],
             )
+
+        # Build a set of renewable unit IDs (match your labels exactly) to handle no-upward-redispatch
+        res_gen = {"solar pv", "wind onshore", "wind offshore", "hydro", "biomass"}
+
+        generators_df = self.grid_data.get("generators")
+        if generators_df is None:
+            self.res_unit_ids = set()
+        else:
+            # IMPORTANT: confirm the column names in generators_df
+            tech_col = "technology" if "technology" in generators_df.columns else None
+            if tech_col is None:
+                self.res_unit_ids = set()
+            else:
+                self.res_unit_ids = set(
+                    generators_df.index[generators_df[tech_col].isin(res_gen)].tolist()
+                )
 
         # solver selection
         self.solver = marketconfig.param_dict.get("solver", "highs")
@@ -132,7 +153,7 @@ class RedispatchMarketRole(MarketRole):
 
         # --- 1) build pivots -------------------------------------------------
         volume_pivot = orderbook_df.pivot(
-            index="start_time", columns="unit_id", values="volume"
+            index="start_time", columns="unit_id", values="volume"  
         )
         max_power_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="max_power"
@@ -149,6 +170,11 @@ class RedispatchMarketRole(MarketRole):
         max_power_pivot = max_power_pivot.fillna(0.0)
         min_power_pivot = min_power_pivot.fillna(0.0)
         price_pivot = price_pivot.fillna(0.0)
+
+        # No upward redispatch for RES: force max_power == volume for RES units
+        res_cols = [u for u in volume_pivot.columns if u in self.res_unit_ids]
+        if res_cols:
+            max_power_pivot.loc[:, res_cols] = volume_pivot.loc[:, res_cols]
 
         p_set = volume_pivot
 
@@ -186,10 +212,10 @@ class RedispatchMarketRole(MarketRole):
 
         # --- 2) build a working copy of the network --------------------------
         redispatch_network = self.network.copy()
-
+        
         # align network snapshots to the redispatch horizon (same as p_set index)
         redispatch_network.set_snapshots(p_set.index)
-
+        
         # Storage + loads + exchange units ALL must appear in p_set
         all_loads = redispatch_network.loads.index
 
@@ -202,18 +228,24 @@ class RedispatchMarketRole(MarketRole):
 
         redispatch_network.loads_t.p_set = p_set_aligned
 
-        # Map per-unit headrooms & marginal costs to generator time series
+        #redispatch_network.loads_t.p_set = p_set
+
+        # Update p_max_pu for generators with _up and _down suffixes
         redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
         redispatch_network.generators_t.p_max_pu.update(
             p_max_pu_down.add_suffix("_down")
         )
+
+        # Add _up and _down suffix to costs and update the network
         redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
         redispatch_network.generators_t.marginal_cost.update(
             costs.add_suffix("_down") * (-1)
         )
 
-        # --- 3) DC load flow & check congestion ------------------------------
+        # run linear powerflow
         redispatch_network.lpf()
+
+        # check lines for congestion where power flow is larger than s_nom
         line_loading = (
             redispatch_network.lines_t.p0.abs() / redispatch_network.lines.s_nom
         )
@@ -284,6 +316,13 @@ class RedispatchMarketRole(MarketRole):
             if status != "ok":
                 logger.error(f"Solver exited with {termination_condition}")
                 raise Exception("Solver in redispatch market did not converge")
+            
+            self._rd_snapshots.append(pd.Index(redispatch_network.snapshots))
+            self._rd_generators_p.append(redispatch_network.generators_t.p.copy())
+            self._rd_lines_p0.append(redispatch_network.lines_t.p0.copy())
+            if hasattr(redispatch_network, "buses_t") and hasattr(redispatch_network.buses_t, "marginal_price"):
+                self._rd_buses_mp.append(redispatch_network.buses_t.marginal_price.copy())
+
         else:
             logger.debug("No congestion detected")
 
@@ -330,33 +369,69 @@ class RedispatchMarketRole(MarketRole):
         for unit in valid_units:
             unit_orders = orderbook_df["unit_id"] == unit
 
-            total_volume = 0.0
-
             if f"{unit}_up" in upward_redispatch.columns:
-                total_volume += float(upward_redispatch[f"{unit}_up"].sum())
+                orderbook_df.loc[unit_orders, "accepted_volume"] += upward_redispatch[
+                    f"{unit}_up"
+                ].values
 
             if f"{unit}_down" in downward_redispatch.columns:
-                total_volume -= float(downward_redispatch[f"{unit}_down"].sum())
-
-            # scalar, applied to all rows of this unit (usually 1 row)
-            orderbook_df.loc[unit_orders, "accepted_volume"] = total_volume
+                orderbook_df.loc[unit_orders, "accepted_volume"] -= downward_redispatch[
+                    f"{unit}_down"
+                ].values
 
             if self.payment_mechanism == "pay_as_bid":
-                # If there is any non-zero redispatch, pay the bid price; otherwise 0.
-                if total_volume != 0:
-                    orderbook_df.loc[unit_orders, "accepted_price"] = orderbook_df.loc[
-                        unit_orders, "price"
-                    ]
-                else:
-                    orderbook_df.loc[unit_orders, "accepted_price"] = 0.0
+                # set accepted price as the price bid price from the orderbook
+                orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
+                    orderbook_df.loc[unit_orders, "accepted_volume"] > 0,
+                    orderbook_df.loc[unit_orders, "price"],
+                    np.where(
+                        orderbook_df.loc[unit_orders, "accepted_volume"] < 0,
+                        orderbook_df.loc[unit_orders, "price"],
+                        0,  # This sets accepted_price to 0 when redispatch_volume is exactly 0
+                    ),
+                )
 
             elif self.payment_mechanism == "pay_as_clear":
-                # average nodal marginal price for the unit's node
-                unit_node = orderbook_df.loc[unit_orders, "node"].iloc[0]
-                node_price_series = nodal_marginal_prices[unit_node]
-                cleared_price = float(node_price_series.mean())
+                # set accepted price as the nodal marginal price
+                nodal_marginal_prices = -network.buses_t.marginal_price
+                unit_node = orderbook_df.loc[unit_orders, "node"].values[0]
 
-                if total_volume != 0:
-                    orderbook_df.loc[unit_orders, "accepted_price"] = cleared_price
-                else:
-                    orderbook_df.loc[unit_orders, "accepted_price"] = 0.0
+                orderbook_df.loc[unit_orders, "accepted_price"] = np.where(
+                    orderbook_df.loc[unit_orders, "accepted_volume"] != 0,
+                    nodal_marginal_prices[unit_node],
+                    0,
+                )
+    async def on_stop(self):
+        await super().on_stop()
+        self.export_full_redispatch_netcdf()
+
+    def export_full_redispatch_netcdf(self):
+        if not self._rd_generators_p:
+            return
+
+        out_dir = self.marketconfig.param_dict.get("export_dir", "outputs/pypsa_nc")
+        os.makedirs(out_dir, exist_ok=True)
+        fn = os.path.join(out_dir, f"redispatch_full_{self.marketconfig.market_id}.nc")
+
+        n = self.network.copy()
+
+        # concatenate along time
+        gen_p = pd.concat(self._rd_generators_p, axis=0)
+        line_p0 = pd.concat(self._rd_lines_p0, axis=0)
+
+        # ensure snapshots match concatenated time length
+        n.set_snapshots(range(len(gen_p.index)))
+
+        # assign stitched results (these are outputs, not inputs)
+        n.generators_t.p = gen_p.reset_index(drop=True)
+        n.lines_t.p0 = line_p0.reset_index(drop=True)
+
+        if self._rd_buses_mp:
+            mp = pd.concat(self._rd_buses_mp, axis=0)
+            n.buses_t.marginal_price = mp.reset_index(drop=True)
+        
+        logger.info(f"Redispatch NetCDF will be written to: {fn}")
+
+        n.export_to_netcdf(fn)
+        logger.info(f"Exported full redispatch network to {fn}")
+
