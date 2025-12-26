@@ -85,3 +85,4 @@ base:
         solver: gurobi
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
+        export_dir: outputs/pypsa_nc 
