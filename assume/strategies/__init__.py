@@ -107,6 +107,7 @@ try:
         EnergyLearningSingleBidStrategy,
         StorageEnergyLearningStrategy,
         RenewableEnergyLearningSingleBidStrategy,
+        EnergyLearningSingleBidRedispatchStrategy,
     )
 
     deprecated_bidding_strategies["pp_learning"] = EnergyLearningStrategy
@@ -124,6 +125,9 @@ try:
     bidding_strategies["renewable_energy_learning_single_bid"] = (
         RenewableEnergyLearningSingleBidStrategy
     )
+    bidding_strategies[
+        "powerplant_energy_learning_redispatch"
+    ] = EnergyLearningSingleBidRedispatchStrategy
 
 
 except ImportError:
