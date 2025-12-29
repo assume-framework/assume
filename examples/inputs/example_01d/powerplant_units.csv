@@ -14,7 +14,7 @@ Unit 12,nuclear,powerplant_energy_naive,powerplant_energy_naive_redispatch,power
 Unit 13,nuclear,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,powerplant_energy_heuristic_block,uranium,0.0,1000.0,0,0.3,17,north_2,Operator 2
 Unit 14,nuclear,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,powerplant_energy_heuristic_block,uranium,0.0,1000.0,0,0.3,18,north_2,Operator 2
 Unit 15,nuclear,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,powerplant_energy_heuristic_block,uranium,0.0,1000.0,0,0.3,19,north_2,Operator 2
-Unit 16,nuclear,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,powerplant_energy_heuristic_block,uranium,0.0,1000.0,0,0.3,20,north_2,Operator 2
+Unit 16,nuclear,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,powerplant_energy_naive,powerplant_energy_heuristic_block,uranium,0.0,1000.0,0,0.3,20,north_2,Operator 2
 Unit 17,nuclear,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,powerplant_energy_heuristic_block,uranium,0.0,1000.0,0,0.3,21,north_2,Operator 2
 Unit 18,nuclear,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,powerplant_energy_heuristic_block,uranium,0.0,1000.0,0,0.3,22,north_2,Operator 2
 Unit 19,nuclear,powerplant_energy_naive,powerplant_energy_naive_redispatch,powerplant_energy_naive,powerplant_energy_heuristic_block,uranium,0.0,1000.0,0,0.3,23,north_2,Operator 2
