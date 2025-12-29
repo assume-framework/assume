@@ -82,10 +82,9 @@ inc_dec_heuristic:
       #additional_fields:
       #  - node
       #  - bid_type
-      #param_dict:
-      #  network_path: .
-      #  zones_identifier: zone_id
-
+      param_dict:
+        network_path: .
+        
     Redispatch_heuristic:
       operator: Redispatch_operator
       product_type: energy
