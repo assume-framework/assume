@@ -84,7 +84,7 @@ inc_dec_heuristic:
       #  - bid_type
       param_dict:
         network_path: .
-        
+
     Redispatch_heuristic:
       operator: Redispatch_operator
       product_type: energy
@@ -115,9 +115,9 @@ learning_single_diesel:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-02 00:00
   time_step: 1h
-  learning_mode: true
   save_frequency_hours: null
   learning_config:
+    learning_mode: true
     algorithm: matd3
     batch_size: 64
     continue_learning: false
