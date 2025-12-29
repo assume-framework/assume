@@ -6,7 +6,7 @@ base_case:
   save_frequency_hours: False
   
   markets_config:
-    EOM:
+    EOM_base:
       operator: EOM_operator
       product_type: energy
       start_date: 2019-01-01 00:00
@@ -29,7 +29,64 @@ base_case:
       #  network_path: .
       #  zones_identifier: zone_id
 
-    Redispatch:
+    Redispatch_base:
+      operator: Redispatch_operator
+      product_type: energy
+      start_date: 2019-01-01 02:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+
+inc_dec_heuristic:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-06 00:00
+  time_step: 1h
+  learning_mode: False
+  save_frequency_hours: False
+  
+  markets_config:
+    EOM_heuristic:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      #additional_fields:
+      #  - node
+      #  - bid_type
+      #param_dict:
+      #  network_path: .
+      #  zones_identifier: zone_id
+
+    Redispatch_heuristic:
       operator: Redispatch_operator
       product_type: energy
       start_date: 2019-01-01 02:00
@@ -82,7 +139,7 @@ learning_single_diesel:
     validation_episodes_interval: 5
 
   markets_config:
-    EOM:
+    EOM_learning:
       operator: EOM_operator
       product_type: energy
       start_date: 2019-01-01 00:00
@@ -105,7 +162,7 @@ learning_single_diesel:
       #  network_path: .
       #  zones_identifier: zone_id
 
-    Redispatch:
+    Redispatch_learning:
       operator: network_operator
       product_type: energy
       start_date: 2019-01-01 02:00
