@@ -118,9 +118,10 @@ class ForecastInitialisation:
                 # calculate if not present
                 if config['market_mechanism'] in ["redispatch", "nodal_clearing"]:
                     forecast = self.calculate_locational_marginal_price_forecast(market_id)
+                    price_forecasts['LMPs'] = forecast
                 else:
                     forecast = self.calculate_market_price_forecast(market_id)
-                price_forecasts[market_id] = forecast
+                    price_forecasts[market_id] = forecast
 
             residual_loads[market_id] = self._forecasts.get(
                 f"residual_load_{market_id}"
@@ -480,10 +481,12 @@ class ForecastInitialisation:
 
         if status != "ok":
             self._logger.error(f"Solver exited with {termination_condition}")
-            raise Exception("Solver in nodal clearing did not converge")
+            raise Exception("Solver in nodal clearing forecast did not converge")
         
         # extract lmps
-        lmp_forecast = self.network.buses_t.marginal_price.copy()
+         # make sure the order of the columns is same as in the buses csv
+        lmp_forecast = self.network.buses_t.marginal_price.copy()[self.network.buses.index]
+        self.zones_id = self.market_configs[market_id]["param_dict"].get("zones_identifier")
         if self.zones_id:
             # map zonal prices to nodes
             lmp_forecast_nodes = pd.DataFrame(index=lmp_forecast.index, columns=self.buses.index)
