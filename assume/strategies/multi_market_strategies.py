@@ -76,16 +76,16 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
     def calculate_EOM_bids(
         self,
         unit: SupportsMinMax,
-        market_config: MarketConfig,
+        marketconfig: MarketConfig,
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
         """
         Generates a single price bid for the full available capacity (max_power).
 
-        The method observes unit state, derives an action (bid price) from
-        the actor network, and constructs one bid covering the entire capacity, without
-        distinguishing between flexible and inflexible components.
+        The method observes unit state, own marginal costs, own LMP, neighbouring nodes LMPs
+        and decides wether to take part in inc-dec or not.
+        Depending on this, the uni bids own marginal cost or tries to bid in a way to extract windfall profits.
 
         Notes
         -----
@@ -97,17 +97,34 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
             A list containing one bid with start/end time, full volume, and calculated price.
         """
         start = product_tuples[0][0]
-        end = product_tuples[0][1]
+        end = product_tuples[-1][1]
+        start_times = [product[0] for product in product_tuples]
 
         # get technical bounds for the unit output from the unit
         min_power, max_power = unit.calculate_min_max_power(start, end)
-        min_power = min_power[0]
-        max_power = max_power[0]
 
         # =============================================================================
         # 1. Get the LMP forecast, which are the basis of the following decision
         # =============================================================================
-        # ...
+        buses = marketconfig.param_dict['grid_data']['buses']
+        lines = marketconfig.param_dict['grid_data']['lines']
+        # get own node number from buses.csv
+        node = unit.node
+        node_number = buses.index.get_loc(node)
+        own_lmp = [unit.forecaster.price["LMPs"].at[i][node_number] for i in start_times]
+
+        # get neighbouring node numbers from lines.csv
+        neighboring_nodes = set()
+        for _, line in lines.iterrows():
+            if line['bus0'] == node:
+                neighboring_nodes.add(line['bus1'])
+            elif line['bus1'] == node:
+                neighboring_nodes.add(line['bus0'])
+        neighboring_node_numbers = [buses.index.get_loc(n) for n in neighboring_nodes]
+        neighboring_lmps = np.array([
+            [unit.forecaster.price["LMPs"].at[i][n] for n in neighboring_node_numbers]
+            for i in start_times
+        ])
 
         # =============================================================================
         # 2. Create bids, based on the forecasted LMPs
@@ -123,21 +140,38 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
         # if mc < LMP_n and LMP_n < LMP_Nm -> generation pocket at own node and bidding mc would result in eom dispatch, no inc-dec opportunity -> offer own mc
         # if mc < LMP_n and LMP_n > LMP_Nm -> bid own LMP_n
         # else -> bid mc
+        product_type = marketconfig.product_type
+        bids = []
+        # starting cost # TODO
+        for i, start in enumerate(start_times):
+            end = product_tuples[i][1]
+            marginal_cost = unit.calculate_marginal_cost(
+                start, unit.outputs[product_type].at[start]
+            )
+            if marginal_cost > own_lmp[i]:
+                if own_lmp[i] < np.max(neighboring_lmps[i]):
+                    bid_price = own_lmp[i]
+                else:
+                    bid_price = marginal_cost
+            elif marginal_cost < own_lmp[i]:
+                if own_lmp[i] < np.max(neighboring_lmps[i]):
+                    bid_price = marginal_cost
+                else:
+                    bid_price = own_lmp[i]
 
+            # actually formulate bids in orderbook format
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": bid_price,
+                    "volume": max_power[i],
+                    "node": unit.node,
+                },
+            )
 
-        # actually formulate bids in orderbook format
-        bids = [
-            {
-                "start_time": start,
-                "end_time": end,
-                "only_hours": None,
-                "price": bid_price,
-                "volume": max_power,
-                "node": unit.node,
-            },
-        ]
-
-        unit.outputs["eom_bids"].loc[product_tuples[0][0]] = bid_price
+            unit.outputs["eom_bids"].loc[product_tuples[i][0]] = bid_price
 
         return bids
 

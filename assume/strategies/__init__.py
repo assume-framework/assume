@@ -87,6 +87,8 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "industry_capacity_heuristic_balancing_neg": DsmCapacityHeuristicBalancingNegStrategy,
     "powerplant_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
     "demand_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
+    "powerplant_energy_heuristic_redispatch": EnergyHeuristicRedispatchStrategy,
+    "demand_energy_heuristic_redispatch": EnergyHeuristicRedispatchStrategy,
     "household_energy_optimization": DsmEnergyOptimizationStrategy,
     "industry_energy_optimization": DsmEnergyOptimizationStrategy,
     "household_energy_naive_redispatch": DsmEnergyNaiveRedispatchStrategy,
