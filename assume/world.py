@@ -527,6 +527,9 @@ class World:
             if not strategy:
                 continue
 
+            if market_id not in self.markets.keys():
+                continue
+            
             if strategy not in self.bidding_strategies:
                 # raise a deprecated warning for learning_advanced_orders
                 raise ValueError(
