@@ -355,7 +355,7 @@ class ForecastInitialisation:
 
         if market_id != "redispatch":
             # does not make sense for zonal redispatch markets
-            self.zones_id = self.market_configs[market_id]['param_dict']["zones_identifier"]
+            self.zones_id = self.market_configs[market_id]['param_dict'].get("zones_identifier")
             self.node_to_zone = None
 
             # Generate the incidence matrix and set the nodes based on zones or individual buses
