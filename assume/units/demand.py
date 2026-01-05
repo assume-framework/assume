@@ -66,6 +66,11 @@ class Demand(SupportsMinMax):
 
         self.volume = -abs(self.forecaster[self.id])  # demand is negative
         self.price = FastSeries(index=self.index, value=price)
+        #addtional forcasts
+        self.crm_pos_cap = self.forecaster[f"{self.id}_crm_pos_cap"]
+        self.crm_pos_price = self.forecaster[f"{self.id}_crm_pos_price"]
+        self.crm_neg_cap = self.forecaster[f"{self.id}_crm_neg_cap"]
+        self.crm_neg_price = self.forecaster[f"{self.id}_crm_neg_price"]
 
         # Elastic demand parameters
         self.max_price = price

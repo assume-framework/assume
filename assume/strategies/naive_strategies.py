@@ -333,6 +333,74 @@ class DSM_NegCRM_Strategy(BaseStrategy):
         return self.remove_empty_bids(bids)
 
 
+class demand_PosCRM_Strategy(BaseStrategy):
+    """
+    Strategy for trading positive reserve (CRM_pos) based on available reserve power.
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            end = product[1]
+            
+            pos_cap = (
+                    unit.forecaster[f"{unit.id}_crm_pos_cap"][start]
+                )
+            pos_cap_price = (
+                    unit.forecaster[f"{unit.id}_crm_pos_price"][start]
+                )
+
+            bids.append({
+                "start_time": start,
+                "end_time": end,
+                "price": pos_cap_price,
+                "volume": pos_cap,
+                "node": unit.node,
+            })
+
+        return self.remove_empty_bids(bids)
+    
+class demand_NegCRM_Strategy(BaseStrategy):
+    """
+    Strategy for trading negative reserve (CRM_neg) based on available reserve power.
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            end = product[1]
+
+            neg_cap = (
+                    unit.forecaster[f"{unit.id}_crm_neg_cap"][start]
+                )
+            neg_cap_price = (
+                    unit.forecaster[f"{unit.id}_crm_neg_price"][start]
+                )
+
+            bids.append({
+                "start_time": start,
+                "end_time": end,
+                "price": neg_cap_price,
+                "volume": neg_cap,
+                "node": unit.node,
+            })
+
+        return self.remove_empty_bids(bids)
+    
 class NaiveRedispatchDSMStrategy(BaseStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of the unit on the redispatch market.
@@ -545,45 +613,22 @@ class FlexableRedispatchDSM(BaseStrategy):
         s = forecaster[key]  # KeyError bubbles up if missing
         return self._as_clean_series(s, key, index)
 
-    # ---------- main ------------------------------------------------------------
-
     def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
-        """
-        Redispatch bidding for an industrial DSM (cement plant) consumer.
-
-        Data expected in unit.forecaster (all Series aligned to unit.index):
-        f"{unit.id}_baseline_power"  [MW]   (not strictly needed for bidding)
-        f"{unit.id}_max_up"          [MW]   (feasible increase of consumption)
-        f"{unit.id}_max_down"        [MW]   (feasible decrease of consumption)
-        f"{unit.id}_price_up"        [€/MWh] (activation cost to consume more)
-        f"{unit.id}_price_down"      [€/MWh] (opportunity cost to consume less)
-
-        Sign convention for consumer bids:
-        - UP (consume more):  volume NEGATIVE (−MW)
-        - DOWN (consume less): volume POSITIVE (+MW)
-        """
-
         f = unit.forecaster
-        idx = unit.index
 
-        # Dynamic keys per-plant
         k_power      = f"{unit.id}_baseline_power"
         k_up_cap     = f"{unit.id}_max_up"
         k_down_cap   = f"{unit.id}_max_down"
         k_up_price   = f"{unit.id}_price_up"
         k_down_price = f"{unit.id}_price_down"
 
-        # Pull series (must be pandas-like and aligned to idx)
-        try:
-            s_power      = f[k_power]
-            s_cap_up     = f[k_up_cap]
-            s_cap_down   = f[k_down_cap]
-            s_price_up   = f[k_up_price]
-            s_price_down = f[k_down_price]
-        except KeyError as e:
-            raise KeyError(f"Forecaster missing required key: {e}") from e
+        # fetch series (must be pandas Series aligned to unit.index)
+        s_power      = f[k_power]
+        s_cap_up     = f[k_up_cap]
+        s_cap_down   = f[k_down_cap]
+        s_price_up   = f[k_up_price]
+        s_price_down = f[k_down_price]
 
-        # Light type sanity
         for key, s in [(k_power, s_power), (k_up_cap, s_cap_up), (k_down_cap, s_cap_down),
                     (k_up_price, s_price_up), (k_down_price, s_price_down)]:
             if not hasattr(s, "at"):
@@ -595,69 +640,74 @@ class FlexableRedispatchDSM(BaseStrategy):
             t0, t1 = product[0], product[1]
             only_hours = product[2] if len(product) > 2 else None
 
-            # Fetch values
-            cap_up   = float(max(0.0, s_cap_up.at[t0]   if t0 in s_cap_up.index   else 0.0))
-            cap_down = float(max(0.0, s_cap_down.at[t0] if t0 in s_cap_down.index else 0.0))
-            p_up     = float(max(0.0, s_price_up.at[t0]   if t0 in s_price_up.index   else 0.0))
-            p_down   = float(max(0.0, s_price_down.at[t0] if t0 in s_price_down.index else 0.0))
+            P0 = float(max(0.0, s_power.at[t0] if t0 in s_power.index else 0.0))
+            U  = float(max(0.0, s_cap_up.at[t0] if t0 in s_cap_up.index else 0.0))
+            D  = float(max(0.0, s_cap_down.at[t0] if t0 in s_cap_down.index else 0.0))
 
-            # If no headroom either way, skip
-            if cap_up <= 0.0 and cap_down <= 0.0:
+            p_up   = float(s_price_up.at[t0] if t0 in s_price_up.index else 0.0)
+            p_down = float(s_price_down.at[t0] if t0 in s_price_down.index else 0.0)
+
+            # no flexibility -> no bid
+            if U <= 0.0 and D <= 0.0:
                 continue
 
-            # Choose side: if both possible, pick the cheaper €/MWh;
-            # tie-break by larger available MW.
+            # absolute bounds
+            P_min = max(0.0, P0 - D)
+            P_max = P0 + U
+
+            # choose side (keep your rule; you can change later)
             choose_up = False
             choose_down = False
 
-            if cap_up > 0.0 and cap_down <= 0.0:
+            if U > 0.0 and D <= 0.0:
                 choose_up = True
-            elif cap_down > 0.0 and cap_up <= 0.0:
+            elif D > 0.0 and U <= 0.0:
                 choose_down = True
             else:
-                # both > 0
+                # both possible: choose cheaper activation price; tie -> larger range
                 if p_up < p_down - 1e-9:
                     choose_up = True
                 elif p_down < p_up - 1e-9:
                     choose_down = True
                 else:
-                    # equal prices -> pick the side with more volume
-                    if cap_up >= cap_down:
+                    # tie: pick bigger movement potential
+                    if U >= D:
                         choose_up = True
                     else:
                         choose_down = True
 
             if choose_up:
-                # UP = consume more => NEGATIVE volume
+                # UP: can increase load from P0 to P0+U
                 bids.append({
                     "start_time": t0,
                     "end_time": t1,
                     "only_hours": only_hours,
-                    "price": p_up,                     # €/MWh for 1h block → €/MW
-                    "volume": -cap_up,                 # NEGATIVE MW
-                    "max_power": cap_up,               # optional metadata
-                    "min_power": 0.0,                  # optional metadata
+                    "price": p_up,
+                    "volume": P0,            # baseline
+                    "min_power": P0,
+                    "max_power": P0 + U,
                     "node": unit.node,
                     "direction": "up",
                     "unit_id": unit.id,
                 })
 
             if choose_down:
-                # DOWN = consume less => POSITIVE volume
+                # DOWN: can decrease load from P0 to max(0, P0-D)
                 bids.append({
                     "start_time": t0,
                     "end_time": t1,
                     "only_hours": only_hours,
-                    "price": p_down,                   # €/MWh for 1h block → €/MW
-                    "volume": cap_down,                # POSITIVE MW
-                    "max_power": cap_down,             # optional metadata
-                    "min_power": 0.0,                  # optional metadata
+                    "price": p_down,
+                    "volume": P0,            # baseline
+                    "min_power": P_min,
+                    "max_power": P0,
                     "node": unit.node,
                     "direction": "down",
                     "unit_id": unit.id,
                 })
 
         return self.remove_empty_bids(bids)
+
 
 class NaiveRedispatchStrategyDSM(BaseStrategy):
     def calculate_bids(

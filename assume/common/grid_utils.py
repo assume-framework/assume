@@ -329,45 +329,50 @@ def add_nodal_loads(
 
 def add_redispatch_dsm(network: pypsa.Network, industrial_dsm_units: pd.DataFrame) -> None:
     dsm_units = industrial_dsm_units.copy()
+    if dsm_units is None or dsm_units.empty:
+        return
 
-    # 0) Fixed baseline load
+    # We need an absolute capacity for scaling (same role as generators["max_power"])
+    if "max_power" not in dsm_units.columns:
+        raise KeyError(
+            "industrial_dsm_units must contain column 'max_power' (absolute max import MW) "
+            "so that p_nom is consistent with redispatch headroom calculation."
+        )
+
+    # placeholder time series (will be overwritten in redispatch.clear via loads_t.p_set)
     p_set = pd.DataFrame(0.0, index=network.snapshots, columns=dsm_units.index)
+
+    # 0) Baseline consumption schedule is represented as a Load (p_set filled later)
     network.add(
         "Load",
-        names=dsm_units.index,
+        name=dsm_units.index,
         bus=dsm_units["node"],
         p_set=p_set,
         sign=1,
     )
 
-    # Decide nominal caps (static). Prefer explicit columns if you have them:
-    # e.g., dsm_units["max_up_cap"], dsm_units["max_down_cap"].
-    # If not, use a large but safe bound:
-    p_nom_up   = dsm_units.get("max_up_cap", pd.Series(1e3, index=dsm_units.index))
-    p_nom_down = dsm_units.get("max_down_cap", pd.Series(1e3, index=dsm_units.index))
-
-    # upward redispatch (consume more) – use sign=-1
-    network.madd(
+    # 1) Upward redispatch for DSM = consume more (negative injection)
+    network.add(
         "Generator",
-        names=dsm_units.index,
+        name=dsm_units.index,
         suffix="_up",
         bus=dsm_units["node"],
-        p_nom=1,                     # keep the “1 MW trick”
-        p_min_pu=p_set,              # 0 before clearing
-        p_max_pu=p_set + 1,          # allow a band; clearing code can set p_set to accepted MW
-        marginal_cost=p_set,         # filled with bid price later
+        p_nom=dsm_units["max_power"],
+        p_min_pu=p_set,         
+        p_max_pu=p_set + 1.0,   
+        marginal_cost=p_set,    
         sign=-1,
     )
 
-    # downward redispatch (consume less) – use sign=+1
-    network.madd(
+    # 2) Downward redispatch for DSM = consume less (positive injection vs baseline)
+    network.add(
         "Generator",
-        names=dsm_units.index,
+        name=dsm_units.index,
         suffix="_down",
         bus=dsm_units["node"],
-        p_nom=1,
+        p_nom=dsm_units["max_power"],
         p_min_pu=p_set,
-        p_max_pu=p_set + 1,
+        p_max_pu=p_set + 1.0,
         marginal_cost=p_set,
         sign=1,
     )
