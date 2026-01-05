@@ -273,7 +273,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 # default WH params if not set externally
                 if not hasattr(self.model, "wh_per_t_clinker"):
                     self.model.wh_per_t_clinker = pyo.Param(
-                        initialize=0.061
+                        initialize=0.802
                     )  # [MWh_th/t]
                 if not hasattr(self.model, "wh_util_eff"):
                     self.model.wh_util_eff = pyo.Param(initialize=0.90)
@@ -283,7 +283,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
                     # recovered waste heat = clinker_out * yield * efficiency
                     return (
                         m.dsm_blocks["preheater"].external_heat_in[t]
-                        == m.dsm_blocks["kiln"].clinker_out[t]
+                        <= m.dsm_blocks["kiln"].clinker_out[t]
                         * m.wh_per_t_clinker
                         * m.wh_util_eff
                     )
@@ -1671,7 +1671,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         def _safe_getattr(obj, name, default=None):
             return getattr(obj, name) if hasattr(obj, name) else default
 
-        enable_fcr  = bool(getattr(self, "enable_fcr", True))
+        enable_fcr  = bool(getattr(self, "enable_fcr", False))
         enable_afrr = bool(getattr(self, "enable_afrr", True))
 
         L       = int(getattr(self, "_FCR_BLOCK_LENGTH", 4))   # hours per block

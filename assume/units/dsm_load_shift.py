@@ -119,8 +119,6 @@ class DSMFlex:
             self.determine_optimal_operation_without_flex(switch_flex_off=False)
 
         # Modify the model to include the flexibility measure constraints
-        # as well as add a new objective function to the model
-        # to maximize the flexibility measure
         if self.flexibility_measure in DSMFlex.flexibility_map:
             DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
         else:
@@ -837,12 +835,12 @@ class DSMFlex:
         # self.plot_2(instance, save_path="./outputs/DE_FCR_products.png", show=True)
 
         #Cement Plot plots
-        # self.plot_1(instance, save_name="cement_BAU_week42", out_dir="./outputs", show=True)
-        # self.plot_capacity_products(instance, save_name="cement_BAU_capacity_week42", out_dir="./outputs", show=True) 
-        # self.dashboard_cement(instance,
-        #                     baseline_instance=instance,   # or None
-        #                     html_path="./outputs/cement_full_dashboard.html",
-        #                     sankey_max_steps=168)
+        self.plot_1(instance, save_name=f"{self.id}_BAU", out_dir="./outputs", show=False)
+        self.plot_capacity_products(instance, save_name=f"{self.id}_capacity", out_dir="./outputs", show=False) 
+        self.dashboard_cement(instance,
+                            baseline_instance=instance,   # or None
+                            html_path=f"./outputs/{self.id}_dashboard.html",
+                            sankey_max_steps=168)
 
     def determine_optimal_operation_with_flex(self):
         """

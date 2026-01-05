@@ -4,7 +4,7 @@
  
 base:
   start_date: 2035-01-01 00:00
-  end_date: 2035-12-30 23:00
+  end_date: 2035-12-31 23:00
   time_step: 1h
   save_frequency_hours: 24
  
@@ -85,3 +85,4 @@ base:
         solver: highs
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
+        export_dir: outputs/pypsa_nc 

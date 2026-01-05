@@ -25,6 +25,8 @@ from assume.strategies.naive_strategies import (
     DSM_PosCRM_Strategy,
     DSM_NegCRM_Strategy,
     FlexableRedispatchDSM,
+    demand_PosCRM_Strategy,
+    demand_NegCRM_Strategy,
 )
 from assume.strategies.manual_strategies import SimpleManualTerminalStrategy
 from assume.strategies.dmas_powerplant import DmasPowerplantStrategy
@@ -61,6 +63,8 @@ bidding_strategies: dict[str, BaseStrategy] = {
     "dsm_neg_crm_strategy": DSM_NegCRM_Strategy,
     "flexible_storage_redispatch_strategy": flexableRedispatchStorage,
     "flexible_dsm_redispatch_strategy": FlexableRedispatchDSM,
+    "demand_pos_crm_strategy": demand_PosCRM_Strategy,
+    "demand_neg_crm_strategy": demand_NegCRM_Strategy,
 }
 
 try:

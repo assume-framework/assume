@@ -115,7 +115,6 @@ available_examples = {
     "redisp_storage_3_nodes_small": {"scenario": "example_05b", "study_case": "base"},
     "redisp_storage_3_nodes": {"scenario": "example_05c", "study_case": "base"},
     "redisp_dsm_3_nodes": {"scenario": "example_05e", "study_case": "base"},
-    "redisp_storage_3_nodes": {"scenario": "example_05e", "study_case": "base"},
     "redisp_valid_2023": {
         "scenario": "example_05f",
         "study_case": "base",
@@ -152,9 +151,9 @@ if __name__ == "__main__":
 
     # list of examples you want to run
     examples_to_run = [
-        #"redisp_storage_3_nodes_small",
-        "use_case_O45strom",
-        # "use_case_O45H2_HS10",
+        # "redisp_storage_3_nodes",
+        # "use_case_2023",
+        "cement_plant_use_case",
     ]
     # examples_to_run = [example]
 
