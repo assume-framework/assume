@@ -1641,7 +1641,6 @@ class CementPlant(DSMFlex, SupportsMinMax):
     def _add_reserve_capacity_market_threshold_guardrail(self, model):
         """
         Reserve capacity market with threshold/guardrail strategy (cement variant).
-        Mirrors steam plant logic but builds headroom/footroom from cement blocks:
         - calciner, kiln (only if electrically heated in the chosen config),
             electrolyser, cement mill, TES heater (power_in).
         One 4h-block product per block: FCR (symmetric) OR aFRR (up XOR down).
