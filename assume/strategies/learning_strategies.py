@@ -1357,7 +1357,23 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
     def __init__(self, *args, **kwargs):
         super().__init__(act_dim=1, *args, **kwargs)
 
-    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
+        # select 24h foresight
+        self.foresight = 24
+
+    def calculate_bids(self,
+                       unit: SupportsMinMax,
+                       market_config: MarketConfig,
+                       product_tuples: list[Product],
+                       **kwargs,
+                       ) -> Orderbook:
+        """
+        Depending on the market mechanism, calculates either redispatch bids or energy-only market bids.
+
+        Returns
+        -------
+        Orderbook
+            A list containing bids with start/end time, volume, and calculated price.
+        """
         if market_config.market_mechanism == "redispatch":
             return self.calculate_redispatch_bids(
                 unit, market_config, product_tuples, **kwargs
@@ -1366,7 +1382,7 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
             bids = self.calculate_EOM_bids(
                 unit, market_config, product_tuples, **kwargs
             )
-            return bids
+        return bids
 
     def calculate_redispatch_bids(
         self,
@@ -1375,10 +1391,13 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        
         start = product_tuples[0][0]
-        #end_all = product_tuples[-1][1]
-        previous_power = unit.get_output_before(start)
-        min_power, max_power = unit.min_power, unit.max_power
+        end = product_tuples[0][1]
+        
+        # _, max_power = unit.calculate_min_max_power(start, end)
+        max_power = unit.max_power
+        min_power = 0
 
         bids = []
         for product in product_tuples:
@@ -1404,7 +1423,6 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
             )
 
         unit.outputs["redispatch_bids"].loc[product_tuples[0][0]] = price
-
         return bids
 
     def calculate_EOM_bids(
@@ -1431,8 +1449,7 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         end = product_tuples[0][1]
 
         # get technical bounds for the unit output from the unit
-        min_power, max_power = unit.calculate_min_max_power(start, end)
-        min_power = min_power[0]
+        _, max_power = unit.calculate_min_max_power(start, end)
         max_power = max_power[0]
 
         # =============================================================================
@@ -1453,10 +1470,8 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         # =============================================================================
         # 3. Transform Actions into bids
         # =============================================================================
-        # actions are in the range [-1,1], we need to transform them into actual bids
-        # we can use our domain knowledge to guide the bid formulation
-        bid_price = (actions * self.max_bid_price)[0]
-
+        # actions are in the range [0,1], we need to transform them into actual bid
+        bid_price = actions[0] * self.max_bid_price
         # actually formulate bids in orderbook format
         bids = [
             {
@@ -1535,18 +1550,19 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         profit = revenue - costs
 
         # store results in unit outputs which are written to database by unit operator
-        unit.outputs["redispatch_profit"].loc[start:end_excl] = profit
-        unit.outputs["redispatch_costs"].loc[start:end_excl] = costs
+        unit.outputs["redispatch_profit"].loc[start] = profit
+        unit.outputs["redispatch_costs"].loc[start] = costs
 
-        unit.outputs['profit'].loc[start:end_excl] = unit.outputs["eom_profit"].loc[start:end_excl] + unit.outputs["redispatch_profit"].loc[start:end_excl]
-        unit.outputs['total_costs'].loc[start:end_excl] = unit.outputs["eom_costs"].loc[start:end_excl] + unit.outputs["redispatch_costs"].loc[start:end_excl]
+        total_profit = unit.outputs["eom_profit"].loc[start] + unit.outputs["redispatch_profit"].loc[start]
+        unit.outputs['profit'].loc[start] = total_profit
+        unit.outputs['total_costs'].loc[start] = unit.outputs["eom_costs"].loc[start] + unit.outputs["redispatch_costs"].loc[start]
         # calculate reward
-        scaling = 0.1 / unit.max_power
-        reward = unit.outputs["profit"].loc[start:end_excl].sum() * scaling
+        scaling = 1 / (self.max_bid_price * unit.max_power)
+        reward = unit.outputs['profit'].loc[start] * scaling
 
         # write rl-rewards to buffer
         if self.learning_mode:
-            self.learning_role.add_reward_to_cache(unit.id, start, reward, 0, profit)
+            self.learning_role.add_reward_to_cache(unit.id, start, reward, 0, total_profit)
 
     def calculate_EOM_profit(
         self,
@@ -1555,7 +1571,7 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         orderbook: Orderbook,
     ):
         """
-        Calculates the reward for the unit on eom market based on profits and costs.
+        Calculates the profit for the unit on eom market based on profits and costs.
         Args
         ----
         unit : SupportsMinMax
@@ -1595,7 +1611,7 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
             accepted_volume = order.get("accepted_volume", 0)
             accepted_price = order.get("accepted_price", 0)
 
-            # calculate profit as income - running_cost from this event
+            # calculate profit as revenue - running_cost from this event
             order_revenue = accepted_price * accepted_volume * duration
             order_cost = marginal_cost * accepted_volume * duration
 
