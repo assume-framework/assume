@@ -19,6 +19,9 @@ from assume.common.utils import min_max_scale
 
 
 class GenericEnergyMultiMarketStrategy:
+    '''
+    Placeholder class to be developed in the future for multi-market energy and/or capacity bidding strategies.
+    '''
     pass
 
 class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMaxStrategy):
@@ -158,7 +161,9 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
                     bid_price = marginal_cost
                 else:
                     bid_price = own_lmp[i]
-
+            else:
+                bid_price = marginal_cost
+                
             # actually formulate bids in orderbook format
             bids.append(
                 {
