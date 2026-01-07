@@ -370,7 +370,11 @@ class ForecastInitialisation:
                 # Nodal Case
                 self.incidence_matrix = create_incidence_matrix(self.lines, self.buses)
                 self.nodes = self.buses.index.values
-        
+        # if buses and lines dont contain carrier, set it to AC to silence PyPSA warning
+        if "carrier" not in self.lines.columns:
+            self.lines["carrier"] = "AC"
+        if "carrier" not in self.buses.columns:
+            self.buses["carrier"] = "AC"
         self.network.add("Bus", self.buses.index, **self.buses)
         self.network.add("Line", self.lines.index, **self.lines)
         
