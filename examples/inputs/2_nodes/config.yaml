@@ -57,7 +57,7 @@ base_case:
 
 inc_dec_heuristic:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-06 00:00
+  end_date: 2019-02-01 00:00
   time_step: 1h
   learning_mode: False
   save_frequency_hours: False
@@ -111,30 +111,31 @@ inc_dec_heuristic:
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
 
-learning_single_diesel:
+learning_diesel:
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-02 00:00
+  end_date: 2019-02-01 00:00
   time_step: 1h
   save_frequency_hours: null
+
   learning_config:
     learning_mode: true
-    algorithm: matd3
-    batch_size: 64
     continue_learning: false
-    device: cpu
-    episodes_collecting_initial_experience: 40
-    gamma: 0.99
-    gradient_steps: 1
-    learning_rate: 0.0003
-    learning_rate_schedule: linear
+    trained_policies_save_path: null
+    trained_policies_load_path: null
     max_bid_price: 100
-    action_noise_schedule: linear
-    noise_dt: 1
-    noise_scale: 0.5
-    noise_sigma: 0.3
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 20
+    episodes_collecting_initial_experience: 5
     train_freq: 24h
-    trained_policies_save_path: null # path to save trained policies nur sinnvoll wenn continue_learning: true, sonst wird der Pfad komisch
-    training_episodes: 100
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
     validation_episodes_interval: 5
 
   markets_config:

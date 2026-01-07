@@ -1,2 +1,2 @@
-name,bus0,bus1,s_nom,x,r
-Line_N_S,north,south,30000.0,0.01,0.001
+name,bus0,bus1,s_nom,s_max_pu,carrier,x,r
+Line_N_S,north,south,30000.0,1,AC,0.01,0.001
