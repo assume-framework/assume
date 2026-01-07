@@ -6,6 +6,7 @@ import calendar
 import inspect
 import logging
 import os
+import random
 import re
 import shutil
 import sys
@@ -843,3 +844,39 @@ def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
                 "Simulation aborted by user not to overwrite existing learned strategies. "
                 "You can set a different 'simulation_id' or 'trained_policies_save_path' in the config."
             )
+
+
+def set_random_seed(seed: int, torch_deterministic: bool = True):
+    """
+    Args:
+     seed (int): Integer seed for random number generators.
+     torch_deterministic (bool): If True, enforces PyTorch deterministic algorithms.
+                           May reduce performance. Default is True.
+
+     Notes:
+         - Completely reproducible results are not guaranteed across different PyTorch versions, hardware, or CUDA configurations.
+         - See https://docs.pytorch.org/docs/stable/notes/randomness.html
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+
+    try:
+        import torch as th
+
+        if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
+        th.manual_seed(seed)
+
+        if torch_deterministic:
+            th.backends.cudnn.deterministic = True
+            th.backends.cudnn.benchmark = False
+
+            th.use_deterministic_algorithms(True)
+
+            logger.debug(
+                "PyTorch set to use deterministic algorithms. This may impact performance but ensures reproducibility. For better performance, consider setting 'deterministic' to False when set_random_seed() is called."
+            )
+    except ImportError:
+        pass
