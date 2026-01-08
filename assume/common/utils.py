@@ -846,10 +846,10 @@ def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
             )
 
 
-def set_random_seed(seed: int, torch_deterministic: bool = True):
+def set_random_seed(seed: int | None, torch_deterministic: bool = True):
     """
     Args:
-     seed (int): Integer seed for random number generators.
+     seed (int | None): Integer seed for random number generators or None to disable seeding.
      torch_deterministic (bool): If True, enforces PyTorch deterministic algorithms.
                            May reduce performance. Default is True.
 
@@ -857,9 +857,11 @@ def set_random_seed(seed: int, torch_deterministic: bool = True):
          - Completely reproducible results are not guaranteed across different PyTorch versions, hardware, or CUDA configurations.
          - See https://docs.pytorch.org/docs/stable/notes/randomness.html
     """
+    if seed is None:
+        return
+
     random.seed(seed)
     np.random.seed(seed)
-    os.environ["PYTHONHASHSEED"] = str(seed)
 
     try:
         import torch as th

@@ -493,13 +493,8 @@ def load_config_and_create_forecaster(
         study_case = list(config.keys())[0]
     config = config[study_case]
 
-    # Default deterministic behavior
-    if "seed" not in config:
-        set_random_seed(42)
-    # If seed is provided, set the random seed accordingly
-    elif config.get("seed") is not None:
-        set_random_seed(config["seed"])
-    # 'seed: null' in config -> no seeding
+    # Set seed, or disable with `seed: null` in config
+    set_random_seed(config.get("seed", 42))
 
     simulation_id = config.get("simulation_id", f"{scenario}_{study_case}")
 
