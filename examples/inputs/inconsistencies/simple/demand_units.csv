@@ -1,2 +1,0 @@
-name,technology,bidding_EOM,max_power,min_power,unit_operator,max_price,elasticity,elasticity_model,num_bids
-demand,demand,elastic_demand,83102,0,eom_operator,3000.0,-0.0361,isoelastic,10
