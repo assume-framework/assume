@@ -2,15 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-"""
-ROLLOUT BUFFER - On-Policy Experience Storage for PPO
-
-Unlike the replay buffer (off-policy), the rollout buffer:
-1. Stores complete trajectories from current policy
-2. Computes advantages using GAE (Generalized Advantage Estimation)
-3. Is cleared after each policy update (single-use data)
-"""
-
 import numpy as np
 import torch as th
 from typing import NamedTuple, Generator
@@ -29,15 +20,6 @@ class RolloutBufferSamples(NamedTuple):
 class RolloutBuffer:
     """
     On-policy rollout buffer for PPO algorithm.
-    
-    Stores trajectories from the current policy and computes
-    GAE-based advantages for policy optimization.
-    
-    Key differences from ReplayBuffer:
-    - Single-use: data is discarded after update
-    - Stores log_probs for importance sampling
-    - Stores values for advantage computation
-    - Computes advantages and returns before sampling
     """
 
     def __init__(
@@ -53,16 +35,6 @@ class RolloutBuffer:
     ):
         """
         Initialize rollout buffer.
-        
-        Args:
-            buffer_size: Maximum number of transitions per rollout
-            obs_dim: Observation dimension per agent
-            act_dim: Action dimension per agent
-            n_rl_units: Number of RL agents
-            device: Torch device (cpu/cuda)
-            float_type: Data type for tensors
-            gamma: Discount factor for returns
-            gae_lambda: Lambda for GAE computation
         """
         self.buffer_size = buffer_size
         self.obs_dim = obs_dim
@@ -133,14 +105,6 @@ class RolloutBuffer:
     ) -> None:
         """
         Add a transition to the buffer.
-        
-        Args:
-            obs: Observations [n_agents, obs_dim]
-            action: Actions taken [n_agents, act_dim]
-            reward: Rewards received [n_agents]
-            done: Episode done flags [n_agents]
-            value: Value estimates [n_agents]
-            log_prob: Log probabilities of actions [n_agents]
         """
         if self.pos >= self.buffer_size:
             self.full = True
@@ -162,13 +126,6 @@ class RolloutBuffer:
     ) -> None:
         """
         Compute GAE advantages and returns.
-        
-        Uses Generalized Advantage Estimation (GAE) for lower variance
-        advantage estimates.
-        
-        Args:
-            last_values: Value estimates for the last state [n_agents]
-            dones: Done flags for the last state [n_agents]
         """
         last_values = np.array(last_values).flatten()
         dones = np.array(dones).flatten()
@@ -209,16 +166,10 @@ class RolloutBuffer:
     ) -> Generator[RolloutBufferSamples, None, None]:
         """
         Generate batches of samples for training.
-        
-        Args:
-            batch_size: Size of each batch. If None, return all data.
-            
-        Yields:
-            RolloutBufferSamples containing observation, action, etc.
         """
         if not self.generator_ready:
             raise ValueError(
-                "Must call compute_returns_and_advantages before sampling!"
+                "Must call compute_returns_and_advantages before sampling."
             )
 
         buffer_size = self.pos if not self.full else self.buffer_size
