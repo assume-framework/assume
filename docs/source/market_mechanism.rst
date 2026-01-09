@@ -79,7 +79,7 @@ is given by: :math:`\mathbf{a}_{c, p} \: u_c \leq u_{p} \quad \forall \: c, p \i
 
 with the incidence matrix :math:`\mathbf{a}_{c, p}` defining the links between bids as 1, if c is linked as child to p, 0 else.
 
-Flows in the network are limited by the Net Transfer Capacity ('s_nom') of each line l: :math:`\quad -NTC_{l} \leq F_{l, t} \leq NTC_{l} \quad \forall \: l \in \mathcal{L}, t \in \mathcal{T}`,
+Flows in the network are limited by the Net Transfer Capacity ('s_nom' * 's_max_pu') of each line l: :math:`\quad -NTC_{l} \leq F_{l, t} \leq NTC_{l} \quad \forall \: l \in \mathcal{L}, t \in \mathcal{T}`,
 
 Because with this algorithm, paradoxically accepted bids (PABs) can occur, the objective is solved in an iterative manner:
 
