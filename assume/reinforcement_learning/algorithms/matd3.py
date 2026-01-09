@@ -329,7 +329,7 @@ class TD3(RLAlgorithm):
         The created actor networks are associated with each unit strategy and stored as attributes.
 
         Note:
-            The observation dimension need to be the same, due to the centralized criic that all actors share.
+            The observation dimension need to be the same, due to the centralized critic that all actors share.
             If you have units with different observation dimensions. They need to have different critics and hence learning roles.
 
         """
