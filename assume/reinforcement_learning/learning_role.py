@@ -19,6 +19,8 @@ from assume.common.utils import (
 )
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
+from assume.reinforcement_learning.algorithms.maddpg import DDPG
+from assume.reinforcement_learning.algorithms.mappo import PPO
 from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
@@ -453,6 +455,10 @@ class Learning(Role):
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(learning_role=self)
+        elif algorithm == "maddpg":
+            self.rl_algorithm = DDPG(learning_role=self)
+        elif algorithm == "mappo":
+            self.rl_algorithm = PPO(learning_role=self)
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")
 

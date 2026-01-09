@@ -248,7 +248,7 @@ def transfer_weights(
 ) -> dict | None:
     """
     Transfer weights from loaded model to new model. Copy only those obs- and action-slices for matching IDs.
-    New IDs keep their original (random) weights. Function only works if the neural network architeczture remained stable besides the input layer, namely with the same hidden layers.
+    New IDs keep their original (random) weights. Function only works if the neural network architecture remained stable besides the input layer, namely with the same hidden layers.
 
     Args:
         model (th.nn.Module): The model to transfer weights to.
@@ -259,7 +259,7 @@ def transfer_weights(
         act_dim (int): The action dimension size.
         unique_obs (int): The unique observation size per agent, smaller than obs_base as these include also shared observation values.
 
-    returns:
+    Returns:
         dict | None: The updated state dictionary with transferred weights, or None if architecture mismatch.
     """
 
