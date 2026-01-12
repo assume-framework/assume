@@ -56,8 +56,8 @@ Attributes
 
 4. **Line**: Transmission grids that transmit electricity
     - **name**: Unique identifier of the line
-    - **s_nom**: Nominal transmission capacity
-    - **s_max_pu**: Maximum loading as a fraction of s_nom
+    - **s_nom**: Nominal transmission capacity of apparent power in MVA
+    - **s_max_pu**: Maximum loading as a fraction of s_nom (value between 0 and 1)
     - **capital_cost**: Capital cost for extending lines by 1 MVA
     - **r**: Resistance in Ohms
     - **bus0**: First node the line is connected to
