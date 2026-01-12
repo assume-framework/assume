@@ -480,7 +480,7 @@ def calculate_price_average(current_time, foresight, price_forecast):
     start = max(current_time - foresight, price_forecast.index[0])
     end = min(current_time + foresight, price_forecast.index[-1])
 
-    average_price = np.mean(price_forecast.loc[start:end])
+    average_price = np.round(np.mean(price_forecast.loc[start:end]), 5)
 
     return average_price
 
