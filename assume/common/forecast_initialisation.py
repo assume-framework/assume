@@ -406,11 +406,11 @@ class ForecastInitialisation:
         for line_id, line_data in self.lines.iterrows():
             node1, node2 = line_data["bus0"], line_data["bus1"]
             s_max_pu = (
-                    self.lines.at[line_id, "s_max_pu"]
-                    if "s_max_pu" in self.lines.columns
-                    and not pd.isna(self.lines.at[line_id, "s_max_pu"])
-                    else 1.0
-                )
+                self.lines.at[line_id, "s_max_pu"]
+                if "s_max_pu" in self.lines.columns
+                and not pd.isna(self.lines.at[line_id, "s_max_pu"])
+                else 1.0
+            )
             line_capacity = line_data["s_nom"] * s_max_pu
 
             # Calculate net load for the line as the sum of net loads from both connected nodes
