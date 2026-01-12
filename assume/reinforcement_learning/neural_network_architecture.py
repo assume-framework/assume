@@ -183,7 +183,7 @@ class CriticDDPG(Critic):
         xu = th.cat([obs, actions], dim=1) # Concatenate obs & actions
 
         # Compute Q
-        x = nn.Sequential(*self.layers)(xu)
+        x = nn.Sequential(*self.q_layers)(xu)
 
         return x
 
@@ -232,7 +232,10 @@ class CriticPPO(Critic):
 
     def forward(self, obs: th.Tensor) -> th.Tensor:
         """Returns V value."""
-        return self.v_net(obs)
+        x = obs
+        for layer in self.v_layers:
+            x = layer(x)
+        return x
 
 
 class Actor(nn.Module):
@@ -396,15 +399,20 @@ class LSTMActor(Actor):
 
 
 class ActorPPO(nn.Module):
-    """
-    PPO Stochastic Actor Network.
-    
-    Key differences from MLPActor (DDPG):
-    - Outputs mean AND log_std for Gaussian policy
-    - Provides log_prob for importance sampling
-    - Used with clipped surrogate objective
-    """
+    activation_function_limit = {
+        "softsign": (-1, 1),
+        "tanh": (-1, 1),
+        "sigmoid": (0, 1),
+        "relu": (0, float("inf")),
+    }
 
+    activation_function_map = {
+        "softsign": F.softsign,
+        "tanh": th.tanh,
+        "sigmoid": th.sigmoid,
+        "relu": F.relu
+    }
+    
     def __init__(
         self,
         obs_dim: int,
@@ -414,19 +422,21 @@ class ActorPPO(nn.Module):
         *args,
         **kwargs,
     ):
-        """
-        Initialize stochastic actor.
-        
-        Args:
-            obs_dim: Observation dimension
-            act_dim: Action dimension
-            float_type: Data type for parameters
-            log_std_init: Initial log standard deviation
-        """
         super().__init__()
 
         self.act_dim = act_dim
         self.float_type = float_type
+
+        self.activation = "softsign" # or "tanh", "sigmoid", "relu"
+
+        if self.activation not in self.activation_function_limit:
+            raise ValueError(
+                f"Activation '{self.activation}' not supported! Supported: {list(self.activation_function_limit.keys())}"
+            )
+        
+        self.min_output, self.max_output = self.activation_function_limit[
+            self.activation
+        ]
 
         # Policy network (outputs mean)
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
@@ -457,21 +467,31 @@ class ActorPPO(nn.Module):
         nn.init.orthogonal_(self.mean_layer.weight, gain=0.01)
         nn.init.zeros_(self.mean_layer.bias)
 
-    def forward(self, obs: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
-        """
-        Forward pass: observation → (mean, log_std).
-        
-        Args:
-            obs: Observations [batch, obs_dim]
-            
-        Returns:
-            Tuple of (action_mean, log_std)
-        """
+    def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        """Forward pass"""
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
         mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
         
-        # Expand log_std to batch size
+        if deterministic:
+            return mean
+        
+        # Sample from Gaussian during training
+        log_std = self.log_std.expand_as(mean)
+        std = log_std.exp()
+        noise = th.randn_like(mean)
+        action = mean + std * noise
+        
+        # Clamp to valid range
+        return th.clamp(action, -1.0, 1.0)
+
+    def get_distribution(self, obs: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
+        """
+        Get the policy distribution parameters.
+        """
+        x = F.relu(self.FC1(obs))
+        x = F.relu(self.FC2(x))
+        mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
         log_std = self.log_std.expand_as(mean)
         
         return mean, log_std
@@ -491,7 +511,7 @@ class ActorPPO(nn.Module):
         Returns:
             Tuple of (action, log_prob)
         """
-        mean, log_std = self.forward(obs)
+        mean, log_std = self.get_distribution(obs)
         std = log_std.exp()
 
         if deterministic:
@@ -526,7 +546,7 @@ class ActorPPO(nn.Module):
         Returns:
             Tuple of (log_prob, entropy, values)
         """
-        mean, log_std = self.forward(obs)
+        mean, log_std = self.get_distribution(obs)
         std = log_std.exp()
 
         # Log probability

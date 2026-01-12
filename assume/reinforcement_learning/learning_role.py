@@ -7,6 +7,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch as th
 from mango import Role
@@ -21,7 +22,10 @@ from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.algorithms.maddpg import DDPG
 from assume.reinforcement_learning.algorithms.mappo import PPO
-from assume.reinforcement_learning.buffer import ReplayBuffer
+from assume.reinforcement_learning.buffer import (
+    ReplayBuffer, 
+    RolloutBuffer
+)
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
     transform_buffer_data,
@@ -54,6 +58,7 @@ class Learning(Role):
 
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
+        self.rollout_buffer: RolloutBuffer = None # For on-policy algorithms (PPO)
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.learning_config = learning_config
@@ -123,6 +128,10 @@ class Learning(Role):
             self.all_rewards = defaultdict(lambda: defaultdict(list))
             self.all_regrets = defaultdict(lambda: defaultdict(list))
             self.all_profits = defaultdict(lambda: defaultdict(list))
+            # PPO algorithm specific caches for on-policy learning
+            self.all_values = defaultdict(lambda: defaultdict(list))
+            self.all_log_probs = defaultdict(lambda: defaultdict(list))
+            self.all_dones = defaultdict(lambda: defaultdict(list))
 
     def on_ready(self):
         """
@@ -234,6 +243,10 @@ class Learning(Role):
         current_noises = self.all_noises
         current_regrets = self.all_regrets
         current_profits = self.all_profits
+        # PPO specific caches
+        current_values = self.all_values
+        current_log_probs = self.all_log_probs
+        current_dones = self.all_dones
 
         # Reset cache dicts immediately with new defaultdicts
         self.all_obs = defaultdict(lambda: defaultdict(list))
@@ -242,6 +255,10 @@ class Learning(Role):
         self.all_noises = defaultdict(lambda: defaultdict(list))
         self.all_regrets = defaultdict(lambda: defaultdict(list))
         self.all_profits = defaultdict(lambda: defaultdict(list))
+        # PPO specific resets
+        self.all_values = defaultdict(lambda: defaultdict(list))
+        self.all_log_probs = defaultdict(lambda: defaultdict(list))
+        self.all_dones = defaultdict(lambda: defaultdict(list))
 
         # Get timestamps from cache we took
         all_timestamps = sorted(current_obs.keys())
@@ -257,6 +274,9 @@ class Learning(Role):
                 "noises": {t: current_noises[t] for t in timestamps_to_process},
                 "regret": {t: current_regrets[t] for t in timestamps_to_process},
                 "profit": {t: current_profits[t] for t in timestamps_to_process},
+                "values": {t: current_values[t] for t in timestamps_to_process},
+                "log_probs": {t: current_log_probs[t] for t in timestamps_to_process},
+                "dones": {t: current_dones[t] for t in timestamps_to_process}
             }
 
             # write data to output agent
@@ -289,12 +309,84 @@ class Learning(Role):
                 )
                 return
 
-        # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
-        self.buffer.add(
-            obs=transform_buffer_data(cache["obs"], device),
-            actions=transform_buffer_data(cache["actions"], device),
-            reward=transform_buffer_data(cache["rewards"], device),
-        )
+        # check which buffer type to use based on algorithm
+        if self.learning_config.algorithm == "mappo":
+            # for PPO use on-policy RolloutBuffer
+            # Add each transition to the rollout buffer
+            for timestamp in sorted(cache["obs"].keys()):
+                obs_data = transform_buffer_data(
+                    {
+                        timestamp: cache["obs"][timestamp]
+                    },
+                    device
+                )
+                actions_data = transform_buffer_data(
+                    {
+                        timestamp: cache["actions"][timestamp]
+                    },
+                    device
+                )
+                rewards_data = transform_buffer_data(
+                    {
+                        timestamp: cache["rewards"][timestamp]
+                    },
+                    device
+                )
+                
+                if cache["values"].get(timestamp):
+                    values_data = transform_buffer_data(
+                        {
+                            timestamp: cache["values"][timestamp]
+                        },
+                        device
+                    )
+                else:
+                    values_data = np.zeros(len(self.values_data))
+                
+                if cache["log_probs"].get(timestamp):
+                    log_probs_data = transform_buffer_data(
+                        {
+                            timestamp: cache["log_probs"][timestamp]
+                        },
+                        device
+                    )
+                else:
+                    log_probs_data = np.zeros(len(self.log_probs_data))
+
+                if cache["dones"].get(timestamp):
+                    dones_data = transform_buffer_data(
+                        {
+                            timestamp: cache["dones"][timestamp]
+                        },
+                        device
+                    )
+                else:
+                    dones_data = np.zeros(len(self.rl_strats))
+
+                # Helper to convert to numpy
+                def to_numpy(data):
+                    if isinstance(data, th.Tensor):
+                        return data.cpu().numpy()
+                    return np.array(data)
+
+                # Add to rollout buffer
+                if self.rollout_buffer is not None:
+                    self.rollout_buffer.add(
+                        obs = to_numpy(obs_data),
+                        action = to_numpy(actions_data),
+                        reward = to_numpy(rewards_data),
+                        done = to_numpy(dones_data),
+                        value = to_numpy(values_data),
+                        log_prob = to_numpy(log_probs_data)
+                    )
+        else:
+            # for TD3/DDPG use off-policy ReplayBuffer
+            # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
+            self.buffer.add(
+                obs = transform_buffer_data(cache["obs"], device),
+                actions = transform_buffer_data(cache["actions"], device),
+                reward = transform_buffer_data(cache["rewards"], device),
+            )
 
         if (
             self.episodes_done
@@ -347,6 +439,27 @@ class Learning(Role):
         self.all_regrets[start][unit_id].append(regret)
         self.all_profits[start][unit_id].append(profit)
 
+    def add_ppo_data_to_cache(
+        self,
+        unit_id,
+        start,
+        value,
+        log_prob,
+        done=False
+    ) -> None:
+        """
+        Add PPO specific data to the cache dict, per unit_id.
+
+        Args:
+            unit_id (str): The id of the unit.
+            value (float): The value estimate V(s) from the critic.
+            log_prob (float): The log probability of the action.
+            done (bool): Whether a terminal state or not.
+        """
+        self.all_values[start][unit_id].append(value)
+        self.all_log_probs[start][unit_id].append(log_prob)
+        self.all_dones[start][unit_id].append(float(done))
+
     def load_inter_episodic_data(self, inter_episodic_data):
         """
         Load the inter-episodic data from the dict stored across simulation runs.
@@ -361,6 +474,7 @@ class Learning(Role):
         self.rl_eval = inter_episodic_data["all_eval"]
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
+        self.rollout_buffer = inter_episodic_data["rollout_buffer"]
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
@@ -390,6 +504,7 @@ class Learning(Role):
             "all_eval": self.rl_eval,
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
+            "rollout_buffer": self.rollout_buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
 

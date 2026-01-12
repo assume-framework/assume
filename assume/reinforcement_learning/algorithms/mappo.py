@@ -28,21 +28,23 @@ class PPO(RLAlgorithm):
     def __init__(
         self, 
         learning_role,
-        clip_range = 0.2, # Clipping parameter 
-        clip_range_vf = None, 
-        n_epochs = 10, # Number of epochs per update
-        entropy_coef = 0.01, # Entropy bonus coefficient
-        vf_coef = 0.5, # Value function loss coefficient
-        max_grad_norm = 0.5, # Gradient clipping
+        clip_range = 0.1,       # Epsilon clipping constant preventing the policy from changing too much in a single update.
+        clip_range_vf = 0.1,    # preventing the value function from changing too much from previous estimates
+        n_epochs = 30,          # sample efficiency
+        entropy_coef = 0.02,    # encourages exploration by rewarding "randomness"
+        vf_coef = 1.0,          # balances the importance of training the Critic and training the Actor
+        max_grad_norm = 0.5,    # Gradient clipping
     ):
         """Initialize PPO algorithm."""
         super().__init__(learning_role)
 
-        self.clip_range = clip_range
-        self.clip_range_vf = clip_range_vf
-        self.n_epochs = n_epochs
-        self.entropy_coef = entropy_coef
-        self.vf_coef = vf_coef
+        config = self.learning_config
+        
+        self.clip_range = clip_range if clip_range is not None else getattr(config, 'ppo_clip_range', 0.2)
+        self.clip_range_vf = clip_range_vf if clip_range_vf is not None else getattr(config, 'ppo_clip_range_vf', None)
+        self.n_epochs = n_epochs if n_epochs is not None else getattr(config, 'ppo_n_epochs', 10)
+        self.entropy_coef = entropy_coef if entropy_coef is not None else getattr(config, 'ppo_entropy_coef', 0.01)
+        self.vf_coef = vf_coef if vf_coef is not None else getattr(config, 'ppo_vf_coef', 0.5)
         self.max_grad_norm = max_grad_norm
 
         # Update counter
@@ -274,6 +276,21 @@ class PPO(RLAlgorithm):
 
         # Get rollout buffer
         rollout_buffer = self.learning_role.rollout_buffer
+        
+        # Check if rollout buffer has data
+        if rollout_buffer is None or rollout_buffer.pos == 0:
+            logger.debug("Rollout buffer is empty, skipping policy update")
+            return
+
+        # Accumulate data if we don't have enough for a full batch
+        # This decouples train_freq from the required rollout length
+        if rollout_buffer.pos < self.learning_role.learning_config.batch_size:
+            logger.debug(
+                f"Rollout buffer has {rollout_buffer.pos} samples, "
+                f"waiting for {self.learning_role.learning_config.batch_size} (batch_size). "
+                "Skipping update to accumulate more on-policy data."
+            )
+            return
 
         # Update learning rate
         progress_remaining = self.learning_role.get_progress_remaining()
@@ -293,16 +310,37 @@ class PPO(RLAlgorithm):
         buffer_size = rollout_buffer.pos if not rollout_buffer.full else rollout_buffer.buffer_size
 
         if buffer_size > 0:
-            # Get the last observation from the buffer
-            last_obs = rollout_buffer.observations[buffer_size-1]
-            last_dones = rollout_buffer.dones[buffer_size-1]
+            # Use the LAST observation as the bootstrap for the REST of the buffer.
+            # We sacrifice the last step (pos-1) to serve as s_{t+1} for the step before it.
+            # This ensures V(s_{t+1}) is calculating using the REAL next state, not self-referential.
+            
+            last_idx = buffer_size - 1
+            last_obs = rollout_buffer.observations[last_idx]
+            last_dones = rollout_buffer.dones[last_idx]
+            
+            # Reduce buffer size by 1 so as to not train on the bootstrap step
+            rollout_buffer.pos -= 1
+            if rollout_buffer.full:
+                rollout_buffer.full = False # If it was full, it's not anymore
+                
+            # Prepare unique observations for centralized critic
+            last_unique_obs = last_obs[:, self.obs_dim - self.unique_obs_dim :]
 
             with th.no_grad():
                 for i, strategy in enumerate(strategies):
+                    # Construct centralized observation
+                    obs_i = last_obs[i : i + 1]
+                    other_unique = np.concatenate(
+                        (last_unique_obs[:i], last_unique_obs[i + 1 :]), axis=0
+                    )
+                    centralized_obs = np.concatenate(
+                        (obs_i, other_unique.reshape(1, -1)), axis=1
+                    )
+
                     obs_tensor = th.as_tensor(
-                        last_obs[i:i+1],
-                        device = self.device,
-                        dtype = self.float_type
+                        centralized_obs,
+                        device=self.device,
+                        dtype=self.float_type,
                     )
                     # Get value estimate from critic
                     last_values[i] = strategy.critic(obs_tensor).cpu().numpy().flatten()[0]
@@ -315,14 +353,54 @@ class PPO(RLAlgorithm):
         all_actor_losses = []
         all_critic_losses = []
         all_entropy_losses = []
+        
+        # Initialize unit_params for gradient logging
+        # Use an empty list that will be dynamically extended
+        unit_params = []
+        step_count = 0
+        
+        # Helper to create a new step entry
+        def create_step_entry():
+            return {
+                u_id: {
+                    "actor_loss": None,
+                    "actor_total_grad_norm": None,
+                    "actor_max_grad_norm": None,
+                    "critic_loss": None,
+                    "critic_total_grad_norm": None,
+                    "critic_max_grad_norm": None,
+                }
+                for u_id in self.learning_role.rl_strats.keys()
+            }
 
         for epoch in range(self.n_epochs):
             for batch in rollout_buffer.get(self.learning_config.batch_size):
+                current_batch_size = batch.observations.shape[0]
+
+                # Precompute unique observation parts for centralized critic
+                unique_obs_from_others = batch.observations[
+                    :, :, self.obs_dim - self.unique_obs_dim :
+                ].reshape(current_batch_size, n_rl_agents, -1)
+
                 for i, strategy in enumerate(strategies):
                     actor = strategy.actor
                     critic = strategy.critic
 
                     obs_i = batch.observations[:, i, :]
+                    
+                    # Construct centralized state
+                    other_unique_obs = th.cat(
+                        (unique_obs_from_others[:, :i], unique_obs_from_others[:, i + 1 :]),
+                        dim=1,
+                    )
+                    all_states = th.cat(
+                        (
+                            obs_i.reshape(current_batch_size, -1),
+                            other_unique_obs.reshape(current_batch_size, -1),
+                        ),
+                        dim=1,
+                    )
+
                     actions_i = batch.actions[:, i, :]
                     old_log_probs_i = batch.old_log_probs[:, i]
                     advantages_i = batch.advantages[:, i]
@@ -337,7 +415,7 @@ class PPO(RLAlgorithm):
                         obs_i,
                         actions_i
                     )
-                    values = critic(obs_i).flatten()
+                    values = critic(all_states).flatten()
 
                     # Importance sampling ratio
                     ratio = th.exp(log_probs - old_log_probs_i)
@@ -347,12 +425,12 @@ class PPO(RLAlgorithm):
                     policy_loss_2 = advantages_i * th.clamp(
                         ratio, 1 - self.clip_range, 1 + self.clip_range
                     )
-                    policy_loss = -th.min(policy_loss_1, policy_loss_2)
+                    policy_loss = -th.min(policy_loss_1, policy_loss_2).mean()
 
                     # Entropy loss
                     entropy_loss = -self.entropy_coef * entropy.mean()
 
-                    if self.clip_rnage_vf is not None:
+                    if self.clip_range_vf is not None:
                         # Clipped value function loss
                         values_clipped = old_values_i + th.clamp(
                             values - old_values_i,
@@ -372,11 +450,24 @@ class PPO(RLAlgorithm):
                     critic.optimizer.zero_grad()
                     loss.backward()
 
+                    # Calculate gradient norms BEFORE clipping
+                    actor_params = list(actor.parameters())
+                    critic_params = list(critic.parameters())
+                    
+                    actor_max_grad_norm = max(
+                        (p.grad.norm().item() for p in actor_params if p.grad is not None),
+                        default=0.0
+                    )
+                    critic_max_grad_norm = max(
+                        (p.grad.norm().item() for p in critic_params if p.grad is not None),
+                        default=0.0
+                    )
+
                     # Gradient clipping
-                    th.nn.utils.clip_grad_norm_(
+                    actor_total_grad_norm = th.nn.utils.clip_grad_norm_(
                         actor.parameters(), self.max_grad_norm
                     )
-                    th.nn.utils.clip_grad_norm_(
+                    critic_total_grad_norm = th.nn.utils.clip_grad_norm_(
                         critic.parameters(), self.max_grad_norm
                     )
 
@@ -387,20 +478,44 @@ class PPO(RLAlgorithm):
                     all_actor_losses.append(policy_loss.item())
                     all_critic_losses.append(value_loss.item())
                     all_entropy_losses.append(entropy_loss.item())
+                    
+                    # Ensure we have an entry for this step
+                    if step_count >= len(unit_params):
+                        unit_params.append(create_step_entry())
+                    
+                    # Store per-unit gradient params for this step
+                    unit_params[step_count][strategy.unit_id]["actor_loss"] = policy_loss.item()
+                    unit_params[step_count][strategy.unit_id]["critic_loss"] = value_loss.item()
+                    unit_params[step_count][strategy.unit_id]["actor_total_grad_norm"] = actor_total_grad_norm.item() if isinstance(actor_total_grad_norm, th.Tensor) else actor_total_grad_norm
+                    unit_params[step_count][strategy.unit_id]["actor_max_grad_norm"] = actor_max_grad_norm
+                    unit_params[step_count][strategy.unit_id]["critic_total_grad_norm"] = critic_total_grad_norm.item() if isinstance(critic_total_grad_norm, th.Tensor) else critic_total_grad_norm
+                    unit_params[step_count][strategy.unit_id]["critic_max_grad_norm"] = critic_max_grad_norm
+                
+                step_count += 1
 
         self.n_updates += 1
 
         # Log average metrics
-        if self.learning_role.tensor_board_logger:
-            self.learning_role.tensor_board_logger.log_scalar(
-                "ppo/actor_loss", np.mean(all_actor_losses), self.n_updates
-            )
-            self.learning_role.tensor_board_logger.log_scalar(
-                "ppo/critic_loss", np.mean(all_critic_losses), self.n_updates
-            )
-            self.learning_role.tensor_board_logger.log_scalar(
-                "ppo/entropy_loss", np.mean(all_entropy_losses), self.n_updates
-            )
+        # Log average metrics
+        # if self.learning_role.tensor_board_logger:
+        #     self.learning_role.tensor_board_logger.log_scalar(
+        #         "ppo/actor_loss", np.mean(all_actor_losses), self.n_updates
+        #     )
+        #     self.learning_role.tensor_board_logger.log_scalar(
+        #         "ppo/critic_loss", np.mean(all_critic_losses), self.n_updates
+        #     )
+        #     self.learning_role.tensor_board_logger.log_scalar(
+        #         "ppo/entropy_loss", np.mean(all_entropy_losses), self.n_updates
+        #     )
+        # if all_actor_losses:
+        #     logger.info(
+        #         f"PPO Update {self.n_updates} - Actor loss: {np.mean(all_actor_losses):.4f}, "
+        #         f"Critic loss: {np.mean(all_critic_losses):.4f}, "
+        #         f"Entropy loss: {np.mean(all_entropy_losses):.4f}"
+        #     )
+
+        # Write gradient params to output
+        self.learning_role.write_rl_grad_params_to_output(learning_rate, unit_params)
 
         # Clear rollout buffer
         rollout_buffer.reset()

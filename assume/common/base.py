@@ -865,6 +865,13 @@ class LearningConfig:
     target_policy_noise: float = 0.2
     target_noise_clip: float = 0.5
 
+    ppo_clip_range: float | None = 0.1
+    ppo_clip_range_vf: float | None = None
+    ppo_n_epochs: int = 10
+    ppo_entropy_coef: float = 0.01
+    ppo_vf_coef: float = 0.5
+    ppo_gae_lambda: float = 0.95
+
     def __post_init__(self):
         """Calculate defaults that depend on other fields and validate inputs."""
         if self.early_stopping_steps is None:
