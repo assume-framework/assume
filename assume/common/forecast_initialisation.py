@@ -6,6 +6,11 @@ import logging
 from collections.abc import Callable
 
 import pandas as pd
+from dateutil import rrule as rr
+
+from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.strategies.naive_strategies import EnergyHeuristicElasticStrategy
+from assume.markets.clearing_algorithms.simple import PayAsClearRole
 
 
 def _ensure_not_none(
@@ -282,6 +287,32 @@ class ForecastInitialisation:
         ]
         sum_demand = self.demand[demand_units.index].sum(axis=1)
 
+        # Process elastic demand (which is not included in demand_df.csv and therefore not in self.demand)
+        elastic_demand_units = self.demand_units[
+            (self.demand_units[f"bidding_{market_id}"] == "demand_energy_heuristic_elastic")
+            | (self.demand_units[f"bidding_{market_id}"] == "elastic_demand")
+        ]
+        elastic_demand_volumes = []
+        elastic_demand_prices = []
+        elastic_demand_bids = []
+        if not elastic_demand_units.empty:
+            es = EnergyHeuristicElasticStrategy()
+            start = pd.Timestamp(self.market_configs[market_id]['start_date'])
+            end = start + pd.Timedelta(self.market_configs[market_id]['products'][0]['duration'])
+            product_tuples = {(start,
+                               end,
+                               None)}        
+            for unit in elastic_demand_units.index:
+                # calculate bids as elastic_demand with no time dependency
+                elastic_demand_bids.extend(es.calculate_bids(elastic_demand_units.loc[unit],
+                                                             self.market_configs[market_id],
+                                                             product_tuples=product_tuples)
+                                                             )
+                
+            # sort all bids by price descending
+            all_bids = pd.DataFrame(elastic_demand_bids).sort_values(by='price', ascending=False).reset_index(drop=True)
+            elastic_demand_prices = all_bids['price']
+            elastic_demand_volumes = all_bids['volume']
         # get exchanges if exchange_units are available
         if self.exchange_units is not None:
             exchange_units = self.exchange_units[
@@ -299,31 +330,79 @@ class ForecastInitialisation:
         # 5. Initialize the price forecast series.
         price_forecast = pd.Series(index=self.index, data=0.0)
 
-        # 6. Loop over each time step
-        for t in self.index:
-            # Get marginal costs and available power for time t (both are Series indexed by unit)
-            mc_t = marginal_costs.loc[t]
-            power_t = power.loc[t]
-            demand_t = sum_demand.loc[t]
+        if elastic_demand_units.empty:
+            # clear the market forecast in a simplified merit order way, by iterating the for loop
+            # 6. Loop over each time step
+            for t in self.index:
+                # Get marginal costs and available power for time t (both are Series indexed by unit)
+                mc_t = marginal_costs.loc[t]
+                power_t = power.loc[t]
+                demand_t = sum_demand.loc[t]
 
-            # Sort units by their marginal cost in ascending order for time t.
-            sorted_units = mc_t.sort_values().index
-            sorted_mc = mc_t.loc[sorted_units]
-            sorted_power = power_t.loc[sorted_units]
+                # Sort units by their marginal cost in ascending order for time t.
+                sorted_units = mc_t.sort_values().index
+                sorted_mc = mc_t.loc[sorted_units]
+                sorted_power = power_t.loc[sorted_units]
 
-            # Compute the cumulative sum of available power in the sorted order.
-            cumsum_power = sorted_power.cumsum()
+                # Compute the cumulative sum of available power in the sorted order.
+                cumsum_power = sorted_power.cumsum()
 
-            # Find the first unit where the cumulative available power meets or exceeds demand.
-            matching_units = cumsum_power[cumsum_power >= demand_t]
-            if matching_units.empty:
-                # If available capacity is insufficient, set the price to 1000.
-                price = 1000.0
-            else:
-                # The marginal cost of the first unit that meets demand becomes the price.
-                price = sorted_mc.loc[matching_units.index[0]]
+                # Find the first unit where the cumulative available power meets or exceeds demand.
+                matching_units = cumsum_power[cumsum_power >= demand_t]
+                if matching_units.empty:
+                    # If available capacity is insufficient, set the price to 1000.
+                    price = 1000.0
+                else:
+                    # The marginal cost of the first unit that meets demand becomes the price.
+                    price = sorted_mc.loc[matching_units.index[0]]
 
-            price_forecast.loc[t] = price
+                price_forecast.loc[t] = price
+
+        else:
+            # clear the market forecast including elastic demand bids using the PayAsClearRole
+            for t in self.index:
+                # get the supply offers
+                mc_t = marginal_costs.loc[t]
+                power_t = power.loc[t]
+                sorted_units = mc_t.sort_values().index
+                sorted_mc = mc_t.loc[sorted_units]
+                sorted_power = power_t.loc[sorted_units]
+
+                # Compute the cumulative sum of available power in the sorted order.
+                # cumsum_power = sorted_power.cumsum()
+                supply_offers = pd.DataFrame({
+                    'price': mc_t,
+                    'volume': sorted_power
+                }).reset_index().rename(columns={'index': 'unit_id'})
+                # get the demand bids
+                demand_t = sum_demand.loc[t]
+                demand_bids = pd.DataFrame({
+                    'price': elastic_demand_prices,
+                    'volume': elastic_demand_volumes
+                }).reset_index().rename(columns={'index': 'bid_id'})
+                # create an orderbook containing all supply offers and demand bids
+                orderbook = []
+                orderbook.extend(supply_offers.to_dict('records'))
+                orderbook.extend(demand_bids.to_dict('records'))
+                if demand_t > 0:
+                    orderbook.append({'price': 3000.0, 'volume': demand_t})
+                marketconfig = self.market_configs[market_id]
+                start = pd.Timestamp(marketconfig['start_date'])
+                end = start + pd.Timedelta(marketconfig['products'][0]['duration'])
+                marketconfig_dict = marketconfig.copy() if isinstance(marketconfig, dict) else marketconfig.__dict__
+                marketconfig_dict['opening_hours'] = rr.rrule(
+                    rr.HOURLY,
+                    dtstart=start,
+                    until=end,
+                    cache=True,
+                )
+                # remove 'operator' from marketconfig and marketconfig_dict
+                if 'operator' in marketconfig_dict:
+                    del marketconfig_dict['operator']
+                pac = PayAsClearRole(MarketConfig(**marketconfig_dict), MarketProduct(**marketconfig['products'][0]))
+
+                cleared_market = pac.clear(orderbook)
+                price_forecast.loc[t] = cleared_market['price']
 
         return price_forecast
 
