@@ -341,7 +341,7 @@ class Learning(Role):
                         device
                     )
                 else:
-                    values_data = np.zeros(len(self.values_data))
+                    values_data = np.zeros(len(self.rl_strats))
                 
                 if cache["log_probs"].get(timestamp):
                     log_probs_data = transform_buffer_data(
@@ -351,7 +351,7 @@ class Learning(Role):
                         device
                     )
                 else:
-                    log_probs_data = np.zeros(len(self.log_probs_data))
+                    log_probs_data = np.zeros(len(self.rl_strats))
 
                 if cache["dones"].get(timestamp):
                     dones_data = transform_buffer_data(
