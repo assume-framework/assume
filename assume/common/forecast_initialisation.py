@@ -9,6 +9,7 @@ import pandas as pd
 from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
+from assume.common.utils import get_available_products as get_available_products
 from assume.markets.clearing_algorithms.simple import PayAsClearRole
 from assume.strategies.naive_strategies import EnergyHeuristicElasticStrategy
 
@@ -387,11 +388,23 @@ class ForecastInitialisation:
                 sorted_units = mc_t.sort_values().index
                 sorted_mc = mc_t.loc[sorted_units]
                 sorted_power = power_t.loc[sorted_units]
-
+                start = t
+                end = start + pd.Timedelta(
+                    self.market_configs[market_id]["products"][0]["duration"]
+                )
                 # Compute the cumulative sum of available power in the sorted order.
                 # cumsum_power = sorted_power.cumsum()
                 supply_offers = (
-                    pd.DataFrame({"price": mc_t, "volume": sorted_power})
+                    pd.DataFrame(
+                        {   
+                            "start_time": start,
+                            "end_time": end,
+                            "only_hours": None,
+                            "node": 'node0',
+                            "price": mc_t,
+                            "volume": sorted_power
+                         }
+                         )
                     .reset_index()
                     .rename(columns={"index": "unit_id"})
                 )
@@ -399,7 +412,10 @@ class ForecastInitialisation:
                 demand_t = sum_demand.loc[t]
                 demand_bids = (
                     pd.DataFrame(
-                        {
+                        {   "start_time": start,
+                            "end_time": end,
+                            "only_hours": None,
+                            "node": 'node0',
                             "price": elastic_demand_prices,
                             "volume": elastic_demand_volumes,
                         }
@@ -413,28 +429,14 @@ class ForecastInitialisation:
                 orderbook.extend(demand_bids.to_dict("records"))
                 if demand_t > 0:
                     orderbook.append({"price": 3000.0, "volume": demand_t})
-                marketconfig = self.market_configs[market_id]
-                marketconfig_dict = (
-                    marketconfig.copy()
-                    if isinstance(marketconfig, dict)
-                    else marketconfig.__dict__
-                )
-                marketconfig_dict["opening_hours"] = rr.rrule(
-                    rr.HOURLY,
-                    dtstart=start,
-                    until=end,
-                    cache=True,
-                )
-                # remove 'operator' from marketconfig and marketconfig_dict
-                if "operator" in marketconfig_dict:
-                    del marketconfig_dict["operator"]
-                pac = PayAsClearRole(
-                    MarketConfig(**marketconfig_dict),
-                    MarketProduct(**marketconfig["products"][0]),
-                )
+                marketconfig_dict = self.market_configs[market_id]
+                from assume.scenario.loader_csv import make_market_config
+                mc = make_market_config('forecast', marketconfig_dict, self.index[0], self.index[-1])
+                mps = get_available_products(mc.market_products, pd.Timestamp(start) - pd.Timedelta('1h'))
+                pac = PayAsClearRole(mc)
 
-                cleared_market = pac.clear(orderbook)
-                price_forecast.loc[t] = cleared_market["price"]
+                accepted, rejected, meta, flows = pac.clear(orderbook, mps)
+                price_forecast.loc[t] = meta[0]['price']
 
         return price_forecast
 
