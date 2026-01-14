@@ -130,10 +130,60 @@ Note, that the specific implementation of each network architecture is defined i
 
 [2] Y. Ye, D. Qiu, J. Li and G. Strbac, "Multi-Period and Multi-Spatial Equilibrium Analysis in Imperfect Electricity Markets: A Novel Multi-Agent Deep Reinforcement Learning Approach," in IEEE Access, vol. 7, pp. 130515-130529, 2019, doi: 10.1109/ACCESS.2019.2940005.
 
-.. _replay-buffer:
+DDPG (Deep Deterministic Policy Gradient)
+------------------------------------------
+
+DDPG is a single-agent off-policy algorithm that serves as the foundation for TD3. While TD3 improves upon DDPG with twin critics and delayed updates,
+DDPG itself remains a powerful baseline for continuous control tasks.
+
+Original paper: https://arxiv.org/abs/1509.02971
+
+OpenAI Spinning Guide for DDPG: https://spinningup.openai.com/en/latest/algorithms/ddpg.html
+
+DDPG extends the deterministic policy gradient to off-policy settings using a single critic network and an actor network.
+The algorithm updates the critic towards the Bellman target:
+
+.. math::
+    y = r + \gamma Q_{\theta'}(s', \pi_{\phi'}(s'))
+
+And updates the actor using the deterministic policy gradient:
+
+.. math::
+    \nabla_\phi J(\phi) = \mathbb{E}[(\nabla_a Q(s, a) |_{a=\pi(s)} \nabla_\phi \pi(s))]
+
+In ASSUME, DDPG is implemented in a multi-agent setting (MADDPG) with centralized training and decentralized execution.
+The main differences from TD3 are: only one critic network, actor updates every step (no policy delay), and no target action smoothing.
+The implementation follows the same structure as TD3, with actors and critics initialized via :func:`assume.reinforcement_learning.algorithms.maddpg.DDPG.initialize_policy`
+and policy updates performed in :func:`assume.reinforcement_learning.algorithms.maddpg.DDPG.update_policy`.
+
+PPO (Proximal Policy Optimization)
+-----------------------------------
+
+PPO is a state-of-the-art on-policy algorithm that uses a clipped surrogate objective to ensure stable policy updates.
+Unlike off-policy methods like TD3 and DDPG, PPO requires fresh data collected under the current policy.
+
+Original paper: https://arxiv.org/abs/1707.06347
+
+OpenAI Spinning Guide for PPO: https://spinningup.openai.com/en/latest/algorithms/ppo.html
+
+PPO improves upon policy gradient methods by limiting policy updates with a clipping mechanism:
+
+.. math::
+    L^{CLIP}(\theta) = \hat{\mathbb{E}}_t[\min(r_t(\theta) \hat{A}_t, \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) \hat{A}_t)]
+
+where :math:`r_t(\theta)` is the importance sampling ratio and :math:`\hat{A}_t` is the advantage estimate using Generalized Advantage Estimation (GAE).
+
+In ASSUME, PPO uses a rollout buffer instead of a replay buffer, collecting on-policy experiences and training over multiple epochs.
+The algorithm maintains both an actor and a centralized critic, similar to other methods, but updates them using the clipped surrogate objective.
+Network initialization is handled by :func:`assume.reinforcement_learning.algorithms.mappo.PPO.initialize_policy`
+and policy updates occur in :func:`assume.reinforcement_learning.algorithms.mappo.PPO.update_policy`.
+The rollout buffer enables efficient multi-pass training over the same batch of experiences, improving sample efficiency.
+For more details on how the rollout buffer works, see :ref:`rollout-buffer`.
+
+.. _buffer:
 
 ##############
-Replay Buffer
+Buffer
 ##############
 
 This chapter gives you an insight into the general usage of buffers in reinforcement learning and how they are implemented in ASSUME.
@@ -142,22 +192,16 @@ This chapter gives you an insight into the general usage of buffers in reinforce
 Why do we need buffers?
 =======================
 
-In reinforcement learning, a buffer, often referred to as a replay buffer, is a crucial component in algorithms like for Experience Replay.
-It serves as a memory for the agent's past experiences, storing tuples of observations, actions, rewards, and subsequent observations.
+In reinforcement learning, a buffer is a crucial component for storing
+the agent's past experiences as tuples of observations, actions, rewards,
+and subsequent observations.
 
-Instead of immediately using each new experience for training, the experiences are stored in the buffer. During the training process,
-a batch of experiences is randomly sampled from the replay buffer. This random sampling breaks the temporal correlation in the data, contributing to a more stable learning process.
-
-The replay buffer improves sample efficiency by allowing the agent to reuse and learn from past experiences multiple times.
-This reduces the reliance on new experiences and makes better use of the available data. It also helps mitigate the effects of non-stationarity in the environment,
-as the agent is exposed to a diverse set of experiences.
-
-Overall, the replay buffer is instrumental in stabilizing the learning process in reinforcement learning algorithms,
+Overall, the buffer is instrumental in stabilizing the learning process in reinforcement learning algorithms,
 enhancing their robustness and performance by providing a diverse and non-correlated set of training samples.
 
 
-How are they used in ASSUME?
-============================
+How are buffers implemented in ASSUME?
+======================================
 In principal ASSUME allows for different buffers to be implemented. They just need to adhere to the structure presented in the base buffer. Here we will present the different buffers already implemented, which is only one, yet.
 
 
@@ -170,3 +214,52 @@ Yet, the buffer is quite large to store all observations also from multiple agen
 After a certain round of training runs which is defined in the config file the RL strategy is updated by calling the update function of the respective algorithms which calls the sample function of the replay buffer.
 The sample function returns a batch of experiences which is then used to update the RL strategy.
 For more information on the learning capabilities of ASSUME, see :doc:`learning`.
+
+Instead of immediately using each new experience for training, the experiences are stored in the buffer. During the training process,
+a batch of experiences is randomly sampled from the buffer. This random sampling breaks the temporal correlation in the data, contributing to a more stable learning process.
+
+The buffer improves sample efficiency by allowing the agent to reuse and learn from past experiences multiple times.
+This reduces the reliance on new experiences and makes better use of the available data. It also helps mitigate the effects of non-stationarity in the environment,
+as the agent is exposed to a diverse set of experiences.
+
+
+The rollout buffer
+------------------
+
+A rollout buffer is a specialized type of experience storage designed for on-policy reinforcement learning algorithms like PPO (Proximal Policy Optimization).
+Unlike replay buffers that store and reuse experiences from multiple past policies, rollout buffers only store experiences collected by the current policy.
+
+The key characteristics of a rollout buffer are:
+
+* **On-policy storage**: Only stores trajectories from the current policy version
+* **Single-use data**: Experiences are used once for training, then discarded
+* **Temporal structure**: Maintains the sequential order of experiences for advantage computation
+* **Additional metadata**: Stores policy-specific information like old log probabilities and value estimates
+
+This design makes rollout buffers particularly suitable for policy gradient methods that require fresh, on-policy data for stable learning.
+
+The rollout buffer for PPO is implemented as a fixed-size circular buffer that stores one complete rollout of experiences.
+Unlike the replay buffer, it is completely reset after each training update to ensure only on-policy data is used.
+
+The buffer stores the following information for each timestep:
+
+* **Observations**: The state observed by each agent
+* **Actions**: The actions taken by each agent
+* **Rewards**: The rewards received by each agent
+* **Old log probabilities**: The log probability of the action under the policy that collected it
+* **Old values**: The value function estimate at that state
+* **Dones**: Whether the episode terminated
+
+After a complete rollout is collected (determined by the ``train_freq`` parameter in the config), the buffer computes:
+
+* **Returns**: Discounted sum of future rewards for each timestep
+* **Advantages**: GAE-based advantage estimates that guide policy improvement
+
+The learning role collects experiences after each environment step by calling the buffer's add function.
+Once the buffer accumulates enough data (specified by ``batch_size``), the PPO algorithm's update function
+is triggered, which retrieves mini-batches from the buffer for multiple training epochs (specified by ``ppo_n_epochs``).
+
+After training is complete, the buffer is reset, and the cycle begins again with the updated policy.
+This ensures that PPO always learns from fresh, on-policy experiences, which is critical for the algorithm's stability and performance.
+
+For more information on how PPO uses the rollout buffer, see the PPO algorithm documentation above.
