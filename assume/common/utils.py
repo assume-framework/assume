@@ -877,7 +877,7 @@ def set_random_seed(seed: int | None, torch_deterministic: bool = True):
 
             th.use_deterministic_algorithms(True)
 
-            logger.debug(
+            logger.warning(
                 "PyTorch set to use deterministic algorithms. This may impact performance but ensures reproducibility. For better performance, consider setting 'deterministic' to False when set_random_seed() is called."
             )
     except ImportError:
