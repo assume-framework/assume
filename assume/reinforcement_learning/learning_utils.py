@@ -26,6 +26,22 @@ observation_dict = dict[list[datetime], ObsActRew]
 Schedule = Callable[[float], float]
 
 
+class ActivationLimits(TypedDict):
+    """Output limits for activation functions."""
+
+    min: float
+    max: float
+    func: Callable[[th.Tensor], th.Tensor]
+
+
+activation_function_limit: dict[str, ActivationLimits] = {
+    "tanh": {"min": -1, "max": 1, "func": th.tanh},
+    "sigmoid": {"min": 0, "max": 1, "func": th.sigmoid},
+    "relu": {"min": 0, "max": float("inf"), "func": th.nn.functional.relu},
+    "softsign": {"min": -1, "max": 1, "func": th.nn.functional.softsign},
+}
+
+
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:

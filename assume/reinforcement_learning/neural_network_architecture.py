@@ -2,11 +2,10 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+
 import torch as th
 from torch import nn
 from torch.nn import functional as F
-
-from typing import List, Tuple, Type, Optional, Union
 
 
 class Critic(nn.Module):
@@ -20,6 +19,7 @@ class Critic(nn.Module):
         float_type: Data type for parameters
         unique_obs_dim: Dimension of agent-specific observations
     """
+
     def __init__(
         self,
         n_agents: int,
@@ -39,9 +39,7 @@ class Critic(nn.Module):
         # Dynamic Architecture Definition
         self.hidden_sizes = self._get_architecture(n_agents)
 
-    def _get_architecture(
-        self, n_agents: int
-    ) -> List[int]:
+    def _get_architecture(self, n_agents: int) -> list[int]:
         """Returns hidden layer sizes based on the number of agents."""
         if n_agents <= 20:
             hidden_sizes = [256, 128]  # Shallow network for small `n_agents`
@@ -58,13 +56,13 @@ class Critic(nn.Module):
         layers = nn.ModuleList()
         input_dim = (
             self.obs_dim + self.act_dim
-        ) # Input includes all observations and actions
+        )  # Input includes all observations and actions
 
         for h in self.hidden_sizes:
             layers.append(nn.Linear(input_dim, h, dtype=self.float_type))
             layers.append(nn.ReLU())
             input_dim = h
-        layers.append(nn.Linear(input_dim, 1, dtype=self.float_type)) # Output Q-value
+        layers.append(nn.Linear(input_dim, 1, dtype=self.float_type))  # Output Q-value
 
         return layers
 
@@ -87,21 +85,11 @@ class CriticTD3(Critic):
         obs_dim (int): Dimension of each state
         act_dim (int): Dimension of each action
     """
+
     def __init__(
-        self,
-        n_agents: int,
-        obs_dim: int,
-        act_dim: int,
-        float_type,
-        unique_obs_dim: int
+        self, n_agents: int, obs_dim: int, act_dim: int, float_type, unique_obs_dim: int
     ):
-        super().__init__(
-            n_agents, 
-            obs_dim, 
-            act_dim, 
-            float_type, 
-            unique_obs_dim
-        )
+        super().__init__(n_agents, obs_dim, act_dim, float_type, unique_obs_dim)
 
         # First Q-network (Q1)
         self.q1_layers = self._build_q_network()
@@ -110,14 +98,12 @@ class CriticTD3(Critic):
         self.q2_layers = self._build_q_network()
 
     def forward(
-        self,
-        obs: th.Tensor,
-        actions: th.Tensor
-    ) -> Tuple[th.Tensor, th.Tensor]:
+        self, obs: th.Tensor, actions: th.Tensor
+    ) -> tuple[th.Tensor, th.Tensor]:
         """
         Forward pass through both Q-networks.
         """
-        xu = th.cat([obs, actions], dim=1) # Concatenate obs & actions
+        xu = th.cat([obs, actions], dim=1)  # Concatenate obs & actions
 
         # Compute Q1
         x1 = nn.Sequential(*self.q1_layers)(xu)
@@ -127,11 +113,7 @@ class CriticTD3(Critic):
 
         return x1, x2
 
-    def q1_forward(
-        self,
-        obs: th.Tensor,
-        actions: th.Tensor
-    ) -> th.Tensor:
+    def q1_forward(self, obs: th.Tensor, actions: th.Tensor) -> th.Tensor:
         """
         Compute only Q1 (used during actor updates).
         """
@@ -152,6 +134,7 @@ class CriticDDPG(Critic):
         float_type: Data type for parameters
         unique_obs_dim: Dimension of agent-specific observations
     """
+
     def __init__(
         self,
         n_agents: int,
@@ -160,27 +143,17 @@ class CriticDDPG(Critic):
         float_type: th.dtype,
         unique_obs_dim: int,
     ):
-        super().__init__(
-            n_agents, 
-            obs_dim, 
-            act_dim, 
-            float_type, 
-            unique_obs_dim
-        )
+        super().__init__(n_agents, obs_dim, act_dim, float_type, unique_obs_dim)
 
         # Q-network
         self.q_layers = self._build_q_network()
-        
+
         # Initialize weights properly
         self._init_weights()
 
-    def forward(
-        self,
-        obs: th.Tensor,
-        actions: th.Tensor
-    ) -> th.Tensor:
+    def forward(self, obs: th.Tensor, actions: th.Tensor) -> th.Tensor:
         """Returns Q value."""
-        xu = th.cat([obs, actions], dim=1) # Concatenate obs & actions
+        xu = th.cat([obs, actions], dim=1)  # Concatenate obs & actions
 
         # Compute Q
         x = nn.Sequential(*self.q_layers)(xu)
@@ -198,19 +171,13 @@ class CriticPPO(Critic):
         unique_obs_dim: Dimension of agent-specific observations
     """
 
-    def __init__(
-        self,
-        n_agents: int,
-        obs_dim: int,
-        float_type,
-        unique_obs_dim: int
-    ):
+    def __init__(self, n_agents: int, obs_dim: int, float_type, unique_obs_dim: int):
         super().__init__(
             n_agents=n_agents,
             obs_dim=obs_dim,
             act_dim=0,
             float_type=float_type,
-            unique_obs_dim=unique_obs_dim
+            unique_obs_dim=unique_obs_dim,
         )
 
         # V-network
@@ -223,11 +190,12 @@ class CriticPPO(Critic):
         """
         Apply Orthogonal initialization.
         """
+
         def init_layer(m):
             if isinstance(m, nn.Linear):
                 nn.init.orthogonal_(m.weight, gain=1.0)
                 nn.init.zeros_(m.bias)
-        
+
         self.apply(init_layer)
 
     def forward(self, obs: th.Tensor) -> th.Tensor:
@@ -243,30 +211,16 @@ class Actor(nn.Module):
     Parent class for actor networks.
     """
 
-    activation_function_limit = {
-        "softsign": (-1, 1),
-        "tanh": (-1, 1),
-        "sigmoid": (0, 1),
-        "relu": (0, float("inf")),
-    }
-
-    activation_function_map = {
-        "softsign": F.softsign,
-        "tanh": th.tanh,
-        "sigmoid": th.sigmoid,
-        "relu": F.relu
-    }
-
     def __init__(self):
         super().__init__()
 
-        self.activation = "softsign" # or "tanh", "sigmoid", "relu"
+        self.activation = "softsign"  # or "tanh", "sigmoid", "relu"
 
         if self.activation not in self.activation_function_limit:
             raise ValueError(
                 f"Activation '{self.activation}' not supported! Supported: {list(self.activation_function_limit.keys())}"
             )
-        
+
         self.min_output, self.max_output = self.activation_function_limit[
             self.activation
         ]
@@ -286,7 +240,7 @@ class MLPActor(Actor):
 
     def __init__(self, obs_dim: int, act_dim: int, float_type, *args, **kwargs):
         super().__init__()
-        
+
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
         self.FC2 = nn.Linear(256, 128, dtype=float_type)
         self.FC3 = nn.Linear(128, act_dim, dtype=float_type)
@@ -320,7 +274,7 @@ class LSTMActor(Actor):
     Based on "Multi-Period and Multi-Spatial Equilibrium Analysis in Imperfect Electricity Markets"
     by Ye at al. (2019)
 
-    Note: the original source code was not available, therefore this implementation was derived from the published paper. 
+    Note: the original source code was not available, therefore this implementation was derived from the published paper.
     Adjustments to resemble final layers from MLPActor:
     - dense layer 2 was omitted
     - single output layer with softsign activation function to output actions directly instead of two output layers for mean and stddev
@@ -334,7 +288,7 @@ class LSTMActor(Actor):
         unique_obs_dim: int,
         num_timeseries_obs_dim: int,
         *args,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.float_type = float_type
@@ -388,7 +342,7 @@ class LSTMActor(Actor):
 
         outputs = th.cat(outputs, dim=1)
         x = th.cat((outputs, x2), dim=1)
-        
+
         x = F.relu(self.FC1(x))
         x = self.activation_function(self.FC2(x))
 
@@ -399,20 +353,6 @@ class LSTMActor(Actor):
 
 
 class ActorPPO(nn.Module):
-    activation_function_limit = {
-        "softsign": (-1, 1),
-        "tanh": (-1, 1),
-        "sigmoid": (0, 1),
-        "relu": (0, float("inf")),
-    }
-
-    activation_function_map = {
-        "softsign": F.softsign,
-        "tanh": th.tanh,
-        "sigmoid": th.sigmoid,
-        "relu": F.relu
-    }
-    
     def __init__(
         self,
         obs_dim: int,
@@ -427,13 +367,13 @@ class ActorPPO(nn.Module):
         self.act_dim = act_dim
         self.float_type = float_type
 
-        self.activation = "softsign" # or "tanh", "sigmoid", "relu"
+        self.activation = "softsign"  # or "tanh", "sigmoid", "relu"
 
         if self.activation not in self.activation_function_limit:
             raise ValueError(
                 f"Activation '{self.activation}' not supported! Supported: {list(self.activation_function_limit.keys())}"
             )
-        
+
         self.min_output, self.max_output = self.activation_function_limit[
             self.activation
         ]
@@ -444,25 +384,24 @@ class ActorPPO(nn.Module):
         self.mean_layer = nn.Linear(128, act_dim, dtype=float_type)
 
         # Learnable log standard deviation
-        self.log_std = nn.Parameter(
-            th.ones(act_dim, dtype=float_type) * log_std_init
-        )
+        self.log_std = nn.Parameter(th.ones(act_dim, dtype=float_type) * log_std_init)
 
         self._init_weights()
 
     def _init_weights(self) -> None:
         """Apply orthogonal initialization."""
+
         def init_layer(m):
             if isinstance(m, nn.Linear):
                 nn.init.orthogonal_(m.weight, gain=0.01)
                 nn.init.zeros_(m.bias)
-        
+
         # Initialize hidden layers with larger gain
         nn.init.orthogonal_(self.FC1.weight, gain=1.0)
         nn.init.orthogonal_(self.FC2.weight, gain=1.0)
         nn.init.zeros_(self.FC1.bias)
         nn.init.zeros_(self.FC2.bias)
-        
+
         # Initialize output layer with small gain
         nn.init.orthogonal_(self.mean_layer.weight, gain=0.01)
         nn.init.zeros_(self.mean_layer.bias)
@@ -472,16 +411,16 @@ class ActorPPO(nn.Module):
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
         mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
-        
+
         if deterministic:
             return mean
-        
+
         # Sample from Gaussian during training
         log_std = self.log_std.expand_as(mean)
         std = log_std.exp()
         noise = th.randn_like(mean)
         action = mean + std * noise
-        
+
         # Clamp to valid range
         return th.clamp(action, -1.0, 1.0)
 
@@ -493,7 +432,7 @@ class ActorPPO(nn.Module):
         x = F.relu(self.FC2(x))
         mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
         log_std = self.log_std.expand_as(mean)
-        
+
         return mean, log_std
 
     def get_action_and_log_prob(
@@ -503,11 +442,11 @@ class ActorPPO(nn.Module):
     ) -> tuple[th.Tensor, th.Tensor]:
         """
         Sample action and compute log probability.
-        
+
         Args:
             obs: Observations
             deterministic: If True, return mean action
-            
+
         Returns:
             Tuple of (action, log_prob)
         """
@@ -536,13 +475,13 @@ class ActorPPO(nn.Module):
     ) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
         """
         Evaluate log probability and entropy for given actions.
-        
+
         Used during PPO update to compute importance ratio.
-        
+
         Args:
             obs: Observations
             actions: Actions to evaluate
-            
+
         Returns:
             Tuple of (log_prob, entropy, values)
         """
