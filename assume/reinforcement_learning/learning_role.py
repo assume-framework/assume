@@ -19,13 +19,10 @@ from assume.common.utils import (
     timestamp2datetime,
 )
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.algorithms.maddpg import DDPG
 from assume.reinforcement_learning.algorithms.mappo import PPO
-from assume.reinforcement_learning.buffer import (
-    ReplayBuffer, 
-    RolloutBuffer
-)
+from assume.reinforcement_learning.algorithms.matd3 import TD3
+from assume.reinforcement_learning.buffer import ReplayBuffer, RolloutBuffer
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
     transform_buffer_data,
@@ -58,7 +55,7 @@ class Learning(Role):
 
         # how many learning roles do exist and how are they named
         self.buffer: ReplayBuffer = None
-        self.rollout_buffer: RolloutBuffer = None # For on-policy algorithms (PPO)
+        self.rollout_buffer: RolloutBuffer = None  # For on-policy algorithms (PPO)
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.learning_config = learning_config
@@ -276,7 +273,7 @@ class Learning(Role):
                 "profit": {t: current_profits[t] for t in timestamps_to_process},
                 "values": {t: current_values[t] for t in timestamps_to_process},
                 "log_probs": {t: current_log_probs[t] for t in timestamps_to_process},
-                "dones": {t: current_dones[t] for t in timestamps_to_process}
+                "dones": {t: current_dones[t] for t in timestamps_to_process},
             }
 
             # write data to output agent
@@ -315,50 +312,32 @@ class Learning(Role):
             # Add each transition to the rollout buffer
             for timestamp in sorted(cache["obs"].keys()):
                 obs_data = transform_buffer_data(
-                    {
-                        timestamp: cache["obs"][timestamp]
-                    },
-                    device
+                    {timestamp: cache["obs"][timestamp]}, device
                 )
                 actions_data = transform_buffer_data(
-                    {
-                        timestamp: cache["actions"][timestamp]
-                    },
-                    device
+                    {timestamp: cache["actions"][timestamp]}, device
                 )
                 rewards_data = transform_buffer_data(
-                    {
-                        timestamp: cache["rewards"][timestamp]
-                    },
-                    device
+                    {timestamp: cache["rewards"][timestamp]}, device
                 )
-                
+
                 if cache["values"].get(timestamp):
                     values_data = transform_buffer_data(
-                        {
-                            timestamp: cache["values"][timestamp]
-                        },
-                        device
+                        {timestamp: cache["values"][timestamp]}, device
                     )
                 else:
                     values_data = np.zeros(len(self.rl_strats))
-                
+
                 if cache["log_probs"].get(timestamp):
                     log_probs_data = transform_buffer_data(
-                        {
-                            timestamp: cache["log_probs"][timestamp]
-                        },
-                        device
+                        {timestamp: cache["log_probs"][timestamp]}, device
                     )
                 else:
                     log_probs_data = np.zeros(len(self.rl_strats))
 
                 if cache["dones"].get(timestamp):
                     dones_data = transform_buffer_data(
-                        {
-                            timestamp: cache["dones"][timestamp]
-                        },
-                        device
+                        {timestamp: cache["dones"][timestamp]}, device
                     )
                 else:
                     dones_data = np.zeros(len(self.rl_strats))
@@ -372,20 +351,20 @@ class Learning(Role):
                 # Add to rollout buffer
                 if self.rollout_buffer is not None:
                     self.rollout_buffer.add(
-                        obs = to_numpy(obs_data),
-                        action = to_numpy(actions_data),
-                        reward = to_numpy(rewards_data),
-                        done = to_numpy(dones_data),
-                        value = to_numpy(values_data),
-                        log_prob = to_numpy(log_probs_data)
+                        obs=to_numpy(obs_data),
+                        action=to_numpy(actions_data),
+                        reward=to_numpy(rewards_data),
+                        done=to_numpy(dones_data),
+                        value=to_numpy(values_data),
+                        log_prob=to_numpy(log_probs_data),
                     )
         else:
             # for TD3/DDPG use off-policy ReplayBuffer
             # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
             self.buffer.add(
-                obs = transform_buffer_data(cache["obs"], device),
-                actions = transform_buffer_data(cache["actions"], device),
-                reward = transform_buffer_data(cache["rewards"], device),
+                obs=transform_buffer_data(cache["obs"], device),
+                actions=transform_buffer_data(cache["actions"], device),
+                reward=transform_buffer_data(cache["rewards"], device),
             )
 
         if (
@@ -405,7 +384,7 @@ class Learning(Role):
         """
         self.all_obs[start][unit_id].append(observation)
 
-    def add_actions_to_cache(self, unit_id, start, action, noise) -> None:
+    def add_actions_to_cache(self, unit_id, start, action, extra_info) -> None:
         """
         Add the action and noise to the cache dict, per unit_id.
 
@@ -424,7 +403,15 @@ class Learning(Role):
             return
 
         self.all_actions[start][unit_id].append(action)
-        self.all_noises[start][unit_id].append(noise)
+
+        if isinstance(extra_info, th.Tensor) and extra_info.shape == action.shape:
+            self.all_noises[start][unit_id].append(extra_info)  # It's noise
+        else:
+            self.all_log_probs[start][unit_id].append(
+                extra_info["log_probs"]
+            )  # It's log_probs and other stuff
+            self.all_values[start][unit_id].append(extra_info["value"])
+            self.all_dones[start][unit_id].append(float(extra_info["done"]))
 
     def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
         """
@@ -438,27 +425,6 @@ class Learning(Role):
         self.all_rewards[start][unit_id].append(reward)
         self.all_regrets[start][unit_id].append(regret)
         self.all_profits[start][unit_id].append(profit)
-
-    def add_ppo_data_to_cache(
-        self,
-        unit_id,
-        start,
-        value,
-        log_prob,
-        done=False
-    ) -> None:
-        """
-        Add PPO specific data to the cache dict, per unit_id.
-
-        Args:
-            unit_id (str): The id of the unit.
-            value (float): The value estimate V(s) from the critic.
-            log_prob (float): The log probability of the action.
-            done (bool): Whether a terminal state or not.
-        """
-        self.all_values[start][unit_id].append(value)
-        self.all_log_probs[start][unit_id].append(log_prob)
-        self.all_dones[start][unit_id].append(float(done))
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
