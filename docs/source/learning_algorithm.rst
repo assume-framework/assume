@@ -62,6 +62,9 @@ The following table shows the options that can be adjusted and gives a short exp
   target_noise_clip                       The maximum absolute value for clipping the target policy noise. Prevents the noise from being too large. Default is 0.5.
  ======================================== ==========================================================================================================
 
+Note: We advise to not use the setting of a seed in the general config (``seed=null``) when using learning, as it will decrease performance, see https://docs.pytorch.org/docs/stable/notes/randomness.html. Completely reproducible results are not guaranteed across different PyTorch versions, hardware, or CUDA configurations.
+
+
 How to use continue learning
 ----------------------------
 
