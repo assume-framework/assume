@@ -26,6 +26,7 @@ from assume.common.utils import (
     parse_duration,
     plot_orderbook,
     separate_orders,
+    set_random_seed,
     timestamp2datetime,
     visualize_orderbook,
 )
@@ -45,6 +46,23 @@ def test_convert_rrule():
     freq, interval = convert_to_rrule_freq("99d")
     assert freq == rr.DAILY
     assert interval == 99
+
+
+def test_reproducability_with_seed():
+    set_random_seed(42)
+    rand_nums_1 = np.random.rand(5)
+
+    rand_nums_2 = np.random.rand(5)
+
+    assert np.array_equal(rand_nums_1, rand_nums_2), (
+        "Random numbers should be the same for the same seed"
+    )
+
+    set_random_seed("null")
+    rand_nums_3 = np.random.rand(5)
+    assert not np.array_equal(rand_nums_1, rand_nums_3), (
+        "Random numbers should differ for different seeds"
+    )
 
 
 def test_make_market_config():
