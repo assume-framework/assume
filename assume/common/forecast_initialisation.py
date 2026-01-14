@@ -297,7 +297,7 @@ class ForecastInitialisation:
         elastic_demand_bids = []
         if not elastic_demand_units.empty:
             es = EnergyHeuristicElasticStrategy()
-            start = pd.Timestamp(self.market_configs[market_id]['start_date'])
+            start = self.index[0] # TODO should rather be something like pd.Timestamp(self.market_configs[market_id]['start_date']) - but the marketconfig has no start_date here...?
             end = start + pd.Timedelta(self.market_configs[market_id]['products'][0]['duration'])
             product_tuples = {(start,
                                end,
@@ -387,8 +387,6 @@ class ForecastInitialisation:
                 if demand_t > 0:
                     orderbook.append({'price': 3000.0, 'volume': demand_t})
                 marketconfig = self.market_configs[market_id]
-                start = pd.Timestamp(marketconfig['start_date'])
-                end = start + pd.Timedelta(marketconfig['products'][0]['duration'])
                 marketconfig_dict = marketconfig.copy() if isinstance(marketconfig, dict) else marketconfig.__dict__
                 marketconfig_dict['opening_hours'] = rr.rrule(
                     rr.HOURLY,
