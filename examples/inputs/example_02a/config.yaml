@@ -17,17 +17,29 @@ base:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 100
-    episodes_collecting_initial_experience: 5
-    train_freq: 100h
-    gradient_steps: 10
-    batch_size: 128
-    gamma: 0.99
     device: cpu
-    action_noise_schedule: linear
-    noise_sigma: 0.1
-    noise_scale: 1
-    noise_dt: 1
     validation_episodes_interval: 5
+    matd3:
+      actor_architecture: mlp
+      batch_size: 64
+      episodes_collecting_initial_experience: 3
+      gamma: 0.99
+      gradient_steps: 10
+      noise_dt: 1
+      noise_scale: 1
+      noise_sigma: 0.1
+      action_noise_schedule: linear
+      train_freq: 24h
+    ppo:
+      actor_architecture: dist
+      batch_size: 11
+      clip_ratio: 0.05
+      entropy_coef: 0.005
+      gae_lambda: 0.95
+      gamma: 0.99
+      max_grad_norm: 0.3
+      train_freq: 33h
+      vf_coef: 0.75
 
   markets_config:
     EOM:

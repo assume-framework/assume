@@ -457,7 +457,7 @@ class TD3(RLAlgorithm):
 
         """
 
-        logger.debug("Updating Policy")
+        logger.debug("Updating Policy (TD3)")
 
         # Stack strategies for easier access
         strategies = list(self.learning_role.rl_strats.values())
