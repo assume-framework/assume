@@ -35,6 +35,7 @@ from assume.common.utils import (
     confirm_learning_save_path,
     convert_to_rrule_freq,
     normalize_availability,
+    set_random_seed,
 )
 from assume.strategies import BaseStrategy
 from assume.world import World
@@ -491,6 +492,9 @@ def load_config_and_create_forecaster(
     if not study_case:
         study_case = list(config.keys())[0]
     config = config[study_case]
+
+    # Set seed, or disable with `seed: null` in config
+    set_random_seed(config.get("seed", 42))
 
     simulation_id = config.get("simulation_id", f"{scenario}_{study_case}")
 
