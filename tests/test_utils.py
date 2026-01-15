@@ -50,17 +50,20 @@ def test_convert_rrule():
 
 def test_reproducability_with_seed():
     set_random_seed(42)
-    rand_nums_1 = np.random.rand(5)
+    rand_nums_1_1 = np.random.rand(5)
+    rand_nums_1_2 = np.random.rand(5)
 
-    rand_nums_2 = np.random.rand(5)
+    set_random_seed(42)
+    rand_nums_2_1 = np.random.rand(5)
+    rand_nums_2_2 = np.random.rand(5)
 
-    assert np.array_equal(rand_nums_1, rand_nums_2), (
-        "Random numbers should be the same for the same seed"
-    )
+    assert np.array_equal(
+        [rand_nums_1_1, rand_nums_1_2], [rand_nums_2_1, rand_nums_2_2]
+    ), "Random numbers should be the same for the same seed"
 
-    set_random_seed("null")
+    set_random_seed(None)
     rand_nums_3 = np.random.rand(5)
-    assert not np.array_equal(rand_nums_1, rand_nums_3), (
+    assert not np.array_equal(rand_nums_1_1, rand_nums_3), (
         "Random numbers should differ for different seeds"
     )
 
