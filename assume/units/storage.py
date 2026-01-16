@@ -193,9 +193,9 @@ class Storage(SupportsMinMaxCharge):
             raise ValueError(f"{downtime_warm_start=} must be >= 0 for unit {self.id}")
         self.downtime_warm_start = downtime_warm_start
 
-        self.hot_start_cost = hot_start_cost * max_power_discharge
-        self.warm_start_cost = warm_start_cost * max_power_discharge
-        self.cold_start_cost = cold_start_cost * max_power_discharge
+        self.hot_start_cost = hot_start_cost * min_power_discharge
+        self.warm_start_cost = warm_start_cost * min_power_discharge
+        self.cold_start_cost = cold_start_cost * min_power_discharge
 
     def execute_current_dispatch(self, start: datetime, end: datetime) -> np.ndarray:
         """

@@ -116,9 +116,9 @@ class PowerPlant(SupportsMinMax):
         self.emission_factor = emission_factor
         self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
-        self.hot_start_cost = hot_start_cost * max_power
-        self.warm_start_cost = warm_start_cost * max_power
-        self.cold_start_cost = cold_start_cost * max_power
+        self.hot_start_cost = hot_start_cost * min_power
+        self.warm_start_cost = warm_start_cost * min_power
+        self.cold_start_cost = cold_start_cost * min_power
 
         # check ramping enabled
         self.ramp_down = None if ramp_down == 0 else ramp_down
