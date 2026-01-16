@@ -603,6 +603,11 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - unit.index.freq
 
+        # profit_series = (
+        #     unit.outputs[f"{product_type}_cashflow"][start:end]
+        #     - unit.outputs[f"{product_type}_generation_costs"][start:end]
+        # )
+
         # Depending on how the unit calculates marginal costs, retrieve cost values.
         marginal_cost = unit.calculate_marginal_cost(
             start, unit.outputs[product_type].at[start]
