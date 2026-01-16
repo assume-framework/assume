@@ -101,7 +101,7 @@ class PayAsBidContractRole(MarketRole):
             for order in orderbook:
                 if order["contract"] not in allowed_contracts:
                     contract = order["contract"]
-                    raise ValueError(f"{contract} is not in {allowed_contracts}")
+                    raise ValueError(f"invalid contract: {contract} is not in {allowed_contracts}")
 
     def check_working(self, supply_order: Order, demand_order: Order) -> bool:
         """
