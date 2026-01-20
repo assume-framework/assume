@@ -647,6 +647,15 @@ class World:
 
         if not market_operator:
             raise Exception(f"invalid {market_operator_id=}")
+        
+        market_start = market_config.opening_hours[0]
+        market_end = market_config.opening_hours[-1]
+
+        if market_start < self.start or market_end > self.end:
+                msg = (f"Market {market_config.market_id} violates world schedule. \n"
+                       f"Market start: {market_start}, end: {market_end}. \n)"
+                       f"World start: {self.start}, end: {self.end}.)")
+                raise ValueError(msg)
 
         market_operator.add_role(market_role)
         market_operator.markets.append(market_config)
@@ -654,20 +663,7 @@ class World:
 
     def _validate_setup(self):
         """ Pre-empt invalid/unclear states, by detecting defective setups. """
-
-        # Integrity of schedule.
-        for market_id, market_config in self.markets.items():
-            market_start = market_config.opening_hours[0] 
-            market_end = market_config.opening_hours[-1]
-            
-            if market_start < self.start or market_end > self.end:
-                msg = (f"Market {market_id} violates world schedule. \n"
-                       f"Market start: {market_start}, end: {market_end}. \n)"
-                       f"World start: {self.start}, end: {self.end}.)")
-                raise ValueError(msg)
-
-        # Integrity of reference.
-        # For each UnitOperator: strategies must reference existing markets.
+        # For each UnitOperator: Strategies must reference existing markets.
         unit_operators = list(self.unit_operators.values())
         for operator in unit_operators:
             for market_id in operator.portfolio_strategies.keys():
@@ -677,7 +673,7 @@ class World:
                            f"Known markets are:\n{list(self.markets.keys())}.")
                     raise ValueError(msg)
 
-        # Each market should be referenced by a market strategy.
+        # For each market: Should be referenced by a market strategy.
         referenced_markets = {market 
                               for market in operator.portfolio_strategies.keys()
                               for operator in unit_operators}
@@ -686,7 +682,6 @@ class World:
                 msg = f"Added market {market_id}, has no participants."
                 warnings.warn(msg)
         
-        # Real-world integrity.
         # A Re-Dispatch market can only open if an earlier market closed.
         dispatch_markets = [config for config in self.markets.values()
                             if config.market_mechanism != "redispatch"]

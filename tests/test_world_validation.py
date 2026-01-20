@@ -101,10 +101,8 @@ def test_market_too_early(world):
         "test_EOM", opening_hours=market_opening, market_products=market_products
     )
 
-    world.add_market(market_operator_id="test_operator", market_config=market_config)
-
     with pytest.raises(ValueError):
-        world.run()
+        world.add_market(market_operator_id="test_operator", market_config=market_config)
 
 
 def test_market_too_late(world):
@@ -125,10 +123,8 @@ def test_market_too_late(world):
         "test_EOM", opening_hours=market_opening, market_products=market_products
     )
 
-    world.add_market(market_operator_id="test_operator", market_config=market_config)
-
     with pytest.raises(ValueError):
-        world.run()
+        world.add_market(market_operator_id="test_operator", market_config=market_config)
 
 
 def test_refering_non_existant_market(world):
