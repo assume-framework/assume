@@ -4,6 +4,7 @@
 
 import asyncio
 import logging
+import operator
 import sys
 import time
 from datetime import datetime
@@ -414,6 +415,14 @@ class World:
 
         if self.unit_operators.get(id):
             raise ValueError(f"Unit operator {id} already exists")
+        
+        # Strategies must reference existing markets.
+        for market_id in strategies.keys():
+            if market_id not in list(self.markets.keys()):
+                msg = (f"Strategies of unit operator {id} references "
+                        f"market {market_id} which is not known in world."
+                        f"Known markets are:\n{list(self.markets.keys())}.")
+                raise ValueError(msg)
 
         bidding_strategies = self._prepare_bidding_strategies(
             {"bidding_strategies": strategies}, id

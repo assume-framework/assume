@@ -131,10 +131,9 @@ def test_refering_non_existant_market(world):
     """A UnitOperator referencing a non-existant Market, raises an Error."""
 
     strategies = {"none_existant_market": "naive_eom"}
-    world.add_unit_operator("unit_operator", strategies)
 
     with pytest.raises(ValueError):
-        world.run()
+        world.add_unit_operator("unit_operator", strategies)
 
 
 def test_non_referred_market(world):
@@ -236,9 +235,6 @@ def test_redispatch_too_early(grid_data, world):
 def test_addition_order(world, demand):
     """Add participants before market."""
 
-    world.add_unit_operator("unit_operator", {"dispatch": "naive_eom"})
-    world.add_unit_instance(operator_id="unit_operator", unit=demand)
-
     opening_dispatch = rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end)
 
     market_products = [
@@ -257,5 +253,8 @@ def test_addition_order(world, demand):
     world.add_market(
         market_operator_id="market_operator", market_config=redispatch_config
     )
+
+    world.add_unit_operator("unit_operator", {"dispatch": "naive_eom"})
+    world.add_unit_instance(operator_id="unit_operator", unit=demand)
 
     world.run()
