@@ -158,7 +158,7 @@ def test_non_referred_market():
         market_operator_id="market_operator",
         market_config=market_config)
 
-    with pytest.warns(UserWarning) as record:
+    with pytest.warns(UserWarning, match="has no participants") as record:
         world.run()
     assert len(record) > 0
     
@@ -226,4 +226,33 @@ def test_redispatch_too_early(grid_data):
 
     with pytest.raises(ValueError):
         world.run()
+
+def test_addition_order(demand):
+    """ Add participants before market. """
     
+    
+    world.add_unit_operator(
+        "unit_operator",
+        {"dispatch": "naive_eom"})
+    world.add_unit_instance(
+        operator_id="unit_operator",
+        unit=demand)
+    
+    opening_dispatch = rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end)
+    
+    market_products= [MarketProduct(
+        duration=datetime.timedelta(hours=1),
+        count=1,
+        first_delivery=datetime.timedelta(hours=1))]
+    
+    redispatch_config = MarketConfig(
+        "dispatch",
+        opening_hours=opening_dispatch,
+        market_products=market_products)
+    
+    world.add_market_operator("market_operator")
+    world.add_market(
+        market_operator_id="market_operator",
+        market_config=redispatch_config)
+    
+    world.run()

@@ -4,7 +4,11 @@
 
 base:
   start_date: 2019-01-01 00:00
+<<<<<<< HEAD
   end_date: 2019-01-04 00:00
+=======
+  end_date: 2019-01-03 00:00
+>>>>>>> 35192efb (Config validation)
   time_step: 1h
   save_frequency_hours: 24
 
