@@ -662,7 +662,8 @@ class World:
         self.markets[f"{market_config.market_id}"] = market_config
 
     def _validate_setup(self):
-        """ Pre-empt invalid/unclear states, by detecting defective setups. """
+        """ Validate the consistency of the world configuration and fail early. """
+        
         # For each UnitOperator: Strategies must reference existing markets.
         unit_operators = list(self.unit_operators.values())
         for operator in unit_operators:
