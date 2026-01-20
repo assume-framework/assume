@@ -1785,6 +1785,190 @@ class DRIStorage(GenericStorage):
         return model_block
 
 
+class UtilityBattery:
+    """
+    A class to represent a utility battery storage unit in an energy system model.
+
+    This class is functionally identical to GenericStorage but is designed specifically
+    for depot-level utility battery applications. It can store and release energy to
+    balance power flows in depot systems with PV generation, EV charging, and grid interaction.
+
+    The class encapsulates the parameters, variables, and constraints necessary to model
+    the behavior of a utility battery system, including charging, discharging, state of charge (SOC),
+    ramp rates, and storage losses.
+
+    Args:
+        max_capacity (float): Maximum energy storage capacity of the battery unit.
+        min_capacity (float, optional): Minimum allowable state of charge (SOC). Defaults to 0.0.
+        max_power_charge (float, optional): Maximum charging power of the battery unit. Defaults to `max_capacity` if not provided.
+        max_power_discharge (float, optional): Maximum discharging power of the battery unit. Defaults to `max_capacity` if not provided.
+        efficiency_charge (float, optional): Efficiency of the charging process. Defaults to 1.0.
+        efficiency_discharge (float, optional): Efficiency of the discharging process. Defaults to 1.0.
+        initial_soc (float, optional): Initial state of charge as a fraction of `max_capacity`. Defaults to 1.0.
+        ramp_up (float, optional): Maximum allowed increase in charging/discharging power per time step. Defaults to None (no ramp constraint).
+        ramp_down (float, optional): Maximum allowed decrease in charging/discharging power per time step. Defaults to None (no ramp constraint).
+        storage_loss_rate (float, optional): Fraction of energy lost per time step due to storage inefficiencies. Defaults to 0.0.
+    """
+
+    def __init__(
+        self,
+        max_capacity: float,
+        time_steps: list[int],
+        min_capacity: float = 0.0,
+        max_power_charge: float | None = None,
+        max_power_discharge: float | None = None,
+        efficiency_charge: float = 1.0,
+        efficiency_discharge: float = 1.0,
+        initial_soc: float = 1.0,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        storage_loss_rate: float = 0.0,
+        **kwargs,
+    ):
+        super().__init__()
+
+        # check if initial_soc is within the bounds [0, 1] and fix it if not
+        if initial_soc > 1:
+            initial_soc /= max_capacity
+            logger.warning(
+                f"Initial SOC is greater than 1.0. Setting it to {initial_soc}."
+            )
+
+        self.max_capacity = max_capacity
+        self.min_capacity = min_capacity
+        self.time_steps = time_steps
+        self.max_power_charge = (
+            max_capacity if max_power_charge is None else max_power_charge
+        )
+        self.max_power_discharge = (
+            max_capacity if max_power_discharge is None else max_power_discharge
+        )
+        self.efficiency_charge = efficiency_charge
+        self.efficiency_discharge = efficiency_discharge
+        self.initial_soc = initial_soc
+        self.ramp_up = max_power_charge if ramp_up is None else ramp_up
+        self.ramp_down = max_power_charge if ramp_down is None else ramp_down
+        self.storage_loss_rate = storage_loss_rate
+        self.kwargs = kwargs
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """
+        Adds a utility battery storage block to the Pyomo model, defining parameters, variables, and constraints.
+
+        Pyomo Components:
+            - **Parameters**:
+                - `max_capacity`: Maximum capacity of the battery unit.
+                - `min_capacity`: Minimum state of charge (SOC).
+                - `max_power_charge`: Maximum charging power.
+                - `max_power_discharge`: Maximum discharging power.
+                - `efficiency_charge`: Charging efficiency.
+                - `efficiency_discharge`: Discharging efficiency.
+                - `initial_soc`: Initial state of charge.
+                - `ramp_up`: Maximum allowed ramp-up rate for charging and discharging.
+                - `ramp_down`: Maximum allowed ramp-down rate for charging and discharging.
+                - `storage_loss_rate`: Fraction of energy lost during storage.
+
+            - **Variables**:
+                - `soc[t]`: State of charge (SOC) at each time step `t`.
+                - `charge[t]`: Charging power at each time step `t`.
+                - `discharge[t]`: Discharging power at each time step `t`.
+
+            - **Constraints**:
+                - `soc_balance_rule[t]`: Tracks SOC changes over time based on charging, discharging, and storage loss.
+                - `charge_ramp_up_constraint[t]`: Limits the ramp-up rate for charging if specified.
+                - `discharge_ramp_up_constraint[t]`: Limits the ramp-up rate for discharging if specified.
+                - `charge_ramp_down_constraint[t]`: Limits the ramp-down rate for charging if specified.
+                - `discharge_ramp_down_constraint[t]`: Limits the ramp-down rate for discharging if specified.
+
+        Args:
+            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
+            model_block (pyo.Block): A Pyomo Block object to which the battery storage block will be added.
+
+        Returns:
+            pyo.Block: A Pyomo block representing the utility battery system with variables and constraints.
+        """
+
+        # Define parameters
+        model_block.max_capacity = pyo.Param(initialize=self.max_capacity)
+        model_block.min_capacity = pyo.Param(initialize=self.min_capacity)
+        model_block.max_power_charge = pyo.Param(initialize=self.max_power_charge)
+        model_block.max_power_discharge = pyo.Param(initialize=self.max_power_discharge)
+        model_block.efficiency_charge = pyo.Param(initialize=self.efficiency_charge)
+        model_block.efficiency_discharge = pyo.Param(
+            initialize=self.efficiency_discharge
+        )
+        model_block.initial_soc = pyo.Param(
+            initialize=self.initial_soc * self.max_capacity
+        )
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
+
+        # Define variables
+        model_block.soc = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(model_block.min_capacity, model_block.max_capacity),
+            doc="State of Charge at each time step",
+        )
+        model_block.charge = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power_charge),
+            doc="Charging power at each time step",
+        )
+        model_block.discharge = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power_discharge),
+            doc="Discharging power at each time step",
+        )
+
+        # Define SOC dynamics with energy loss and efficiency
+        @model_block.Constraint(self.time_steps)
+        def soc_balance_rule(b, t):
+            if t == self.time_steps.at(1):
+                prev_soc = b.initial_soc
+            else:
+                prev_soc = b.soc[t - 1]
+            return b.soc[t] == (
+                prev_soc
+                + b.efficiency_charge * b.charge[t]
+                - (1 / b.efficiency_discharge) * b.discharge[t]
+                - b.storage_loss_rate * prev_soc
+            )
+
+        # Apply ramp-up constraints if ramp_up is specified
+        @model_block.Constraint(self.time_steps)
+        def charge_ramp_up_constraint(b, t):
+            if t == self.time_steps.at(1):
+                return b.charge[t] <= b.ramp_up
+            return b.charge[t] - b.charge[t - 1] <= b.ramp_up
+
+        @model_block.Constraint(self.time_steps)
+        def discharge_ramp_up_constraint(b, t):
+            if t == self.time_steps.at(1):
+                return b.discharge[t] <= b.ramp_up
+            return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
+
+        # Apply ramp-down constraints if ramp_down is specified
+        @model_block.Constraint(self.time_steps)
+        def charge_ramp_down_constraint(b, t):
+            if t == self.time_steps.at(1):
+                return b.charge[t] <= b.ramp_down
+            return b.charge[t - 1] - b.charge[t] <= b.ramp_down
+
+        @model_block.Constraint(self.time_steps)
+        def discharge_ramp_down_constraint(b, t):
+            if t == self.time_steps.at(1):
+                return b.discharge[t] <= b.ramp_down
+            return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
+
+        return model_block
+
+
 # Mapping of component type identifiers to their respective classes
 demand_side_technologies: dict = {
     "electrolyser": Electrolyser,
@@ -1797,6 +1981,7 @@ demand_side_technologies: dict = {
     "boiler": Boiler,
     "electric_vehicle": ElectricVehicle,
     "generic_storage": GenericStorage,
+    "utility_battery": GenericStorage,
     "pv_plant": PVPlant,
     "thermal_storage": GenericStorage,
     "charging_station": ChargingStation,

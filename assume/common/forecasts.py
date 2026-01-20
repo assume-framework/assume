@@ -645,6 +645,14 @@ class CsvForecaster(Forecaster):
         merged_forecasts.index = pd.date_range(
             start=self.index[0], end=self.index[-1], freq=self.index.freq
         )
+
+        # Add solar/PV availability columns if RE_availability exists
+        # availability_solar is used by depot.py for PV calculations
+        # pv_availability is added for clarity in analysis
+        if "RE_availability" in merged_forecasts.columns:
+            merged_forecasts["availability_solar"] = merged_forecasts["RE_availability"]
+            merged_forecasts["pv_availability"] = merged_forecasts["RE_availability"]
+
         merged_forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
 
     def convert_forecasts_to_fast_series(self):

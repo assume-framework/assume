@@ -173,7 +173,7 @@ class NaiveDADSMStrategy(BaseStrategy):
 
         # check if unit has opt_power_requirement attribute
         # if not hasattr(unit, "opt_power_requirement"):
-        unit.determine_optimal_operation_without_flex()
+        unit.determine_optimal_operation_with_flex()
         self.export_power_requirements_to_csv(
             unit, "./examples/inputs/example_bus/power_requirements_timeseries.csv"
         )

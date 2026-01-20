@@ -46,7 +46,7 @@ class BusDepot(DSMFlex, SupportsMinMax):
     """
 
     required_technologies = ["electric_vehicle"]
-    optional_technologies = ["charging_station", "pv_plant"]
+    optional_technologies = ["charging_station", "pv_plant", "utility_battery"]
 
     def __init__(
         self,
@@ -203,13 +203,21 @@ class BusDepot(DSMFlex, SupportsMinMax):
         # Check for presence of PV component
         self.has_pv = "pv_plant" in self.components.keys()
 
+        # Check for presence of utility battery
+        self.has_utility_battery = "utility_battery" in self.components.keys()
+
         # Configure PV plant power profile based on availability (similar to steam_plant)
         if self.has_pv:
+            uses_power_profile = self.components["pv_plant"].get("uses_power_profile", "false")
+            # Handle both boolean and string values
+            if isinstance(uses_power_profile, bool):
+                uses_pp = uses_power_profile
+            else:
+                uses_pp = str_to_bool(uses_power_profile)
+
             profile_key = (
                 f"{self.id}_pv_power_profile"
-                if not str_to_bool(
-                    self.components["pv_plant"].get("uses_power_profile", "false")
-                )
+                if not uses_pp
                 else "availability_solar"
             )
             pv_profile = self.forecaster[profile_key]
@@ -313,14 +321,19 @@ class BusDepot(DSMFlex, SupportsMinMax):
             self.model.time_steps, within=pyo.NonNegativeReals, doc="Power from grid"
         )
 
-        # PV integration variables (if PV is present)
-        if self.has_pv:
-            self.model.pv_used = pyo.Var(
-                self.model.time_steps, within=pyo.NonNegativeReals, doc="PV energy used on-site"
+        # Grid feed-in variable (for prosumers)
+        if self.is_prosumer:
+            self.model.grid_feed_in = pyo.Var(
+                self.model.time_steps, within=pyo.NonNegativeReals, doc="Power sold to grid"
             )
-            self.model.pv_curtail = pyo.Var(
-                self.model.time_steps, within=pyo.NonNegativeReals, doc="PV energy curtailed"
-            )
+
+        # PV integration variables (always defined for consistency in constraints)
+        self.model.pv_used = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals, doc="PV energy used on-site"
+        )
+        self.model.pv_surplus = pyo.Var(
+            self.model.time_steps, within=pyo.NonNegativeReals, doc="PV surplus energy (excess generation)"
+        )
         #  1: EV-CS assignment variables
         # Represents whether an electric vehicle (EV) is assigned to a charging station (CS)
         self.model.is_assigned = pyo.Var(
@@ -462,6 +475,22 @@ class BusDepot(DSMFlex, SupportsMinMax):
                 # PV can be partially used or curtailed - not forced to use all
                 return m.pv_used[t] <= m.dsm_blocks["pv_plant"].power[t]
 
+            @self.model.Constraint(self.model.time_steps)
+            def pv_surplus_balance(m, t):
+                """PV surplus = PV generation - PV used on-site"""
+                return m.pv_surplus[t] == m.dsm_blocks["pv_plant"].power[t] - m.pv_used[t]
+        else:
+            # No PV system - both pv_used and pv_surplus must be 0
+            @self.model.Constraint(self.model.time_steps)
+            def no_pv_used(m, t):
+                """When no PV exists, pv_used = 0"""
+                return m.pv_used[t] == 0
+
+            @self.model.Constraint(self.model.time_steps)
+            def no_pv_surplus(m, t):
+                """When no PV exists, pv_surplus = 0"""
+                return m.pv_surplus[t] == 0
+
         # --- Electricity balance: PV_used + grid == electric loads (CS discharge to EVs) ---
         @self.model.Constraint(self.model.time_steps, doc="Electricity supply balance: grid + PV = CS loads")
         def electricity_balance(m, t):
@@ -590,12 +619,21 @@ class BusDepot(DSMFlex, SupportsMinMax):
         
         @self.model.Constraint(self.model.time_steps)
         def total_power_output_constraint(m, t):
+            """
+            Total power output = CS charge (from EV discharge) + PV surplus
+
+            For utility battery case: PV surplus + CS charge goes to battery
+            For non-battery case: PV surplus + CS charge goes to grid
+            """
             cs_charge = sum(
                 m.dsm_blocks[cs].charge[t]
                 for cs in m.dsm_blocks
                 if cs.startswith("charging_station")
             )
-            return m.total_power_output[t] == cs_charge        
+
+            pv_surplus = m.pv_surplus[t] if self.has_pv else 0
+
+            return m.total_power_output[t] == cs_charge + pv_surplus        
 
         @self.model.Constraint(self.model.time_steps)
         def variable_cost_constraint(m, t):
@@ -968,15 +1006,46 @@ class BusDepot(DSMFlex, SupportsMinMax):
         # PURPOSE: Advanced queue priority logic to minimize switching
         # CHALLENGE: HiGHS solver requires linear constraints only
         # CURRENT STATUS: Basic switching prevention is handled by constraints 20, 22, and 24
-        # 
-        # FOR FUTURE IMPLEMENTATION: Would require additional binary variables and 
+        #
+        # FOR FUTURE IMPLEMENTATION: Would require additional binary variables and
         # linearization techniques to make it compatible with linear solvers
-        # 
+        #
         # The current constraints already provide:
         # - Correct future usage calculation (Constraint 20)
-        # - Charging continuity until sufficient charge (Constraint 22) 
+        # - Charging continuity until sufficient charge (Constraint 22)
         # - Prevention of premature switching (Constraint 24)
         # This combination significantly reduces unnecessary switching
+
+        # CONSTRAINT 27: Utility battery or grid feed-in logic
+        if self.has_utility_battery:
+            # Case 1: Utility battery exists - charge battery with surplus
+            @self.model.Constraint(self.model.time_steps)
+            def utility_battery_charge_constraint(m, t):
+                """
+                When utility battery exists: total_power_output charges the battery
+                Battery charge = CS charge + PV surplus
+                """
+                return m.dsm_blocks["utility_battery"].charge[t] == m.total_power_output[t]
+
+            # When utility battery exists, grid feed-in must be 0
+            if self.is_prosumer:
+                @self.model.Constraint(self.model.time_steps)
+                def no_grid_feed_in_with_battery(m, t):
+                    """
+                    When utility battery exists: grid feed-in = 0
+                    All surplus goes to battery, not to grid
+                    """
+                    return m.grid_feed_in[t] == 0
+
+        elif self.is_prosumer:
+            # Case 2: No utility battery but is prosumer - feed to grid
+            @self.model.Constraint(self.model.time_steps)
+            def grid_feed_in_constraint(m, t):
+                """
+                When no utility battery: total_power_output goes to grid
+                Grid feed-in = CS charge + PV surplus
+                """
+                return m.grid_feed_in[t] == m.total_power_output[t]
 
         # Add FCR capacity market if prosumer is enabled
     ##    if self.is_prosumer:
