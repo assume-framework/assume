@@ -704,7 +704,7 @@ class World:
                 msg = "Redispatch market but no dispatch market was defined."
                 raise ValueError(msg)
             
-            earliest_dispatch_closing = min(x.opening_hours[-1]
+            earliest_dispatch_closing = min(x.opening_hours[0] + x.opening_duration 
                                             for x in dispatch_markets)
             earliest_redispatch_opening = min(x.opening_hours[0]
                                               for x in redispatch_markets)
