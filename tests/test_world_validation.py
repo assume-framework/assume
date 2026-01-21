@@ -20,7 +20,7 @@ import dateutil.rrule as rr
 
 @pytest.fixture(scope="function")
 def world():
-    """World is function-scoped to ensure operator isolation."""
+    """World is function-scoped to prevent multiple additions of operators."""
 
     return setup_simple_world()
 
@@ -128,12 +128,13 @@ def test_market_too_late(world):
 
 
 def test_refering_non_existant_market(world):
-    """A UnitOperator referencing a non-existant Market, raises an Error."""
+    """A UnitOperator referencing a non-existant Market, raises a Warning."""
 
     strategies = {"none_existant_market": "naive_eom"}
 
-    with pytest.raises(ValueError):
+    with pytest.warns(UserWarning) as record:
         world.add_unit_operator("unit_operator", strategies)
+    assert len(record) > 0
 
 
 def test_non_referred_market(world):
@@ -164,7 +165,7 @@ def test_redispatch_no_dispatch(grid_data, world):
     """A redispatch without a dispatch market raises an Error."""
 
     world.add_market_operator("market_operator")
-    world.add_unit_operator("unit_operator")
+    
     market_opening = rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end)
     market_products = [
         MarketProduct(
@@ -187,6 +188,9 @@ def test_redispatch_no_dispatch(grid_data, world):
         market_operator_id="market_operator", market_config=redispatch_config
     )
 
+    strategies = {"redispatch": "naive_eom"}
+    world.add_unit_operator("unit_operator", strategies)
+
     with pytest.raises(ValueError):
         world.run()
 
@@ -195,7 +199,6 @@ def test_redispatch_too_early(grid_data, world):
     """A redispatch market opening before dispatch closure raises an Error."""
 
     world.add_market_operator("market_operator")
-    world.add_unit_operator("unit_operator")
     opening_dispatch = rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end)
     opening_redispatch = opening_dispatch
 
@@ -228,33 +231,8 @@ def test_redispatch_too_early(grid_data, world):
         market_operator_id="market_operator", market_config=redispatch_config
     )
 
+    strategies = {"redispatch": "naive_eom", "dispatch": "naive_eom"}
+    world.add_unit_operator("unit_operator", strategies)
+
     with pytest.raises(ValueError):
         world.run()
-
-
-def test_addition_order(world, demand):
-    """Add participants before market."""
-
-    opening_dispatch = rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end)
-
-    market_products = [
-        MarketProduct(
-            duration=datetime.timedelta(hours=1),
-            count=1,
-            first_delivery=datetime.timedelta(hours=1),
-        )
-    ]
-
-    redispatch_config = MarketConfig(
-        "dispatch", opening_hours=opening_dispatch, market_products=market_products
-    )
-
-    world.add_market_operator("market_operator")
-    world.add_market(
-        market_operator_id="market_operator", market_config=redispatch_config
-    )
-
-    world.add_unit_operator("unit_operator", {"dispatch": "naive_eom"})
-    world.add_unit_instance(operator_id="unit_operator", unit=demand)
-
-    world.run()

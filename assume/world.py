@@ -420,9 +420,10 @@ class World:
         for market_id in strategies.keys():
             if market_id not in list(self.markets.keys()):
                 msg = (f"Strategies of unit operator {id} references "
-                        f"market {market_id} which is not known in world."
-                        f"Known markets are:\n{list(self.markets.keys())}.")
-                raise ValueError(msg)
+                       f"market {market_id} which is not known in world.\n"
+                       f"Known markets are: {list(self.markets.keys())}.\n"
+                       f"Note: Markets must be added before unit operators.")
+                warnings.warn(msg)
 
         bidding_strategies = self._prepare_bidding_strategies(
             {"bidding_strategies": strategies}, id
