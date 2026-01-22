@@ -17,7 +17,10 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
-from assume.common.forecast_initialisation import ForecastInitialisation
+from assume.common.forecast_initialisation import (
+    LoadAndNodeForecastInitialisation,
+    NaivePriceForcastInitialisation,
+)
 from assume.common.forecaster import (
     BuildingForecaster,
     CustomUnitForecaster,
@@ -580,7 +583,7 @@ def load_config_and_create_forecaster(
     buses = load_file(path=path, config=config, file_name="buses")
     lines = load_file(path=path, config=config, file_name="lines")
 
-    initializer = ForecastInitialisation(
+    load_node_initializer = LoadAndNodeForecastInitialisation(
         index=index,
         demand_units=demand_units,
         exchange_units=exchange_units,
@@ -594,16 +597,31 @@ def load_config_and_create_forecaster(
         availability=availability,
         exchanges=exchanges_df,
     )
+    price_initializer = NaivePriceForcastInitialisation(
+        index=index,
+        demand_units=demand_units,
+        exchange_units=exchange_units,
+        powerplants_units=powerplant_units,
+        fuel_prices=fuel_prices_df,
+        market_configs=config["markets_config"],
+        forecasts=forecasts_df,
+        demand=demand_df,
+        availability=availability,
+        exchanges=exchanges_df,
+    )
 
     unit_forecasts: dict[str, UnitForecaster] = {}
-    market_prices, residual_loads = initializer.calculate_market_forecasts()
-    congestion_signal, renewable_utilization = initializer.calc_node_forecasts()
+
+    market_prices = price_initializer.calculate_market_forecasts()
+    residual_loads = load_node_initializer.calculate_residual_load_forecast()
+    congestion_signal, renewable_utilization = load_node_initializer.calc_node_forecasts()
+
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
                 index=index,
-                availability=initializer.availability(id),
-                fuel_prices=initializer.fuel_prices,
+                availability=price_initializer.availability(id),
+                fuel_prices=price_initializer.fuel_prices,
                 market_prices=market_prices,
                 residual_load=residual_loads,
             )
@@ -611,7 +629,7 @@ def load_config_and_create_forecaster(
         for id, demand in demand_units.iterrows():
             unit_forecasts[id] = DemandForecaster(
                 index=index,
-                availability=initializer.availability(id),
+                availability=price_initializer.availability(id),
                 demand=-demand_df[id].abs(),
                 market_prices=market_prices,
                 residual_load=residual_loads,
@@ -620,7 +638,7 @@ def load_config_and_create_forecaster(
         for id, storage in storage_units.iterrows():
             unit_forecasts[id] = UnitForecaster(
                 index=index,
-                availability=initializer.availability(id),
+                availability=price_initializer.availability(id),
                 market_prices=market_prices,
                 residual_load=residual_loads,
             )
@@ -628,7 +646,7 @@ def load_config_and_create_forecaster(
         for id, exchange in exchange_units.iterrows():
             unit_forecasts[id] = ExchangeForecaster(
                 index=index,
-                availability=initializer.availability(id),
+                availability=price_initializer.availability(id),
                 market_prices=market_prices,
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
@@ -640,12 +658,12 @@ def load_config_and_create_forecaster(
                 if type == "building":
                     unit_forecasts[id] = BuildingForecaster(
                         index=index,
-                        availability=initializer.availability(id),
+                        availability=price_initializer.availability(id),
                         market_prices=market_prices,
-                        fuel_prices=initializer.fuel_prices,
+                        fuel_prices=price_initializer.fuel_prices,
                         residual_load=residual_loads,
                         # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
+                        electricity_price=price_initializer.forecasts("price_EOM"),
                         load_profile=0,  # TODO
                         ev_load_profile=0,  # TODO
                         heat_demand=0,  # TODO
@@ -655,36 +673,36 @@ def load_config_and_create_forecaster(
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
                         index=index,
-                        availability=initializer.availability(id),
+                        availability=price_initializer.availability(id),
                         market_prices=market_prices,
-                        fuel_prices=initializer.fuel_prices,
+                        fuel_prices=price_initializer.fuel_prices,
                         residual_load=residual_loads,
                         # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
+                        electricity_price=price_initializer.forecasts("price_EOM"),
                         congestion_signal=congestion_signal,
                         renewable_utilisation_signal=renewable_utilization,
                     )
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
                         index=index,
-                        availability=initializer.availability(id),
+                        availability=price_initializer.availability(id),
                         market_prices=market_prices,
                         hydrogen_demand=unit["demand"],
                         residual_load=residual_loads,
                         # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
+                        electricity_price=price_initializer.forecasts("price_EOM"),
                         seasonal_storage_schedule=0,  # TODO
                     )
                 if type == "steam_plant":
                     unit_forecasts[id] = SteamgenerationForecaster(
                         index=index,
-                        availability=initializer.availability(id),
+                        availability=price_initializer.availability(id),
                         demand=unit["demand"],
                         market_prices=market_prices,
-                        fuel_prices=initializer.fuel_prices,
+                        fuel_prices=price_initializer.fuel_prices,
                         residual_load=residual_loads,
                         # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
+                        electricity_price=price_initializer.forecasts("price_EOM"),
                         congestion_signal=congestion_signal,
                         renewable_utilisation_signal=renewable_utilization,
                         electricity_price_flex=0,  # TODO

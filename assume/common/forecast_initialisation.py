@@ -17,33 +17,13 @@ def _ensure_not_none(
         raise ValueError("Forecast frequency does not match index frequency.")
     return df
 
-
-class ForecastInitialisation:
+class BaseForcastInitialisation:
     """
-    This class represents a forecaster that provides timeseries for forecasts derived from existing files.
-
-    It initializes with the provided index and configuration data, including power plants, demand units,
-    and market configurations. The forecaster also supports optional inputs like DSM (demand-side management) units,
-    buses, and lines for more advanced forecasting scenarios.
-
-    Methods are included to retrieve forecasts for specific columns, availability of units,
-    and prices of fuel types, returning the corresponding timeseries as pandas Series.
-
-    Note:
-    - Some built-in forecasts are calculated at the beginning of the simulation, such as price forecast and residual load forecast.
-    - Price forecast is calculated for energy-only markets using a merit order approach.
-    - Residual load forecast is calculated by subtracting the total available power from variable renewable energy power plants from the overall demand forecast. Only power plants containing 'wind' or 'solar' in their technology column are considered VRE power plants.
+    A base class for forecasting algorithms.
 
     Args:
-        index (FastIndex | pd.Series | pd.DatetimeIndex): The index of the forecasts.
-        powerplants_units (pd.DataFrame): A DataFrame containing information about power plants.
-        demand_units (pd.DataFrame): A DataFrame with demand unit data.
-        market_configs (dict[str, dict]): Configuration details for the markets.
-        buses (pd.DataFrame | None, optional): A DataFrame of buses information. Defaults to None.
-        lines (pd.DataFrame | None, optional): A DataFrame of line information. Defaults to None.
-        *args (object): Additional positional arguments.
-        **kwargs (object): Additional keyword arguments.
-
+        *args (list): The arguments.
+        **kwargs (dict): The keyword arguments.
     """
 
     def __init__(
@@ -51,126 +31,53 @@ class ForecastInitialisation:
         index: pd.Series | pd.DatetimeIndex,
         powerplants_units: pd.DataFrame,
         demand_units: pd.DataFrame,
-        market_configs: dict[str, dict],
         demand: pd.DataFrame = None,
         availability: pd.DataFrame = None,
-        exchanges: pd.DataFrame = None,
         forecasts: pd.DataFrame = None,
-        fuel_prices: pd.DataFrame = None,
-        exchange_units: pd.DataFrame = None,
-        buses: pd.DataFrame = None,
-        lines: pd.DataFrame = None,
+        *args,
+        **kwargs
     ):
+        """
+        Initalizes the forecasting algorithm.
+        """
         self.index = index
         self._logger = logging.getLogger(__name__)
         self.powerplants_units = powerplants_units
         self.demand_units = demand_units
-        self.market_configs = market_configs
-        self.exchange_units = exchange_units
-        self.buses = buses
-        self.lines = lines
         self.demand = _ensure_not_none(demand, index, check_index=True)
-        self.exchanges = _ensure_not_none(exchanges, index, check_index=True)
 
-        fuel_prices = _ensure_not_none(fuel_prices, index)
-        if len(fuel_prices) <= 1:  # single value provided, extend to full index
-            fuel_prices.index = index[:1]
-            fuel_prices = fuel_prices.reindex(index, method="ffill")
-        self.fuel_prices = fuel_prices
         self._forecasts = _ensure_not_none(forecasts, index, check_index=True)
         self._availability = _ensure_not_none(availability, index, check_index=True)
 
     def forecasts(self, id: str) -> pd.Series:
+        """
+        Returns corresponding forecast to given 'id'.
+
+        Args:
+            id (str): The ID of the forecast.
+        
+        Returns:
+            pd.Series: forecast (zeros if not existing)
+
+        """
         if self._forecasts is not None and id in self._forecasts.columns:
             return self._forecasts[id]
         return pd.Series(0.0, self.index, name=id)
 
     def availability(self, id: str) -> pd.Series:
+        """
+        Returns corresponding availability to given 'id'.
+
+        Args:
+            id (str): The ID of the availability.
+        
+        Returns:
+            pd.Series: availability (ones if not existing)
+
+        """
         if self._availability is not None and id in self._availability.columns:
             return self._availability[id]
         return pd.Series(1.0, self.index, name=f"availability_{id}")
-
-    def calculate_market_forecasts(
-        self,
-    ) -> tuple[dict[str, pd.Series], dict[str, pd.Series]]:
-        """Calculate market-specific price and residual load forecasts."""
-        price_forecasts: dict[str, pd.Series] = {}
-        residual_loads: dict[str, pd.Series] = {}
-
-        for market_id, config in self.market_configs.items():
-            if config["product_type"] != "energy":
-                self._logger.warning(
-                    f"Price forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
-                )
-                continue
-            price_forecasts[market_id] = self._forecasts.get(f"price_{market_id}")
-            if price_forecasts[market_id] is None:
-                # calculate if not present
-                forecast = self.calculate_market_price_forecast(market_id)
-                price_forecasts[market_id] = forecast
-
-            residual_loads[market_id] = self._forecasts.get(
-                f"residual_load_{market_id}"
-            )
-            if residual_loads[market_id] is None:
-                # calculate if not present
-                load_forecast = self.calculate_residual_load_forecast(market_id)
-                residual_loads[market_id] = load_forecast
-
-        return price_forecasts, residual_loads
-
-    def calc_node_forecasts(self):
-        if self.buses is None or self.lines is None:
-            return None, None
-        if (
-            "node" not in self.demand_units.columns
-            or not self.demand_units["node"].isin(self.buses.index).all()
-        ):
-            self._logger.warning(
-                "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
-                "Either 'node' column is missing in demand_units or nodes are not available in buses."
-            )
-            return None, None
-
-        nodes = {node for node in self.demand_units["node"].unique()}
-        all_nodes = nodes | {"all"}
-        return (
-            self._calc_unpresent(nodes, self.calc_congestion_forecast),
-            self._calc_unpresent(all_nodes, self.calc_renewable_utilisation),
-        )
-
-    def _calc_unpresent(
-        self, columns: set, calculation_func: Callable[[], pd.DataFrame]
-    ) -> pd.DataFrame:
-        """
-        Checks if all specified columns are present in the forecasts, if not calculate them using the provided function.
-        """
-        if columns.issubset(set(self._forecasts.columns)):
-            return self._forecasts[columns]
-        df = calculation_func()
-        for col in df.columns:
-            if col in self._forecasts.columns:
-                df[col] = self._forecasts[col]
-        return df
-
-    def get_registered_market_participants(self, market_id: str) -> pd.DataFrame:
-        """
-        Retrieves information about market participants to make accurate price forecasts.
-
-        Currently, the functionality for using different markets and specified registration for
-        the price forecast is not implemented, so it returns the power plants as a DataFrame.
-
-        Args:
-            market_id (str): The market ID.
-
-        Returns:
-            pd.DataFrame: The registered market participants.
-
-        """
-        self._logger.warning(
-            "Functionality of using the different markets and specified registration for the price forecast is not implemented yet"
-        )
-        return self.powerplants_units
 
     def _calc_power(self, mask: pd.Series = None) -> pd.DataFrame:
         """
@@ -187,49 +94,47 @@ class ForecastInitialisation:
         availabilities.columns = powerplants.index
         return powerplants.max_power * availabilities
 
-    def calculate_residual_load_forecast(self, market_id) -> pd.Series:
-        """
-        This method calculates the residual demand forecast by subtracting the total available power from renewable energy (VRE) power plants from the overall demand forecast for each time step.
 
-        Returns:
-            pd.Series: The residual demand forecast.
+class NaivePriceForcastInitialisation(BaseForcastInitialisation):
+    def __init__(
+        self,
+        market_configs: dict[str, dict],
+        exchanges: pd.DataFrame = None,
+        fuel_prices: pd.DataFrame = None,
+        exchange_units: pd.DataFrame = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.market_configs = market_configs
+        self.exchange_units = exchange_units
+        self.exchanges = _ensure_not_none(exchanges, index, check_index=True)
 
-        Note:
-            1. Selects VRE power plants from the powerplants_units DataFrame based on the technology column (wind or solar).
-            2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
-            3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
-            4. Calculates the residual demand by subtracting the total VRE power feed-in from the overall demand forecast.
-            5. If exchange units are available, imports and exports are subtracted and added to the demand forecast, respectively.
+        fuel_prices = _ensure_not_none(fuel_prices, index)
+        if len(fuel_prices) <= 1:  # single value provided, extend to full index
+            fuel_prices.index = index[:1]
+            fuel_prices = fuel_prices.reindex(index, method="ffill")
+        self.fuel_prices = fuel_prices
+    
+    def calculate_market_forecasts(
+        self,
+    ) -> tuple[dict[str, pd.Series], dict[str, pd.Series]]:
+        """Calculate market-specific price forecasts."""
+        price_forecasts: dict[str, pd.Series] = {}
 
-        """
-        demand_units = self.demand_units[
-            self.demand_units[f"bidding_{market_id}"].notnull()
-        ]
-        sum_demand = self.demand[demand_units.index].sum(axis=1)
+        for market_id, config in self.market_configs.items():
+            if config["product_type"] != "energy":
+                self._logger.warning(
+                    f"Price forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
+                )
+                continue
+            price_forecasts[market_id] = self._forecasts.get(f"price_{market_id}")
+            if price_forecasts[market_id] is None:
+                # calculate if not present
+                forecast = self.calculate_market_price_forecast(market_id)
+                price_forecasts[market_id] = forecast
 
-        # get exchanges if exchange_units are available
-        if self.exchange_units is not None:
-            exchange_units = self.exchange_units[
-                self.exchange_units[f"bidding_{market_id}"].notnull()
-            ]
-            # get sum of imports as name of exchange_unit_import
-            import_units = [f"{unit}_import" for unit in exchange_units.index]
-            sum_imports = self.exchanges[import_units].sum(axis=1)
-            # get sum of exports as name of exchange_unit_export
-            export_units = [f"{unit}_export" for unit in exchange_units.index]
-            sum_exports = self.exchanges[export_units].sum(axis=1)
-            # add imports and exports to the sum_demand
-            sum_demand += sum_imports - sum_exports
-
-        mask = self.powerplants_units["technology"].str.contains(
-            r"\b(?:wind|solar)", case=False, na=False
-        )
-        vre_feed_in_df = self._calc_power(mask).sum(axis=1)
-        if vre_feed_in_df.empty:
-            vre_feed_in_df = 0
-        res_demand_df = sum_demand - vre_feed_in_df
-
-        return res_demand_df
+        return price_forecasts, residual_loads
 
     def calculate_market_price_forecast(self, market_id) -> pd.Series:
         """
@@ -327,6 +232,7 @@ class ForecastInitialisation:
 
         return price_forecast
 
+    
     def calculate_marginal_cost(self, pp_series: pd.Series) -> pd.Series:
         """
         Calculates time series of marginal costs for a power plant.
@@ -367,6 +273,176 @@ class ForecastInitialisation:
         marginal_cost = fuel_cost + emissions_cost + additional_cost
 
         return marginal_cost
+
+
+class LoadAndNodeForecastInitialisation(BaseForcastInitialisation):
+    """
+    This class represents a forecaster that provides timeseries for forecasts derived from existing files.
+
+    It initializes with the provided index and configuration data, including power plants, demand units,
+    and market configurations. The forecaster also supports optional inputs like DSM (demand-side management) units,
+    buses, and lines for more advanced forecasting scenarios.
+
+    Methods are included to retrieve forecasts for specific columns, availability of units,
+    and prices of fuel types, returning the corresponding timeseries as pandas Series.
+
+    Note:
+    - Some built-in forecasts are calculated at the beginning of the simulation, such as price forecast and residual load forecast.
+    - Price forecast is calculated for energy-only markets using a merit order approach.
+    - Residual load forecast is calculated by subtracting the total available power from variable renewable energy power plants from the overall demand forecast. Only power plants containing 'wind' or 'solar' in their technology column are considered VRE power plants.
+
+    Args:
+        index (FastIndex | pd.Series | pd.DatetimeIndex): The index of the forecasts.
+        powerplants_units (pd.DataFrame): A DataFrame containing information about power plants.
+        demand_units (pd.DataFrame): A DataFrame with demand unit data.
+        market_configs (dict[str, dict]): Configuration details for the markets.
+        buses (pd.DataFrame | None, optional): A DataFrame of buses information. Defaults to None.
+        lines (pd.DataFrame | None, optional): A DataFrame of line information. Defaults to None.
+        *args (object): Additional positional arguments.
+        **kwargs (object): Additional keyword arguments.
+
+    """
+
+    def __init__(
+        self,
+        market_configs: dict[str, dict],
+        exchanges: pd.DataFrame = None,
+        fuel_prices: pd.DataFrame = None,
+        exchange_units: pd.DataFrame = None,
+        buses: pd.DataFrame = None,
+        lines: pd.DataFrame = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.market_configs = market_configs
+        self.exchange_units = exchange_units
+        self.buses = buses
+        self.lines = lines
+        self.exchanges = _ensure_not_none(exchanges, index, check_index=True)
+
+        fuel_prices = _ensure_not_none(fuel_prices, index)
+        if len(fuel_prices) <= 1:  # single value provided, extend to full index
+            fuel_prices.index = index[:1]
+            fuel_prices = fuel_prices.reindex(index, method="ffill")
+        self.fuel_prices = fuel_prices
+
+    def calc_node_forecasts(self):
+        if self.buses is None or self.lines is None:
+            return None, None
+        if (
+            "node" not in self.demand_units.columns
+            or not self.demand_units["node"].isin(self.buses.index).all()
+        ):
+            self._logger.warning(
+                "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
+                "Either 'node' column is missing in demand_units or nodes are not available in buses."
+            )
+            return None, None
+
+        nodes = {node for node in self.demand_units["node"].unique()}
+        all_nodes = nodes | {"all"}
+        return (
+            self._calc_unpresent(nodes, self.calc_congestion_forecast),
+            self._calc_unpresent(all_nodes, self.calc_renewable_utilisation),
+        )
+
+    def _calc_unpresent(
+        self, columns: set, calculation_func: Callable[[], pd.DataFrame]
+    ) -> pd.DataFrame:
+        """
+        Checks if all specified columns are present in the forecasts, if not calculate them using the provided function.
+        """
+        if columns.issubset(set(self._forecasts.columns)):
+            return self._forecasts[columns]
+        df = calculation_func()
+        for col in df.columns:
+            if col in self._forecasts.columns:
+                df[col] = self._forecasts[col]
+        return df
+
+    def get_registered_market_participants(self, market_id: str) -> pd.DataFrame:
+        """
+        Retrieves information about market participants to make accurate price forecasts.
+
+        Currently, the functionality for using different markets and specified registration for
+        the price forecast is not implemented, so it returns the power plants as a DataFrame.
+
+        Args:
+            market_id (str): The market ID.
+
+        Returns:
+            pd.DataFrame: The registered market participants.
+
+        """
+        self._logger.warning(
+            "Functionality of using the different markets and specified registration for the price forecast is not implemented yet"
+        )
+        return self.powerplants_units
+
+    def calculate_residual_load_forecast(self) -> dict[str, pd.Series]:
+        """
+        This method calculates the residual demand forecasts per market by subtracting the total available power 
+        from renewable energy (VRE) power plants from the overall demand forecast for each time step.
+
+        Returns:
+            dict[str, pd.Series]: The residual demand forecast for each market_id.
+
+        Note:
+            1. Selects VRE power plants from the powerplants_units DataFrame based on the technology column (wind or solar).
+            2. Creates a DataFrame, vre_feed_in_df, with columns representing VRE power plants and initializes it with zeros.
+            3. Calculates the power feed-in for each VRE power plant based on its availability and maximum power.
+            4. Calculates the residual demand by subtracting the total VRE power feed-in from the overall demand forecast.
+            5. If exchange units are available, imports and exports are subtracted and added to the demand forecast, respectively.
+
+        """       
+        residual_loads: dict[str, pd.Series] = {}
+
+        for market_id, config in self.market_configs.items():
+            if config["product_type"] != "energy":
+                self._logger.warning(
+                    f"Residual load forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
+                )
+                continue
+
+            residual_loads[market_id] = self._forecasts.get(
+                f"residual_load_{market_id}"
+            )
+            if residual_loads[market_id] is not None:
+                # go on if already existing
+                continue
+
+            demand_units = self.demand_units[
+                self.demand_units[f"bidding_{market_id}"].notnull()
+            ]
+            sum_demand = self.demand[demand_units.index].sum(axis=1)
+
+            # get exchanges if exchange_units are available
+            if self.exchange_units is not None:
+                exchange_units = self.exchange_units[
+                    self.exchange_units[f"bidding_{market_id}"].notnull()
+                ]
+                # get sum of imports as name of exchange_unit_import
+                import_units = [f"{unit}_import" for unit in exchange_units.index]
+                sum_imports = self.exchanges[import_units].sum(axis=1)
+                # get sum of exports as name of exchange_unit_export
+                export_units = [f"{unit}_export" for unit in exchange_units.index]
+                sum_exports = self.exchanges[export_units].sum(axis=1)
+                # add imports and exports to the sum_demand
+                sum_demand += sum_imports - sum_exports
+
+            mask = self.powerplants_units["technology"].str.contains(
+                r"\b(?:wind|solar)", case=False, na=False
+            )
+            vre_feed_in_df = self._calc_power(mask).sum(axis=1)
+            if vre_feed_in_df.empty:
+                vre_feed_in_df = 0
+            res_demand_df = sum_demand - vre_feed_in_df
+
+            residual_loads[market_id] = res_demand_df
+        
+        return residual_loads
+
 
     def calc_congestion_forecast(self) -> pd.DataFrame:
         """
