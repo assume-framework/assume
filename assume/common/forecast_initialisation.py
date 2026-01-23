@@ -94,11 +94,24 @@ class BaseForcastInitialisation:
         availabilities.columns = powerplants.index
         return powerplants.max_power * availabilities
 
-
-class NaivePriceForcastInitialisation(BaseForcastInitialisation):
+class BasePriceForcastInitialisation(BaseForcastInitialisation):
     def __init__(
         self,
         market_configs: dict[str, dict],
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.market_configs = market_configs
+
+    def calculate_market_forecasts(
+        self,
+    ) -> dict[str, pd.Series]:
+        """Calculate market-specific price forecasts."""
+
+class NaivePriceForcastInitialisation(BasePriceForcastInitialisation):
+    def __init__(
+        self,
         exchanges: pd.DataFrame = None,
         fuel_prices: pd.DataFrame = None,
         exchange_units: pd.DataFrame = None,
@@ -106,19 +119,18 @@ class NaivePriceForcastInitialisation(BaseForcastInitialisation):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-        self.market_configs = market_configs
         self.exchange_units = exchange_units
-        self.exchanges = _ensure_not_none(exchanges, index, check_index=True)
+        self.exchanges = _ensure_not_none(exchanges, self.index, check_index=True)
 
-        fuel_prices = _ensure_not_none(fuel_prices, index)
+        fuel_prices = _ensure_not_none(fuel_prices, self.index)
         if len(fuel_prices) <= 1:  # single value provided, extend to full index
-            fuel_prices.index = index[:1]
-            fuel_prices = fuel_prices.reindex(index, method="ffill")
+            fuel_prices.index = self.index[:1]
+            fuel_prices = fuel_prices.reindex(self.index, method="ffill")
         self.fuel_prices = fuel_prices
     
     def calculate_market_forecasts(
         self,
-    ) -> tuple[dict[str, pd.Series], dict[str, pd.Series]]:
+    ) -> dict[str, pd.Series]:
         """Calculate market-specific price forecasts."""
         price_forecasts: dict[str, pd.Series] = {}
 
@@ -134,7 +146,7 @@ class NaivePriceForcastInitialisation(BaseForcastInitialisation):
                 forecast = self.calculate_market_price_forecast(market_id)
                 price_forecasts[market_id] = forecast
 
-        return price_forecasts, residual_loads
+        return price_forecasts
 
     def calculate_market_price_forecast(self, market_id) -> pd.Series:
         """
@@ -232,7 +244,6 @@ class NaivePriceForcastInitialisation(BaseForcastInitialisation):
 
         return price_forecast
 
-    
     def calculate_marginal_cost(self, pp_series: pd.Series) -> pd.Series:
         """
         Calculates time series of marginal costs for a power plant.
@@ -275,7 +286,39 @@ class NaivePriceForcastInitialisation(BaseForcastInitialisation):
         return marginal_cost
 
 
-class LoadAndNodeForecastInitialisation(BaseForcastInitialisation):
+class DummyPriceForecastInitialisation(BasePriceForcastInitialisation):
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+    def calculate_market_forecasts(self):
+        price_forecasts: dict[str, pd.Series] = {}
+
+        for market_id, config in self.market_configs.items():
+            price_forecasts[market_id] = self.forecasts(f"price_{market_id}")
+
+        return price_forecasts
+
+
+class BaseLoadAndNodeForecastInitialisation(BaseForcastInitialisation):
+    def __init__(
+        self,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+
+    def calculate_residual_load_forecast(self):
+        """This method calculates the residual demand forecasts per market"""
+
+    def calc_node_forecasts(self):
+        """This method calculated the nodewise congestion signals and renewable utilization"""
+
+
+class LoadAndNodeForecastInitialisation(BaseLoadAndNodeForecastInitialisation):
     """
     This class represents a forecaster that provides timeseries for forecasts derived from existing files.
 
@@ -319,15 +362,15 @@ class LoadAndNodeForecastInitialisation(BaseForcastInitialisation):
         self.exchange_units = exchange_units
         self.buses = buses
         self.lines = lines
-        self.exchanges = _ensure_not_none(exchanges, index, check_index=True)
+        self.exchanges = _ensure_not_none(exchanges, self.index, check_index=True)
 
-        fuel_prices = _ensure_not_none(fuel_prices, index)
+        fuel_prices = _ensure_not_none(fuel_prices, self.index)
         if len(fuel_prices) <= 1:  # single value provided, extend to full index
-            fuel_prices.index = index[:1]
-            fuel_prices = fuel_prices.reindex(index, method="ffill")
+            fuel_prices.index = self.index[:1]
+            fuel_prices = fuel_prices.reindex(self.index, method="ffill")
         self.fuel_prices = fuel_prices
 
-    def calc_node_forecasts(self):
+    def calc_node_forecasts(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         if self.buses is None or self.lines is None:
             return None, None
         if (
@@ -572,3 +615,9 @@ class LoadAndNodeForecastInitialisation(BaseForcastInitialisation):
             start=self.index[0], end=self.index[-1], freq=self.index.freq
         )
         merged_forecasts.to_csv(f"{path}/forecasts_df.csv", index=True)
+
+
+price_forcast_initialisations: dict[str, BasePriceForcastInitialisation] = {
+    "naive_forecast": NaivePriceForcastInitialisation,
+    "dummy_forecast": DummyPriceForecastInitialisation,
+}
