@@ -4,12 +4,11 @@
 
 import asyncio
 import logging
-import operator
 import sys
 import time
+import warnings
 from datetime import datetime
 from pathlib import Path
-import warnings
 
 from mango import (
     RoleAgent,
@@ -697,7 +696,7 @@ class World:
             for operator in unit_operators
         }
         for market_id in self.markets.keys():
-            if not market_id in referenced_markets:
+            if market_id not in referenced_markets:
                 msg = f"Added market {market_id}, has no participants."
                 warnings.warn(msg)
 
@@ -727,8 +726,8 @@ class World:
 
             if earliest_redispatch_opening < earliest_dispatch_closing:
                 msg = (
-                    f"First redispatch market opens before first dispatch "
-                    f"market has closed."
+                    "First redispatch market opens before first dispatch "
+                    "market has closed."
                 )
                 raise ValueError(msg)
 
@@ -736,7 +735,7 @@ class World:
         demand_exists, generation_exists = False, False
         for operator in unit_operators:
             for unit in operator.units.values():
-                # ToDo: Are the defintions of demand and generation exhaustive?
+                # ToDo: Are the definitions of demand and generation exhaustive?
                 if type(unit) in [self.unit_types["demand"]]:
                     demand_exists = True
                 elif type(unit) in [

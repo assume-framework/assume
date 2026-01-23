@@ -2,20 +2,18 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import datetime
+
+import dateutil.rrule as rr
 import pandas as pd
 import pytest
 
-import datetime
-
+from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.strategies.naive_strategies import EnergyNaiveStrategy
-from assume.units.powerplant import PowerPlant
-
-from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.units.demand import Demand
+from assume.units.powerplant import PowerPlant
 from tests.utils import index, setup_simple_world
-
-import dateutil.rrule as rr
 
 
 @pytest.fixture(scope="function")
@@ -102,7 +100,9 @@ def test_market_too_early(world):
     )
 
     with pytest.raises(ValueError):
-        world.add_market(market_operator_id="test_operator", market_config=market_config)
+        world.add_market(
+            market_operator_id="test_operator", market_config=market_config
+        )
 
 
 def test_market_too_late(world):
@@ -124,13 +124,15 @@ def test_market_too_late(world):
     )
 
     with pytest.raises(ValueError):
-        world.add_market(market_operator_id="test_operator", market_config=market_config)
+        world.add_market(
+            market_operator_id="test_operator", market_config=market_config
+        )
 
 
-def test_refering_non_existant_market(world):
-    """A UnitOperator referencing a non-existant Market, raises a Warning."""
+def test_refering_non_existent_market(world):
+    """A UnitOperator referencing a non-existent Market, raises a Warning."""
 
-    strategies = {"none_existant_market": "naive_eom"}
+    strategies = {"none_existent_market": "naive_eom"}
 
     with pytest.warns(UserWarning) as record:
         world.add_unit_operator("unit_operator", strategies)
@@ -165,7 +167,7 @@ def test_redispatch_no_dispatch(grid_data, world):
     """A redispatch without a dispatch market raises an Error."""
 
     world.add_market_operator("market_operator")
-    
+
     market_opening = rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end)
     market_products = [
         MarketProduct(
