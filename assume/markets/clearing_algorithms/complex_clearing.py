@@ -219,6 +219,7 @@ def market_clearing_opt(
     lines: pd.DataFrame = None,
     solver: str = "appsi_highs",
     solver_options: dict = {},
+    solver_instance=None,
     func_constraints=market_clearing_opt_constraints,
     func_objective=market_clearing_opt_objective,
 ):
@@ -269,10 +270,15 @@ def market_clearing_opt(
 
     func_objective(model, orders)
 
-    solver = SolverFactory(solver)
+    # Reuse solver instance if provided, otherwise create new one
+    if solver_instance is None:
+        solver_obj = SolverFactory(solver)
+    else:
+        solver_obj = solver_instance
+    
     # Solve the model
     instance = model.create_instance()
-    results = solver.solve(instance, options=solver_options)
+    results = solver_obj.solve(instance, options=solver_options)
 
     # Fix all model.x to the values in the solution
     if mode == "with_min_acceptance_ratio":
@@ -289,7 +295,7 @@ def market_clearing_opt(
             instance.x[bid_id].domain = pyo.Reals
 
         # Resolve the model
-        results = solver.solve(instance, options=solver_options)
+        results = solver_obj.solve(instance, options=solver_options)
 
     return instance, results
 
@@ -390,6 +396,8 @@ class ComplexClearingRole(MarketRole):
 
         self.solver = solver
         self.solver_options = solver_options
+        # Create solver instance once and reuse it to prevent file descriptor leaks
+        self.solver_instance = SolverFactory(solver)
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
@@ -523,6 +531,7 @@ class ComplexClearingRole(MarketRole):
                 lines=self.lines,
                 solver=self.solver,
                 solver_options=self.solver_options,
+                solver_instance=self.solver_instance,
             )
 
             if results.solver.termination_condition == TerminationCondition.infeasible:
