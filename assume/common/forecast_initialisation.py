@@ -39,7 +39,7 @@ class BaseForcastInitialisation:
         **kwargs,
     ):
         """
-        Initalizes the forecasting algorithm.
+        Initializes the forecasting algorithm.
         """
         self.index = index
         self._logger = logging.getLogger(__name__)
