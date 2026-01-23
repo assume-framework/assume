@@ -62,7 +62,9 @@ class Learning(Role):
         if self.learning_config:
             if "cuda" in self.learning_config.device and th.cuda.is_available():
                 device = self.learning_config.device
-            elif "mps" in self.learning_config.device and th.backends.mps.is_available():
+            elif (
+                "mps" in self.learning_config.device and th.backends.mps.is_available()
+            ):
                 device = self.learning_config.device
         self.device = th.device(device)
 
