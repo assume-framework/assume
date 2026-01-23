@@ -58,15 +58,14 @@ class Learning(Role):
         self.critics = {}
         self.target_critics = {}
 
-        self.device = th.device(
-            self.learning_config.device
-            if (
-                self.learning_config
-                and "cuda" in self.learning_config.device
-                and th.cuda.is_available()
-            )
-            else "cpu"
-        )
+        device = "cpu"
+        if self.learning_config:
+            if "cuda" in self.learning_config.device and th.cuda.is_available():
+                device = self.learning_config.device
+            elif "mps" in self.learning_config.device and th.backends.mps.is_available():
+                device = self.learning_config.device
+        self.device = th.device(device)
+
         # future: add option to choose between float16 and float32
         # float_type = learning_config.float_type
         self.float_type = th.float
