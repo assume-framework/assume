@@ -163,6 +163,7 @@ def test_non_referred_market(world):
     assert len(record) > 0
 
 
+@pytest.mark.require_network
 def test_redispatch_no_dispatch(grid_data, world):
     """A redispatch without a dispatch market raises an Error."""
 
@@ -197,6 +198,7 @@ def test_redispatch_no_dispatch(grid_data, world):
         world.run()
 
 
+@pytest.mark.require_network
 def test_redispatch_too_early(grid_data, world):
     """A redispatch market opening before dispatch closure raises an Error."""
 
