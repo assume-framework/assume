@@ -12,7 +12,6 @@ from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products as get_available_products
 from assume.markets.clearing_algorithms.simple import PayAsClearRole
 from assume.strategies.naive_strategies import EnergyHeuristicElasticStrategy
-from assume.markets.clearing_algorithms.simple import PayAsClearRole
 
 
 def _ensure_not_none(
