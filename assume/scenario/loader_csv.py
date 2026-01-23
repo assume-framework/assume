@@ -18,8 +18,8 @@ from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
 from assume.common.forecast_initialisation import (
-    BasePriceForcastInitialisation,
     BaseLoadAndNodeForecastInitialisation,
+    BasePriceForcastInitialisation,
     LoadAndNodeForecastInitialisation,
     price_forcast_initialisations,
 )
@@ -469,6 +469,7 @@ def read_units(
         )
     return units_dict
 
+
 def create_forecast_initialisations(
     config,
     **kwargs,
@@ -476,16 +477,12 @@ def create_forecast_initialisations(
     """
     Creates forecast initialisations based on the config.
     """
-    
-    load_node_initialisation = LoadAndNodeForecastInitialisation(
-        **kwargs
-    )
+
+    load_node_initialisation = LoadAndNodeForecastInitialisation(**kwargs)
 
     price_forecast_type = config.get("price_forecast_type", "naive_forecast")
     price_forecast_class = price_forcast_initialisations[price_forecast_type]
-    price_initialisation = price_forecast_class(
-        **kwargs
-    )
+    price_initialisation = price_forecast_class(**kwargs)
 
     return price_initialisation, load_node_initialisation
 
@@ -625,7 +622,9 @@ def load_config_and_create_forecaster(
 
     market_prices = price_initialisation.calculate_market_forecasts()
     residual_loads = load_node_initialisation.calculate_residual_load_forecast()
-    congestion_signal, renewable_utilization = load_node_initialisation.calc_node_forecasts()
+    congestion_signal, renewable_utilization = (
+        load_node_initialisation.calc_node_forecasts()
+    )
 
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():

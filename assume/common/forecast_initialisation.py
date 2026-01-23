@@ -17,6 +17,7 @@ def _ensure_not_none(
         raise ValueError("Forecast frequency does not match index frequency.")
     return df
 
+
 class BaseForcastInitialisation:
     """
     A base class for forecasting algorithms.
@@ -35,7 +36,7 @@ class BaseForcastInitialisation:
         availability: pd.DataFrame = None,
         forecasts: pd.DataFrame = None,
         *args,
-        **kwargs
+        **kwargs,
     ):
         """
         Initalizes the forecasting algorithm.
@@ -55,7 +56,7 @@ class BaseForcastInitialisation:
 
         Args:
             id (str): The ID of the forecast.
-        
+
         Returns:
             pd.Series: forecast (zeros if not existing)
 
@@ -70,7 +71,7 @@ class BaseForcastInitialisation:
 
         Args:
             id (str): The ID of the availability.
-        
+
         Returns:
             pd.Series: availability (ones if not existing)
 
@@ -94,6 +95,7 @@ class BaseForcastInitialisation:
         availabilities.columns = powerplants.index
         return powerplants.max_power * availabilities
 
+
 class BasePriceForcastInitialisation(BaseForcastInitialisation):
     def __init__(
         self,
@@ -108,6 +110,7 @@ class BasePriceForcastInitialisation(BaseForcastInitialisation):
         self,
     ) -> dict[str, pd.Series]:
         """Calculate market-specific price forecasts."""
+
 
 class NaivePriceForcastInitialisation(BasePriceForcastInitialisation):
     def __init__(
@@ -127,7 +130,7 @@ class NaivePriceForcastInitialisation(BasePriceForcastInitialisation):
             fuel_prices.index = self.index[:1]
             fuel_prices = fuel_prices.reindex(self.index, method="ffill")
         self.fuel_prices = fuel_prices
-    
+
     def calculate_market_forecasts(
         self,
     ) -> dict[str, pd.Series]:
@@ -425,7 +428,7 @@ class LoadAndNodeForecastInitialisation(BaseLoadAndNodeForecastInitialisation):
 
     def calculate_residual_load_forecast(self) -> dict[str, pd.Series]:
         """
-        This method calculates the residual demand forecasts per market by subtracting the total available power 
+        This method calculates the residual demand forecasts per market by subtracting the total available power
         from renewable energy (VRE) power plants from the overall demand forecast for each time step.
 
         Returns:
@@ -438,7 +441,7 @@ class LoadAndNodeForecastInitialisation(BaseLoadAndNodeForecastInitialisation):
             4. Calculates the residual demand by subtracting the total VRE power feed-in from the overall demand forecast.
             5. If exchange units are available, imports and exports are subtracted and added to the demand forecast, respectively.
 
-        """       
+        """
         residual_loads: dict[str, pd.Series] = {}
 
         for market_id, config in self.market_configs.items():
@@ -483,9 +486,8 @@ class LoadAndNodeForecastInitialisation(BaseLoadAndNodeForecastInitialisation):
             res_demand_df = sum_demand - vre_feed_in_df
 
             residual_loads[market_id] = res_demand_df
-        
-        return residual_loads
 
+        return residual_loads
 
     def calc_congestion_forecast(self) -> pd.DataFrame:
         """

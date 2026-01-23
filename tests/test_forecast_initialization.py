@@ -10,15 +10,15 @@ import pytest
 from pandas._testing import assert_frame_equal, assert_series_equal
 
 from assume.common.forecast_initialisation import (
-    price_forcast_initialisations,
-    NaivePriceForcastInitialisation,
     DummyPriceForecastInitialisation,
     LoadAndNodeForecastInitialisation,
+    price_forcast_initialisations,
 )
 
 path = Path("./tests/fixtures/forecast_init")
 
 parse_date = {"index_col": "datetime", "parse_dates": ["datetime"]}
+
 
 @pytest.fixture
 def market_configs():
@@ -38,24 +38,26 @@ def market_configs():
         }
     }
 
+
 @pytest.fixture
 def forecast_inputs(market_configs):
     return {
         "market_configs": market_configs,
         "index": pd.date_range("2019-01-01", periods=24, freq="h"),
-        "powerplants_units": pd.read_csv(path / "powerplant_units.csv", index_col="name"),
+        "powerplants_units": pd.read_csv(
+            path / "powerplant_units.csv", index_col="name"
+        ),
         "demand_units": pd.read_csv(path / "demand_units.csv", index_col="name"),
         "availability": pd.read_csv(path / "availability.csv", **parse_date),
         "demand": pd.read_csv(path / "demand.csv", **parse_date),
         "fuel_prices": pd.read_csv(path / "fuel_prices.csv", index_col="fuel"),
     }
 
-@pytest.fixture(params=["naive_forecast", "dummy_forecast"]) # TODO!!!!!!!!!!!!!
+
+@pytest.fixture(params=["naive_forecast", "dummy_forecast"])  # TODO!!!!!!!!!!!!!
 def price_forecast_init(request, forecast_inputs):
     price_forecast_class = price_forcast_initialisations[request.param]
-    price_initialisation = price_forecast_class(
-        **forecast_inputs
-    )
+    price_initialisation = price_forecast_class(**forecast_inputs)
     return price_initialisation
 
 
@@ -69,7 +71,9 @@ def load_node_forecast_init(forecast_inputs):
     return load_node_forecast_initialisation
 
 
-def test_forecast_init__calc_market_forecasts(price_forecast_init, load_node_forecast_init):
+def test_forecast_init__calc_market_forecasts(
+    price_forecast_init, load_node_forecast_init
+):
     price_forecast = price_forecast_init.calculate_market_forecasts()
     load_forecast = load_node_forecast_init.calculate_residual_load_forecast()
     # assert the passed forecast is generated
@@ -103,7 +107,9 @@ def test_forecast_init__calc_node_forecasts(load_node_forecast_init):
     )
 
 
-def test_forecast_init__uses_given_forecast(price_forecast_init, load_node_forecast_init):
+def test_forecast_init__uses_given_forecast(
+    price_forecast_init, load_node_forecast_init
+):
     forecasts = pd.read_csv(path / "forecasts.csv", **parse_date)
     price_forecast_init._forecasts = forecasts
     load_node_forecast_init._forecasts = forecasts
