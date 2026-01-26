@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
+from functools import lru_cache
 from typing import TypeAlias
 
 import pandas as pd
@@ -9,6 +10,14 @@ from assume.common.fast_pandas import FastIndex, FastSeries
 
 ForecastIndex: TypeAlias = FastIndex | pd.DatetimeIndex | pd.Series
 ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
+
+
+@lru_cache(maxsize=1000)
+def preprocess_price(args1,args2):
+    # TODO implement preprocess
+    # this should allow to remove the whole forecast_initialisation stuff
+    # this functions does not evaluate again if it is called by different Forecasts with the same input.
+    pass
 
 
 class UnitForecaster:
@@ -50,6 +59,17 @@ class UnitForecaster:
         for key, value in d.items():
             result[key] = self._to_series(value)
         return result
+
+    def preprocess(self, args1, args2):
+        preprocess_price(args1, args2)
+
+    def initialize(self, args1, args2):
+        pass
+        # TODO like preprocess
+
+    def update(self, args1, args2):
+        pass
+        # TODO like preprocess
 
 
 class CustomUnitForecaster(UnitForecaster):
