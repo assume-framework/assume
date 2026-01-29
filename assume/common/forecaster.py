@@ -12,6 +12,7 @@ from assume.common.base import BaseUnit
 from assume.units.powerplant import PowerPlant
 from assume.units.demand import Demand
 from assume.units.exchange import Exchange
+from assume.units.dsm_load_shift import DSMFlex
 
 ForecastIndex: TypeAlias = FastIndex | pd.DatetimeIndex | pd.Series
 ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
@@ -28,16 +29,24 @@ def _ensure_not_none(
         return pd.DataFrame(index=index)
     if check_index and index.freq != df.index.inferred_freq:
         raise ValueError("Forecast frequency does not match index frequency.")
-    return df
+    return 
+
+@lru_cache(max_size=100)
+def calculate_max_power(units):
+    """
+    Returns: max available power: shape (num_units, forecast_len)
+    """
+    return [unit.max_power * unit.forecaster.availability for unit in units]
 
 @lru_cache(max_size=10)
-def sort_units(units:list[BaseUnit], market_id:str):
+def sort_units(units:list[BaseUnit], market_id:str | None):
     pps: list[PowerPlant] = []
     demands: list[Demand] = []
     exchanges: list[Exchange] = []
+    dsm_units: list[DSMFlex] = []
 
     for unit in units:
-        if market_id not in unit.bidding_strategies:
+        if market_id is not None and market_id not in unit.bidding_strategies:
             continue
         if isinstance(unit, PowerPlant):
             pps.append(unit)
@@ -45,10 +54,12 @@ def sort_units(units:list[BaseUnit], market_id:str):
             demands.append(unit)
         elif isinstance(unit, Exchange):
             exchanges.append(unit)
+        elif isinstance(unit, DSMFlex):
+            dsm_units.appen(unit)
 
-    return pps, demand, exchanges
+    return pps, demand, exchanges, dsm_units
 
-# @lru_cache(maxsize=10)
+@lru_cache(maxsize=10)
 def calculate_sum_demand(
     demand_units: list[Demand],
     exchange_units: list[Exchange],
@@ -80,10 +91,15 @@ def calculate_naive_price(
     forecast_df: ForecastSeries = None,
     exchange_df: ForecastSeries = None,
 ) -> dict[str, ForecastSeries]:
+    """
+    Naive price forecast that calculates prices based on merit order with marginal costs.
+    Does not take account: Storages, DSM units.
+    TODO: further documentation
+    """
 
     demand_df = _ensure_not_none(demand_df, index)
-    forecast_df = _ensure_not_none(demand_df, index)
-    exchange_df = _ensure_not_none(demand_df, index)
+    forecast_df = _ensure_not_none(forecast_df, index)
+    exchange_df = _ensure_not_none(exchange_df, index)
 
     price_forecasts: dict[str, pd.Series] = {}
 
@@ -100,7 +116,7 @@ def calculate_naive_price(
             continue
 
         # 1. Sort units by type and filter for units with bidding strategy for the given market_id
-        powerplant_units, demand_units, exchange_units = sort_units(
+        powerplant_units, demand_units, exchange_units, dsm_units = sort_units(
             units, market_id
         )
 
@@ -108,13 +124,14 @@ def calculate_naive_price(
         #    The resulting DataFrame has rows = time steps and columns = units.
         #    shape: (index_len, num_pp_units)
         # marginal_costs = powerplants_units.apply(calculate_marginal_cost, axis=1).T
-        marginal_costs = pd.Series([unit.marginal_cost for unit in powerplant_units]).T
+        marginal_costs = pd.DataFrame([unit.marginal_cost for unit in powerplant_units]).T
 
 
         # 3. Compute available power for each unit at each time step.
         #    shape: (index_len, num_pp_units)
         # power = self._calc_power()
-        power = pd.Series([unit.forecaster.availability * unit.max_power for unit in powerplant_units]).T
+        # power = pd.Series([unit.forecaster.availability * unit.max_power for unit in powerplant_units]).T
+        power = pd.DataFrame(calculate_max_power(powerplant_units)).T
 
         # 4. Process the demand.
         #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
@@ -153,6 +170,7 @@ def calculate_naive_price(
 
     return price_forecasts
 
+
 @lru_cache(maxsize=100)
 def calculate_residual_load(
     units: dict[str, BaseUnit],
@@ -163,8 +181,8 @@ def calculate_residual_load(
 ) -> dict[str, pd.Series]:
 
     demand_df = _ensure_not_none(demand_df, index)
-    forecast_df = _ensure_not_none(demand_df, index)
-    exchange_df = _ensure_not_none(demand_df, index)
+    forecast_df = _ensure_not_none(forecast_df, index)
+    exchange_df = _ensure_not_none(exchange_df, index)
 
     residual_loads: dict[str, pd.Series] = {}
 
@@ -180,17 +198,17 @@ def calculate_residual_load(
             # go next if forecast existing
             continue
             
-        powerplants_units, demand_units, exchange_units = sort_units(
+        powerplants_units, demand_units, exchange_units, dsm_units = sort_units(
             units, market_id
         )
 
         sum_demand = calculate_sum_demand(demand_units, exchange_units, demand_df, exchange_df)
 
         # shape: (num_pp_units, index_len) -> (index_len)
-        vre_feed_in_df = pd.Series([unit.max_power * unit.forecaster.availability
-            for unit in powerplants_units if is_renewable(unit.technology)]).sum(axis=0)
-
         # vre_feed_in_df = self._calc_power(mask).sum(axis=1)
+        renewable_units = [unit for unit in powerplants_units if is_renewable(unit.technology)]
+        vre_feed_in_df = pd.DataFrame(calculate_max_power(renewable_units)).sum(axis=0)
+
         if vre_feed_in_df.empty:
             vre_feed_in_df = 0
         res_demand_df = sum_demand - vre_feed_in_df
@@ -198,7 +216,188 @@ def calculate_residual_load(
         residual_loads[market_id] = res_demand_df
     return residual_loads
 
-@lru_cache(maxsize=1000)
+def extract_buses_and_lines(market_configs: dict[str, dict]):
+    buses, lines = None, None
+
+    for market_config in market_configs:
+        grid_data = market_configs.param_dict.get("grid_data")
+
+        if grid_data is None:
+            continue
+
+        buses = grid_data.get("buses")
+        lines = grid_data.get("lines")
+        if buses is not None and lines is not None:
+            break
+    
+    return buses, lines
+
+
+@lru_cache(maxsize=100)
+def calculate_congestion_forecast(
+    index: ForecastIndex,
+    units: dict[str, BaseUnit],
+    market_configs: dict[str, dict],
+    forecast_df: ForecastSeries = None,
+    demand_df: ForecastSeries = None,
+):
+
+    forecast_df = _ensure_not_none(forecast_df, index)
+    demand_df = _ensure_not_none(demand_df, index)
+
+    # Lines and buses should be everywhere the same
+    buses, lines = extract_buses_and_lines(market_configs)
+
+    if buses is None or lines is None:
+        return None
+
+    powerplants_units, demand_units, exchange_units, dsm_units = sort_units(
+        units
+    )
+
+    demand_unit_nodes = {demand.node for demand in demand_units}
+    if not all(node in buses for node in demand_unit_nodes):
+        self._logger.warning(
+                "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
+                "Not all unit nodes are available in buses."
+            )
+        return None
+
+    # Step 1: Calculate load for each powerplant based on availability factor and max power
+    # shape: (num_pps, forecast_len)
+    power = pd.DataFrame(
+        calculate_max_power(powerplant_units),
+        index=[pp.name for pp in powerplant_units]
+    )
+
+    # Step 2: Calculate net load for each node (demand - generation)
+    net_load_by_node = {}
+    
+    for node in demand_unit_nodes:
+        # Calculate total demand for this node
+        node_demand_units = [unit for unit in demand_units if unit.node == node]
+        node_demand = calculate_sum_demand(node_demand_units, [], demand_df, None)
+
+        # Calculate total generation for this node by summing powerplant loads
+        node_powerplant_units = [unit.name for unit in powerplants_units if unit.node == node]
+        node_generation = power[node_powerplant_units].sum(axis=1)
+
+        # Calculate net load (demand - generation)
+        net_load_by_node[node] = node_demand - node_generation
+
+    # Step 3: Calculate line-specific congestion severity
+    line_congestion_severity = pd.DataFrame(index=index)
+
+    for line_id, line_data in lines.iterrows():
+        node1, node2 = line_data["bus0"], line_data["bus1"]
+        s_max_pu = (
+            lines.at[line_id, "s_max_pu"]
+            if "s_max_pu" in lines.columns
+            and not pd.isna(lines.at[line_id, "s_max_pu"])
+            else 1.0
+        )
+        line_capacity = line_data["s_nom"] * s_max_pu
+
+        # Calculate net load for the line as the sum of net loads from both connected nodes
+        line_net_load = net_load_by_node[node1] + net_load_by_node[node2]
+        congestion_severity = line_net_load / line_capacity
+
+        # Store the line-specific congestion severity in DataFrame
+        line_congestion_severity[f"{line_id}_congestion_severity"] = (
+            congestion_severity
+        )
+    
+    # Step 4: Calculate node-specific congestion signal by aggregating connected lines
+    node_congestion_signal = pd.DataFrame(index=index)
+
+    for node in demand_unit_nodes:
+        node_congestion_signal[f"{node}_congestion_severity"] = forecast_df.get(f"{node}_congestion_severity")
+
+        if node_congestion_signal[f"{node}_congestion_severity"] is not None:
+            # go next if forecast existing
+            continue
+
+        # Find all lines connected to this node
+        connected_lines = lines[
+            (lines["bus0"] == node) | (lines["bus1"] == node)
+        ].index
+
+        # Collect all relevant line congestion severities
+        relevant_lines = [
+            f"{line_id}_congestion_severity" for line_id in connected_lines
+        ]
+
+        # Ensure only existing columns are used to avoid KeyError
+        relevant_lines = [
+            line
+            for line in relevant_lines
+            if line in line_congestion_severity.columns
+        ]
+
+        # Aggregate congestion severities for this node (use max or mean)
+        if relevant_lines:
+            node_congestion_signal[f"{node}_congestion_severity"] = (
+                line_congestion_severity[relevant_lines].max(axis=1)
+            )
+
+    return node_congestion_signal
+
+@lru_cache(maxsize=100)
+def calculate_renewable_utilisation(
+    index: ForecastIndex,
+    units: dict[str, BaseUnit],
+    market_configs: dict[str, dict],
+    forecast_df: ForecastSeries = None,
+):
+    forecast_df = _ensure_not_none(forecast_df, index)
+
+    # Lines and buses should be everywhere the same
+    buses, lines = extract_buses_and_lines(market_configs)
+
+    if buses is None or lines is None:
+        return None
+
+    powerplants_units, demand_units, exchange_units, dsm_units = sort_units(
+        units
+    )
+
+    demand_unit_nodes = {demand.node for demand in demand_units}
+    if not all(node in buses for node in demand_unit_nodes):
+        self._logger.warning(
+                "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
+                "Not all unit nodes are available in buses."
+            )
+        return None
+
+    # Calculate load for each renewable powerplant based on availability factor and max power
+    # shape: (num_pps, forecast_len)
+    renewable_units = [unit for unit in powerplants_units if is_renewable(unit.technology)]
+    power = pd.DataFrame(
+        calculate_max_power(renewable_units),
+        index=[pp.name for pp in renewable_units]
+    )
+
+    renewable_utilisation = pd.DataFrame(index=index)
+    
+    # Calculate utilisation based on availability and max power for each node
+    for node in demand_unit_nodes:
+        renewable_utilisation[f"{node}_renewable_utilisation"] = forecast_df.get(f"{node}_renewable_utilisation")
+
+        if renewable_utilisation[f"{node}_renewable_utilisation"] is not None:
+            # go next if forecast existing
+            continue
+        node_powerplant_units = [unit.name for unit in renewable_units if unit.node == node]
+        utilization = powers[node_units].sum(axis=0)
+        renewable_utilisation[f"{node}_renewable_utilisation"] = utilization
+
+    # Calculate the total renewable utilisation across all nodes if not in forecast_df
+    renewable_utilisation["all_nodes_renewable_utilisation"] = forecast_df.get("all_nodes_renewable_utilisation")
+    if renewable_utilisation["all_nodes_renewable_utilisation"] is None:
+        all_nodes_sum = renewable_utilisation.sum(axis=0)
+        renewable_utilisation["all_nodes_renewable_utilisation"] = all_nodes_sum
+
+    return renewable_utilisation
+
 def preprocess_price(args1,args2):
     # TODO implement preprocess
     # this should allow to remove the whole forecast_initialisation stuff
@@ -260,7 +459,7 @@ class UnitForecaster:
     ):
         """
         """
-        self.price_forecasts = calculate_naive_price(
+        self.price = calculate_naive_price(
             self.index,
             units,
             market_configs,
@@ -392,13 +591,43 @@ class DsmUnitForecaster(UnitForecaster):
         #    renewable_utilisation_signal
         #)
 
-    def initialize():
-        # TODO: preprocess that creates price
+    def initialize(
+        self,
+        units: dict[str, BaseUnit],
+        market_configs: dict[str, dict],
+        # fuel_prices: ForecastSeries = None,
+        demand_df: ForecastSeries = None,
+        forecast_df: ForecastSeries = None,
+        exchange_df: ForecastSeries = None,
+    ):
+        # Get default price and residual load forecast
+        super(UnitForecaster).initialize(
+            units,
+            market_configs,
+            demand_df,
+            forecast_df,
+            exchange_df
+        )
 
-        # END TODO:
-        self.self.electricity_price = self.prices.get("price_EOM")
+        # TODO how to handle other markets?
+        self.electricity_price = self.price_forecast.get("price_EOM")
+        
+        self.congestion_signal = calculate_congestion_forecast(
+            self.index,
+            units,
+            market_configs,
+            forecast_df,
+            demand_df,
+        )
+        self.renewable_utilization = calculate_renewable_utilisation(
+            self.index,
+            units,
+            market_configs,
+            forecast_df,
+        )
 
-class SteelplantForecaster(UnitForecaster):
+
+class SteelplantForecaster(DsmUnitForecaster):
     """
     A forecaster for steelplant units
     Attributes:
@@ -441,7 +670,7 @@ class SteelplantForecaster(UnitForecaster):
     # preprocess
 
 
-class SteamgenerationForecaster(UnitForecaster):
+class SteamgenerationForecaster(DsmUnitForecaster):
     """
     A forecaster for steam generation units
     Attributes:
@@ -492,8 +721,7 @@ class SteamgenerationForecaster(UnitForecaster):
             return self._to_series(0)
         return self.fuel_prices[fuel]
 
-
-class BuildingForecaster(UnitForecaster):
+class BuildingForecaster(DsmUnitForecaster):
     """
     A forecaster for building units
     Attributes:
@@ -540,7 +768,7 @@ class BuildingForecaster(UnitForecaster):
         return self.fuel_prices[fuel]
 
 
-class HydrogenForecaster(UnitForecaster):
+class HydrogenForecaster(DsmUnitForecaster):
     """
     A forecaster for hydrogen units
     Attributes:
