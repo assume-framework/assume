@@ -523,7 +523,6 @@ class DemandForecaster(UnitForecaster):
         demand: ForecastSeries = -100,
         # residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
-        price_forecasts: ForecastSeries = None,
     ):
         # super().__init__(index, market_prices, residual_load, availability)
         super().__init__(index, availability)

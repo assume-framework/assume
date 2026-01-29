@@ -158,6 +158,7 @@ class World:
         self.market_operators: dict[str, RoleAgent] = {}
         self.markets: dict[str, MarketConfig] = {}
         self.unit_operators: dict[str, UnitsOperator] = {}
+        self.units: dict[str, BaseUnit] = {}
         self.unit_types = unit_types
         self.dst_components = demand_side_technologies
 
@@ -584,7 +585,10 @@ class World:
             raise ValueError(f"Invalid unit type: {unit_type}")
 
         if self.unit_operators[unit_operator_id].units.get(id):
-            raise ValueError(f"Unit {id} already exists")
+            raise ValueError(f"Unit {id} already exists in operator {unit_operator_id}")
+
+        if self.units.get(id):
+            raise ValueError(f"Unit {id} already exists in world")
 
     def _validate_unit_operator(self, unit_operator_id: str):
         """
@@ -757,6 +761,7 @@ class World:
         self.market_operators = {}
         self.markets = {}
         self.unit_operators = {}
+        self.units = {}
         self.forecast_providers = {}
 
     def add_unit(
@@ -789,6 +794,8 @@ class World:
             id, unit_type, unit_operator_id, unit_params, forecaster
         )
 
+        self.units[id] = unit
+
         self.unit_operators[unit_operator_id].add_unit(unit)
 
     def add_unit_instance(self, operator_id: str, unit: BaseUnit):
@@ -808,15 +815,25 @@ class World:
 
     # the world needs to know about all forecasts and initialize these.
     # this way, the forecast mechanism works similar for CSV, WorldScript as well as AMIRIS/pypsa
-    def init_forecasts(self):
-        for unit in self.units:
+    def init_forecasts(self,
+        forecast_df: pd.DataFrame = None,
+        demand_df: pd.DataFrame = None,
+        exchange_df: pd.DataFrame = None,
+        ):
+        for unit in self.units.values():
             for forecast in unit.forecasts:
-                forecast.initialize(self.units)
+                forecast.initialize(
+                    self.units.values(),
+                    self.markets.values(),
+                    forecast_df,
+                    demand_df,
+                    exchange_df,
+                )
 
     # The update routine is not needed. We call it in calculate_bids or through a scheduled task during runtime
     # see update_forecasts_if_needed
     def update_forecasts(self):
-        for unit in self.units:
+        for unit in self.units.values():
             for forecast in unit.forecasts:
-                forecast.update_forecasts(self.units)
+                forecast.update_forecasts(self.units.values())
 
