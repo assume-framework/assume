@@ -41,26 +41,31 @@ class UnitOperatorStrategy:
     def total_capacity(
         self,
         units_operator,  # type: UnitsOperator
-    ) -> dict[str, dict[str, float]]:
+    ) -> dict[str, float]:
         """
-        Computes the total capacity of the units owned by a unit operator by market and technology.
+        Computes the total capacity of the units owned by a unit operator by market.
 
         Args:
             units_operator (UnitsOperator): The operator that bids on the market(s).
         Returns:
-            dict: a nested dictionary indexed by market and by technology.
+            dict: a nested dictionary indexed by market.
         """
 
         total_capacity = {}
 
         for unit in units_operator.units.values():
             for market_id in unit.bidding_strategies.keys():
-                total_capacity[market_id] = total_capacity.get(market_id, {})
-                total_capacity[market_id][unit.technology] = (
-                    total_capacity[market_id].get(unit.technology, 0) + unit.max_power
-                )
+                total_capacity[market_id] = total_capacity.get(market_id, 0) + unit.max_power
 
         return total_capacity
+    
+    
+    def calculate_reward(self, 
+                         units_operator, # type: UnitsOperator
+                         marketconfig: MarketConfig,
+                         orderbook: Orderbook,
+    ):
+        pass
 
 
 class UnitsOperatorDirectStrategy(UnitOperatorStrategy):
