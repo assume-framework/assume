@@ -55,15 +55,17 @@ class UnitOperatorStrategy:
 
         for unit in units_operator.units.values():
             for market_id in unit.bidding_strategies.keys():
-                total_capacity[market_id] = total_capacity.get(market_id, 0) + unit.max_power
+                total_capacity[market_id] = (
+                    total_capacity.get(market_id, 0) + unit.max_power
+                )
 
         return total_capacity
-    
-    
-    def calculate_reward(self, 
-                         units_operator, # type: UnitsOperator
-                         marketconfig: MarketConfig,
-                         orderbook: Orderbook,
+
+    def calculate_reward(
+        self,
+        units_operator,  # type: UnitsOperator
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
     ):
         pass
 
