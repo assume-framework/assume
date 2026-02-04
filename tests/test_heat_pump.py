@@ -173,7 +173,7 @@ def test_heat_pump_consumption_behavior(
                     f"Heat pump power at time {t} is {power_in}, which is below the minimum power {heat_pump_config['min_power']}."
                 )
             else:
-                assert power_in == 0, (
+                assert math.isclose(power_in, 0, rel_tol=1e-6), (
                     f"Heat pump should be off at time {t}, but power_in is {power_in}."
                 )
 
