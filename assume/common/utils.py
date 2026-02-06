@@ -548,7 +548,7 @@ def validate_availability(powerplants_df, availability_df):
     # Create a copy of the availability dataframe to avoid modifying the original
     validated_df = availability_df.copy()
 
-    if validated_df is not None and validated_df.max().max() > 1:
+    if validated_df.max().max() > 1:
         # warn the user that the availability contains values larger than 1
         # and normalize the availability
         logger.warning(

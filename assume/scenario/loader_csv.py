@@ -563,7 +563,8 @@ def load_config_and_create_forecaster(
         path=path, config=config, file_name="availability_df", index=index
     )
     # normalize availability in case of values > 1 and set values below minimum power to 0.0
-    availability = validate_availability(powerplant_units, availability)
+    if availability is not None:
+        availability = validate_availability(powerplant_units, availability)
 
     fuel_prices_df = load_file(
         path=path, config=config, file_name="fuel_prices_df", index=index
