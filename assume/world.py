@@ -717,9 +717,11 @@ class World:
                 msg = "Redispatch market but no dispatch market was defined."
                 raise ValueError(msg)
 
+            # when will market result be available from dispatch market
             earliest_dispatch_closing = min(
                 x.opening_hours[0] + x.opening_duration for x in dispatch_markets
             )
+            # opening of redispatch market
             earliest_redispatch_opening = min(
                 x.opening_hours[0] for x in redispatch_markets
             )
@@ -735,7 +737,6 @@ class World:
         demand_exists, generation_exists = False, False
         for operator in unit_operators:
             for unit in operator.units.values():
-                # ToDo: Are the definitions of demand and generation exhaustive?
                 if type(unit) in [self.unit_types["demand"]]:
                     demand_exists = True
                 elif type(unit) in [
@@ -744,10 +745,10 @@ class World:
                 ]:
                     generation_exists = True
         if demand_exists and not generation_exists:
-            msg = "Demand units but no generation units were created. "
+            msg = f"Units of type {self.unit_types['demand']} but no generation units of the type of type {self.unit_types['power_plant']} or {self.unit_types['hydrogen_plant']} were created. This indicates an incomplete simulation setup. Please double check"
             warnings.warn(msg)
         elif generation_exists and not demand_exists:
-            msg = "Generation units but no demand units were created. "
+            msg = f"Units of type {self.unit_types['power_plant']} or {self.unit_types['hydrogen_plant']} but no units of type {self.unit_types['demand']} were created. This indicates an incomplete simulation setup. Please double check"
             warnings.warn(msg)
 
     async def _step(self, container):
