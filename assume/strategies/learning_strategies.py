@@ -612,14 +612,27 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         duration = (end - start) / timedelta(hours=1)
 
         income = 0.0
+        income_smooth = 0.0
         operational_cost = 0.0
+        operational_costs_smooth = 0.0
 
         accepted_volume_total = 0
+        accepted_volume_total_smooth = 0
         offered_volume_total = 0
+
+        # Glatte Annahme-Wahrscheinlichkeit statt harter Schwelle
+        # k steuert die Steilheit (größer = härter, kleiner = weicher)
+        k = 2
 
         # Iterate over all orders in the orderbook to calculate order-specific profit.
         for order in orderbook:
+            accept_prob_dynamic = 1 / (
+                1 + np.exp(k * (order.get("price", 0) - market_clearing_price))
+            )
+
             accepted_volume = order.get("accepted_volume", 0)
+            accepted_volume_smooth = accepted_volume * accept_prob_dynamic
+            accepted_volume_total_smooth += accepted_volume_smooth
             accepted_volume_total += accepted_volume
 
             offered_volume_total += order["volume"]
@@ -628,9 +641,18 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
             order_income = market_clearing_price * accepted_volume * duration
             order_cost = marginal_cost * accepted_volume * duration
 
+            # calculate smooth values
+            order_income_smooth = (
+                market_clearing_price * accepted_volume_smooth * duration
+            )
+            order_cost_smooth = marginal_cost * accepted_volume_smooth * duration
+
             # Accumulate income and operational cost for all orders.
             income += order_income
             operational_cost += order_cost
+
+            income_smooth += order_income_smooth
+            operational_costs_smooth += order_cost_smooth
 
         # Consideration of start-up costs, divided evenly between upward and downward regulation events.
         if (
@@ -646,6 +668,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         profit = income - operational_cost
 
+        # TODO: add start costs here
+        profit_smooth = income_smooth - operational_costs_smooth
+
         # Stabilizing learning: Limit positive profit to 10% of its absolute value.
         # This reduces variance in rewards and avoids extreme profit-seeking behavior.
         # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
@@ -658,6 +683,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         profit_scale = 1
         profit = min(profit, profit_scale * abs(profit))
+        profit_smooth = min(profit_smooth, profit_scale * abs(profit_smooth))
 
         # Opportunity cost: The income lost due to not operating at full capacity.
         opportunity_cost = (
@@ -666,8 +692,15 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
             * duration
         )
 
+        opportunity_cost_smooth = (
+            (market_clearing_price - marginal_cost)
+            * (unit.max_power - accepted_volume_smooth)
+            * duration
+        )
+
         # If opportunity cost is negative, no income was lost, so we set it to zero.
         opportunity_cost = max(opportunity_cost, 0)
+        opportunity_cost_smooth = max(opportunity_cost_smooth, 0)
 
         # Dynamic regret scaling:
         # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
@@ -681,8 +714,8 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         # scaling factor to normalize the reward to the range [-1,1]
         scaling = 1 / (self.max_bid_price * unit.max_power)
-        regret = regret_scale * opportunity_cost
-        reward = scaling * (profit - regret)
+        regret = regret_scale * opportunity_cost_smooth
+        reward = scaling * (profit_smooth - regret)
 
         # Store results in unit outputs
         # Note: these are not learning-specific results but stored for all units for analysis
