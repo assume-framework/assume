@@ -261,7 +261,7 @@ class PowerPlant(SupportsMinMax):
         self, start: datetime, end: datetime, product_type="energy"
     ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Calculates the minimum and maximum power output of the unit and returns it,
+        Calculates the additional minimum and maximum power output of the unit and returns it,
         while considering heat demand and positive capacity reserve power.
         Args:
             start (pandas.Timestamp): The start time of the dispatch.
@@ -269,7 +269,7 @@ class PowerPlant(SupportsMinMax):
             product_type (str, optional): The product type of the unit. Defaults to "energy".
 
         Returns:
-            tuple[pandas.Series, pandas.Series]: The minimum and maximum power output of the unit.
+            tuple[pandas.Series, pandas.Series]: The additional minimum and maximum power output of the unit.
 
         Note:
             The calculation does not include ramping constraints and can be used for arbitrary start times in the future.
@@ -279,27 +279,23 @@ class PowerPlant(SupportsMinMax):
 
         base_load = self.outputs["energy"].loc[start:end_excl]
         heat_demand = self.outputs["heat"].loc[start:end_excl]
+        capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        # needed minimum + capacity_neg - what is already sold is actual minimum
-        min_power = self.min_power + capacity_neg - base_load
-        # min_power should be at least the heat demand at that time
-        min_power = min_power.clip(min=heat_demand)
-
-        available_power = self.forecaster.availability.loc[start:end_excl]
-        max_power = available_power * self.max_power
-        # check if available power is larger than max_power and raise an error if so
-        if (max_power > self.max_power).any():
-            raise ValueError(
-                f"Available power is larger than max_power for unit {self.id} at time {start}."
-            )
+        availability = self.forecaster.availability.loc[start:end_excl]
+        available_power = availability * self.max_power
 
         # provide reserve for capacity_pos
-        max_power = max_power - self.outputs["capacity_pos"].loc[start:end_excl]
+        max_power = available_power - capacity_pos
         # remove what has already been bid
         max_power = max_power - base_load
         # make sure that max_power is > 0 for all timesteps
         max_power = max_power.clip(min=0)
+
+        # 'needed minimum' + capacity_neg - 'what is already sold' is actual minimum
+        min_power = self.min_power + capacity_neg - base_load
+        # min_power should be at least the heat demand at that time
+        min_power = min_power.clip(min=heat_demand, max=max_power)
 
         return min_power, max_power
 

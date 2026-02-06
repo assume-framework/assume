@@ -544,29 +544,45 @@ def create_incidence_matrix(lines, buses, zones_id=None):
     return incidence_matrix
 
 
-def normalize_availability(powerplants_df, availability_df):
+def validate_availability(powerplants_df, availability_df):
     # Create a copy of the availability dataframe to avoid modifying the original
-    normalized_df = availability_df.copy()
+    validated_df = availability_df.copy()
+
+    if validated_df is not None and validated_df.max().max() > 1:
+        # warn the user that the availability contains values larger than 1
+        # and normalize the availability
+        logger.warning(
+            "Availability contains values larger than 1. This is not allowed. "
+            "The availability will be normalized automatically. "
+            "The quality of the automatic normalization is not guaranteed."
+        )
 
     # Iterate through each column in the availability dataframe
-    for column in normalized_df.columns:
+    for column in validated_df.columns:
+        # Get the max_power for the current unit from the powerplants dataframe
+        max_power = powerplants_df.loc[column, "max_power"]
         # Check if any value in the column is greater than 1
-        if (normalized_df[column] > 1).any():
+        if (validated_df[column] > 1).any():
             try:
-                # Get the max_power for the current unit from the powerplants dataframe
-                max_power = powerplants_df.loc[column, "max_power"]
-
                 # Normalize the entire column
-                normalized_df[column] = normalized_df[column] / max_power
+                validated_df[column] = validated_df[column] / max_power
 
                 # Ensure all values are between 0 and 1
-                normalized_df[column] = normalized_df[column].clip(0, 1)
+                validated_df[column] = validated_df[column].clip(0, 1)
             except KeyError:
                 logger.warning(
                     f"Unit '{column}' not found in powerplants dataframe. Skipping normalization for this unit."
                 )
+        # Get the max_power for the current unit from the powerplants dataframe
+        min_power = powerplants_df.loc[column, "min_power"]
+        if (validated_df[column] * max_power < min_power).any():
+            logger.warning(
+                f"Availability for unit '{column}' contains values that would result in available power below the minimum power. Setting it to 0.0 for those hours. "
+                f"Please check input availabilities and minimum power for this unit."
+            )
+            validated_df.loc[validated_df[column] * max_power < min_power, column] = 0.0
 
-    return normalized_df
+    return validated_df
 
 
 def rename_study_case(path: str, old_key: str, new_key: str):
