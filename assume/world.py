@@ -697,7 +697,7 @@ class World:
         }
         for market_id in self.markets.keys():
             if market_id not in referenced_markets:
-                msg = f"Added market {market_id}, has no participants."
+                msg = f"Added market {market_id}, has no bidding participants."
                 warnings.warn(msg)
 
         # A Re-Dispatch market can only open if an earlier market closed.
@@ -735,20 +735,32 @@ class World:
 
         # Existence of demand implies existence of generation and vice versa.
         demand_exists, generation_exists = False, False
+
+        demand_types = [self.unit_types[x] for x in ["demand"]]
+        generation_types = [
+            self.unit_types[x] for x in ["power_plant", "hydrogen_plant"]
+        ]
+
         for operator in unit_operators:
             for unit in operator.units.values():
-                if type(unit) in [self.unit_types["demand"]]:
+                if type(unit) in demand_types:
                     demand_exists = True
-                elif type(unit) in [
-                    self.unit_types["power_plant"],
-                    self.unit_types["hydrogen_plant"],
-                ]:
+                elif type(unit) in generation_types:
                     generation_exists = True
+
         if demand_exists and not generation_exists:
-            msg = f"Units of type {self.unit_types['demand']} but no generation units of the type of type {self.unit_types['power_plant']} or {self.unit_types['hydrogen_plant']} were created. This indicates an incomplete simulation setup. Please double check"
+            msg = (
+                f"Demand units but no generation units were created.\n"
+                f"Known generation types are: {generation_types}.\n"
+                f"This indicates an incomplete simulation setup."
+            )
             warnings.warn(msg)
         elif generation_exists and not demand_exists:
-            msg = f"Units of type {self.unit_types['power_plant']} or {self.unit_types['hydrogen_plant']} but no units of type {self.unit_types['demand']} were created. This indicates an incomplete simulation setup. Please double check"
+            msg = (
+                f"Generation units but no demand units were created.\n"
+                f"Known demand types are: {demand_types}.\n"
+                f"This indicates an incomplete simulation setup."
+            )
             warnings.warn(msg)
 
     async def _step(self, container):
