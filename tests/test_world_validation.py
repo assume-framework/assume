@@ -158,7 +158,7 @@ def test_non_referred_market(world):
 
     world.add_market(market_operator_id="market_operator", market_config=market_config)
 
-    with pytest.warns(UserWarning, match="has no participants") as record:
+    with pytest.warns(UserWarning, match="has no bidding participants.") as record:
         world.run()
     assert len(record) > 0
 
