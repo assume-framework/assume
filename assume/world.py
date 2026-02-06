@@ -717,9 +717,11 @@ class World:
                 msg = "Redispatch market but no dispatch market was defined."
                 raise ValueError(msg)
 
+            # when will market result be available from dispatch market
             earliest_dispatch_closing = min(
                 x.opening_hours[0] + x.opening_duration for x in dispatch_markets
             )
+            # opening of redispatch market
             earliest_redispatch_opening = min(
                 x.opening_hours[0] for x in redispatch_markets
             )
@@ -748,14 +750,16 @@ class World:
 
         if demand_exists and not generation_exists:
             msg = (
-                f"Demand units but no generation units were created. "
-                f"Known generation types are {generation_types}"
+                f"Demand units but no generation units were created.\n"
+                f"Known generation types are: {generation_types}.\n"
+                f"This indicates an incomplete simulation setup."
             )
             warnings.warn(msg)
         elif generation_exists and not demand_exists:
             msg = (
-                f"Generation units but no demand units were created. "
-                f"Known demand types are {demand_types}"
+                f"Generation units but no demand units were created.\n"
+                f"Known demand types are: {demand_types}.\n"
+                f"This indicates an incomplete simulation setup."
             )
             warnings.warn(msg)
 
