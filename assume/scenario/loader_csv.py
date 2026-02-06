@@ -34,8 +34,8 @@ from assume.common.utils import (
     adjust_unit_operator_for_learning,
     confirm_learning_save_path,
     convert_to_rrule_freq,
-    normalize_availability,
     set_random_seed,
+    validate_availability,
 )
 from assume.strategies import BaseStrategy
 from assume.world import World
@@ -562,16 +562,9 @@ def load_config_and_create_forecaster(
     availability = load_file(
         path=path, config=config, file_name="availability_df", index=index
     )
-    # check if availability contains any values larger than 1 and raise a warning
-    if availability is not None and availability.max().max() > 1:
-        # warn the user that the availability contains values larger than 1
-        # and normalize the availability
-        logger.warning(
-            "Availability contains values larger than 1. This is not allowed. "
-            "The availability will be normalized automatically. "
-            "The quality of the automatic normalization is not guaranteed."
-        )
-        availability = normalize_availability(powerplant_units, availability)
+    # normalize availability in case of values > 1 and set values below minimum power to 0.0
+    if availability is not None:
+        availability = validate_availability(powerplant_units, availability)
 
     fuel_prices_df = load_file(
         path=path, config=config, file_name="fuel_prices_df", index=index
