@@ -694,7 +694,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         opportunity_cost_smooth = (
             (market_clearing_price - marginal_cost)
-            * (unit.max_power - accepted_volume_smooth)
+            * (unit.max_power - accepted_volume_total_smooth)
             * duration
         )
 
@@ -706,6 +706,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
         # - If no dispatch happens, apply higher regret (0.5) to discourage idle behavior, if it could have been profitable.
         regret_scale = 0.1 if accepted_volume_total > unit.min_power else 0.5
+        regret_scale_smooth = (
+            0.1 if accepted_volume_total_smooth > unit.min_power else 0.5
+        )
 
         # --------------------
         # 4.1 Calculate Reward
@@ -714,7 +717,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         # scaling factor to normalize the reward to the range [-1,1]
         scaling = 1 / (self.max_bid_price * unit.max_power)
-        regret = regret_scale * opportunity_cost_smooth
+        regret = regret_scale_smooth * opportunity_cost_smooth
         reward = scaling * (profit_smooth - regret)
 
         # Store results in unit outputs
