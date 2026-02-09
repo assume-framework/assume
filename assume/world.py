@@ -817,8 +817,6 @@ class World:
     # this way, the forecast mechanism works similar for CSV, WorldScript as well as AMIRIS/pypsa
     def init_forecasts(self,
         forecast_df: pd.DataFrame = None,
-        demand_df: pd.DataFrame = None,
-        exchange_df: pd.DataFrame = None,
         ):
         for unit in self.units.values():
             for forecast in unit.forecasts:
@@ -826,8 +824,6 @@ class World:
                     self.units.values(),
                     self.markets.values(),
                     forecast_df,
-                    demand_df,
-                    exchange_df,
                 )
 
     # The update routine is not needed. We call it in calculate_bids or through a scheduled task during runtime

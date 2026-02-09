@@ -64,7 +64,7 @@ def calculate_sum_demand(
     demand_units: list[Demand],
     exchange_units: list[Exchange],
     demand_df: ForecastSeries,
-    exchange_df: ForecastSeries,
+    exchanges_df: ForecastSeries,
 ):
     demand_names = [unit.name for unit in demand_units]
     sum_demand = demand_df[demand_names].sum(axis=1)
@@ -87,9 +87,7 @@ def calculate_naive_price(
     index: ForecastIndex,
     units: dict[str, BaseUnit],
     market_configs: dict[str, dict],
-    demand_df: ForecastSeries = None,
     forecast_df: ForecastSeries = None,
-    exchange_df: ForecastSeries = None,
 ) -> dict[str, ForecastSeries]:
     """
     Naive price forecast that calculates prices based on merit order with marginal costs.
@@ -97,9 +95,9 @@ def calculate_naive_price(
     TODO: further documentation
     """
 
-    demand_df = _ensure_not_none(demand_df, index)
     forecast_df = _ensure_not_none(forecast_df, index)
-    exchange_df = _ensure_not_none(exchange_df, index)
+    demand_df = get_demand_df(demand_units, index)
+    exchanges_df = get_exchange_df(exchange_units, index)
 
     price_forecasts: dict[str, pd.Series] = {}
 
@@ -135,7 +133,7 @@ def calculate_naive_price(
 
         # 4. Process the demand.
         #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
-        sum_demand = calculate_sum_demand(demand_units, exchange_units, demand_df, exchange_df)
+        sum_demand = calculate_sum_demand(demand_units, exchange_units, demand_df, exchanges_df)
 
         # 5. Initialize the price forecast series.
         price_forecast = pd.Series(index=index, data=0.0)
@@ -175,14 +173,16 @@ def calculate_naive_price(
 def calculate_residual_load(
     units: dict[str, BaseUnit],
     market_configs: dict[str, dict],
-    demand_df: ForecastSeries = None,
     forecast_df: ForecastSeries = None,
-    exchange_df: ForecastSeries = None,
 ) -> dict[str, pd.Series]:
 
-    demand_df = _ensure_not_none(demand_df, index)
+    _, demand_units, exchange_units, _ = sort_units(
+            units
+    )
+
     forecast_df = _ensure_not_none(forecast_df, index)
-    exchange_df = _ensure_not_none(exchange_df, index)
+    demand_df = get_demand_df(demand_units, index)
+    exchanges_df = get_exchanges_df(exchange_units, index)
 
     residual_loads: dict[str, pd.Series] = {}
 
@@ -202,7 +202,7 @@ def calculate_residual_load(
             units, market_id
         )
 
-        sum_demand = calculate_sum_demand(demand_units, exchange_units, demand_df, exchange_df)
+        sum_demand = calculate_sum_demand(demand_units, exchange_units, demand_df, exchanges_df)
 
         # shape: (num_pp_units, index_len) -> (index_len)
         # vre_feed_in_df = self._calc_power(mask).sum(axis=1)
@@ -232,6 +232,32 @@ def extract_buses_and_lines(market_configs: dict[str, dict]):
     
     return buses, lines
 
+@lru_cache(maxsize=100)
+def get_demand_df(
+    index: ForecastIndex,
+    demand_units: dict[str, BaseUnit]
+):
+    
+    demand_df = pd.DataFrame(index=index)
+
+    for unit in demand_units:
+        demand_df.assign(**{f"{unit.id}": unit.forecaster.demand.abs()})
+
+    return demand_df
+
+@lru_cache(maxsize=100)
+def get_exchanges_df(
+    index: ForecastIndex,
+    exchange_units: dict[str, BaseUnit]
+):
+    
+    exchanges_df = pd.DataFrame(index=index)
+
+    for unit in exchange_units:
+        exchanges_df.assign(**{f"{unit.id}_export": unit.forecaster.volume_export})
+        exchanges_df.assign(**{f"{unit.id}_import": unit.forecaster.volume_import})
+
+    return exchanges_df
 
 @lru_cache(maxsize=100)
 def calculate_congestion_forecast(
@@ -241,10 +267,6 @@ def calculate_congestion_forecast(
     forecast_df: ForecastSeries = None,
     demand_df: ForecastSeries = None,
 ):
-
-    forecast_df = _ensure_not_none(forecast_df, index)
-    demand_df = _ensure_not_none(demand_df, index)
-
     # Lines and buses should be everywhere the same
     buses, lines = extract_buses_and_lines(market_configs)
 
@@ -254,6 +276,9 @@ def calculate_congestion_forecast(
     powerplants_units, demand_units, exchange_units, dsm_units = sort_units(
         units
     )
+
+    forecast_df = _ensure_not_none(forecast_df, index)
+    demand_df = get_demand_df(demand_units, index)
 
     demand_unit_nodes = {demand.node for demand in demand_units}
     if not all(node in buses for node in demand_unit_nodes):
@@ -453,9 +478,7 @@ class UnitForecaster:
         units: dict[str, BaseUnit],
         market_configs: dict[str, dict],
         # fuel_prices: ForecastSeries = None,
-        demand_df: ForecastSeries = None,
         forecast_df: ForecastSeries = None,
-        exchange_df: ForecastSeries = None,
     ):
         """
         """
@@ -463,17 +486,13 @@ class UnitForecaster:
             self.index,
             units,
             market_configs,
-            demand_df,
             forecast_df,
-            exchange_df
         )
 
         self.residual_load = calculate_residual_load(
             units,
             market_configs,
-            demand_df,
             forecast_df,
-            exchange_df,
         )
 
     def update(self, args1, args2):
@@ -595,17 +614,13 @@ class DsmUnitForecaster(UnitForecaster):
         units: dict[str, BaseUnit],
         market_configs: dict[str, dict],
         # fuel_prices: ForecastSeries = None,
-        demand_df: ForecastSeries = None,
         forecast_df: ForecastSeries = None,
-        exchange_df: ForecastSeries = None,
     ):
         # Get default price and residual load forecast
         super(UnitForecaster).initialize(
             units,
             market_configs,
-            demand_df,
             forecast_df,
-            exchange_df
         )
 
         # TODO how to handle other markets?
@@ -616,7 +631,6 @@ class DsmUnitForecaster(UnitForecaster):
             units,
             market_configs,
             forecast_df,
-            demand_df,
         )
         self.renewable_utilization = calculate_renewable_utilisation(
             self.index,

@@ -743,8 +743,6 @@ def setup_world(
     dsm_units = scenario_data["dsm_units"]
     unit_forecasts = scenario_data["unit_forecasts"]
     forecast_df = scenario_data["forecast_df"]
-    exchange_df = scenario_data["exchange_df"]
-    demand_df = scenario_data["demand_df"]
 
 
     # save every thousand steps by default to free up memory
@@ -932,7 +930,7 @@ def setup_world(
             for unit in op_units:
                 world.add_unit(**unit)
 
-    world.init_forecasts(forecast_df, demand_df, exchange_df)
+    world.init_forecasts(forecast_df)
 
     if (
         world.learning_mode
