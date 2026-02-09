@@ -623,7 +623,6 @@ def load_config_and_create_forecaster(
             unit_forecasts[id] = ExchangeForecaster(
                 index=index,
                 availability=availability.get(id, pd.Series(0.0, self.index, name=id)),#initializer.availability(id),
-                demand=-demand_df[id].abs(),
                 #market_prices=market_prices,
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
