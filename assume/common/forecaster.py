@@ -423,11 +423,6 @@ def calculate_renewable_utilisation(
 
     return renewable_utilisation
 
-def preprocess_price(args1,args2):
-    # TODO implement preprocess
-    # this should allow to remove the whole forecast_initialisation stuff
-    # this functions does not evaluate again if it is called by different Forecasts with the same input.
-    pass
 
 class UnitForecaster:
     """
@@ -549,9 +544,6 @@ class DemandForecaster(UnitForecaster):
         if any(self.demand > 0):
             raise ValueError(f"{demand=} must be negative")
 
-    # TODO:
-    # initialize
-    # preprocess
 
 
 class PowerplantForecaster(UnitForecaster):
@@ -584,9 +576,6 @@ class PowerplantForecaster(UnitForecaster):
             return self._to_series(0)
         return self.fuel_prices[fuel]
 
-    # TODO:
-    # initialize
-    # preprocess
 
 class DsmUnitForecaster(UnitForecaster):
     def __init__(
