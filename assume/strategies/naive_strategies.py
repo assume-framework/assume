@@ -380,11 +380,12 @@ class EnergyHeuristicElasticStrategy(MinMaxStrategy):
     """
 
     def update_forecasts_if_needed(unit):
-        if last_forecast_update <= 30 tage her..?:
-            return False
+        #if last_forecast_update <= 30 tage her..?:
+        #    return False
 
         # hier bekommt der Forecaster die Infos um sich zu aktualisieren
-        unit.forecaster.update(unit.outputs["eom_price"])
+        #unit.forecaster.update(unit.outputs["eom_price"])
+        pass
 
 
     def calculate_bids(
@@ -395,7 +396,7 @@ class EnergyHeuristicElasticStrategy(MinMaxStrategy):
         **kwargs,
     ) -> Orderbook:
         bids = []
-        self.update_forecasts_if_needed(unit)
+        # self.update_forecasts_if_needed(unit)
 
         for product in product_tuples:
             start, end, only_hours = product

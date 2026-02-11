@@ -25,6 +25,7 @@ from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine, make_url
 from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
+import pandas as pd
 
 from assume.common import (
     MarketConfig,
@@ -819,17 +820,17 @@ class World:
         forecast_df: pd.DataFrame = None,
         ):
         for unit in self.units.values():
-            for forecast in unit.forecasts:
-                forecast.initialize(
-                    self.units.values(),
-                    self.markets.values(),
-                    forecast_df,
-                )
+            #for forecast in unit.forecaster:
+            unit.forecaster.initialize(
+                self.units.values(),
+                self.markets.values(),
+                forecast_df,
+            )
 
     # The update routine is not needed. We call it in calculate_bids or through a scheduled task during runtime
     # see update_forecasts_if_needed
     def update_forecasts(self):
         for unit in self.units.values():
-            for forecast in unit.forecasts:
-                forecast.update_forecasts(self.units.values())
+            #for forecast in unit.forecaster:
+            unit.forecaster.update_forecasts(self.units.values())
 
