@@ -4,7 +4,7 @@
 from __future__ import annotations
 import logging
 from functools import lru_cache
-from typing import TypeAlias, TYPE_CHECKING
+from typing import TypeAlias, Callable, TYPE_CHECKING
 from collections import defaultdict
 
 import pandas as pd
@@ -41,14 +41,14 @@ def _ensure_not_none(
     return df 
 
 # @lru_cache(maxsize=100)
-def calculate_max_power(units):
+def calculate_max_power(units, index=None):
     """
     Returns: max available power: shape (num_units, forecast_len)
     """
-    return pd.DataFrame([unit.max_power * unit.forecaster.availability for unit in units])
+    return pd.DataFrame([unit.max_power * unit.forecaster.availability for unit in units], index=index)
 
 @lru_cache(maxsize=10)
-def sort_units(units:tuple[BaseUnit], market_id:str | None=None):
+def sort_units(units:list[BaseUnit], market_id:str | None=None):
     from assume.common.base import BaseUnit #, BaseForecaster
     from assume.units.powerplant import PowerPlant
     from assume.units.demand import Demand
@@ -82,26 +82,17 @@ def sort_units(units:tuple[BaseUnit], market_id:str | None=None):
 def calculate_sum_demand(
     demand_units: list[Demand],
     exchange_units: list[Exchange],
-    #demand_df: ForecastSeries,
-    #exchanges_df: ForecastSeries,
 ):
     """
     Returns summed demand at every timestep (incl. imports and exports)
     """
     sum_demand = abs(np.array([unit.forecaster.demand for unit in demand_units])).sum(axis=0)
-    #demand_names = [unit.name for unit in demand_units]
-    #sum_demand = demand_df[demand_names].sum(axis=1)
 
     # get exchanges if exchange_units are available
     if exchange_units:  # if not empty
         # get sum of imports as name of exchange_unit_import
         sum_imports = abs(np.array([unit.forecaster.volume_import for unit in exchange_units])).sum(axis=0)
-        #import_units = [f"{unit.name}_import" for unit in exchange_units]
-        #sum_imports = exchanges[import_units].sum(axis=1)
-        
-        # get sum of exports as name of exchange_unit_export
-        #export_units = [f"{unit.name}_export" for unit in exchange_units]
-        #sum_exports = exchanges[export_units].sum(axis=1)
+
         sum_exports = abs(np.array([unit.forecaster.volume_export for unit in exchange_units])).sum(axis=0)
         # add imports and exports to the sum_demand
         sum_demand += sum_imports - sum_exports
@@ -111,7 +102,7 @@ def calculate_sum_demand(
 @lru_cache(maxsize=1000)
 def calculate_naive_price(
     index: ForecastIndex,
-    units: tuple[BaseUnit],
+    units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
 ) -> dict[str, ForecastSeries]:
@@ -127,8 +118,6 @@ def calculate_naive_price(
             units
     )
     forecast_df = _ensure_not_none(forecast_df, index)
-    #demand_df = get_demand_df(demand_units, index)
-    #exchanges_df = get_exchanges_df(exchange_units, index)
 
     price_forecasts: dict[str, pd.Series] = {}
 
@@ -201,20 +190,18 @@ def calculate_naive_price(
 
 
 @lru_cache(maxsize=100)
-def calculate_residual_load(
+def calculate_naive_residual_load(
     index: ForecastIndex,
-    units: tuple[BaseUnit],
+    units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
-) -> dict[str, pd.Series]:
+) -> dict[str, ForecastSeries]:
 
     _, demand_units, exchange_units, _, _ = sort_units(
             units
     )
 
     forecast_df = _ensure_not_none(forecast_df, index)
-    #demand_df = get_demand_df(demand_units, index)
-    #exchanges_df = get_exchanges_df(exchange_units, index)
 
     residual_loads: dict[str, pd.Series] = {}
 
@@ -265,40 +252,13 @@ def extract_buses_and_lines(market_configs: list[MarketConfig]):
     
     return buses, lines
 
-#@lru_cache(maxsize=100)
-def get_demand_df(
-    demand_units: list[BaseUnit],
-    index: ForecastIndex,
-):
-    
-    demand_df = pd.DataFrame(index=index)
-
-    for unit in demand_units:
-        demand_df.assign(**{f"{unit.id}": abs(unit.forecaster.demand)})
-
-    return demand_df
-
-#@lru_cache(maxsize=100)
-def get_exchanges_df(
-    exchange_units: list[BaseUnit],
-    index: ForecastIndex,
-):
-    
-    exchanges_df = pd.DataFrame(index=index)
-
-    for unit in exchange_units:
-        exchanges_df.assign(**{f"{unit.id}_export": unit.forecaster.volume_export})
-        exchanges_df.assign(**{f"{unit.id}_import": unit.forecaster.volume_import})
-
-    return exchanges_df
-
 @lru_cache(maxsize=100)
-def calculate_congestion_forecast(
+def calculate_naive_congestion_forecast(
     index: ForecastIndex,
-    units: tuple[BaseUnit],
+    units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
-):
+) -> dict[str, ForecastSeries]:
     # Lines and buses should be everywhere the same
     buses, lines = extract_buses_and_lines(market_configs)
 
@@ -310,7 +270,6 @@ def calculate_congestion_forecast(
     )
 
     forecast_df = _ensure_not_none(forecast_df, index)
-    #demand_df = get_demand_df(demand_units, index)
 
     demand_unit_nodes = {demand.node for demand in demand_units}
     if not all(node in buses for node in demand_unit_nodes):
@@ -322,10 +281,8 @@ def calculate_congestion_forecast(
 
     # Step 1: Calculate load for each powerplant based on availability factor and max power
     # shape: (num_pps, forecast_len)
-    power = pd.DataFrame(
-        calculate_max_power(powerplant_units),
-        index=[pp.name for pp in powerplant_units]
-    )
+    power = calculate_max_power(powerplant_units, index=[pp.name for pp in powerplant_units])
+
 
     # Step 2: Calculate net load for each node (demand - generation)
     net_load_by_node = {}
@@ -400,12 +357,12 @@ def calculate_congestion_forecast(
     return node_congestion_signal
 
 @lru_cache(maxsize=100)
-def calculate_renewable_utilisation(
+def calculate_naive_renewable_utilisation(
     index: ForecastIndex,
-    units: tuple[BaseUnit],
+    units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
-):
+) -> dict[str, ForecastSeries]:
     forecast_df = _ensure_not_none(forecast_df, index)
 
     # Lines and buses should be everywhere the same
@@ -429,10 +386,7 @@ def calculate_renewable_utilisation(
     # Calculate load for each renewable powerplant based on availability factor and max power
     # shape: (num_pps, forecast_len)
     renewable_units = [unit for unit in powerplants_units if is_renewable(unit.technology)]
-    power = pd.DataFrame(
-        calculate_max_power(renewable_units),
-        index=[pp.name for pp in renewable_units]
-    )
+    power = calculate_max_power(renewable_units, index=[pp.name for pp in renewable_units])
 
     renewable_utilisation = pd.DataFrame(index=index)
     
@@ -468,20 +422,23 @@ class UnitForecaster:
     def __init__(
         self,
         index: ForecastIndex,
-        # market_prices: dict[str, ForecastSeries] = None,
-        # residual_load: dict[str, ForecastSeries] = None,
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
+        forecast_algorithms: dict[str, str] = {},
     ):
         if not isinstance(index, FastIndex):
             index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
-        # if market_prices is None:
-        #     market_prices = {"EOM": 50}  # default value for tests
-        # if residual_load is None:
-        #     residual_load = {}
+
         self.index: FastIndex = index
         self.availability: FastSeries = self._to_series(availability)
-        # self.price = self._dict_to_series(market_prices)
-        # self.residual_load = self._dict_to_series(residual_load)
+        self.forecast_algorithms = forecast_algorithms
+        if market_prices is None:
+             market_prices = {"EOM": 50}  # default value for tests
+        if residual_load is None:
+             residual_load = {}
+        self.price: dict[str, ForecastSeries] = self._dict_to_series(market_prices)
+        self.residual_load: dict[str, ForecastSeries] = self._dict_to_series(residual_load)
 
     def _to_series(self, item: ForecastSeries) -> FastSeries:
         if isinstance(item, FastSeries):
@@ -502,26 +459,36 @@ class UnitForecaster:
 
     def initialize(
         self,
-        units: tuple[BaseUnit],
+        units: list[BaseUnit],
         market_configs: list[MarketConfig],
         # fuel_prices: ForecastSeries = None,
         forecast_df: ForecastSeries = None,
     ):
         """
         """
-        self.price = calculate_naive_price(
+        price_forecast_algorithm = price_forecast_algorithms.get(
+            self.forecast_algorithms.get("price"),
+            calculate_naive_price
+        )
+        self.price = price_forecast_algorithm(
             self.index,
             units,
             market_configs,
             forecast_df,
         )
+        self.price = self._dict_to_series(self.price)
 
-        self.residual_load = calculate_residual_load(
+        residual_load_forecast_algorithm = residual_load_forecast_algorithms.get(
+            self.forecast_algorithms.get("residual_load"),
+            calculate_naive_residual_load
+        )
+        self.residual_load = residual_load_forecast_algorithm(
             self.index,
             units,
             market_configs,
             forecast_df,
         )
+        self.residual_load = self._dict_to_series(self.residual_load)
 
     def update(self, args1, args2):
         """
@@ -566,13 +533,20 @@ class DemandForecaster(UnitForecaster):
     def __init__(
         self,
         index: ForecastIndex,
-        # market_prices: dict[str, ForecastSeries] = None,
+        market_prices: dict[str, ForecastSeries] = None,
         demand: ForecastSeries = -100,
-        # residual_load: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
+        forecast_algorithms: dict[str, str] = {},
     ):
         # super().__init__(index, market_prices, residual_load, availability)
-        super().__init__(index, availability)
+        super().__init__(
+            index=index,
+            availability=availability,
+            forecast_algorithms=forecast_algorithms,
+            market_prices=market_prices,
+            residual_load=residual_load,
+        )
         self.demand = self._to_series(demand)
         if any(self.demand > 0):
             raise ValueError(f"{demand=} must be negative")
@@ -594,12 +568,19 @@ class PowerplantForecaster(UnitForecaster):
         self,
         index: ForecastIndex,
         fuel_prices: dict[str, ForecastSeries] = None,
-        #market_prices: dict[str, ForecastSeries] = None,
-        #residual_load: dict[str, ForecastSeries] = None,
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
+        forecast_algorithms: dict[str, str] = {},
     ):
         # super().__init__(index, market_prices, residual_load, availability)
-        super().__init__(index, availability)
+        super().__init__(
+            index=index,
+            availability=availability,
+            forecast_algorithms=forecast_algorithms,
+            market_prices=market_prices,
+            residual_load=residual_load,
+        )
         if fuel_prices is None:
             fuel_prices = {}
         self.fuel_prices = self._dict_to_series(fuel_prices)
@@ -614,28 +595,30 @@ class DsmUnitForecaster(UnitForecaster):
     def __init__(
         self,
         index: ForecastIndex,
-        # market_prices: dict[str, ForecastSeries] = None,
-        fuel_prices=dict[str, ForecastSeries],
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
-        # congestion_signal: ForecastSeries = 0,
-        # residual_load: dict[str, ForecastSeries] = None,
-        # renewable_utilisation_signal: ForecastSeries = 0,
-        # electricity_price: ForecastSeries = None,
+        forecast_algorithms: dict[str, str] = {},
+        congestion_signal: ForecastSeries = 0.0,
+        renewable_utilisation_signal: ForecastSeries = 0.0,
+        electricity_price: ForecastSeries = 0.0,
     ):
-        #super().__init__(index, market_prices, residual_load, availability)
-        super().__init__(index, availability)
-        self.fuel_prices = self._dict_to_series(fuel_prices)
-        # self.congestion_signal = self._to_series(congestion_signal)
-        # self.electricity_price = self._to_series(electricity_price)  # --> market_prices.get("price_EOM")
-        # self.renewable_utilisation_signal = self._to_series(
-        #    renewable_utilisation_signal
-        #)
+        super().__init__(
+            index=index,
+            availability=availability,
+            forecast_algorithms=forecast_algorithms,
+            market_prices=market_prices,
+            residual_load=residual_load,
+        )
+        self.congestion_signal = self._to_series(congestion_signal)
+        self.electricity_price = self._to_series(electricity_price)
+        self.renewable_utilisation_signal = self._to_series(renewable_utilisation_signal)
+
 
     def initialize(
         self,
-        units: tuple[BaseUnit],
+        units: list[BaseUnit],
         market_configs: list[MarketConfig],
-        # fuel_prices: ForecastSeries = None,
         forecast_df: ForecastSeries = None,
     ):
         # Get default price and residual load forecast
@@ -648,18 +631,29 @@ class DsmUnitForecaster(UnitForecaster):
         # TODO how to handle other markets?
         self.electricity_price = self.price_forecast.get("price_EOM")
         
-        self.congestion_signal = calculate_congestion_forecast(
+        congestion_signal_forecast_algorithm = congestion_signal_forecast_algorithms.get(
+            self.forecast_algorithms.get("congestion_signal"),
+            calculate_naive_congestion_signal
+        )
+        self.congestion_signal = congestion_signal_forecast_algorithm(
             self.index,
             units,
             market_configs,
             forecast_df,
         )
-        self.renewable_utilization = calculate_renewable_utilisation(
+        self.congestion_signal = self._dict_to_series(self.congestion_signal)
+
+        renewable_utilization_forecast_algorithm = renewable_utilization_forecast_algorithms.get(
+            self.forecast_algorithms.get("renewable_utilization"),
+            renewable_utilization_congestion_signal
+        )
+        self.renewable_utilization = renewable_utilization_forecast_algorithm(
             self.index,
             units,
             market_configs,
             forecast_df,
         )
+        self.renewable_utilization = self._dict_to_series(self.renewable_utilization)
 
 
 class SteelplantForecaster(DsmUnitForecaster):
@@ -678,31 +672,33 @@ class SteelplantForecaster(DsmUnitForecaster):
     def __init__(
         self,
         index: ForecastIndex,
-        # market_prices: dict[str, ForecastSeries] = None,
-        fuel_prices=dict[str, ForecastSeries],
+        fuel_prices: dict[str, ForecastSeries],
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
-        # congestion_signal: ForecastSeries = 0,
-        # residual_load: dict[str, ForecastSeries] = None,
-        # renewable_utilisation_signal: ForecastSeries = 0,
-        # electricity_price: ForecastSeries = None,
+        forecast_algorithms: dict[str, str] = {},
+        congestion_signal: ForecastSeries = 0.0,
+        renewable_utilisation_signal: ForecastSeries = 0.0,
+        electricity_price: ForecastSeries = None,
     ):
         #super().__init__(index, market_prices, residual_load, availability)
-        super().__init__(index, availability)
+        super().__init__(
+            index=index,
+            availability=availability,
+            forecast_algorithms=forecast_algorithms,
+            market_prices=market_prices,
+            residual_load=residual_load,
+            congestion_signal=congestion_signal,
+            renewable_utilisation_signal=renewable_utilisation_signal,
+            electricity_price=electricity_price
+        )
         self.fuel_prices = self._dict_to_series(fuel_prices)
-        # self.congestion_signal = self._to_series(congestion_signal)
-        # self.electricity_price = self._to_series(electricity_price)  # --> market_prices.get("price_EOM")
-        # self.renewable_utilisation_signal = self._to_series(
-        #    renewable_utilisation_signal
-        #)
 
     def get_price(self, fuel: str) -> FastSeries:
         if fuel not in self.fuel_prices:
             return self._to_series(0)
         return self.fuel_prices[fuel]
 
-    # TODO:
-    # initialize
-    # preprocess
 
 
 class SteamgenerationForecaster(DsmUnitForecaster):
@@ -726,29 +722,34 @@ class SteamgenerationForecaster(DsmUnitForecaster):
     def __init__(
         self,
         index: ForecastIndex,
-        # electricity_price: ForecastSeries,
         fuel_prices: dict[str, ForecastSeries],
         demand: ForecastSeries = 0,
         electricity_price_flex: ForecastSeries = 0,
         thermal_demand: ForecastSeries = 0,
-        # congestion_signal: ForecastSeries = 0,
-        # renewable_utilisation_signal: ForecastSeries = 0,
         thermal_storage_schedule: ForecastSeries = 0,
-        # residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
-        # market_prices: dict[str, ForecastSeries] = None,
+        forecast_algorithms: dict[str, str] = {},
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
+        congestion_signal: ForecastSeries = 0.0,
+        renewable_utilisation_signal: ForecastSeries = 0.0,
+        electricity_price: ForecastSeries = 0.0,
     ):
-        # super().__init__(index, market_prices, residual_load, availability)
-        super().__init__(index, availability)
+
+        super().__init__(
+            index=index,
+            availability=availability,
+            forecast_algorithms=forecast_algorithms,
+            market_prices=market_prices,
+            residual_load=residual_load,
+            congestion_signal=congestion_signal,
+            renewable_utilisation_signal=renewable_utilisation_signal,
+            electricity_price=electricity_price
+        )
         self.demand = demand
-        #self.electricity_price = self._to_series(electricity_price)
         self.electricity_price_flex = self._to_series(electricity_price_flex)
         self.fuel_prices = self._dict_to_series(fuel_prices)
         self.thermal_demand = self._to_series(thermal_demand)
-        #self.congestion_signal = self._to_series(congestion_signal)
-        #self.renewable_utilisation_signal = self._to_series(
-        #    renewable_utilisation_signal
-        #)
         self.thermal_storage_schedule = self._to_series(thermal_storage_schedule)
 
     def get_price(self, fuel: str) -> FastSeries:
@@ -781,21 +782,32 @@ class BuildingForecaster(DsmUnitForecaster):
         ev_load_profile: ForecastSeries,
         battery_load_profile: ForecastSeries,
         pv_profile: ForecastSeries,
-        #electricity_price: ForecastSeries = None,
-        #residual_load: dict[str, ForecastSeries] = None,
+        forecast_algorithms: dict[str, str] = {},
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
+        congestion_signal: ForecastSeries = 0.0,
+        renewable_utilisation_signal: ForecastSeries = 0.0,
+        electricity_price: ForecastSeries = 0.0,
         availability: ForecastSeries = 1,
-        #market_prices: dict[str, ForecastSeries] = None,
         load_profile: ForecastSeries = 0,
     ):
-        # super().__init__(index, market_prices, residual_load, availability)
-        super().__init__(index, availability)
+        super().__init__(
+            index=index,
+            availability=availability,
+            forecast_algorithms=forecast_algorithms,
+            market_prices=market_prices,
+            residual_load=residual_load,
+            congestion_signal=congestion_signal,
+            renewable_utilisation_signal=renewable_utilisation_signal,
+            electricity_price=electricity_price
+        )
         self.fuel_prices = self._dict_to_series(fuel_prices)
         self.heat_demand = self._to_series(heat_demand)
         self.ev_load_profile = self._to_series(ev_load_profile)
         self.battery_load_profile = self._to_series(battery_load_profile)
         self.pv_profile = self._to_series(pv_profile)
         self.load_profile = self._to_series(load_profile)
-        # self.electricity_price = self._to_series(electricity_price)
+
 
     def get_price(self, fuel: str) -> FastSeries:
         if fuel not in self.fuel_prices:
@@ -819,15 +831,23 @@ class HydrogenForecaster(DsmUnitForecaster):
     def __init__(
         self,
         index: ForecastIndex,
-        # electricity_price: ForecastSeries,
         hydrogen_demand: ForecastSeries,
+        forecast_algorithms: dict[str, str] = {},
         seasonal_storage_schedule: ForecastSeries = 0,
-        #residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
-        #market_prices: dict[str, ForecastSeries] = None,
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
+        electricity_price: ForecastSeries = 0.0,
     ):
         # super().__init__(index, market_prices, residual_load, availability)
-        super().__init__(index, availability)
+        super().__init__(
+            index=index,
+            availability=availability,
+            forecast_algorithms=forecast_algorithms,
+            market_prices=market_prices,
+            residual_load=residual_load,
+            electricity_price=electricity_price
+        )
         # self.electricity_price = self._to_series(electricity_price)
         self.hydrogen_demand = self._to_series(hydrogen_demand)
         self.seasonal_storage_schedule = self._to_series(seasonal_storage_schedule)
@@ -848,13 +868,41 @@ class ExchangeForecaster(UnitForecaster):
     def __init__(
         self,
         index: ForecastIndex,
+        forecast_algorithms: dict[str, str] = {},
         volume_import: ForecastSeries = 0,
         volume_export: ForecastSeries = 0,
-        #residual_load: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
-        #market_prices: dict[str, ForecastSeries] = None,
+        market_prices: dict[str, ForecastSeries] = None,
     ):
         # super().__init__(index, market_prices, residual_load, availability)
-        super().__init__(index, availability)
+        super().__init__(
+            index=index,
+            availability=availability,
+            forecast_algorithms=forecast_algorithms,
+            market_prices=market_prices,
+            residual_load=residual_load,
+        )
         self.volume_import = self._to_series(volume_import)
         self.volume_export = self._to_series(volume_export)
+
+
+price_forecast_algorithms: dict[str, Callable] = {
+    "price_naive_forecast": calculate_naive_price,
+    "default_test": lambda index, *args: {"EOM", FastSeries(index=index, value=50)}
+}
+
+residual_load_forecast_algorithms: dict[str, Callable] = {
+    "residual_load_naive_forecast": calculate_naive_residual_load,
+    "default_test": lambda *args: {},
+}
+
+congestion_signal_forecast_algorithms: dict[str, Callable] = {
+    "congestion_signal_naive_forecast": calculate_naive_congestion_forecast,
+    "default_test": lambda index, *args: FastSeries(index=self.index, value=0.0),
+}
+
+renewable_utilization_forecast_algorithms: dict[str, Callable] = {
+    "renewable_utilization_naive_forecast": calculate_naive_renewable_utilisation,
+    "default_test": lambda index, *args: FastSeries(index=self.index, value=0.0),
+}

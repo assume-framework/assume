@@ -588,6 +588,8 @@ def load_config_and_create_forecaster(
 
     buses = load_file(path=path, config=config, file_name="buses")
     lines = load_file(path=path, config=config, file_name="lines")
+    
+    forecast_algorithms = config.get("forecast_algorithms", {})
 
     unit_forecasts: dict[str, UnitForecaster] = {}
     #market_prices, residual_loads = initializer.calculate_market_forecasts()
@@ -598,6 +600,7 @@ def load_config_and_create_forecaster(
                 index=index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
                 fuel_prices=fuel_prices_df,
+                forecast_algorithms=forecast_algorithms,
                 #market_prices=market_prices,
                 #residual_load=residual_loads,
             )
@@ -607,6 +610,7 @@ def load_config_and_create_forecaster(
                 index=index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
                 demand=-demand_df[id].abs(),
+                forecast_algorithms=forecast_algorithms,
                 #market_prices=market_prices,
                 #residual_load=residual_loads,
             )
@@ -615,6 +619,7 @@ def load_config_and_create_forecaster(
             unit_forecasts[id] = UnitForecaster(
                 index=index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
+                forecast_algorithms=forecast_algorithms,
                 #market_prices=market_prices,
                 #residual_load=residual_loads,
             )
@@ -623,6 +628,7 @@ def load_config_and_create_forecaster(
             unit_forecasts[id] = ExchangeForecaster(
                 index=index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
+                forecast_algorithms=forecast_algorithms,
                 #market_prices=market_prices,
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
@@ -635,6 +641,7 @@ def load_config_and_create_forecaster(
                     unit_forecasts[id] = BuildingForecaster(
                         index=index,
                         availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
+                        forecast_algorithms=forecast_algorithms,
                         #market_prices=market_prices,
                         fuel_prices=fuel_prices_df,
                         #residual_load=residual_loads,
@@ -650,6 +657,7 @@ def load_config_and_create_forecaster(
                     unit_forecasts[id] = SteelplantForecaster(
                         index=index,
                         availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
+                        forecast_algorithms=forecast_algorithms,
                         #market_prices=market_prices,
                         fuel_prices=fuel_prices_df,
                         #residual_load=residual_loads,
@@ -662,6 +670,7 @@ def load_config_and_create_forecaster(
                     unit_forecasts[id] = HydrogenForecaster(
                         index=index,
                         availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
+                        forecast_algorithms=forecast_algorithms,
                         #market_prices=market_prices,
                         hydrogen_demand=unit["demand"],
                         #residual_load=residual_loads,
@@ -673,6 +682,7 @@ def load_config_and_create_forecaster(
                     unit_forecasts[id] = SteamgenerationForecaster(
                         index=index,
                         availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
+                        forecast_algorithms=forecast_algorithms,
                         demand=unit["demand"],
                         #market_prices=market_prices,
                         fuel_prices=fuel_prices_df,
