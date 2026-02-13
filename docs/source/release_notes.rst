@@ -17,6 +17,8 @@ Upcoming Release
     - ``seed`` not set in top-level of config: Sets the seed to a fixed default value (42) for deterministic behavior.
     - ``seed: <int>``: Sets the seed for all random number generators to provided <int>.
     - ``seed: null``: Disables seed setting, allowing for non-deterministic behavior as before. May improve performance of reinforcement learning.
+  - **Delete environment.yaml**: The environment.yaml file has been removed from the repository to simplify maintenance and was completely redundant with the `pyproject.toml`. Users can as before create their own environment using the provided pip installation instructions, which allows for more flexibility and easier updates.
+  - **Add validation for simulation setup**: Added checks to validate the simulation setup for common issues, such as missing bidding strategies or inconsistent market configurations. Warnings are issued to inform users of potential problems that could affect simulation results.
 
 0.5.6 - (23th December 2025)
 ============================
