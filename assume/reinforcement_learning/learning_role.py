@@ -98,12 +98,12 @@ class Learning(Role):
                     lambda x: self.learning_config.learning_rate
                 )
 
-            if self.learning_config.action_noise_schedule == "linear":
+            if self.learning_config.off_policy.action_noise_schedule == "linear":
                 self.calc_noise_from_progress = linear_schedule_func(
-                    self.learning_config.noise_dt
+                    self.learning_config.off_policy.noise_dt
                 )
             else:
-                self.calc_noise_from_progress = lambda x: self.learning_config.noise_dt
+                self.calc_noise_from_progress = lambda x: self.learning_config.off_policy.noise_dt
 
             self.eval_episodes_done = 0
 
@@ -336,51 +336,36 @@ class Learning(Role):
                     device
                 )
                 
-                if cache["values"].get(timestamp):
-                    values_data = transform_buffer_data(
-                        {
-                            timestamp: cache["values"][timestamp]
-                        },
-                        device
-                    )
-                else:
-                    values_data = np.zeros(len(self.rl_strats))
+                values_data = transform_buffer_data(
+                    {
+                        timestamp: cache["values"][timestamp]
+                    },
+                    device
+                )
                 
-                if cache["log_probs"].get(timestamp):
-                    log_probs_data = transform_buffer_data(
-                        {
-                            timestamp: cache["log_probs"][timestamp]
-                        },
-                        device
-                    )
-                else:
-                    log_probs_data = np.zeros(len(self.rl_strats))
+                log_probs_data = transform_buffer_data(
+                    {
+                        timestamp: cache["log_probs"][timestamp]
+                    },
+                    device
+                )
 
-                if cache["dones"].get(timestamp):
-                    dones_data = transform_buffer_data(
-                        {
-                            timestamp: cache["dones"][timestamp]
-                        },
-                        device
-                    )
-                else:
-                    dones_data = np.zeros(len(self.rl_strats))
-
-                # Helper to convert to numpy
-                def to_numpy(data):
-                    if isinstance(data, th.Tensor):
-                        return data.cpu().numpy()
-                    return np.array(data)
+                dones_data = transform_buffer_data(
+                    {
+                        timestamp: cache["dones"][timestamp]
+                    },
+                    device
+                )
 
                 # Add to rollout buffer
                 if self.rollout_buffer is not None:
                     self.rollout_buffer.add(
-                        obs = to_numpy(obs_data),
-                        action = to_numpy(actions_data),
-                        reward = to_numpy(rewards_data),
-                        done = to_numpy(dones_data),
-                        value = to_numpy(values_data),
-                        log_prob = to_numpy(log_probs_data)
+                        obs = obs_data,
+                        action = actions_data,
+                        reward = rewards_data,
+                        done = dones_data,
+                        value = values_data,
+                        log_prob = log_probs_data
                     )
         else:
             # for TD3/DDPG use off-policy ReplayBuffer
@@ -683,10 +668,10 @@ class Learning(Role):
                         )
                         if (
                             self.learning_config.learning_rate_schedule
-                            or self.learning_config.action_noise_schedule
+                            or self.learning_config.off_policy.action_noise_schedule
                         ) is not None:
                             logger.info(
-                                f"Learning rate schedule ({self.learning_config.learning_rate_schedule}) or action noise schedule ({self.learning_config.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
+                                f"Learning rate schedule ({self.learning_config.learning_rate_schedule}) or action noise schedule ({self.learning_config.off_policy.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
                             )
 
                         self.rl_algorithm.save_params(

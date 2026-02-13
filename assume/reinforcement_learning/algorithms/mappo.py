@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: ASSUME Developers
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
+
 import json
 import logging
 import os
@@ -10,214 +11,114 @@ import torch as th
 from torch.nn import functional as F
 from torch.optim import AdamW
 
-from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.learning_utils import polyak_update
+from assume.reinforcement_learning.algorithms.base_algorithm import A2CAlgorithm
 from assume.reinforcement_learning.neural_network_architecture import (
     ActorPPO,
-    CriticPPO
+    CriticPPO,
+    LSTMActorPPO,
 )
-from assume.reinforcement_learning.rollout_buffer import RolloutBuffer
 
 logger = logging.getLogger(__name__)
 
-class PPO(RLAlgorithm):
+
+class PPO(A2CAlgorithm):
     """
     Proximal Policy Optimization (PPO) Algorithm.
+
+    A policy gradient method that alternates between 
+    sampling data through interaction with the environment, 
+    and optimizing a surrogate objective function using 
+    stochastic gradient ascent. It is an on-policy algorithm.
+
+    Args:
+        learning_role (LearningRole): The central learning role.
+        clip_range (float): Clipping parameter epsilon.
+        clip_range_vf (float, optional): Clipping parameter for the value function.
+            If None, value function is not clipped.
+        n_epochs (int): Number of epochs to optimize the surrogate loss per update.
+        entropy_coef (float): Entropy coefficient for the loss calculation.
+        vf_coef (float): Value function coefficient for the loss calculation.
+        max_grad_norm (float): The maximum value for the gradient clipping.
     """
 
     def __init__(
-        self, 
+        self,
         learning_role,
-        clip_range = 0.1,       # Epsilon clipping constant preventing the policy from changing too much in a single update.
-        clip_range_vf = 0.1,    # preventing the value function from changing too much from previous estimates
-        n_epochs = 30,          # sample efficiency
-        entropy_coef = 0.02,    # encourages exploration by rewarding "randomness"
-        vf_coef = 1.0,          # balances the importance of training the Critic and training the Actor
-        max_grad_norm = 0.5,    # Gradient clipping
+        clip_range=0.1,
+        clip_range_vf=0.1,
+        n_epochs=30,
+        entropy_coef=0.02,
+        vf_coef=1.0,
+        max_grad_norm=0.5,
     ):
-        """Initialize PPO algorithm."""
+        """
+        Initialize PPO algorithm with specific hyperparameters.
+
+        Args:
+            learning_role (LearningRole): The learning role object.
+            clip_range (float, optional): The epsilon parameter for PPO clipping. 
+            clip_range_vf (float, optional): The epsilon parameter for value function clipping.
+            n_epochs (int, optional): Number of optimization epochs per rollout.
+            entropy_coef (float, optional): Coefficient for entropy term in loss.
+            vf_coef (float, optional): Coefficient for value function term in loss.
+            max_grad_norm (float, optional): Maximum gradient norm for clipping.
+        """
         super().__init__(learning_role)
 
+        # Set PPO-specific architecture classes
+        self.actor_architecture_class = ActorPPO
+        self.critic_architecture_class = CriticPPO
+
         config = self.learning_config
-        
-        self.clip_range = clip_range if clip_range is not None else getattr(config, 'ppo_clip_range', 0.2)
-        self.clip_range_vf = clip_range_vf if clip_range_vf is not None else getattr(config, 'ppo_clip_range_vf', None)
-        self.n_epochs = n_epochs if n_epochs is not None else getattr(config, 'ppo_n_epochs', 10)
-        self.entropy_coef = entropy_coef if entropy_coef is not None else getattr(config, 'ppo_entropy_coef', 0.01)
-        self.vf_coef = vf_coef if vf_coef is not None else getattr(config, 'ppo_vf_coef', 0.5)
-        self.max_grad_norm = max_grad_norm
+        ppo_config = getattr(config, "ppo", None)
+
+        # Use PPO-specific config if available, otherwise use defaults
+        self.clip_range = clip_range if clip_range is not None else getattr(ppo_config, "clip_ratio", 0.2)
+        self.clip_range_vf = clip_range_vf if clip_range_vf is not None else getattr(ppo_config, "clip_range_vf", None)
+        self.n_epochs = n_epochs if n_epochs is not None else getattr(ppo_config, "n_epochs", 10)
+        self.entropy_coef = entropy_coef if entropy_coef is not None else getattr(ppo_config, "entropy_coef", 0.01)
+        self.vf_coef = vf_coef if vf_coef is not None else getattr(ppo_config, "vf_coef", 0.5)
+        self.max_grad_norm = max_grad_norm if max_grad_norm is not None else getattr(ppo_config, "max_grad_norm", 0.5)
 
         # Update counter
         self.n_updates = 0
 
-    def save_params(self, directory: str) -> None:
-        """Save all actor and critic network parameters to disk."""
-        self.save_critic_params(directory=f"{directory}/critics")
-        self.save_actor_params(directory=f"{directory}/actors")
+    # =========================================================================
+    # CHECKPOINT SAVING METHODS
+    # =========================================================================
 
-    def save_critic_params(self, directory: str) -> None:
-        """Save value network parameters for all agents."""
-        os.makedirs(directory, exist_ok=True)
-        
-        for u_id, strategy in self.learning_role.rl_strats.items():
-            obj = {
-                "critic": strategy.critic.state_dict(),
-                "critic_optimizer": strategy.critic.optimizer.state_dict(),
-            }
-            path = f"{directory}/critic_{u_id}.pt"
-            th.save(obj, path)
+    uses_target_networks: bool = False
 
-        # Save unit ID order
-        u_id_list = [str(u) for u in self.learning_role.rl_strats.keys()]
-        mapping = {"u_id_order": u_id_list}
-        map_path = os.path.join(directory, "u_id_order.json")
-        with open(map_path, "w") as f:
-            json.dump(mapping, f, indent=2)
+    # Note: save_params, save_critic_params, save_actor_params, load_params,
+    # load_critic_params, load_actor_params, initialize_policy are inherited from A2CAlgorithm
 
-    def save_actor_params(self, directory: str) -> None:
-        """Save actor network parameters for all agents."""
-        os.makedirs(directory, exist_ok=True)
-        
-        for u_id, strategy in self.learning_role.rl_strats.items():
-            obj = {
-                "actor": strategy.actor.state_dict(),
-                "actor_optimizer": strategy.actor.optimizer.state_dict(),
-            }
-            path = f"{directory}/actor_{u_id}.pt"
-            th.save(obj, path)
 
-    def load_params(self, directory: str) -> None:
-        """Load all actor and critic parameters from disk."""
-        self.load_critic_params(directory)
-        self.load_actor_params(directory)
-
-    def load_critic_params(self, directory: str) -> None:
-        """Load critic parameters."""
-        logger.info("Loading PPO critic parameters...")
-
-        if not os.path.exists(directory):
-            logger.warning(
-                "Specified directory does not exist. Using randomly initialized critics."
-            )
-            return
-
-        for u_id, strategy in self.learning_role.rl_strats.items():
-            critic_path = os.path.join(directory, "critics", f"critic_{u_id}.pt")
-            if not os.path.exists(critic_path):
-                logger.warning(f"No saved critic for {u_id}; skipping.")
-                continue
-
-            try:
-                critic_params = th.load(critic_path, weights_only=True)
-                strategy.critic.load_state_dict(critic_params["critic"])
-                strategy.critic.optimizer.load_state_dict(critic_params["critic_optimizer"])
-            except Exception as e:
-                logger.warning(f"Failed to load critic for {u_id}: {e}")
-
-    def load_actor_params(self, directory: str) -> None:
-        """Load actor network parameters from disk."""
-        logger.info("Loading PPO actor parameters...")
-        
-        if not os.path.exists(directory):
-            logger.warning(
-                "Specified directory for actors does not exist! "
-                "Starting with randomly initialized values!"
-            )
-            return
-
-        for u_id, strategy in self.learning_role.rl_strats.items():
-            try:
-                actor_params = self.load_obj(
-                    directory=f"{directory}/actors/actor_{str(u_id)}.pt"
-                )
-                
-                strategy.actor.load_state_dict(actor_params["actor"])
-                strategy.actor.optimizer.load_state_dict(actor_params["actor_optimizer"])
-                strategy.actor.loaded = True
-                
-            except Exception:
-                logger.warning(f"No actor values loaded for agent {u_id}")
-
-    def initialize_policy(self, actors_and_critics: dict = None) -> None:
-        """
-        Initialize actor and critic networks for all agents.
-        
-        Args:
-            actors_and_critics: Optional pre-existing networks to assign
-        """
-        if actors_and_critics is None:
-            self.check_strategy_dimensions()
-            self.create_actors()
-            self.create_critics()
-        else:
-            for u_id, strategy in self.learning_role.rl_strats.items():
-                strategy.actor = actors_and_critics["actors"][u_id]
-                strategy.critic = actors_and_critics["critics"][u_id]
-
-            self.obs_dim = actors_and_critics["obs_dim"]
-            self.act_dim = actors_and_critics["act_dim"]
-            self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
-
-    def check_strategy_dimensions(self) -> None:
-        """Validate that all agents have consistent dimensions."""
-        foresight_list = []
-        obs_dim_list = []
-        act_dim_list = []
-        unique_obs_dim_list = []
-        num_timeseries_obs_dim_list = []
-
-        for strategy in self.learning_role.rl_strats.values():
-            foresight_list.append(strategy.foresight)
-            obs_dim_list.append(strategy.obs_dim)
-            act_dim_list.append(strategy.act_dim)
-            unique_obs_dim_list.append(strategy.unique_obs_dim)
-            num_timeseries_obs_dim_list.append(strategy.num_timeseries_obs_dim)
-        
-        if len(set(foresight_list)) > 1:
-            raise ValueError(
-                f"All foresight values must be the same for all RL agents. THe defined learning strategies have the following foresight values: {foresight_list}"
-            )
-        else:
-            self.foresight = foresight_list[0]
-            
-        if len(set(obs_dim_list)) > 1:
-            raise ValueError(
-                f"All observation dimensions must be the same. Got: {obs_dim_list}"
-            )
-        else:
-            self.obs_dim = obs_dim_list[0]
-
-        if len(set(act_dim_list)) > 1:
-            raise ValueError(
-                f"All action dimensions must be the same. Got: {act_dim_list}"
-            )
-        else:
-            self.act_dim = act_dim_list[0]
-
-        if len(set(unique_obs_dim_list)) > 1:
-            raise ValueError(
-                f"All unique_obs_dim values must be the same. Got: {unique_obs_dim_list}"
-            )
-        else:
-            self.unique_obs_dim = unique_obs_dim_list[0]
-
-        if len(set(num_timeseries_obs_dim_list)) > 1:
-            raise ValueError(
-                f"All num_timeseries_obs_dim values must be the same. "
-                f"Got: {num_timeseries_obs_dim_list}"
-            )
-        else:
-            self.num_timeseries_obs_dim = num_timeseries_obs_dim_list[0]
 
     def create_actors(self) -> None:
-        """Create stochastic actor networks for all agents."""
+        """
+        Creates stochastic actor networks for all agents.
+        Initializes the ActorPPO network and its optimizer for each agent strategy.
+        """
+        config = self.learning_config
+        ppo_config = getattr(config, "ppo", None)
+        actor_architecture = getattr(ppo_config, "actor_architecture", "mlp")
+
         for strategy in self.learning_role.rl_strats.values():
             # Create PPO Actor
-            strategy.actor = ActorPPO(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
-                float_type=self.float_type,
-            ).to(self.device)
+            if actor_architecture == "lstm":
+                strategy.actor = LSTMActorPPO(
+                    obs_dim=self.obs_dim,
+                    act_dim=self.act_dim,
+                    float_type=self.float_type,
+                    unique_obs_dim=self.unique_obs_dim,
+                    num_timeseries_obs_dim=strategy.num_timeseries_obs_dim,
+                ).to(self.device)
+            else:
+                strategy.actor = ActorPPO(
+                    obs_dim=self.obs_dim,
+                    act_dim=self.act_dim,
+                    float_type=self.float_type,
+                ).to(self.device)
 
             # Create Optimizer
             strategy.actor.optimizer = AdamW(
@@ -229,13 +130,14 @@ class PPO(RLAlgorithm):
 
     def create_critics(self) -> None:
         """
-        Create value networks for all agents.
+        Creates value networks for all agents.
+        Initializes the CriticPPO network (Centralized Critic) and its optimizer.
         """
         n_agents = len(self.learning_role.rl_strats)
 
         for strategy in self.learning_role.rl_strats.values():
             # Create value network
-            strategy.critic = CriticPPO(
+            strategy.critics = CriticPPO(
                 n_agents=n_agents,
                 obs_dim=self.obs_dim,
                 unique_obs_dim=self.unique_obs_dim,
@@ -243,19 +145,24 @@ class PPO(RLAlgorithm):
             ).to(self.device)
 
             # Create optimizer
-            strategy.critic.optimizer = AdamW(
-                strategy.critic.parameters(),
+            strategy.critics.optimizer = AdamW(
+                strategy.critics.parameters(),
                 lr=self.learning_role.calc_lr_from_progress(1),
             )
 
     def extract_policy(self) -> dict:
-        """Extract all actor and critic networks into a dictionary."""
+        """
+        Extract all actor and critic networks into a dictionary.
+
+        Returns:
+            dict: Dictionary with keys 'actors', 'critics', and dimension information.
+        """
         actors = {}
         critics = {}
 
         for u_id, strategy in self.learning_role.rl_strats.items():
             actors[u_id] = strategy.actor
-            critics[u_id] = strategy.critic
+            critics[u_id] = strategy.critics
 
         return {
             "actors": actors,
@@ -265,9 +172,20 @@ class PPO(RLAlgorithm):
             "unique_obs_dim": self.unique_obs_dim,
         }
 
+    # =========================================================================
+    # CORE TRAINING: POLICY UPDATE
+    # =========================================================================
+
     def update_policy(self) -> None:
         """
-        Update actor and critic networks.
+        Update actor and critic networks using proximal policy optimization (PPO).
+        Checks if enough data is collected (batch_size).
+        Computes Generalized Advantage Estimation (GAE) and Returns using the last value estimate.
+        Updates the Actor and Critic networks over multiple epochs (n_epochs) using mini-batches.
+        Calculates the surrogate objective with clipping (clip_range).
+        Calculates value function loss (MSE) and entropy bonus.
+        Logs metrics and gradients.
+        Clears the on-policy buffer after the update.
         """
         logger.debug("Updating Policy")
 
@@ -276,7 +194,7 @@ class PPO(RLAlgorithm):
 
         # Get rollout buffer
         rollout_buffer = self.learning_role.rollout_buffer
-        
+
         # Check if rollout buffer has data
         if rollout_buffer is None or rollout_buffer.pos == 0:
             logger.debug("Rollout buffer is empty, skipping policy update")
@@ -297,7 +215,7 @@ class PPO(RLAlgorithm):
         learning_rate = self.learning_role.calc_lr_from_progress(progress_remaining)
 
         for strategy in strategies:
-            for param_group in strategy.critic.optimizer.param_groups:
+            for param_group in strategy.critics.optimizer.param_groups:
                 param_group["lr"] = learning_rate
             for param_group in strategy.actor.optimizer.param_groups:
                 param_group["lr"] = learning_rate
@@ -313,16 +231,16 @@ class PPO(RLAlgorithm):
             # Use the LAST observation as the bootstrap for the REST of the buffer.
             # We sacrifice the last step (pos-1) to serve as s_{t+1} for the step before it.
             # This ensures V(s_{t+1}) is calculating using the REAL next state, not self-referential.
-            
+
             last_idx = buffer_size - 1
             last_obs = rollout_buffer.observations[last_idx]
             last_dones = rollout_buffer.dones[last_idx]
-            
+
             # Reduce buffer size by 1 so as to not train on the bootstrap step
             rollout_buffer.pos -= 1
             if rollout_buffer.full:
-                rollout_buffer.full = False # If it was full, it's not anymore
-                
+                rollout_buffer.full = False  # If it was full, it's not anymore
+
             # Prepare unique observations for centralized critic
             last_unique_obs = last_obs[:, self.obs_dim - self.unique_obs_dim :]
 
@@ -343,7 +261,7 @@ class PPO(RLAlgorithm):
                         dtype=self.float_type,
                     )
                     # Get value estimate from critic
-                    last_values[i] = strategy.critic(obs_tensor).cpu().numpy().flatten()[0]
+                    last_values[i] = strategy.critics(obs_tensor).cpu().numpy().flatten()[0]
                     dones[i] = last_dones[i]
 
         # Compute advantages and returns
@@ -353,12 +271,12 @@ class PPO(RLAlgorithm):
         all_actor_losses = []
         all_critic_losses = []
         all_entropy_losses = []
-        
+
         # Initialize unit_params for gradient logging
         # Use an empty list that will be dynamically extended
         unit_params = []
         step_count = 0
-        
+
         # Helper to create a new step entry
         def create_step_entry():
             return {
@@ -384,10 +302,10 @@ class PPO(RLAlgorithm):
 
                 for i, strategy in enumerate(strategies):
                     actor = strategy.actor
-                    critic = strategy.critic
+                    critic = strategy.critics
 
                     obs_i = batch.observations[:, i, :]
-                    
+
                     # Construct centralized state
                     other_unique_obs = th.cat(
                         (unique_obs_from_others[:, :i], unique_obs_from_others[:, i + 1 :]),
@@ -411,10 +329,7 @@ class PPO(RLAlgorithm):
                         advantages_i.std() + 1e-8
                     )
 
-                    log_probs, entropy = actor.evaluate_actions(
-                        obs_i,
-                        actions_i
-                    )
+                    log_probs, entropy = actor.evaluate_actions(obs_i, actions_i)
                     values = critic(all_states).flatten()
 
                     # Importance sampling ratio
@@ -435,7 +350,7 @@ class PPO(RLAlgorithm):
                         values_clipped = old_values_i + th.clamp(
                             values - old_values_i,
                             -self.clip_range_vf,
-                            self.clip_range_vf
+                            self.clip_range_vf,
                         )
                         value_loss_1 = F.mse_loss(values, returns_i)
                         value_loss_2 = F.mse_loss(values_clipped, returns_i)
@@ -453,14 +368,14 @@ class PPO(RLAlgorithm):
                     # Calculate gradient norms BEFORE clipping
                     actor_params = list(actor.parameters())
                     critic_params = list(critic.parameters())
-                    
+
                     actor_max_grad_norm = max(
                         (p.grad.norm().item() for p in actor_params if p.grad is not None),
-                        default=0.0
+                        default=0.0,
                     )
                     critic_max_grad_norm = max(
                         (p.grad.norm().item() for p in critic_params if p.grad is not None),
-                        default=0.0
+                        default=0.0,
                     )
 
                     # Gradient clipping
@@ -478,41 +393,30 @@ class PPO(RLAlgorithm):
                     all_actor_losses.append(policy_loss.item())
                     all_critic_losses.append(value_loss.item())
                     all_entropy_losses.append(entropy_loss.item())
-                    
+
                     # Ensure we have an entry for this step
                     if step_count >= len(unit_params):
                         unit_params.append(create_step_entry())
-                    
+
                     # Store per-unit gradient params for this step
                     unit_params[step_count][strategy.unit_id]["actor_loss"] = policy_loss.item()
                     unit_params[step_count][strategy.unit_id]["critic_loss"] = value_loss.item()
-                    unit_params[step_count][strategy.unit_id]["actor_total_grad_norm"] = actor_total_grad_norm.item() if isinstance(actor_total_grad_norm, th.Tensor) else actor_total_grad_norm
+                    unit_params[step_count][strategy.unit_id]["actor_total_grad_norm"] = (
+                        actor_total_grad_norm.item()
+                        if isinstance(actor_total_grad_norm, th.Tensor)
+                        else actor_total_grad_norm
+                    )
                     unit_params[step_count][strategy.unit_id]["actor_max_grad_norm"] = actor_max_grad_norm
-                    unit_params[step_count][strategy.unit_id]["critic_total_grad_norm"] = critic_total_grad_norm.item() if isinstance(critic_total_grad_norm, th.Tensor) else critic_total_grad_norm
+                    unit_params[step_count][strategy.unit_id]["critic_total_grad_norm"] = (
+                        critic_total_grad_norm.item()
+                        if isinstance(critic_total_grad_norm, th.Tensor)
+                        else critic_total_grad_norm
+                    )
                     unit_params[step_count][strategy.unit_id]["critic_max_grad_norm"] = critic_max_grad_norm
-                
+
                 step_count += 1
 
         self.n_updates += 1
-
-        # Log average metrics
-        # Log average metrics
-        # if self.learning_role.tensor_board_logger:
-        #     self.learning_role.tensor_board_logger.log_scalar(
-        #         "ppo/actor_loss", np.mean(all_actor_losses), self.n_updates
-        #     )
-        #     self.learning_role.tensor_board_logger.log_scalar(
-        #         "ppo/critic_loss", np.mean(all_critic_losses), self.n_updates
-        #     )
-        #     self.learning_role.tensor_board_logger.log_scalar(
-        #         "ppo/entropy_loss", np.mean(all_entropy_losses), self.n_updates
-        #     )
-        # if all_actor_losses:
-        #     logger.info(
-        #         f"PPO Update {self.n_updates} - Actor loss: {np.mean(all_actor_losses):.4f}, "
-        #         f"Critic loss: {np.mean(all_critic_losses):.4f}, "
-        #         f"Entropy loss: {np.mean(all_entropy_losses):.4f}"
-        #     )
 
         # Write gradient params to output
         self.learning_role.write_rl_grad_params_to_output(learning_rate, unit_params)

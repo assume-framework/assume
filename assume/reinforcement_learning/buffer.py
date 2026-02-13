@@ -187,16 +187,23 @@ class RolloutBufferSamples(NamedTuple):
 
 class RolloutBuffer:
     """
-    On-policy rollout buffer for PPO algorithm. This is different from TD3/DDPG which keep old data in a replay buffer. The buffer stores data for all the agents together.
+    Rollout buffer is used in on-policy algorithms like PPO.
 
-    buffer_size (int): maximum number of transitions the buffer can store before training.
-    obs_dim (int): dimension of the observation space.
-    act_dim (int): dimension of the action space.
-    n_rl_units (int): number of RL agents in the multi-agent system.
-    device (str | th.device): specifies the device for training.
-    float_type (th.dtype): precision of floating-point numbers.
-    gamma (float): discount factor for defining how much to value future rewards.
-    gae_lambda (float): GAE (Generalized Advantage Estimationn) smoothing parameter.
+    It corresponds to the transitions collected using the current policy.
+    This experience is discarded after the policy is updated.
+    In order to use PPO, the current observations are needed to be stored.
+    the observations include actions, rewards, values, log probabilities and done for each action.
+
+    Args:
+        buffer_size (int): Max number of elements allowed in the buffer
+        obs_dim (int): Dimension of the observation space
+        act_dim (int): Dimension of the action space
+        n_rl_units (int): Number of RL agents
+        device (str | th.device): PyTorch device config
+        float_type (th.dtype): Data type for floating point numbers
+        gamma (float): Discount factor
+        gae_lambda (float): bias-variance trade-off factor for Generalized Advantage Estimator
+    
     """
     
     def __init__(
@@ -229,7 +236,10 @@ class RolloutBuffer:
         self.reset()
 
     def reset(self) -> None:
-        """Clear the buffer and allocate new storage."""
+        """
+        Reset the rollout buffer. 
+        Clearing the buffer and allocating new storage.
+        """
         self.observations = np.zeros(
             (
                 self.buffer_size, 
@@ -304,7 +314,17 @@ class RolloutBuffer:
         value: np.ndarray,
         log_prob: np.ndarray
     ) -> None:
-        """Add a transition to the buffer."""
+        """
+        Add a transition to the buffer.
+        
+        Args:
+            obs (np.ndarray): Observation of the agents
+            action (np.ndarray): Action taken by the agents
+            reward (np.ndarray): Reward obtained
+            done (np.ndarray): Whether the episode ended
+            value (np.ndarray): Value estimate from the critic
+            log_prob (np.ndarray): Log probability of the action
+        """
         if self.pos >= self.buffer_size:
             self.full = True
             return
@@ -324,7 +344,14 @@ class RolloutBuffer:
         last_values: np.ndarray,
         dones: np.ndarray
     ) -> None:
-        """Compute GAE advantages and returns."""
+        """
+        Uses Generalized Advantage Estimation to compute the advantage. 
+        To obtain the lambda-return, the advantage is added to the value estiamte.
+
+        Args:
+            last_values (np.ndarray): value estimation for the last step
+            dones (np.ndarray): whether the last step was terminal
+        """
         # taking the final value estimates and episode-end flags,
         # and making them flat arrays providing one number per agent.
         last_values = np.array(last_values).flatten()
@@ -368,7 +395,15 @@ class RolloutBuffer:
         self,
         batch_size: int | None = None
     ) -> Generator[RolloutBufferSamples, None, None]:
-        """Generate batches of samples for training."""
+        """
+        Generator for generating batches of transition samples for training.
+        
+        Args:
+            batch_size (int | None): Number of samples to be accessed per batch.
+
+        Yields:
+            Generator[RolloutBufferSamples]: A generator yielding RolloutBufferSamples
+        """
         if not self.generator_ready:
             raise ValueError(
                 "Must call compute_returns_and_advantages before sampling."
@@ -387,7 +422,16 @@ class RolloutBuffer:
             start_idx += batch_size
 
     def _get_samples(self, indices: np.ndarray) -> RolloutBufferSamples:
-        """Convert numpy arrays to torch tensors for given indices."""
+        """
+        Helper function to sample data from the buffer.
+        Converts numpy arrays to torch tensors for given indices.
+        
+        Args:
+            indices (np.ndarray): Indices of the samples to retrieve.
+        
+        Returns:
+            RolloutBufferSamples: The batch of samples converted to PyTorch tensors.
+        """
         return RolloutBufferSamples(
             observations = th.as_tensor(
                 self.observations[indices],
@@ -422,5 +466,10 @@ class RolloutBuffer:
         )
     
     def size(self) -> int:
-        """Return current number of stored transitions."""
+        """
+        Return the current number of stored transitions.
+
+        Returns:
+            int: The size of the buffer.
+        """
         return self.buffer_size if self.full else self.pos

@@ -8,6 +8,8 @@ from torch.nn import functional as F
 
 from typing import List, Tuple, Type, Optional, Union
 
+from assume.reinforcement_learning.learning_utils import activation_function_limit
+
 
 class Critic(nn.Module):
     """
@@ -243,40 +245,19 @@ class Actor(nn.Module):
     Parent class for actor networks.
     """
 
-    activation_function_limit = {
-        "softsign": (-1, 1),
-        "tanh": (-1, 1),
-        "sigmoid": (0, 1),
-        "relu": (0, float("inf")),
-    }
-
-    activation_function_map = {
-        "softsign": F.softsign,
-        "tanh": th.tanh,
-        "sigmoid": th.sigmoid,
-        "relu": F.relu
-    }
-
     def __init__(self):
         super().__init__()
 
-        self.activation = "softsign" # or "tanh", "sigmoid", "relu"
+        self.activation = "softsign"  # or "tanh", "sigmoid", "relu"
 
-        if self.activation not in self.activation_function_limit:
+        if self.activation not in activation_function_limit:
             raise ValueError(
-                f"Activation '{self.activation}' not supported! Supported: {list(self.activation_function_limit.keys())}"
+                f"Activation '{self.activation}' not supported! Supported: {list(activation_function_limit.keys())}"
             )
-        
-        self.min_output, self.max_output = self.activation_function_limit[
-            self.activation
-        ]
 
-        self.activation_function = self.activation_function_map.get(self.activation)
-
-        if self.activation_function is None:
-            raise ValueError(
-                f"Activation '{self.activation}' not implemented in forward pass!"
-            )
+        self.min_output = activation_function_limit[self.activation]["min"]
+        self.max_output = activation_function_limit[self.activation]["max"]
+        self.activation_function = activation_function_limit[self.activation]["func"]
 
 
 class MLPActor(Actor):
@@ -399,20 +380,10 @@ class LSTMActor(Actor):
 
 
 class ActorPPO(nn.Module):
-    activation_function_limit = {
-        "softsign": (-1, 1),
-        "tanh": (-1, 1),
-        "sigmoid": (0, 1),
-        "relu": (0, float("inf")),
-    }
+    """
+    PPO Actor network with stochastic policy (Gaussian).
+    """
 
-    activation_function_map = {
-        "softsign": F.softsign,
-        "tanh": th.tanh,
-        "sigmoid": th.sigmoid,
-        "relu": F.relu
-    }
-    
     def __init__(
         self,
         obs_dim: int,
@@ -427,16 +398,15 @@ class ActorPPO(nn.Module):
         self.act_dim = act_dim
         self.float_type = float_type
 
-        self.activation = "softsign" # or "tanh", "sigmoid", "relu"
+        self.activation = "softsign"  # or "tanh", "sigmoid", "relu"
 
-        if self.activation not in self.activation_function_limit:
+        if self.activation not in activation_function_limit:
             raise ValueError(
-                f"Activation '{self.activation}' not supported! Supported: {list(self.activation_function_limit.keys())}"
+                f"Activation '{self.activation}' not supported! Supported: {list(activation_function_limit.keys())}"
             )
-        
-        self.min_output, self.max_output = self.activation_function_limit[
-            self.activation
-        ]
+
+        self.min_output = activation_function_limit[self.activation]["min"]
+        self.max_output = activation_function_limit[self.activation]["max"]
 
         # Policy network (outputs mean)
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
@@ -564,10 +534,139 @@ class ActorPPO(nn.Module):
         std: th.Tensor,
     ) -> th.Tensor:
         """Compute log probability of actions under Gaussian distribution."""
-        var = std.pow(2)
-        log_prob = -0.5 * (
-            ((actions - mean).pow(2) / var)
-            + 2 * th.log(std)
-            + th.log(th.tensor(2 * th.pi))
+        distribution = th.distributions.Normal(mean, std)
+        return distribution.log_prob(actions).sum(dim=-1)
+
+
+class LSTMActorPPO(ActorPPO):
+    """
+    PPO Actor network with LSTM architecture and stochastic policy (Gaussian).
+    """
+
+    def __init__(
+        self,
+        obs_dim: int,
+        act_dim: int,
+        float_type,
+        unique_obs_dim: int,
+        num_timeseries_obs_dim: int,
+        log_std_init: float = 0.0,
+        *args,
+        **kwargs,
+    ):
+        # Initialize ActorPPO params
+        nn.Module.__init__(self)  # Don't call ActorPPO.__init__ to avoid FC creation
+
+        self.act_dim = act_dim
+        self.float_type = float_type
+        self.unique_obs_dim = unique_obs_dim
+        self.num_timeseries_obs_dim = num_timeseries_obs_dim
+
+        self.activation = "softsign"
+        self.activation_function = activation_function_limit[self.activation]["func"]
+
+        # Compute timeseries length for LSTM
+        try:
+            self.timeseries_len = int(
+                (obs_dim - unique_obs_dim) / num_timeseries_obs_dim
+            )
+        except Exception as e:
+            raise ValueError(
+                f"Using LSTM but not providing correctly shaped timeseries: Expected integer as unique timeseries length, got {(obs_dim - unique_obs_dim) / num_timeseries_obs_dim} instead."
+            ) from e
+
+        # LSTM Layers
+        self.LSTM1 = nn.LSTMCell(num_timeseries_obs_dim, 8, dtype=float_type)
+        self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
+
+        # Fully Connected Layers
+        self.FC1 = nn.Linear(self.timeseries_len * 16 + unique_obs_dim, 128, dtype=float_type)
+        self.mean_layer = nn.Linear(128, act_dim, dtype=float_type)
+
+        # Learnable log standard deviation
+        self.log_std = nn.Parameter(
+            th.ones(act_dim, dtype=float_type) * log_std_init
         )
-        return log_prob.sum(dim=-1)
+
+        self._init_weights()
+
+    def _init_weights(self) -> None:
+        """Apply orthogonal initialization."""
+        def init_layer(m):
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=1.0)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.LSTMCell):
+                nn.init.orthogonal_(m.weight_ih, gain=1.0)
+                nn.init.orthogonal_(m.weight_hh, gain=1.0)
+                nn.init.zeros_(m.bias_ih)
+                nn.init.zeros_(m.bias_hh)
+        
+        self.apply(init_layer)
+        
+        # Initialize output layer with small gain
+        nn.init.orthogonal_(self.mean_layer.weight, gain=0.01)
+        nn.init.zeros_(self.mean_layer.bias)
+
+    def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        """Forward pass"""
+        if obs.dim() not in (1, 2):
+            raise ValueError(
+                f"LSTMCell: Expected input to be 1D or 2D, got {obs.dim()}D instead"
+            )
+
+        is_batched = obs.dim() == 2
+        if not is_batched:
+            obs = obs.unsqueeze(0)
+
+        # Split observation into time series and stationary parts
+        x1, x2 = obs.split(
+            [obs.shape[1] - self.unique_obs_dim, self.unique_obs_dim], dim=1
+        )
+        x1 = x1.reshape(-1, self.num_timeseries_obs_dim, self.timeseries_len)
+
+        # Initial hidden states
+        batch_size = x1.size(0)
+        h_t = th.zeros(batch_size, 8, dtype=self.float_type, device=obs.device)
+        c_t = th.zeros(batch_size, 8, dtype=self.float_type, device=obs.device)
+
+        h_t2 = th.zeros(batch_size, 16, dtype=self.float_type, device=obs.device)
+        c_t2 = th.zeros(batch_size, 16, dtype=self.float_type, device=obs.device)
+
+        outputs = []
+
+        # LSTM Loop
+        for time_step in x1.split(1, dim=2):
+            # x1 is (Batch, Features, Time) -> split on Time dim=2
+            # time_step is (Batch, Features, 1) -> reshape to (Batch, Features)
+            time_step = time_step.reshape(batch_size, self.num_timeseries_obs_dim)
+            h_t, c_t = self.LSTM1(time_step, (h_t, c_t))
+            h_t2, c_t2 = self.LSTM2(h_t, (h_t2, c_t2))
+            outputs.append(h_t2)
+
+        # Concatenate LSTM outputs
+        outputs = th.cat(outputs, dim=1)
+        
+        # Concatenate with stationary observations
+        x = th.cat((outputs, x2), dim=1)
+        
+        # FC Layers
+        x = F.relu(self.FC1(x))
+        mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
+
+        if not is_batched:
+            mean = mean.squeeze(0)
+
+        if deterministic:
+            return mean
+        
+        # Sample from Gaussian during training
+        log_std = self.log_std.expand_as(mean)
+        std = log_std.exp()  # Ensure positive
+        # Add small epsilon for numerical stability
+        std = std + 1e-6
+        noise = th.randn_like(mean)
+        action = mean + std * noise
+        
+        # Clamp to valid range
+        return th.clamp(action, -1.0, 1.0)

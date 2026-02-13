@@ -74,10 +74,10 @@ class TorchLearningStrategy(LearningStrategy):
 
             self.action_noise = NormalActionNoise(
                 mu=0.0,
-                sigma=self.learning_config.noise_sigma,
+                sigma=self.learning_config.off_policy.noise_sigma,
                 action_dimension=self.act_dim,
-                scale=self.learning_config.noise_scale,
-                dt=self.learning_config.noise_dt,
+                scale=self.learning_config.off_policy.noise_scale,
+                dt=self.learning_config.off_policy.noise_dt,
             )
 
             self.learning_role.register_strategy(self)
