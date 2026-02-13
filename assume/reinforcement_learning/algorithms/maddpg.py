@@ -75,7 +75,7 @@ class DDPG(A2CAlgorithm):
                 }
                 for u_id in self.learning_role.rl_strats.keys()
             }
-            for _ in range(self.learning_config.gradient_steps)
+            for _ in range(self.learning_config.off_policy.gradient_steps)
         ]
 
         # Update noise and learning rate schedules
@@ -91,7 +91,7 @@ class DDPG(A2CAlgorithm):
             strategy.action_noise.update_noise_decay(updated_noise_decay)
 
         # Main gradient step loop
-        for step in range(self.learning_config.gradient_steps):
+        for step in range(self.learning_config.off_policy.gradient_steps):
             self.n_updates += 1
 
             # Sample from replay buffer

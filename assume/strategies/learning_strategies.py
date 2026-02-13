@@ -22,6 +22,10 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
+from assume.common.base import (
+    is_off_policy,
+    is_on_policy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,13 +76,16 @@ class TorchLearningStrategy(LearningStrategy):
             # learning role overwrites this if loaded from file or after initial experience episodes
             self.collect_initial_experience_mode = True
 
-            self.action_noise = NormalActionNoise(
-                mu=0.0,
-                sigma=self.learning_config.off_policy.noise_sigma,
-                action_dimension=self.act_dim,
-                scale=self.learning_config.off_policy.noise_scale,
-                dt=self.learning_config.off_policy.noise_dt,
-            )
+            
+            if is_off_policy(self.algorithm):
+                self.action_noise = NormalActionNoise(
+                    mu=0.0,
+                    sigma=self.learning_config.off_policy.noise_sigma,
+                    action_dimension=self.act_dim,
+                    scale=self.learning_config.off_policy.noise_scale,
+                    dt=self.learning_config.off_policy.noise_dt,
+                )
+            # For on-policy algorithms, no action noise needed - variable remains undefined
 
             self.learning_role.register_strategy(self)
 
@@ -269,7 +276,8 @@ class TorchLearningStrategy(LearningStrategy):
         if self.learning_mode and not self.evaluation_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
-            if self.collect_initial_experience_mode:
+            # Only use initial experience collection for off-policy algorithms (not PPO)
+            if self.collect_initial_experience_mode and self.algorithm != "mappo":
                 # define current action as solely noise
                 noise = th.normal(
                     mean=0.0,
@@ -291,7 +299,7 @@ class TorchLearningStrategy(LearningStrategy):
                     self._last_value = th.tensor(0.0, device=self.device)
 
             else:
-                # Check if we're using PPO algorithm
+                # For PPO/MAPPO, always use the policy (no initial random exploration)
                 if self.algorithm == "mappo":
                     # PPO: use get_action_and_log_prob for proper stochastic sampling
                     curr_action, log_prob = self.actor.get_action_and_log_prob(next_observation.unsqueeze(0))

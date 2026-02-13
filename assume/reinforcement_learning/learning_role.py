@@ -12,7 +12,12 @@ import pandas as pd
 import torch as th
 from mango import Role
 
-from assume.common.base import LearningConfig, LearningStrategy
+from assume.common.base import (
+    LearningConfig,
+    LearningStrategy,
+    is_off_policy,
+    is_on_policy,
+)
 from assume.common.utils import (
     create_rrule,
     datetime2timestamp,
@@ -97,13 +102,15 @@ class Learning(Role):
                 self.calc_lr_from_progress = (
                     lambda x: self.learning_config.learning_rate
                 )
-
-            if self.learning_config.off_policy.action_noise_schedule == "linear":
-                self.calc_noise_from_progress = linear_schedule_func(
-                    self.learning_config.off_policy.noise_dt
-                )
-            else:
-                self.calc_noise_from_progress = lambda x: self.learning_config.off_policy.noise_dt
+            # Only set up noise schedule for off-policy algorithms
+            if is_off_policy(self.learning_config.algorithm):
+                if self.learning_config.off_policy.action_noise_schedule == "linear":
+                    self.calc_noise_from_progress = linear_schedule_func(
+                        self.learning_config.off_policy.noise_dt
+                    )
+                else:
+                    self.calc_noise_from_progress = lambda x: self.learning_config.off_policy.noise_dt
+            # For on-policy algorithms, no noise schedule needed
 
             self.eval_episodes_done = 0
 
@@ -215,15 +222,25 @@ class Learning(Role):
         training_episodes = self.learning_config.training_episodes
         validation_interval = min(training_episodes, default_interval)
 
-        min_required_episodes = (
-            self.learning_config.episodes_collecting_initial_experience
-            + validation_interval
-        )
-
-        if self.learning_config.training_episodes < min_required_episodes:
-            raise ValueError(
-                f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({self.learning_config.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
+        # Only check initial experience episodes for off-policy algorithms
+        if is_off_policy(self.learning_config.algorithm):
+            min_required_episodes = (
+                self.learning_config.off_policy.episodes_collecting_initial_experience
+                + validation_interval
             )
+            
+            if self.learning_config.training_episodes < min_required_episodes:
+                raise ValueError(
+                    f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({self.learning_config.off_policy.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
+                )
+        else:
+            # For on-policy algorithms, no initial experience collection needed
+            min_required_episodes = validation_interval
+            
+            if self.learning_config.training_episodes < min_required_episodes:
+                raise ValueError(
+                    f"Training episodes ({training_episodes}) must be greater than evaluation interval ({validation_interval})."
+                )
 
         return validation_interval
 
@@ -376,10 +393,15 @@ class Learning(Role):
                 reward = transform_buffer_data(cache["rewards"], device),
             )
 
-        if (
-            self.episodes_done
-            >= self.learning_config.episodes_collecting_initial_experience
-        ):
+        # Only update policy after initial experience for off-policy algorithms
+        if is_off_policy(self.learning_config.algorithm):
+            if (
+                self.episodes_done
+                >= self.learning_config.off_policy.episodes_collecting_initial_experience
+            ):
+                self.rl_algorithm.update_policy()
+        else:
+            # For on-policy algorithms, update policy immediately
             self.rl_algorithm.update_policy()
 
     def add_observation_to_cache(self, unit_id, start, observation) -> None:
@@ -467,11 +489,14 @@ class Learning(Role):
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
         # Disable initial exploration if initial experience collection is complete
-        if (
-            self.episodes_done
-            >= self.learning_config.episodes_collecting_initial_experience
-        ):
-            self.turn_off_initial_exploration()
+        # Only for off-policy algorithms
+        if is_off_policy(self.learning_config.algorithm):
+            if (
+                self.episodes_done
+                >= self.learning_config.off_policy.episodes_collecting_initial_experience
+            ):
+                self.turn_off_initial_exploration()
+        # For on-policy algorithms, no initial exploration to disable
 
         # In continue_learning mode, disable it only for loaded strategies
         elif self.learning_config.continue_learning:
@@ -521,28 +546,35 @@ class Learning(Role):
         total_duration = self.end - self.start
         elapsed_duration = self.context.current_timestamp - self.start
 
-        learning_episodes = (
-            self.learning_config.training_episodes
-            - self.learning_config.episodes_collecting_initial_experience
-        )
-
-        if (
-            self.episodes_done
-            < self.learning_config.episodes_collecting_initial_experience
-        ):
-            progress_remaining = 1
-        else:
-            progress_remaining = (
-                1
-                - (
-                    (
-                        self.episodes_done
-                        - self.learning_config.episodes_collecting_initial_experience
-                    )
-                    / learning_episodes
-                )
-                - ((1 / learning_episodes) * (elapsed_duration / total_duration))
+        # Only calculate progress for off-policy algorithms
+        if is_off_policy(self.learning_config.algorithm):
+            initial_experience_episodes = self.learning_config.off_policy.episodes_collecting_initial_experience
+            learning_episodes = (
+                self.learning_config.training_episodes
+                - initial_experience_episodes
             )
+
+            if (
+                self.episodes_done
+                < initial_experience_episodes
+            ):
+                progress_remaining = 1
+            else:
+                progress_remaining = (
+                    1
+                    - (
+                        (
+                            self.episodes_done
+                            - initial_experience_episodes
+                        )
+                        / learning_episodes
+                    )
+                    - ((1 / learning_episodes) * (elapsed_duration / total_duration))
+                )
+        else:
+            # For on-policy algorithms, simpler progress calculation
+            total_episodes = self.learning_config.training_episodes
+            progress_remaining = 1 - (self.episodes_done / total_episodes) - (elapsed_duration / total_duration)
 
         return progress_remaining
 
@@ -712,7 +744,11 @@ class Learning(Role):
             evaluation_mode=self.learning_config.evaluation_mode,
             episode=episode,
             eval_episode=eval_episode,
-            episodes_collecting_initial_experience=self.learning_config.episodes_collecting_initial_experience,
+            episodes_collecting_initial_experience=(
+                self.learning_config.off_policy.episodes_collecting_initial_experience
+                if is_off_policy(self.learning_config.algorithm)
+                else 0
+            ),
         )
 
         # Parameters required for sending data to the output role
@@ -786,25 +822,55 @@ class Learning(Role):
             Each dictionary maps critic names to their corresponding loss values.
         """
         # gradient steps performed in previous training episodes
-        gradient_steps_done = (
-            max(
-                self.episodes_done
-                - self.learning_config.episodes_collecting_initial_experience,
-                0,
+        if is_off_policy(self.learning_config.algorithm):
+            gradient_steps_done = (
+                max(
+                    self.episodes_done
+                    - self.learning_config.off_policy.episodes_collecting_initial_experience,
+                    0,
+                )
+                * int(
+                    (timestamp2datetime(self.end) - timestamp2datetime(self.start))
+                    / pd.Timedelta(self.learning_config.train_freq)
+                )
+                * self.learning_config.off_policy.gradient_steps
             )
-            * int(
-                (timestamp2datetime(self.end) - timestamp2datetime(self.start))
-                / pd.Timedelta(self.learning_config.train_freq)
+            current_gradient_steps = self.learning_config.off_policy.gradient_steps
+        else:
+            # For on-policy, no gradient steps concept - use 1 for calculation purposes
+            gradient_steps_done = 0
+            current_gradient_steps = 1
+
+        # Handle different parameter structures for on-policy vs off-policy
+        if self.learning_config.algorithm == "mappo":
+            # For PPO/MAPPO: unit_params_list length equals actual update steps
+            actual_gradient_steps = len(unit_params_list)
+            gradient_step_range = range(actual_gradient_steps)
+            # For on-policy, use simple step counting
+            base_step = self.update_steps * actual_gradient_steps
+        else:
+            # For off-policy: use configured gradient_steps
+            actual_gradient_steps = self.learning_config.off_policy.gradient_steps
+            gradient_step_range = range(actual_gradient_steps)
+            
+            # gradient steps performed in previous training episodes
+            gradient_steps_done = (
+                max(
+                    self.episodes_done
+                    - self.learning_config.off_policy.episodes_collecting_initial_experience,
+                    0,
+                )
+                * int(
+                    (timestamp2datetime(self.end) - timestamp2datetime(self.start))
+                    / pd.Timedelta(self.learning_config.train_freq)
+                )
+                * self.learning_config.off_policy.gradient_steps
             )
-            * self.learning_config.gradient_steps
-        )
+            base_step = gradient_steps_done + self.update_steps * actual_gradient_steps
 
         output_list = [
             {
-                "step": gradient_steps_done
-                + self.update_steps
-                * self.learning_config.gradient_steps  # gradient steps performed in current training episode
-                + gradient_step,
+                "step": base_step + gradient_step,
                 "unit": u_id,
                 "actor_loss": params["actor_loss"],
                 "actor_total_grad_norm": params["actor_total_grad_norm"],
@@ -814,7 +880,7 @@ class Learning(Role):
                 "critic_max_grad_norm": params["critic_max_grad_norm"],
                 "learning_rate": learning_rate,
             }
-            for gradient_step in range(self.learning_config.gradient_steps)
+            for gradient_step in gradient_step_range
             for u_id, params in unit_params_list[gradient_step].items()
         ]
 

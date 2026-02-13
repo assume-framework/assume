@@ -74,7 +74,7 @@ class TD3(A2CAlgorithm):
                 }
                 for u_id in self.learning_role.rl_strats.keys()
             }
-            for _ in range(self.learning_config.gradient_steps)
+            for _ in range(self.learning_config.off_policy.gradient_steps)
         ]
 
         # update noise decay and learning rate
@@ -97,7 +97,7 @@ class TD3(A2CAlgorithm):
             )
             strategy.action_noise.update_noise_decay(updated_noise_decay)
 
-        for step in range(self.learning_config.gradient_steps):
+        for step in range(self.learning_config.off_policy.gradient_steps):
             self.n_updates += 1
 
             transitions = self.learning_role.buffer.sample(

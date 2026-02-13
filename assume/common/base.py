@@ -772,6 +772,22 @@ class AlgorithmConfig:
     train_freq: str = "24h"
 
 
+# Algorithm category mapping
+ALGORITHM_CATEGORIES = {
+    "mappo": "on-policy",
+    "matd3": "off-policy", 
+    "maddpg": "off-policy"
+}
+
+def is_on_policy(algorithm_name: str) -> bool:
+    """Check if algorithm is on-policy."""
+    return ALGORITHM_CATEGORIES.get(algorithm_name) == "on-policy"
+
+def is_off_policy(algorithm_name: str) -> bool:
+    """Check if algorithm is off-policy."""
+    return ALGORITHM_CATEGORIES.get(algorithm_name) == "off-policy"
+
+
 @dataclass
 class OffPolicyConfig(AlgorithmConfig):
     """
@@ -795,18 +811,18 @@ class OffPolicyConfig(AlgorithmConfig):
         replay_buffer_size (int): The maximum number of transitions stored in the replay buffer. Default is 50000.
     """
 
-    episodes_collecting_initial_experience: int = 5
-    gradient_steps: int = 100
-    noise_dt: int = 1
-    noise_scale: int = 1
-    noise_sigma: float = 0.1
-    actor_architecture: str = "mlp"
-    action_noise_schedule: str | None = None
-    policy_delay: int = 2
-    tau: float = 0.005
-    target_policy_noise: float = 0.2
-    target_noise_clip: float = 0.5
-    replay_buffer_size: int = 50000
+    # episodes_collecting_initial_experience: int = 5
+    # gradient_steps: int = 100
+    # noise_dt: int = 1
+    # noise_scale: int = 1
+    # noise_sigma: float = 0.1
+    # actor_architecture: str = "mlp"
+    # action_noise_schedule: str | None = None
+    # policy_delay: int = 2
+    # tau: float = 0.005
+    # target_policy_noise: float = 0.2
+    # target_noise_clip: float = 0.5
+    # replay_buffer_size: int = 50000
 
 
 @dataclass
@@ -859,9 +875,6 @@ class LearningConfig:
 
         device (str): The device to use for PyTorch computations. Options include "cpu", "cuda", or specific
             CUDA devices like "cuda:0". Default is "cpu".
-        episodes_collecting_initial_experience (int): The number of episodes at the start during which random
-            actions are chosen instead of using the actor network. This helps populate the replay buffer with
-            diverse experiences. Default is 5.
         exploration_noise_std (float): The standard deviation of Gaussian noise added to actions during
             exploration in the environment. Higher values encourage more exploration. Default is 0.2.
         training_episodes (int): The number of training episodes, where one episode is the entire simulation
@@ -873,8 +886,6 @@ class LearningConfig:
         batch_size (int): The batch size of experiences sampled from the replay buffer for each training update.
             Larger batches provide more stable gradients but require more memory. In environments with many leanring agents we advise small batch sizes.
             Default is 128.
-        gradient_steps (int): The number of gradient descent steps performed during each training update.
-            More steps can lead to better learning but increase computation time. Default is 100.
         learning_rate (float): The learning rate (step size) for the optimizer, which controls how much the
             policy and value networks are updated during training. Default is 0.001.
         learning_rate_schedule (str | None): Which learning rate decay schedule to use. Currently only "linear"
@@ -888,8 +899,6 @@ class LearningConfig:
 
         algorithm (str): Specifies which reinforcement learning algorithm to use. Options include "matd3"
             (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient), "maddpg", and "mappo". Default is "matd3".
-        replay_buffer_size (int): The maximum number of transitions stored in the replay buffer for experience replay.
-            Larger buffers allow for more diverse training samples. Default is 500000.
         gamma (float): The discount factor for future rewards, ranging from 0 to 1. Higher values give more
             weight to long-term rewards in decision-making. Default is 0.99.
         actor_architecture (str): The architecture of the neural networks used for the actors. Options include
@@ -910,20 +919,17 @@ class LearningConfig:
     max_bid_price: float | None = 100.0
 
     device: str = "cpu"
-    episodes_collecting_initial_experience: int = 5
     exploration_noise_std: float = 0.2
     training_episodes: int = 100
     validation_episodes_interval: int = 5
     train_freq: str = "24h"
     batch_size: int = 128
-    gradient_steps: int = 100
     learning_rate: float = 0.001
     learning_rate_schedule: str | None = None
     early_stopping_steps: int | None = None
     early_stopping_threshold: float = 0.05
 
     algorithm: str = "matd3"
-    replay_buffer_size: int = 50000
     gamma: float = 0.99
     actor_architecture: str = "mlp"
 
@@ -948,29 +954,13 @@ class LearningConfig:
             
         self.off_policy.actor_architecture = self.actor_architecture
         self.on_policy.actor_architecture = self.actor_architecture
-        self.off_policy.episodes_collecting_initial_experience = self.episodes_collecting_initial_experience
-        self.off_policy.gradient_steps = self.gradient_steps
-        self.off_policy.replay_buffer_size = self.replay_buffer_size
 
         if self.early_stopping_steps is None:
             self.early_stopping_steps = int(
                 self.training_episodes / self.validation_episodes_interval + 1
             )
 
-        # if we do not have initial experience collected we will get an error as no samples are available on the
-        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
-        if self.episodes_collecting_initial_experience < 1:
-            logger.warning(
-                f"episodes_collecting_initial_experience need to be at least 1 to sample from buffer, got {self.episodes_collecting_initial_experience}. setting to 1"
-            )
-
-            self.episodes_collecting_initial_experience = 1
-
-        # check that gradient_steps is positive
-        if self.gradient_steps <= 0:
-            raise ValueError(
-                f"gradient_steps need to be positive, got {self.gradient_steps}"
-            )
+        # check that gradient_steps is positive (now checked in off_policy config)
 
 
 class LearningStrategy(BaseStrategy):

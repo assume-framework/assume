@@ -1142,7 +1142,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            >= world.learning_role.learning_config.episodes_collecting_initial_experience
+            >= world.learning_role.learning_config.off_policy.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.reset()
@@ -1190,7 +1190,7 @@ def run_learning(
         # save the policies after each episode in case the simulation is stopped or crashes
         if (
             episode
-            >= world.learning_role.learning_config.episodes_collecting_initial_experience
+            >= world.learning_role.learning_config.off_policy.episodes_collecting_initial_experience
             + validation_interval
         ):
             world.learning_role.rl_algorithm.save_params(
