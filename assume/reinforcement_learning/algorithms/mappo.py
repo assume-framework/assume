@@ -44,10 +44,10 @@ class PPO(A2CAlgorithm):
     def __init__(
         self,
         learning_role,
-        clip_range=0.1,
+        clip_range=0.2,
         clip_range_vf=0.1,
-        n_epochs=30,
-        entropy_coef=0.02,
+        n_epochs=50,
+        entropy_coef=0.05,
         vf_coef=1.0,
         max_grad_norm=0.5,
     ):
@@ -192,8 +192,8 @@ class PPO(A2CAlgorithm):
         strategies = list(self.learning_role.rl_strats.values())
         n_rl_agents = len(strategies)
 
-        # Get rollout buffer
-        rollout_buffer = self.learning_role.rollout_buffer
+        # Get buffer (will be RolloutBuffer for on-policy algorithms)
+        rollout_buffer = self.learning_role.buffer
 
         # Check if rollout buffer has data
         if rollout_buffer is None or rollout_buffer.pos == 0:
@@ -325,8 +325,11 @@ class PPO(A2CAlgorithm):
                     returns_i = batch.returns[:, i]
                     old_values_i = batch.old_values[:, i]
 
-                    advantages_i = (advantages_i - advantages_i.mean()) / (
-                        advantages_i.std() + 1e-8
+                    # Normalize advantages across the entire batch, not per-mini-batch
+                    # This provides more stable training
+                    advantages_flat = advantages_i.flatten()
+                    advantages_i = (advantages_i - advantages_flat.mean()) / (
+                        advantages_flat.std() + 1e-8
                     )
 
                     log_probs, entropy = actor.evaluate_actions(obs_i, actions_i)

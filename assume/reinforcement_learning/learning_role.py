@@ -61,9 +61,8 @@ class Learning(Role):
     ):
         super().__init__()
 
-        # how many learning roles do exist and how are they named
-        self.buffer: ReplayBuffer = None
-        self.rollout_buffer: RolloutBuffer = None # For on-policy algorithms (PPO)
+        # Single buffer that can be either ReplayBuffer (off-policy) or RolloutBuffer (on-policy)
+        self.buffer = None
         self.episodes_done = 0
         self.rl_strats: dict[int, LearningStrategy] = {}
         self.learning_config = learning_config
@@ -329,10 +328,9 @@ class Learning(Role):
                 )
                 return
 
-        # check which buffer type to use based on algorithm
-        if self.learning_config.algorithm == "mappo":
-            # for PPO use on-policy RolloutBuffer
-            # Add each transition to the rollout buffer
+        # Add data to buffer - type depends on algorithm category
+        if is_on_policy(self.learning_config.algorithm):
+            # For on-policy algorithms (PPO/MAPPO), use RolloutBuffer
             for timestamp in sorted(cache["obs"].keys()):
                 obs_data = transform_buffer_data(
                     {
@@ -375,17 +373,16 @@ class Learning(Role):
                 )
 
                 # Add to rollout buffer
-                if self.rollout_buffer is not None:
-                    self.rollout_buffer.add(
-                        obs = obs_data,
-                        action = actions_data,
-                        reward = rewards_data,
-                        done = dones_data,
-                        value = values_data,
-                        log_prob = log_probs_data
-                    )
+                self.buffer.add(
+                    obs = obs_data,
+                    action = actions_data,
+                    reward = rewards_data,
+                    done = dones_data,
+                    value = values_data,
+                    log_prob = log_probs_data
+                )
         else:
-            # for TD3/DDPG use off-policy ReplayBuffer
+            # For off-policy algorithms (TD3/DDPG), use ReplayBuffer
             # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
             self.buffer.add(
                 obs = transform_buffer_data(cache["obs"], device),
@@ -484,7 +481,6 @@ class Learning(Role):
         self.rl_eval = inter_episodic_data["all_eval"]
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
-        self.rollout_buffer = inter_episodic_data["rollout_buffer"]
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
@@ -517,7 +513,6 @@ class Learning(Role):
             "all_eval": self.rl_eval,
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
-            "rollout_buffer": self.rollout_buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
 

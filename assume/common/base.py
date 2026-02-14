@@ -811,18 +811,18 @@ class OffPolicyConfig(AlgorithmConfig):
         replay_buffer_size (int): The maximum number of transitions stored in the replay buffer. Default is 50000.
     """
 
-    # episodes_collecting_initial_experience: int = 5
-    # gradient_steps: int = 100
-    # noise_dt: int = 1
-    # noise_scale: int = 1
-    # noise_sigma: float = 0.1
-    # actor_architecture: str = "mlp"
-    # action_noise_schedule: str | None = None
-    # policy_delay: int = 2
-    # tau: float = 0.005
-    # target_policy_noise: float = 0.2
-    # target_noise_clip: float = 0.5
-    # replay_buffer_size: int = 50000
+    episodes_collecting_initial_experience: int = 5
+    gradient_steps: int = 100
+    noise_dt: int = 1
+    noise_scale: int = 1
+    noise_sigma: float = 0.1
+    actor_architecture: str = "mlp"
+    action_noise_schedule: str | None = None
+    policy_delay: int = 2
+    tau: float = 0.005
+    target_policy_noise: float = 0.2
+    target_noise_clip: float = 0.5
+    replay_buffer_size: int = 50000
 
 
 @dataclass

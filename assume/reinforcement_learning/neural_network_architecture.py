@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import numpy as np
 import torch as th
 from torch import nn
 from torch.nn import functional as F
@@ -223,11 +224,14 @@ class CriticPPO(Critic):
 
     def _init_weights(self) -> None:
         """
-        Apply Orthogonal initialization.
+        Apply Orthogonal initialization with appropriate gains.
         """
         def init_layer(m):
             if isinstance(m, nn.Linear):
-                nn.init.orthogonal_(m.weight, gain=1.0)
+                if m.out_features == 1:  # Output layer
+                    nn.init.orthogonal_(m.weight, gain=0.01)
+                else:  # Hidden layers
+                    nn.init.orthogonal_(m.weight, gain=np.sqrt(2))
                 nn.init.zeros_(m.bias)
         
         self.apply(init_layer)
@@ -421,15 +425,18 @@ class ActorPPO(nn.Module):
         self._init_weights()
 
     def _init_weights(self) -> None:
-        """Apply orthogonal initialization."""
+        """Apply orthogonal initialization with appropriate gains."""
         def init_layer(m):
             if isinstance(m, nn.Linear):
-                nn.init.orthogonal_(m.weight, gain=0.01)
+                if m.out_features == self.act_dim:  # Output layer (mean)
+                    nn.init.orthogonal_(m.weight, gain=0.01)
+                else:  # Hidden layers
+                    nn.init.orthogonal_(m.weight, gain=np.sqrt(2))
                 nn.init.zeros_(m.bias)
         
         # Initialize hidden layers with larger gain
-        nn.init.orthogonal_(self.FC1.weight, gain=1.0)
-        nn.init.orthogonal_(self.FC2.weight, gain=1.0)
+        nn.init.orthogonal_(self.FC1.weight, gain=np.sqrt(2))
+        nn.init.orthogonal_(self.FC2.weight, gain=np.sqrt(2))
         nn.init.zeros_(self.FC1.bias)
         nn.init.zeros_(self.FC2.bias)
         
