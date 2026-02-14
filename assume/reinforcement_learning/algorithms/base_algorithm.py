@@ -17,18 +17,37 @@ logger = logging.getLogger(__name__)
 
 
 class RLAlgorithm:
+    """Base reinforcement learning algorithm class.
+    
+    This is the foundation class for all Reinforcement Learning algorithms in the framework. 
+    To implement a custom RL algorithm, subclass this class and override the `update_policy` method.
+    
+    The class provides common functionality for:
+    - Learning rate scheduling
+    - Parameter saving/loading
+    - Device management
+    
+    Attributes:
+        learning_role: The learning role object containing configuration and strategies.
+        learning_config: Configuration parameters from the learning role.
+        device: The computation device (CPU/GPU) for tensors.
+        float_type: The floating point precision type for computations.
+        actor_architecture_class: The actor network architecture class.
+    
+    Example:
+        >>> class CustomAlgorithm(RLAlgorithm):
+        ...     def update_policy(self):
+        ...         # Custom policy update logic
+        ...         pass
     """
-    The base RL model class. To implement your own RL algorithm, you need to subclass this class and implement the `update_policy` method.
 
-    Args:
-        learning_role (Learning Role object): Learning object
-    """
-
-    def __init__(
-        self,
-        # init learning_role as object of Learning class
-        learning_role,
-    ):
+    def __init__(self, learning_role):
+        """Initialize the RL algorithm.
+        
+        Args:
+            learning_role: Learning role object containing configuration and strategies.
+                Must be an instance of the Learning class.
+        """
         super().__init__()
 
         self.learning_role = learning_role
@@ -51,17 +70,23 @@ class RLAlgorithm:
         optimizers: list[th.optim.Optimizer] | th.optim.Optimizer,
         learning_rate: float,
     ) -> None:
-        """
-        Update the optimizers learning rate using the current learning rate schedule and the current progress remaining (from 1 to 0).
-
+        """Update optimizer learning rates.
+        
+        Sets the learning rate for one or more optimizers. Handles both single
+        optimizers and lists of optimizers uniformly.
+        
         Args:
-            optimizers (List[th.optim.Optimizer] | th.optim.Optimizer): An optimizer or a list of optimizers.
-
+            optimizers: A single optimizer or list of optimizers to update.
+            learning_rate: The new learning rate value to set.
+        
         Note:
-            Adapted from SB3:
+            Adapted from Stable Baselines 3:
             - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/base_class.py#L286
             - https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L68
-
+        
+        Example:
+            >>> optimizer = AdamW(model.parameters(), lr=0.001)
+            >>> algorithm.update_learning_rate(optimizer, 0.0001)
         """
 
         if not isinstance(optimizers, list):
@@ -70,70 +95,128 @@ class RLAlgorithm:
             for param_group in optimizer.param_groups:
                 param_group["lr"] = learning_rate
 
-    def update_policy(self):
+    def update_policy(self) -> None:
+        """Update the policy parameters.
+        
+        This method must be overridden by subclasses to implement the specific
+        policy update logic for each RL algorithm. The base implementation raises
+        an error to enforce this requirement.
+        
+        Raises:
+            NotImplementedError: If called on the base class without override.
+        
+        Example:
+            >>> class CustomAlgorithm(RLAlgorithm):
+            ...     def update_policy(self):
+            ...         # Implement algorithm-specific policy update
+            ...         pass
+        """
         logger.error(
-            "No policy update function of the used Rl algorithm was defined. Please define how the policies should be updated in the specific algorithm you use"
+            "No policy update function of the used RL algorithm was defined. "
+            "Please define how the policies should be updated in the specific "
+            "algorithm you use."
         )
 
     def load_obj(self, directory: str):
-        """
-        Load an object from a specified directory.
-
-        This method loads an object, typically saved as a checkpoint file, from the specified
-        directory and returns it. It uses the `torch.load` function and specifies the device for loading.
-
+        """Load a serialized object from directory.
+        
+        Loads a PyTorch serialized object from the specified directory path.
+        The object is loaded onto the device specified by the algorithm's configuration.
+        
         Args:
-            directory (str): The directory from which the object should be loaded.
-
+            directory: Path to the directory containing the serialized object.
+                Should point to a valid .pt file.
+        
         Returns:
-            object: The loaded object.
+            object: The deserialized Python object.
+        
+        Example:
+            >>> model_state = algorithm.load_obj('/path/to/checkpoint.pt')
         """
         return th.load(directory, map_location=self.device, weights_only=True)
 
     def load_params(self, directory: str) -> None:
-        """
-        Load learning params - abstract method to be implemented by the Learning Algorithm
+        """Load learning parameters from disk.
+        
+        Abstract method that should be implemented by subclasses to load
+        algorithm-specific parameters from the specified directory.
+        
+        Args:
+            directory: Path to the directory containing saved parameters.
+        
+        Note:
+            This is an abstract method that must be overridden by subclasses.
         """
 
 
 class A2CAlgorithm(RLAlgorithm):
-    """
-    The base A2C model class for actor-critic algorithms.
-    Provides shared save/load/initialize functionality for MATD3, MADDPG, and MAPPO.
-
-    Args:
-        learning_role (Learning Role object): Learning object
+    """Base actor-critic algorithm class.
+    
+    Provides shared functionality for actor-critic reinforcement learning algorithms
+    including parameter management, network initialization, and saving/loading utilities.
+    This serves as the foundation for algorithms like MATD3, MADDPG, and MAPPO.
+    
+    The class handles:
+    - Actor and critic network creation and management
+    - Target network synchronization (when applicable)
+    - Parameter saving and loading
+    - Weight transfer between different agent configurations
     
     Attributes:
-        uses_target_networks (bool): Whether this algorithm uses target networks.
+        uses_target_networks: Whether this algorithm uses target networks.
             TD3 and DDPG use target networks (True), PPO does not (False).
+    
+    Example:
+        >>> class ActorCriticAlgorithm(A2CAlgorithm):
+        ...     def update_policy(self):
+        ...         # Custom actor-critic update logic
+        ...         pass
     """
 
-    # Class attribute - subclasses can override
+    #: Whether this algorithm uses target networks for stability.
+    #: TD3 and DDPG use target networks (True), PPO does not (False).
     uses_target_networks: bool = True
 
-    def __init__(
-        self,
-        learning_role,
-    ):
+    def __init__(self, learning_role):
+        """Initialize the actor-critic algorithm.
+        
+        Args:
+            learning_role: Learning role object containing configuration and strategies.
+        """
         super().__init__(learning_role)
 
-    def save_params(self, directory):
-        """
-        Save the parameters of both actor and critic networks.
-
+    def save_params(self, directory: str) -> None:
+        """Save actor and critic network parameters.
+        
+        Saves both actor and critic network parameters to separate subdirectories.
+        Creates the directory structure if it doesn't exist.
+        
         Args:
-            directory (str): The base directory for saving the parameters.
+            directory: Base directory path where parameters will be saved.
+                Will create 'actors/' and 'critics/' subdirectories.
+        
+        Example:
+            >>> algorithm.save_params('/path/to/save/directory')
+            # Creates:
+            # /path/to/save/directory/actors/
+            # /path/to/save/directory/critics/
         """
         self.save_critic_params(directory=f"{directory}/critics")
         self.save_actor_params(directory=f"{directory}/actors")
 
-    def save_critic_params(self, directory):
-        """
-        Save the parameters of critic networks.
-
+    def save_critic_params(self, directory: str) -> None:
+        """Save critic network parameters.
+        
+        Saves critic networks, their optimizers, and target critics (if applicable)
+        for all registered learning strategies. Also saves agent ID ordering information
+        to ensure proper loading.
+        
         Args:
-            directory (str): The base directory for saving the parameters.
+            directory: Directory path where critic parameters will be saved.
+                Will be created if it doesn't exist.
+        
+        Example:
+            >>> algorithm.save_critic_params('/path/to/critics/')
         """
         os.makedirs(directory, exist_ok=True)
         for u_id, strategy in self.learning_role.rl_strats.items():
@@ -155,12 +238,18 @@ class A2CAlgorithm(RLAlgorithm):
         with open(map_path, "w") as f:
             json.dump(mapping, f, indent=2)
 
-    def save_actor_params(self, directory):
-        """
-        Save the parameters of actor networks.
-
+    def save_actor_params(self, directory: str) -> None:
+        """Save actor network parameters.
+        
+        Saves actor networks, their optimizers, and target actors (if applicable)
+        for all registered learning strategies.
+        
         Args:
-            directory (str): The base directory for saving the parameters.
+            directory: Directory path where actor parameters will be saved.
+                Will be created if it doesn't exist.
+        
+        Example:
+            >>> algorithm.save_actor_params('/path/to/actors/')
         """
         os.makedirs(directory, exist_ok=True)
         for u_id, strategy in self.learning_role.rl_strats.items():
@@ -176,22 +265,36 @@ class A2CAlgorithm(RLAlgorithm):
             th.save(obj, path)
 
     def load_params(self, directory: str) -> None:
-        """
-        Load the parameters of both actor and critic networks.
-
+        """Load actor and critic network parameters.
+        
+        Loads both actor and critic parameters from the specified directory.
+        Calls load_critic_params() and load_actor_params() sequentially.
+        
         Args:
-            directory (str): The directory from which the parameters should be loaded.
+            directory: Base directory containing 'actors/' and 'critics/' subdirectories.
+        
+        Example:
+            >>> algorithm.load_params('/path/to/saved/parameters/')
         """
         self.load_critic_params(directory)
         self.load_actor_params(directory)
 
     def load_critic_params(self, directory: str) -> None:
-        """
-        Load critic, target_critic, and optimizer states for each agent strategy.
-        If agent count differs between saved and current model, performs weight transfer for both networks.
+        """Load critic network parameters.
+        
+        Loads critic networks, target critics (if applicable), and optimizer states
+        for each registered agent strategy. Handles cases where the number of agents
+        differs between saved and current models by performing intelligent weight transfer.
         
         Args:
-            directory (str): The directory from which the parameters should be loaded.
+            directory: Base directory containing the 'critics/' subdirectory.
+        
+        Note:
+            Automatically handles agent count mismatches through weight transfer.
+            Preserves the order of agents using saved mapping information.
+        
+        Example:
+            >>> algorithm.load_critic_params('/path/to/saved/parameters/')
         """
         logger.info("Loading critic parameters...")
 
@@ -285,11 +388,16 @@ class A2CAlgorithm(RLAlgorithm):
                 logger.warning(f"Failed to load critic for {u_id}: {e}")
 
     def load_actor_params(self, directory: str) -> None:
-        """
-        Load the parameters of actor networks from a specified directory.
-
+        """Load actor network parameters.
+        
+        Loads actor networks, target actors (if applicable), and optimizer states
+        for each registered agent strategy from the specified directory.
+        
         Args:
-            directory (str): The directory from which the parameters should be loaded.
+            directory: The directory containing the 'actors/' subdirectory where the parameters should be loaded.
+        
+        Example:
+            >>> algorithm.load_actor_params('/path/to/saved/parameters/')
         """
         logger.info("Loading actor parameters...")
         if not os.path.exists(directory):
@@ -325,8 +433,17 @@ class A2CAlgorithm(RLAlgorithm):
         If `actors_and_critics` is provided, it assigns existing networks to the respective attributes.
 
         Args:
-            actors_and_critics (dict): The actor and critic networks to be assigned.
-
+            actors_and_critics: Optional dictionary containing pre-trained networks.
+                If None, creates new networks. If provided, assigns existing networks.
+                Expected format includes 'actors', 'critics', and optionally
+                'actor_targets' and 'target_critics' keys.
+        
+        Example:
+            >>> # Create new networks
+            >>> algorithm.initialize_policy()
+            >>> 
+            >>> # Assign existing networks
+            >>> algorithm.initialize_policy(existing_networks_dict)
         """
         if actors_and_critics is None:
             self.check_strategy_dimensions()
@@ -347,10 +464,25 @@ class A2CAlgorithm(RLAlgorithm):
             self.unique_obs_dim = actors_and_critics["unique_obs_dim"]
 
     def check_strategy_dimensions(self) -> None:
-        """
-        Iterate over all learning strategies and check if the dimensions of observations and actions are the same.
-        Also check if the unique observation dimensions are the same. If not, raise a ValueError.
-        This is important for centralized critic algorithms, as it uses a centralized critic that requires consistent dimensions across all agents.
+        """Validate learning strategy dimensions.
+        
+        Ensures all registered learning strategies have consistent dimensional
+        properties required for centralized critic algorithms. Checks:
+        - Observation dimensions
+        - Action dimensions
+        - Unique observation dimensions
+        - Timeseries observation dimensions
+        - Foresight parameters
+        If not consistent, raises a ValueError. This is important for centralized
+        critic algorithms, as it uses a centralized critic that requires consistent
+        dimensions across all agents.
+        
+        Raises:
+            ValueError: If any dimension mismatch is detected across strategies.
+        
+        Note:
+            This validation is crucial for centralized critic algorithms where
+            all agents must have compatible observation and action spaces.
         """
         foresight_list = []
         obs_dim_list = []
@@ -402,16 +534,19 @@ class A2CAlgorithm(RLAlgorithm):
             self.obs_dim = obs_dim_list[0]
 
     def create_actors(self) -> None:
-        """
-        Create actor networks for reinforcement learning for each unit strategy.
-
-        This method initializes actor networks and their corresponding target networks for each unit strategy.
-        The actors are designed to map observations to action probabilities in a reinforcement learning setting.
-
+        """Create actor networks for all learning strategies.
+        
+        This method initializes actor networks and their corresponding target networks for
+        each registered unit strategy. Actors map observations to actions.
+        
         Note:
-            The observation dimension need to be the same, due to the centralized critic that all actors share.
-            If you have units with different observation dimensions. They need to have different critics and hence learning roles.
-
+            All strategies must have the same observation dimension due to the
+            centralized critic architecture. Units with different observation
+            dimensions require separate learning roles with different critics.
+        
+        Example:
+            >>> algorithm.create_actors()
+            >>> # Creates actor and actor_target for each strategy
         """
 
         for strategy in self.learning_role.rl_strats.values():
@@ -444,14 +579,19 @@ class A2CAlgorithm(RLAlgorithm):
             strategy.actor.loaded = False
 
     def create_critics(self) -> None:
-        """
-        Create critic networks for reinforcement learning.
-
-        This method initializes critic networks for each agent in the reinforcement learning setup.
-
+        """Create critic networks for all learning strategies.
+        
+        Initializes critic networks and their corresponding target networks for
+        each registered agent strategy. Critics evaluate state-action pairs.
+        
         Note:
-            The observation dimension need to be the same, due to the centralized critic that all actors share.
-            If you have units with different observation dimensions. They need to have different critics and hence learning roles.
+            All strategies must have the same observation dimension due to the
+            centralized critic architecture. Units with different observation
+            dimensions require separate learning roles with different critics.
+        
+        Example:
+            >>> algorithm.create_critics()
+            >>> # Creates critics and target_critics for each strategy
         """
         n_agents = len(self.learning_role.rl_strats)
 
@@ -483,15 +623,22 @@ class A2CAlgorithm(RLAlgorithm):
             )
 
     def extract_policy(self) -> dict:
-        """
-        Extract actor and critic networks.
-
-        This method extracts the actor and critic networks associated with each learning strategy and organizes them into a
-        dictionary structure. The extracted networks include actors, actor_targets, critics, and target_critics. The resulting
-        dictionary is typically used for saving and sharing these networks.
-
+        """Extract all policy networks.
+        
+        Collects actor and critic networks from all learning strategies into
+        a structured dictionary. Includes both primary and target networks.
+        
         Returns:
-            dict: The extracted actor and critic networks.
+            Dictionary containing all network components organized by type:
+                - 'actors': Primary actor networks
+                - 'actor_targets': Target actor networks
+                - 'critics': Primary critic networks
+                - 'target_critics': Target critic networks
+                - Dimension information for reconstruction
+        
+        Example:
+            >>> policy_dict = algorithm.extract_policy()
+            >>> # Contains all networks ready for saving or transfer
         """
         actors = {}
         actor_targets = {}
