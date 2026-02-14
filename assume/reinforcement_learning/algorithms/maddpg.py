@@ -17,27 +17,38 @@ logger = logging.getLogger(__name__)
 
 
 class DDPG(A2CAlgorithm):
+    """Deep Deterministic Policy Gradient (DDPG) Algorithm.
+    
+    An off-policy actor-critic algorithm that uses deterministic policy gradients
+    for continuous action spaces. DDPG combines Q-learning with policy gradients,
+    using:
+    
+    - A single critic network to estimate Q-values
+    - Deterministic actor networks that map states to actions
+    - Target networks updated via Polyak averaging for stability
+    - Replay buffer for sample efficiency and decorrelation
+    
+    Unlike TD3, DDPG updates the actor at every training step without delay.
+    
+    Attributes:
+        n_updates: Counter for gradient updates performed.
+        grad_clip_norm: Maximum gradient norm for clipping.
+        critic_architecture_class: Critic network architecture (CriticDDPG).
+    
+    Example:
+        >>> ddpg = DDPG(learning_role)
+        >>> ddpg.update_policy()  # Performs one training iteration
     """
-    Deep Deterministic Policy Gradient (DDPG) Algorithm.
 
-    An off-policy actor-critic algorithm using deterministic policy gradients.
-    It uses a single critic network and updates the actor at every training step.
-    Target networks are updated using Polyak averaging to stabilize the learning
-    process. It is designed for environments with continuous action
-    spaces by combining the benefits of Q-learning and policy gradients. It
-    utilizes a replay buffer to break correlations between consecutive samples
-    and improve sample efficiency.
-
-    Args:
-        learning_role (LearningRole): The central learning role managing the agents and buffer.
-    """
-
-    def __init__(self, learning_role):
-        """
-        Initialize DDPG algorithm.
+    def __init__(self, learning_role) -> None:
+        """Initialize the DDPG algorithm.
+        
+        Sets up the algorithm with gradient counters, clipping parameters,
+        and critic architecture.
         
         Args:
-            learning_role (LearningRole): The learning role object.
+            learning_role: Learning role object managing agents and replay buffer.
+                Must have off-policy configuration.
         """
         super().__init__(learning_role)
         
@@ -51,18 +62,21 @@ class DDPG(A2CAlgorithm):
         self.critic_architecture_class = CriticDDPG
 
     def update_policy(self) -> None:
-        """
-        Update actor and critic networks using the DDPG algorithm.
-        Performs sampling from replay buffer. Updates the critic (MSE Loss).
-        Updates the Actor (Policy Gradient). Updates the target networks using
-        polyak update.
+        """Update actor and critic networks using DDPG algorithm.
+        
+        Performs one complete training iteration consisting of:
+        1. Sampling batches from replay buffer
+        2. Updating critic networks using MSE loss
+        3. Updating actor networks using policy gradient
+        4. Updating target networks via Polyak averaging
+        
         """
         logger.debug("Updating Policy (MADDPG/DDPG)")
 
         strategies = list(self.learning_role.rl_strats.values())
         n_rl_agents = len(strategies)
 
-        # Initialize metrics storage
+        # Initialize metrics storage for gradient logging
         unit_params = [
             {
                 u_id: {
@@ -78,11 +92,12 @@ class DDPG(A2CAlgorithm):
             for _ in range(self.learning_config.off_policy.gradient_steps)
         ]
 
-        # Update noise and learning rate schedules
+        # Update noise decay and learning rate based on training progress
         progress_remaining = self.learning_role.get_progress_remaining()
         updated_noise_decay = self.learning_role.calc_noise_from_progress(progress_remaining)
         learning_rate = self.learning_role.calc_lr_from_progress(progress_remaining)
 
+        # Update learning rates and noise schedules for all strategies
         for strategy in strategies:
             self.update_learning_rate(
                 [strategy.critics.optimizer, strategy.actor.optimizer],
@@ -90,11 +105,11 @@ class DDPG(A2CAlgorithm):
             )
             strategy.action_noise.update_noise_decay(updated_noise_decay)
 
-        # Main gradient step loop
+        # Perform gradient updates for specified number of steps
         for step in range(self.learning_config.off_policy.gradient_steps):
             self.n_updates += 1
 
-            # Sample from replay buffer
+            # Sample transition batch from replay buffer
             transitions = self.learning_role.buffer.sample(
                 self.learning_config.batch_size
             )
@@ -106,7 +121,7 @@ class DDPG(A2CAlgorithm):
                 transitions.rewards,
             )
 
-            # Compute target actions (no smoothing noise in DDPG)
+            # Compute target actions using target actors
             with th.no_grad():
                 next_actions = th.stack([
                     strategy.actor_target(next_states[:, i, :]).clamp(-1, 1)
@@ -117,7 +132,7 @@ class DDPG(A2CAlgorithm):
 
             all_actions = actions.view(self.learning_config.batch_size, -1)
 
-            # Precompute observation slices
+            # Extract unique observations for centralized critic construction
             unique_obs_from_others = states[
                 :, :, self.obs_dim - self.unique_obs_dim :
             ].reshape(self.learning_config.batch_size, n_rl_agents, -1)
@@ -126,9 +141,9 @@ class DDPG(A2CAlgorithm):
                 :, :, self.obs_dim - self.unique_obs_dim :
             ].reshape(self.learning_config.batch_size, n_rl_agents, -1)
 
-            # =================================================================
-            # CRITIC UPDATE
-            # =================================================================
+            # ------------------------------------------------------------
+            # CRITIC UPDATE PHASE
+            # ------------------------------------------------------------
             for strategy in strategies:
                 strategy.critics.optimizer.zero_grad(set_to_none=True)
 
@@ -194,9 +209,9 @@ class DDPG(A2CAlgorithm):
                 unit_params[step][strategy.unit_id]["critic_total_grad_norm"] = total_norm
                 unit_params[step][strategy.unit_id]["critic_max_grad_norm"] = max_grad_norm
 
-            # =================================================================
-            # ACTOR UPDATE (every step, no delay in DDPG)
-            # =================================================================
+            # ------------------------------------------------------------
+            # ACTOR UPDATE PHASE (updated every step)
+            # ------------------------------------------------------------
             for strategy in strategies:
                 strategy.actor.optimizer.zero_grad(set_to_none=True)
 
@@ -247,9 +262,9 @@ class DDPG(A2CAlgorithm):
                 unit_params[step][strategy.unit_id]["actor_total_grad_norm"] = total_norm
                 unit_params[step][strategy.unit_id]["actor_max_grad_norm"] = max_grad_norm
 
-            # =================================================================
-            # TARGET NETWORK UPDATES (Polyak averaging)
-            # =================================================================
+            # ------------------------------------------------------------
+            # TARGET NETWORK UPDATE PHASE (Polyak averaging)
+            # ------------------------------------------------------------
             all_critic_params = []
             all_target_critic_params = []
             all_actor_params = []
@@ -272,5 +287,5 @@ class DDPG(A2CAlgorithm):
                 self.learning_config.off_policy.tau,
             )
 
-        # Log metrics
+        # Log gradient parameters and metrics to output
         self.learning_role.write_rl_grad_params_to_output(learning_rate, unit_params)
