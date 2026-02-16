@@ -8,6 +8,7 @@ import torch as th
 from torch.nn import functional as F
 
 from assume.reinforcement_learning.algorithms.base_algorithm import A2CAlgorithm
+from assume.reinforcement_learning.algorithms.base_algorithm import A2CAlgorithm
 from assume.reinforcement_learning.learning_utils import (
     polyak_update,
 )
@@ -16,6 +17,7 @@ from assume.reinforcement_learning.neural_network_architecture import CriticTD3
 logger = logging.getLogger(__name__)
 
 
+class TD3(A2CAlgorithm):
 class TD3(A2CAlgorithm):
     """
     Twin Delayed Deep Deterministic Policy Gradients (TD3).
@@ -56,6 +58,7 @@ class TD3(A2CAlgorithm):
 
         """
 
+        logger.debug("Updating Policy (TD3)")
         logger.debug("Updating Policy (TD3)")
 
         # Stack strategies for easier access

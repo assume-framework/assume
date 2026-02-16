@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+import numpy as np
 import pandas as pd
 import torch as th
 from mango import Role
@@ -24,6 +25,8 @@ from assume.common.utils import (
     timestamp2datetime,
 )
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
+from assume.reinforcement_learning.algorithms.maddpg import DDPG
+from assume.reinforcement_learning.algorithms.mappo import PPO
 from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.algorithms.maddpg import DDPG
 from assume.reinforcement_learning.algorithms.mappo import PPO
@@ -134,6 +137,10 @@ class Learning(Role):
             self.all_rewards = defaultdict(lambda: defaultdict(list))
             self.all_regrets = defaultdict(lambda: defaultdict(list))
             self.all_profits = defaultdict(lambda: defaultdict(list))
+            # PPO algorithm specific caches for on-policy learning
+            self.all_values = defaultdict(lambda: defaultdict(list))
+            self.all_log_probs = defaultdict(lambda: defaultdict(list))
+            self.all_dones = defaultdict(lambda: defaultdict(list))
             # PPO algorithm specific caches for on-policy learning
             self.all_values = defaultdict(lambda: defaultdict(list))
             self.all_log_probs = defaultdict(lambda: defaultdict(list))
@@ -266,6 +273,10 @@ class Learning(Role):
         current_values = self.all_values
         current_log_probs = self.all_log_probs
         current_dones = self.all_dones
+        # PPO specific caches
+        current_values = self.all_values
+        current_log_probs = self.all_log_probs
+        current_dones = self.all_dones
 
         # Reset cache dicts immediately with new defaultdicts
         self.all_obs = defaultdict(lambda: defaultdict(list))
@@ -274,6 +285,10 @@ class Learning(Role):
         self.all_noises = defaultdict(lambda: defaultdict(list))
         self.all_regrets = defaultdict(lambda: defaultdict(list))
         self.all_profits = defaultdict(lambda: defaultdict(list))
+        # PPO specific resets
+        self.all_values = defaultdict(lambda: defaultdict(list))
+        self.all_log_probs = defaultdict(lambda: defaultdict(list))
+        self.all_dones = defaultdict(lambda: defaultdict(list))
         # PPO specific resets
         self.all_values = defaultdict(lambda: defaultdict(list))
         self.all_log_probs = defaultdict(lambda: defaultdict(list))
@@ -412,7 +427,7 @@ class Learning(Role):
         """
         self.all_obs[start][unit_id].append(observation)
 
-    def add_actions_to_cache(self, unit_id, start, action, noise) -> None:
+    def add_actions_to_cache(self, unit_id, start, action, extra_info) -> None:
         """
         Add the action and noise to the cache dict, per unit_id.
 
@@ -431,7 +446,15 @@ class Learning(Role):
             return
 
         self.all_actions[start][unit_id].append(action)
-        self.all_noises[start][unit_id].append(noise)
+
+        if isinstance(extra_info, th.Tensor) and extra_info.shape == action.shape:
+            self.all_noises[start][unit_id].append(extra_info)  # It's noise
+        else:
+            self.all_log_probs[start][unit_id].append(
+                extra_info["log_probs"]
+            )  # It's log_probs and other stuff
+            self.all_values[start][unit_id].append(extra_info["value"])
+            self.all_dones[start][unit_id].append(float(extra_info["done"]))
 
     def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
         """
@@ -481,6 +504,7 @@ class Learning(Role):
         self.rl_eval = inter_episodic_data["all_eval"]
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
         self.buffer = inter_episodic_data["buffer"]
+        self.rollout_buffer = inter_episodic_data["rollout_buffer"]
 
         self.initialize_policy(inter_episodic_data["actors_and_critics"])
 
@@ -513,6 +537,7 @@ class Learning(Role):
             "all_eval": self.rl_eval,
             "avg_all_eval": self.avg_rewards,
             "buffer": self.buffer,
+            "rollout_buffer": self.rollout_buffer,
             "actors_and_critics": self.rl_algorithm.extract_policy(),
         }
 
@@ -585,6 +610,10 @@ class Learning(Role):
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(learning_role=self)
+        elif algorithm == "maddpg":
+            self.rl_algorithm = DDPG(learning_role=self)
+        elif algorithm == "mappo":
+            self.rl_algorithm = PPO(learning_role=self)
         elif algorithm == "maddpg":
             self.rl_algorithm = DDPG(learning_role=self)
         elif algorithm == "mappo":

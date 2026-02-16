@@ -4,6 +4,7 @@
 
 import warnings
 from typing import NamedTuple, Generator
+from typing import NamedTuple, Generator
 
 import numpy as np
 import torch as th
