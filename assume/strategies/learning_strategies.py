@@ -487,9 +487,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
-        # Depending on the algorithm, we call specific function that passes obs through actor and generates actions
-        # extra_info is either noise (MATD3) or log_probs (PPO)
-        actions, extra_info = self.get_actions(self, next_observation)
+        actions, noise = self.get_actions(next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -818,9 +816,7 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
         # =============================================================================
         # 2. Get the Actions, based on the observations
         # =============================================================================
-        # Depending on the algorithm, we call specific function that passes obs through actor and generates actions
-        # extra_info is either noise (MATD3) or log_probs (PPO)
-        actions, extra_info = self.get_actions(self, next_observation)
+        actions, noise = self.get_actions(next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -1015,9 +1011,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         # =============================================================================
         # Get the Actions, based on the observations
         # =============================================================================
-        # Depending on the algorithm, we call specific function that passes obs through actor and generates actions
-        # extra_info is either noise (MATD3) or log_probs (PPO)
-        actions, extra_info = self.get_actions(self, next_observation)
+        actions, noise = self.get_actions(next_observation)
 
         # =============================================================================
         # 3. Transform Actions into bids
@@ -1063,9 +1057,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
             )
 
         if self.learning_mode:
-            self.learning_role.add_actions_to_cache(
-                self.unit_id, start, actions, extra_info
-            )
+            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
 
         return bids
 

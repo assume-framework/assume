@@ -22,10 +22,6 @@ class Critic(nn.Module):
         act_dim: Dimension of action per agent
         float_type: Data type for parameters
         unique_obs_dim: Dimension of agent-specific observations
-        obs_dim (int): Dimension of observation per agent
-        act_dim: Dimension of action per agent
-        float_type: Data type for parameters
-        unique_obs_dim: Dimension of agent-specific observations
     """
     def __init__(
         self,
@@ -37,7 +33,6 @@ class Critic(nn.Module):
     ):
         super().__init__()
 
-        # Calculate total (centralized) dimensions
         # Calculate total (centralized) dimensions
         self.obs_dim = obs_dim + unique_obs_dim * (n_agents - 1)
         self.act_dim = act_dim * n_agents
@@ -60,11 +55,7 @@ class Critic(nn.Module):
         return hidden_sizes
 
     def _build_q_network(self) -> nn.ModuleList:
-        return hidden_sizes
-
-    def _build_q_network(self) -> nn.ModuleList:
         """
-        Dynamically create a Q-network given the chosen hidden layer sizes.
         Dynamically create a Q-network given the chosen hidden layer sizes.
         """
         layers = nn.ModuleList()
@@ -72,9 +63,6 @@ class Critic(nn.Module):
             self.obs_dim + self.act_dim
         ) # Input includes all observations and actions
 
-        for h in self.hidden_sizes:
-            layers.append(nn.Linear(input_dim, h, dtype=self.float_type))
-            layers.append(nn.ReLU())
         for h in self.hidden_sizes:
             layers.append(nn.Linear(input_dim, h, dtype=self.float_type))
             layers.append(nn.ReLU())
@@ -136,10 +124,8 @@ class CriticTD3(Critic):
 
         # Compute Q1
         x1 = nn.Sequential(*self.q1_layers)(xu)
-        x1 = nn.Sequential(*self.q1_layers)(xu)
 
         # Compute Q2
-        x2 = nn.Sequential(*self.q2_layers)(xu)
         x2 = nn.Sequential(*self.q2_layers)(xu)
 
         return x1, x2
@@ -281,7 +267,6 @@ class Actor(nn.Module):
 class MLPActor(Actor):
     """
     The neural network for the MLP actor.
-    The neural network for the MLP actor.
     """
 
     def __init__(self, obs_dim: int, act_dim: int, float_type, *args, **kwargs):
@@ -315,7 +300,6 @@ class MLPActor(Actor):
 
 class LSTMActor(Actor):
     """
-    The LSTM recurrent neural network for the actor.
     The LSTM recurrent neural network for the actor.
 
     Based on "Multi-Period and Multi-Spatial Equilibrium Analysis in Imperfect Electricity Markets"
@@ -382,7 +366,6 @@ class LSTMActor(Actor):
         outputs = []
 
         for time_step in x1.split(1, dim=2):
-            time_step = time_step.reshape(-1, self.num_timeseris_obs_dim)
             time_step = time_step.reshape(-1, self.num_timeseris_obs_dim)
             h_t, c_t = self.LSTM1(time_step, (h_t, c_t))
             h_t2, c_t2 = self.LSTM2(h_t, (h_t2, c_t2))

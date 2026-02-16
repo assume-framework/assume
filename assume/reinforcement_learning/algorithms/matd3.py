@@ -8,7 +8,6 @@ import torch as th
 from torch.nn import functional as F
 
 from assume.reinforcement_learning.algorithms.base_algorithm import A2CAlgorithm
-from assume.reinforcement_learning.algorithms.base_algorithm import A2CAlgorithm
 from assume.reinforcement_learning.learning_utils import (
     polyak_update,
 )
@@ -57,7 +56,6 @@ class TD3(A2CAlgorithm):
 
         """
 
-        logger.debug("Updating Policy (TD3)")
         logger.debug("Updating Policy (TD3)")
 
         # Stack strategies for easier access

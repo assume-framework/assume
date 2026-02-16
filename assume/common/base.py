@@ -5,7 +5,6 @@
 import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -878,6 +877,10 @@ class LearningConfig:
             CUDA devices like "cuda:0". Default is "cpu".
         exploration_noise_std (float): The standard deviation of Gaussian noise added to actions during
             exploration in the environment. Higher values encourage more exploration. Default is 0.2.
+        training_episodes (int): The number of training episodes, where one episode is the entire simulation
+            horizon specified in the general config. Default is 100.
+        validation_episodes_interval (int): The interval (in episodes) at which validation episodes are run
+            to evaluate the current policy's performance without training updates. Default is 5.
         train_freq (str): Defines the frequency in time steps at which the actor and critic networks are updated.
             Accepts time strings like "24h" for 24 hours or "1d" for 1 day. Default is "24h".
         batch_size (int): The batch size of experiences sampled from the replay buffer for each training update.

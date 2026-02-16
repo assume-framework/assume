@@ -18,29 +18,31 @@ base:
     algorithm: matd3
     learning_rate: 0.001
     training_episodes: 100
+    actor_architecture: mlp
+    train_freq: 100h
+    batch_size: 128
+    gamma: 0.99
     device: cpu
     validation_episodes_interval: 5
-    matd3:
-      actor_architecture: mlp
-      batch_size: 64
+    
+    # Off-policy parameters (required for TD3/DDPG algorithms)
+    off_policy:
       episodes_collecting_initial_experience: 3
-      gamma: 0.99
       gradient_steps: 10
-      noise_dt: 1
-      noise_scale: 1
-      noise_sigma: 0.1
-      action_noise_schedule: linear
-      train_freq: 24h
-    ppo:
-      actor_architecture: dist
-      batch_size: 11
-      clip_ratio: 0.05
-      entropy_coef: 0.005
-      gae_lambda: 0.95
       gamma: 0.99
-      max_grad_norm: 0.3
-      train_freq: 33h
-      vf_coef: 0.75
+      noise_sigma: 0.1
+      noise_scale: 1
+      action_noise_schedule: linear
+      noise_dt: 1
+      replay_buffer_size: 10000
+    
+    # On-policy parameters (required for PPO/MAPPO algorithms)
+    on_policy:
+      clip_ratio: 0.2
+      entropy_coef: 0.01
+      vf_coef: 0.5
+      gae_lambda: 0.95
+      n_epochs: 25
 
   markets_config:
     EOM:
@@ -88,6 +90,25 @@ base_lstm:
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
     actor_architecture: lstm
+    
+    # Off-policy parameters
+    off_policy:
+      episodes_collecting_initial_experience: 5
+      gradient_steps: 24
+      gamma: 0.99
+      noise_sigma: 0.1
+      noise_scale: 1
+      action_noise_schedule: linear
+      noise_dt: 1
+      replay_buffer_size: 10000
+    
+    # On-policy parameters
+    on_policy:
+      clip_ratio: 0.2
+      entropy_coef: 0.01
+      vf_coef: 0.5
+      gae_lambda: 0.95
+      n_epochs: 25
 
   markets_config:
     EOM:
@@ -133,6 +154,25 @@ tiny:
     noise_dt: 1
     validation_episodes_interval: 5
     actor_architecture: mlp
+    
+    # Off-policy parameters
+    off_policy:
+      episodes_collecting_initial_experience: 3
+      gradient_steps: 24
+      gamma: 0.99
+      noise_sigma: 0.1
+      noise_scale: 1
+      action_noise_schedule: linear
+      noise_dt: 1
+      replay_buffer_size: 10000
+    
+    # On-policy parameters
+    on_policy:
+      clip_ratio: 0.2
+      entropy_coef: 0.01
+      vf_coef: 0.5
+      gae_lambda: 0.95
+      n_epochs: 25
 
   markets_config:
     EOM:
