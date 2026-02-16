@@ -15,9 +15,6 @@ from assume.reinforcement_learning.learning_utils import activation_function_lim
 class Critic(nn.Module):
     """
     Base Critic class handling architecture generation and initialization.
-class Critic(nn.Module):
-    """
-    Base Critic class handling architecture generation and initialization.
 
     Args:
         n_agents (int): Number of agents
