@@ -790,7 +790,7 @@ def get_supported_solver(default_solver: str | None = None):
     if solver not in solvers:
         logger.warning("Solver %s not available, using %s", solver, solvers[0])
         solver = solvers[0]
-
+    # TODO check: when gurobi in param_dict but not in solvers, no warning is printed
     return solver
 
 

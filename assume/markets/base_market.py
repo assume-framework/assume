@@ -641,6 +641,7 @@ class MarketRole(MarketMechanism, Role):
         except Exception as e:
             logger.error("clearing failed: %s", e)
             raise e
+        # TODO mit gurobi complex clearing kommt hier Too many open files
 
         self.all_orders = []
 
