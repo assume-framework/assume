@@ -586,8 +586,8 @@ def load_config_and_create_forecaster(
         fuel_prices_df.index = index[:1]
         fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
 
-    buses = load_file(path=path, config=config, file_name="buses")
-    lines = load_file(path=path, config=config, file_name="lines")
+    #buses = load_file(path=path, config=config, file_name="buses")
+    #lines = load_file(path=path, config=config, file_name="lines")
     
     forecast_algorithms = config.get("forecast_algorithms", {})
 

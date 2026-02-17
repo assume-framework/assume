@@ -99,7 +99,7 @@ def calculate_sum_demand(
 
     return sum_demand
 
-@lru_cache(maxsize=1000)
+#@lru_cache(maxsize=1000)
 def calculate_naive_price(
     index: ForecastIndex,
     units: list[BaseUnit],
@@ -189,7 +189,7 @@ def calculate_naive_price(
     return price_forecasts
 
 
-@lru_cache(maxsize=100)
+#@lru_cache(maxsize=100)
 def calculate_naive_residual_load(
     index: ForecastIndex,
     units: list[BaseUnit],
@@ -252,7 +252,7 @@ def extract_buses_and_lines(market_configs: list[MarketConfig]):
     
     return buses, lines
 
-@lru_cache(maxsize=100)
+#@lru_cache(maxsize=100)
 def calculate_naive_congestion_forecast(
     index: ForecastIndex,
     units: list[BaseUnit],
@@ -356,7 +356,7 @@ def calculate_naive_congestion_forecast(
 
     return node_congestion_signal
 
-@lru_cache(maxsize=100)
+#@lru_cache(maxsize=100)
 def calculate_naive_renewable_utilisation(
     index: ForecastIndex,
     units: list[BaseUnit],
@@ -466,28 +466,33 @@ class UnitForecaster:
     ):
         """
         """
+
+        # 1. Get price forecast
         price_forecast_algorithm = price_forecast_algorithms.get(
             self.forecast_algorithms.get("price"),
             calculate_naive_price
         )
-        self.price = price_forecast_algorithm(
-            self.index,
-            units,
-            market_configs,
-            forecast_df,
-        )
+        if price_forecast_algorithm is not None:  # None if one wants to keep forecasts
+            self.price = price_forecast_algorithm(
+                self.index,
+                units,
+                market_configs,
+                forecast_df,
+            )
         self.price = self._dict_to_series(self.price)
 
+        # 2. Get residual load forecast
         residual_load_forecast_algorithm = residual_load_forecast_algorithms.get(
             self.forecast_algorithms.get("residual_load"),
             calculate_naive_residual_load
         )
-        self.residual_load = residual_load_forecast_algorithm(
-            self.index,
-            units,
-            market_configs,
-            forecast_df,
-        )
+        if residual_load_forecast_algorithm is not None:  # None if one wants to keep forecasts
+            self.residual_load = residual_load_forecast_algorithm(
+                self.index,
+                units,
+                market_configs,
+                forecast_df,
+            )
         self.residual_load = self._dict_to_series(self.residual_load)
 
     def update(self, args1, args2):
@@ -621,38 +626,45 @@ class DsmUnitForecaster(UnitForecaster):
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
     ):
-        # Get default price and residual load forecast
+        # Get 1. price and 2. residual load forecast
         super(UnitForecaster).initialize(
             units,
             market_configs,
             forecast_df,
         )
 
+        # 3. Get electricity price forecast
         # TODO how to handle other markets?
         self.electricity_price = self.price_forecast.get("price_EOM")
-        
+
+
+        # 4. Get congestion signal forecast
         congestion_signal_forecast_algorithm = congestion_signal_forecast_algorithms.get(
             self.forecast_algorithms.get("congestion_signal"),
             calculate_naive_congestion_signal
         )
-        self.congestion_signal = congestion_signal_forecast_algorithm(
-            self.index,
-            units,
-            market_configs,
-            forecast_df,
-        )
+        if congestion_signal_forecast_algorithm is not None:  # None if one wants to keep forecasts
+            self.congestion_signal = congestion_signal_forecast_algorithm(
+                self.index,
+                units,
+                market_configs,
+                forecast_df,
+            )
         self.congestion_signal = self._dict_to_series(self.congestion_signal)
 
+
+        # 5. Get renewable utilization forecast
         renewable_utilization_forecast_algorithm = renewable_utilization_forecast_algorithms.get(
             self.forecast_algorithms.get("renewable_utilization"),
             renewable_utilization_congestion_signal
         )
-        self.renewable_utilization = renewable_utilization_forecast_algorithm(
-            self.index,
-            units,
-            market_configs,
-            forecast_df,
-        )
+        if congestion_signal_forecast_algorithm is not None:  # None if one wants to keep forecasts
+            self.renewable_utilization = renewable_utilization_forecast_algorithm(
+                self.index,
+                units,
+                market_configs,
+                forecast_df,
+            )
         self.renewable_utilization = self._dict_to_series(self.renewable_utilization)
 
 
@@ -889,20 +901,24 @@ class ExchangeForecaster(UnitForecaster):
 
 price_forecast_algorithms: dict[str, Callable] = {
     "price_naive_forecast": calculate_naive_price,
-    "default_test": lambda index, *args: {"EOM", FastSeries(index=index, value=50)}
+    "default_test": lambda index, *args: {"EOM", FastSeries(index=index, value=50)},
+    "keep_given": None,
 }
 
 residual_load_forecast_algorithms: dict[str, Callable] = {
     "residual_load_naive_forecast": calculate_naive_residual_load,
     "default_test": lambda *args: {},
+    "keep_given": None,
 }
 
 congestion_signal_forecast_algorithms: dict[str, Callable] = {
     "congestion_signal_naive_forecast": calculate_naive_congestion_forecast,
     "default_test": lambda index, *args: FastSeries(index=self.index, value=0.0),
+    "keep_given": None,
 }
 
 renewable_utilization_forecast_algorithms: dict[str, Callable] = {
     "renewable_utilization_naive_forecast": calculate_naive_renewable_utilisation,
     "default_test": lambda index, *args: FastSeries(index=self.index, value=0.0),
+    "keep_given": None,
 }
