@@ -5,6 +5,8 @@
 import logging
 from datetime import timedelta
 from operator import itemgetter
+import contextlib
+import sys
 
 import pandas as pd
 import pyomo.environ as pyo
@@ -209,6 +211,16 @@ def market_clearing_opt_objective(model: pyo.ConcreteModel, orders: Orderbook):
 
     model.objective = pyo.Objective(expr=obj_expr, sense=pyo.minimize)
 
+class DummyFile(object):
+    def write(self, x): pass
+    
+    def flush(self): pass
+@contextlib.contextmanager
+def nostdout():
+    save_stdout = sys.stdout
+    sys.stdout = DummyFile()
+    yield
+    sys.stdout = save_stdout
 
 def market_clearing_opt(
     orders: Orderbook,
@@ -295,7 +307,8 @@ def market_clearing_opt(
             instance.x[bid_id].domain = pyo.Reals
 
         # Resolve the model
-        results = solver_obj.solve(instance, options=solver_options)
+        with nostdout():
+            results = solver_obj.solve(instance, options=solver_options)
 
     return instance, results
 
