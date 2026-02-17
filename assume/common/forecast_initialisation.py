@@ -110,6 +110,7 @@ class ForecastInitialisation:
                 )
                 continue
             price_forecasts[market_id] = self._forecasts.get(f"price_{market_id}")
+            price_forecasts[f'{market_id}_msv'] = self._forecasts.get("msv")
             if price_forecasts[market_id] is None:
                 # calculate if not present
                 forecast = self.calculate_market_price_forecast(market_id)

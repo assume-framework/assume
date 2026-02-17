@@ -484,6 +484,25 @@ def calculate_price_average(current_time, foresight, price_forecast):
 
     return average_price
 
+def calculate_msv_average(current_time, foresight, msv_forecast):
+    """
+    Calculates the expected system benefit from dispatch / storing energy
+    based on the marginal storage value (MSV) of the timesteps for a given foresight.
+
+    Args:
+        current_time (datetime.datetime): The current time.
+        foresight (datetime.timedelta): The foresight.
+        msv_forecast (FastSeries): The marginal storage value forecast. (to be provided by the user)
+        The MSV can be extracted e.g. from optimization models as the dual variable of the storage balance constraint.
+    Returns:
+        float: The expected system benefit.
+    """
+    start = max(current_time - foresight, msv_forecast.index[0])
+    end = min(current_time + foresight, msv_forecast.index[-1])
+
+    msv_average = np.round(np.mean(msv_forecast.loc[start:end]), 5)
+
+    return msv_average
 
 def get_specific_revenue(unit, marginal_cost, t, foresight, price_forecast):
     """
