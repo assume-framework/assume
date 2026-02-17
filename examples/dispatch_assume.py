@@ -15,8 +15,37 @@ os.makedirs("./examples/local_db", exist_ok=True)
 
 scenario = {
     "simple": {"scenario": "simple", "study_case": "base_case"},
+    "simple_complex": {"scenario":"simple", "study_case":"complex_clearing"},
     "simple_with_storage": {"scenario":"simple_with_storage", "study_case":"base_case"},
+    "simple_with_storage_complex": {"scenario":"simple_with_storage", "study_case":"complex_clearing"},
+    "simple_with_storage_24h": {"scenario":"simple_with_storage", "study_case":"cc_24h_foresight"},
+    "simple_with_storage_48h": {"scenario":"simple_with_storage", "study_case":"cc_48h_foresight"},
+    "simple_with_storage_336h": {"scenario":"simple_with_storage", "study_case":"cc_336h_foresight"},
+    "simple_with_storage_8760h": {"scenario":"simple_with_storage", "study_case":"cc_8760h_foresight"},
+    "simple_with_storage_price" : {"scenario":"simple_with_storage_forecast", "study_case":"price"},
+    "simple_with_storage_cc_price" : {"scenario":"simple_with_storage_forecast", "study_case":"cc_price"},
+    "simple_with_storage_cc_price_24h" : {"scenario":"simple_with_storage_forecast", "study_case":"cc_price_24h_foresight"},
+    "simple_with_storage_cc_price_48h" : {"scenario":"simple_with_storage_forecast", "study_case":"cc_price_48h_foresight"},
+    "simple_with_storage_cc_price_336h" : {"scenario":"simple_with_storage_forecast", "study_case":"cc_price_336h_foresight"},
+    "simple_with_storage_cc_price_8760h" : {"scenario":"simple_with_storage_forecast", "study_case":"cc_price_8760h_foresight"},
+    
+    "simple_with_storage_opt_price" : {"scenario":"simple_with_storage_opt", "study_case":"price"},
+    "simple_with_storage_opt_cc_price" : {"scenario":"simple_with_storage_opt", "study_case":"cc_price"},
+    "simple_with_storage_opt_cc_price_24h" : {"scenario":"simple_with_storage_opt", "study_case":"cc_price_24h_foresight"},
+    "simple_with_storage_opt_cc_price_48h" : {"scenario":"simple_with_storage_opt", "study_case":"cc_price_48h_foresight"},
+    "simple_with_storage_opt_cc_price_336h" : {"scenario":"simple_with_storage_opt", "study_case":"cc_price_336h_foresight"},
+    "simple_with_storage_opt_cc_price_8760h" : {"scenario":"simple_with_storage_opt", "study_case":"cc_price_8760h_foresight"},
+
     "stylized": {"scenario":"stylized", "study_case":"base_case"},
+    "stylized_complex": {"scenario":"stylized", "study_case":"complex_clearing"},
+
+    "stylized_forecast_price": {"scenario":"stylized_forecast", "study_case":"price"},
+    "stylized_forecast_cc_price": {"scenario":"stylized_forecast", "study_case":"cc_price"},
+    "stylized_forecast_cc_price_24h": {"scenario":"stylized_forecast", "study_case":"cc_price_24h_foresight"},
+    
+    "stylized_opt_price": {"scenario":"stylized_opt", "study_case":"price"},
+    "stylized_opt_cc_price": {"scenario":"stylized_opt", "study_case":"cc_price"},
+    "stylized_opt_cc_price_24h": {"scenario":"stylized_opt", "study_case":"cc_price_24h_foresight"},
 }
 
 
@@ -30,7 +59,7 @@ if __name__ == "__main__":
 
     data_format = "timescale"  # "local_db" or "timescale"
 
-    example = "simple_with_storage"
+    example = "stylized_opt_cc_price_24h"  # "simple", "simple_complex", "simple_with_storage", "simple_with_storage_complex", "stylized"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
