@@ -37,6 +37,7 @@ from assume.strategies.portfolio_strategies import (
     UnitsOperatorDirectStrategy,
     UnitsOperatorEnergyHeuristicCournotStrategy,
 )
+from assume.strategies.optimization_storage import StorageEnergyOptimizationStrategy
 
 # TODO remove after a few releases
 deprecated_bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
@@ -90,6 +91,7 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "industry_energy_naive_redispatch": DsmEnergyNaiveRedispatchStrategy,
     "powerplant_energy_optimization_dmas": EnergyOptimizationDmasStrategy,
     "storage_energy_optimization_dmas": StorageEnergyOptimizationDmasStrategy,
+    "storage_energy_optimization": StorageEnergyOptimizationStrategy,
     "units_operator_energy_heuristic_cournot": UnitsOperatorEnergyHeuristicCournotStrategy,
     "units_operator_direct": UnitsOperatorDirectStrategy,
     "powerplant_energy_naive_profile": EnergyNaiveProfileStrategy,
