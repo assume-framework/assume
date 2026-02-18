@@ -126,6 +126,12 @@ available_examples = {
         "scenario": "example_06b",  
         "study_case": "base",
     },
+    "use_case_steel_6b_EL20.41": {"scenario": "steel_example_06b_EL20.41", "study_case": "base"},
+    "use_case_steel_6b_EL18.7": {"scenario": "steel_example_06b_EL18.7", "study_case": "base"},
+    "use_case_steel_6b_EL13.75": {"scenario": "steel_example_06b_EL13.75", "study_case": "base"},
+    "use_case_steel_6b_HN20.41": {"scenario": "steel_example_06b_HN20.41", "study_case": "base"},
+    "use_case_steel_6b_HN18.7": {"scenario": "steel_example_06b_HN18.7", "study_case": "base"},
+    "use_case_steel_6b_HN13.75": {"scenario": "steel_example_06b_HN13.75", "study_case": "base"},
 }
 
 
@@ -152,8 +158,14 @@ if __name__ == "__main__":
     # list of examples you want to run
     examples_to_run = [
         # "redisp_storage_3_nodes",
-        "use_case_O45H2",
+        # "use_case_O45strom",
         # "cement_plant_use_case",
+        "use_case_steel_6b_EL20.41",
+        "use_case_steel_6b_EL18.7",
+        "use_case_steel_6b_EL13.75",
+        "use_case_steel_6b_HN20.41",
+        "use_case_steel_6b_HN18.7",
+        "use_case_steel_6b_HN13.75",
     ]
     # examples_to_run = [example]
 

@@ -119,10 +119,10 @@ class DSMFlex:
             self.determine_optimal_operation_without_flex(switch_flex_off=False)
 
         # Modify the model to include the flexibility measure constraints
-        if self.flexibility_measure in DSMFlex.flexibility_map:
-            DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
-        else:
-            raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
+        # if self.flexibility_measure in DSMFlex.flexibility_map:
+        #     DSMFlex.flexibility_map[self.flexibility_measure](self, self.model)
+        # else:
+        #     raise ValueError(f"Unknown flexibility measure: {self.flexibility_measure}")
 
     def define_sets(self) -> None:
         """
@@ -837,10 +837,10 @@ class DSMFlex:
         #Cement Plot plots
         self.plot_1(instance, save_name=f"{self.id}_BAU", out_dir="./outputs", show=False)
         self.plot_capacity_products(instance, save_name=f"{self.id}_capacity", out_dir="./outputs", show=False) 
-        self.dashboard_cement(instance,
-                            baseline_instance=instance,   # or None
-                            html_path=f"./outputs/{self.id}_dashboard.html",
-                            sankey_max_steps=168)
+        # self.dashboard_cement(instance,
+        #                     baseline_instance=instance,   # or None
+        #                     html_path=f"./outputs/{self.id}_dashboard.html",
+        #                     sankey_max_steps=168)
 
     def determine_optimal_operation_with_flex(self):
         """

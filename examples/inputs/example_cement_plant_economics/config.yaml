@@ -4,7 +4,7 @@
 
 base:
   start_date: 2035-01-01 00:00
-  end_date: 2035-01-10 23:00
+  end_date: 2035-12-31 23:00
   time_step: 1h
   save_frequency_hours: 24
 
