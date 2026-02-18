@@ -52,7 +52,7 @@ learning = [
     "tensorboard >=2.7.0",
 ]
 network = [
-    "pypsa",
+    "pypsa<1.1.0",
 ]
 oeds = [
     "demandlib >=0.1.9",
