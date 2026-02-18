@@ -135,7 +135,7 @@ def calculate_naive_price(
             continue
 
         # 1. Sort units by type and filter for units with bidding strategy for the given market_id
-        powerplant_units, demand_units, exchange_units, storage_units, dsm_units = sort_units(
+        powerplants_units, demand_units, exchange_units, storage_units, dsm_units = sort_units(
             units, market_id
         )
 
@@ -143,14 +143,14 @@ def calculate_naive_price(
         #    The resulting DataFrame has rows = time steps and columns = units.
         #    shape: (index_len, num_pp_units)
         # marginal_costs = powerplants_units.apply(calculate_marginal_cost, axis=1).T
-        marginal_costs = pd.DataFrame([unit.marginal_cost for unit in powerplant_units]).T.set_index(index)
+        marginal_costs = pd.DataFrame([unit.marginal_cost for unit in powerplants_units]).T.set_index(index)
 
 
         # 3. Compute available power for each unit at each time step.
         #    shape: (index_len, num_pp_units)
         # power = self._calc_power()
-        # power = pd.Series([unit.forecaster.availability * unit.max_power for unit in powerplant_units]).T
-        power = calculate_max_power(powerplant_units).T.set_index(index)
+        # power = pd.Series([unit.forecaster.availability * unit.max_power for unit in powerplants_units]).T
+        power = calculate_max_power(powerplants_units).T.set_index(index)
 
         # 4. Process the demand.
         #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
@@ -240,7 +240,7 @@ def extract_buses_and_lines(market_configs: list[MarketConfig]):
     buses, lines = None, None
 
     for market_config in market_configs:
-        grid_data = market_configs.param_dict.get("grid_data")
+        grid_data = market_config.param_dict.get("grid_data")
 
         if grid_data is None:
             continue
@@ -272,16 +272,16 @@ def calculate_naive_congestion_forecast(
     forecast_df = _ensure_not_none(forecast_df, index)
 
     demand_unit_nodes = {demand.node for demand in demand_units}
-    if not all(node in buses for node in demand_unit_nodes):
-        self._logger.warning(
+    if not all(node in buses.index for node in demand_unit_nodes):
+        log.warning(
                 "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
                 "Not all unit nodes are available in buses."
             )
         return None
 
     # Step 1: Calculate load for each powerplant based on availability factor and max power
-    # shape: (num_pps, forecast_len)
-    power = calculate_max_power(powerplant_units, index=[pp.name for pp in powerplant_units])
+    # shape: (forecast_len, num_units)
+    power = calculate_max_power(powerplants_units, index=[pp.id for pp in powerplants_units]).T
 
 
     # Step 2: Calculate net load for each node (demand - generation)
@@ -293,17 +293,19 @@ def calculate_naive_congestion_forecast(
         node_demand = calculate_sum_demand(node_demand_units, [],)
 
         # Calculate total generation for this node by summing powerplant loads
-        node_powerplant_units = [unit.name for unit in powerplants_units if unit.node == node]
-        node_generation = power[node_powerplant_units].sum(axis=1)
+        node_powerplants_units = [unit.id for unit in powerplants_units if unit.node == node]
+        node_generation = power[node_powerplants_units].sum(axis=1)
 
         # Calculate net load (demand - generation)
         net_load_by_node[node] = node_demand - node_generation
-
+    print("load_by_node", net_load_by_node)
     # Step 3: Calculate line-specific congestion severity
     line_congestion_severity = pd.DataFrame(index=index)
 
     for line_id, line_data in lines.iterrows():
         node1, node2 = line_data["bus0"], line_data["bus1"]
+        print(line_id, line_data)
+        print(node1, node2)
         s_max_pu = (
             lines.at[line_id, "s_max_pu"]
             if "s_max_pu" in lines.columns
@@ -314,13 +316,15 @@ def calculate_naive_congestion_forecast(
 
         # Calculate net load for the line as the sum of net loads from both connected nodes
         line_net_load = net_load_by_node[node1] + net_load_by_node[node2]
+        print(line_net_load)
+        print(line_capacity)
         congestion_severity = line_net_load / line_capacity
 
         # Store the line-specific congestion severity in DataFrame
-        line_congestion_severity[f"{line_id}_congestion_severity"] = (
-            congestion_severity
-        )
+        name = f"{line_id}_congestion_severity"
+        line_congestion_severity.insert(0, )
     
+    print("line_congestion_severity", line_congestion_severity)
     # Step 4: Calculate node-specific congestion signal by aggregating connected lines
     node_congestion_signal = pd.DataFrame(index=index)
 
@@ -353,7 +357,7 @@ def calculate_naive_congestion_forecast(
             node_congestion_signal[f"{node}_congestion_severity"] = (
                 line_congestion_severity[relevant_lines].max(axis=1)
             )
-
+    print("cs", node_congestion_signal)
     return node_congestion_signal
 
 #@lru_cache(maxsize=100)
@@ -376,8 +380,8 @@ def calculate_naive_renewable_utilisation(
     )
 
     demand_unit_nodes = {demand.node for demand in demand_units}
-    if not all(node in buses for node in demand_unit_nodes):
-        self._logger.warning(
+    if not all(node in buses.index for node in demand_unit_nodes):
+        log.warning(
                 "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
                 "Not all unit nodes are available in buses."
             )
@@ -386,7 +390,7 @@ def calculate_naive_renewable_utilisation(
     # Calculate load for each renewable powerplant based on availability factor and max power
     # shape: (num_pps, forecast_len)
     renewable_units = [unit for unit in powerplants_units if is_renewable(unit.technology)]
-    power = calculate_max_power(renewable_units, index=[pp.name for pp in renewable_units])
+    power = calculate_max_power(renewable_units, index=[pp.id for pp in renewable_units])
 
     renewable_utilisation = pd.DataFrame(index=index)
     
@@ -397,8 +401,8 @@ def calculate_naive_renewable_utilisation(
         if renewable_utilisation[f"{node}_renewable_utilisation"] is not None:
             # go next if forecast existing
             continue
-        node_powerplant_units = [unit.name for unit in renewable_units if unit.node == node]
-        utilization = powers[node_units].sum(axis=0)
+        node_renewable_units = [unit.id for unit in renewable_units if unit.node == node]
+        utilization = powers[node_renewable_units].sum(axis=0)
         renewable_utilisation[f"{node}_renewable_utilisation"] = utilization
 
     # Calculate the total renewable utilisation across all nodes if not in forecast_df

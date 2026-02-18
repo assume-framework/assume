@@ -64,7 +64,6 @@ def forecast_preprocess():
     }
     
     market_configs["EOM"] = MarketConfig(**market_configs["EOM"])
-    # print(market_configs["EOM"].market_id)
 
     demand_units["min_power"] = -abs(demand_units["min_power"])
     demand_units["max_power"] = -abs(demand_units["max_power"])
@@ -172,10 +171,11 @@ def test_forecast_init__calc_node_forecasts(forecast_preprocess):
 
     expected_cgn = pd.read_csv(path / "results/congestion_signal.csv", **parse_date)
     expected_uti = pd.read_csv(path / "results/renewable_utilization.csv", **parse_date)
+    # print(congestion_signal)
     assert_frame_equal(
         expected_cgn,
         #congestion_signal,
-        pd.Series(congestion_signal, index, dtype=int),
+        pd.DataFrame(congestion_signal, index, dtype=int),
         check_names=False,
         check_dtype=False,
         check_freq=False,
@@ -183,7 +183,7 @@ def test_forecast_init__calc_node_forecasts(forecast_preprocess):
     assert_frame_equal(
         expected_uti,
         #rn_utilization,
-        pd.Series(rn_utilization, index, dtype=int),
+        pd.DataFrame(rn_utilization, index, dtype=int),
         check_names=False,
         check_dtype=False,
         check_freq=False,
@@ -205,6 +205,7 @@ def test_forecast_init__uses_given_forecast(forecast_preprocess):
     #price_forecast, load_forecast = forecast_init.calculate_market_forecasts()
     market_forecast = unit.forecaster.price
     load_forecast = unit.forecaster.residual_load
+    print(pd.Series(market_forecast["EOM"], index, dtype=int), forecasts["price_EOM"],)
     assert_series_equal(
         pd.Series(market_forecast["EOM"], index, dtype=int),
         forecasts["price_EOM"],
