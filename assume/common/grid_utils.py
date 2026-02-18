@@ -275,9 +275,33 @@ def read_pypsa_grid(
     def add_lines(network: pypsa.Network, lines: pd.DataFrame) -> None:
         network.add("Line", lines.index, **lines)
 
+    def add_links(network: pypsa.Network, links: pd.DataFrame) -> None:
+        if links is None or len(links) == 0:
+            return
+        links_c = links.copy()
+
+        # Minimal required columns for PyPSA Link: bus0, bus1, p_nom
+        required = {"bus0", "bus1", "p_nom"}
+        missing = required - set(links_c.columns)
+        if missing:
+            raise ValueError(f"links.csv missing required columns: {sorted(missing)}")
+
+        # Optional defaults
+        if "efficiency" not in links_c.columns:
+            links_c["efficiency"] = 1.0
+        if "p_min_pu" not in links_c.columns:
+            links_c["p_min_pu"] = 0.0
+        if "p_max_pu" not in links_c.columns:
+            links_c["p_max_pu"] = 1.0
+        if "carrier" not in links_c.columns:
+            links_c["carrier"] = "link"
+
+        network.add("Link", links_c.index, **links_c)
+
     # setup the network
     add_buses(network, grid_dict["buses"])
     add_lines(network, grid_dict["lines"])
+    add_links(network, grid_dict.get("links"))
     network.add("Carrier", "AC")
     return network
 
