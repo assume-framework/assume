@@ -135,27 +135,26 @@ def test_forecast_init__calc_market_forecasts(forecast_preprocess):
         unit.forecaster.initialize(
             forecast_preprocess["units"],
             forecast_preprocess["market_configs"],
-            forecast_preprocess["forecast_df"],
+            None,  # no forecast_df --> calculate on its own
         )
         break
-    #market_forecast, load_forecast = forecast_init.calculate_market_forecasts()
+
     market_forecast = unit.forecaster.price
     load_forecast = unit.forecaster.residual_load
-    index = forecast_preprocess["index"]
+
     # assert the passed forecast is generated
     expected = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
-    print(pd.Series(load_forecast["EOM"], index, dtype=int), expected["load_forecast"])
     assert_series_equal(
         expected["load_forecast"],
-        pd.Series(load_forecast["EOM"], index, dtype=int),
-        check_names=False
+        pd.Series(load_forecast["EOM"], forecast_preprocess["index"]),  # convert FastSeries to pd.Series for comparison
+        check_names=False,
+        check_dtype=False,
+        check_freq=False,
     )
     assert list(market_forecast["EOM"]) == [1000] * 24
 
 
 def test_forecast_init__calc_node_forecasts(forecast_preprocess):
-    #congestion_signal, rn_utilization = forecast_init.calc_node_forecasts()
-    index = forecast_preprocess["index"]
     congestion_signal = calculate_naive_congestion_forecast(
             forecast_preprocess["index"],
             forecast_preprocess["units"],
@@ -171,28 +170,24 @@ def test_forecast_init__calc_node_forecasts(forecast_preprocess):
 
     expected_cgn = pd.read_csv(path / "results/congestion_signal.csv", **parse_date)
     expected_uti = pd.read_csv(path / "results/renewable_utilization.csv", **parse_date)
-    # print(congestion_signal)
+
+    # NOTE: instead of reindexing to sort columns one could probably use: check_like = True
+    # But this would allow differently ordered index aswell
     assert_frame_equal(
         expected_cgn,
-        #congestion_signal,
-        pd.DataFrame(congestion_signal, index, dtype=int),
+        congestion_signal.reindex(sorted(congestion_signal.columns), axis=1),  # otherwise order of columns **sometimes** is wrong!
         check_names=False,
-        check_dtype=False,
         check_freq=False,
     )
     assert_frame_equal(
-        expected_uti,
-        #rn_utilization,
-        pd.DataFrame(rn_utilization, index, dtype=int),
+        expected_uti.reindex(sorted(expected_uti.columns), axis=1), # otherwise order of columns **sometimes** is wrong!
+        rn_utilization.reindex(sorted(rn_utilization.columns), axis=1),  # otherwise order of columns **sometimes** is wrong!
         check_names=False,
-        check_dtype=False,
         check_freq=False,
     )
 
 
 def test_forecast_init__uses_given_forecast(forecast_preprocess):
-    # forecasts = pd.read_csv(path / "forecasts.csv", **parse_date)
-    # forecast_init._forecasts = forecasts
     forecasts = forecast_preprocess["forecast_df"]
     index = forecast_preprocess["index"]
     for unit in forecast_preprocess["units"]:
@@ -202,19 +197,20 @@ def test_forecast_init__uses_given_forecast(forecast_preprocess):
             forecasts,
         )
         break
-    #price_forecast, load_forecast = forecast_init.calculate_market_forecasts()
+
     market_forecast = unit.forecaster.price
     load_forecast = unit.forecaster.residual_load
-    print(pd.Series(market_forecast["EOM"], index, dtype=int), forecasts["price_EOM"],)
     assert_series_equal(
-        pd.Series(market_forecast["EOM"], index, dtype=int),
+        pd.Series(market_forecast["EOM"], index),  # convert FastSeries to pd.Series for assertion
         forecasts["price_EOM"],
         check_names=False,
+        check_dtype=False,
         check_freq=False,
     )
     assert_series_equal(
-        pd.Series(load_forecast["EOM"], index, dtype=int),
+        pd.Series(load_forecast["EOM"], index),  # convert FastSeries to pd.Series for assertion
         forecasts["residual_load_EOM"],
         check_names=False,
+        check_dtype=False,
         check_freq=False,
     )

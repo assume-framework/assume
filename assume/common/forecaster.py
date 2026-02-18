@@ -85,6 +85,7 @@ def calculate_sum_demand(
 ):
     """
     Returns summed demand at every timestep (incl. imports and exports)
+    Shape: (num_timesteps,)
     """
     sum_demand = abs(np.array([unit.forecaster.demand for unit in demand_units])).sum(axis=0)
 
@@ -298,14 +299,12 @@ def calculate_naive_congestion_forecast(
 
         # Calculate net load (demand - generation)
         net_load_by_node[node] = node_demand - node_generation
-    print("load_by_node", net_load_by_node)
+
     # Step 3: Calculate line-specific congestion severity
     line_congestion_severity = pd.DataFrame(index=index)
 
     for line_id, line_data in lines.iterrows():
         node1, node2 = line_data["bus0"], line_data["bus1"]
-        print(line_id, line_data)
-        print(node1, node2)
         s_max_pu = (
             lines.at[line_id, "s_max_pu"]
             if "s_max_pu" in lines.columns
@@ -316,22 +315,19 @@ def calculate_naive_congestion_forecast(
 
         # Calculate net load for the line as the sum of net loads from both connected nodes
         line_net_load = net_load_by_node[node1] + net_load_by_node[node2]
-        print(line_net_load)
-        print(line_capacity)
-        congestion_severity = line_net_load / line_capacity
+        congestion_severity = line_net_load.values / line_capacity
 
         # Store the line-specific congestion severity in DataFrame
-        name = f"{line_id}_congestion_severity"
-        line_congestion_severity.insert(0, )
-    
-    print("line_congestion_severity", line_congestion_severity)
+        line_congestion_severity[f"{line_id}_congestion_severity"] = line_net_load.values / line_capacity
+
     # Step 4: Calculate node-specific congestion signal by aggregating connected lines
     node_congestion_signal = pd.DataFrame(index=index)
 
     for node in demand_unit_nodes:
-        node_congestion_signal[f"{node}_congestion_severity"] = forecast_df.get(f"{node}_congestion_severity")
+        congestion_signal = forecast_df.get(f"{node}_congestion_severity")
 
-        if node_congestion_signal[f"{node}_congestion_severity"] is not None:
+        if congestion_signal is not None:
+            node_congestion_signal[f"{node}_congestion_severity"] = congestion_signal
             # go next if forecast existing
             continue
 
@@ -357,7 +353,7 @@ def calculate_naive_congestion_forecast(
             node_congestion_signal[f"{node}_congestion_severity"] = (
                 line_congestion_severity[relevant_lines].max(axis=1)
             )
-    print("cs", node_congestion_signal)
+
     return node_congestion_signal
 
 #@lru_cache(maxsize=100)
@@ -388,28 +384,31 @@ def calculate_naive_renewable_utilisation(
         return None
 
     # Calculate load for each renewable powerplant based on availability factor and max power
-    # shape: (num_pps, forecast_len)
+    # shape: (forecast_len, num_pps)
     renewable_units = [unit for unit in powerplants_units if is_renewable(unit.technology)]
-    power = calculate_max_power(renewable_units, index=[pp.id for pp in renewable_units])
+    power = calculate_max_power(renewable_units, index=[pp.id for pp in renewable_units]).T
 
     renewable_utilisation = pd.DataFrame(index=index)
     
     # Calculate utilisation based on availability and max power for each node
     for node in demand_unit_nodes:
-        renewable_utilisation[f"{node}_renewable_utilisation"] = forecast_df.get(f"{node}_renewable_utilisation")
+        utilisation = forecast_df.get(f"{node}_renewable_utilisation")
 
-        if renewable_utilisation[f"{node}_renewable_utilisation"] is not None:
+        if utilisation is not None:
+            renewable_utilisation[f"{node}_renewable_utilisation"] = utilisation
             # go next if forecast existing
             continue
         node_renewable_units = [unit.id for unit in renewable_units if unit.node == node]
-        utilization = powers[node_renewable_units].sum(axis=0)
-        renewable_utilisation[f"{node}_renewable_utilisation"] = utilization
+        utilisation = power[node_renewable_units].sum(axis=1)
+        renewable_utilisation[f"{node}_renewable_utilisation"] = utilisation.values
 
     # Calculate the total renewable utilisation across all nodes if not in forecast_df
-    renewable_utilisation["all_nodes_renewable_utilisation"] = forecast_df.get("all_nodes_renewable_utilisation")
-    if renewable_utilisation["all_nodes_renewable_utilisation"] is None:
-        all_nodes_sum = renewable_utilisation.sum(axis=0)
-        renewable_utilisation["all_nodes_renewable_utilisation"] = all_nodes_sum
+    all_node_utilization = forecast_df.get("all_nodes_renewable_utilisation")
+    if all_node_utilization is None:
+        all_node_utilization = renewable_utilisation.sum(axis=1)
+        renewable_utilisation["all_nodes_renewable_utilisation"] = all_node_utilization.values
+    else:
+        renewable_utilisation["all_nodes_renewable_utilisation"] = all_node_utilization.values
 
     return renewable_utilisation
 
@@ -657,7 +656,7 @@ class DsmUnitForecaster(UnitForecaster):
         self.congestion_signal = self._dict_to_series(self.congestion_signal)
 
 
-        # 5. Get renewable utilization forecast
+        # 5. Get renewable utilisation forecast
         renewable_utilization_forecast_algorithm = renewable_utilization_forecast_algorithms.get(
             self.forecast_algorithms.get("renewable_utilization"),
             renewable_utilization_congestion_signal
