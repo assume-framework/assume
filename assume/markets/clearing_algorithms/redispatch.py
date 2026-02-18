@@ -71,9 +71,9 @@ class RedispatchMarketRole(MarketRole):
 
         self.solver = marketconfig.param_dict.get("solver", "highs")
         if self.solver == "gurobi":
-            self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
+            self.solver_options = {"OutputFlag": 0}
         elif self.solver == "highs":
-            self.solver_options = {"output_flag": False, "log_to_console": False}
+            self.solver_options = {"output_flag": False}
         else:
             self.solver_options = {}
 
@@ -193,6 +193,7 @@ class RedispatchMarketRole(MarketRole):
             status, termination_condition = redispatch_network.optimize(
                 solver_name=self.solver,
                 solver_options=self.solver_options,
+                log_to_console=False,
                 # do not show tqdm progress bars for large grids
                 # https://github.com/PyPSA/linopy/pull/375
                 progress=False,
