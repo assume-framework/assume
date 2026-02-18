@@ -20,6 +20,14 @@ Upcoming Release
   - **Delete environment.yaml**: The environment.yaml file has been removed from the repository to simplify maintenance and was completely redundant with the `pyproject.toml`. Users can as before create their own environment using the provided pip installation instructions, which allows for more flexibility and easier updates.
   - **Add validation for simulation setup**: Added checks to validate the simulation setup for common issues, such as missing bidding strategies or inconsistent market configurations. Warnings are issued to inform users of potential problems that could affect simulation results.
 
+0.5.7 - (18th February 2026)
+============================
+
+**Bug Fixes:**
+
+- **Notebook 10a**: Bidding strategy- strings were replaced by the method. Tutorial works error-free.
+
+
 0.5.6 - (23th December 2025)
 ============================
 
