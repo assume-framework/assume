@@ -1,4 +1,3 @@
-name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,max_power,min_power,unit_operator
-demand_EOM,inflex_demand,naive_eom,,,1000000.0,0.0,eom_de
-demand_CRM_pos,reserve_capacity,,naive_pos_reserve,,1000000.0,0.0,crm_de
-demand_CRM_neg,reserve_capacity,,,naive_neg_reserve,1000000.0,0.0,crm_de
+version https://git-lfs.github.com/spec/v1
+oid sha256:5398c90193a033a9bfe1c227bd9b655b2395ed1c88902152f168356a2559b9a3
+size 298

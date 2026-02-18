@@ -1,4 +1,3 @@
-name,unit_type,technology,node,bidding_EOM,bidding_redispatch,unit_operator,objective,flexibility_measure,demand,fuel_type,max_heat_out,max_power,min_power,ramp_up,ramp_down,min_operating_steps,min_down_steps,specific_heat_demand,specific_electricity_aux,efficiency,eta_electric,eta_fossil,fossil_ng_share,ng_co2_factor,coal_co2_factor,calcination_emission_factor,storage_type,max_capacity,min_capacity,max_power_charge,max_power_discharge,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,is_prosumer
-A360,cement_plant,calciner,west,naive_da_dsm,flexible_dsm_redispatch_strategy,dsm_operator,min_variable_cost,electricity_price_signal,,electricity,300,300,,300,300,0,0,0.5528,0,,0.95,0.9,0,0.202,0.341,0.525,,,,,,,,,,No
-A360,cement_plant,kiln,,,,,,,,fossil,81,0,,81,81,0,0,0.3361,0.0166,,,0.9,0,0.202,0.341,,,,,,,,,,,
-A360,cement_plant,thermal_storage,,,,,,,,,,500,,500,500,,,,,,,,,,,,short-term_with_generator,1000,0,500,700,0,0.001,1,0.99,
+version https://git-lfs.github.com/spec/v1
+oid sha256:2e4a7a16f782d69cd7e984fa8bd7b8896545b9e332c6c705a68aa920bda12af4
+size 962

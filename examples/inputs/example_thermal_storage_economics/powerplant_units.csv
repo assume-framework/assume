@@ -1,25 +1,3 @@
-name,technology,bidding_EOM,bidding_redispatch,bidding_nodal,bidding_DAM,bidding_CRM_pos,bidding_CRM_neg,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,node,unit_operator
-Unit 1,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,lignite,0.3,31,0,1,10,north,Operator 1
-Unit 2,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,hard coal,0.3,19,0,1,20,east,Operator 1
-Unit 3,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 1
-Unit 4,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 2
-Unit 5,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 3
-Unit 6,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 4
-Unit 7,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 5
-Unit 8,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 6
-Unit 9,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 7
-Unit 10,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 8
-Unit 11,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 9
-Unit 12,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 10
-Unit 13,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 11
-Unit 14,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 12
-Unit 15,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 13
-Unit 16,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 14
-Unit 17,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 15
-Unit 18,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 16
-Unit 19,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 17
-Unit 20,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 18
-Unit 21,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 19
-Unit 22,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 20
-Unit 23,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 21
-Unit 24,steam turbine,naive_eom,naive_redispatch,naive_eom,flexable_eom_block,flexable_pos_crm,flexable_neg_crm,natural gas,0.2,50,0,1,50,west,Operator 22
+version https://git-lfs.github.com/spec/v1
+oid sha256:0d5fb1dec394e251f46ab4a0f5ec779836e5c0bde5178dcb487dbc1c317cfbb2
+size 3892

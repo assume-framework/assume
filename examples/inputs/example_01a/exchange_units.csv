@@ -1,2 +1,3 @@
-name,bidding_EOM,price_import,price_export,unit_operator
-exchange,naive_exchange,0,2999,Exchanges Operator
+version https://git-lfs.github.com/spec/v1
+oid sha256:a8370ba4ceff8bb76b2433d732ebd0c0198d4a9e4c5ad70334887fad72f0afe5
+size 107

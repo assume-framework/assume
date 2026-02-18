@@ -660,8 +660,7 @@ class GenericStorage:
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.initial_soc = pyo.Param(
-            initialize=self.initial_soc * self.max_capacity
-        )
+            initialize=self.initial_soc)
         model_block.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
 
         # Define variables
@@ -683,17 +682,17 @@ class GenericStorage:
             bounds=(0, model_block.max_power_discharge),
             doc="Discharging power at each time step",
         )
-        # # add a binary variable to disallow discharging and charging at the same time
-        # model_block.status = pyo.Var(self.time_steps, within=pyo.Binary)
+        # add a binary variable to disallow discharging and charging at the same time
+        model_block.status = pyo.Var(self.time_steps, within=pyo.Binary)
 
-        # # add a constraint that disallows discharging and charging at the same time
-        # @model_block.Constraint(self.time_steps)
-        # def max_charge_power_constraint_with_status(b, t):
-        #     return b.charge[t] <= b.max_power_charge * b.status[t]
+        # add a constraint that disallows discharging and charging at the same time
+        @model_block.Constraint(self.time_steps)
+        def max_charge_power_constraint_with_status(b, t):
+            return b.charge[t] <= b.max_power_charge * b.status[t]
 
-        # @model_block.Constraint(self.time_steps)
-        # def max_discharge_power_constraint_with_status(b, t):
-        #     return b.discharge[t] <= b.max_power_discharge * (1 - b.status[t])
+        @model_block.Constraint(self.time_steps)
+        def max_discharge_power_constraint_with_status(b, t):
+            return b.discharge[t] <= b.max_power_discharge * (1 - b.status[t])
 
         # Define SOC dynamics with energy loss and efficiency
         @model_block.Constraint(self.time_steps)
