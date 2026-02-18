@@ -149,4 +149,5 @@ examples/notebooks/outputs
 **/scenario/*.csv
 *.pb
 *.jar
+*.nbconvert.ipynb
 fameSetup.yaml
