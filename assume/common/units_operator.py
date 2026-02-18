@@ -333,11 +333,18 @@ class UnitsOperator(Role):
         """
         orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
-            orderbook = list(orders)
+            unit_orders = list(orders)
             self.units[unit_id].calculate_cashflow_and_reward(
                 marketconfig=marketconfig,
-                orderbook=orderbook,
+                orderbook=unit_orders,
             )
+
+        # Calculate reward for the portfolio strategy
+        self.portfolio_strategies.get(marketconfig.market_id).calculate_reward(
+            units_operator=self,
+            marketconfig=marketconfig,
+            orderbook=orderbook,
+        )
 
     def get_actual_dispatch(
         self, product_type: str, last: datetime
