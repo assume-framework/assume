@@ -10,11 +10,11 @@ import pytest
 from pandas._testing import assert_frame_equal, assert_series_equal
 
 from assume.common.fast_pandas import FastIndex, FastSeries
-
-#from assume.common.forecast_initialisation import ForecastInitialisation
 from assume.common.forecaster import (
     PowerplantForecaster,
     DemandForecaster,
+)
+from assume.common.forecast_algorithms import (
     calculate_naive_congestion_forecast,
     calculate_naive_renewable_utilisation
 )
@@ -32,10 +32,8 @@ def forecast_preprocess():
     market_configs = {
         "EOM": {
             "market_id": "EOM",
-            #"operator": "EOM_operator",
             "product_type": "energy",
             "market_products": [{"duration": "1h", "count": 1, "first_delivery": "1h"}],
-            # "opening_frequency": "1h",
             "opening_duration": "1h",
             "volume_unit": "MWh",
             "maximum_bid_volume": 100000,
@@ -71,20 +69,8 @@ def forecast_preprocess():
     fuel_prices_df.index = index[:1]
     fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
  
-    #unit_forecasts: dict[str, UnitForecaster] = {}
     units: dict[str, BaseUnit] = {}
     for id, plant in powerplants_units.iterrows():
-
-        # plant_bidding_strategies = {
-        #     key.split("bidding_")[1]: unit_paplantrams[key]
-        #     for key in plant.keys()
-        #     if key.startswith("bidding_") and plant[key]
-        # }
-        # plant_strategies = {
-        #     bidding_strategies[strategy](unit_id=unit_id, **bidding_params,)
-        #     for strategy in plant_bidding_strategies
-        # }
-
         plant["forecaster"] = PowerplantForecaster(
             index=index,
             availability=availability.get(id, pd.Series(1.0, index, name=id)),
@@ -104,30 +90,12 @@ def forecast_preprocess():
         demand["id"] = id
         units[id] = Demand(**demand)
 
-    #index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
-    # forecast_df = FastSeries(index, forecast_df)
-
     return {
         "index" : index,
         "units" : units.values(),
         "market_configs": market_configs.values(),
         "forecast_df": forecast_df,
     }
-    
-    
-
-    # forecast_init = ForecastInitialisation(
-    #     market_configs=market_configs,
-    #     index=pd.date_range("2019-01-01", periods=24, freq="h"),
-    #     powerplants_units=pd.read_csv(path / "powerplant_units.csv", index_col="name"),
-    #     demand_units=pd.read_csv(path / "demand_units.csv", index_col="name"),
-    #     availability=pd.read_csv(path / "availability.csv", **parse_date),
-    #     demand=pd.read_csv(path / "demand.csv", **parse_date),
-    #     fuel_prices=pd.read_csv(path / "fuel_prices.csv", index_col="fuel"),
-    #     lines=pd.read_csv(path / "lines.csv", index_col="line"),
-    #     buses=pd.read_csv(path / "buses.csv", index_col="name"),
-    # )
-    #return forecast_init
 
 
 def test_forecast_init__calc_market_forecasts(forecast_preprocess):

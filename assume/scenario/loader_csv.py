@@ -17,7 +17,6 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
-from assume.common.forecast_initialisation import ForecastInitialisation
 from assume.common.forecaster import (
     BuildingForecaster,
     CustomUnitForecaster,
