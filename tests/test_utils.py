@@ -28,6 +28,7 @@ from assume.common.utils import (
     separate_orders,
     set_random_seed,
     timestamp2datetime,
+    validate_availability,
     visualize_orderbook,
 )
 from assume.scenario.loader_csv import make_market_config
@@ -821,6 +822,36 @@ def test_solver_unavailable(monkeypatch):
     monkeypatch.setattr("assume.common.utils.check_available_solvers", lambda *args: [])
     with pytest.raises(RuntimeError):
         get_supported_solver()
+
+
+def test_validate_availability():
+    # Setup test data
+    powerplants_df = pd.DataFrame(
+        {"max_power": [100, 200], "min_power": [20, 40]}, index=["unit1", "unit2"]
+    )
+
+    # Test 1: Normal availability (0-1 range)
+    availability_df = pd.DataFrame({"unit1": [0.5, 0.8, 1.0], "unit2": [0.3, 0.6, 0.9]})
+    result = validate_availability(powerplants_df, availability_df)
+    pd.testing.assert_frame_equal(result, availability_df)
+
+    # Test 2: Availability > 1 (needs normalization)
+    availability_df = pd.DataFrame({"unit1": [50, 80, 100], "unit2": [60, 120, 180]})
+    result = validate_availability(powerplants_df, availability_df)
+    assert result["unit1"].max() <= 1.0
+    assert result["unit2"].max() <= 1.0
+    assert result.loc[0, "unit1"] == 0.5  # 50/100
+    assert result.loc[1, "unit2"] == 0.6  # 120/200
+
+    # Test 3: Availability * max_power < min_power (should be set to 0)
+    availability_df = pd.DataFrame(
+        {"unit1": [0.1, 0.5], "unit2": [0.1, 0.5]}  # 10 < 20  # 20 < 40
+    )
+    result = validate_availability(powerplants_df, availability_df)
+    assert result.loc[0, "unit1"] == 0.0  # Below min_power
+    assert result.loc[0, "unit2"] == 0.0  # Below min_power
+    assert result.loc[1, "unit1"] == 0.5  # Above min_power
+    assert result.loc[1, "unit2"] == 0.5  # Above min_power
 
 
 if __name__ == "__main__":
