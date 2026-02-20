@@ -526,7 +526,12 @@ class WriteOutput(Role):
                 try:
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
-                except (ProgrammingError, OperationalError, DataError):
+                except (
+                    ProgrammingError,
+                    OperationalError,
+                    DataError,
+                    pd.errors.DatabaseError,
+                ):
                     self.check_columns(table, df)
                     # now try again
                     with self.db.begin() as db:
@@ -593,7 +598,13 @@ class WriteOutput(Role):
             try:
                 with self.db.begin() as db:
                     df.to_sql(geo_table, db, if_exists="append")
-            except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+            except (
+                ProgrammingError,
+                OperationalError,
+                DataError,
+                UndefinedColumn,
+                pd.errors.DatabaseError,
+            ):
                 # if a column is missing, check and try again
                 self.check_columns(geo_table, df)
                 # now try again
