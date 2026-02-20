@@ -12,6 +12,26 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+  **Improvements:**
+  - **Deterministic behavior with seed setting**: Simulations are now deterministic by default for improved reproducibility. This can be controlled via a seed setting in `config.yaml` files, therefore it only applies for scenarios loaded via `load_scenario_folder`. Note that complete determinism is not guaranteed for all hardware and software configurations, especially with PyTorch-based learning strategies. It may also decrease performance of reinforcement learning due to disabled non-deterministic optimizations.
+    - ``seed`` not set in top-level of config: Sets the seed to a fixed default value (42) for deterministic behavior.
+    - ``seed: <int>``: Sets the seed for all random number generators to provided <int>.
+    - ``seed: null``: Disables seed setting, allowing for non-deterministic behavior as before. May improve performance of reinforcement learning.
+  - **Delete environment.yaml**: The environment.yaml file has been removed from the repository to simplify maintenance and was completely redundant with the `pyproject.toml`. Users can as before create their own environment using the provided pip installation instructions, which allows for more flexibility and easier updates.
+  - **Add validation for simulation setup**: Added checks to validate the simulation setup for common issues, such as missing bidding strategies or inconsistent market configurations. Warnings are issued to inform users of potential problems that could affect simulation results.
+  - **Added reward calculation for unit operators**: Unit operators have now the opportunity to calculate rewards based on the returned orderbooks for their own purposes. This enables learning strategies on unit operator level / portfolio learning strategies.
+
+0.5.7 - (18th February 2026)
+============================
+
+**Bug Fixes:**
+
+- **Notebook 10a**: Bidding strategy- strings were replaced by the method. Tutorial works error-free.
+
+
+0.5.6 - (23th December 2025)
+============================
+
 **Bug Fixes:**
 
 - **Changed action clamping**: The action clamping was changed to extreme values defined by dicts. Instead of using the min and max of a forward pass in the NN, the clamping is now based on the activation function of the actor network. Previously, the output range was incorrectly assumed based only on the input, which failed when weights were negative due to Xavier initialization.
@@ -23,14 +43,13 @@ Upcoming Release
 **Improvements:**
 
 - **Application of new naming convention for bidding strategies**: [unit]_[market]_[method]_[comment] for bidding strategy keys (in snake_case) and [Unit][Market][Method][Comment]Strategy for bidding strategy classes (in PascalCase for classes)
+- **Changed SoC Definition**: The state of charge (SoC) for storage units is now defined to take values between 0 and 1, instead of absolute energy content (MWh). This change ensures consistency with other models and standard definition. The absolute energy content can still be calculated by multiplying SoC with the unit's capacity. The previous 'max_soc' is renamed to 'capacity'. 'max_soc' and 'min_soc' can still be used to model allowed SoC ranges, but are now defined between 0 and 1 as well.
 - **Restructured learning_role tasks**: Major learning changes that make learning application more generalizable across the framework.
-
   - **Simplified learning data flow:** Removed the special ``learning_unit_operator`` that previously aggregated unit data and forwarded it to the learning role. Eliminates the single-sender dependency and avoids double bookkeeping across units and operators.
   - **Direct write access:** All learning-capable entities (units, unit operators, market agents) now write learning data directly to the learning role.
   - **Centralized logic:** Learning-related functionality is now almost always contained within the learning role, improving maintainability.
-  .. note::
-    Distributed learning across multiple machines is no longer supported, but this feature was not in active use.
-
+  - **Automatic calculation of obs_dim:** The observation dimension is now automatically calculated based on the definition of the foresight, num_timeseries_obs_dim and unique_obs_dim in the learning configuration. This avoids inconsistencies between the defined observation space and the actual observation dimension used in the actor network. However, if assumes the rational that 'self.obs_dim = num_timeseries_obs_dim * foresight + unique_obs_dim', if this is not the case the calculation of obs_dim needs to be adjusted in the learning strategy.
+  - **Note:** Distributed learning across multiple machines is no longer supported, but this feature was not in active use.
 - **Restructured learning configuration**: All learning-related configuration parameters are now contained within a single `learning_config` dictionary in the `config.yaml` file. This change simplifies configuration management and avoids ambiguous setting of defaults.
 
   .. note::
@@ -39,9 +58,11 @@ Upcoming Release
 - **Learning_role in all cases involving DRL**: The `learning_role` is now available in all simulations involving DRL, also if pre-trained strategies are loaded and no policy updates are performed. This change ensures consistent handling of learning configurations and simplifies the codebase by removing special cases.
 - **Final DRL simulation with last policies**: After training, the final simulation now uses the last trained policies instead of the best policies. This change provides a more accurate representation of the learned behavior, as the last policies reflect the most recent training state. Additionally, multi-agent simulations do not always converge to the maximum reward. E.g. competing agents may underbid each other to gain market share, leading to lower overall rewards while reaching a stable state nevertheless.
 
+
 **New Features:**
 
 - **Unit Operator Portfolio Strategy**: A new bidding strategy type that enables portfolio optimization, where the default is called `UnitsOperatorEnergyNaiveDirectStrategy`. This strategy simply passes through bidding decisions of individual units within a portfolio, which was the default behavior beforehand as well. Further we added 'UnitsOperatorEnergyHeuristicCournotStrategy' which allows to model bidding behavior of a portfolio of units in a day-ahead market. The strategy calculates the optimal bid price and quantity for each unit in the portfolio, taking into account markup and the production costs of the units. This enables users to simulate and analyze the impact of strategic portfolio bidding on market outcomes and unit profitability.
+- **Nodal Market Clearing Algorithm**: A new market clearing algorithm that performs electricity market clearing using an optimal power flow (OPF) approach, considering grid constraints and nodal pricing. This algorithm utilizes PyPSA to solve the OPF problem, allowing for a physics based representation of network constraints.
 
 0.5.5 - (13th August 2025)
 ==========================

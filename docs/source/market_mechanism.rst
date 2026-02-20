@@ -35,7 +35,8 @@ The available market mechanisms are the following:
 3. :py:meth:`assume.markets.clearing_algorithms.complex_clearing.ComplexClearingRole`
 4. :py:meth:`assume.markets.clearing_algorithms.complex_clearing_dmas.ComplexDmasClearingRole`
 5. :py:meth:`assume.markets.clearing_algorithms.redispatch.RedispatchMarketRole`
-6. :py:meth:`assume.markets.clearing_algorithms.contracts.PayAsBidContractRole`
+6. :py:meth:`assume.markets.clearing_algorithms.nodal_clearing.NodalClearingRole`
+7. :py:meth:`assume.markets.clearing_algorithms.contracts.PayAsBidContractRole`
 
 
 The :code:`PayAsClearRole` performs an electricity market clearing using a pay-as-clear mechanism.
@@ -78,6 +79,8 @@ is given by: :math:`\mathbf{a}_{c, p} \: u_c \leq u_{p} \quad \forall \: c, p \i
 
 with the incidence matrix :math:`\mathbf{a}_{c, p}` defining the links between bids as 1, if c is linked as child to p, 0 else.
 
+Flows in the network are limited by the Net Transfer Capacity ('s_nom' * 's_max_pu') of each line l: :math:`\quad -NTC_{l} \leq F_{l, t} \leq NTC_{l} \quad \forall \: l \in \mathcal{L}, t \in \mathcal{T}`,
+
 Because with this algorithm, paradoxically accepted bids (PABs) can occur, the objective is solved in an iterative manner:
 
 1. The optimization problem is solved with the objective function and all constraints.
@@ -89,5 +92,12 @@ Because with this algorithm, paradoxically accepted bids (PABs) can occur, the o
 
 
 If you want a hands-on use-case of the complex clearing check out the prepared tutorial in Colab: https://colab.research.google.com/github/assume-framework/assume
+
+Nodal clearing
+=================
+
+The :code:`NodalClearingRole` performs an electricity market clearing of the bids submitted by market participants using an optimal power flow (OPF) approach.
+Profile, block and linked orders are not supported.
+The algorithm utilizes PyPSA to solve the OPF problem, allowing for a physics based representation of network constraints.
 
 .. include:: redispatch_modeling.rst

@@ -171,6 +171,9 @@ class Learning(Role):
             )
             return None
         total_length = self.end_datetime - self.start_datetime
+        assert total_length >= train_freq, (
+            f"Simulation length ({total_length}) must be at least as long as train_freq ({train_freq_str})"
+        )
         quotient, remainder = divmod(total_length, train_freq)
 
         if remainder != pd.Timedelta(0):
