@@ -49,6 +49,23 @@ def bidding_strategies_from_param_dict(param_dict: dict):
         if ident.startswith("bidding_")
     }
 
+def forecast_algorithm_from_param_dict(param_dict: dict) -> dict[str: str]:
+    return {
+        ident.split("forecast_")[1]: forecast_algorithm
+        for ident, forecast_algorithm in param_dict.items()
+        if ident.startswith("forecast_")
+    }
+
+def get_unit_forecast_algorithms(forecast_algorithms: dict[str: str], plant: dict) -> dict[str: str]:
+    unit_forecast_algorithms = forecast_algorithm_from_param_dict(plant)  # get forecast specific parts
+
+    # overwrite None in plant csv with values from config if it exists!
+    for key, forecast_alg in unit_forecast_algorithms.items():
+        if forecast_alg is None or pd.isna(forecast_alg):
+            unit_forecast_algorithms[key] = forecast_algorithms.get(key)
+
+    return forecast_algorithms | unit_forecast_algorithms  # merge dicts together
+
 
 def load_file(
     path: str,
@@ -93,7 +110,6 @@ def load_file(
             na_values=["n.a.", "None", "-", "none", "nan"],
             parse_dates=index is not None,
         )
-
         for col in df:
             # check if the column is of dtype int
             if df[col].dtype == "int":
@@ -344,7 +360,7 @@ def make_market_config(
     return market_config
 
 
-def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
+def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame | None]:
     network_path = Path(network_path)
     buses = None
     lines = None
@@ -584,68 +600,52 @@ def load_config_and_create_forecaster(
     if len(fuel_prices_df) <= 1:  # single value provided, extend to full index
         fuel_prices_df.index = index[:1]
         fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
-
-    #buses = load_file(path=path, config=config, file_name="buses")
-    #lines = load_file(path=path, config=config, file_name="lines")
     
     forecast_algorithms = config.get("forecast_algorithms", {})
 
     unit_forecasts: dict[str, UnitForecaster] = {}
-    #market_prices, residual_loads = initializer.calculate_market_forecasts()
-    #congestion_signal, renewable_utilization = initializer.calc_node_forecasts()
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
                 index=index,
-                availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 fuel_prices=fuel_prices_df,
-                forecast_algorithms=forecast_algorithms,
-                #market_prices=market_prices,
-                #residual_load=residual_loads,
+                forecast_algorithms=get_unit_forecast_algorithms(forecast_algorithms, plant),
             )
     if demand_units is not None:
         for id, demand in demand_units.iterrows():
             unit_forecasts[id] = DemandForecaster(
                 index=index,
-                availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 demand=-demand_df[id].abs(),
-                forecast_algorithms=forecast_algorithms,
-                #market_prices=market_prices,
-                #residual_load=residual_loads,
+                forecast_algorithms=get_unit_forecast_algorithms(forecast_algorithms, demand),
             )
     if storage_units is not None:
         for id, storage in storage_units.iterrows():
             unit_forecasts[id] = UnitForecaster(
                 index=index,
-                availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
-                forecast_algorithms=forecast_algorithms,
-                #market_prices=market_prices,
-                #residual_load=residual_loads,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                forecast_algorithms=get_unit_forecast_algorithms(forecast_algorithms, storage),
             )
     if exchange_units is not None:
         for id, exchange in exchange_units.iterrows():
             unit_forecasts[id] = ExchangeForecaster(
                 index=index,
-                availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
-                forecast_algorithms=forecast_algorithms,
-                #market_prices=market_prices,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                forecast_algorithms=get_unit_forecast_algorithms(forecast_algorithms, exchange),
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
-                #residual_load=residual_loads,
             )
     if dsm_units is not None:
         for type, dsm in dsm_units.items():
             for id, unit in dsm.iterrows():
+                unit_forecast_algorithms = get_unit_forecast_algorithms(forecast_algorithms, unit)
                 if type == "building":
                     unit_forecasts[id] = BuildingForecaster(
                         index=index,
-                        availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
-                        forecast_algorithms=forecast_algorithms,
-                        #market_prices=market_prices,
+                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        forecast_algorithms=unit_forecast_algorithms,
                         fuel_prices=fuel_prices_df,
-                        #residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        # electricity_price=initializer.forecasts("price_EOM"),
                         load_profile=0,  # TODO
                         ev_load_profile=0,  # TODO
                         heat_demand=0,  # TODO
@@ -655,41 +655,25 @@ def load_config_and_create_forecaster(
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
                         index=index,
-                        availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
-                        forecast_algorithms=forecast_algorithms,
-                        #market_prices=market_prices,
+                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        forecast_algorithms=unit_forecast_algorithms,
                         fuel_prices=fuel_prices_df,
-                        #residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        #electricity_price=initializer.forecasts("price_EOM"),
-                        #congestion_signal=congestion_signal,
-                        #renewable_utilisation_signal=renewable_utilization,
                     )
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
                         index=index,
-                        availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
-                        forecast_algorithms=forecast_algorithms,
-                        #market_prices=market_prices,
+                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        forecast_algorithms=unit_forecast_algorithms,
                         hydrogen_demand=unit["demand"],
-                        #residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        #electricity_price=initializer.forecasts("price_EOM"),
                         seasonal_storage_schedule=0,  # TODO
                     )
                 if type == "steam_plant":
                     unit_forecasts[id] = SteamgenerationForecaster(
                         index=index,
-                        availability=availability.get(id, pd.Series(1.0, index, name=id)),#initializer.availability(id),
-                        forecast_algorithms=forecast_algorithms,
+                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        forecast_algorithms=unit_forecast_algorithms,
                         demand=unit["demand"],
-                        #market_prices=market_prices,
                         fuel_prices=fuel_prices_df,
-                        #residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        #electricity_price=initializer.forecasts("price_EOM"),
-                        #congestion_signal=congestion_signal,
-                        #renewable_utilisation_signal=renewable_utilization,
                         electricity_price_flex=0,  # TODO
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
