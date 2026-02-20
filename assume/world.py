@@ -6,6 +6,7 @@ import asyncio
 import logging
 import sys
 import time
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -414,6 +415,17 @@ class World:
         if self.unit_operators.get(id):
             raise ValueError(f"Unit operator {id} already exists")
 
+        # Strategies must reference existing markets.
+        for market_id in strategies.keys():
+            if market_id not in list(self.markets.keys()):
+                msg = (
+                    f"Strategies of unit operator {id} references "
+                    f"market {market_id} which is not known in world.\n"
+                    f"Known markets are: {list(self.markets.keys())}.\n"
+                    f"Note: Markets must be added before unit operators."
+                )
+                warnings.warn(msg)
+
         bidding_strategies = self._prepare_bidding_strategies(
             {"bidding_strategies": strategies}, id
         )
@@ -647,9 +659,109 @@ class World:
         if not market_operator:
             raise Exception(f"invalid {market_operator_id=}")
 
+        market_start = market_config.opening_hours[0]
+        market_end = market_config.opening_hours[-1]
+
+        if market_start < self.start or market_end > self.end:
+            msg = (
+                f"Market {market_config.market_id} violates world schedule. \n"
+                f"Market start: {market_start}, end: {market_end}. \n)"
+                f"World start: {self.start}, end: {self.end}.)"
+            )
+            raise ValueError(msg)
+
         market_operator.add_role(market_role)
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.market_id}"] = market_config
+
+    def _validate_setup(self):
+        """Validate the consistency of the world configuration and fail early."""
+
+        # For each UnitOperator: Strategies must reference existing markets.
+        unit_operators = list(self.unit_operators.values())
+        for operator in unit_operators:
+            for market_id in operator.portfolio_strategies.keys():
+                if market_id not in list(self.markets.keys()):
+                    msg = (
+                        f"Strategies of unit operator {operator} references"
+                        f"market {market_id} which is not known in world."
+                        f"Known markets are:\n{list(self.markets.keys())}."
+                    )
+                    raise ValueError(msg)
+
+        # For each market: Should be referenced by a market strategy.
+        referenced_markets = {
+            market
+            for market in operator.portfolio_strategies.keys()
+            for operator in unit_operators
+        }
+        for market_id in self.markets.keys():
+            if market_id not in referenced_markets:
+                msg = f"Added market {market_id}, has no bidding participants."
+                warnings.warn(msg)
+
+        # A Re-Dispatch market can only open if an earlier market closed.
+        dispatch_markets = [
+            config
+            for config in self.markets.values()
+            if config.market_mechanism != "redispatch"
+        ]
+        redispatch_markets = [
+            config
+            for config in self.markets.values()
+            if config.market_mechanism == "redispatch"
+        ]
+
+        if len(redispatch_markets) > 0:
+            if len(dispatch_markets) == 0:
+                msg = "Redispatch market but no dispatch market was defined."
+                raise ValueError(msg)
+
+            # when will market result be available from dispatch market
+            earliest_dispatch_closing = min(
+                x.opening_hours[0] + x.opening_duration for x in dispatch_markets
+            )
+            # opening of redispatch market
+            earliest_redispatch_opening = min(
+                x.opening_hours[0] for x in redispatch_markets
+            )
+
+            if earliest_redispatch_opening < earliest_dispatch_closing:
+                msg = (
+                    "First redispatch market opens before first dispatch "
+                    "market has closed."
+                )
+                raise ValueError(msg)
+
+        # Existence of demand implies existence of generation and vice versa.
+        demand_exists, generation_exists = False, False
+
+        demand_types = [self.unit_types[x] for x in ["demand"]]
+        generation_types = [
+            self.unit_types[x] for x in ["power_plant", "hydrogen_plant"]
+        ]
+
+        for operator in unit_operators:
+            for unit in operator.units.values():
+                if type(unit) in demand_types:
+                    demand_exists = True
+                elif type(unit) in generation_types:
+                    generation_exists = True
+
+        if demand_exists and not generation_exists:
+            msg = (
+                f"Demand units but no generation units were created.\n"
+                f"Known generation types are: {generation_types}.\n"
+                f"This indicates an incomplete simulation setup."
+            )
+            warnings.warn(msg)
+        elif generation_exists and not demand_exists:
+            msg = (
+                f"Generation units but no demand units were created.\n"
+                f"Known demand types are: {demand_types}.\n"
+                f"This indicates an incomplete simulation setup."
+            )
+            warnings.warn(msg)
 
     async def _step(self, container):
         """
@@ -690,6 +802,8 @@ class World:
             start_ts (datetime.datetime): The start timestamp for the simulation run.
             end_ts (datetime.datetime): The end timestamp for the simulation run.
         """
+        self._validate_setup()
+
         logger.debug("activating container")
         # agent is implicit added to self.container._agents
         async with activate(self.container) as c:
