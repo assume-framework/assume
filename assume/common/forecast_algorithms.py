@@ -413,53 +413,40 @@ def calculate_naive_renewable_utilisation(
     return renewable_utilisation
 
 
-price_forecast_algorithms = {
+forecast_algorithms = {
     "price_naive_forecast": calculate_naive_price,
-    "default_test": lambda index, *args: {"EOM": FastSeries(index=index, value=50)},
-    "keep_given": None,
-}
+    "price_default_test": lambda index, *args: {"EOM": FastSeries(index=index, value=50)},
+    "price_keep_given": None,
 
-residual_load_forecast_algorithms = {
     "residual_load_naive_forecast": calculate_naive_residual_load,
-    "default_test": lambda *args: {},
-    "keep_given": None,
-}
+    "residual_load_default_test": lambda *args: {},
+    "residual_load_keep_given": None,
 
-congestion_signal_forecast_algorithms = {
     "congestion_signal_naive_forecast": calculate_naive_congestion_forecast,
-    "default_test": lambda index, *args: FastSeries(index=index, value=0.0),
-    "keep_given": None,
-}
+    "congestion_signal_default_test": lambda index, *args: FastSeries(index=index, value=0.0),
+    "congestion_signal_keep_given": None,
 
-renewable_utilisation_forecast_algorithms = {
     "renewable_utilisation_naive_forecast": calculate_naive_renewable_utilisation,
-    "default_test": lambda index, *args: FastSeries(index=index, value=0.0),
-    "keep_given": None,
+    "renewable_utilisation_default_test": lambda index, *args: FastSeries(index=index, value=0.0),
+    "renewable_utilisation_keep_given": None,
 }
 
+def default_preprocess(*args, **kwargs):
+    return None
 
-price_preprocess_algorithms = {
-    "default": lambda *args: None
-}
-residual_load_preprocess_algorithms = {
-    "default": lambda *args: None
-}
-congestion_signal_preprocess_algorithms = {
-    "default": lambda *args: None
-}
-renewable_utilisation_preprocess_algorithms = {
-    "default": lambda *args: None
+forecast_preprocess_algorithms = {
+    "price_default": default_preprocess,
+    "residual_load_default": default_preprocess,
+    "congestion_signal_default": default_preprocess,
+    "renewable_utilisation_default": default_preprocess,
 }
 
-price_udpate_algorithms = {
-    "default": lambda old_forecast, *args, **kwargs: old_forecast
-}
-residual_load_udpate_algorithms = {
-    "default": lambda old_forecast, *args, **kwargs: old_forecast
-}
-congestion_signal_udpate_algorithms = {
-    "default": lambda old_forecast, *args, **kwargs: old_forecast
-}
-renewable_utilisation_udpate_algorithms = {
-    "default": lambda old_forecast, *args, **kwargs: old_forecast
+def default_update(old_forecast, preprocess_information, *args, **kwargs):
+    return old_forecast
+
+forecast_update_algorithms = {
+    "price_default": default_update,
+    "residaul_load_default": default_update,
+    "congestion_signal_default": default_update,
+    "renewable_utilisation_default": default_update,
 }

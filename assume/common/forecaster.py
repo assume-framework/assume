@@ -13,18 +13,9 @@ import numpy as np
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.market_objects import MarketConfig
 from assume.common.forecast_algorithms import (
-    price_forecast_algorithms,
-    residual_load_forecast_algorithms,
-    congestion_signal_forecast_algorithms,
-    renewable_utilisation_forecast_algorithms,
-    price_preprocess_algorithms,
-    price_udpate_algorithms,
-    residual_load_preprocess_algorithms,
-    residual_load_udpate_algorithms,
-    congestion_signal_preprocess_algorithms,
-    congestion_signal_udpate_algorithms,
-    renewable_utilisation_preprocess_algorithms,
-    renewable_utilisation_udpate_algorithms
+    forecast_algorithms,
+    forecast_preprocess_algorithms,
+    forecast_update_algorithms,
 )
 
 if TYPE_CHECKING:
@@ -100,8 +91,11 @@ class UnitForecaster:
         Preprocess information is stored in self.preprocess_information
         """
 
-        price_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_price", "default")
-        price_preprocess_algorithm = price_preprocess_algorithms.get(
+        price_preprocess_algorithm_name = self.forecast_algorithms.get(
+            "preprocess_price",
+            "price_default"
+        )
+        price_preprocess_algorithm = forecast_preprocess_algorithms.get(
             price_preprocess_algorithm_name
         )
         self.preprocess_information["price"] = price_preprocess_algorithm(
@@ -112,8 +106,11 @@ class UnitForecaster:
             initializing_unit
         )
 
-        residual_load_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_residual_load", "default")
-        residual_load_preprocess_algorithm = residual_load_preprocess_algorithms.get(
+        residual_load_preprocess_algorithm_name = self.forecast_algorithms.get(
+            "preprocess_residual_load",
+            "residual_load_default"
+        )
+        residual_load_preprocess_algorithm = forecast_preprocess_algorithms.get(
             residual_load_preprocess_algorithm_name
         )
         self.preprocess_information["residual_load"] = residual_load_preprocess_algorithm(
@@ -138,7 +135,7 @@ class UnitForecaster:
 
         # 1. Get price forecast
         price_forecast_algorithm_name = self.forecast_algorithms.get("price", "price_naive_forecast")
-        price_forecast_algorithm = price_forecast_algorithms.get(
+        price_forecast_algorithm = forecast_algorithms.get(
             price_forecast_algorithm_name
         )
         if price_forecast_algorithm is not None:  # None if one wants to keep forecasts
@@ -153,7 +150,7 @@ class UnitForecaster:
 
         # 2. Get residual load forecast
         residual_load_forecast_algorithm_name = self.forecast_algorithms.get("residual_load", "residual_load_naive_forecast")
-        residual_load_forecast_algorithm = residual_load_forecast_algorithms.get(
+        residual_load_forecast_algorithm = forecast_algorithms.get(
             residual_load_forecast_algorithm_name
         )
         if residual_load_forecast_algorithm is not None:  # None if one wants to keep forecasts
@@ -172,8 +169,8 @@ class UnitForecaster:
         update information is stored in self.update_information
         """
 
-        price_update_algorithm_name = self.forecast_algorithms.get("update_price", "default")
-        price_update_algorithm = price_update_algorithms.get(
+        price_update_algorithm_name = self.forecast_algorithms.get("update_price", "price_default")
+        price_update_algorithm = forecast_update_algorithms.get(
             price_update_algorithm_name
         )
         self.price = price_update_algorithm(
@@ -183,8 +180,8 @@ class UnitForecaster:
             **kwargs
         )
 
-        residual_load_update_algorithm_name = self.forecast_algorithms.get("update_residual_load", "default")
-        residual_load_update_algorithm = residual_load_update_algorithms.get(
+        residual_load_update_algorithm_name = self.forecast_algorithms.get("update_residual_load", "residual_load_default")
+        residual_load_update_algorithm = forecast_update_algorithms.get(
             residual_load_update_algorithm_name
         )
         self.residual_load = residual_load_update_algorithm(
@@ -324,8 +321,8 @@ class DsmUnitForecaster(UnitForecaster):
         Preprocess information is stored in self.preprocess_information.
         """
 
-        congestion_signal_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_congestion_signal", "default")
-        congestion_signal_preprocess_algorithm = congestion_signal_preprocess_algorithms.get(
+        congestion_signal_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_congestion_signal", "congestion_signal_default")
+        congestion_signal_preprocess_algorithm = forecast_preprocess_algorithms.get(
             congestion_signal_preprocess_algorithm_name
         )
         self.preprocess_information["congestion_signal"] = congestion_signal_preprocess_algorithm(
@@ -336,8 +333,8 @@ class DsmUnitForecaster(UnitForecaster):
             initializing_unit,
         )
 
-        renewable_utilisation_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_renewable_utilisation", "default")
-        renewable_utilisation_preprocess_algorithm = renewable_utilisation_preprocess_algorithms.get(
+        renewable_utilisation_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_renewable_utilisation", "renewable_utilisation_default")
+        renewable_utilisation_preprocess_algorithm = forecast_preprocess_algorithms.get(
             renewable_utilisation_preprocess_algorithm_name
         )
         self.preprocess_information["renewable_utilisation"] = renewable_utilisation_preprocess_algorithm(
@@ -379,7 +376,7 @@ class DsmUnitForecaster(UnitForecaster):
             congestion_signal_forecast_algorithm_name
         )
         if congestion_signal_forecast_algorithm is not None:  # None if one wants to keep forecasts
-            self.congestion_signal = congestion_signal_forecast_algorithm(
+            self.congestion_signal = forecast_algorithm(
                 self.index,
                 units,
                 market_configs,
@@ -391,7 +388,7 @@ class DsmUnitForecaster(UnitForecaster):
 
         # 6. Get renewable utilisation forecast
         renewable_utilisation_forecast_algorithm_name = self.forecast_algorithms.get("renewable_utilisation", "renewable_utilisation_naive_forecast")
-        renewable_utilisation_forecast_algorithm = renewable_utilisation_forecast_algorithms.get(
+        renewable_utilisation_forecast_algorithm = forecast_algorithms.get(
             renewable_utilisation_forecast_algorithm_name
         )
         if renewable_utilisation_forecast_algorithm is not None:  # None if one wants to keep forecasts
@@ -412,8 +409,8 @@ class DsmUnitForecaster(UnitForecaster):
 
         super().update(*args, **kwargs)
 
-        congestion_signal_update_algorithm_name = self.forecast_algorithms.get("update_congestion_signal", "default")
-        congestion_signal_update_algorithm = congestion_signal_update_algorithms.get(
+        congestion_signal_update_algorithm_name = self.forecast_algorithms.get("update_congestion_signal", "congestion_signal_default")
+        congestion_signal_update_algorithm = forecast_update_algorithms.get(
             congestion_signal_update_algorithm_name
         )
         self.congestion_signal = congestion_signal_update_algorithm(
@@ -423,8 +420,8 @@ class DsmUnitForecaster(UnitForecaster):
             **kwargs
         )
 
-        renewable_utilisation_update_algorithm_name = self.forecast_algorithms.get("update_renewable_utilisation", "default")
-        renewable_utilisation_update_algorithm = renewable_utilisation_update_algorithms.get(
+        renewable_utilisation_update_algorithm_name = self.forecast_algorithms.get("update_renewable_utilisation", "renewable_utilisation_default")
+        renewable_utilisation_update_algorithm = forecast_update_algorithms.get(
             renewable_utilisation_update_algorithm_name
         )
         self.renewable_utilisation = renewable_utilisation_update_algorithm(
