@@ -104,6 +104,7 @@ def calculate_naive_price(
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
+    preprocess_information = None,
 ) -> dict[str, ForecastSeries]:
     """
     Naive price forecast that calculates prices based on merit order with marginal costs.
@@ -194,6 +195,7 @@ def calculate_naive_residual_load(
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
+    preprocess_information = None,
 ) -> dict[str, ForecastSeries]:
 
     _, demand_units, exchange_units, _, _ = sort_units(
@@ -433,4 +435,31 @@ renewable_utilisation_forecast_algorithms = {
     "renewable_utilisation_naive_forecast": calculate_naive_renewable_utilisation,
     "default_test": lambda index, *args: FastSeries(index=index, value=0.0),
     "keep_given": None,
+}
+
+
+price_preprocess_algorithms = {
+    "default": lambda *args: None
+}
+residual_load_preprocess_algorithms = {
+    "default": lambda *args: None
+}
+congestion_signal_preprocess_algorithms = {
+    "default": lambda *args: None
+}
+renewable_utilisation_preprocess_algorithms = {
+    "default": lambda *args: None
+}
+
+price_udpate_algorithms = {
+    "default": lambda old_forecast, *args, **kwargs: old_forecast
+}
+residual_load_udpate_algorithms = {
+    "default": lambda old_forecast, *args, **kwargs: old_forecast
+}
+congestion_signal_udpate_algorithms = {
+    "default": lambda old_forecast, *args, **kwargs: old_forecast
+}
+renewable_utilisation_udpate_algorithms = {
+    "default": lambda old_forecast, *args, **kwargs: old_forecast
 }

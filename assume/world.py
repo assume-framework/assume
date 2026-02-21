@@ -825,6 +825,7 @@ class World:
                 self.units.values(),
                 self.markets.values(),
                 forecast_df,
+                unit,
             )
 
     # The update routine is not needed. We call it in calculate_bids or through a scheduled task during runtime

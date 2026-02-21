@@ -17,6 +17,14 @@ from assume.common.forecast_algorithms import (
     residual_load_forecast_algorithms,
     congestion_signal_forecast_algorithms,
     renewable_utilisation_forecast_algorithms,
+    price_preprocess_algorithms,
+    price_udpate_algorithms,
+    residual_load_preprocess_algorithms,
+    residual_load_udpate_algorithms,
+    congestion_signal_preprocess_algorithms,
+    congestion_signal_udpate_algorithms,
+    renewable_utilisation_preprocess_algorithms,
+    renewable_utilisation_udpate_algorithms
 )
 
 if TYPE_CHECKING:
@@ -67,6 +75,7 @@ class UnitForecaster:
              residual_load = {}
         self.price: dict[str, ForecastSeries] = self._dict_to_series(market_prices)
         self.residual_load: dict[str, ForecastSeries] = self._dict_to_series(residual_load)
+        self.preprocess_information = []
 
     def _to_series(self, item: ForecastSeries) -> FastSeries:
         if isinstance(item, FastSeries):
@@ -79,21 +88,53 @@ class UnitForecaster:
             result[key] = self._to_series(value)
         return result
 
-    def preprocess(self, args1, args2):
+    def preprocess(
+        self,
+        units: list[BaseUnit],
+        market_configs: list[MarketConfig],
+        forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
+    ):
         """
+        Applies preprocessing to the given data.
+        Preprocess information is stored in self.preprocess_information
         """
-        #preprocess_price(args1, args2)
-        pass
+
+        price_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_price", "default")
+        price_preprocess_algorithm = price_preprocess_algorithms.get(
+            price_preprocess_algorithm_name
+        )
+        self.preprocess_information["price"] = price_preprocess_algorithm(
+            self.index,
+            units,
+            market_config,
+            forecast_df,
+            initializing_unit
+        )
+
+        residual_load_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_residual_load", "default")
+        residual_load_preprocess_algorithm = residual_load_preprocess_algorithms.get(
+            residual_load_preprocess_algorithm_name
+        )
+        self.preprocess_information["residual_load"] = residual_load_preprocess_algorithm(
+            self.index,
+            units,
+            market_config,
+            forecast_df,
+            initializing_unit
+        )
+
 
     def initialize(
         self,
         units: list[BaseUnit],
         market_configs: list[MarketConfig],
-        # fuel_prices: ForecastSeries = None,
         forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
     ):
         """
         """
+        self.preprocess(units, market_config, forecast_df, initializing_unit)
 
         # 1. Get price forecast
         price_forecast_algorithm_name = self.forecast_algorithms.get("price", "price_naive_forecast")
@@ -106,6 +147,7 @@ class UnitForecaster:
                 units,
                 market_configs,
                 forecast_df,
+                self.preprocess_information["price"],
             )
         self.price = self._dict_to_series(self.price)
 
@@ -120,14 +162,37 @@ class UnitForecaster:
                 units,
                 market_configs,
                 forecast_df,
+                self.preprocess_information["residual_load"]
             )
         self.residual_load = self._dict_to_series(self.residual_load)
 
-    def update(self, args1, args2):
+    def update(self, *args, **kwargs):
         """
+        Updates the price and residual_load forecasts.
+        update information is stored in self.update_information
         """
-        pass
-        # TODO like preprocess
+
+        price_update_algorithm_name = self.forecast_algorithms.get("update_price", "default")
+        price_update_algorithm = price_update_algorithms.get(
+            price_update_algorithm_name
+        )
+        self.price = price_update_algorithm(
+            self.price,
+            self.preprocess_information["price"],
+            *args,
+            **kwargs
+        )
+
+        residual_load_update_algorithm_name = self.forecast_algorithms.get("update_residual_load", "default")
+        residual_load_update_algorithm = residual_load_update_algorithms.get(
+            residual_load_update_algorithm_name
+        )
+        self.residual_load = residual_load_update_algorithm(
+            self.residual_load,
+            self.preprocess_information["residual_load"],
+            *args,
+            **kwargs
+        )
 
 
 class CustomUnitForecaster(UnitForecaster):
@@ -247,26 +312,68 @@ class DsmUnitForecaster(UnitForecaster):
         self.electricity_price = self._to_series(electricity_price)
         self.renewable_utilisation_signal = self._to_series(renewable_utilisation_signal)
 
+    def preprocess(
+        self,
+        units: list[BaseUnit],
+        market_configs: list[MarketConfig],
+        forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
+    ):
+        """
+        Applies preprocessing to the given data for congestion signal and renewable utilization.
+        Preprocess information is stored in self.preprocess_information.
+        """
+
+        congestion_signal_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_congestion_signal", "default")
+        congestion_signal_preprocess_algorithm = congestion_signal_preprocess_algorithms.get(
+            congestion_signal_preprocess_algorithm_name
+        )
+        self.preprocess_information["congestion_signal"] = congestion_signal_preprocess_algorithm(
+            self.index,
+            units,
+            market_config,
+            forecast_df,
+            initializing_unit,
+        )
+
+        renewable_utilisation_preprocess_algorithm_name = self.forecast_algorithms.get("preprocess_renewable_utilisation", "default")
+        renewable_utilisation_preprocess_algorithm = renewable_utilisation_preprocess_algorithms.get(
+            renewable_utilisation_preprocess_algorithm_name
+        )
+        self.preprocess_information["renewable_utilisation"] = renewable_utilisation_preprocess_algorithm(
+            self.index,
+            units,
+            market_config,
+            forecast_df,
+            initializing_unit
+        )
+
 
     def initialize(
         self,
         units: list[BaseUnit],
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
     ):
-        # Get 1. price and 2. residual load forecast
+        # Initialization and preprocess of 1. price and 2. residual load forecast 
         super().initialize(
             units,
             market_configs,
             forecast_df,
+            initializing_unit,
         )
 
-        # 3. Get electricity price forecast
+        # 3. Do own preprocess
+        self.preprocess(units, market_config, forecast_df, initializing_unit)
+
+
+        # 4. Get electricity price forecast
         # TODO how to handle other markets?
         self.electricity_price = self.price.get("EOM")
 
 
-        # 4. Get congestion signal forecast
+        # 5. Get congestion signal forecast
         congestion_signal_forecast_algorithm_name = self.forecast_algorithms.get("congestion_signal", "congestion_signal_naive_forecast")
         congestion_signal_forecast_algorithm = congestion_signal_forecast_algorithms.get(
             congestion_signal_forecast_algorithm_name
@@ -277,11 +384,12 @@ class DsmUnitForecaster(UnitForecaster):
                 units,
                 market_configs,
                 forecast_df,
+                self.preprocess_information["congestion_signal"],
             )
         self.congestion_signal = self._dict_to_series(self.congestion_signal)
 
 
-        # 5. Get renewable utilisation forecast
+        # 6. Get renewable utilisation forecast
         renewable_utilisation_forecast_algorithm_name = self.forecast_algorithms.get("renewable_utilisation", "renewable_utilisation_naive_forecast")
         renewable_utilisation_forecast_algorithm = renewable_utilisation_forecast_algorithms.get(
             renewable_utilisation_forecast_algorithm_name
@@ -292,9 +400,39 @@ class DsmUnitForecaster(UnitForecaster):
                 units,
                 market_configs,
                 forecast_df,
+                self.preprocess_information["congestion_signal"],
             )
         self.renewable_utilisation_signal = self._dict_to_series(self.renewable_utilisation_signal)
 
+    def update(self, *args, **kwargs):
+        """
+        Updates the congestion_signal and renewable_utilisation forecasts.
+        update information is stored in self.update_information
+        """
+
+        super().update(*args, **kwargs)
+
+        congestion_signal_update_algorithm_name = self.forecast_algorithms.get("update_congestion_signal", "default")
+        congestion_signal_update_algorithm = congestion_signal_update_algorithms.get(
+            congestion_signal_update_algorithm_name
+        )
+        self.congestion_signal = congestion_signal_update_algorithm(
+            self.congestion_signal,
+            self.preprocess_information["congestion_signal"],
+            *args,
+            **kwargs
+        )
+
+        renewable_utilisation_update_algorithm_name = self.forecast_algorithms.get("update_renewable_utilisation", "default")
+        renewable_utilisation_update_algorithm = renewable_utilisation_update_algorithms.get(
+            renewable_utilisation_update_algorithm_name
+        )
+        self.renewable_utilisation = renewable_utilisation_update_algorithm(
+            self.renewable_utilisation,
+            self.preprocess_information["renewable_utilisation"],
+            *args,
+            **kwargs
+        )
 
 class SteelplantForecaster(DsmUnitForecaster):
     """

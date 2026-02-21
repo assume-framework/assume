@@ -49,14 +49,14 @@ def bidding_strategies_from_param_dict(param_dict: dict):
         if ident.startswith("bidding_")
     }
 
-def forecast_algorithm_from_param_dict(param_dict: dict) -> dict[str: str]:
+def forecast_algorithm_from_param_dict(param_dict: dict) -> dict[str, str]:
     return {
         ident.split("forecast_")[1]: forecast_algorithm
         for ident, forecast_algorithm in param_dict.items()
         if ident.startswith("forecast_")
     }
 
-def get_unit_forecast_algorithms(forecast_algorithms: dict[str: str], plant: dict) -> dict[str: str]:
+def get_unit_forecast_algorithms(forecast_algorithms: dict[str, str], plant: dict) -> dict[str, str]:
     unit_forecast_algorithms = forecast_algorithm_from_param_dict(plant)  # get forecast specific parts
 
     # overwrite None in plant csv with values from config if it exists!
