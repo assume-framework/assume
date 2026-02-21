@@ -75,7 +75,7 @@ class UnitForecaster:
              residual_load = {}
         self.price: dict[str, ForecastSeries] = self._dict_to_series(market_prices)
         self.residual_load: dict[str, ForecastSeries] = self._dict_to_series(residual_load)
-        self.preprocess_information = []
+        self.preprocess_information = {}
 
     def _to_series(self, item: ForecastSeries) -> FastSeries:
         if isinstance(item, FastSeries):
@@ -107,7 +107,7 @@ class UnitForecaster:
         self.preprocess_information["price"] = price_preprocess_algorithm(
             self.index,
             units,
-            market_config,
+            market_configs,
             forecast_df,
             initializing_unit
         )
@@ -119,7 +119,7 @@ class UnitForecaster:
         self.preprocess_information["residual_load"] = residual_load_preprocess_algorithm(
             self.index,
             units,
-            market_config,
+            market_configs,
             forecast_df,
             initializing_unit
         )
@@ -134,7 +134,7 @@ class UnitForecaster:
     ):
         """
         """
-        self.preprocess(units, market_config, forecast_df, initializing_unit)
+        self.preprocess(units, market_configs, forecast_df, initializing_unit)
 
         # 1. Get price forecast
         price_forecast_algorithm_name = self.forecast_algorithms.get("price", "price_naive_forecast")
@@ -331,7 +331,7 @@ class DsmUnitForecaster(UnitForecaster):
         self.preprocess_information["congestion_signal"] = congestion_signal_preprocess_algorithm(
             self.index,
             units,
-            market_config,
+            market_configs,
             forecast_df,
             initializing_unit,
         )
@@ -343,7 +343,7 @@ class DsmUnitForecaster(UnitForecaster):
         self.preprocess_information["renewable_utilisation"] = renewable_utilisation_preprocess_algorithm(
             self.index,
             units,
-            market_config,
+            market_configs,
             forecast_df,
             initializing_unit
         )
@@ -365,7 +365,7 @@ class DsmUnitForecaster(UnitForecaster):
         )
 
         # 3. Do own preprocess
-        self.preprocess(units, market_config, forecast_df, initializing_unit)
+        self.preprocess(units, market_configs, forecast_df, initializing_unit)
 
 
         # 4. Get electricity price forecast
