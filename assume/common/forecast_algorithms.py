@@ -259,6 +259,7 @@ def calculate_naive_congestion_forecast(
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
+    preprocess_information = None,
 ) -> dict[str, ForecastSeries]:
     # Lines and buses should be everywhere the same
     buses, lines = extract_buses_and_lines(market_configs)
@@ -362,6 +363,7 @@ def calculate_naive_renewable_utilisation(
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
+    preprocess_information = None,
 ) -> dict[str, ForecastSeries]:
     forecast_df = _ensure_not_none(forecast_df, index)
 
