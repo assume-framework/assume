@@ -146,7 +146,7 @@ class UnitForecaster:
                 forecast_df,
                 self.preprocess_information["price"],
             )
-        self.price = self._dict_to_series(self.price)
+            self.price = self._dict_to_series(self.price)
 
         # 2. Get residual load forecast
         residual_load_forecast_algorithm_name = self.forecast_algorithms.get("residual_load", "residual_load_naive_forecast")
@@ -161,7 +161,7 @@ class UnitForecaster:
                 forecast_df,
                 self.preprocess_information["residual_load"]
             )
-        self.residual_load = self._dict_to_series(self.residual_load)
+            self.residual_load = self._dict_to_series(self.residual_load)
 
     def update(self, *args, **kwargs):
         """
@@ -353,17 +353,16 @@ class DsmUnitForecaster(UnitForecaster):
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
     ):
-        # Initialization and preprocess of 1. price and 2. residual load forecast 
+        # 1. preprocess of price and residual load forecast 
+        super().preprocess(units, market_configs, forecast_df, initializing_unit)
+        
+        # 2. Own preprocess and 3. Initialization and of price and load forecasts
         super().initialize(
             units,
             market_configs,
             forecast_df,
             initializing_unit,
         )
-
-        # 3. Do own preprocess
-        self.preprocess(units, market_configs, forecast_df, initializing_unit)
-
 
         # 4. Get electricity price forecast
         # TODO how to handle other markets?
@@ -372,18 +371,18 @@ class DsmUnitForecaster(UnitForecaster):
 
         # 5. Get congestion signal forecast
         congestion_signal_forecast_algorithm_name = self.forecast_algorithms.get("congestion_signal", "congestion_signal_naive_forecast")
-        congestion_signal_forecast_algorithm = congestion_signal_forecast_algorithms.get(
+        congestion_signal_forecast_algorithm = forecast_algorithms.get(
             congestion_signal_forecast_algorithm_name
         )
         if congestion_signal_forecast_algorithm is not None:  # None if one wants to keep forecasts
-            self.congestion_signal = forecast_algorithm(
+            self.congestion_signal = congestion_signal_forecast_algorithm(
                 self.index,
                 units,
                 market_configs,
                 forecast_df,
                 self.preprocess_information["congestion_signal"],
             )
-        self.congestion_signal = self._dict_to_series(self.congestion_signal)
+            self.congestion_signal = self._dict_to_series(self.congestion_signal)
 
 
         # 6. Get renewable utilisation forecast
@@ -399,7 +398,7 @@ class DsmUnitForecaster(UnitForecaster):
                 forecast_df,
                 self.preprocess_information["congestion_signal"],
             )
-        self.renewable_utilisation_signal = self._dict_to_series(self.renewable_utilisation_signal)
+            self.renewable_utilisation_signal = self._dict_to_series(self.renewable_utilisation_signal)
 
     def update(self, *args, **kwargs):
         """
@@ -474,6 +473,26 @@ class SteelplantForecaster(DsmUnitForecaster):
             return self._to_series(0)
         return self.fuel_prices[fuel]
 
+    def initialize(
+        self,
+        units: list[BaseUnit],
+        market_configs: list[MarketConfig],
+        forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
+    ):
+        super().initialize(
+            units,
+            market_configs,
+            forecast_df,
+            initializing_unit,
+        )
+        
+        initializing_unit.electricity_price = self.electricity_price
+        initializing_unit.congestion_signal = self.congestion_signal
+        initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
+
+
+        #initializing_unit.setup_model()
 
 
 class SteamgenerationForecaster(DsmUnitForecaster):
@@ -532,6 +551,26 @@ class SteamgenerationForecaster(DsmUnitForecaster):
             return self._to_series(0)
         return self.fuel_prices[fuel]
 
+    def initialize(
+        self,
+        units: list[BaseUnit],
+        market_configs: list[MarketConfig],
+        forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
+    ):
+        super().initialize(
+            units,
+            market_configs,
+            forecast_df,
+            initializing_unit,
+        )
+
+        initializing_unit.electricity_price = self.electricity_price
+        initializing_unit.congestion_signal = self.congestion_signal
+        initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
+
+        #initializing_unit.setup_model()
+
 class BuildingForecaster(DsmUnitForecaster):
     """
     A forecaster for building units
@@ -589,6 +628,25 @@ class BuildingForecaster(DsmUnitForecaster):
             return self._to_series(0)
         return self.fuel_prices[fuel]
 
+    def initialize(
+        self,
+        units: list[BaseUnit],
+        market_configs: list[MarketConfig],
+        forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
+    ):
+        super().initialize(
+            units,
+            market_configs,
+            forecast_df,
+            initializing_unit,
+        )
+
+        initializing_unit.electricity_price = self.electricity_price
+        # initializing_unit.congestion_signal = self.congestion_signal
+        # initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
+
+        #initializing_unit.setup_model(presolve=True)
 
 class HydrogenForecaster(DsmUnitForecaster):
     """
@@ -626,6 +684,26 @@ class HydrogenForecaster(DsmUnitForecaster):
         # self.electricity_price = self._to_series(electricity_price)
         self.hydrogen_demand = self._to_series(hydrogen_demand)
         self.seasonal_storage_schedule = self._to_series(seasonal_storage_schedule)
+
+    def initialize(
+        self,
+        units: list[BaseUnit],
+        market_configs: list[MarketConfig],
+        forecast_df: ForecastSeries = None,
+        initializing_unit: BaseUnit = None,
+    ):
+        super().initialize(
+            units,
+            market_configs,
+            forecast_df,
+            initializing_unit,
+        )
+
+        initializing_unit.electricity_price = self.electricity_price
+        # initializing_unit.congestion_signal = self.congestion_signal
+        # initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
+
+        #initializing_unit.setup_model()
 
 
 class ExchangeForecaster(UnitForecaster):

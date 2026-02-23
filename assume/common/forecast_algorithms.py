@@ -265,7 +265,7 @@ def calculate_naive_congestion_forecast(
     buses, lines = extract_buses_and_lines(market_configs)
 
     if buses is None or lines is None:
-        return None
+        return {}
 
     powerplants_units, demand_units, exchange_units, storage_units, dsm_units, = sort_units(
         units
@@ -276,10 +276,10 @@ def calculate_naive_congestion_forecast(
     demand_unit_nodes = {demand.node for demand in demand_units}
     if not all(node in buses.index for node in demand_unit_nodes):
         log.warning(
-                "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
+                "Node-specific congestion signals forecast could not be calculated. "
                 "Not all unit nodes are available in buses."
             )
-        return None
+        return {}
 
     # Step 1: Calculate load for each powerplant based on availability factor and max power
     # shape: (forecast_len, num_units)
@@ -371,7 +371,7 @@ def calculate_naive_renewable_utilisation(
     buses, lines = extract_buses_and_lines(market_configs)
 
     if buses is None or lines is None:
-        return None
+        return {}
 
     powerplants_units, demand_units, exchange_units, storage_units, dsm_units = sort_units(
         units
@@ -380,10 +380,10 @@ def calculate_naive_renewable_utilisation(
     demand_unit_nodes = {demand.node for demand in demand_units}
     if not all(node in buses.index for node in demand_unit_nodes):
         log.warning(
-                "Node-specific congestion signals and renewable utilisation forecasts could not be calculated. "
+                "Node-specific renewable utilisation forecasts could not be calculated. "
                 "Not all unit nodes are available in buses."
             )
-        return None
+        return {}
 
     # Calculate load for each renewable powerplant based on availability factor and max power
     # shape: (forecast_len, num_pps)
