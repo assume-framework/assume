@@ -492,7 +492,7 @@ class SteelplantForecaster(DsmUnitForecaster):
         initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
 
 
-        #initializing_unit.setup_model()
+        initializing_unit.setup_model()
 
 
 class SteamgenerationForecaster(DsmUnitForecaster):
@@ -569,7 +569,7 @@ class SteamgenerationForecaster(DsmUnitForecaster):
         initializing_unit.congestion_signal = self.congestion_signal
         initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
 
-        #initializing_unit.setup_model()
+        initializing_unit.setup_model()
 
 class BuildingForecaster(DsmUnitForecaster):
     """
@@ -646,7 +646,7 @@ class BuildingForecaster(DsmUnitForecaster):
         # initializing_unit.congestion_signal = self.congestion_signal
         # initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
 
-        #initializing_unit.setup_model(presolve=True)
+        initializing_unit.setup_model(presolve=True)
 
 class HydrogenForecaster(DsmUnitForecaster):
     """
@@ -703,7 +703,7 @@ class HydrogenForecaster(DsmUnitForecaster):
         # initializing_unit.congestion_signal = self.congestion_signal
         # initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
 
-        #initializing_unit.setup_model()
+        initializing_unit.setup_model()
 
 
 class ExchangeForecaster(UnitForecaster):
