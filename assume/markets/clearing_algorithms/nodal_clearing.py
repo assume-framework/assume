@@ -103,7 +103,7 @@ class NodalClearingRole(MarketRole):
         # if we have multiple hours (count >1), we cannot handle storage units bids yet
         # this is because the storage bids would be linked bids
         storage_units = self.grid_data.get("storage_units", pd.DataFrame())
-        if not storage_units.empty:
+        if storage_units is not None and not storage_units.empty:
             if self.marketconfig.market_products[0].count > 1:
                 # make sure storages potentially present in the grid do not participate in this market
                 if not (
@@ -148,7 +148,7 @@ class NodalClearingRole(MarketRole):
         # storage units
         # also add them as generators, as we only regard bids here and are not interested in their internal state
         # we take the max of discharging and charging power as p_nom for PyPSA. Bids are later used to set p_min_pu and p_max_pu accordingly.
-        if not storage_units.empty:
+        if storage_units is not None and not storage_units.empty:
             self.network.add(
                 "Generator",
                 self.grid_data["storage_units"].index,
@@ -162,12 +162,6 @@ class NodalClearingRole(MarketRole):
             )
 
         self.solver = marketconfig.param_dict.get("solver", "highs")
-        if self.solver == "gurobi":
-            self.solver_options = {"OutputFlag": 0}
-        elif self.solver == "highs":
-            self.solver_options = {"output_flag": False}
-        else:
-            self.solver_options = {}
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
@@ -301,7 +295,6 @@ class NodalClearingRole(MarketRole):
         n.optimize.fix_optimal_capacities()
         status, termination_condition = n.optimize(
             solver=self.solver,
-            solver_options=self.solver_options,
             log_to_console=False,
             progress=False,
         )
