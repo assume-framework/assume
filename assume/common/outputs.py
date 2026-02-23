@@ -589,7 +589,7 @@ class WriteOutput(Role):
 
         for table, df in grid.items():
             geo_table = f"{table}_geo"
-            if df.empty:
+            if df is None or df.empty:
                 continue
             df["simulation"] = self.simulation_id
             df.reset_index()
