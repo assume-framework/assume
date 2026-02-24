@@ -9,6 +9,7 @@ from functools import lru_cache
 import numpy as np
 
 from assume.common.base import SupportsMinMaxCharge
+from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import UnitForecaster
 
@@ -98,36 +99,72 @@ class Storage(SupportsMinMaxCharge):
             **kwargs,
         )
         if capacity < 0:
-            raise ValueError(f"{capacity=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{capacity=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="",
+            )
         if not 0 <= min_soc <= 1:
-            raise ValueError(f"{min_soc=} must be between 0 and 1 for unit {self.id}")
+            raise ValidationError(
+                message=f"{min_soc=} must be between 0 and 1 for unit {self.id}",
+                id=self.id,
+                field="",
+            )
         if not 0 <= max_soc <= 1:
-            raise ValueError(f"{max_soc=} must be between 0 and 1 for unit {self.id}")
+            raise ValidationError(
+                message=f"{max_soc=} must be between 0 and 1 for unit {self.id}",
+                id=self.id,
+                field="",
+            )
         if max_soc < min_soc:
-            raise ValueError(f"{max_soc=} must be >= {min_soc=} for unit {self.id}")
+            raise ValidationError(
+                message=f"{max_soc=} must be >= {min_soc=} for unit {self.id}",
+                id=self.id,
+                field="",
+            )
         self.capacity = capacity
         self.max_soc = max_soc
         self.min_soc = min_soc
         if initial_soc is None:
             initial_soc = 0.5
         if not 0 <= initial_soc <= 1:
-            raise ValueError(
-                f"{initial_soc=} must be between 0 and 1 for unit {self.id}"
+            raise ValidationError(
+                f"{initial_soc=} must be between 0 and 1 for unit {self.id}",
+                id=self.id,
+                field="initial_soc",
             )
         self.initial_soc = initial_soc
 
         if max_power_charge > 0:
-            raise ValueError(f"{max_power_charge=} must be <= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{max_power_charge=} must be <= 0 for unit {self.id}",
+                id=self.id,
+                field="max_power_charge",
+            )
         if min_power_charge > 0:
-            raise ValueError(f"{min_power_charge=} must be <= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{min_power_charge=} must be <= 0 for unit {self.id}",
+                id=self.id,
+                field="min_power_charge",
+            )
         if max_power_charge > min_power_charge:
-            raise ValueError(
-                f"{max_power_charge=} must be <= {min_power_charge=} for unit {self.id}"
+            raise ValidationError(
+                f"{max_power_charge=} must be <= {min_power_charge=} for unit {self.id}",
+                id=self.id,
+                field="max_power_charge",
             )
         if max_power_discharge < 0:
-            raise ValueError(f"{max_power_discharge=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{max_power_discharge=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="max_power_discharge",
+            )
         if min_power_discharge < 0:
-            raise ValueError(f"{min_power_discharge=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{min_power_discharge=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="min_power_discharge",
+            )
         if max_power_discharge < min_power_discharge:
             raise ValueError(
                 f"{max_power_discharge=} must be >= {min_power_discharge=} for unit {self.id}"
@@ -141,16 +178,24 @@ class Storage(SupportsMinMaxCharge):
         self.outputs["cost_stored_energy"] = FastSeries(value=0.0, index=self.index)
 
         if soc_tick < 0:
-            raise ValueError(f"{soc_tick=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{soc_tick=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="soc_tick",
+            )
         self.soc_tick = soc_tick
 
         if not 0 <= efficiency_charge <= 1:
-            raise ValueError(
-                f"{efficiency_charge=} must be between 0 and 1 for unit {self.id}"
+            raise ValidationError(
+                f"{efficiency_charge=} must be between 0 and 1 for unit {self.id}",
+                id=self.id,
+                field="efficiency_charge",
             )
         if not 0 <= efficiency_discharge <= 1:
-            raise ValueError(
-                f"{efficiency_discharge=} must be between 0 and 1 for unit {self.id}"
+            raise ValidationError(
+                f"{efficiency_discharge=} must be between 0 and 1 for unit {self.id}",
+                id=self.id,
+                field="efficiency_discharge",
             )
         # The efficiency of the storage unit while charging.
         self.efficiency_charge = efficiency_charge
@@ -164,13 +209,29 @@ class Storage(SupportsMinMaxCharge):
         # if ramp_up_charge == 0, the ramp_up_charge is set to enable ramping between full charge and discharge power
         # else the ramp_up_charge is set to the negative value of the ramp_up_charge
         if ramp_up_charge is not None and ramp_up_charge > 0:
-            raise ValueError(f"{ramp_up_charge=} must be <= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{ramp_up_charge=} must be <= 0 for unit {self.id}",
+                id=self.id,
+                field="ramp_up_charge",
+            )
         if ramp_down_charge is not None and ramp_down_charge > 0:
-            raise ValueError(f"{ramp_down_charge=} must be <= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{ramp_down_charge=} must be <= 0 for unit {self.id}",
+                id=self.id,
+                field="ramp_down_charge",
+            )
         if ramp_up_discharge is not None and ramp_up_discharge < 0:
-            raise ValueError(f"{ramp_up_discharge=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{ramp_up_discharge=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="ramp_up_discharge",
+            )
         if ramp_down_discharge is not None and ramp_down_discharge < 0:
-            raise ValueError(f"{ramp_down_discharge=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{ramp_down_discharge=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="ramp_down_discharge",
+            )
         self.ramp_up_charge = ramp_up_charge
         self.ramp_down_charge = ramp_down_charge
         self.ramp_up_discharge = ramp_up_discharge
@@ -178,19 +239,35 @@ class Storage(SupportsMinMaxCharge):
 
         # How long the storage unit has to be in operation before it can be shut down.
         if min_operating_time < 0:
-            raise ValueError(f"{min_operating_time=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{min_operating_time=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="min_operating_time",
+            )
         self.min_operating_time = min_operating_time
         # How long the storage unit has to be shut down before it can be started.
         if min_down_time < 0:
-            raise ValueError(f"{min_down_time=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{min_down_time=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="min_down_time",
+            )
         self.min_down_time = min_down_time
         # The downtime before hot start of the storage unit.
         if downtime_hot_start < 0:
-            raise ValueError(f"{downtime_hot_start=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{downtime_hot_start=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="downtime_hot_start",
+            )
         self.downtime_hot_start = downtime_hot_start
         # The downtime before warm start of the storage unit.
         if downtime_warm_start < 0:
-            raise ValueError(f"{downtime_warm_start=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{downtime_warm_start=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="downtime_warm_start",
+            )
         self.downtime_warm_start = downtime_warm_start
 
         self.hot_start_cost = hot_start_cost * max_power_discharge
