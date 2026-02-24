@@ -28,6 +28,8 @@ Upcoming Release
 
 - **Notebook 10a**: Bidding strategy- strings were replaced by the method. Tutorial works error-free.
 
+**Improvements:**
+- Upgrade to Pandas 3
 
 0.5.6 - (23th December 2025)
 ============================
