@@ -179,6 +179,7 @@ class UnitForecaster:
             *args,
             **kwargs
         )
+        self.price = self._dict_to_series(self.price)
 
         residual_load_update_algorithm_name = self.forecast_algorithms.get("update_residual_load", "residual_load_default")
         residual_load_update_algorithm = forecast_update_algorithms.get(
@@ -190,6 +191,7 @@ class UnitForecaster:
             *args,
             **kwargs
         )
+        self.residual_load = self._dict_to_series(self.residual_load)
 
 
 class CustomUnitForecaster(UnitForecaster):
@@ -418,6 +420,7 @@ class DsmUnitForecaster(UnitForecaster):
             *args,
             **kwargs
         )
+        self.congestion_signal = self._dict_to_series(self.congestion_signal)
 
         renewable_utilisation_update_algorithm_name = self.forecast_algorithms.get("update_renewable_utilisation", "renewable_utilisation_default")
         renewable_utilisation_update_algorithm = forecast_update_algorithms.get(
@@ -429,6 +432,7 @@ class DsmUnitForecaster(UnitForecaster):
             *args,
             **kwargs
         )
+        self.renewable_utilisation_signal = self._dict_to_series(self.renewable_utilisation_signal)
 
 class SteelplantForecaster(DsmUnitForecaster):
     """

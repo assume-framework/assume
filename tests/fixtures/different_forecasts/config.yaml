@@ -32,3 +32,13 @@ base:
     congestion_signal: congestion_signal_special_forecast
     new_specific_forecast: new_naive_forecast
 
+    preprocess_price: price_default
+    preprocess_residual_load: residual_load_default
+    preprocess_congestion_signal: congestion_signal_default
+    preprocess_renewable_utilisation: renewable_utilisation_special
+
+    update_price: price_default
+    update_residual_load: residual_load_fancy
+    update_congestion_signal: congestion_signal_default
+    update_renewable_utilisation: renewable_utilisation_special
+

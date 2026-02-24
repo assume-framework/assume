@@ -23,6 +23,14 @@ def test_csv_loader_validation():
         )
 
 def test_csv_loader_forecaster_algorithms():
+    """
+    Testing forecast_algorithm loading. This includes:
+        setting via config
+        setting via csv (overwrites config if not None)
+    for forecast, preprocess and update algorithms.
+    Includes:
+        test in config and csv with forecasts that are not present in the other.
+    """
     scenario_data = load_config_and_create_forecaster(
             inputs_path="tests/fixtures", scenario="different_forecasts", study_case="base"
     )
@@ -66,11 +74,25 @@ def test_csv_loader_forecaster_algorithms():
         }
     }
 
+    # Also include preprocess and update algorithms
+    for key in expected_forcast_algorithms:
+        expected_forcast_algorithms[key]["preprocess_price"] = "price_default"
+        expected_forcast_algorithms[key]["preprocess_residual_load"] = "residual_load_default"
+        expected_forcast_algorithms[key]["preprocess_congestion_signal"] = "congestion_signal_default"
+        expected_forcast_algorithms[key]["preprocess_renewable_utilisation"] = "renewable_utilisation_special"
+
+        expected_forcast_algorithms[key]["update_price"] = "price_default"
+        expected_forcast_algorithms[key]["update_residual_load"] = "residual_load_fancy"
+        expected_forcast_algorithms[key]["update_congestion_signal"] = "congestion_signal_default"
+        expected_forcast_algorithms[key]["update_renewable_utilisation"] = "renewable_utilisation_special"
+
+    expected_forcast_algorithms["Unit 1"]["preprocess_residual_load"] = "residual_load_prepare_multiple"
+    expected_forcast_algorithms["Unit 2"]["update_congestion_signal"] = "congestion_signal_neural_net"
+    expected_forcast_algorithms["Unit 3"]["update_congestion_signal"] = "congestion_signal_special"
+
     for unit, forecaster in forecasters.items():
         for forecast_type, forecast_algorithm_id in forecaster.forecast_algorithms.items():
             assert forecast_algorithm_id == expected_forcast_algorithms[unit][forecast_type], f"{unit}, forecast type: {forecast_type}, {forecast_algorithm_id} != {expected_forcast_algorithms[unit][forecast_type]}"
-
-
 
 
 def test_get_unit_forecast_algorithms():

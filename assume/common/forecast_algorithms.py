@@ -436,19 +436,40 @@ forecast_algorithms = {
 def default_preprocess(*args, **kwargs):
     return None
 
+def prepare_unit_specific_residual_load_forecasts(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    market_configs: list[MarketConfig],
+    forecast_df: ForecastSeries = None,
+    initializing_unit: BaseUnit = None,
+):
+    unit_name = initializing_unit.id
+    preprocess_information = {
+        key:forecast_df[key] for key in forecast_df.columns
+        if unit_name in key and "residual_load" in key
+    }
+
+    return preprocess_information
+
+
 forecast_preprocess_algorithms = {
     "price_default": default_preprocess,
     "residual_load_default": default_preprocess,
+    "residual_load_prepare_multiple": prepare_unit_specific_residual_load_forecasts,
     "congestion_signal_default": default_preprocess,
     "renewable_utilisation_default": default_preprocess,
 }
 
-def default_update(old_forecast, preprocess_information, *args, **kwargs):
-    return old_forecast
+def default_update(current_forecast, preprocess_information, *args, **kwargs):
+    return current_forecast
+
+def set_preloaded_forecast_by_name(current_forecast, preprocess_information, new_forecast_name:str):
+    return preprocess_information[new_forecast_name]
 
 forecast_update_algorithms = {
     "price_default": default_update,
     "residaul_load_default": default_update,
+    "residual_load_set_preloaded": set_preloaded_forecast_by_name,
     "congestion_signal_default": default_update,
     "renewable_utilisation_default": default_update,
 }

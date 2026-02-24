@@ -28,7 +28,7 @@ parse_date = {"index_col": "datetime", "parse_dates": ["datetime"]}
 
 
 @pytest.fixture
-def forecast_preprocess():
+def forecast_setup():
     market_configs = {
         "EOM": {
             "market_id": "EOM",
@@ -98,12 +98,13 @@ def forecast_preprocess():
     }
 
 
-def test_forecast_init__calc_market_forecasts(forecast_preprocess):
-    for unit in forecast_preprocess["units"]:
+def test_forecast_init__calc_market_forecasts(forecast_setup):
+    for unit in forecast_setup["units"]:
         unit.forecaster.initialize(
-            forecast_preprocess["units"],
-            forecast_preprocess["market_configs"],
+            forecast_setup["units"],
+            forecast_setup["market_configs"],
             None,  # no forecast_df --> calculate on its own
+            unit,
         )
         break
 
@@ -114,7 +115,7 @@ def test_forecast_init__calc_market_forecasts(forecast_preprocess):
     expected = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
     assert_series_equal(
         expected["load_forecast"],
-        pd.Series(load_forecast["EOM"], forecast_preprocess["index"]),  # convert FastSeries to pd.Series for comparison
+        pd.Series(load_forecast["EOM"], forecast_setup["index"]),  # convert FastSeries to pd.Series for comparison
         check_names=False,
         check_dtype=False,
         check_freq=False,
@@ -122,18 +123,18 @@ def test_forecast_init__calc_market_forecasts(forecast_preprocess):
     assert list(market_forecast["EOM"]) == [1000] * 24
 
 
-def test_forecast_init__calc_node_forecasts(forecast_preprocess):
+def test_forecast_init__calc_node_forecasts(forecast_setup):
     congestion_signal = calculate_naive_congestion_forecast(
-            forecast_preprocess["index"],
-            forecast_preprocess["units"],
-            forecast_preprocess["market_configs"],
-            forecast_preprocess["forecast_df"],
+            forecast_setup["index"],
+            forecast_setup["units"],
+            forecast_setup["market_configs"],
+            forecast_setup["forecast_df"],
     )
     rn_utilization = calculate_naive_renewable_utilisation(
-            forecast_preprocess["index"],
-            forecast_preprocess["units"],
-            forecast_preprocess["market_configs"],
-            forecast_preprocess["forecast_df"],
+            forecast_setup["index"],
+            forecast_setup["units"],
+            forecast_setup["market_configs"],
+            forecast_setup["forecast_df"],
     )
 
     expected_cgn = pd.read_csv(path / "results/congestion_signal.csv", **parse_date)
@@ -155,13 +156,13 @@ def test_forecast_init__calc_node_forecasts(forecast_preprocess):
     )
 
 
-def test_forecast_init__uses_given_forecast(forecast_preprocess):
-    forecasts = forecast_preprocess["forecast_df"]
-    index = forecast_preprocess["index"]
-    for unit in forecast_preprocess["units"]:
+def test_forecast_init__uses_given_forecast(forecast_setup):
+    forecasts = forecast_setup["forecast_df"]
+    index = forecast_setup["index"]
+    for unit in forecast_setup["units"]:
         unit.forecaster.initialize(
-            forecast_preprocess["units"],
-            forecast_preprocess["market_configs"],
+            forecast_setup["units"],
+            forecast_setup["market_configs"],
             forecasts,
         )
         break
