@@ -7,6 +7,7 @@ from datetime import datetime
 import numpy as np
 
 from assume.common.base import SupportsMinMax
+from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import DemandForecaster
 
@@ -58,15 +59,23 @@ class Demand(SupportsMinMax):
             raise ValueError(f"forecaster must be of type {DemandForecaster.__name__}")
 
         if max_power > 0:
-            raise ValueError(
-                f"max_power must be < 0 but is {max_power} for unit {self.id}"
+            raise ValidationError(
+                message=f"max_power must be < 0 but is {max_power} for unit {self.id}",
+                id=self.id,
+                field="max_power",
             )
         if min_power > 0:
-            raise ValueError(
-                f"min_power must be < 0 but is {min_power} for unit {self.id}"
+            raise ValidationError(
+                f"min_power must be < 0 but is {min_power} for unit {self.id}",
+                id=self.id,
+                field="min_power",
             )
         if max_power > min_power:
-            raise ValueError(f"{max_power=} must be <= {min_power=} for unit {self.id}")
+            raise ValidationError(
+                message=f"{max_power=} must be <= {min_power=} for unit {self.id}",
+                id=self.id,
+                field="max_power",
+            )
 
         self.max_power = max_power
         self.min_power = min_power
