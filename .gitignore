@@ -152,4 +152,5 @@ logs
 **/scenario/*.csv
 *.pb
 *.jar
+*.nbconvert.ipynb
 fameSetup.yaml

@@ -177,10 +177,18 @@ def market_clearing_opt_constraints(
     )
 
     if incidence_matrix is not None:
+        # add NTCs
         model.transmission_constr = pyo.ConstraintList()
         for t in model.T:
             for line in model.lines:
-                capacity = lines.at[line, "s_nom"]
+                # s_max_pu might also be time variant. but for now we assume it is static
+                s_max_pu = (
+                    lines.at[line, "s_max_pu"]
+                    if "s_max_pu" in lines.columns
+                    and not pd.isna(lines.at[line, "s_max_pu"])
+                    else 1.0
+                )
+                capacity = lines.at[line, "s_nom"] * s_max_pu
                 # Limit the flow on each line
                 model.transmission_constr.add(model.flows[t, line] <= capacity)
                 model.transmission_constr.add(model.flows[t, line] >= -capacity)
@@ -290,8 +298,8 @@ class ComplexClearingRole(MarketRole):
     """
     This class defines an optimization-based market clearing algorithm with support for complex bid types,
     including block bids, linked bids, minimum acceptance ratios, and profiled volumes. It supports network
-    representations with either zonal or nodal configurations, enabling the modeling of complex markets with
-    multiple zones and power flow constraints.
+    representations (through Net Transfer Capacities) with either zonal or nodal configurations, enabling the modeling of complex markets with
+    multiple zones based on a transport model.
 
     The market clearing algorithm accepts additional arguments via the ``param_dict`` in the market configuration.
 
@@ -332,7 +340,12 @@ class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
-        self.define_solver(solver=marketconfig.param_dict.get("solver", "appsi_highs"))
+        self.solver = get_supported_solver(
+            marketconfig.param_dict.get("solver", "appsi_highs")
+        )
+        self.solver_options = {}
+        if self.solver == "gurobi":
+            self.solver_options = {"cutoff": -1.0, "MIPGap": EPS}
 
         # Define grid data
         self.nodes = ["node0"]
@@ -343,6 +356,11 @@ class ComplexClearingRole(MarketRole):
         if self.grid_data:
             self.lines = self.grid_data["lines"]
             buses = self.grid_data["buses"]
+
+            if "x" in self.lines.columns:
+                logger.warning(
+                    "Warning: 'lines.csv' contains reactances 'x' but this clearing is based on Net Transfer Capacities only (Transport model). Use 'nodal_clearing' to include a linear OPF."
+                )
 
             self.zones_id = self.marketconfig.param_dict.get("zones_identifier")
             self.node_to_zone = None
@@ -364,19 +382,6 @@ class ComplexClearingRole(MarketRole):
         self.pricing_mechanism = self.marketconfig.param_dict.get(
             "pricing_mechanism", "pay_as_clear"
         )
-
-    def define_solver(self, solver: str):
-        solver = get_supported_solver(solver)
-
-        if solver == "gurobi":
-            solver_options = {"cutoff": -1.0, "MIPGap": EPS, "LogToConsole": 0}
-        elif solver == "appsi_highs":
-            solver_options = {"output_flag": False, "log_to_console": False}
-        else:
-            solver_options = {}
-
-        self.solver = solver
-        self.solver_options = solver_options
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
@@ -779,7 +784,6 @@ def extract_results(
         if hasattr(model, "flows"):
             flows = model.flows
 
-            # filter flows and only use positive flows to half the size of the dict
             flows_filtered = {
                 index: flow.value for index, flow in flows.items() if not flow.stale
             }

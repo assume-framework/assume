@@ -94,9 +94,9 @@ def test_total_steel_production(eaf_model):
     """
     model, _ = eaf_model
     total_steel = sum(pyo.value(model.eaf.steel_output[t]) for t in model.time_steps)
-    assert (
-        abs(total_steel - 500) < 1e-5
-    ), f"Total steel production is {total_steel}, expected 800."
+    assert abs(total_steel - 500) < 1e-5, (
+        f"Total steel production is {total_steel}, expected 800."
+    )
 
 
 def test_eaf_ramping_constraints(eaf_model, eaf_config):
@@ -114,12 +114,12 @@ def test_eaf_ramping_constraints(eaf_model, eaf_config):
             ramp_up = power_current - power_prev
             ramp_down = power_prev - power_current
 
-            assert (
-                ramp_up <= ramp_up_limit + 1e-5
-            ), f"Ramp-up at time {t} is {ramp_up}, exceeds limit of {ramp_up_limit}."
-            assert (
-                ramp_down <= ramp_down_limit + 1e-5
-            ), f"Ramp-down at time {t} is {ramp_down}, exceeds limit of {ramp_down_limit}."
+            assert ramp_up <= ramp_up_limit + 1e-5, (
+                f"Ramp-up at time {t} is {ramp_up}, exceeds limit of {ramp_up_limit}."
+            )
+            assert ramp_down <= ramp_down_limit + 1e-5, (
+                f"Ramp-down at time {t} is {ramp_down}, exceeds limit of {ramp_down_limit}."
+            )
 
 
 def test_eaf_power_bounds(eaf_model, eaf_config):
@@ -171,9 +171,9 @@ def test_eaf_min_operating_steps(eaf_model, eaf_config):
             future_t = t + step
             if future_t in model.time_steps:
                 status = pyo.value(operational_status[future_t])
-                assert (
-                    status == 1
-                ), f"Operational status at time {future_t} should be 1 after startup at {t}, but is {status}."
+                assert status == 1, (
+                    f"Operational status at time {future_t} should be 1 after startup at {t}, but is {status}."
+                )
 
 
 def test_eaf_min_downtime_steps(eaf_model, eaf_config):
@@ -193,9 +193,9 @@ def test_eaf_min_downtime_steps(eaf_model, eaf_config):
             future_t = t + step
             if future_t in model.time_steps:
                 status = pyo.value(operational_status[future_t])
-                assert (
-                    status == 0
-                ), f"Operational status at time {future_t} should be 0 after shutdown at {t}, but is {status}."
+                assert status == 0, (
+                    f"Operational status at time {future_t} should be 0 after shutdown at {t}, but is {status}."
+                )
 
 
 def test_initial_operational_status(eaf_model, eaf_config):
@@ -206,9 +206,9 @@ def test_initial_operational_status(eaf_model, eaf_config):
     initial_status = eaf_config["initial_operational_status"]
     first_time_step = model.time_steps.at(1)
     actual_status = pyo.value(model.eaf.operational_status[first_time_step])
-    assert (
-        actual_status == initial_status
-    ), f"Initial operational status is {actual_status}, expected {initial_status}."
+    assert actual_status == initial_status, (
+        f"Initial operational status is {actual_status}, expected {initial_status}."
+    )
 
 
 def test_eaf_dri_demand_relation(eaf_model, eaf_config):
@@ -222,9 +222,9 @@ def test_eaf_dri_demand_relation(eaf_model, eaf_config):
         steel_output = pyo.value(model.eaf.steel_output[t])
         dri_input = pyo.value(model.eaf.dri_input[t])
         expected_dri = steel_output * specific_dri_demand
-        assert (
-            abs(dri_input - expected_dri) < 1e-5
-        ), f"DRI input at time {t} is {dri_input}, expected {expected_dri} based on steel output."
+        assert abs(dri_input - expected_dri) < 1e-5, (
+            f"DRI input at time {t} is {dri_input}, expected {expected_dri} based on steel output."
+        )
 
 
 def test_eaf_lime_demand_relation(eaf_model, eaf_config):
@@ -238,9 +238,9 @@ def test_eaf_lime_demand_relation(eaf_model, eaf_config):
         steel_output = pyo.value(model.eaf.steel_output[t])
         lime_demand = pyo.value(model.eaf.lime_demand[t])
         expected_lime = steel_output * specific_lime_demand
-        assert (
-            abs(lime_demand - expected_lime) < 1e-5
-        ), f"Lime demand at time {t} is {lime_demand}, expected {expected_lime} based on steel output."
+        assert abs(lime_demand - expected_lime) < 1e-5, (
+            f"Lime demand at time {t} is {lime_demand}, expected {expected_lime} based on steel output."
+        )
 
 
 def test_eaf_co2_emission_relation(eaf_model):
@@ -253,9 +253,9 @@ def test_eaf_co2_emission_relation(eaf_model):
         lime_demand = pyo.value(model.eaf.lime_demand[t])
         co2_emission = pyo.value(model.eaf.co2_emission[t])
         expected_co2 = lime_demand * model.eaf.lime_co2_factor
-        assert (
-            abs(co2_emission - expected_co2) < 1e-5
-        ), f"CO2 emission at time {t} is {co2_emission}, expected {expected_co2} based on lime demand."
+        assert abs(co2_emission - expected_co2) < 1e-5, (
+            f"CO2 emission at time {t} is {co2_emission}, expected {expected_co2} based on lime demand."
+        )
 
 
 def test_eaf_operating_cost(eaf_model, price_profile):
@@ -270,9 +270,9 @@ def test_eaf_operating_cost(eaf_model, price_profile):
         pyo.value(model.eaf.operating_cost[t]) for t in model.time_steps
     )
     total_model_cost = pyo.value(model.total_cost)
-    assert (
-        abs(total_calculated_cost - total_model_cost) < 1e-5
-    ), f"Calculated total operating cost {total_calculated_cost} does not match model's total cost {total_model_cost}."
+    assert abs(total_calculated_cost - total_model_cost) < 1e-5, (
+        f"Calculated total operating cost {total_calculated_cost} does not match model's total cost {total_model_cost}."
+    )
 
     # Additionally, verify individual operating costs
     for t in model.time_steps:
@@ -285,9 +285,9 @@ def test_eaf_operating_cost(eaf_model, price_profile):
             + lime_demand * lime_price[t]
         )
         actual_cost = pyo.value(model.eaf.operating_cost[t])
-        assert (
-            abs(actual_cost - expected_cost) < 1e-5
-        ), f"Operating cost at time {t} is {actual_cost}, expected {expected_cost}."
+        assert abs(actual_cost - expected_cost) < 1e-5, (
+            f"Operating cost at time {t} is {actual_cost}, expected {expected_cost}."
+        )
 
 
 def test_eaf_steel_output_relation(eaf_model):
@@ -301,6 +301,6 @@ def test_eaf_steel_output_relation(eaf_model):
         power_in = pyo.value(model.eaf.power_in[t])
         steel_output = pyo.value(model.eaf.steel_output[t])
         expected_steel_output = power_in / specific_electricity_consumption
-        assert (
-            abs(steel_output - expected_steel_output) < 1e-5
-        ), f"Steel output at time {t} is {steel_output}, expected {expected_steel_output} based on power input."
+        assert abs(steel_output - expected_steel_output) < 1e-5, (
+            f"Steel output at time {t} is {steel_output}, expected {expected_steel_output} based on power input."
+        )

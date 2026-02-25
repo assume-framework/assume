@@ -76,10 +76,11 @@ def test_model_solves_successfully(heat_pump_model):
     Test that the optimization model solves successfully.
     """
     model, results = heat_pump_model
-    assert (
-        (results.solver.status == pyo.SolverStatus.ok)
-        and (results.solver.termination_condition == pyo.TerminationCondition.optimal)
-    ), f"Solver did not find an optimal solution. Status: {results.solver.status}, Termination Condition: {results.solver.termination_condition}"
+    assert (results.solver.status == pyo.SolverStatus.ok) and (
+        results.solver.termination_condition == pyo.TerminationCondition.optimal
+    ), (
+        f"Solver did not find an optimal solution. Status: {results.solver.status}, Termination Condition: {results.solver.termination_condition}"
+    )
 
 
 def test_total_heat_production(heat_pump_model):
@@ -88,9 +89,9 @@ def test_total_heat_production(heat_pump_model):
     """
     model, _ = heat_pump_model
     total_heat = sum(pyo.value(model.heat_pump.heat_out[t]) for t in model.time_steps)
-    assert (
-        abs(total_heat - 400) < 1e-5
-    ), f"Total heat production is {total_heat}, expected 400."
+    assert abs(total_heat - 400) < 1e-5, (
+        f"Total heat production is {total_heat}, expected 400."
+    )
 
 
 def test_heat_pump_ramping_constraints(heat_pump_model, heat_pump_config):
@@ -108,12 +109,12 @@ def test_heat_pump_ramping_constraints(heat_pump_model, heat_pump_config):
             ramp_up = power_current - power_prev
             ramp_down = power_prev - power_current
 
-            assert (
-                ramp_up <= ramp_up_limit + 1e-5
-            ), f"Ramp-up at time {t} is {ramp_up}, exceeds limit of {ramp_up_limit}."
-            assert (
-                ramp_down <= ramp_down_limit + 1e-5
-            ), f"Ramp-down at time {t} is {ramp_down}, exceeds limit of {ramp_down_limit}."
+            assert ramp_up <= ramp_up_limit + 1e-5, (
+                f"Ramp-up at time {t} is {ramp_up}, exceeds limit of {ramp_up_limit}."
+            )
+            assert ramp_down <= ramp_down_limit + 1e-5, (
+                f"Ramp-down at time {t} is {ramp_down}, exceeds limit of {ramp_down_limit}."
+            )
 
 
 def test_heat_pump_power_bounds(heat_pump_model, heat_pump_config):
@@ -155,9 +156,9 @@ def test_heat_pump_consumption_behavior(
         power_in = pyo.value(model.heat_pump.power_in[t])
         if price >= high_price_threshold:
             # When price is high, heat pump should not consume power
-            assert (
-                power_in == 0
-            ), f"Heat pump is consuming power at time {t} despite high price {price}."
+            assert power_in == 0, (
+                f"Heat pump is consuming power at time {t} despite high price {price}."
+            )
         else:
             # When price is low, heat pump should consume at least min_power
             operational_status = round(
@@ -166,13 +167,15 @@ def test_heat_pump_consumption_behavior(
             if operational_status:
                 # Adjust the assert statement to use math.isclose for comparison
                 assert (
-                    math.isclose(power_in, heat_pump_config["min_power"], rel_tol=1e-6)
+                    math.isclose(power_in, heat_pump_config["min_power"], abs_tol=1e-6)
                     or power_in > heat_pump_config["min_power"]
-                ), f"Heat pump power at time {t} is {power_in}, which is below the minimum power {heat_pump_config['min_power']}."
+                ), (
+                    f"Heat pump power at time {t} is {power_in}, which is below the minimum power {heat_pump_config['min_power']}."
+                )
             else:
-                assert (
-                    power_in == 0
-                ), f"Heat pump should be off at time {t}, but power_in is {power_in}."
+                assert math.isclose(power_in, 0, abs_tol=1e-9), (
+                    f"Heat pump should be off at time {t}, but power_in is {power_in}."
+                )
 
 
 def test_min_operating_steps(heat_pump_model, heat_pump_config):
@@ -192,9 +195,9 @@ def test_min_operating_steps(heat_pump_model, heat_pump_config):
             future_t = t + step
             if future_t in model.time_steps:
                 status = pyo.value(operational_status[future_t])
-                assert math.isclose(
-                    status, 1, rel_tol=1e-6
-                ), f"Operational status at time {future_t} should be 1 after startup at {t}, but is {status}."
+                assert math.isclose(status, 1, abs_tol=1e-6), (
+                    f"Operational status at time {future_t} should be 1 after startup at {t}, but is {status}."
+                )
 
 
 def test_min_downtime_steps(heat_pump_model, heat_pump_config):
@@ -214,9 +217,9 @@ def test_min_downtime_steps(heat_pump_model, heat_pump_config):
             future_t = t + step
             if future_t in model.time_steps:
                 status = pyo.value(operational_status[future_t])
-                assert (
-                    status == 0
-                ), f"Operational status at time {future_t} should be 0 after shutdown at {t}, but is {status}."
+                assert status == 0, (
+                    f"Operational status at time {future_t} should be 0 after shutdown at {t}, but is {status}."
+                )
 
 
 def test_initial_operational_status(heat_pump_model, heat_pump_config):
@@ -229,9 +232,9 @@ def test_initial_operational_status(heat_pump_model, heat_pump_config):
     initial_status = heat_pump_config["initial_operational_status"]
     first_time_step = model.time_steps.first()
     actual_status = pyo.value(model.heat_pump.operational_status[first_time_step])
-    assert actual_status == pytest.approx(
-        initial_status, abs=1e-8
-    ), f"Initial operational status is {actual_status}, expected {initial_status}."
+    assert actual_status == pytest.approx(initial_status, abs=1e-8), (
+        f"Initial operational status is {actual_status}, expected {initial_status}."
+    )
 
 
 def test_operating_cost(heat_pump_model, price_profile, heat_pump_config):
@@ -244,16 +247,16 @@ def test_operating_cost(heat_pump_model, price_profile, heat_pump_config):
         for t in model.time_steps
     )
     total_model_cost = pyo.value(model.total_cost)
-    assert (
-        abs(total_calculated_cost - total_model_cost) < 1e-5
-    ), f"Calculated total operating cost {total_calculated_cost} does not match model's total cost {total_model_cost}."
+    assert abs(total_calculated_cost - total_model_cost) < 1e-5, (
+        f"Calculated total operating cost {total_calculated_cost} does not match model's total cost {total_model_cost}."
+    )
 
     for t in model.time_steps:
         expected_cost = pyo.value(model.heat_pump.power_in[t]) * price_profile[t]
         actual_cost = pyo.value(model.heat_pump.operating_cost[t])
-        assert (
-            abs(actual_cost - expected_cost) < 1e-5
-        ), f"Operating cost at time {t} is {actual_cost}, expected {expected_cost}."
+        assert abs(actual_cost - expected_cost) < 1e-5, (
+            f"Operating cost at time {t} is {actual_cost}, expected {expected_cost}."
+        )
 
 
 if __name__ == "__main__":

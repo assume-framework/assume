@@ -177,7 +177,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime, coalesce(abs(flow),0)/s_nom as \"usage\", l.line as name, bus0, bus1, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, l.simulation\nFROM lines_geo l\nleft join grid_flows g on l.line = g.line and l.simulation = g.simulation\nWHERE\n  $__timeFilter(datetime) AND\nl.simulation = '$simulation'\nORDER BY 1\n",
+          "rawSql": "SELECT\n  datetime, coalesce(abs(flow),0)/(s_nom * s_max_pu) as \"usage\", l.line as name, bus0, bus1, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, l.simulation\nFROM lines_geo l\nleft join grid_flows g on l.line = g.line and l.simulation = g.simulation\nWHERE\n  $__timeFilter(datetime) AND\nl.simulation = '$simulation'\nORDER BY 1\n",
           "refId": "A",
           "select": [
             [

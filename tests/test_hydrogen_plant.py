@@ -25,8 +25,8 @@ def hydrogen_components():
             "min_down_time": 0,
         },
         "hydrogen_seasonal_storage": {
-            "max_capacity": 200,
-            "min_capacity": 20,
+            "capacity": 200,
+            "min_soc": 0.1,
             "max_power_charge": 40,
             "max_power_discharge": 40,
             "efficiency_charge": 0.95,
@@ -100,9 +100,9 @@ def test_optimal_operation_without_flex_initialization(hydrogen_plant):
         total_supplied += electrolyser_out + storage_discharge - storage_charge
 
     absolute_hydrogen_demand = pyo.value(instance.absolute_hydrogen_demand)
-    assert (
-        total_supplied >= absolute_hydrogen_demand - 1e-3
-    ), f"Total hydrogen supplied ({total_supplied}) is less than demand ({absolute_hydrogen_demand})"
+    assert total_supplied >= absolute_hydrogen_demand - 1e-3, (
+        f"Total hydrogen supplied ({total_supplied}) is less than demand ({absolute_hydrogen_demand})"
+    )
 
 
 def test_ramping_constraints_without_flex(hydrogen_plant):
@@ -129,21 +129,21 @@ def test_ramping_constraints_without_flex(hydrogen_plant):
         # Check charge ramping
         if charge_prev is not None and charge_curr is not None:
             change_in_charge = abs(charge_curr - charge_prev)
-            assert (
-                change_in_charge <= ramp_up + 1e-3
-            ), f"Charge ramp-up at time {t} exceeds limit"
+            assert change_in_charge <= ramp_up + 1e-3, (
+                f"Charge ramp-up at time {t} exceeds limit"
+            )
         if discharge_prev is not None and discharge_curr is not None:
             change_in_charge = abs(discharge_curr - discharge_prev)
-            assert (
-                change_in_charge <= ramp_down + 1e-3
-            ), f"Charge ramp-down at time {t} exceeds limit"
+            assert change_in_charge <= ramp_down + 1e-3, (
+                f"Charge ramp-down at time {t} exceeds limit"
+            )
 
 
-def test_initial_soc_greater_than_capacity(hydrogen_plant):
+def test_initial_soc_greater_than_max_soc(hydrogen_plant):
     storage = hydrogen_plant.components["hydrogen_seasonal_storage"]
-    assert (
-        storage.initial_soc <= storage.max_capacity
-    ), f"Initial SOC should be capped at max_capacity. Got {storage.initial_soc} > {storage.max_capacity}"
+    assert storage.initial_soc <= storage.max_soc, (
+        f"Initial SOC should be capped at max_soc. Got {storage.initial_soc} > {storage.max_soc}"
+    )
 
 
 def test_optimal_operation_with_flex_initialization(hydrogen_plant):
@@ -167,16 +167,16 @@ def test_optimal_operation_with_flex_initialization(hydrogen_plant):
     total_power_input = sum(
         (instance.total_power_input[t].value or 0.0) for t in instance.time_steps
     )
-    assert (
-        total_power_input > 0
-    ), "Total power input should be greater than zero under flexibility"
+    assert total_power_input > 0, (
+        "Total power input should be greater than zero under flexibility"
+    )
 
     for t in instance.time_steps:
         expected_power = hydrogen_plant.opt_power_requirement.iloc[t]
         actual_power = instance.total_power_input[t].value
-        assert (
-            abs(expected_power - actual_power) < 1e-3
-        ), f"Mismatch in power input at time {t}: expected {expected_power}, got {actual_power}"
+        assert abs(expected_power - actual_power) < 1e-3, (
+            f"Mismatch in power input at time {t}: expected {expected_power}, got {actual_power}"
+        )
 
     # Hydrogen demand balance check under flexibility
     total_supplied = 0.0
@@ -197,9 +197,9 @@ def test_optimal_operation_with_flex_initialization(hydrogen_plant):
         total_supplied += electrolyser_out + storage_discharge - storage_charge
 
     absolute_hydrogen_demand = pyo.value(instance.absolute_hydrogen_demand)
-    assert (
-        total_supplied >= absolute_hydrogen_demand - 1e-3
-    ), f"Total hydrogen supplied ({total_supplied}) is less than demand ({absolute_hydrogen_demand})"
+    assert total_supplied >= absolute_hydrogen_demand - 1e-3, (
+        f"Total hydrogen supplied ({total_supplied}) is less than demand ({absolute_hydrogen_demand})"
+    )
 
 
 def test_unknown_technology_error():
@@ -285,9 +285,9 @@ def test_electrolyser_only_operation(hydrogen_plant_no_storage):
         for t in instance.time_steps
     )
     absolute_hydrogen_demand = pyo.value(instance.absolute_hydrogen_demand)
-    assert (
-        total_electrolyser_output >= absolute_hydrogen_demand - 1e-3
-    ), f"Total electrolyser output {total_electrolyser_output} is less than absolute hydrogen demand {absolute_hydrogen_demand}"
+    assert total_electrolyser_output >= absolute_hydrogen_demand - 1e-3, (
+        f"Total electrolyser output {total_electrolyser_output} is less than absolute hydrogen demand {absolute_hydrogen_demand}"
+    )
 
 
 def test_electrolyser_meets_total_hydrogen_demand(hydrogen_plant_no_storage):

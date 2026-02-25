@@ -58,15 +58,16 @@ class Learning(Role):
         self.critics = {}
         self.target_critics = {}
 
-        self.device = th.device(
-            self.learning_config.device
-            if (
-                self.learning_config
-                and "cuda" in self.learning_config.device
-                and th.cuda.is_available()
-            )
-            else "cpu"
-        )
+        device = "cpu"
+        if self.learning_config:
+            if "cuda" in self.learning_config.device and th.cuda.is_available():
+                device = self.learning_config.device
+            elif (
+                "mps" in self.learning_config.device and th.backends.mps.is_available()
+            ):
+                device = self.learning_config.device
+        self.device = th.device(device)
+
         # future: add option to choose between float16 and float32
         # float_type = learning_config.float_type
         self.float_type = th.float
@@ -171,6 +172,9 @@ class Learning(Role):
             )
             return None
         total_length = self.end_datetime - self.start_datetime
+        assert total_length >= train_freq, (
+            f"Simulation length ({total_length}) must be at least as long as train_freq ({train_freq_str})"
+        )
         quotient, remainder = divmod(total_length, train_freq)
 
         if remainder != pd.Timedelta(0):
@@ -555,7 +559,7 @@ class Learning(Role):
 
                     if avg_change < self.learning_config.early_stopping_threshold:
                         logger.info(
-                            f"Stopping training as no improvement above {self.learning_config.early_stopping_threshold*100}% in last {self.learning_config.early_stopping_steps} evaluations for {metric}"
+                            f"Stopping training as no improvement above {self.learning_config.early_stopping_threshold * 100}% in last {self.learning_config.early_stopping_steps} evaluations for {metric}"
                         )
                         if (
                             self.learning_config.learning_rate_schedule

@@ -140,8 +140,8 @@ The Actor
 We will explain the way learning works in ASSUME starting from the interface to the simulation, namely the bidding strategy of the power plants.
 The bidding strategy, per definition in ASSUME, defines the way we formulate bids based on the technical restrictions of the unit.
 In a learning setting, this is done by the actor network which maps the observation to an action. The observation thereby is managed and collected by the units operator as
-summarized in the following picture. As you can see in the current working version, the observation space contains a residual load forecast for the next 24 hours and a price
-forecast for 24 hours, as well as the current capacity of the power plant and its marginal costs.
+summarized in the following picture. As you can see in the current working version, the observation space contains a residual load forecast and a price
+forecast for example for the next 24 hours, as well as the current capacity of the power plant and its marginal costs.
 
 .. image:: img/ActorTask.jpg
     :align: center
@@ -227,6 +227,7 @@ the notion of an “optimal” solution is often unclear. What we *do* observe a
 depends heavily on the reward design and on how other agents behave. Therefore:
 
     **Do not rely on rewards alone.** Behavior itself must be examined carefully.
+
 **Why solely reward-based evaluation is problematic**
 
 Let :math:`R_i` denote the episodic return of agent :math:`i` under the joint policy :math:`\pi=(\pi_1,\dots,\pi_n)`. A common but potentially misleading

@@ -9,6 +9,7 @@ from functools import lru_cache
 import numpy as np
 
 from assume.common.base import MinMaxStrategy, SupportsMinMax
+from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import PowerplantForecaster
 
@@ -94,19 +95,41 @@ class PowerPlant(SupportsMinMax):
             )
 
         if min_power < 0:
-            raise ValueError(f"{min_power=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{min_power=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="min_power",
+            )
         if max_power < 0:
-            raise ValueError(f"{max_power=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{max_power=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="max_power",
+            )
         if min_power > max_power:
-            raise ValueError(f"{min_power=} must be <= {max_power=} for unit {self.id}")
+            raise ValidationError(
+                message=f"{min_power=} must be <= {max_power=} for unit {self.id}",
+                id=self.id,
+                field="min_power",
+            )
         if not 0 <= efficiency <= 1:
-            raise ValueError(
-                f"{efficiency=} must be between 0 and 1 for unit {self.id}"
+            raise ValidationError(
+                message=f"{efficiency=} must be between 0 and 1 for unit {self.id}",
+                id=self.id,
+                field="efficiency",
             )
         if emission_factor < 0:
-            raise ValueError(f"{emission_factor=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{emission_factor=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="emission_factor",
+            )
         if max_heat_extraction < 0:
-            raise ValueError(f"{max_heat_extraction=} must be >= 0 for unit {self.id}")
+            raise ValidationError(
+                message=f"{max_heat_extraction=} must be >= 0 for unit {self.id}",
+                id=self.id,
+                field="max_heat_extraction",
+            )
         self.max_power = max_power
         self.min_power = min_power
         self.efficiency = efficiency
@@ -124,11 +147,19 @@ class PowerPlant(SupportsMinMax):
         self.ramp_down = None if ramp_down == 0 else ramp_down
         self.ramp_up = None if ramp_up == 0 else ramp_up
 
-        if min_operating_time <= 0:
-            raise ValueError(f"{min_operating_time=} must be > 0 for unit {self.id}")
+        if min_operating_time < 0:
+            raise ValidationError(
+                message=f"{min_operating_time=} must be > 0 for unit {self.id}",
+                id=self.id,
+                field="min_operating_time",
+            )
         self.min_operating_time = min_operating_time
-        if min_down_time <= 0:
-            raise ValueError(f"{min_down_time=} must be > 0 for unit {self.id}")
+        if min_down_time < 0:
+            raise ValidationError(
+                message=f"{min_down_time=} must be > 0 for unit {self.id}",
+                id=self.id,
+                field="min_down_time",
+            )
         self.min_down_time = min_down_time
         self.downtime_hot_start = downtime_hot_start / (
             self.index.freq / timedelta(hours=1)
@@ -290,8 +321,10 @@ class PowerPlant(SupportsMinMax):
         max_power = available_power * self.max_power
         # check if available power is larger than max_power and raise an error if so
         if (max_power > self.max_power).any():
-            raise ValueError(
-                f"Available power is larger than max_power for unit {self.id} at time {start}."
+            raise ValidationError(
+                message=f"Available power is larger than max_power for unit {self.id} at time {start}.",
+                id=self.id,
+                field="availability",
             )
 
         # provide reserve for capacity_pos

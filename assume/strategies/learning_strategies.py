@@ -120,6 +120,8 @@ class TorchLearningStrategy(LearningStrategy):
 
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
+        # Note: These scaling factors could be interpreted as information leakage. However as we are in a simulation environment and not a purley forecasting setting
+        # we assume that the agent has access to this information already
         upper_scaling_factor_price = max(unit.forecaster.price[market_id])
         lower_scaling_factor_price = min(unit.forecaster.price[market_id])
         residual_load = unit.forecaster.residual_load.get(
@@ -188,6 +190,8 @@ class TorchLearningStrategy(LearningStrategy):
         )
 
         # --- 2. Historical actual prices (backward-looking) ---
+        # Note: We scale with the max_bid_price here in comparison to the scaling of the forecast where we use the max price of the forecast period
+        # this is not consistent but has worked well so far. Future work could look into this in more detail.
         scaled_price_history = (
             unit.outputs["energy_accepted_price"].window(
                 start, self.foresight, direction="backward"
@@ -316,11 +320,11 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     on an Energy-Only Market.
 
     The agent submits two price bids: one for the inflexible component (P_min) and another for
-    the flexible component (P_max - P_min) of its capacity. This strategy utilizes a set of 50
+    the flexible component (P_max - P_min) of its capacity. This strategy utilizes a set of 38
     observations to generate actions, which are then transformed into market bids. The observation
     space comprises two unique values: the marginal cost and the current capacity of the unit.
 
-    The observation space for this strategy consists of 50 elements, drawn from both the forecaster
+    The observation space for this strategy consists of 38 elements, drawn from both the forecaster
     and the unit's internal state. Observations include the following components:
 
     - **Forecasted Residual Load**: Forecasted load over the foresight period, scaled by the maximum
@@ -352,7 +356,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     Attributes
     ----------
     foresight : int
-        Number of time steps for which the agent forecasts market conditions. Defaults to 24.
+        Number of time steps for which the agent forecasts market conditions. Defaults to 12.
     max_bid_price : float
         Maximum allowable bid price. Defaults to 100.
     max_demand : float
@@ -383,23 +387,18 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 44)
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations.
+        foresight = kwargs.pop("foresight", 12)
         act_dim = kwargs.pop("act_dim", 2)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
-            obs_dim=obs_dim,
+            foresight=foresight,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
-
-        # 'foresight' represents the number of time steps into the future that we will consider
-        # when constructing the observations. This value is fixed for each strategy, as the
-        # neural network architecture is predefined, and the size of the observations must remain consistent.
-        # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
-        # as the observation dimension depends on the foresight value.
-        self.foresight = 12
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -690,8 +689,8 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         # scaling factor to normalize the reward to the range [-1,1]
         scaling = 1 / (self.max_bid_price * unit.max_power)
-        reward = scaling * (profit - regret_scale * opportunity_cost)
         regret = regret_scale * opportunity_cost
+        reward = scaling * (profit - regret)
 
         # Store results in unit outputs
         # Note: these are not learning-specific results but stored for all units for analysis
@@ -730,19 +729,17 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 44)
+        # we select 24 to be in line with the storage strategies
+        foresight = kwargs.pop("foresight", 24)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
-            obs_dim=obs_dim,
+            foresight=foresight,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
-
-        # we select 24 to be in line with the storage strategies
-        self.foresight = 12
 
     def calculate_bids(
         self,
@@ -815,7 +812,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
     Reinforcement Learning Strategy for a storage unit that enables the agent to learn
     optimal bidding strategies on an Energy-Only Market.
 
-    The observation space for this strategy consists of 50 elements. Key components include:
+    The observation space for this strategy consists of 74 elements. Key components include:
 
     - **State of Charge**: Represents the current level of energy in the storage unit,
       influencing the bid direction and capacity.
@@ -876,23 +873,18 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 44)
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations.
+        foresight = kwargs.pop("foresight", 12)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
-            obs_dim=obs_dim,
+            foresight=foresight,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
-
-        # 'foresight' represents the number of time steps into the future that we will consider
-        # when constructing the observations. This value is fixed for each strategy, as the
-        # neural network architecture is predefined, and the size of the observations must remain consistent.
-        # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
-        # as the observation dimension depends on the foresight value.
-        self.foresight = 12
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -922,12 +914,12 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         the agent's action selection.
         """
         # get the current soc and energy cost value
-        soc_scaled = unit.outputs["soc"].at[start] / unit.max_soc
+        soc = unit.outputs["soc"].at[start]
         cost_stored_energy_scaled = (
             unit.outputs["cost_stored_energy"].at[start] / self.max_bid_price
         )
 
-        individual_observations = np.array([soc_scaled, cost_stored_energy_scaled])
+        individual_observations = np.array([soc, cost_stored_energy_scaled])
 
         return individual_observations
 
@@ -1085,15 +1077,17 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
 
         # Calculate and clip the energy cost for the start time
         # cost_stored_energy = average volume-weighted procurement costs of the currently stored energy
-        if next_soc < 1:
+        if next_soc * unit.capacity < 1:
             unit.outputs["cost_stored_energy"].at[next_time] = 0
         elif accepted_volume < 0:
             # increase costs of current SoC by price for buying energy
             # not fully representing the true cost per MWh (e.g. omitting discharge efficiency losses), but serving as a proxy for it
             unit.outputs["cost_stored_energy"].at[next_time] = (
-                unit.outputs["cost_stored_energy"].at[start] * current_soc
+                unit.outputs["cost_stored_energy"].at[start]
+                * current_soc
+                * unit.capacity
                 - (accepted_price + marginal_cost) * accepted_volume * duration_hours
-            ) / next_soc
+            ) / (next_soc * unit.capacity)
         else:
             unit.outputs["cost_stored_energy"].at[next_time] = unit.outputs[
                 "cost_stored_energy"
@@ -1176,23 +1170,18 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        obs_dim = kwargs.pop("obs_dim", 44)
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations.
+        foresight = kwargs.pop("foresight", 12)
         act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
-            obs_dim=obs_dim,
+            foresight=foresight,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
-
-        # 'foresight' represents the number of time steps into the future that we will consider
-        # when constructing the observations. This value is fixed for each strategy, as the
-        # neural network architecture is predefined, and the size of the observations must remain consistent.
-        # If you wish to modify the foresight length, remember to also update the 'obs_dim' parameter above,
-        # as the observation dimension depends on the foresight value.
-        self.foresight = 12
 
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
@@ -1315,12 +1304,16 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
 
         profit = income - operational_cost
 
-        # Stabilizing learning: Limit positive profit to 10% of its absolute value.
+        # Stabilizing learning: Limit positive profit to 50% of its absolute value.
         # This reduces variance in rewards and prevents overfitting to extreme profit-seeking behavior.
         # However, this does NOT prevent the agent from exploiting market inefficiencies if they exist.
         # RL by nature identifies and exploits system weaknesses if they lead to higher profit.
         # This is not a price cap but rather a stabilizing factor to avoid reward spikes affecting learning stability.
-        # profit = min(profit, 0.8 * abs(profit))
+        # IMPORTANT: This is a clear case of reward_tuning to stabilize learning - Use with caution!
+        # profit_scale = 0.5
+
+        profit_scale = 1
+        profit = min(profit, profit_scale * abs(profit))
 
         # get potential maximum infeed according to availability from order volume
         # Note: this will only work as the correct reference point when the volume is not defined by an action

@@ -94,9 +94,9 @@ def test_optimal_operation_without_flex_initialization_hp(steam_plant_with_hp):
     steam_plant_with_hp.determine_optimal_operation_without_flex()
 
     # Check that opt_power_requirement is populated and of the correct type
-    assert (
-        steam_plant_with_hp.opt_power_requirement is not None
-    ), "opt_power_requirement should be populated"
+    assert steam_plant_with_hp.opt_power_requirement is not None, (
+        "opt_power_requirement should be populated"
+    )
     assert isinstance(steam_plant_with_hp.opt_power_requirement, FastSeries)
 
     # Create an instance of the model and switch to optimization mode
@@ -115,9 +115,9 @@ def test_optimal_operation_without_flex_initialization_hp(steam_plant_with_hp):
     for t in instance.time_steps:
         heat_pump_output = instance.dsm_blocks["heat_pump"].heat_out[t].value
         thermal_demand = instance.thermal_demand[t]
-        assert heat_pump_output == pytest.approx(
-            thermal_demand, rel=1e-3
-        ), f"Heat pump output does not meet thermal demand at time {t}"
+        assert heat_pump_output == pytest.approx(thermal_demand, rel=1e-3), (
+            f"Heat pump output does not meet thermal demand at time {t}"
+        )
 
 
 # Pytest with Heatpump & Boiler
@@ -210,9 +210,9 @@ def test_optimal_operation_without_flex_initialization_hp_b(steam_plant_with_hp_
     steam_plant_with_hp_b.determine_optimal_operation_without_flex()
 
     # Check that opt_power_requirement is populated and of the correct type
-    assert (
-        steam_plant_with_hp_b.opt_power_requirement is not None
-    ), "opt_power_requirement should be populated"
+    assert steam_plant_with_hp_b.opt_power_requirement is not None, (
+        "opt_power_requirement should be populated"
+    )
     assert isinstance(steam_plant_with_hp_b.opt_power_requirement, FastSeries)
 
     # Create an instance of the model and switch to optimization mode
@@ -259,8 +259,9 @@ def steam_plant_components_with_hp_b_ts():
             "ramp_down": 50,
         },
         "thermal_storage": {
-            "max_capacity": 100,
-            "min_capacity": 0,
+            "capacity": 100,
+            "min_soc": 0,
+            "max_soc": 1,
             "max_power_charge": 50,
             "max_power_discharge": 50,
             "efficiency_charge": 1,
@@ -342,9 +343,9 @@ def test_optimal_operation_without_flex_initialization_hp_b_ts(
     steam_plant_with_hp_b_ts.determine_optimal_operation_without_flex()
 
     # Check that opt_power_requirement is populated and of the correct type
-    assert (
-        steam_plant_with_hp_b_ts.opt_power_requirement is not None
-    ), "opt_power_requirement should be populated"
+    assert steam_plant_with_hp_b_ts.opt_power_requirement is not None, (
+        "opt_power_requirement should be populated"
+    )
     assert isinstance(steam_plant_with_hp_b_ts.opt_power_requirement, FastSeries)
 
     # Create an instance of the model and switch to optimization mode
@@ -396,8 +397,9 @@ def steam_plant_components_with_hp_b_longterm_ts():
             "ramp_down": 50,
         },
         "thermal_storage": {
-            "max_capacity": 200,
-            "min_capacity": 0,
+            "capacity": 200,
+            "min_soc": 0,
+            "max_soc": 1,
             "max_power_charge": 40,
             "max_power_discharge": 50,
             "efficiency_charge": 1,

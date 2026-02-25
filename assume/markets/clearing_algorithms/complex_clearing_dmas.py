@@ -111,7 +111,7 @@ class ComplexDmasClearingRole(MarketRole):
             if order_type is not None:
                 tt = (order["start_time"] - start) / duration
                 # block_id, hour, name
-                name = f'{order["agent_addr"]} {order.get("unit_id", "")}'
+                name = f"{order['agent_addr']} {order.get('unit_id', '')}"
                 if "exclusive" in order_type:
                     idx = (order["exclusive_id"], tt, name)
                 elif "linked" in order_type:

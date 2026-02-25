@@ -105,36 +105,36 @@ def test_exchange_initialization(exchange_unit):
     assert exchange_unit.price_export == 2000.0
 
     # Validate correct forecasting data
-    assert (
-        exchange_unit.volume_import.at["2024-01-01 00:00:00"] == 100
-    ), "Incorrect import volume"
-    assert (
-        exchange_unit.volume_export.at["2024-01-01 00:00:00"] == -50
-    ), "Incorrect export volume"  # Export is negative
+    assert exchange_unit.volume_import.at["2024-01-01 00:00:00"] == 100, (
+        "Incorrect import volume"
+    )
+    assert exchange_unit.volume_export.at["2024-01-01 00:00:00"] == -50, (
+        "Incorrect export volume"
+    )  # Export is negative
 
 
 def test_exchange_import_only(exchange_import_only):
     """Test Exchange unit when only import data is available in the forecast."""
-    assert (
-        exchange_import_only.volume_import.at["2024-01-01 00:00:00"] == 100
-    ), "Incorrect import volume"
+    assert exchange_import_only.volume_import.at["2024-01-01 00:00:00"] == 100, (
+        "Incorrect import volume"
+    )
 
     # Export should be zero when missing from forecast
-    assert (
-        exchange_import_only.volume_export.at["2024-01-01 00:00:00"] == 0
-    ), "Export should default to 0 when missing"
+    assert exchange_import_only.volume_export.at["2024-01-01 00:00:00"] == 0, (
+        "Export should default to 0 when missing"
+    )
 
 
 def test_exchange_export_only(exchange_export_only):
     """Test Exchange unit when only export data is available in the forecast."""
-    assert (
-        exchange_export_only.volume_export.at["2024-01-01 00:00:00"] == -50
-    ), "Incorrect export volume"
+    assert exchange_export_only.volume_export.at["2024-01-01 00:00:00"] == -50, (
+        "Incorrect export volume"
+    )
 
     # Import should be zero when missing from forecast
-    assert (
-        exchange_export_only.volume_import.at["2024-01-01 00:00:00"] == 0
-    ), "Import should default to 0 when missing"
+    assert exchange_export_only.volume_import.at["2024-01-01 00:00:00"] == 0, (
+        "Import should default to 0 when missing"
+    )
 
 
 def test_exchange_energy_naive_strategy_bidding(exchange_unit, market_config):
@@ -170,9 +170,9 @@ def test_exchange_energy_naive_strategy_import_only(
 
     assert len(bids) == 1, "Only import bid should be generated"
     assert bids[0]["volume"] > 0, "Import volume should be positive"
-    assert (
-        bids[0]["price"] == exchange_import_only.price_import
-    ), "Incorrect import price"
+    assert bids[0]["price"] == exchange_import_only.price_import, (
+        "Incorrect import price"
+    )
 
 
 def test_exchange_energy_naive_strategy_export_only(
@@ -186,6 +186,6 @@ def test_exchange_energy_naive_strategy_export_only(
 
     assert len(bids) == 1, "Only export bid should be generated"
     assert bids[0]["volume"] < 0, "Export volume should be negative"
-    assert (
-        bids[0]["price"] == exchange_export_only.price_export
-    ), "Incorrect export price"
+    assert bids[0]["price"] == exchange_export_only.price_export, (
+        "Incorrect export price"
+    )
