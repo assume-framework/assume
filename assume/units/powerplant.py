@@ -323,6 +323,8 @@ class PowerPlant(SupportsMinMax):
         if (max_power > self.max_power).any():
             raise ValidationError(
                 message=f"Available power is larger than max_power for unit {self.id} at time {start}.",
+                id=self.id,
+                field="availability",
             )
 
         # provide reserve for capacity_pos
