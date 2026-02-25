@@ -139,9 +139,9 @@ class PowerPlant(SupportsMinMax):
         self.emission_factor = emission_factor
         self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
-        self.hot_start_cost = hot_start_cost * max_power
-        self.warm_start_cost = warm_start_cost * max_power
-        self.cold_start_cost = cold_start_cost * max_power
+        self.hot_start_cost = hot_start_cost * min_power
+        self.warm_start_cost = warm_start_cost * min_power
+        self.cold_start_cost = cold_start_cost * min_power
 
         # check ramping enabled
         self.ramp_down = None if ramp_down == 0 else ramp_down
@@ -196,7 +196,9 @@ class PowerPlant(SupportsMinMax):
             current_power = self.outputs["energy"].at[t]
             previous_power = self.get_output_before(t)
             op_time = self.get_operation_time(t)
-
+            self.outputs["energy_generation_costs"].at[t] += self.get_starting_costs(
+                op_time
+            )
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
@@ -204,7 +206,7 @@ class PowerPlant(SupportsMinMax):
                 current_power = max(current_power, self.min_power)
 
             self.outputs["energy"].at[t] = current_power
-
+        self.calculate_generation_cost(start, end, "energy")
         return self.outputs["energy"].loc[start:end]
 
     def calc_simple_marginal_cost(
@@ -361,6 +363,35 @@ class PowerPlant(SupportsMinMax):
                 power_output=power,
                 timestep=start,
             )
+
+    def get_starting_costs(self, op_time: int) -> float:
+        """
+        Returns the start-up cost for the given operation time.
+        If operation time is positive, the unit is running, so no start-up costs are returned.
+        If operation time is negative, the unit is not running, so start-up costs are returned
+        according to the start-up costs of the unit and the hot/warm/cold start times.
+
+        Args:
+            op_time (int): The operation time.
+
+        Returns:
+            float: The start-up costs depending on the down time.
+        """
+        if op_time > 0:
+            # The unit is running, no start-up cost is needed
+            return 0
+
+        downtime = abs(op_time)
+
+        # Check and return the appropriate start-up cost
+        if downtime <= self.downtime_hot_start:
+            return self.hot_start_cost
+
+        if downtime <= self.downtime_warm_start:
+            return self.warm_start_cost
+
+        # If it exceeds warm start threshold, return cold start cost
+        return self.cold_start_cost
 
     def as_dict(self) -> dict:
         """
