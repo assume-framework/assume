@@ -54,6 +54,10 @@ available_examples = {
         "scenario": "example_01d",
         "study_case": "zonal_case",
     },
+    "small_with_nodal_clearing": {
+        "scenario": "example_01d",
+        "study_case": "nodal_case",
+    },
     # example_01e is used in the tutorial notebook #3: Custom unit and bidding strategy example
     "market_study_eom": {
         "scenario": "example_01f",
@@ -114,7 +118,7 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "timescale"  # "local_db" or "timescale"
+    data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
     example = "small_with_vre_and_storage"
@@ -124,19 +128,15 @@ if __name__ == "__main__":
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-    # csv_path = "examples/inputs/portfolio_examples/"
-    input_path = "examples/inputs/"  # "portfolio_examples/"
-    scenario = "example_01h"  # "solar_storage_baseline"
-    study_case = "eom"  # "base_portfolio"#, "learning_portfolio2"  #"base_portfolio"
     # create world
     world = World(database_uri=db_uri, export_csv_path=csv_path)
 
     # load scenario
     load_scenario_folder(
         world,
-        inputs_path=input_path,
-        scenario=scenario,  # "MA_baseline", # "solar_storage_baseline", trivial, loadfollow, complex
-        study_case=study_case,  # "base_portfolio", "learning_portfolio", "learning_storage", "learning_solar", "learning_split"
+        inputs_path="examples/inputs",
+        scenario=available_examples[example]["scenario"],
+        study_case=available_examples[example]["study_case"],
     )
 
     # to add custom bidding strategies, you need to import them
@@ -164,3 +164,5 @@ if __name__ == "__main__":
         run_learning(world)
 
     world.run()
+
+# %%

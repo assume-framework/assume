@@ -70,7 +70,7 @@ def forecast_setup():
     fuel_prices_df.index = index[:1]
     fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
 
-    units: dict[str, BaseUnit] = {}
+    units: dict = {}
     for id, plant in powerplants_units.iterrows():
         plant["forecaster"] = PowerplantForecaster(
             index=index,

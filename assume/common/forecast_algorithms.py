@@ -344,7 +344,6 @@ def calculate_naive_congestion_forecast(
 
         # Calculate net load for the line as the sum of net loads from both connected nodes
         line_net_load = net_load_by_node[node1] + net_load_by_node[node2]
-        congestion_severity = line_net_load.values / line_capacity
 
         # Store the line-specific congestion severity in DataFrame
         line_congestion_severity[f"{line_id}_congestion_severity"] = (
