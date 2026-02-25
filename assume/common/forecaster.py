@@ -437,8 +437,8 @@ class DsmUnitForecaster(UnitForecaster):
         renewable_utilisation_update_algorithm = forecast_update_algorithms.get(
             renewable_utilisation_update_algorithm_name
         )
-        self.renewable_utilisation = renewable_utilisation_update_algorithm(
-            self.renewable_utilisation,
+        self.renewable_utilisation_signal = renewable_utilisation_update_algorithm(
+            self.renewable_utilisation_signal,
             self.preprocess_information["renewable_utilisation"],
             *args,
             **kwargs,

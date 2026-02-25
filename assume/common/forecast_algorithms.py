@@ -521,7 +521,7 @@ def set_preloaded_forecast_by_name(
 
 forecast_update_algorithms = {
     "price_default": default_update,
-    "residaul_load_default": default_update,
+    "residual_load_default": default_update,
     "residual_load_set_preloaded": set_preloaded_forecast_by_name,
     "congestion_signal_default": default_update,
     "renewable_utilisation_default": default_update,
