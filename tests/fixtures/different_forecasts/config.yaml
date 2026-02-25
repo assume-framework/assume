@@ -41,4 +41,3 @@ base:
     update_residual_load: residual_load_fancy
     update_congestion_signal: congestion_signal_default
     update_renewable_utilisation: renewable_utilisation_special
-

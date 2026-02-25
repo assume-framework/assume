@@ -124,10 +124,10 @@ if __name__ == "__main__":
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
-    #csv_path = "examples/inputs/portfolio_examples/"
-    input_path = "examples/inputs/"  #"portfolio_examples/"
-    scenario = "example_01h" #"solar_storage_baseline"
-    study_case = "eom"  #"base_portfolio"#, "learning_portfolio2"  #"base_portfolio"
+    # csv_path = "examples/inputs/portfolio_examples/"
+    input_path = "examples/inputs/"  # "portfolio_examples/"
+    scenario = "example_01h"  # "solar_storage_baseline"
+    study_case = "eom"  # "base_portfolio"#, "learning_portfolio2"  #"base_portfolio"
     # create world
     world = World(database_uri=db_uri, export_csv_path=csv_path)
 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
     load_scenario_folder(
         world,
         inputs_path=input_path,
-        scenario=scenario, #"MA_baseline", # "solar_storage_baseline", trivial, loadfollow, complex
+        scenario=scenario,  # "MA_baseline", # "solar_storage_baseline", trivial, loadfollow, complex
         study_case=study_case,  # "base_portfolio", "learning_portfolio", "learning_storage", "learning_solar", "learning_split"
     )
 

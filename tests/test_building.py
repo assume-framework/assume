@@ -314,7 +314,7 @@ def test_building_optimization_boiler(
         components=building_components_boiler,
         forecaster=forecaster,
     )
-    
+
     building.setup_model(presolve=True)
 
     # Perform optimization

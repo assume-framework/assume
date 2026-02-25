@@ -9,18 +9,17 @@ import pandas as pd
 import pytest
 from pandas._testing import assert_frame_equal, assert_series_equal
 
-from assume.common.fast_pandas import FastIndex, FastSeries
-from assume.common.forecaster import (
-    PowerplantForecaster,
-    DemandForecaster,
-)
 from assume.common.forecast_algorithms import (
     calculate_naive_congestion_forecast,
-    calculate_naive_renewable_utilisation
+    calculate_naive_renewable_utilisation,
 )
-from assume.units import PowerPlant, Demand
+from assume.common.forecaster import (
+    DemandForecaster,
+    PowerplantForecaster,
+)
 from assume.common.market_objects import MarketConfig
 from assume.strategies import EnergyNaiveStrategy
+from assume.units import Demand, PowerPlant
 
 path = Path("./tests/fixtures/forecast_init")
 
@@ -43,10 +42,12 @@ def forecast_setup():
             "market_mechanism": "pay_as_clear",
             "param_dict": {
                 "grid_data": None,
-            }
+            },
         }
     }
-    index = pd.DatetimeIndex(pd.date_range("2019-01-01", periods=24, freq="h"),)
+    index = pd.DatetimeIndex(
+        pd.date_range("2019-01-01", periods=24, freq="h"),
+    )
     powerplants_units = pd.read_csv(path / "powerplant_units.csv", index_col="name")
     demand_units = pd.read_csv(path / "demand_units.csv", index_col="name")
     availability = pd.read_csv(path / "availability.csv", **parse_date)
@@ -60,7 +61,7 @@ def forecast_setup():
         "buses": buses,
         "lines": lines,
     }
-    
+
     market_configs["EOM"] = MarketConfig(**market_configs["EOM"])
 
     demand_units["min_power"] = -abs(demand_units["min_power"])
@@ -68,7 +69,7 @@ def forecast_setup():
 
     fuel_prices_df.index = index[:1]
     fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
- 
+
     units: dict[str, BaseUnit] = {}
     for id, plant in powerplants_units.iterrows():
         plant["forecaster"] = PowerplantForecaster(
@@ -91,8 +92,8 @@ def forecast_setup():
         units[id] = Demand(**demand)
 
     return {
-        "index" : index,
-        "units" : units.values(),
+        "index": index,
+        "units": units.values(),
         "market_configs": market_configs.values(),
         "forecast_df": forecast_df,
     }
@@ -115,7 +116,9 @@ def test_forecast_init__calc_market_forecasts(forecast_setup):
     expected = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
     assert_series_equal(
         expected["load_forecast"],
-        pd.Series(load_forecast["EOM"], forecast_setup["index"]),  # convert FastSeries to pd.Series for comparison
+        pd.Series(
+            load_forecast["EOM"], forecast_setup["index"]
+        ),  # convert FastSeries to pd.Series for comparison
         check_names=False,
         check_dtype=False,
         check_freq=False,
@@ -125,32 +128,38 @@ def test_forecast_init__calc_market_forecasts(forecast_setup):
 
 def test_forecast_init__calc_node_forecasts(forecast_setup):
     congestion_signal = calculate_naive_congestion_forecast(
-            forecast_setup["index"],
-            forecast_setup["units"],
-            forecast_setup["market_configs"],
-            forecast_setup["forecast_df"],
+        forecast_setup["index"],
+        forecast_setup["units"],
+        forecast_setup["market_configs"],
+        forecast_setup["forecast_df"],
     )
     rn_utilization = calculate_naive_renewable_utilisation(
-            forecast_setup["index"],
-            forecast_setup["units"],
-            forecast_setup["market_configs"],
-            forecast_setup["forecast_df"],
+        forecast_setup["index"],
+        forecast_setup["units"],
+        forecast_setup["market_configs"],
+        forecast_setup["forecast_df"],
     )
 
     expected_cgn = pd.read_csv(path / "results/congestion_signal.csv", **parse_date)
     expected_uti = pd.read_csv(path / "results/renewable_utilization.csv", **parse_date)
 
     # NOTE: instead of reindexing to sort columns one could probably use: check_like = True
-    # But this would allow differently ordered index aswell
+    # But this would allow differently ordered index as well
     assert_frame_equal(
         expected_cgn,
-        congestion_signal.reindex(sorted(congestion_signal.columns), axis=1),  # otherwise order of columns **sometimes** is wrong!
+        congestion_signal.reindex(
+            sorted(congestion_signal.columns), axis=1
+        ),  # otherwise order of columns **sometimes** is wrong!
         check_names=False,
         check_freq=False,
     )
     assert_frame_equal(
-        expected_uti.reindex(sorted(expected_uti.columns), axis=1), # otherwise order of columns **sometimes** is wrong!
-        rn_utilization.reindex(sorted(rn_utilization.columns), axis=1),  # otherwise order of columns **sometimes** is wrong!
+        expected_uti.reindex(
+            sorted(expected_uti.columns), axis=1
+        ),  # otherwise order of columns **sometimes** is wrong!
+        rn_utilization.reindex(
+            sorted(rn_utilization.columns), axis=1
+        ),  # otherwise order of columns **sometimes** is wrong!
         check_names=False,
         check_freq=False,
     )
@@ -170,14 +179,18 @@ def test_forecast_init__uses_given_forecast(forecast_setup):
     market_forecast = unit.forecaster.price
     load_forecast = unit.forecaster.residual_load
     assert_series_equal(
-        pd.Series(market_forecast["EOM"], index),  # convert FastSeries to pd.Series for assertion
+        pd.Series(
+            market_forecast["EOM"], index
+        ),  # convert FastSeries to pd.Series for assertion
         forecasts["price_EOM"],
         check_names=False,
         check_dtype=False,
         check_freq=False,
     )
     assert_series_equal(
-        pd.Series(load_forecast["EOM"], index),  # convert FastSeries to pd.Series for assertion
+        pd.Series(
+            load_forecast["EOM"], index
+        ),  # convert FastSeries to pd.Series for assertion
         forecasts["residual_load_EOM"],
         check_names=False,
         check_dtype=False,

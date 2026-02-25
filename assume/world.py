@@ -9,6 +9,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import pandas as pd
 from mango import (
     RoleAgent,
     activate,
@@ -25,7 +26,6 @@ from mango.util.termination_detection import tasks_complete_or_sleeping
 from sqlalchemy import create_engine, make_url
 from sqlalchemy.exc import OperationalError
 from tqdm import tqdm
-import pandas as pd
 
 from assume.common import (
     MarketConfig,
@@ -816,11 +816,12 @@ class World:
 
     # the world needs to know about all forecasts and initialize these.
     # this way, the forecast mechanism works similar for CSV, WorldScript as well as AMIRIS/pypsa
-    def init_forecasts(self,
+    def init_forecasts(
+        self,
         forecast_df: pd.DataFrame = None,
-        ):
+    ):
         for unit in self.units.values():
-            #for forecast in unit.forecaster:
+            # for forecast in unit.forecaster:
             unit.forecaster.initialize(
                 self.units.values(),
                 self.markets.values(),
@@ -832,6 +833,5 @@ class World:
     # see update_forecasts_if_needed
     def update_forecasts(self):
         for unit in self.units.values():
-            #for forecast in unit.forecaster:
+            # for forecast in unit.forecaster:
             unit.forecaster.update_forecasts(self.units.values())
-

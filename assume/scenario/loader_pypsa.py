@@ -170,6 +170,7 @@ def load_pypsa(
 
     world.init_forecasts()
 
+
 if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
     world = World(database_uri=db_uri)

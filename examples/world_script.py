@@ -79,7 +79,7 @@ def init(world, n=1):
             },
             nuclear_forecast,
         )
-    
+
     world.init_forecasts()
 
 

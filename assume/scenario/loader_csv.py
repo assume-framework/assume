@@ -49,6 +49,7 @@ def bidding_strategies_from_param_dict(param_dict: dict):
         if ident.startswith("bidding_")
     }
 
+
 def forecast_algorithm_from_param_dict(param_dict: dict) -> dict[str, str]:
     return {
         ident.split("forecast_")[1]: forecast_algorithm
@@ -56,8 +57,13 @@ def forecast_algorithm_from_param_dict(param_dict: dict) -> dict[str, str]:
         if ident.startswith("forecast_")
     }
 
-def get_unit_forecast_algorithms(forecast_algorithms: dict[str, str], plant: dict) -> dict[str, str]:
-    unit_forecast_algorithms = forecast_algorithm_from_param_dict(plant)  # get forecast specific parts
+
+def get_unit_forecast_algorithms(
+    forecast_algorithms: dict[str, str], plant: dict
+) -> dict[str, str]:
+    unit_forecast_algorithms = forecast_algorithm_from_param_dict(
+        plant
+    )  # get forecast specific parts
 
     # overwrite None in plant csv with values from config if it exists!
     for key, forecast_alg in unit_forecast_algorithms.items():
@@ -600,7 +606,7 @@ def load_config_and_create_forecaster(
     if len(fuel_prices_df) <= 1:  # single value provided, extend to full index
         fuel_prices_df.index = index[:1]
         fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
-    
+
     forecast_algorithms = config.get("forecast_algorithms", {})
 
     unit_forecasts: dict[str, UnitForecaster] = {}
@@ -610,7 +616,9 @@ def load_config_and_create_forecaster(
                 index=index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 fuel_prices=fuel_prices_df,
-                forecast_algorithms=get_unit_forecast_algorithms(forecast_algorithms, plant),
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, plant
+                ),
             )
     if demand_units is not None:
         for id, demand in demand_units.iterrows():
@@ -618,32 +626,42 @@ def load_config_and_create_forecaster(
                 index=index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 demand=-demand_df[id].abs(),
-                forecast_algorithms=get_unit_forecast_algorithms(forecast_algorithms, demand),
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, demand
+                ),
             )
     if storage_units is not None:
         for id, storage in storage_units.iterrows():
             unit_forecasts[id] = UnitForecaster(
                 index=index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
-                forecast_algorithms=get_unit_forecast_algorithms(forecast_algorithms, storage),
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, storage
+                ),
             )
     if exchange_units is not None:
         for id, exchange in exchange_units.iterrows():
             unit_forecasts[id] = ExchangeForecaster(
                 index=index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
-                forecast_algorithms=get_unit_forecast_algorithms(forecast_algorithms, exchange),
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, exchange
+                ),
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
             )
     if dsm_units is not None:
         for type, dsm in dsm_units.items():
             for id, unit in dsm.iterrows():
-                unit_forecast_algorithms = get_unit_forecast_algorithms(forecast_algorithms, unit)
+                unit_forecast_algorithms = get_unit_forecast_algorithms(
+                    forecast_algorithms, unit
+                )
                 if type == "building":
                     unit_forecasts[id] = BuildingForecaster(
                         index=index,
-                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
                         forecast_algorithms=unit_forecast_algorithms,
                         fuel_prices=fuel_prices_df,
                         load_profile=0,  # TODO
@@ -655,14 +673,18 @@ def load_config_and_create_forecaster(
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
                         index=index,
-                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
                         forecast_algorithms=unit_forecast_algorithms,
                         fuel_prices=fuel_prices_df,
                     )
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
                         index=index,
-                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
                         forecast_algorithms=unit_forecast_algorithms,
                         hydrogen_demand=unit["demand"],
                         seasonal_storage_schedule=0,  # TODO
@@ -670,7 +692,9 @@ def load_config_and_create_forecaster(
                 if type == "steam_plant":
                     unit_forecasts[id] = SteamgenerationForecaster(
                         index=index,
-                        availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
                         forecast_algorithms=unit_forecast_algorithms,
                         demand=unit["demand"],
                         fuel_prices=fuel_prices_df,
@@ -692,7 +716,7 @@ def load_config_and_create_forecaster(
         "dsm_units": dsm_units,
         "unit_forecasts": unit_forecasts,
         "index": index,
-        "forecasts_df":forecasts_df,
+        "forecasts_df": forecasts_df,
     }
 
 
@@ -734,7 +758,6 @@ def setup_world(
     dsm_units = scenario_data["dsm_units"]
     unit_forecasts = scenario_data["unit_forecasts"]
     forecasts_df = scenario_data["forecasts_df"]
-
 
     # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
