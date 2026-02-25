@@ -8,8 +8,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from pandas._testing import assert_frame_equal, assert_series_equal
-from assume.common.fast_pandas import FastIndex
 
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecast_algorithms import (
     calculate_naive_congestion_forecast,
     calculate_naive_renewable_utilisation,
