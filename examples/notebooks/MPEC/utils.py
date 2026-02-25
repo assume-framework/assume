@@ -11,10 +11,10 @@ import yaml
 from matplotlib import pyplot as plt
 from pyomo.opt import SolverFactory
 
-from examples.notebooks.MPEC.bilevel_opt import (
+from bilevel_opt import (
     find_optimal_dispatch_quadratic,
 )
-from examples.notebooks.MPEC.uc_problem import solve_uc_problem
+from uc_problem import solve_uc_problem
 
 
 def calculate_profits(main_df, gens_df, price_column="mcp", supp_df=None):
