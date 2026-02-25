@@ -24,12 +24,6 @@ ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 
 log = logging.getLogger(__name__)
 
-# Registry for forecast algorithms
-# price_forecast_algorithms: dict[str, Callable] = {}
-# residual_load_forecast_algorithms: dict[str, Callable] = {}
-# congestion_signal_forecast_algorithms: dict[str, Callable] = {}
-# renewable_utilisation_forecast_algorithms: dict[str, Callable] = {}
-
 
 class UnitForecaster:
     """
