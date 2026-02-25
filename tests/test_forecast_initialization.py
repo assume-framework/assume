@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from pandas._testing import assert_frame_equal, assert_series_equal
+from assume.common.fast_pandas import FastIndex
 
 from assume.common.forecast_algorithms import (
     calculate_naive_congestion_forecast,
@@ -128,7 +129,7 @@ def test_forecast_init__calc_market_forecasts(forecast_setup):
 
 def test_forecast_init__calc_node_forecasts(forecast_setup):
     congestion_signal = calculate_naive_congestion_forecast(
-        forecast_setup["index"],
+        FastIndex.from_pandas_index(forecast_setup["index"]),  # test FastIndex
         forecast_setup["units"],
         forecast_setup["market_configs"],
         forecast_setup["forecast_df"],

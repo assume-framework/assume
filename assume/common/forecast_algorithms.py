@@ -279,6 +279,10 @@ def calculate_naive_congestion_forecast(
     forecast_df: ForecastSeries = None,
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
+
+    if isinstance(index, FastIndex):
+        index = index.as_datetimeindex()
+    
     # Lines and buses should be everywhere the same
     buses, lines = extract_buses_and_lines(market_configs)
 
@@ -391,6 +395,10 @@ def calculate_naive_renewable_utilisation(
     forecast_df: ForecastSeries = None,
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
+
+    if isinstance(index, FastIndex):
+        index = index.as_datetimeindex()
+
     forecast_df = _ensure_not_none(forecast_df, index)
 
     # Lines and buses should be everywhere the same
