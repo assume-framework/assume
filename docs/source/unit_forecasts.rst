@@ -60,7 +60,7 @@ For 2. initialize, the following algorithm ids are currently available.
 
 Price forecast algorithms:
 
-.. list-table:: 
+.. list-table::
    :widths: 20 30 50
    :header-rows: 1
 
@@ -79,7 +79,7 @@ Price forecast algorithms:
 
 Residual load forecast algorithms:
 
-.. list-table:: 
+.. list-table::
    :widths: 20 30 50
    :header-rows: 1
 
@@ -98,7 +98,7 @@ Residual load forecast algorithms:
 
 Congestion signal forecast algorithms:
 
-.. list-table:: 
+.. list-table::
    :widths: 20 30 50
    :header-rows: 1
 
@@ -117,7 +117,7 @@ Congestion signal forecast algorithms:
 
 Renewable utilisation forecast algorithms:
 
-.. list-table:: 
+.. list-table::
    :widths: 20 30 50
    :header-rows: 1
 

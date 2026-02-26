@@ -366,6 +366,8 @@ def load_oeds(
                     ),
                 )
 
+    world.init_forecasts()
+
 
 if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"
