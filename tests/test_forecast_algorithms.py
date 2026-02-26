@@ -2,8 +2,8 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import pytest
 from assume.common.forecast_algorithms import custom_lru_cache
+
 
 def test_custom_lru_cache_basic():
     calls = 0
@@ -20,6 +20,7 @@ def test_custom_lru_cache_basic():
     assert calls == 1
     assert add(2, 3) == 5
     assert calls == 2
+
 
 def test_custom_lru_cache_unhashable():
     calls = 0
@@ -39,6 +40,7 @@ def test_custom_lru_cache_unhashable():
     assert calls == 1  # Hit cache because same id
     assert get_len(l2) == 3
     assert calls == 2  # Miss cache because different id
+
 
 def test_custom_lru_cache_maxsize():
     calls = 0

@@ -104,6 +104,7 @@ def calculate_max_power(units, index=None):
 
 @custom_lru_cache
 def sort_units(units: list[BaseUnit], market_id: str | None = None):
+    # FIXME: This is not nice but circumvents circular import for now
     from assume.units.demand import Demand
     from assume.units.dsm_load_shift import DSMFlex
     from assume.units.exchange import Exchange
@@ -203,15 +204,12 @@ def calculate_naive_price(
         # 2. Calculate marginal costs for each unit and time step.
         #    The resulting DataFrame has rows = time steps and columns = units.
         #    shape: (index_len, num_pp_units)
-        # marginal_costs = powerplants_units.apply(calculate_marginal_cost, axis=1).T
         marginal_costs = pd.DataFrame(
             [unit.marginal_cost for unit in powerplants_units]
         ).T.set_index(index)
 
         # 3. Compute available power for each unit at each time step.
         #    shape: (index_len, num_pp_units)
-        # power = self._calc_power()
-        # power = pd.Series([unit.forecaster.availability * unit.max_power for unit in powerplants_units]).T
         power = calculate_max_power(powerplants_units).T.set_index(index)
 
         # 4. Process the demand.
@@ -287,7 +285,6 @@ def calculate_naive_residual_load(
         sum_demand = calculate_sum_demand(demand_units, exchange_units)
 
         # shape: (num_pp_units, index_len) -> (index_len)
-        # vre_feed_in_df = self._calc_power(mask).sum(axis=1)
         renewable_units = [
             unit for unit in powerplants_units if is_renewable(unit.technology)
         ]
