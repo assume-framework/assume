@@ -27,11 +27,29 @@ log = logging.getLogger(__name__)
 
 class UnitForecaster:
     """
-    A generalized forecaster for units
+    A generalized forecaster to provide units with static input data, such as availability or market price predictions.
+
+    Forecast data is typically provided as time series data, either loaded from a CSV file or calculated
+    internally from imported data. This class implements the basic forecaster interface, which relies on three main
+    methods to manage the lifecycle of forecasts:
+
+    1. ``preprocess``: Prepares information/forecasts for the initialization and update steps.
+    2. ``initialize``: Initializes all forecast timeseries. This should be called once all units are created.
+    3. ``update``: Used to change forecasts during runtime. This shall be called during the bid calculation of
+       bidding strategies.
+
+    These methods call functions that can be specified in the ``config.yaml`` or the unit CSV files via
+    the ``forecast_algorithms`` dictionary. The functions are specified using the pattern ``{prefix}_{forecast_metric}``,
+    where ``prefix`` is ``preprocess``, ``update``, or empty for ``initialize``.
 
     Attributes:
-        index (ForecastIndex): the index of all forecast series in this unit
-        availability (ForecastSeries): Forecasted availability of a unit
+        index (ForecastIndex): The time index for all forecast series in this unit.
+        availability (ForecastSeries): Forecasted availability of the unit.
+        forecast_algorithms (dict[str, str]): Map specifying the forecast algorithms to use. Keys generally follow
+            the format ``{prefix}_{forecast_metric}`` mapping to an ``algorithm_id``.
+        price (dict[str, ForecastSeries]): Map of ``market_id`` to forecasted prices. (Initialized from ``market_prices``)
+        residual_load (dict[str, ForecastSeries]): Map of ``market_id`` to forecasted residual load.
+        preprocess_information (dict): Dictionary storing information prepared during the ``preprocess`` step.
     """
 
     def __init__(
@@ -77,8 +95,21 @@ class UnitForecaster:
         initializing_unit: BaseUnit = None,
     ):
         """
-        Applies preprocessing to the given data.
-        Preprocess information is stored in self.preprocess_information
+        Applies preprocessing algorithms to the given data.
+
+        This method prepares information and intermediate forecasts required for the
+        subsequent `initialize` and `update` steps. The results are stored in the
+        `self.preprocess_information` dictionary.
+
+        The specific preprocessing algorithms are configured in `self.forecast_algorithms`
+        using the keys `preprocess_price` (default: `price_default`) and
+        `preprocess_residual_load` (default: `residual_load_default`).
+
+        Args:
+            units (list[BaseUnit]): List of all units in the simulation.
+            market_configs (list[MarketConfig]): List of available market configurations.
+            forecast_df (ForecastSeries, optional): Dataframe containing explicitly provided forecasts.
+            initializing_unit (BaseUnit, optional): The unit that is currently being initialized.
         """
 
         price_preprocess_algorithm_name = self.forecast_algorithms.get(
@@ -110,7 +141,23 @@ class UnitForecaster:
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
     ):
-        """ """
+        """
+        Initializes all forecast metric timeseries for the unit.
+
+        This method should be called exactly once after all units in the simulation are created.
+        It first delegates to `preprocess()` to prepare data, then computes the initial
+        forecasts (e.g., `price` and `residual_load`).
+
+        The specific forecast algorithms are configured in `self.forecast_algorithms`
+        using the keys `price` (default: `price_naive_forecast`) and
+        `residual_load` (default: `residual_load_naive_forecast`).
+
+        Args:
+            units (list[BaseUnit]): List of all units in the simulation.
+            market_configs (list[MarketConfig]): List of available market configurations.
+            forecast_df (ForecastSeries, optional): Dataframe containing explicitly provided forecasts.
+            initializing_unit (BaseUnit, optional): The unit that is currently being initialized.
+        """
         self.preprocess(units, market_configs, forecast_df, initializing_unit)
 
         # 1. Get price forecast
@@ -151,8 +198,19 @@ class UnitForecaster:
 
     def update(self, *args, **kwargs):
         """
-        Updates the price and residual_load forecasts.
-        update information is stored in self.update_information
+        Dynamically updates the forecast timeseries during runtime.
+
+        This method is designed to be called periodically during the simulation (e.g., during
+        the bid calculation of bidding strategies) to change the unit's forecasts based on
+        sliding horizons or new runtime data.
+
+        The specific update algorithms are configured in `self.forecast_algorithms`
+        using the keys `update_price` (default: `price_default`) and
+        `update_residual_load` (default: `residual_load_default`).
+
+        Args:
+            *args: Variable length argument list passed to the underlying update algorithms.
+            **kwargs: Arbitrary keyword arguments passed to the underlying update algorithms.
         """
 
         price_update_algorithm_name = self.forecast_algorithms.get(
@@ -275,6 +333,25 @@ class PowerplantForecaster(UnitForecaster):
 
 
 class DsmUnitForecaster(UnitForecaster):
+    """
+    A forecaster for demand side management (DSM) units.
+
+    This class extends the `UnitForecaster` to include metrics specifically relevant to
+    DSM units, such as congestion signals, renewable utilisation signals, and electricity prices.
+    It overrides the base interface (`preprocess`, `initialize`, `update`) to prepare and
+    maintain forecasts for these additional metrics.
+
+    Attributes:
+        index (ForecastIndex): The index of all forecast series in this unit.
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices.
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load.
+        availability (ForecastSeries): Forecasted availability of a unit.
+        congestion_signal (ForecastSeries): Forecasted congestion signal.
+        renewable_utilisation_signal (ForecastSeries): Forecasted renewable utilisation signal.
+        electricity_price (ForecastSeries): Forecasted electricity price.
+        forecast_algorithms (dict[str, str]): Map specifying the forecast algorithms to use.
+    """
+
     def __init__(
         self,
         index: ForecastIndex,
@@ -308,7 +385,18 @@ class DsmUnitForecaster(UnitForecaster):
     ):
         """
         Applies preprocessing to the given data for congestion signal and renewable utilization.
-        Preprocess information is stored in self.preprocess_information.
+
+        Preprocess information is stored in the `self.preprocess_information` dictionary.
+
+        The specific preprocessing algorithms are configured in `self.forecast_algorithms`
+        using the keys `preprocess_congestion_signal` (default: `congestion_signal_default`) and
+        `preprocess_renewable_utilisation` (default: `renewable_utilisation_default`).
+
+        Args:
+            units (list[BaseUnit]): List of all units in the simulation.
+            market_configs (list[MarketConfig]): List of available market configurations.
+            forecast_df (ForecastSeries, optional): Dataframe containing explicitly provided forecasts.
+            initializing_unit (BaseUnit, optional): The unit that is currently being initialized.
         """
 
         congestion_signal_preprocess_algorithm_name = self.forecast_algorithms.get(
@@ -346,6 +434,23 @@ class DsmUnitForecaster(UnitForecaster):
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
     ):
+        """
+        Initializes forecast metric timeseries specific to DSM units.
+
+        This calls the parent class initialization and additionally initializes the
+        `electricity_price`, `congestion_signal`, and `renewable_utilisation_signal`.
+
+        The specific forecast algorithms for the new metrics are configured in
+        `self.forecast_algorithms` using the keys `congestion_signal`
+        (default: `congestion_signal_naive_forecast`) and `renewable_utilisation`
+        (default: `renewable_utilisation_naive_forecast`).
+
+        Args:
+            units (list[BaseUnit]): List of all units in the simulation.
+            market_configs (list[MarketConfig]): List of available market configurations.
+            forecast_df (ForecastSeries, optional): Dataframe containing explicitly provided forecasts.
+            initializing_unit (BaseUnit, optional): The unit that is currently being initialized.
+        """
         # 1. preprocess of price and residual load forecast
         super().preprocess(units, market_configs, forecast_df, initializing_unit)
 
@@ -405,8 +510,18 @@ class DsmUnitForecaster(UnitForecaster):
 
     def update(self, *args, **kwargs):
         """
-        Updates the congestion_signal and renewable_utilisation forecasts.
-        update information is stored in self.update_information
+        Dynamically updates the DSM-specific forecast timeseries during runtime.
+
+        Calls the parent class update method and additionally updates the
+        `congestion_signal` and `renewable_utilisation_signal` forecasts.
+
+        The specific update algorithms are configured in `self.forecast_algorithms`
+        using the keys `update_congestion_signal` (default: `congestion_signal_default`)
+        and `update_renewable_utilisation` (default: `renewable_utilisation_default`).
+
+        Args:
+            *args: Variable length argument list passed to the underlying update algorithms.
+            **kwargs: Arbitrary keyword arguments passed to the underlying update algorithms.
         """
 
         super().update(*args, **kwargs)
