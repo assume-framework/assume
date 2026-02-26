@@ -444,7 +444,7 @@ def obtain_k_values(k_df, gens_df):
     # k_values_df.reset_index(inplace=True)
 
     # sort columns to match the order of the columns in the gens_df
-    k_values_df = k_values_df[gens_df["name"].values]
+    k_values_df = k_values_df[gens_df["unit"].values]
     k_values_df["date"] = k_values_df.index.date
     return k_values_df
 
