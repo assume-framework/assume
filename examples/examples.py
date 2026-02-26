@@ -103,7 +103,7 @@ available_examples = {
         "scenario": "example_03",
         "study_case": "base_case_2019_with_DSM",
     },
-    "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019_old8459abd"},
+    "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019_old8459abd_singel"},
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
     "large_2019_storage": {
         "scenario": "example_03c",
