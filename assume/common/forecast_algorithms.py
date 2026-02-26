@@ -26,10 +26,56 @@ ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 
 log = logging.getLogger(__name__)
 
+# from https://discuss.python.org/t/memoizing-based-on-id-to-avoid-implementing-and-computing-hash-method/87701/7
+# Needs testing!!!!
+# also do some speed measurement if there is actual gain
+def hashifying_lru_cache(
+        func_or_None=None, maxsize=128, typed=False, hasher=id):
+    # Wraps lru cache:
+    #   hashifies inputs, than does lru_cache, than turns inputs back to normal and calls function
+    # wrapper(inputs)
+    #    decorated(hashified_inputs)
+    #        cache(hashified_inputs)
+    #            unwrapper(hashified_inputs)
+    #                func(inputs)
+    #
+    # decorated = lru_cache(unwrapper)
+    #   --> call of decorated uses cache and gives input to unwrapper
+
+    def decorator(func):
+        class Hashified:
+            def __init__(self, obj):
+                self.obj = obj
+            def __eq__(self, other):
+                return hasher(self.obj) == hasher(other.obj)
+            def __hash__(self):
+                return hasher(self.obj)
+    
+        def unwrapper(*args, **kwargs):
+            # returns hashable inputs back to normal state
+            return func(
+                *(arg.obj if isinstance(arg, Hashified) else arg
+                    for arg in args),
+                **{name: value.obj if isinstance(value, Hashified) else value
+                    for name, value in kwargs.items()}
+            )
+
+        def wrapper(*args, **kwargs):
+            # makes inputs hashable
+            return decorated(
+                *(Hashified(arg) if arg.__hash__ is None else arg
+                    for arg in args),
+                **{name: Hashified(value) if value.__hash__ is None else value
+                    for name, value in kwargs.items()}
+            )
+
+        # wrap lru_cache with hashable inputs and afterwards turn them back to normal
+        decorated = lru_cache(maxsize=maxsize, typed=typed)(unwrapper)
+        return wrapper
+    return decorator if func_or_None is None else decorator(func_or_None)
 
 def is_renewable(name: str) -> bool:
     return "wind" in name.lower() or "solar" in name.lower()
-
 
 def _ensure_not_none(
     df: pd.DataFrame | None, index: ForecastIndex, check_index=False
@@ -54,7 +100,8 @@ def calculate_max_power(units, index=None):
     )
 
 
-@lru_cache(maxsize=10)
+#@lru_cache(maxsize=10)
+@hashifying_lru_cache
 def sort_units(units: list[BaseUnit], market_id: str | None = None):
     from assume.units.demand import Demand
     from assume.units.dsm_load_shift import DSMFlex
@@ -114,13 +161,14 @@ def calculate_sum_demand(
     return sum_demand
 
 
-# @lru_cache(maxsize=1000)
+#@lru_cache(maxsize=100)
+@hashifying_lru_cache
 def calculate_naive_price(
     index: ForecastIndex,
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
-    preprocess_information=None,
+    preprocess_information = None,
 ) -> dict[str, ForecastSeries]:
     """
     Naive price forecast that calculates prices based on merit order with marginal costs.
@@ -206,13 +254,14 @@ def calculate_naive_price(
     return price_forecasts
 
 
-# @lru_cache(maxsize=100)
+#@lru_cache(maxsize=100)
+@hashifying_lru_cache
 def calculate_naive_residual_load(
     index: ForecastIndex,
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
-    preprocess_information=None,
+    preprocess_information = None,
 ) -> dict[str, ForecastSeries]:
     _, demand_units, exchange_units, _, _ = sort_units(units)
 
@@ -271,13 +320,14 @@ def extract_buses_and_lines(market_configs: list[MarketConfig]):
     return buses, lines
 
 
-# @lru_cache(maxsize=100)
+#@lru_cache(maxsize=100)
+@hashifying_lru_cache
 def calculate_naive_congestion_forecast(
     index: ForecastIndex,
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
-    preprocess_information=None,
+    preprocess_information = None,
 ) -> dict[str, ForecastSeries]:
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
@@ -386,13 +436,14 @@ def calculate_naive_congestion_forecast(
     return node_congestion_signal
 
 
-# @lru_cache(maxsize=100)
+#@lru_cache(maxsize=100)
+@hashifying_lru_cache
 def calculate_naive_renewable_utilisation(
     index: ForecastIndex,
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
     forecast_df: ForecastSeries = None,
-    preprocess_information=None,
+    preprocess_information = None,
 ) -> dict[str, ForecastSeries]:
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
