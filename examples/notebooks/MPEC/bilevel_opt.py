@@ -523,7 +523,7 @@ def find_optimal_dispatch_linearized(
     # solve
     instance = model.create_instance()
 
-    solver = SolverFactory("gurobi")
+    solver = SolverFactory("highs")
     options = {
         "LogToConsole": print_results,
         "TimeLimit": time_limit,
@@ -1079,7 +1079,7 @@ def find_optimal_dispatch_quadratic(
     # solve
     instance = model.create_instance()
 
-    solver = SolverFactory("gurobi")
+    solver = SolverFactory("highs")
     options = {
         "LogToConsole": print_results,
         "TimeLimit": time_limit,

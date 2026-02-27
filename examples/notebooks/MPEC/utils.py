@@ -119,7 +119,7 @@ def calculate_uplift(main_df, gens_df, gen_unit, profits, price_column="mcp"):
     model.shut_down_cost = pyo.Constraint(model.time, rule=shut_down_cost_rule)
 
     # solve model
-    solver = SolverFactory("gurobi")
+    solver = SolverFactory("highs")
     instance = model.create_instance()
     solver.solve(instance, tee=False)
 

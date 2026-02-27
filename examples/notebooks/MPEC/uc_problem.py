@@ -146,7 +146,7 @@ def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_
 
     instance = model.create_instance()
 
-    solver = SolverFactory("gurobi")
+    solver = SolverFactory("highs")
     solver.solve(instance, tee=False)
 
     # make new instance with fixed u
