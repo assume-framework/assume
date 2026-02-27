@@ -23,6 +23,9 @@ Upcoming Release
   - **Upgrade to Pandas 3**
   - **Structured Validation Error**: Introduces the new ValidationError to represent a failing validation. Since it derives from the base ValidationError, all existing error handling remains compatible, but users can now also catch this specific error type to handle validation errors separately if desired.
 
+  **New Features:**
+  - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+
 0.5.6 - (23th December 2025)
 ============================
 

@@ -751,6 +751,14 @@ class BaseStrategy:
 
         return cleaned_bids
 
+    def update_forecasts_if_needed(unit: BaseUnit, *args, **kwargs):
+        # if last_forecast_update <= 30 day ago..?:
+        #    return False
+
+        # hier bekommt der Forecaster die Infos um sich zu aktualisieren
+        # unit.forecaster.update(unit.outputs["eom_price"])
+        unit.forecaster.update(*args, **kwargs)
+
 
 @dataclass
 class LearningConfig:

@@ -282,6 +282,8 @@ def test_building_optimization_heatpump(
         forecaster=forecaster,  # Passed via **kwargs
     )
 
+    building.setup_model(presolve=True)
+
     # Perform optimization
     building.determine_optimal_operation_without_flex()
 
@@ -313,6 +315,8 @@ def test_building_optimization_boiler(
         forecaster=forecaster,
     )
 
+    building.setup_model(presolve=True)
+
     # Perform optimization
     building.determine_optimal_operation_without_flex()
 
@@ -342,6 +346,8 @@ def test_building_marginal_cost_calculation_heatpump(
         components=building_components_heatpump,
         forecaster=forecaster,  # Passed via **kwargs
     )
+
+    building.setup_model(presolve=True)
 
     building.determine_optimal_operation_without_flex()
 
@@ -376,6 +382,8 @@ def test_building_marginal_cost_calculation_boiler(
         forecaster=forecaster,  # Passed via **kwargs
     )
 
+    building.setup_model(presolve=True)
+
     building.determine_optimal_operation_without_flex()
 
     # Select a timestamp to test
@@ -409,6 +417,8 @@ def test_building_objective_function_heatpump(
         forecaster=forecaster,  # Passed via **kwargs
     )
 
+    building.setup_model(presolve=True)
+
     # Access the objective function
     objective = building.model.obj_rule_opt
 
@@ -421,7 +431,7 @@ def test_building_objective_function_invalid(
     building_components_heatpump,
 ):
     with pytest.raises(ValueError) as exc_info:
-        Building(
+        building = Building(
             id="building",
             unit_operator="operator_invalid",
             bidding_strategies={},
@@ -429,6 +439,7 @@ def test_building_objective_function_invalid(
             objective="unknown_objective",
             forecaster=forecaster,  # Passed via **kwargs
         )
+        building.setup_model(presolve=True)
 
     assert "Unknown objective: unknown_objective" in str(exc_info.value)
 
@@ -448,6 +459,8 @@ def test_building_define_constraints_heatpump(
         components=building_components_heatpump,
         forecaster=forecaster,  # Passed via **kwargs
     )
+
+    building.setup_model(presolve=True)
 
     # Check if constraints are defined
     constraints = list(building.model.component_map(pyo.Constraint).keys())
@@ -512,6 +525,8 @@ def test_building_solver_infeasibility_logging(
         forecaster=forecaster,
     )
 
+    building.setup_model(presolve=True)
+
     # Mock the solver to simulate infeasibility
     class MockResults:
         class Solver:
@@ -553,6 +568,8 @@ def test_building_bidding_strategy_execution(
         forecaster=forecaster,
     )
 
+    building.setup_model(presolve=True)
+
     # Create dummy market configuration and product tuples
     market_config = MarketConfig(
         product_type="electricity",
@@ -591,7 +608,7 @@ def test_building_unknown_flexibility_measure(
     invalid_flexibility_measure = "invalid_flex_measure"
 
     with pytest.raises(ValueError) as exc_info:
-        Building(
+        building = Building(
             id="building",
             unit_operator="operator_hp",
             bidding_strategies={},
@@ -600,6 +617,7 @@ def test_building_unknown_flexibility_measure(
             flexibility_measure=invalid_flexibility_measure,
             forecaster=forecaster,
         )
+        building.setup_model(presolve=True)
 
     # Assert the correct error message
     assert f"Unknown flexibility measure: {invalid_flexibility_measure}" in str(
@@ -621,6 +639,8 @@ def test_building_prosumer_constraint(forecaster, building_components_heatpump):
         is_prosumer="No",
     )
 
+    building.setup_model(presolve=True)
+
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "grid_export_constraint" in constraints, (
         "Non-prosumer should have grid export constraint."
@@ -640,6 +660,7 @@ def test_building_prosumer_no_constraint(forecaster, building_components_heatpum
         is_prosumer="Yes",
     )
 
+    building.setup_model(presolve=True)
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "grid_export_constraint" not in constraints, (
         "Prosumer should not have grid export constraint."
@@ -658,6 +679,7 @@ def test_prosumer_energy_export(forecaster, building_components_heatpump):
         forecaster=forecaster,
         is_prosumer="Yes",
     )
+    building.setup_model(presolve=True)
 
     # Run optimization
     building.determine_optimal_operation_without_flex()
@@ -679,6 +701,8 @@ def test_non_prosumer_no_energy_export(forecaster, building_components_heatpump)
         forecaster=forecaster,
         is_prosumer="No",
     )
+
+    building.setup_model(presolve=True)
 
     # Run optimization
     building.determine_optimal_operation_without_flex()
@@ -707,6 +731,8 @@ def test_building_constraint_enforcement(forecaster, building_components_heatpum
         components=building_components_heatpump,
         forecaster=forecaster,
     )
+
+    building.setup_model(presolve=True)
 
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "total_power_input_constraint" in constraints, (

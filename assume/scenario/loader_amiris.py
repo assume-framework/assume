@@ -535,6 +535,8 @@ def load_amiris(
             supports,
             index,
         )
+
+    world.init_forecasts()
     # calculate market price before simulation
     world
 
