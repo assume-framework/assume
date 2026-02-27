@@ -76,45 +76,6 @@ class InfrastructureInterface:
                 index_col="code",
             )
 
-        query = 'select kw."Id", "Wert", "Name" from "Katalogwerte" kw join "Katalogkategorien" kk on kw."KatalogKategorieId"=kk."Id"'
-        with self.databases["mastr"].connect() as conn:
-            katalogwerte = pd.read_sql_query(query, conn, index_col="Id")
-
-        energietraeger = katalogwerte[
-            katalogwerte["Name"].str.contains("Energieträger")
-        ]
-        del energietraeger["Name"]
-        energietraeger = energietraeger.to_dict()["Wert"]
-
-        self.energietraeger_translated = {
-            fuel_translation.get(y, "unknown"): x for x, y in energietraeger.items()
-        }
-
-        verbrennungsanlagen = katalogwerte[
-            katalogwerte["Name"] == "TechnologieVerbrennungsanlagen"
-        ]
-        kernkraft = katalogwerte[katalogwerte["Name"] == "TechnologieKernkraft"]
-        verbrennungsanlagen = pd.concat([verbrennungsanlagen, kernkraft])
-        del verbrennungsanlagen["Name"]
-        self.mastr_generation_codes = verbrennungsanlagen.to_dict()["Wert"]
-        # solarlage = katalogwerte[katalogwerte["Name"] == "SolarLage"]
-
-        windlage = katalogwerte[katalogwerte["Name"] == "WindLage"]
-        del windlage["Name"]
-        windlage = windlage.to_dict()["Wert"]
-        windlage_translation = {
-            "Windkraft an Land": "on_shore",
-            "Windkraft auf See": "off_shore",
-        }
-
-        self.mastr_wind_type = {
-            windlage_translation.get(y, "unknown"): x for x, y in windlage.items()
-        }
-
-        windhersteller = katalogwerte[katalogwerte["Name"] == "WindHersteller"]
-        del windhersteller["Name"]
-        self.windhersteller = windhersteller.to_dict()["Wert"]
-
     def get_lat_lon(self, plz):
         if not isinstance(plz, int):
             raise ValueError(f"invalid plz {plz}")
@@ -193,6 +154,7 @@ class InfrastructureInterface:
 
         df["startDate"] = df["startDate"].fillna(pd.to_datetime("2005-05-05"))
         df["startDate"] = pd.to_datetime(df["startDate"])
+        # endDate not used here
         if "combination" in df.columns:  # if no combination flag is set, set it to 0
             # 0 if None, else 1
             df["combination"] = df["combination"].notna().astype(int)
@@ -249,7 +211,7 @@ class InfrastructureInterface:
             COALESCE(ev."Inbetriebnahmedatum", '2010-01-01') as "startDate",
             COALESCE(ev."DatumEndgueltigeStilllegung", '2050-01-01') as "endDate",
             ev."Nettonennleistung" as "maxPower",
-            COALESCE(ev."Technologie", 839) as "turbineTyp",
+            COALESCE(ev."Technologie", \'Kondensationsmaschine ohne Entnahme\') as "turbineTyp",
             ev."GenMastrNummer" as "generatorID"
             """
         plz_codes_str = "', '".join([str(x) for x in plz_codes])
@@ -260,15 +222,15 @@ class InfrastructureInterface:
                 kwk."ThermischeNutzleistung" as "kwkPowerTherm",
                 kwk."ElektrischeKwkLeistung" as "kwkPowerElec",
                 ev."AnlageIstImKombibetrieb" as "combination"
-                FROM "EinheitenVerbrennung" ev
-                LEFT JOIN "AnlagenKwk" kwk ON kwk."KwkMastrNummer" = ev."KwkMastrNummer"
+                FROM "combustion_extended" ev
+                LEFT JOIN "kwk" kwk ON kwk."KwkMastrNummer" = ev."KwkMastrNummer"
                 WHERE ev."Postleitzahl" in {plz_codes_str}
-                AND ev."Energietraeger" = {self.energietraeger_translated[fuel_type]}
-                AND ev."Nettonennleistung" > 5000 AND ev."EinheitBetriebsstatus" >= 35
+                AND ev."Energietraeger" = \'{self.energietraeger_translated[fuel_type]}\'
+                AND ev."Nettonennleistung" > 5000
                 """
         else:
             query += f"""
-                FROM "EinheitenKernkraft" ev
+                FROM "nuclear_extended" ev
                 WHERE ev."Postleitzahl" in {plz_codes_str}
                 """
         if created_before:
@@ -348,17 +310,16 @@ class InfrastructureInterface:
             f'"Nettonennleistung" as "maxPower", '
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat", '
-            f'COALESCE("Hauptausrichtung", 699) as "azimuthCode", '
+            f'COALESCE("Hauptausrichtung", \'Süd\') as "azimuthCode", '
             f'"Leistungsbegrenzung" as "limited", '
             f'"Einspeisungsart" as "ownConsumption", '
-            f'COALESCE("HauptausrichtungNeigungswinkel", 809) as "tiltCode", '
+            f'COALESCE("HauptausrichtungNeigungswinkel", \'21 - 40 Grad\') as "tiltCode", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate",'
             f'"InanspruchnahmeZahlungNachEeg" as "eeg" '
-            f'FROM "EinheitenSolar" '
-            f'INNER JOIN "AnlagenEegSolar" ON "EinheitMastrNummer" = "VerknuepfteEinheitenMastrNummern" '
+            f'FROM "solar_extended" '
+            f'INNER JOIN "solar_eeg" ON "EinheitMastrNummer" = "VerknuepfteEinheit" '
             f'WHERE "Postleitzahl" in {plz_codes_str} '
-            f'AND "Lage" = {mastr_solar_codes[solar_type]} '
-            f'AND "EinheitBetriebsstatus" >= 35 '
+            f'AND "ArtDerSolaranlage" = \'{mastr_solar_codes[solar_type]}\' '
         )
 
         if created_before:
@@ -377,27 +338,25 @@ class InfrastructureInterface:
         df["startDate"] = pd.to_datetime(df["startDate"])
         # all PVs with nan are south oriented assets
         df["azimuth"] = [
-            mastr_solar_azimuth[str(code)] for code in df["azimuthCode"].to_numpy(int)
+            mastr_solar_azimuth[str(code)] for code in df["azimuthCode"]
         ]
         del df["azimuthCode"]
         # all PVs with nan have a tilt angle of 30°
         df["tilt"] = [
-            mastr_solar_azimuth[str(code)] for code in df["tiltCode"].to_numpy(int)
+            mastr_solar_azimuth[str(code)] for code in df["tiltCode"]
         ]
         del df["tiltCode"]
         if solar_type == "roof_top":
             # all PVs with nan and startDate > 2013 have ownConsumption
             missing_values = df["ownConsumption"].isna()
-            deadline = [date.year > 2013 for date in df["startDate"]]
-            own_consumption = [
-                all([missing_values[i], deadline[i]])
-                for i in range(len(missing_values))
-            ]
+
+            missing = df["ownConsumption"].isna()
+            deadline = df["startDate"].dt.year > 2013
+            own_consumption = missing & deadline #to avoid key erro after components are exluded
+
             df.loc[own_consumption, "ownConsumption"] = 1
-            grid_use = [
-                all([missing_values[i], not deadline[i]])
-                for i in range(len(missing_values))
-            ]
+
+            grid_use = missing & ~deadline #to avoid key erro after components are exluded
             df.loc[grid_use, "ownConsumption"] = 0
             df["ownConsumption"] = df["ownConsumption"].replace(689, 1)
             df["ownConsumption"] = df["ownConsumption"].replace(688, 0)
@@ -409,34 +368,30 @@ class InfrastructureInterface:
             df["ownConsumption"] = 0
         if solar_type == "roof_top":
             # all PVs with nan and startDate > 2012 and maxPower > 30 kWp are limited to 70%
-            missing_values = df["limited"].isna()
+            missing = df["limited"].isna()#
             power_cap = df["maxPower"] > 30
-            deadline = [date.year > 2012 for date in df["startDate"]]
-            limited = [
-                all([missing_values[i], deadline[i], power_cap[i]])
-                for i in range(len(missing_values))
-            ]
-            df.loc[limited, "limited"] = 803
+            deadline = df["startDate"].dt.year > 2012
+            limited = missing & deadline & power_cap  #to avoid key erro after components are exluded
+
+            df.loc[limited, "limited"] = str("Ja, auf 70%")
             # rest nans have no limitation
-            df["limited"] = df["limited"].fillna(802)
+            df["limited"] = df["limited"].fillna("Nein")
             df["limited"] = [
-                mastr_solar_azimuth[str(code)] for code in df["limited"].to_numpy(int)
+                mastr_solar_azimuth[str(code)] for code in df["limited"]
             ]
         if solar_type == "free_area" or solar_type == "other":
             # TODO: Check restrictions for solar power plant
             # nans have no limitation
-            df["limited"] = df["limited"].fillna(802)
+            df["limited"] = df["limited"].fillna("Nein")
             df["limited"] = [
-                mastr_solar_azimuth[str(code)] for code in df["limited"].to_numpy(int)
+                mastr_solar_azimuth[str(code)] for code in df["limited"]
             ]
         # all PVs with nan and startDate > 2016 and maxPower > 100 kWp have direct marketing
-        missing_values = df["eeg"].isna()
+        missing = df["eeg"].isna()
         power_cap = df["maxPower"] > 100
-        deadline = [date.year > 2016 for date in df["startDate"]]
-        eeg = [
-            all([missing_values[i], deadline[i], power_cap[i]])
-            for i in range(len(missing_values))
-        ]
+        deadline = df["startDate"].dt.year > 2016
+        eeg = missing & deadline & power_cap #to avoid key erro after components are exluded
+
         df.loc[eeg, "eeg"] = 0
         # rest nans are eeg assets and are managed by the tso
         df["eeg"] = df["eeg"].replace(np.nan, 0)
@@ -466,7 +421,7 @@ class InfrastructureInterface:
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat", '
             f'"Typenbezeichnung" as "typ", '
-            f'COALESCE("Hersteller", -1) as "manufacturer", '
+            f'COALESCE("Hersteller", \'unknown\') as "manufacturer", '
             f'"Nabenhoehe" as "height", '
             f'"Rotordurchmesser" as "diameter", '
             f'"ClusterNordsee" as "nordicSea", '
@@ -474,9 +429,8 @@ class InfrastructureInterface:
             f'"GenMastrNummer" as "generatorID", '
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
             f'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
-            f'FROM "EinheitenWind" '
-            f'WHERE "EinheitBetriebsstatus" >= 35 '
-            f'AND "Lage" = {self.mastr_wind_type[wind_type]} '
+            f'FROM "wind_extended" '
+            f'AND "WindAnLandOderAufSee" = \'{self.mastr_wind_type[wind_type]}\' '
         )
         if wind_type == "on_shore":
             query += f' AND "Postleitzahl" in {plz_codes_str} '
@@ -548,9 +502,8 @@ class InfrastructureInterface:
             f'"Nettonennleistung" as "maxPower", '
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
-            f'FROM "EinheitenBiomasse"'
+            f'FROM "biomass_extended"'
             f'WHERE "Postleitzahl" in {plz_codes_str} AND'
-            f'"EinheitBetriebsstatus" >= 35 '
         )
 
         if created_before:
@@ -589,9 +542,9 @@ class InfrastructureInterface:
             f'"Nettonennleistung" as "maxPower", '
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
-            f'FROM "EinheitenWasser" '
+            f'FROM "hydro_extended" '
             f'WHERE "Postleitzahl"::int in {plz_codes_str} AND '
-            f'"EinheitBetriebsstatus" >= 35 AND "ArtDerWasserkraftanlage" = 890 '
+            f'"ArtDerWasserkraftanlage" = \'Laufwasseranlage\''
         )
 
         if created_before:
@@ -624,20 +577,20 @@ class InfrastructureInterface:
         plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
-            f'SELECT "EinheitMastrNummer" as "unitID", '
-            f'"LokationMastrNummer" as "locationID", '
-            f'"SpeMastrNummer" as "storageID", '
-            f'"NameStromerzeugungseinheit" as "name", '
-            f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
-            f'"Nettonennleistung" as "PMinus_max", '
-            f'"NutzbareSpeicherkapazitaet" as "VMax", '
-            f'"PumpbetriebLeistungsaufnahme" as "PPlus_max", '
-            f'COALESCE("Laengengrad", {longitude}) as "lon", '
-            f'COALESCE("Breitengrad", {latitude}) as "lat" '
-            f'FROM "EinheitenStromSpeicher"'
-            f'LEFT JOIN "AnlagenStromSpeicher" ON "EinheitMastrNummer" = "VerknuepfteEinheitenMastrNummern" '
-            f'WHERE "Postleitzahl"::int in {plz_codes_str} AND '
-            f'"EinheitBetriebsstatus" = 35 AND "Technologie" = 1537 AND "EinheitSystemstatus"=472 AND "Land"=84 '
+            f'SELECT spe."EinheitMastrNummer" as "unitID", '
+            f'spe."LokationMastrNummer" as "locationID", '
+            f'spe."SpeMastrNummer" as "storageID", '
+            f'spe."NameStromerzeugungseinheit" as "name", '
+            f'COALESCE(spe."Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
+            f'spe."Nettonennleistung" as "PMinus_max", '
+            f'su."NutzbareSpeicherkapazitaet" as "VMax", '
+            f'spe."PumpbetriebLeistungsaufnahme" as "PPlus_max", '
+            f'COALESCE(spe."Laengengrad", {longitude}) as "lon", '
+            f'COALESCE(spe."Breitengrad", {latitude}) as "lat" '
+            f'FROM "storage_extended" spe '
+            f'LEFT JOIN "storage_units" su ON spe."EinheitMastrNummer" = su."VerknuepfteEinheit" '
+            f'WHERE spe."Postleitzahl"::int in {plz_codes_str} AND '
+            f'spe."Technologie" = \'Pumpspeicher\'  AND spe."EinheitSystemstatus"= \'Aktiviert\' AND spe."Land"= \'Deutschland\' '
             f'AND "Nettonennleistung" > 500'
         )
 
@@ -663,7 +616,7 @@ class InfrastructureInterface:
         df["VMax"] = df["VMax"].fillna(0)
         for index, row in df[df["VMax"] == 0].iterrows():
             # storage_volumes is in [MWh]
-            for key in mastr_storage.keys():
+            for key in mastr_storage.keys(): #Todo: Check value Code or String
                 if key in row["name"]:
                     df.at[index, "VMax"] = mastr_storage[key] * 1e3
                     break
@@ -680,7 +633,6 @@ class InfrastructureInterface:
                 "max_soc": 1,
                 "min_soc": 0,
                 "initial_soc": 0.5,
-                "V0": 0.5 * data["VMax"].to_numpy()[0],
                 "lat": data["lat"].to_numpy()[0],
                 "lon": data["lon"].to_numpy()[0],
                 "efficiency_charge": 0.88,
@@ -734,25 +686,24 @@ class InfrastructureInterface:
         plz_codes_str = "', '".join([str(x) for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
-        query = (
-            f'SELECT spe."LokationMastrNummer" as "unitID", '
-            f'so."Nettonennleistung" as "maxPower", '
-            f'spe."Nettonennleistung" as "batPower", '
-            f'COALESCE(so."Laengengrad", {longitude}) as "lon", '
-            f'COALESCE(so."Breitengrad", {latitude}) as "lat", '
-            f'COALESCE(so."Hauptausrichtung", 699) as "azimuthCode", '
-            f'COALESCE(so."Leistungsbegrenzung", 802) as "limited", '
-            f'COALESCE(so."Einspeisungsart", 689) as "ownConsumption", '
-            f'COALESCE(so."HauptausrichtungNeigungswinkel", 809) as "tiltCode", '
-            f'COALESCE(so."Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
-            f'an."NutzbareSpeicherkapazitaet" as "VMax" '
-            f'FROM "EinheitenStromSpeicher" spe '
-            f'INNER JOIN "EinheitenSolar" so ON spe."LokationMastrNummer" = so."LokationMastrNummer" '
-            f'INNER JOIN "AnlagenStromSpeicher" an ON spe."SpeMastrNummer" = an."MastrNummer" '
-            f'WHERE so."Postleitzahl" in {plz_codes_str} '
-            f'AND so."EinheitBetriebsstatus" >= 35 '
-        )
-
+        query = f"""SELECT
+spe."LokationMastrNummer" as "unitID",
+spe."EinheitMastrNummer" as "unitMastrID",
+so."Nettonennleistung" as "maxPower",
+spe."Nettonennleistung" as "batPower",
+COALESCE(so."Laengengrad", {longitude}) as "lon",
+COALESCE(so."Breitengrad", {latitude}) as "lat",
+COALESCE(so."Hauptausrichtung", 'Süd') as "azimuthCode",
+COALESCE(so."Leistungsbegrenzung", 'Nein') as "limited",
+COALESCE(so."Einspeisungsart", 'Teileinspeisung (einschließlich Eigenverbrauch)') as "ownConsumption",
+COALESCE(so."HauptausrichtungNeigungswinkel", '21 - 40 Grad') as "tiltCode",
+COALESCE(so."Inbetriebnahmedatum", '2018-01-01') as "startDate",
+an."NutzbareSpeicherkapazitaet" as "VMax"
+FROM "storage_extended" spe
+INNER JOIN "solar_extended" so ON spe."LokationMastrNummer" = so."LokationMastrNummer"
+INNER JOIN "storage_units" an ON spe."SpeMastrNummer" = an."MastrNummer"
+WHERE so."Postleitzahl" in {plz_codes_str}
+"""
         if created_before:
             query += f"AND so.\"Inbetriebnahmedatum\" < '{created_before.isoformat()}' "
         if stopped_after:
@@ -770,17 +721,17 @@ class InfrastructureInterface:
         df["ownConsumption"] = df["ownConsumption"].replace(689, 1)
         df["ownConsumption"] = df["ownConsumption"].replace(688, 0)
         df["limited"] = [
-            mastr_solar_azimuth[str(code)] for code in df["limited"].to_numpy(int)
+            mastr_solar_azimuth[str(code)] for code in df["limited"]
         ]
 
         # all PVs with nan are south oriented assets
         df["azimuth"] = [
-            mastr_solar_azimuth[str(code)] for code in df["azimuthCode"].to_numpy(int)
+            mastr_solar_azimuth[str(code)] for code in df["azimuthCode"]
         ]
         del df["azimuthCode"]
         # all PVs with nan have a tilt angle of 30°
         df["tilt"] = [
-            mastr_solar_azimuth[str(code)] for code in df["tiltCode"].to_numpy(int)
+            mastr_solar_azimuth[str(code)] for code in df["tiltCode"]
         ]
         del df["tiltCode"]
         # assumption "regenerative Energiesysteme":
@@ -788,7 +739,6 @@ class InfrastructureInterface:
         df["demandP"] = df["maxPower"] * 1e3
 
         df["eta"] = 0.96
-        df["V0"] = 0
         return df
 
     def get_demand_series_in_area(self, area, year=2019):
@@ -1057,7 +1007,7 @@ def get_solar_series(solar_systems: pd.DataFrame, weather_df: pd.DataFrame):
         azimuth = int(info[0])
         tilt = int(info[1])
         maxPower = group["maxPower"].sum()  # in kW
-
+        # Todo: Find out how to handle East-West and "nachgeführt" systems: "https://pvlib-python.readthedocs.io/en/v0.9.0/auto_examples/plot_mixed_orientation.html"
         if "batPower" in group.columns:
             battery_power += group["batPower"].sum()
         system = PVSystem(
