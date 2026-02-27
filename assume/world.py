@@ -820,11 +820,14 @@ class World:
         self,
         forecast_df: pd.DataFrame = None,
     ):
+        units = self.units.values()  # make same object for cache
+        markets = self.markets.values()  # make same object for cache
+
         for unit in self.units.values():
             # for forecast in unit.forecaster:
             unit.forecaster.initialize(
-                self.units.values(),
-                self.markets.values(),
+                units,
+                markets,
                 forecast_df,
                 unit,
             )

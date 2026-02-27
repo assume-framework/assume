@@ -27,7 +27,7 @@ ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 log = logging.getLogger(__name__)
 
 
-# from https://discuss.python.org/t/memoizing-based-on-id-to-avoid-implementing-and-computing-hash-method/87701/7
+# advanced on: https://discuss.python.org/t/memoizing-based-on-id-to-avoid-implementing-and-computing-hash-method/87701/7
 def custom_lru_cache(func_or_None=None, maxsize=128, typed=False, hasher=id):
     """
     Implements a wrap for lru cache that enables to use non-hashable inputs for initialization:
@@ -60,7 +60,6 @@ def custom_lru_cache(func_or_None=None, maxsize=128, typed=False, hasher=id):
             )
 
         def wrapper(*args, **kwargs):
-            # makes inputs hashable
             return decorated(
                 *(Hashified(arg) if arg.__hash__ is None else arg for arg in args),
                 **{
@@ -71,6 +70,10 @@ def custom_lru_cache(func_or_None=None, maxsize=128, typed=False, hasher=id):
 
         # wrap lru_cache with hashable inputs and afterwards turn them back to normal
         decorated = lru_cache(maxsize=maxsize, typed=typed)(unwrapper)
+        wrapper.cache_info = decorated.cache_info
+        wrapper.cache_clear = decorated.cache_clear
+        if hasattr(decorated, "cache_parameters"):
+            wrapper.cache_parameters = decorated.cache_parameters
         return wrapper
 
     return decorator if func_or_None is None else decorator(func_or_None)
@@ -316,7 +319,7 @@ def extract_buses_and_lines(market_configs: list[MarketConfig]):
 
 
 @custom_lru_cache
-def calculate_naive_congestion_forecast(
+def calculate_naive_congestion_signal(
     index: ForecastIndex,
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
@@ -510,7 +513,7 @@ forecast_algorithms = {
     "residual_load_naive_forecast": calculate_naive_residual_load,
     "residual_load_default_test": lambda *args: {},
     "residual_load_keep_given": None,
-    "congestion_signal_naive_forecast": calculate_naive_congestion_forecast,
+    "congestion_signal_naive_forecast": calculate_naive_congestion_signal,
     "congestion_signal_default_test": lambda index, *args: FastSeries(
         index=index, value=0.0
     ),

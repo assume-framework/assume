@@ -17,6 +17,7 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecaster import (
     BuildingForecaster,
     CustomUnitForecaster,
@@ -609,11 +610,15 @@ def load_config_and_create_forecaster(
 
     forecast_algorithms = config.get("forecast_algorithms", {})
 
+    # create shared unit index for caching!
+    shared_unit_index = FastIndex(
+        start=index[0], end=index[-1], freq=pd.infer_freq(index)
+    )
     unit_forecasts: dict[str, UnitForecaster] = {}
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
-                index=index,
+                index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 fuel_prices=fuel_prices_df,
                 forecast_algorithms=get_unit_forecast_algorithms(
@@ -623,7 +628,7 @@ def load_config_and_create_forecaster(
     if demand_units is not None:
         for id, demand in demand_units.iterrows():
             unit_forecasts[id] = DemandForecaster(
-                index=index,
+                index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 demand=-demand_df[id].abs(),
                 forecast_algorithms=get_unit_forecast_algorithms(
@@ -633,7 +638,7 @@ def load_config_and_create_forecaster(
     if storage_units is not None:
         for id, storage in storage_units.iterrows():
             unit_forecasts[id] = UnitForecaster(
-                index=index,
+                index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, storage
@@ -642,7 +647,7 @@ def load_config_and_create_forecaster(
     if exchange_units is not None:
         for id, exchange in exchange_units.iterrows():
             unit_forecasts[id] = ExchangeForecaster(
-                index=index,
+                index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, exchange
@@ -658,7 +663,7 @@ def load_config_and_create_forecaster(
                 )
                 if type == "building":
                     unit_forecasts[id] = BuildingForecaster(
-                        index=index,
+                        index=shared_unit_index,
                         availability=availability.get(
                             id, pd.Series(1.0, index, name=id)
                         ),
@@ -672,7 +677,7 @@ def load_config_and_create_forecaster(
                     )
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
-                        index=index,
+                        index=shared_unit_index,
                         availability=availability.get(
                             id, pd.Series(1.0, index, name=id)
                         ),
@@ -681,7 +686,7 @@ def load_config_and_create_forecaster(
                     )
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
-                        index=index,
+                        index=shared_unit_index,
                         availability=availability.get(
                             id, pd.Series(1.0, index, name=id)
                         ),
@@ -691,7 +696,7 @@ def load_config_and_create_forecaster(
                     )
                 if type == "steam_plant":
                     unit_forecasts[id] = SteamgenerationForecaster(
-                        index=index,
+                        index=shared_unit_index,
                         availability=availability.get(
                             id, pd.Series(1.0, index, name=id)
                         ),

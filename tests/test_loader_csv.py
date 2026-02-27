@@ -4,10 +4,18 @@
 
 import pytest
 
+from assume.common.forecast_algorithms import (
+    calculate_naive_congestion_signal,
+    calculate_naive_price,
+    calculate_naive_renewable_utilisation,
+    calculate_naive_residual_load,
+)
 from assume.scenario.loader_csv import (
     get_unit_forecast_algorithms,
     load_config_and_create_forecaster,
+    setup_world,
 )
+from assume.world import World
 
 
 def test_csv_loader_validation():
@@ -159,3 +167,23 @@ def test_get_unit_forecast_algorithms():
     # Make sure only strings with "forecast_" are accepted
     for key in expected_output:
         assert expected_output[key] == output[key]
+
+
+def test_cache_unit_forecast_algorithms_cache_hits():
+    calculate_naive_price.cache_clear()
+    calculate_naive_residual_load.cache_clear()
+    calculate_naive_congestion_signal.cache_clear()
+    calculate_naive_renewable_utilisation.cache_clear()
+
+    world = World()
+    world.scenario_data = load_config_and_create_forecaster(
+        inputs_path="tests/fixtures", scenario="forecast_init", study_case="base"
+    )
+
+    setup_world(world=world)
+
+    assert calculate_naive_price.cache_info().hits == len(world.units) - 1
+    assert calculate_naive_price.cache_info().misses == 1
+
+    assert calculate_naive_residual_load.cache_info().hits == len(world.units) - 1
+    assert calculate_naive_residual_load.cache_info().misses == 1

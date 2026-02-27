@@ -10,6 +10,14 @@ import pandas as pd
 import pytest
 from pandas._testing import assert_series_equal
 
+from assume.common.fast_pandas import FastIndex
+from assume.common.forecast_algorithms import (
+    calculate_naive_congestion_signal,
+    calculate_naive_price,
+    calculate_naive_renewable_utilisation,
+    calculate_naive_residual_load,
+    sort_units,
+)
 from assume.common.forecaster import (
     DemandForecaster,
     DsmUnitForecaster,
@@ -46,6 +54,11 @@ def forecast_setup():
     index = pd.DatetimeIndex(
         pd.date_range("2019-01-01", periods=24, freq="h"),
     )
+
+    shared_FastIndex = FastIndex(
+        start=index[0], end=index[-1], freq=pd.infer_freq(index)
+    )
+
     powerplants_units = pd.read_csv(path / "powerplant_units.csv", index_col="name")
     demand_units = pd.read_csv(path / "demand_units.csv", index_col="name")
     availability = pd.read_csv(path / "availability.csv", **parse_date)
@@ -78,7 +91,7 @@ def forecast_setup():
 
     for id, plant in powerplants_units.iterrows():
         plant["forecaster"] = PowerplantForecaster(
-            index=index,
+            index=shared_FastIndex,
             availability=availability.get(id, pd.Series(1.0, index, name=id)),
             fuel_prices=fuel_prices_df,
         )
@@ -88,7 +101,7 @@ def forecast_setup():
 
     for id, demand in demand_units.iterrows():
         demand["forecaster"] = DemandForecaster(
-            index=index,
+            index=shared_FastIndex,
             availability=availability.get(id, pd.Series(1.0, index, name=id)),
             demand=-demand_df[id].abs(),
         )
@@ -215,3 +228,25 @@ def test_forecast_interface__uses_given_forecast(forecast_setup):
         check_dtype=False,
         check_freq=False,
     )
+
+
+def test_forecast_interface__cache_hits(forecast_setup):
+    # clear cache uses
+    calculate_naive_price.cache_clear()
+    calculate_naive_residual_load.cache_clear()
+    calculate_naive_congestion_signal.cache_clear()
+    calculate_naive_renewable_utilisation.cache_clear()
+    sort_units.cache_clear()
+
+    forecasts = forecast_setup["forecast_df"]
+    index = forecast_setup["index"]
+    for i, unit in enumerate(forecast_setup["units"]):
+        unit.forecaster.initialize(
+            forecast_setup["units"], forecast_setup["market_configs"], forecasts, unit
+        )
+
+        assert calculate_naive_price.cache_info().hits == i
+        assert calculate_naive_price.cache_info().misses == 1
+
+        assert calculate_naive_residual_load.cache_info().hits == i
+        assert calculate_naive_residual_load.cache_info().misses == 1

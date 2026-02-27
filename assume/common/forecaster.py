@@ -75,6 +75,7 @@ class UnitForecaster:
             residual_load
         )
         self.preprocess_information = {}
+        print(forecast_algorithms)
 
     def _to_series(self, item: ForecastSeries) -> FastSeries:
         if isinstance(item, FastSeries):
