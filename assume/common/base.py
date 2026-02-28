@@ -4,7 +4,7 @@
 
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -753,6 +753,105 @@ class BaseStrategy:
 
 
 @dataclass
+class AlgorithmConfig:
+    """
+    Base configuration for algorithm-specific parameters.
+
+    Parameters:
+        actor_architecture (str): The architecture of the neural networks used for the actors. Options include
+            "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
+        batch_size (int): The batch size of experiences sampled from the replay buffer for each training update.
+            Larger batches provide more stable gradients but require more memory. Default is 128.
+        gamma (float): The discount factor for future rewards, ranging from 0 to 1. Default is 0.99.
+        train_freq (str): Defines the frequency at which networks are updated. Default is "24h".
+    """
+
+    # actor_architecture: str = "mlp"
+    batch_size: int = 128
+    gamma: float = 0.99
+    train_freq: str = "24h"
+
+
+# Algorithm category mapping
+ALGORITHM_CATEGORIES = {
+    "mappo": "on-policy",
+    "matd3": "off-policy", 
+    "maddpg": "off-policy"
+}
+
+def is_on_policy(algorithm_name: str) -> bool:
+    """Check if algorithm is on-policy."""
+    return ALGORITHM_CATEGORIES.get(algorithm_name) == "on-policy"
+
+def is_off_policy(algorithm_name: str) -> bool:
+    """Check if algorithm is off-policy."""
+    return ALGORITHM_CATEGORIES.get(algorithm_name) == "off-policy"
+
+
+@dataclass
+class OffPolicyConfig(AlgorithmConfig):
+    """
+    Configuration for off-policy algorithms (MATD3/MADDPG) hyperparameters.
+
+    These parameters control the off-policy actor-critic algorithm behavior such as delayed policy updates,
+    target network updates, and exploration noise.
+
+    Parameters:
+        episodes_collecting_initial_experience (int): The number of episodes at the start during which random
+            actions are chosen instead of using the actor network. Default is 5.
+        gradient_steps (int): The number of gradient descent steps performed during each training update. Default is 100.
+        noise_dt (int): The time step parameter for the Ornstein-Uhlenbeck process. Default is 1.
+        noise_scale (int): The scale factor multiplied by the noise drawn from the distribution. Default is 1.
+        noise_sigma (float): The standard deviation of the noise distribution for exploration. Default is 0.1.
+        action_noise_schedule (str | None): Which action noise decay schedule to use. Default is None.
+        policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated. Default is 2.
+        tau (float): The soft update coefficient for updating target networks. Default is 0.005.
+        target_policy_noise (float): The standard deviation of noise added to target policy actions. Default is 0.2.
+        target_noise_clip (float): The maximum absolute value for clipping the target policy noise. Default is 0.5.
+        replay_buffer_size (int): The maximum number of transitions stored in the replay buffer. Default is 50000.
+    """
+
+    episodes_collecting_initial_experience: int = 5
+    gradient_steps: int = 100
+    noise_dt: int = 1
+    noise_scale: int = 1
+    noise_sigma: float = 0.1
+    actor_architecture: str = "mlp"
+    action_noise_schedule: str | None = None
+    policy_delay: int = 2
+    tau: float = 0.005
+    target_policy_noise: float = 0.2
+    target_noise_clip: float = 0.5
+    replay_buffer_size: int = 50000
+
+
+@dataclass
+class OnPolicyConfig(AlgorithmConfig):
+    """
+    Configuration for on-policy algorithms (PPO/MAPPO) hyperparameters.
+
+    These parameters control the PPO algorithm behavior such as clipping ranges,
+    number of optimization epochs, and loss coefficients.
+
+    Parameters:
+        clip_ratio (float): The clipping ratio for the PPO surrogate objective. Default is 0.1.
+        entropy_coef (float): Coefficient for entropy term in loss. Default is 0.01.
+        gae_lambda (float): Lambda parameter for Generalized Advantage Estimation (GAE). Default is 0.95.
+        max_grad_norm (float): Maximum gradient norm for clipping. Default is 0.5.
+        vf_coef (float): Coefficient for value function term in loss. Default is 0.5.
+        n_epochs (int): Number of optimization epochs per rollout. Default is 10.
+    """
+
+    clip_ratio: float = 0.1
+    entropy_coef: float = 0.01
+    gae_lambda: float = 0.95
+    max_grad_norm: float = 0.5
+    vf_coef: float = 0.5
+    n_epochs: int = 10
+    actor_architecture: str = "mlp"
+
+
+@dataclass
 class LearningConfig:
     """
     A class for the learning configuration.
@@ -776,9 +875,6 @@ class LearningConfig:
 
         device (str): The device to use for PyTorch computations. Options include "cpu", "cuda", or specific
             CUDA devices like "cuda:0". Default is "cpu".
-        episodes_collecting_initial_experience (int): The number of episodes at the start during which random
-            actions are chosen instead of using the actor network. This helps populate the replay buffer with
-            diverse experiences. Default is 5.
         exploration_noise_std (float): The standard deviation of Gaussian noise added to actions during
             exploration in the environment. Higher values encourage more exploration. Default is 0.2.
         training_episodes (int): The number of training episodes, where one episode is the entire simulation
@@ -790,8 +886,6 @@ class LearningConfig:
         batch_size (int): The batch size of experiences sampled from the replay buffer for each training update.
             Larger batches provide more stable gradients but require more memory. In environments with many leanring agents we advise small batch sizes.
             Default is 128.
-        gradient_steps (int): The number of gradient descent steps performed during each training update.
-            More steps can lead to better learning but increase computation time. Default is 100.
         learning_rate (float): The learning rate (step size) for the optimizer, which controls how much the
             policy and value networks are updated during training. Default is 0.001.
         learning_rate_schedule (str | None): Which learning rate decay schedule to use. Currently only "linear"
@@ -803,30 +897,15 @@ class LearningConfig:
             early stopping. If the reward improvement is less than this threshold over early_stopping_steps,
             training is terminated early. Default is 0.05.
 
-        algorithm (str): Specifies which reinforcement learning algorithm to use. Currently, only "matd3"
-            (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient) is implemented. Default is "matd3".
-        replay_buffer_size (int): The maximum number of transitions stored in the replay buffer for experience replay.
-            Larger buffers allow for more diverse training samples. Default is 500000.
+        algorithm (str): Specifies which reinforcement learning algorithm to use. Options include "matd3"
+            (Multi-Agent Twin Delayed Deep Deterministic Policy Gradient), "maddpg", and "mappo". Default is "matd3".
         gamma (float): The discount factor for future rewards, ranging from 0 to 1. Higher values give more
             weight to long-term rewards in decision-making. Default is 0.99.
         actor_architecture (str): The architecture of the neural networks used for the actors. Options include
             "mlp" (Multi-Layer Perceptron) and "lstm" (Long Short-Term Memory). Default is "mlp".
-        policy_delay (int): The frequency (in gradient steps) at which the actor policy is updated.
-            TD3 updates the critic more frequently than the actor to stabilize training. Default is 2.
-        noise_sigma (float): The standard deviation of the Ornstein-Uhlenbeck or Gaussian noise distribution
-            used to generate exploration noise added to actions. Default is 0.1.
-        noise_scale (int): The scale factor multiplied by the noise drawn from the distribution.
-            Larger values increase exploration. Default is 1.
-        noise_dt (int): The time step parameter for the Ornstein-Uhlenbeck process, which determines how
-            quickly the noise decays over time. Used for noise scheduling. Default is 1.
-        action_noise_schedule (str | None): Which action noise decay schedule to use. Currently only "linear"
-            decay is available, which linearly decreases exploration noise over training. Default is "linear".
-        tau (float): The soft update coefficient for updating target networks. Controls how slowly target
-            networks track the main networks. Smaller values mean slower updates. Default is 0.005.
-        target_policy_noise (float): The standard deviation of noise added to target policy actions during
-            critic updates. This smoothing helps prevent overfitting to narrow policy peaks. Default is 0.2.
-        target_noise_clip (float): The maximum absolute value for clipping the target policy noise.
-            Prevents the noise from being too large. Default is 0.5.
+
+        off_policy (OffPolicyConfig): Nested configuration for off-policy algorithms (MATD3/MADDPG) hyperparameters.
+        on_policy (OnPolicyConfig): Nested configuration for on-policy algorithms (PPO/MAPPO) hyperparameters.
 
     """
 
@@ -840,52 +919,48 @@ class LearningConfig:
     max_bid_price: float | None = 100.0
 
     device: str = "cpu"
-    episodes_collecting_initial_experience: int = 5
     exploration_noise_std: float = 0.2
     training_episodes: int = 100
     validation_episodes_interval: int = 5
     train_freq: str = "24h"
     batch_size: int = 128
-    gradient_steps: int = 100
     learning_rate: float = 0.001
     learning_rate_schedule: str | None = None
     early_stopping_steps: int | None = None
     early_stopping_threshold: float = 0.05
 
     algorithm: str = "matd3"
-    replay_buffer_size: int = 50000
     gamma: float = 0.99
     actor_architecture: str = "mlp"
-    policy_delay: int = 2
-    noise_sigma: float = 0.1
-    noise_scale: int = 1
-    noise_dt: int = 1
-    action_noise_schedule: str | None = None
-    tau: float = 0.005
-    target_policy_noise: float = 0.2
-    target_noise_clip: float = 0.5
+
+    # Nested algorithm configurations
+    off_policy: OffPolicyConfig = field(default_factory=OffPolicyConfig)
+    on_policy: OnPolicyConfig = field(default_factory=OnPolicyConfig)
 
     def __post_init__(self):
         """Calculate defaults that depend on other fields and validate inputs."""
+        # Convert nested dicts to dataclass instances if necessary
+        if isinstance(self.off_policy, dict):
+            self.off_policy = OffPolicyConfig(**self.off_policy)
+        if isinstance(self.on_policy, dict):
+            self.on_policy = OnPolicyConfig(**self.on_policy)
+
+        for config in [self.off_policy, self.on_policy]:
+            # config.actor_architecture = self.actor_architecture
+            if config:
+                config.batch_size = self.batch_size
+                config.gamma = self.gamma
+                config.train_freq = self.train_freq
+            
+        self.off_policy.actor_architecture = self.actor_architecture
+        self.on_policy.actor_architecture = self.actor_architecture
+
         if self.early_stopping_steps is None:
             self.early_stopping_steps = int(
                 self.training_episodes / self.validation_episodes_interval + 1
             )
 
-        # if we do not have initial experience collected we will get an error as no samples are available on the
-        # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
-        if self.episodes_collecting_initial_experience < 1:
-            logger.warning(
-                f"episodes_collecting_initial_experience need to be at least 1 to sample from buffer, got {self.episodes_collecting_initial_experience}. setting to 1"
-            )
-
-            self.episodes_collecting_initial_experience = 1
-
-        # check that gradient_steps is positive
-        if self.gradient_steps <= 0:
-            raise ValueError(
-                f"gradient_steps need to be positive, got {self.gradient_steps}"
-            )
+        # check that gradient_steps is positive (now checked in off_policy config)
 
 
 class LearningStrategy(BaseStrategy):
