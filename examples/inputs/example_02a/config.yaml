@@ -1,154 +1,179 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 base:
+  start_date: 2019-03-01 00:00
   end_date: 2019-03-31 00:00
-  learning_config:
-    algorithm: matd3
-    batch_size: 256
-    continue_learning: false
-    device: cpu
-    gamma: 0.99
-    learning_mode: true
-    learning_rate: 0.001
-    max_bid_price: 100
-    off_policy:
-      action_noise_schedule: null
-      episodes_collecting_initial_experience: 5
-      gradient_steps: 24
-      noise_dt: 1
-      noise_scale: 1
-      noise_sigma: 0.1
-      replay_buffer_size: 50000
-    on_policy:
-      clip_ratio: 0.1
-      entropy_coef: 0.01
-      gae_lambda: 0.95
-      n_epochs: 25
-      vf_coef: 0.5
-    train_freq: 24h
-    trained_policies_save_path: null
-    training_episodes: 100
-    validation_episodes_interval: 5
-  markets_config:
-    EOM:
-      market_mechanism: pay_as_clear
-      maximum_bid_price: 3000
-      maximum_bid_volume: 100000
-      minimum_bid_price: -500
-      opening_duration: 1h
-      opening_frequency: 1h
-      operator: EOM_operator
-      price_unit: EUR/MWh
-      product_type: energy
-      products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
-      start_date: 2019-03-01 00:00
-      volume_unit: MWh
+  time_step: 1h
   save_frequency_hours: null
   seed: null
-  start_date: 2019-03-01 00:00
-  time_step: 1h
-base_lstm:
-  end_date: 2019-03-31 00:00
+
   learning_config:
-    actor_architecture: lstm
-    algorithm: matd3
-    batch_size: 256
+    learning_mode: true
     continue_learning: false
+    trained_policies_save_path: null
+    trained_policies_load_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 100
+    actor_architecture: mlp
+    train_freq: 100h
+    batch_size: 128
+    gamma: 0.99
     device: cpu
+    validation_episodes_interval: 5
+
+    # Off-policy parameters (required for TD3/DDPG algorithms)
+    off_policy:
+      episodes_collecting_initial_experience: 3
+      gradient_steps: 10
+      noise_sigma: 0.1
+      noise_scale: 1
+      action_noise_schedule: linear
+      noise_dt: 1
+      replay_buffer_size: 10000
+
+    # On-policy parameters (required for PPO/MAPPO algorithms)
+    on_policy:
+      clip_ratio: 0.2
+      entropy_coef: 0.01
+      vf_coef: 0.5
+      gae_lambda: 0.95
+      n_epochs: 25
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-03-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+base_lstm:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-31 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  seed: null
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 50
+    train_freq: 24h
+    batch_size: 256
+    gamma: 0.99
+    device: cpu
+    validation_episodes_interval: 5
     early_stopping_steps: 10
     early_stopping_threshold: 0.05
-    gamma: 0.99
-    learning_mode: true
-    learning_rate: 0.001
-    max_bid_price: 100
+    actor_architecture: lstm
+
+    # Off-policy parameters (required for TD3/DDPG algorithms)
     off_policy:
-      action_noise_schedule: linear
       episodes_collecting_initial_experience: 5
       gradient_steps: 24
-      noise_dt: 1
-      noise_scale: 1
       noise_sigma: 0.1
+      noise_scale: 1
+      action_noise_schedule: linear
+      noise_dt: 1
       replay_buffer_size: 10000
+
+    # On-policy parameters (required for PPO/MAPPO algorithms)
     on_policy:
       clip_ratio: 0.2
       entropy_coef: 0.01
+      vf_coef: 0.5
       gae_lambda: 0.95
       n_epochs: 25
-      vf_coef: 0.5
-    train_freq: 24h
-    trained_policies_save_path: null
-    training_episodes: 50
-    validation_episodes_interval: 5
+
   markets_config:
     EOM:
-      market_mechanism: pay_as_clear
-      maximum_bid_price: 3000
-      maximum_bid_volume: 100000
-      minimum_bid_price: -500
-      opening_duration: 1h
-      opening_frequency: 1h
       operator: EOM_operator
-      price_unit: EUR/MWh
       product_type: energy
-      products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
       start_date: 2019-03-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
       volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+tiny:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-05 00:00
+  time_step: 1h
   save_frequency_hours: null
   seed: null
-  start_date: 2019-03-01 00:00
-  time_step: 1h
-tiny:
-  end_date: 2019-01-05 00:00
+
   learning_config:
-    actor_architecture: mlp
-    algorithm: matd3
-    batch_size: 64
-    continue_learning: false
-    device: cpu
-    gamma: 0.99
     learning_mode: true
-    learning_rate: 0.001
+    continue_learning: false
+    trained_policies_save_path: null
     max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 10
+    train_freq: 24h
+    batch_size: 64
+    gamma: 0.99
+    device: cpu
+    validation_episodes_interval: 5
+    actor_architecture: mlp
+
+    # Off-policy parameters (required for TD3/DDPG algorithms)
     off_policy:
-      action_noise_schedule: linear
       episodes_collecting_initial_experience: 3
       gradient_steps: 24
-      noise_dt: 1
-      noise_scale: 1
       noise_sigma: 0.1
+      noise_scale: 1
+      action_noise_schedule: linear
+      noise_dt: 1
       replay_buffer_size: 10000
+
+    # On-policy parameters (required for PPO/MAPPO algorithms)
     on_policy:
       clip_ratio: 0.2
       entropy_coef: 0.01
+      vf_coef: 0.5
       gae_lambda: 0.95
       n_epochs: 25
-      vf_coef: 0.5
-    train_freq: 24h
-    trained_policies_save_path: null
-    training_episodes: 10
-    validation_episodes_interval: 5
+
   markets_config:
     EOM:
-      market_mechanism: pay_as_clear
-      maximum_bid_price: 3000
-      maximum_bid_volume: 100000
-      minimum_bid_price: -500
-      opening_duration: 1h
-      opening_frequency: 1h
       operator: EOM_operator
-      price_unit: EUR/MWh
       product_type: energy
-      products:
-      - count: 1
-        duration: 1h
-        first_delivery: 1h
       start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
       volume_unit: MWh
-  save_frequency_hours: null
-  seed: null
-  start_date: 2019-01-01 00:00
-  time_step: 1h
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh

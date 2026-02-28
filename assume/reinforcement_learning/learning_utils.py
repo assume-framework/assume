@@ -45,9 +45,7 @@ activation_function_limit: dict[str, ActivationLimits] = {
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:
-    """
-    A class that implements Ornstein-Uhlenbeck noise.
-    """
+    """A class that implements Ornstein-Uhlenbeck noise."""
 
     def __init__(self, action_dimension, mu=0, sigma=0.5, theta=0.15, dt=1e-2):
         self.action_dimension = action_dimension
@@ -76,9 +74,7 @@ class OUNoise:
 
 
 class NormalActionNoise:
-    """
-    A Gaussian action noise that supports direct tensor creation on a given device.
-    """
+    """A Gaussian action noise that supports direct tensor creation on a given device."""
 
     def __init__(self, action_dimension, mu=0.0, sigma=0.1, scale=1.0, dt=0.9998):
         self.act_dimension = action_dimension
@@ -88,15 +84,14 @@ class NormalActionNoise:
         self.dt = dt
 
     def noise(self, device=None, dtype=th.float):
-        """
-        Generates noise using torch.normal(), ensuring efficient execution on GPU if needed.
+        """Generate noise using torch.normal() ensuring efficient execution on GPU if needed.
 
         Args:
-        - device (torch.device, optional): Target device (e.g., 'cuda' or 'cpu').
-        - dtype (torch.dtype, optional): Data type of the tensor (default: torch.float32).
+            device: Target device (e.g., 'cuda' or 'cpu').
+            dtype: Data type of the tensor (default: torch.float32).
 
         Returns:
-        - torch.Tensor: Noise tensor on the specified device.
+            Noise tensor on the specified device.
         """
         return (
             self.dt
@@ -115,9 +110,9 @@ class NormalActionNoise:
 
 
 def polyak_update(params, target_params, tau: float):
-    """
-    Perform a Polyak average update on ``target_params`` using ``params``:
-    target parameters are slowly updated towards the main parameters.
+    """Perform a Polyak average update on ``target_params`` using ``params``.
+    
+    Target parameters are slowly updated towards the main parameters.
     ``tau``, the soft update coefficient controls the interpolation:
     ``tau=1`` corresponds to copying the parameters to the target ones whereas nothing happens when ``tau=0``.
     The Polyak update is done in place, with ``no_grad``, and therefore does not create intermediate tensors,
@@ -127,9 +122,9 @@ def polyak_update(params, target_params, tau: float):
     See https://github.com/DLR-RM/stable-baselines3/issues/93
 
     Args:
-        params: parameters to use to update the target params
-        target_params: parameters to update
-        tau: the soft update coefficient ("Polyak update", between 0 and 1)
+        params: Parameters to use to update the target params.
+        target_params: Parameters to update.
+        tau: The soft update coefficient ("Polyak update", between 0 and 1).
     """
     with th.no_grad():
         for param, target_param in zip(params, target_params):
@@ -139,9 +134,10 @@ def polyak_update(params, target_params, tau: float):
 def linear_schedule_func(
     start: float, end: float = 0, end_fraction: float = 1
 ) -> Schedule:
-    """
-    Create a function that interpolates linearly between start and end
-    between ``progress_remaining`` = 1 and ``progress_remaining`` = 1 - ``end_fraction``.
+    """Create a function that interpolates linearly between start and end.
+    
+    Interpolates linearly between start and end between ``progress_remaining`` = 1 
+    and ``progress_remaining`` = 1 - ``end_fraction``.
 
     Args:
         start: value to start with if ``progress_remaining`` = 1
@@ -151,11 +147,10 @@ def linear_schedule_func(
             of the complete training process.
 
     Returns:
-        Linear schedule function.
+        The linear schedule function.
 
     Note:
         Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L100
-
     """
 
     def func(progress_remaining: float) -> float:
@@ -168,17 +163,18 @@ def linear_schedule_func(
 
 
 def constant_schedule(val: float) -> Schedule:
-    """
-    Create a function that returns a constant. It is useful for learning rate schedule (to avoid code duplication)
+    """Create a function that returns a constant. 
+    
+    It is useful for learning rate schedule (to avoid code duplication).
 
     Args:
-        val: constant value
+        val: Constant value.
+        
     Returns:
         Constant schedule function.
 
     Note:
         From SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L124
-
     """
 
     def func(_):
@@ -205,16 +201,18 @@ def copy_layer_data(dst, src):
 
 
 def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
-    """
-    Transform nested dict {datetime -> {unit_id -> [values]}} into
-    torch tensor of shape (timesteps, powerplants, values). Compatible with buffer storage.
+    """Transform nested dict into torch tensor.
+    
+    Transforms nested dict {datetime -> {unit_id -> [values]}} into torch tensor 
+    of shape (timesteps, powerplants, values). Compatible with buffer storage.
     Get tensors from GPU to CPU.
 
     Args:
-        nested_dict: Dict with structure {datetime -> {unit_id -> list[tensor]}}
+        nested_dict: Dict with structure {datetime -> {unit_id -> list[tensor]}}.
+        device: PyTorch device config.
 
     Returns:
-        th.Tensor: Shape (n_timesteps, n_powerplants, feature_dim)
+        Shape (n_timesteps, n_powerplants, feature_dim).
     """
     # Get sorted lists of units and timestamps (for consistent ordering)
     all_times = sorted(nested_dict.keys())
@@ -262,9 +260,11 @@ def transfer_weights(
     act_dim: int,
     unique_obs: int,
 ) -> dict | None:
-    """
-    Transfer weights from loaded model to new model. Copy only those obs- and action-slices for matching IDs.
-    New IDs keep their original (random) weights. Function only works if the neural network architecture remained stable besides the input layer, namely with the same hidden layers.
+    """Transfer weights from loaded model to new model.
+    
+    Copy only those obs- and action-slices for matching IDs. New IDs keep their 
+    original (random) weights. Function only works if the neural network architecture 
+    remained stable besides the input layer, namely with the same hidden layers.
 
     Args:
         model (th.nn.Module): The model to transfer weights to.

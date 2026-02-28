@@ -41,10 +41,11 @@ logger = logging.getLogger(__name__)
 
 
 class Learning(Role):
-    """
-    This class manages the learning process of reinforcement learning agents, including initializing key components such as
-    neural networks, replay buffer, and learning hyperparameters. It handles both training and evaluation modes based on
-    the provided learning configuration.
+    """Manages the learning process of reinforcement learning agents.
+    
+    This class handles the initialization of key components such as neural networks,
+    replay buffer, and learning hyperparameters. It handles both training and evaluation 
+    modes based on the provided learning configuration.
 
     Args:
         learning_config (LearningConfig): The configuration for the learning process.
@@ -140,14 +141,16 @@ class Learning(Role):
             self.all_dones = defaultdict(lambda: defaultdict(list))
 
     def on_ready(self):
-        """
-        Set up the learning role for reinforcement learning training.
+        """Set up the learning role for reinforcement learning training.
 
-        Notes:
-            This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
-            for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
-            This cannot happen in the init since the context (compare mango agents) is not yet available there.To avoid inconsistent replay buffer states (e.g. observation and action has been stored but not the reward), this
-            slightly shifts the timing of the buffer updates.
+        Note:
+            This method prepares the learning role for the reinforcement learning training process.
+            It subscribes to relevant messages for handling the training process and schedules 
+            recurrent tasks for policy updates based on the specified training frequency.
+            This cannot happen in the init since the context (compare mango agents) is not 
+            yet available there. To avoid inconsistent replay buffer states (e.g. observation 
+            and action has been stored but not the reward), this slightly shifts the timing 
+            of the buffer updates.
         """
         super().on_ready()
 
@@ -168,8 +171,8 @@ class Learning(Role):
         )
 
     def sync_train_freq_with_simulation_horizon(self) -> str | None:
-        """
-        Ensure self.train_freq evenly divides the simulation length.
+        """Ensure self.train_freq evenly divides the simulation length.
+        
         If not, adjust self.train_freq (in-place) and return the new string, otherwise return None.
         Uses self.start_datetime/self.end_datetime when available, otherwise falls back to timestamp fields.
         """
@@ -209,8 +212,7 @@ class Learning(Role):
         return self.learning_config.train_freq
 
     def determine_validation_interval(self) -> int:
-        """
-        Compute and validate validation_interval.
+        """Compute and validate validation_interval.
 
         Returns:
             validation_interval (int)
@@ -244,8 +246,7 @@ class Learning(Role):
         return validation_interval
 
     def register_strategy(self, strategy: LearningStrategy) -> None:
-        """
-        Register a learning strategy with this learning role.
+        """Register a learning strategy with this learning role.
 
         Args:
             strategy (LearningStrategy): The learning strategy to register.
@@ -309,10 +310,10 @@ class Learning(Role):
             logger.warning("No experience retrieved to store in buffer at update step!")
 
     async def _store_to_buffer_and_update_sync(self, cache, device) -> None:
-        """
-        This function takes all the information that the strategies wrote into the learning_role cache dicts and post_processes them to fit into the buffer.
-        Further triggers the next policy update
-
+        """Process strategy data into the buffer and trigger policy update.
+        
+        This function takes all the information that the strategies wrote into the 
+        learning_role cache dicts and post-processes them to fit into the buffer.
         """
         first_start = next(iter(cache["obs"]))
         for name, buffer in [
@@ -402,22 +403,22 @@ class Learning(Role):
             self.rl_algorithm.update_policy()
 
     def add_observation_to_cache(self, unit_id, start, observation) -> None:
-        """
-        Add the observation to the cache dict, per unit_id.
+        """Add the observation to the cache dict, per unit_id.
 
         Args:
             unit_id (str): The id of the unit.
+            start: The start time.
             observation (torch.Tensor): The observation to be added.
 
         """
         self.all_obs[start][unit_id].append(observation)
 
     def add_actions_to_cache(self, unit_id, start, action, noise) -> None:
-        """
-        Add the action and noise to the cache dict, per unit_id.
+        """Add the action and noise to the cache dict, per unit_id.
 
         Args:
             unit_id (str): The id of the unit.
+            start: The start time.
             action (torch.Tensor): The action to be added.
             noise (torch.Tensor): The noise to be added.
 
@@ -434,13 +435,14 @@ class Learning(Role):
         self.all_noises[start][unit_id].append(noise)
 
     def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
-        """
-        Add the reward to the cache dict, per unit_id.
+        """Add the reward to the cache dict, per unit_id.
 
         Args:
-            unit_id (str): The id of the unit.
-            reward (float): The reward to be added.
-
+            unit_id: The id of the unit.
+            start: The start time.
+            reward: The reward to be added.
+            regret: The regret to be added.
+            profit: The profit to be added.
         """
         self.all_rewards[start][unit_id].append(reward)
         self.all_regrets[start][unit_id].append(regret)
@@ -454,26 +456,24 @@ class Learning(Role):
         log_prob,
         done=False
     ) -> None:
-        """
-        Add PPO specific data to the cache dict, per unit_id.
+        """Add PPO specific data to the cache dict, per unit_id.
 
         Args:
-            unit_id (str): The id of the unit.
-            value (float): The value estimate V(s) from the critic.
-            log_prob (float): The log probability of the action.
-            done (bool): Whether a terminal state or not.
+            unit_id: The id of the unit.
+            start: The start time.
+            value: The value estimate V(s) from the critic.
+            log_prob: The log probability of the action.
+            done: Whether a terminal state or not.
         """
         self.all_values[start][unit_id].append(value)
         self.all_log_probs[start][unit_id].append(log_prob)
         self.all_dones[start][unit_id].append(float(done))
 
     def load_inter_episodic_data(self, inter_episodic_data):
-        """
-        Load the inter-episodic data from the dict stored across simulation runs.
+        """Load the inter-episodic data from the dict stored across simulation runs.
 
         Args:
-            inter_episodic_data (dict): The inter-episodic data to be loaded.
-
+            inter_episodic_data: The inter-episodic data to be loaded.
         """
         self.episodes_done = inter_episodic_data["episodes_done"]
         self.eval_episodes_done = inter_episodic_data["eval_episodes_done"]
@@ -499,11 +499,10 @@ class Learning(Role):
             self.turn_off_initial_exploration(loaded_only=True)
 
     def get_inter_episodic_data(self):
-        """
-        Dump the inter-episodic data to a dict for storing across simulation runs.
+        """Dump the inter-episodic data to a dict for storing across simulation runs.
 
         Returns:
-            dict: The inter-episodic data to be stored.
+            The inter-episodic data to be stored.
         """
 
         return {
@@ -517,14 +516,13 @@ class Learning(Role):
         }
 
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
-        """
-        Disable initial exploration mode.
+        """Disable initial exploration mode.
 
         If `loaded_only=True`, only turn off exploration for strategies that were loaded (used in continue_learning mode).
         If `loaded_only=False`, turn it off for all strategies.
 
         Args:
-            loaded_only (bool): Whether to disable exploration only for loaded strategies.
+            loaded_only: Whether to disable exploration only for loaded strategies.
         """
         for strategy in self.rl_strats.values():
             if loaded_only:
@@ -534,9 +532,10 @@ class Learning(Role):
                 strategy.collect_initial_experience_mode = False
 
     def get_progress_remaining(self) -> float:
-        """
-        Get the remaining learning progress from the simulation run.
-
+        """Get the remaining learning progress from the simulation run.
+        
+        Returns:
+            The remaining progress as a float between 0 and 1.
         """
         total_duration = self.end - self.start
         elapsed_duration = self.context.current_timestamp - self.start
@@ -574,14 +573,14 @@ class Learning(Role):
         return progress_remaining
 
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
-        """
-        Create and initialize the reinforcement learning algorithm.
+        """Create and initialize the reinforcement learning algorithm.
 
-        This method creates and initializes the reinforcement learning algorithm based on the specified algorithm name. The algorithm
-        is associated with the learning role and configured with relevant hyperparameters.
+        This method creates and initializes the reinforcement learning algorithm based on 
+        the specified algorithm name. The algorithm is associated with the learning role 
+        and configured with relevant hyperparameters.
 
         Args:
-            algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
+            algorithm: The name of the reinforcement learning algorithm.
         """
         if algorithm == "matd3":
             self.rl_algorithm = TD3(learning_role=self)
@@ -596,9 +595,13 @@ class Learning(Role):
         """
         Initialize the policy of the reinforcement learning agent considering the respective algorithm.
 
-        This method initializes the policy (actor) of the reinforcement learning agent. It tests if we want to continue the learning process with
-        stored policies from a former training process. If so, it loads the policies from the specified directory. Otherwise, it initializes the
-        respective new policies.
+        This method initializes the policy (actor) of the reinforcement learning agent. It 
+        tests if we want to continue the learning process with stored policies from a former 
+        training process. If so, it loads the policies from the specified directory. 
+        Otherwise, it initializes the respective new policies.
+        
+        Args:
+            actors_and_critics: The pre-initialized actor and critic policies.
         """
 
         self.rl_algorithm.initialize_policy(actors_and_critics)
@@ -617,20 +620,23 @@ class Learning(Role):
                 )
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
-        """
-        Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.
+        """Compare evaluation metrics and save best performing policies.
 
-        This method compares the evaluation metrics, such as reward, profit, and regret, and saves the policies if they achieve the
-        best performance in their respective categories. It iterates through the specified modes, compares the current evaluation
-        value with the previous best, and updates the best value if necessary. If an improvement is detected, it saves the policy
-        and associated parameters.
+        This method compares the evaluation metrics, such as reward, profit, and regret, 
+        and saves the policies if they achieve the best performance in their respective 
+        categories. It iterates through the specified modes, compares the current evaluation
+        value with the previous best, and updates the best value if necessary. If an improvement 
+        is detected, it saves the policy and associated parameters.
 
-        metrics contain a metric key like "reward" and the current value.
-        This function stores the policies with the highest metric.
-        So if minimize is required one should add for example "minus_regret" which is then maximized.
+        Metrics contain a metric key like "reward" and the current value. This function 
+        stores the policies with the highest metric. If minimize is required, one should 
+        add for example "minus_regret" which is then maximized.
 
+        Args:
+            metrics: Dictionary of metrics evaluated.
+            
         Returns:
-            bool: True if early stopping criteria is triggered.
+            True if early stopping criteria is triggered, False otherwise.
 
         Note:
             This method is typically used during the evaluation phase to save policies that achieve superior performance.
@@ -717,19 +723,18 @@ class Learning(Role):
         output_agent_addr: str,
         train_start: str,
     ):
-        """
-        Initialize the logging for the reinforcement learning agent.
+        """Initialize the logging for the reinforcement learning agent.
 
         This method initializes the tensor board logger for the reinforcement learning agent.
         It also initializes the parameters required for sending data to the output role.
 
         Args:
-            simulation_id (str): The unique identifier for the simulation.
-            episode (int): The current training episode number.
-            eval_episode (int): The current evaluation episode number.
-            db_uri (str): URI for connecting to the database.
-            output_agent_addr (str): The address of the output agent.
-            train_start (str): The start time of simulation.
+            simulation_id: The unique identifier for the simulation.
+            episode: The current training episode number.
+            eval_episode: The current evaluation episode number.
+            db_uri: URI for connecting to the database.
+            output_agent_addr: The address of the output agent.
+            train_start: The start time of simulation.
         """
 
         self.tensor_board_logger = TensorBoardLogger(
@@ -754,12 +759,10 @@ class Learning(Role):
         self.update_steps = 0
 
     def write_rl_params_to_output(self, cache):
-        """
-        Sends the current rl_strategy update to the output agent.
+        """Sends the current rl_strategy update to the output agent.
 
         Args:
-            products_index (pandas.DatetimeIndex): The index of all products.
-            marketconfig (MarketConfig): The market configuration.
+            cache: The data cache from the strategies.
         """
         output_agent_list = []
 
@@ -801,20 +804,16 @@ class Learning(Role):
     def write_rl_grad_params_to_output(
         self, learning_rate: float, unit_params_list: list[dict]
     ) -> None:
-        """
-        Writes learning parameters and critic losses to output at specified time intervals.
+        """Writes learning parameters and critic losses to output at specified intervals.
 
         This function processes training metrics for each critic over multiple time steps and
         sends them to a database for storage. It tracks the learning rate and critic losses
         across training iterations, associating each record with a timestamp.
 
-        Parameters
-        ----------
-        learning_rate : float
-            The current learning rate used in training.
-        unit_params_list : list[dict]
-            A list of dictionaries containing critic losses for each time step.
-            Each dictionary maps critic names to their corresponding loss values.
+        Args:
+            learning_rate: The current learning rate used in training.
+            unit_params_list: A list of dictionaries containing critic losses for each 
+                time step (mapping critic names to their losses in dict).
         """
         # gradient steps performed in previous training episodes
         if is_off_policy(self.learning_config.algorithm):

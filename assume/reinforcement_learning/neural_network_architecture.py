@@ -13,8 +13,7 @@ from assume.reinforcement_learning.learning_utils import activation_function_lim
 
 
 class Critic(nn.Module):
-    """
-    Base Critic class handling architecture generation and initialization.
+    """Base Critic class handling architecture generation and initialization.
 
     Args:
         n_agents (int): Number of agents
@@ -55,9 +54,7 @@ class Critic(nn.Module):
         return hidden_sizes
 
     def _build_q_network(self) -> nn.ModuleList:
-        """
-        Dynamically create a Q-network given the chosen hidden layer sizes.
-        """
+        """Dynamically create a Q-network given the chosen hidden layer sizes."""
         layers = nn.ModuleList()
         input_dim = (
             self.obs_dim + self.act_dim
@@ -86,9 +83,11 @@ class CriticTD3(Critic):
     """Initialize parameters and build model.
 
     Args:
-        n_agents (int): Number of agents
-        obs_dim (int): Dimension of each state
-        act_dim (int): Dimension of each action
+        n_agents: Number of agents.
+        obs_dim: Dimension of each state.
+        act_dim: Dimension of each action.
+        float_type: Data type for parameters.
+        unique_obs_dim: Dimension of agent-specific observations.
     """
     def __init__(
         self,
@@ -117,9 +116,7 @@ class CriticTD3(Critic):
         obs: th.Tensor,
         actions: th.Tensor
     ) -> Tuple[th.Tensor, th.Tensor]:
-        """
-        Forward pass through both Q-networks.
-        """
+        """Forward pass through both Q-networks."""
         xu = th.cat([obs, actions], dim=1) # Concatenate obs & actions
 
         # Compute Q1
@@ -135,9 +132,7 @@ class CriticTD3(Critic):
         obs: th.Tensor,
         actions: th.Tensor
     ) -> th.Tensor:
-        """
-        Compute only Q1 (used during actor updates).
-        """
+        """Compute only Q1 (used during actor updates)."""
         x = th.cat([obs, actions], dim=1)
 
         x = nn.Sequential(*self.q1_layers)(x)
@@ -195,10 +190,10 @@ class CriticPPO(Critic):
     """Initialize parameters and build PPO value network.
 
     Args:
-        n_agents (int): Number of agents
-        obs_dim (int): Dimension of observation per agent
-        float_type: Data type for parameters
-        unique_obs_dim: Dimension of agent-specific observations
+        n_agents: Number of agents.
+        obs_dim: Dimension of observation per agent.
+        float_type: Data type for parameters.
+        unique_obs_dim: Dimension of agent-specific observations.
     """
 
     def __init__(
@@ -223,9 +218,7 @@ class CriticPPO(Critic):
         self._init_weights()
 
     def _init_weights(self) -> None:
-        """
-        Apply Orthogonal initialization with appropriate gains.
-        """
+        """Apply Orthogonal initialization with appropriate gains."""
         def init_layer(m):
             if isinstance(m, nn.Linear):
                 if m.out_features == 1:  # Output layer
@@ -245,9 +238,7 @@ class CriticPPO(Critic):
 
 
 class Actor(nn.Module):
-    """
-    Parent class for actor networks.
-    """
+    """Parent class for actor networks."""
 
     def __init__(self):
         super().__init__()
@@ -265,9 +256,7 @@ class Actor(nn.Module):
 
 
 class MLPActor(Actor):
-    """
-    The neural network for the MLP actor.
-    """
+    """The neural network for the MLP actor."""
 
     def __init__(self, obs_dim: int, act_dim: int, float_type, *args, **kwargs):
         super().__init__()
@@ -299,16 +288,16 @@ class MLPActor(Actor):
 
 
 class LSTMActor(Actor):
-    """
-    The LSTM recurrent neural network for the actor.
+    """The LSTM recurrent neural network for the actor.
 
     Based on "Multi-Period and Multi-Spatial Equilibrium Analysis in Imperfect Electricity Markets"
     by Ye at al. (2019)
 
-    Note: the original source code was not available, therefore this implementation was derived from the published paper. 
-    Adjustments to resemble final layers from MLPActor:
-    - dense layer 2 was omitted
-    - single output layer with softsign activation function to output actions directly instead of two output layers for mean and stddev
+    Note: 
+        The original source code was not available, therefore this implementation was derived from the published paper. 
+        Adjustments to resemble final layers from MLPActor:
+        - dense layer 2 was omitted
+        - single output layer with softsign activation function to output actions directly instead of two output layers for mean and stddev
     """
 
     def __init__(
@@ -384,9 +373,7 @@ class LSTMActor(Actor):
 
 
 class ActorPPO(nn.Module):
-    """
-    PPO Actor network with stochastic policy (Gaussian).
-    """
+    """PPO Actor network with stochastic policy (Gaussian)."""
 
     def __init__(
         self,
@@ -463,9 +450,7 @@ class ActorPPO(nn.Module):
         return th.clamp(action, -1.0, 1.0)
 
     def get_distribution(self, obs: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
-        """
-        Get the policy distribution parameters.
-        """
+        """Get the policy distribution parameters."""
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
         mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
@@ -478,15 +463,14 @@ class ActorPPO(nn.Module):
         obs: th.Tensor,
         deterministic: bool = False,
     ) -> tuple[th.Tensor, th.Tensor]:
-        """
-        Sample action and compute log probability.
+        """Sample action and compute log probability.
         
         Args:
-            obs: Observations
-            deterministic: If True, return mean action
+            obs: Observations.
+            deterministic: If True, return mean action.
             
         Returns:
-            Tuple of (action, log_prob)
+            Tuple of (action, log_prob).
         """
         mean, log_std = self.get_distribution(obs)
         std = log_std.exp()
@@ -511,17 +495,16 @@ class ActorPPO(nn.Module):
         obs: th.Tensor,
         actions: th.Tensor,
     ) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
-        """
-        Evaluate log probability and entropy for given actions.
+        """Evaluate log probability and entropy for given actions.
         
         Used during PPO update to compute importance ratio.
         
         Args:
-            obs: Observations
-            actions: Actions to evaluate
+            obs: Observations.
+            actions: Actions to evaluate.
             
         Returns:
-            Tuple of (log_prob, entropy, values)
+            Tuple of (log_prob, entropy, values).
         """
         mean, log_std = self.get_distribution(obs)
         std = log_std.exp()
@@ -546,9 +529,7 @@ class ActorPPO(nn.Module):
 
 
 class LSTMActorPPO(ActorPPO):
-    """
-    PPO Actor network with LSTM architecture and stochastic policy (Gaussian).
-    """
+    """PPO Actor network with LSTM architecture and stochastic policy (Gaussian)."""
 
     def __init__(
         self,

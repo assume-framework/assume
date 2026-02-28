@@ -24,11 +24,28 @@ class TD3(A2CAlgorithm):
     clipped double Q-Learning, delayed policy update and target policy smoothing.
 
     Open AI Spinning guide: https://spinningup.openai.com/en/latest/algorithms/td3.html
-
     Original paper: https://arxiv.org/pdf/1802.09477.pdf
+    
+    Attributes:
+        n_updates: Counter for gradient updates performed.
+        grad_clip_norm: Maximum gradient norm for clipping.
+        critic_architecture_class: Critic network architecture class (CriticTD3).
+        
+    Example:
+        >>> td3 = TD3(learning_role)
+        >>> td3.update_policy()
     """
 
     def __init__(self, learning_role):
+        """Initialize the TD3 algorithm.
+        
+        Sets up the algorithm with gradient counters, clipping parameters,
+        and critic architecture.
+        
+        Args:
+            learning_role: Learning role object managing agents and replay buffer.
+                Must have off-policy configuration.
+        """
         super().__init__(learning_role)
 
         self.n_updates = 0
@@ -38,24 +55,21 @@ class TD3(A2CAlgorithm):
         self.critic_architecture_class = CriticTD3
 
     def update_policy(self):
+        """Update the policy using the Twin Delayed Deep Deterministic Policy Gradients (TD3).
+
+        This method performs the policy update step, which involves updating the actor 
+        (policy) and critic (Q-function) networks using the TD3 algorithm. It iterates 
+        over the specified number of gradient steps and performs the following for each 
+        learning strategy:
+
+        1. Sample a batch of transitions from the replay buffer.
+        2. Calculate the next actions with added noise using the actor target network.
+        3. Compute the target Q-values based on the next states, rewards, and the target critic network.
+        4. Compute the critic loss as the mean squared error between current Q-values and target Q-values.
+        5. Optimize the critic network by performing a gradient descent step.
+        6. Update the actor network if the specified policy delay is reached.
+        7. Apply Polyak averaging to update target networks.
         """
-        Update the policy of the reinforcement learning agent using the Twin Delayed Deep Deterministic Policy Gradients (TD3) algorithm.
-
-        Note:
-            This function performs the policy update step, which involves updating the actor (policy) and critic (Q-function) networks
-            using TD3 algorithm. It iterates over the specified number of gradient steps and performs the following steps for each
-            learning strategy:
-
-            1. Sample a batch of transitions from the replay buffer.
-            2. Calculate the next actions with added noise using the actor target network.
-            3. Compute the target Q-values based on the next states, rewards, and the target critic network.
-            4. Compute the critic loss as the mean squared error between current Q-values and target Q-values.
-            5. Optimize the critic network by performing a gradient descent step.
-            6. Update the actor network if the specified policy delay is reached.
-            7. Apply Polyak averaging to update target networks.
-
-        """
-
         logger.debug("Updating Policy (TD3)")
 
         # Stack strategies for easier access

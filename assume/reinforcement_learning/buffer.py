@@ -32,20 +32,18 @@ class ReplayBuffer:
         device: str,
         float_type,
     ):
-        """
+        """Initialize the replay buffer.
+        
         A class that represents a replay buffer for storing observations, actions, and rewards.
         The replay buffer is implemented as a circular buffer, where the oldest experiences are discarded when the buffer is full.
-
+        
         Args:
-            buffer_size (int): The maximum size of the buffer.
-            obs_dim (int): The dimension of the observation space.
-            act_dim (int): The dimension of the action space.
-            n_rl_units (int): The number of reinforcement learning units.
-            device (str): The device to use for storing the data (e.g., 'cpu' or 'cuda').
-            float_type (torch.dtype): The data type to use for the stored data.
-            observations (numpy.ndarray): The stored observations.
-            actions (numpy.ndarray): The stored actions.
-            rewards (numpy.ndarray): The stored rewards.
+            buffer_size: The maximum size of the buffer.
+            obs_dim: The dimension of the observation space.
+            act_dim: The dimension of the action space.
+            n_rl_units: The number of reinforcement learning units.
+            device: The device to use for storing the data (e.g., 'cpu' or 'cuda').
+            float_type: The data type to use for the stored data.
         """
 
         self.buffer_size = buffer_size
@@ -91,28 +89,26 @@ class ReplayBuffer:
                 )
 
     def size(self):
-        # write docstring for this function
-        """
-        Return the current size of the buffer (i.e. number of transitions
-        stored in the buffer).
-
+        """Return the current size of the buffer.
+        
         Returns:
-            buffer_size(int): The current size of the buffer
-
+            The current size of the buffer (i.e. number of transitions stored).
         """
         return self.buffer_size if self.full else self.pos
 
     def to_torch(self, array: np.array, copy=True):
-        """
-        Converts a numpy array to a PyTorch tensor. Note: It copies the data by default.
-
+        """Convert a numpy array to a PyTorch tensor.
+        
+        Note:
+            It copies the data by default.
+            
         Args:
-            array (numpy.ndarray): The numpy array to convert.
-            copy (bool, optional): Whether to copy the data or not
-                (may be useful to avoid changing things by reference). Defaults to True.
-
+            array: The numpy array to convert.
+            copy: Whether to copy the data or not (may be useful to avoid changing 
+                things by reference). Defaults to True.
+                
         Returns:
-            torch.Tensor: The converted PyTorch tensor.
+            The converted PyTorch tensor.
         """
 
         if copy:
@@ -126,13 +122,12 @@ class ReplayBuffer:
         actions: np.ndarray,
         reward: np.ndarray,
     ):
-        """
-        Adds an observation, action, and reward of all agents to the replay buffer.
-
+        """Add an observation, action, and reward of all agents to the replay buffer.
+        
         Args:
-            obs (numpy.ndarray): The observation to add.
-            actions (numpy.ndarray): The actions to add.
-            reward (numpy.ndarray): The reward to add.
+            obs: The observation to add.
+            actions: The actions to add.
+            reward: The reward to add.
         """
         # copying all to avoid modification
         len_obs = obs.shape[0]
@@ -146,15 +141,14 @@ class ReplayBuffer:
             self.pos = 0
 
     def sample(self, batch_size: int) -> ReplayBufferSamples:
-        """
-        Samples a random batch of experiences from the replay buffer.
-
+        """Sample a random batch of experiences from the replay buffer.
+        
         Args:
-            batch_size (int): The number of experiences to sample.
-
+            batch_size: The number of experiences to sample.
+            
         Returns:
-            ReplayBufferSamples: A named tuple containing the sampled observations, actions, and rewards.
-
+            A named tuple containing the sampled observations, actions, and rewards.
+            
         Raises:
             Exception: If there are less than two entries in the buffer.
         """
@@ -174,9 +168,17 @@ class ReplayBuffer:
         return ReplayBufferSamples(*tuple(map(self.to_torch, data)))
 
 class RolloutBufferSamples(NamedTuple):
-    """
-    Container for roll buffer samples. It holds one batch of training samples 
-    from PPO's rollout buffer.
+    """Container for rollout buffer samples.
+    
+    It holds one batch of training samples from PPO's rollout buffer.
+    
+    Attributes:
+        observations: States/observations the agent saw.
+        actions: Actions the agent took.
+        old_values: Critic's value estimates.
+        old_log_probs: Log_probability of taking each action.
+        advantages: Generalized advantage estimates.
+        returns: Expected returns.
     """
     observations: th.Tensor     # states/observations the agent saw
     actions: th.Tensor          # actions the agent took
@@ -186,24 +188,12 @@ class RolloutBufferSamples(NamedTuple):
     returns: th.Tensor          # expected returns
 
 class RolloutBuffer:
-    """
-    Rollout buffer is used in on-policy algorithms like PPO.
-
+    """Rollout buffer used in on-policy algorithms like PPO.
+    
     It corresponds to the transitions collected using the current policy.
     This experience is discarded after the policy is updated.
     In order to use PPO, the current observations are needed to be stored.
-    the observations include actions, rewards, values, log probabilities and done for each action.
-
-    Args:
-        buffer_size (int): Max number of elements allowed in the buffer
-        obs_dim (int): Dimension of the observation space
-        act_dim (int): Dimension of the action space
-        n_rl_units (int): Number of RL agents
-        device (str | th.device): PyTorch device config
-        float_type (th.dtype): Data type for floating point numbers
-        gamma (float): Discount factor
-        gae_lambda (float): bias-variance trade-off factor for Generalized Advantage Estimator
-    
+    The observations include actions, rewards, values, log probabilities and done for each action.
     """
     
     def __init__(
@@ -217,7 +207,18 @@ class RolloutBuffer:
         gamma: float = 0.99,
         gae_lambda: float = 0.98
     ):
-        """Initialize the rollout buffer."""
+        """Initialize the rollout buffer.
+        
+        Args:
+            buffer_size: Max number of elements allowed in the buffer.
+            obs_dim: Dimension of the observation space.
+            act_dim: Dimension of the action space.
+            n_rl_units: Number of RL agents.
+            device: PyTorch device config.
+            float_type: Data type for floating point numbers.
+            gamma: Discount factor.
+            gae_lambda: bias-variance trade-off factor for Generalized Advantage Estimator.
+        """
         self.buffer_size = buffer_size
         self.obs_dim = obs_dim
         self.act_dim = act_dim
@@ -236,8 +237,8 @@ class RolloutBuffer:
         self.reset()
 
     def reset(self) -> None:
-        """
-        Reset the rollout buffer. 
+        """Reset the rollout buffer.
+        
         Clearing the buffer and allocating new storage.
         """
         self.observations = np.zeros(
@@ -314,16 +315,15 @@ class RolloutBuffer:
         value: np.ndarray,
         log_prob: np.ndarray
     ) -> None:
-        """
-        Add a transition to the buffer.
+        """Add a transition to the buffer.
         
         Args:
-            obs (np.ndarray): Observation of the agents
-            action (np.ndarray): Action taken by the agents
-            reward (np.ndarray): Reward obtained
-            done (np.ndarray): Whether the episode ended
-            value (np.ndarray): Value estimate from the critic
-            log_prob (np.ndarray): Log probability of the action
+            obs: Observation of the agents.
+            action: Action taken by the agents.
+            reward: Reward obtained.
+            done: Whether the episode ended.
+            value: Value estimate from the critic.
+            log_prob: Log probability of the action.
         """
         if self.pos >= self.buffer_size:
             self.full = True
@@ -344,13 +344,13 @@ class RolloutBuffer:
         last_values: np.ndarray,
         dones: np.ndarray
     ) -> None:
-        """
-        Uses Generalized Advantage Estimation to compute the advantage. 
-        To obtain the lambda-return, the advantage is added to the value estiamte.
-
+        """Use Generalized Advantage Estimation to compute the advantage.
+        
+        To obtain the lambda-return, the advantage is added to the value estimate.
+        
         Args:
-            last_values (np.ndarray): value estimation for the last step
-            dones (np.ndarray): whether the last step was terminal
+            last_values: Value estimation for the last step.
+            dones: Whether the last step was terminal.
         """
         # taking the final value estimates and episode-end flags,
         # and making them flat arrays providing one number per agent.
@@ -395,14 +395,13 @@ class RolloutBuffer:
         self,
         batch_size: int | None = None
     ) -> Generator[RolloutBufferSamples, None, None]:
-        """
-        Generator for generating batches of transition samples for training.
+        """Generate batches of transition samples for training.
         
         Args:
-            batch_size (int | None): Number of samples to be accessed per batch.
-
+            batch_size: Number of samples to be accessed per batch.
+            
         Yields:
-            Generator[RolloutBufferSamples]: A generator yielding RolloutBufferSamples
+            A generator yielding RolloutBufferSamples.
         """
         if not self.generator_ready:
             raise ValueError(
@@ -422,15 +421,15 @@ class RolloutBuffer:
             start_idx += batch_size
 
     def _get_samples(self, indices: np.ndarray) -> RolloutBufferSamples:
-        """
-        Helper function to sample data from the buffer.
+        """Sample data from the buffer for given indices.
+        
         Converts numpy arrays to torch tensors for given indices.
         
         Args:
-            indices (np.ndarray): Indices of the samples to retrieve.
-        
+            indices: Indices of the samples to retrieve.
+            
         Returns:
-            RolloutBufferSamples: The batch of samples converted to PyTorch tensors.
+            The batch of samples converted to PyTorch tensors.
         """
         return RolloutBufferSamples(
             observations = th.as_tensor(
@@ -466,10 +465,9 @@ class RolloutBuffer:
         )
     
     def size(self) -> int:
-        """
-        Return the current number of stored transitions.
-
+        """Return the current number of stored transitions.
+        
         Returns:
-            int: The size of the buffer.
+            The size of the buffer.
         """
         return self.buffer_size if self.full else self.pos

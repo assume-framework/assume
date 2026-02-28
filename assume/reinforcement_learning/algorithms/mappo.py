@@ -24,21 +24,25 @@ logger = logging.getLogger(__name__)
 class PPO(A2CAlgorithm):
     """
     Proximal Policy Optimization (PPO) Algorithm.
-
-    A policy gradient method that alternates between 
-    sampling data through interaction with the environment, 
-    and optimizing a surrogate objective function using 
-    stochastic gradient ascent. It is an on-policy algorithm.
-
-    Args:
-        learning_role (LearningRole): The central learning role.
-        clip_range (float): Clipping parameter epsilon.
-        clip_range_vf (float, optional): Clipping parameter for the value function.
-            If None, value function is not clipped.
-        n_epochs (int): Number of epochs to optimize the surrogate loss per update.
-        entropy_coef (float): Entropy coefficient for the loss calculation.
-        vf_coef (float): Value function coefficient for the loss calculation.
-        max_grad_norm (float): The maximum value for the gradient clipping.
+    
+    A policy gradient method that alternates between sampling data through 
+    interaction with the environment, and optimizing a surrogate objective 
+    function using stochastic gradient ascent. It is an on-policy algorithm.
+    
+    Attributes:
+        clip_range: The epsilon parameter for PPO clipping.
+        clip_range_vf: The epsilon parameter for value function clipping.
+        n_epochs: Number of optimization epochs per rollout.
+        entropy_coef: Coefficient for entropy term in loss calculation.
+        vf_coef: Coefficient for value function term in loss calculation.
+        max_grad_norm: Maximum gradient norm for clipping.
+        n_updates: Counter for gradient updates performed.
+        actor_architecture_class: Actor network architecture class.
+        critic_architecture_class: Critic network architecture class.
+    
+    Example:
+        >>> ppo = PPO(learning_role)
+        >>> ppo.update_policy()
     """
 
     def __init__(
@@ -51,17 +55,16 @@ class PPO(A2CAlgorithm):
         vf_coef=1.0,
         max_grad_norm=0.5,
     ):
-        """
-        Initialize PPO algorithm with specific hyperparameters.
-
+        """Initialize PPO algorithm with specific hyperparameters.
+        
         Args:
-            learning_role (LearningRole): The learning role object.
-            clip_range (float, optional): The epsilon parameter for PPO clipping. 
-            clip_range_vf (float, optional): The epsilon parameter for value function clipping.
-            n_epochs (int, optional): Number of optimization epochs per rollout.
-            entropy_coef (float, optional): Coefficient for entropy term in loss.
-            vf_coef (float, optional): Coefficient for value function term in loss.
-            max_grad_norm (float, optional): Maximum gradient norm for clipping.
+            learning_role: The primary learning role object.
+            clip_range: The epsilon parameter for PPO policy clipping.
+            clip_range_vf: The epsilon parameter for value function clipping.
+            n_epochs: Number of optimization epochs per rollout.
+            entropy_coef: Coefficient for entropy term in loss.
+            vf_coef: Coefficient for value function term in loss.
+            max_grad_norm: Maximum gradient norm for clipping.
         """
         super().__init__(learning_role)
 
@@ -95,9 +98,14 @@ class PPO(A2CAlgorithm):
 
 
     def create_actors(self) -> None:
-        """
-        Creates stochastic actor networks for all agents.
-        Initializes the ActorPPO network and its optimizer for each agent strategy.
+        """Create stochastic actor networks for all agents.
+        
+        Initializes the ActorPPO or LSTMActorPPO network based on the configuration,
+        as well as its optimizer for each agent strategy.
+        
+        Example:
+            >>> ppo.create_actors()
+            >>> # Creates actor network and optimizer for each strategy
         """
         config = self.learning_config
         ppo_config = getattr(config, "ppo", None)
@@ -129,9 +137,14 @@ class PPO(A2CAlgorithm):
             strategy.actor.loaded = False
 
     def create_critics(self) -> None:
-        """
-        Creates value networks for all agents.
-        Initializes the CriticPPO network (Centralized Critic) and its optimizer.
+        """Create value networks for all agents.
+        
+        Initializes the CriticPPO network (Centralized Critic) and its optimizer 
+        for each registered agent strategy.
+        
+        Example:
+            >>> ppo.create_critics()
+            >>> # Creates critic networks and optimizers for each strategy
         """
         n_agents = len(self.learning_role.rl_strats)
 
@@ -151,11 +164,20 @@ class PPO(A2CAlgorithm):
             )
 
     def extract_policy(self) -> dict:
-        """
-        Extract all actor and critic networks into a dictionary.
-
+        """Extract all actor and critic networks into a dictionary.
+        
+        Collects actor and critic networks from all learning strategies into
+        a structured dictionary.
+        
         Returns:
-            dict: Dictionary with keys 'actors', 'critics', and dimension information.
+            Dictionary containing all network components organized by type:
+                - 'actors': Primary actor networks
+                - 'critics': Primary critic networks
+                - Dimension information for reconstruction
+        
+        Example:
+            >>> policy_dict = ppo.extract_policy()
+            >>> # Contains all networks ready for saving or transfer
         """
         actors = {}
         critics = {}
@@ -177,15 +199,16 @@ class PPO(A2CAlgorithm):
     # =========================================================================
 
     def update_policy(self) -> None:
-        """
-        Update actor and critic networks using proximal policy optimization (PPO).
-        Checks if enough data is collected (batch_size).
-        Computes Generalized Advantage Estimation (GAE) and Returns using the last value estimate.
-        Updates the Actor and Critic networks over multiple epochs (n_epochs) using mini-batches.
-        Calculates the surrogate objective with clipping (clip_range).
-        Calculates value function loss (MSE) and entropy bonus.
-        Logs metrics and gradients.
-        Clears the on-policy buffer after the update.
+        """Update actor and critic networks using Proximal Policy Optimization (PPO).
+        
+        Performs one complete training iteration consisting of:
+        1. Checking if enough data is collected in the rollout buffer.
+        2. Computing Generalized Advantage Estimation (GAE) and Returns using the last value estimate.
+        3. Updating the Actor and Critic networks over multiple epochs using mini-batches.
+        4. Calculating the surrogate objective with clipping.
+        5. Calculating value function loss (MSE) and entropy bonus.
+        6. Logging metrics and gradients.
+        7. Clearing the on-policy buffer after the update.
         """
         logger.debug("Updating Policy")
 

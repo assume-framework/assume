@@ -28,8 +28,6 @@ class DDPG(A2CAlgorithm):
     - Target networks updated via Polyak averaging for stability
     - Replay buffer for sample efficiency and decorrelation
     
-    Unlike TD3, DDPG updates the actor at every training step without delay.
-    
     Attributes:
         n_updates: Counter for gradient updates performed.
         grad_clip_norm: Maximum gradient norm for clipping.
