@@ -10,14 +10,13 @@ import pytest
 
 from assume.common.utils import convert_tensors
 
+# check if torch is present, if not skip all tests in this module since they are related to RL and use torch tensors
+th = pytest.importorskip("torch")
 
+
+@pytest.mark.require_learning
 def test_convert_orderbook_list_with_numpy_floats():
     """Test conversion of orderbook list with numpy floats (real data structure)."""
-
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Simulate real orderbook structure
     orderbook = [
@@ -57,13 +56,9 @@ def test_convert_orderbook_list_with_numpy_floats():
     assert result[0]["start_time"] == datetime(2019, 3, 1, 1, 0)
 
 
+@pytest.mark.require_learning
 def test_convert_rl_params_list_with_numpy_floats():
     """Test conversion of RL params list with numpy floats. This is also a list of dicts so it should work similar as before"""
-
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     rl_data = [
         {
@@ -90,12 +85,9 @@ def test_convert_rl_params_list_with_numpy_floats():
     assert result[0]["actions_1"] == pytest.approx(0.446, rel=1e-6, abs=1e-9)
 
 
+@pytest.mark.require_learning
 def test_convert_single_tensor():
     """Test conversion of a single PyTorch tensor."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Create a simple tensor
     tensor = th.tensor([1.0, 2.0, 3.0])
@@ -105,12 +97,9 @@ def test_convert_single_tensor():
     assert result == [1.0, 2.0, 3.0]
 
 
+@pytest.mark.require_learning
 def test_convert_series_with_tensors():
     """Test conversion of pandas Series containing tensors."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Create a Series with tensors
     data = {
@@ -133,12 +122,9 @@ def test_convert_series_with_tensors():
     assert result["c"] == [5.0, 6.0]
 
 
+@pytest.mark.require_learning
 def test_convert_list_of_dicts_with_tensors():
     """Test conversion of list of dictionaries containing tensors."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Create a list of dicts with tensors
     data = [
@@ -165,12 +151,9 @@ def test_convert_list_of_dicts_with_tensors():
     assert result[2]["id"] == 3
 
 
+@pytest.mark.require_learning
 def test_convert_nested_dict_with_tensors():
     """Test conversion of nested dictionaries with tensors."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Create nested dict with tensors
     data = {
@@ -192,12 +175,9 @@ def test_convert_nested_dict_with_tensors():
     assert result["simple_tensor"] == [5.0, 6.0]
 
 
+@pytest.mark.require_learning
 def test_convert_mixed_data_types():
     """Test conversion of mixed data types (tensors and non-tensors)."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     data = {
         "tensor": th.tensor([1.0, 2.0, 3.0]),
@@ -218,12 +198,9 @@ def test_convert_mixed_data_types():
     assert result["none"] is None
 
 
+@pytest.mark.require_learning
 def test_convert_multidimensional_tensor():
     """Test conversion of multi-dimensional tensors."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Create 2D tensor
     tensor_2d = th.tensor([[1.0, 2.0], [3.0, 4.0]])
@@ -233,12 +210,9 @@ def test_convert_multidimensional_tensor():
     assert result == [[1.0, 2.0], [3.0, 4.0]]
 
 
+@pytest.mark.require_learning
 def test_convert_series_order_preservation():
     """Test that Series order is strictly preserved during conversion."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Create ordered series with specific indices
     indices = ["z", "a", "m", "b", "x"]
@@ -253,6 +227,7 @@ def test_convert_series_order_preservation():
         assert result[idx] == [float(i), float(i + 1)]
 
 
+@pytest.mark.require_learning
 def test_convert_empty_structures():
     """Test conversion of empty structures."""
 
@@ -268,6 +243,7 @@ def test_convert_empty_structures():
     assert len(result) == 0
 
 
+@pytest.mark.require_learning
 def test_convert_no_tensors_present():
     """Test that data without tensors is returned unchanged."""
     data = {
@@ -282,12 +258,9 @@ def test_convert_no_tensors_present():
     assert result == data
 
 
+@pytest.mark.require_learning
 def test_convert_series_with_numeric_values():
     """Test that numeric Series with tensors maintains correct values."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Test with different numeric types
     data = {
@@ -303,12 +276,9 @@ def test_convert_series_with_numeric_values():
     assert result["mixed"] == [1.0, 2.0, 3.0]
 
 
+@pytest.mark.require_learning
 def test_convert_large_tensor():
     """Test conversion of larger tensors to ensure efficiency."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Create a larger tensor
     large_tensor = th.randn(1000, 50)
@@ -319,12 +289,9 @@ def test_convert_large_tensor():
     assert len(result[0]) == 50
 
 
+@pytest.mark.require_learning
 def test_convert_dataframe_with_tensor_columns():
     """Test conversion of DataFrame with columns containing tensors."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     # Create DataFrame with mixed column types
     df = pd.DataFrame(
@@ -380,12 +347,9 @@ def test_convert_dataframe_with_tensor_columns():
     assert result["normal_value"].tolist() == [100, 200, 300]
 
 
+@pytest.mark.require_learning
 def test_transform_buffer_data():
     """Test transform_buffer_data converts nested dict to numpy array correctly."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     from assume.reinforcement_learning.learning_utils import transform_buffer_data
 
@@ -425,12 +389,9 @@ def test_transform_buffer_data():
     )  # t=2, unit_b
 
 
+@pytest.mark.require_learning
 def test_transform_buffer_data_scalar_values():
     """Test transform_buffer_data with scalar values (rewards)."""
-    try:
-        import torch as th
-    except ImportError:
-        pytest.skip("PyTorch not installed")
 
     from assume.reinforcement_learning.learning_utils import transform_buffer_data
 
@@ -458,6 +419,7 @@ def test_transform_buffer_data_scalar_values():
     assert result[1, 1, 0] == pytest.approx(1.2, rel=1e-6, abs=1e-9)
 
 
+@pytest.mark.require_learning
 def test_convert_without_torch_installed():
     """Test that convert_tensors handles missing PyTorch gracefully."""
     # This test simulates PyTorch not being installed
