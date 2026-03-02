@@ -1212,7 +1212,7 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         scaled_available_power = available_power[0] / unit.max_power
 
         individual_observations = np.array(
-            [scaled_total_dispatch, scaled_marginal_cost, scaled_available_power]
+            [scaled_total_dispatch, scaled_available_power, scaled_marginal_cost]
         )
 
         return individual_observations
