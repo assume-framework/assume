@@ -387,6 +387,10 @@ class EnergyHeuristicElasticStrategy(MinMaxStrategy):
         **kwargs,
     ) -> Orderbook:
         bids = []
+        num_bids = int(unit.num_bids)
+        # set node to 'node0' if not defined
+        if not hasattr(unit, "node"):
+            unit.node = "node0"
 
         for product in product_tuples:
             start, end, only_hours = product
@@ -438,10 +442,10 @@ class EnergyHeuristicElasticStrategy(MinMaxStrategy):
                         "Negative remaining volume for bidding. Check max_power and elasticity."
                     )
 
-                bid_volume = remaining_volume / (unit.num_bids - 1)
+                bid_volume = remaining_volume / (num_bids - 1)
                 # calculate the remaining bids in isoelastic model
                 # P = (Q/Q_max) ** (1/E)
-                for i in range(1, unit.num_bids):
+                for i in range(1, num_bids):
                     ratio = (first_bid_volume + i * bid_volume) / max_abs_power
                     if ratio <= 0:
                         continue
@@ -462,9 +466,9 @@ class EnergyHeuristicElasticStrategy(MinMaxStrategy):
                 # LINEAR model: P = P_max - slope * Q
                 # where slope = -(P_max / Q_max)
                 # This ensures price drops linearly with volume
-                bid_volume = max_abs_power / unit.num_bids
+                bid_volume = max_abs_power / num_bids
                 slope = -(unit.max_price / max_abs_power)
-                for i in range(unit.num_bids):
+                for i in range(num_bids):
                     bid_price = unit.max_price + (slope * i * bid_volume)
 
                     bids.append(
