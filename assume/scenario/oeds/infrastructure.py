@@ -18,10 +18,10 @@ from tqdm import tqdm
 from windpowerlib import ModelChain, WindTurbine
 
 from assume.scenario.oeds.static import (
-    fuel_translation,
     mastr_solar_azimuth,
     mastr_solar_codes,
     mastr_storage,
+    mastr_wind_type,
     technical_parameter,
 )
 
@@ -50,7 +50,7 @@ class InfrastructureInterface:
             "oep",
             "nuts",
             "scigrid",
-            "weather",
+            "ecmwf",
             "opec",
             "instrat_pl",
             "entsoe",
@@ -430,7 +430,7 @@ class InfrastructureInterface:
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
             f'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
             f'FROM "wind_extended" '
-            f'AND "WindAnLandOderAufSee" = \'{self.mastr_wind_type[wind_type]}\' '
+            f'WHERE "WindAnLandOderAufSee" = \'{mastr_wind_type[wind_type]}\' '
         )
         if wind_type == "on_shore":
             query += f' AND "Postleitzahl" in {plz_codes_str} '
@@ -455,15 +455,6 @@ class InfrastructureInterface:
         # all WEA with nan set height to mean diameter
         df["diameter"] = df["diameter"].fillna(df["diameter"].mean())
         # all WEA with na are on shore and not allocated to a sea cluster
-        df["nordicSea"] = df["nordicSea"].astype(float).fillna(0)
-        df["balticSea"] = df["balticSea"].astype(float).fillna(0)
-        # get name of manufacturer
-        df["manufacturer"] = df["manufacturer"].replace(self.windhersteller)
-        # try to find the correct type TODO: Check Pattern of new turbines
-        # df['typ'] = [str(typ).replace(' ', '').replace('-', '').upper() for typ in df['typ']]
-        # df['typ'] = [None if re.search(self.pattern_wind, typ) is None else re.search(self.pattern_wind, typ).group()
-        #             for typ in df['typ']]
-        # df['typ'] = df['typ'].replace('', 'default')
         # set tag for wind farms
         wind_farm_prefix = f"{area}0F"
         df["windFarm"] = "x"
@@ -503,7 +494,7 @@ class InfrastructureInterface:
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
             f'FROM "biomass_extended"'
-            f'WHERE "Postleitzahl" in {plz_codes_str} AND'
+            f'WHERE "Postleitzahl" in {plz_codes_str}'
         )
 
         if created_before:
@@ -825,7 +816,7 @@ WHERE so."Postleitzahl" in {plz_codes_str}
         if area is not None:
             query += f" AND nuts_id LIKE '{area.upper()}%%'"
         query += "group by time order by time asc"
-        with self.databases["weather"].connect() as connection:
+        with self.databases["ecmwf"].connect() as connection:
             return pd.read_sql_query(query, connection, index_col="time")
 
     def get_offshore_wind_series(self, start: datetime, end: datetime):
@@ -1090,6 +1081,7 @@ if __name__ == "__main__":
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31)
     area = "DE221"
+    area= "DE2"
     biomass = interface.get_biomass_systems_in_area(area=area)
     water = interface.get_run_river_systems_in_area(area=area)
     storage = interface.get_water_storage_systems(area)

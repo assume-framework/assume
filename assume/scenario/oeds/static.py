@@ -19,6 +19,11 @@ fuel_translation = {
     "Speicher": "storage",
 }
 
+mastr_wind_type = {
+    "on_shore": "Windkraft an Land",
+    "off_shore": "Windkraft auf See",
+}
+
 
 # SolarLage
 mastr_solar_codes = {
@@ -41,6 +46,7 @@ mastr_solar_azimuth = {
     "West": "270",#701
     "Nord-West": "315",#702
     "nachgeführt": "180", #Assumption: most pv are facing south#703
+    "Nachgeführt": "180", #Assumption: most pv are facing south#703
     "Ost-West": "360", #704 half ost, half west
     #Neigungswinkel
     "90 Grad (vertikal) ": "90",#806
