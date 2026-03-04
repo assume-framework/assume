@@ -9,11 +9,6 @@ from typing import TYPE_CHECKING, TypeAlias
 import pandas as pd
 
 from assume.common.fast_pandas import FastIndex, FastSeries
-from assume.common.forecast_algorithms import (
-    forecast_algorithms,
-    forecast_preprocess_algorithms,
-    forecast_update_algorithms,
-)
 from assume.common.market_objects import MarketConfig
 
 if TYPE_CHECKING:
@@ -59,6 +54,7 @@ class UnitForecaster:
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
     ):
         if not isinstance(index, FastIndex):
             index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
@@ -66,6 +62,9 @@ class UnitForecaster:
         self.index: FastIndex = index
         self.availability: FastSeries = self._to_series(availability)
         self.forecast_algorithms = forecast_algorithms
+        if forecast_registries is None:
+            forecast_registries = {"init": {}, "preprocess": {}, "update": {}}
+        self._registries = forecast_registries
         if market_prices is None:
             market_prices = {"EOM": 50}  # default value for tests
         if residual_load is None:
@@ -75,7 +74,6 @@ class UnitForecaster:
             residual_load
         )
         self.preprocess_information = {}
-        print(forecast_algorithms)
 
     def _to_series(self, item: ForecastSeries) -> FastSeries:
         if isinstance(item, FastSeries):
@@ -116,7 +114,7 @@ class UnitForecaster:
         price_preprocess_algorithm_name = self.forecast_algorithms.get(
             "preprocess_price", "price_default"
         )
-        price_preprocess_algorithm = forecast_preprocess_algorithms.get(
+        price_preprocess_algorithm = self._registries["preprocess"].get(
             price_preprocess_algorithm_name
         )
         self.preprocess_information["price"] = price_preprocess_algorithm(
@@ -126,7 +124,7 @@ class UnitForecaster:
         residual_load_preprocess_algorithm_name = self.forecast_algorithms.get(
             "preprocess_residual_load", "residual_load_default"
         )
-        residual_load_preprocess_algorithm = forecast_preprocess_algorithms.get(
+        residual_load_preprocess_algorithm = self._registries["preprocess"].get(
             residual_load_preprocess_algorithm_name
         )
         self.preprocess_information["residual_load"] = (
@@ -165,7 +163,7 @@ class UnitForecaster:
         price_forecast_algorithm_name = self.forecast_algorithms.get(
             "price", "price_naive_forecast"
         )
-        price_forecast_algorithm = forecast_algorithms.get(
+        price_forecast_algorithm = self._registries["init"].get(
             price_forecast_algorithm_name
         )
         if price_forecast_algorithm is not None:  # None if one wants to keep forecasts
@@ -182,7 +180,7 @@ class UnitForecaster:
         residual_load_forecast_algorithm_name = self.forecast_algorithms.get(
             "residual_load", "residual_load_naive_forecast"
         )
-        residual_load_forecast_algorithm = forecast_algorithms.get(
+        residual_load_forecast_algorithm = self._registries["init"].get(
             residual_load_forecast_algorithm_name
         )
         if (
@@ -217,7 +215,7 @@ class UnitForecaster:
         price_update_algorithm_name = self.forecast_algorithms.get(
             "update_price", "price_default"
         )
-        price_update_algorithm = forecast_update_algorithms.get(
+        price_update_algorithm = self._registries["update"].get(
             price_update_algorithm_name
         )
         self.price = price_update_algorithm(
@@ -228,7 +226,7 @@ class UnitForecaster:
         residual_load_update_algorithm_name = self.forecast_algorithms.get(
             "update_residual_load", "residual_load_default"
         )
-        residual_load_update_algorithm = forecast_update_algorithms.get(
+        residual_load_update_algorithm = self._registries["update"].get(
             residual_load_update_algorithm_name
         )
         self.residual_load = residual_load_update_algorithm(
@@ -281,12 +279,13 @@ class DemandForecaster(UnitForecaster):
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
     ):
-        # super().__init__(index, market_prices, residual_load, availability)
         super().__init__(
             index=index,
             availability=availability,
             forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
             market_prices=market_prices,
             residual_load=residual_load,
         )
@@ -314,12 +313,13 @@ class PowerplantForecaster(UnitForecaster):
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
     ):
-        # super().__init__(index, market_prices, residual_load, availability)
         super().__init__(
             index=index,
             availability=availability,
             forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
             market_prices=market_prices,
             residual_load=residual_load,
         )
@@ -360,6 +360,7 @@ class DsmUnitForecaster(UnitForecaster):
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
         congestion_signal: ForecastSeries = 0.0,
         renewable_utilisation_signal: ForecastSeries = 0.0,
         electricity_price: ForecastSeries = 0.0,
@@ -368,6 +369,7 @@ class DsmUnitForecaster(UnitForecaster):
             index=index,
             availability=availability,
             forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
             market_prices=market_prices,
             residual_load=residual_load,
         )
@@ -403,7 +405,7 @@ class DsmUnitForecaster(UnitForecaster):
         congestion_signal_preprocess_algorithm_name = self.forecast_algorithms.get(
             "preprocess_congestion_signal", "congestion_signal_default"
         )
-        congestion_signal_preprocess_algorithm = forecast_preprocess_algorithms.get(
+        congestion_signal_preprocess_algorithm = self._registries["preprocess"].get(
             congestion_signal_preprocess_algorithm_name
         )
         self.preprocess_information["congestion_signal"] = (
@@ -419,7 +421,7 @@ class DsmUnitForecaster(UnitForecaster):
         renewable_utilisation_preprocess_algorithm_name = self.forecast_algorithms.get(
             "preprocess_renewable_utilisation", "renewable_utilisation_default"
         )
-        renewable_utilisation_preprocess_algorithm = forecast_preprocess_algorithms.get(
+        renewable_utilisation_preprocess_algorithm = self._registries["preprocess"].get(
             renewable_utilisation_preprocess_algorithm_name
         )
         self.preprocess_information["renewable_utilisation"] = (
@@ -471,7 +473,7 @@ class DsmUnitForecaster(UnitForecaster):
         congestion_signal_forecast_algorithm_name = self.forecast_algorithms.get(
             "congestion_signal", "congestion_signal_naive_forecast"
         )
-        congestion_signal_forecast_algorithm = forecast_algorithms.get(
+        congestion_signal_forecast_algorithm = self._registries["init"].get(
             congestion_signal_forecast_algorithm_name
         )
         if (
@@ -490,7 +492,7 @@ class DsmUnitForecaster(UnitForecaster):
         renewable_utilisation_forecast_algorithm_name = self.forecast_algorithms.get(
             "renewable_utilisation", "renewable_utilisation_naive_forecast"
         )
-        renewable_utilisation_forecast_algorithm = forecast_algorithms.get(
+        renewable_utilisation_forecast_algorithm = self._registries["init"].get(
             renewable_utilisation_forecast_algorithm_name
         )
         if (
@@ -530,7 +532,7 @@ class DsmUnitForecaster(UnitForecaster):
         congestion_signal_update_algorithm_name = self.forecast_algorithms.get(
             "update_congestion_signal", "congestion_signal_default"
         )
-        congestion_signal_update_algorithm = forecast_update_algorithms.get(
+        congestion_signal_update_algorithm = self._registries["update"].get(
             congestion_signal_update_algorithm_name
         )
         self.congestion_signal = congestion_signal_update_algorithm(
@@ -544,7 +546,7 @@ class DsmUnitForecaster(UnitForecaster):
         renewable_utilisation_update_algorithm_name = self.forecast_algorithms.get(
             "update_renewable_utilisation", "renewable_utilisation_default"
         )
-        renewable_utilisation_update_algorithm = forecast_update_algorithms.get(
+        renewable_utilisation_update_algorithm = self._registries["update"].get(
             renewable_utilisation_update_algorithm_name
         )
         self.renewable_utilisation_signal = renewable_utilisation_update_algorithm(
@@ -579,15 +581,16 @@ class SteelplantForecaster(DsmUnitForecaster):
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
         congestion_signal: ForecastSeries = 0.0,
         renewable_utilisation_signal: ForecastSeries = 0.0,
         electricity_price: ForecastSeries = None,
     ):
-        # super().__init__(index, market_prices, residual_load, availability)
         super().__init__(
             index=index,
             availability=availability,
             forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
             market_prices=market_prices,
             residual_load=residual_load,
             congestion_signal=congestion_signal,
@@ -652,6 +655,7 @@ class SteamgenerationForecaster(DsmUnitForecaster):
         thermal_storage_schedule: ForecastSeries = 0,
         availability: ForecastSeries = 1,
         forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
         market_prices: dict[str, ForecastSeries] = None,
         residual_load: dict[str, ForecastSeries] = None,
         congestion_signal: ForecastSeries = 0.0,
@@ -662,6 +666,7 @@ class SteamgenerationForecaster(DsmUnitForecaster):
             index=index,
             availability=availability,
             forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
             market_prices=market_prices,
             residual_load=residual_load,
             congestion_signal=congestion_signal,
@@ -728,6 +733,7 @@ class BuildingForecaster(DsmUnitForecaster):
         battery_load_profile: ForecastSeries,
         pv_profile: ForecastSeries,
         forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
         market_prices: dict[str, ForecastSeries] = None,
         residual_load: dict[str, ForecastSeries] = None,
         congestion_signal: ForecastSeries = 0.0,
@@ -740,6 +746,7 @@ class BuildingForecaster(DsmUnitForecaster):
             index=index,
             availability=availability,
             forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
             market_prices=market_prices,
             residual_load=residual_load,
             congestion_signal=congestion_signal,
@@ -797,17 +804,18 @@ class HydrogenForecaster(DsmUnitForecaster):
         index: ForecastIndex,
         hydrogen_demand: ForecastSeries,
         forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
         seasonal_storage_schedule: ForecastSeries = 0,
         availability: ForecastSeries = 1,
         market_prices: dict[str, ForecastSeries] = None,
         residual_load: dict[str, ForecastSeries] = None,
         electricity_price: ForecastSeries = 0.0,
     ):
-        # super().__init__(index, market_prices, residual_load, availability)
         super().__init__(
             index=index,
             availability=availability,
             forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
             market_prices=market_prices,
             residual_load=residual_load,
             electricity_price=electricity_price,
@@ -853,17 +861,18 @@ class ExchangeForecaster(UnitForecaster):
         self,
         index: ForecastIndex,
         forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
         volume_import: ForecastSeries = 0,
         volume_export: ForecastSeries = 0,
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
         market_prices: dict[str, ForecastSeries] = None,
     ):
-        # super().__init__(index, market_prices, residual_load, availability)
         super().__init__(
             index=index,
             availability=availability,
             forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
             market_prices=market_prices,
             residual_load=residual_load,
         )

@@ -12,6 +12,7 @@ import yaml
 from dateutil.relativedelta import relativedelta as rd
 from yaml_include import Constructor
 
+from assume.common.forecast_algorithms import get_forecast_registries
 from assume.common.forecaster import (
     DemandForecaster,
     PowerplantForecaster,
@@ -22,6 +23,8 @@ from assume.strategies.extended import SupportStrategy
 from assume.world import World
 
 logger = logging.getLogger(__name__)
+
+_forecast_registries = get_forecast_registries()
 
 translate_clearing = {
     "SAME_SHARES": "pay_as_clear",
@@ -184,7 +187,9 @@ def add_agent_to_world(
                         "technology": "demand",
                         "price": value,
                     },
-                    DemandForecaster(index, demand=-100000),
+                    DemandForecaster(
+                        index, demand=-100000, forecast_registries=_forecast_registries
+                    ),
                 )
         case "EnergyExchange" | "DayAheadMarketSingleZone":
             clearing_section = agent["Attributes"].get("Clearing", agent["Attributes"])
@@ -263,7 +268,11 @@ def add_agent_to_world(
                         "price": load["ValueOfLostLoad"],
                     },
                     # demand_series might contain more values than index
-                    DemandForecaster(index, demand=demand_series[: len(index)]),
+                    DemandForecaster(
+                        index,
+                        demand=demand_series[: len(index)],
+                        forecast_registries=_forecast_registries,
+                    ),
                 )
 
         case "StorageTrader":
@@ -283,6 +292,7 @@ def add_agent_to_world(
                 index,
                 # price_forecast is used for price_EOM
                 market_prices={"eom": forecast_price},
+                forecast_registries=_forecast_registries,
             )
 
             capacity = device["EnergyToPowerRatio"] * device["InstalledPowerInMW"]
@@ -354,6 +364,7 @@ def add_agent_to_world(
                     "co2": prices.get("co2", 2),
                     translate_fuel_type[prototype["FuelType"]]: fuel_price,
                 },
+                forecast_registries=_forecast_registries,
             )
             # TODO UnplannedAvailabilityFactor is not respected
 
@@ -414,6 +425,7 @@ def add_agent_to_world(
                     translate_fuel_type[attr["EnergyCarrier"]]: fuel_price,
                     "co2": prices.get("co2", 0),
                 },
+                forecast_registries=_forecast_registries,
             )
             support_instrument = attr.get("SupportInstrument")
             support_conf = supports.get(attr.get("Set"))

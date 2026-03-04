@@ -812,10 +812,6 @@ class World:
         self._validate_unit_operator(operator_id)
         self.unit_operators[operator_id].add_unit(unit)
 
-    # world methods
-
-    # the world needs to know about all forecasts and initialize these.
-    # this way, the forecast mechanism works similar for CSV, WorldScript as well as AMIRIS/pypsa
     def init_forecasts(
         self,
         forecast_df: pd.DataFrame = None,
@@ -824,17 +820,9 @@ class World:
         markets = self.markets.values()  # make same object for cache
 
         for unit in self.units.values():
-            # for forecast in unit.forecaster:
             unit.forecaster.initialize(
                 units,
                 markets,
                 forecast_df,
                 unit,
             )
-
-    # The update routine is not needed. We call it in calculate_bids or through a scheduled task during runtime
-    # see update_forecasts_if_needed
-    def update_forecasts(self):
-        for unit in self.units.values():
-            # for forecast in unit.forecaster:
-            unit.forecaster.update_forecasts(self.units.values())

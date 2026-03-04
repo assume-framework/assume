@@ -4,25 +4,24 @@
 from __future__ import annotations
 
 import logging
+import re
 from functools import lru_cache
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
 from assume.common.fast_pandas import FastIndex, FastSeries
+from assume.common.forecaster import ForecastIndex, ForecastSeries
 from assume.common.market_objects import MarketConfig
+from assume.units.demand import Demand
+from assume.units.dsm_load_shift import DSMFlex
+from assume.units.exchange import Exchange
+from assume.units.powerplant import PowerPlant
+from assume.units.storage import Storage
 
 if TYPE_CHECKING:
     from assume.common.base import BaseUnit
-    from assume.units.demand import Demand
-    from assume.units.dsm_load_shift import DSMFlex
-    from assume.units.exchange import Exchange
-    from assume.units.powerplant import PowerPlant
-    from assume.units.storage import Storage
-
-ForecastIndex: TypeAlias = FastIndex | pd.DatetimeIndex | pd.Series
-ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 
 log = logging.getLogger(__name__)
 
@@ -79,8 +78,11 @@ def custom_lru_cache(func_or_None=None, maxsize=128, typed=False, hasher=id):
     return decorator if func_or_None is None else decorator(func_or_None)
 
 
-def is_renewable(name: str) -> bool:
-    return "wind" in name.lower() or "solar" in name.lower()
+def is_renewable(string, pattern=r"\b(?:wind|solar|bio)\b") -> bool:
+    """
+    Returns whether a string contains any of the renewable technology keywords (wind, solar, bio).
+    """
+    return re.search(pattern, string, flags=re.IGNORECASE) is not None
 
 
 def _ensure_not_none(
@@ -107,13 +109,6 @@ def calculate_max_power(units, index=None):
 
 @custom_lru_cache
 def sort_units(units: list[BaseUnit], market_id: str | None = None):
-    # FIXME: This is not nice but circumvents circular import for now
-    from assume.units.demand import Demand
-    from assume.units.dsm_load_shift import DSMFlex
-    from assume.units.exchange import Exchange
-    from assume.units.powerplant import PowerPlant
-    from assume.units.storage import Storage
-
     pps: list[PowerPlant] = []
     demands: list[Demand] = []
     storages: list[Storage] = []
@@ -573,3 +568,12 @@ forecast_update_algorithms = {
     "congestion_signal_default": default_update,
     "renewable_utilisation_default": default_update,
 }
+
+
+def get_forecast_registries() -> dict[str, dict]:
+    """Returns the three algorithm registry dicts bundled for injection into forecasters."""
+    return {
+        "init": forecast_algorithms,
+        "preprocess": forecast_preprocess_algorithms,
+        "update": forecast_update_algorithms,
+    }

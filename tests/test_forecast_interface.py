@@ -16,6 +16,7 @@ from assume.common.forecast_algorithms import (
     calculate_naive_price,
     calculate_naive_renewable_utilisation,
     calculate_naive_residual_load,
+    get_forecast_registries,
     sort_units,
 )
 from assume.common.forecaster import (
@@ -82,11 +83,13 @@ def forecast_setup():
     fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
 
     units: dict = {}
+    forecast_registries = get_forecast_registries()
 
     # create a mock dsm forecaster as it also calculates congestion_signal
     # and renewable_utilisation forecasts
     dsm_forecaster = DsmUnitForecaster(
         index=index,
+        forecast_registries=forecast_registries,
     )
 
     for id, plant in powerplants_units.iterrows():
@@ -94,6 +97,7 @@ def forecast_setup():
             index=shared_FastIndex,
             availability=availability.get(id, pd.Series(1.0, index, name=id)),
             fuel_prices=fuel_prices_df,
+            forecast_registries=forecast_registries,
         )
         plant["bidding_strategies"] = {"EOM": EnergyNaiveStrategy()}
         plant["id"] = id
@@ -104,6 +108,7 @@ def forecast_setup():
             index=shared_FastIndex,
             availability=availability.get(id, pd.Series(1.0, index, name=id)),
             demand=-demand_df[id].abs(),
+            forecast_registries=forecast_registries,
         )
         demand["bidding_strategies"] = {"EOM": EnergyNaiveStrategy()}
         demand["id"] = id
