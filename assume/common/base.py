@@ -315,8 +315,8 @@ class SupportsMinMax(BaseUnit):
     ramp_up: float = None
     efficiency: float
     emission_factor: float
-    min_operating_time: int = 0
-    min_down_time: int = 0
+    min_operating_time: int = 1
+    min_down_time: int = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

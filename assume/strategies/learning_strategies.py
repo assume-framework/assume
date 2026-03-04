@@ -436,9 +436,8 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         end = product_tuples[0][1]
         # get technical bounds for the unit output from the unit
         min_power, max_power = unit.calculate_min_max_power(start, end)
-        # default behavior of min_power is that a running power plant has the minimum power of 1 timestep always, because it needs to be running to be running
-        # a value of 1 imposes no real constraint for the bid formulation so we can set it to 0 for the bid formulation to not have this constraint in place
-        min_power = 0 if min_power[0] == 1 else min_power[0]
+
+        min_power = min_power[0]
         max_power = max_power[0]
 
         # =============================================================================

@@ -149,14 +149,14 @@ class PowerPlant(SupportsMinMax):
 
         if min_operating_time < 0:
             raise ValidationError(
-                message=f"{min_operating_time=} must be > 0 for unit {self.id}",
+                message=f"{min_operating_time=} must be >= 1 for unit {self.id}",
                 id=self.id,
                 field="min_operating_time",
             )
         self.min_operating_time = min_operating_time
         if min_down_time < 0:
             raise ValidationError(
-                message=f"{min_down_time=} must be > 0 for unit {self.id}",
+                message=f"{min_down_time=} must be >= 1 for unit {self.id}",
                 id=self.id,
                 field="min_down_time",
             )
