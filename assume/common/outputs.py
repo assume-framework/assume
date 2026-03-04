@@ -262,16 +262,13 @@ class WriteOutput(Role):
         Args:
             rl_params (dict): The RL parameters.
         """
+        # check for tensors and convert them to floats
+        rl_params = convert_tensors(rl_params)
 
         df = pd.DataFrame.from_records(rl_params, index="datetime")
         df["simulation"] = self.simulation_id
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
-
-        # check for tensors and convert them to floats
-        # apply per column to ensure correct restructering after conversion
-        for col in df.columns:
-            df[col] = df[col].apply(convert_tensors)
 
         return df
 
@@ -282,14 +279,13 @@ class WriteOutput(Role):
         Args:
             rl_grad_params (dict): The RL parameters per gradient step.
         """
+        # check for tensors and convert them to floats
+        rl_grad_params = convert_tensors(rl_grad_params)
 
         df = pd.DataFrame.from_records(rl_grad_params, index="step")
         df["simulation"] = self.simulation_id
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
-
-        # check for tensors and convert them to floats
-        df = df.apply(convert_tensors)
 
         return df
 
@@ -526,7 +522,12 @@ class WriteOutput(Role):
                 try:
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
-                except (ProgrammingError, OperationalError, DataError):
+                except (
+                    ProgrammingError,
+                    OperationalError,
+                    DataError,
+                    pd.errors.DatabaseError,
+                ):
                     self.check_columns(table, df)
                     # now try again
                     with self.db.begin() as db:
@@ -584,7 +585,7 @@ class WriteOutput(Role):
 
         for table, df in grid.items():
             geo_table = f"{table}_geo"
-            if df.empty:
+            if df is None or df.empty:
                 continue
             df["simulation"] = self.simulation_id
             df.reset_index()
@@ -593,7 +594,13 @@ class WriteOutput(Role):
             try:
                 with self.db.begin() as db:
                     df.to_sql(geo_table, db, if_exists="append")
-            except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+            except (
+                ProgrammingError,
+                OperationalError,
+                DataError,
+                UndefinedColumn,
+                pd.errors.DatabaseError,
+            ):
                 # if a column is missing, check and try again
                 self.check_columns(geo_table, df)
                 # now try again

@@ -340,7 +340,12 @@ class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
-        self.define_solver(solver=marketconfig.param_dict.get("solver", "appsi_highs"))
+        self.solver = get_supported_solver(
+            marketconfig.param_dict.get("solver", "appsi_highs")
+        )
+        self.solver_options = {}
+        if self.solver == "gurobi":
+            self.solver_options = {"cutoff": -1.0, "MIPGap": EPS}
 
         # Define grid data
         self.nodes = ["node0"]
@@ -377,19 +382,6 @@ class ComplexClearingRole(MarketRole):
         self.pricing_mechanism = self.marketconfig.param_dict.get(
             "pricing_mechanism", "pay_as_clear"
         )
-
-    def define_solver(self, solver: str):
-        solver = get_supported_solver(solver)
-
-        if solver == "gurobi":
-            solver_options = {"cutoff": -1.0, "MIPGap": EPS, "LogToConsole": 0}
-        elif solver == "appsi_highs":
-            solver_options = {"output_flag": False, "log_to_console": False}
-        else:
-            solver_options = {}
-
-        self.solver = solver
-        self.solver_options = solver_options
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
