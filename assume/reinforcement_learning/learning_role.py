@@ -251,6 +251,12 @@ class Learning(Role):
             # Remove last timestamp that has no reward yet
             timestamps_to_process = all_timestamps[:-1]
 
+            # Carry over the last timestamp's data (obs, actions, noises)
+            last_ts = all_timestamps[-1]
+            self.all_obs[last_ts] = current_obs[last_ts]
+            self.all_actions[last_ts] = current_actions[last_ts]
+            self.all_noises[last_ts] = current_noises[last_ts]
+
             # Create filtered cache (only complete timesteps)
             cache = {
                 "obs": {t: current_obs[t] for t in timestamps_to_process},
