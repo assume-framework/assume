@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from datetime import datetime
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -67,3 +68,195 @@ def test_learning_init():
 
     assert ac["target_critics"]["test_id"] == learn.rl_strats["test_id"].target_critics
     assert ac["critics"]["test_id"] == learn.rl_strats["test_id"].critics
+
+
+@pytest.fixture
+async def learning_role():
+    """Fixture that provides a learning role configuration for atomic swap tests."""
+    try:
+        import torch as th
+    except ImportError:
+        pytest.skip("torch not available")
+
+    config = {
+        "foresight": 1,
+        "act_dim": 2,
+        "unique_obs_dim": 0,
+        "learning_config": LearningConfig(
+            train_freq="1h",
+            algorithm="matd3",
+            actor_architecture="mlp",
+            learning_mode=True,
+            evaluation_mode=True,  # evaluation mode to skip buffer/policy update
+            training_episodes=3,
+            episodes_collecting_initial_experience=1,
+            continue_learning=False,
+            trained_policies_save_path=None,
+            early_stopping_steps=10,
+            early_stopping_threshold=0.05,
+        ),
+    }
+
+    learning_role = Learning(config["learning_config"], start=start, end=end)
+    learning_role.rl_strats["unit_1"] = LearningStrategy(
+        **config, learning_role=learning_role
+    )
+
+    # mock function for subsequent processing in store_to_buffer_and_update
+    learning_role.write_rl_params_to_output = MagicMock()
+
+    yield learning_role, th
+
+
+@pytest.mark.require_learning
+async def test_atomic_swap_no_data_loss(learning_role):
+    """
+    Test that the atomic swap in store_to_buffer_and_update does not lose data
+    when add_actions_to_cache / add_observation_to_cache / add_reward_to_cache
+    are called during the async processing, because the last data point might be in transit.
+    """
+
+    learning_role, th = learning_role
+
+    # Add initial data to cache (simulating timestep 1 and 2)
+    ts1 = 1000
+    ts2 = 2000  # last timestep that has not yet have a reward and hence should be carried over after swap
+    ts3 = 3000  # new data that arrives during processing
+
+    obs_ts1 = th.tensor([1.0, 2.0])
+    obs_ts2 = th.tensor([3.0, 4.0])
+    action_ts1 = th.tensor([0.5])
+    action_ts2 = th.tensor([0.6])
+    noise_ts1 = th.tensor([0.01])
+    noise_ts2 = th.tensor([0.02])
+    reward_ts1 = 10.0
+
+    # Add data for ts1 and ts2
+    learning_role.add_observation_to_cache("unit_1", ts1, obs_ts1)
+    learning_role.add_actions_to_cache("unit_1", ts1, action_ts1, noise_ts1)
+    learning_role.add_reward_to_cache(
+        "unit_1", ts1, reward_ts1, regret=0.0, profit=10.0
+    )
+
+    learning_role.add_observation_to_cache("unit_1", ts2, obs_ts2)
+    learning_role.add_actions_to_cache("unit_1", ts2, action_ts2, noise_ts2)
+
+    # Verify data is in cache before swap
+    assert ts1 in learning_role.all_obs
+    assert ts2 in learning_role.all_obs
+    assert len(learning_role.all_obs) == 2
+
+    # Now call store_to_buffer_and_update (atomic swap happens here)
+    # Since we're in evaluation_mode, it won't try to update buffer/policy
+    await learning_role.store_to_buffer_and_update()
+
+    # Check that we do not lose the incomplete last timestep ts1
+    reward_ts2 = 20  # no reward yet for ts2 to simulate the carry-over logic
+    learning_role.add_reward_to_cache("unit_1", ts2, reward_ts2, regret=0, profit=20)
+
+    # After swap: ts1 should be processed, ts2 (last timestamp) should be carried over
+    # The cache should now only contain ts2's obs/actions/noises (carried over)
+    assert ts2 in learning_role.all_obs, "ts2 should be carried over after swap"
+    assert ts1 not in learning_role.all_obs, (
+        "ts1 should have been processed and removed"
+    )
+
+    # Now simulate new data arriving AFTER the swap (this tests that new dict works)
+    obs_ts3 = th.tensor([5.0, 6.0])
+    action_ts3 = th.tensor([0.7])
+    noise_ts3 = th.tensor([0.03])
+    reward_ts3 = 30.0
+
+    learning_role.add_observation_to_cache("unit_1", ts3, obs_ts3)
+    learning_role.add_actions_to_cache("unit_1", ts3, action_ts3, noise_ts3)
+    learning_role.add_reward_to_cache(
+        "unit_1", ts3, reward_ts3, regret=0.0, profit=30.0
+    )
+
+    # Verify new data is in cache (not lost due to atomic swap)
+    assert ts3 in learning_role.all_obs, "ts3 should be in new cache after swap"
+    assert ts3 in learning_role.all_actions, "ts3 actions should be in new cache"
+    assert ts3 in learning_role.all_rewards, "ts3 rewards should be in new cache"
+
+    # Verify ts2 carried-over data is still there
+    assert ts2 in learning_role.all_obs, "ts2 should still be carried over"
+    assert ts2 in learning_role.all_actions, "ts2 actions should still be carried over"
+
+    # Verify the actual data content
+    assert len(learning_role.all_obs[ts3]["unit_1"]) == 1
+    assert th.equal(learning_role.all_obs[ts3]["unit_1"][0], obs_ts3)
+    assert len(learning_role.all_actions[ts3]["unit_1"]) == 1
+    assert th.equal(learning_role.all_actions[ts3]["unit_1"][0], action_ts3)
+
+
+@pytest.mark.require_learning
+async def test_atomic_swap_concurrent_writes(learning_role):
+    """
+    Test that data written to cache during store_to_buffer_and_update execution
+    is not lost. Simulates concurrent-like behavior.
+    """
+    import asyncio
+
+    learning_role, th = learning_role
+
+    # Add initial data
+    ts1 = 1000
+    ts2 = 2000
+    learning_role.add_observation_to_cache("unit_1", ts1, th.tensor([1.0, 2.0]))
+    learning_role.add_actions_to_cache(
+        "unit_1", ts1, th.tensor([0.5]), th.tensor([0.01])
+    )
+    learning_role.add_reward_to_cache("unit_1", ts1, 10.0, regret=0.0, profit=10.0)
+
+    learning_role.add_observation_to_cache("unit_1", ts2, th.tensor([3.0, 4.0]))
+    learning_role.add_actions_to_cache(
+        "unit_1", ts2, th.tensor([0.6]), th.tensor([0.02])
+    )
+    learning_role.add_reward_to_cache("unit_1", ts2, 20.0, regret=0.0, profit=20.0)
+
+    # Track data added during "concurrent" operation
+    concurrent_data_ts = 4000
+    concurrent_obs = th.tensor([9.0, 10.0])
+
+    async def add_data_during_swap():
+        """Simulate data being added while swap is processing"""
+        await asyncio.sleep(0)  # yield control
+        learning_role.add_observation_to_cache(
+            "unit_1", concurrent_data_ts, concurrent_obs
+        )
+        learning_role.add_actions_to_cache(
+            "unit_1", concurrent_data_ts, th.tensor([0.9]), th.tensor([0.05])
+        )
+        learning_role.add_reward_to_cache(
+            "unit_1", concurrent_data_ts, 50.0, regret=0.0, profit=50.0
+        )
+
+    # Run both concurrently
+    await asyncio.gather(
+        learning_role.store_to_buffer_and_update(), add_data_during_swap()
+    )
+
+    # Verify concurrent data was NOT lost
+    assert concurrent_data_ts in learning_role.all_obs, (
+        "Concurrent data should be in cache after swap"
+    )
+    assert concurrent_data_ts in learning_role.all_actions, (
+        "Concurrent actions should be in cache"
+    )
+    assert concurrent_data_ts in learning_role.all_rewards, (
+        "Concurrent rewards should be in cache"
+    )
+
+    # Verify that the original data added before swap is cleared (since it should have been processed)
+    assert ts1 not in learning_role.all_obs, (
+        "ts1 should have been processed and moved to buffer"
+    )
+    assert ts2 in learning_role.all_obs, (
+        "ts2 should have not been processed since last entry is expected to be incomplete"
+    )
+
+    # Verify data content
+    assert len(learning_role.all_obs[concurrent_data_ts]["unit_1"]) == 1
+    assert th.equal(
+        learning_role.all_obs[concurrent_data_ts]["unit_1"][0], concurrent_obs
+    )

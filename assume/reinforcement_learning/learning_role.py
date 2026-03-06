@@ -251,6 +251,12 @@ class Learning(Role):
             # Remove last timestamp that has no reward yet
             timestamps_to_process = all_timestamps[:-1]
 
+            # Carry over the last timestamp's data (obs, actions, noises)
+            last_ts = all_timestamps[-1]
+            self.all_obs[last_ts] = current_obs[last_ts]
+            self.all_actions[last_ts] = current_actions[last_ts]
+            self.all_noises[last_ts] = current_noises[last_ts]
+
             # Create filtered cache (only complete timesteps)
             cache = {
                 "obs": {t: current_obs[t] for t in timestamps_to_process},
@@ -293,9 +299,13 @@ class Learning(Role):
 
         # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
         self.buffer.add(
-            obs=transform_buffer_data(cache["obs"], device),
-            actions=transform_buffer_data(cache["actions"], device),
-            reward=transform_buffer_data(cache["rewards"], device),
+            obs=transform_buffer_data(cache["obs"], device, self.rl_strats.keys()),
+            actions=transform_buffer_data(
+                cache["actions"], device, self.rl_strats.keys()
+            ),
+            reward=transform_buffer_data(
+                cache["rewards"], device, self.rl_strats.keys()
+            ),
         )
 
         if (
