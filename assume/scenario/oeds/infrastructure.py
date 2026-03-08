@@ -20,6 +20,7 @@ from windpowerlib import ModelChain, WindTurbine
 from assume.scenario.oeds.static import (
     mastr_solar_azimuth,
     mastr_solar_codes,
+    mastr_solar_power_limit,
     mastr_storage,
     mastr_wind_type,
     technical_parameter,
@@ -319,8 +320,10 @@ class InfrastructureInterface:
             f'FROM "solar_extended" '
             f'INNER JOIN "solar_eeg" ON "EinheitMastrNummer" = "VerknuepfteEinheit" '
             f'WHERE "Postleitzahl" in {plz_codes_str} '
-            f'AND "ArtDerSolaranlage" = \'{mastr_solar_codes[solar_type]}\' '
         )
+
+        if solar_type:
+            query += f"AND \"ArtDerSolaranlage\" = '{mastr_solar_codes[solar_type]}' "
 
         if created_before:
             query += f"AND \"Inbetriebnahmedatum\" < '{created_before.isoformat()}' "
@@ -336,61 +339,58 @@ class InfrastructureInterface:
 
         # all PVs with are implemented in 2018
         df["startDate"] = pd.to_datetime(df["startDate"])
+
+        if solar_type == "roof_top":
+            df["ownConsumption"] = df["ownConsumption"].fillna(
+                (df["startDate"].dt.year > 2013).astype(int)
+            )
+            df["ownConsumption"] = df["ownConsumption"].apply(
+                lambda x: 1
+                if "Teileinspeisung" in str(x)
+                or "Eigenverbrauch" in str(x)
+                or str(x) == "689"
+                or str(x) == "1"
+                or x is True
+                or x == 1
+                else 0
+            )
+        else:
+            df["ownConsumption"] = 0
         # all PVs with nan are south oriented assets
-        df["azimuth"] = [
-            mastr_solar_azimuth[str(code)] for code in df["azimuthCode"]
-        ]
+        df["azimuth"] = [mastr_solar_azimuth[str(code)] for code in df["azimuthCode"]]
         del df["azimuthCode"]
         # all PVs with nan have a tilt angle of 30°
-        df["tilt"] = [
-            mastr_solar_azimuth[str(code)] for code in df["tiltCode"]
-        ]
+        df["tilt"] = [mastr_solar_azimuth[str(code)] for code in df["tiltCode"]]
         del df["tiltCode"]
-        if solar_type == "roof_top":
-            # all PVs with nan and startDate > 2013 have ownConsumption
-            missing_values = df["ownConsumption"].isna()
 
-            missing = df["ownConsumption"].isna()
-            deadline = df["startDate"].dt.year > 2013
-            own_consumption = missing & deadline #to avoid key erro after components are exluded
-
-            df.loc[own_consumption, "ownConsumption"] = 1
-
-            grid_use = missing & ~deadline #to avoid key erro after components are exluded
-            df.loc[grid_use, "ownConsumption"] = 0
-            df["ownConsumption"] = df["ownConsumption"].replace(689, 1)
-            df["ownConsumption"] = df["ownConsumption"].replace(688, 0)
-            # assumption "regenerative Energiesysteme":
-            # a year has 1000 hours peak
-            df["demandP"] = df["maxPower"] * 1e3
-        elif solar_type == "free_area" or solar_type == "other":
-            # set own consumption for solar power plant mounted PVs to 0, because the demand is unknown
-            df["ownConsumption"] = 0
         if solar_type == "roof_top":
             # all PVs with nan and startDate > 2012 and maxPower > 30 kWp are limited to 70%
-            missing = df["limited"].isna()#
+            missing = df["limited"].isna()  #
             power_cap = df["maxPower"] > 30
             deadline = df["startDate"].dt.year > 2012
-            limited = missing & deadline & power_cap  #to avoid key erro after components are exluded
+            limited = (
+                missing & deadline & power_cap
+            )  # to avoid key error after components are excluded
+            df.loc[limited, "limited"] = "Ja, auf 70%"
 
-            df.loc[limited, "limited"] = str("Ja, auf 70%")
-            # rest nans have no limitation
-            df["limited"] = df["limited"].fillna("Nein")
-            df["limited"] = [
-                mastr_solar_azimuth[str(code)] for code in df["limited"]
-            ]
-        if solar_type == "free_area" or solar_type == "other":
-            # TODO: Check restrictions for solar power plant
-            # nans have no limitation
-            df["limited"] = df["limited"].fillna("Nein")
-            df["limited"] = [
-                mastr_solar_azimuth[str(code)] for code in df["limited"]
-            ]
+        # nans have no limitation
+        df["limited"] = df["limited"].fillna("Nein")
+        df["limit_factor"] = [
+            mastr_solar_power_limit[str(code)] for code in df["limited"]
+        ]
+
+        # apply limit to maxPower
+        df["maxPower"] *= df["limit_factor"]
+
+        df["demandP"] = df["maxPower"] * 1e3
+
         # all PVs with nan and startDate > 2016 and maxPower > 100 kWp have direct marketing
         missing = df["eeg"].isna()
         power_cap = df["maxPower"] > 100
         deadline = df["startDate"].dt.year > 2016
-        eeg = missing & deadline & power_cap #to avoid key erro after components are exluded
+        eeg = (
+            missing & deadline & power_cap
+        )  # to avoid key error after components are excluded
 
         df.loc[eeg, "eeg"] = 0
         # rest nans are eeg assets and are managed by the tso
@@ -430,7 +430,7 @@ class InfrastructureInterface:
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate", '
             f'COALESCE("DatumEndgueltigeStilllegung", \'2050-01-01\') as "endDate" '
             f'FROM "wind_extended" '
-            f'WHERE "WindAnLandOderAufSee" = \'{mastr_wind_type[wind_type]}\' '
+            f"WHERE \"WindAnLandOderAufSee\" = '{mastr_wind_type[wind_type]}' "
         )
         if wind_type == "on_shore":
             query += f' AND "Postleitzahl" in {plz_codes_str} '
@@ -535,7 +535,7 @@ class InfrastructureInterface:
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
             f'FROM "hydro_extended" '
             f'WHERE "Postleitzahl"::int in {plz_codes_str} AND '
-            f'"ArtDerWasserkraftanlage" = \'Laufwasseranlage\''
+            f"\"ArtDerWasserkraftanlage\" = 'Laufwasseranlage'"
         )
 
         if created_before:
@@ -581,7 +581,7 @@ class InfrastructureInterface:
             f'FROM "storage_extended" spe '
             f'LEFT JOIN "storage_units" su ON spe."EinheitMastrNummer" = su."VerknuepfteEinheit" '
             f'WHERE spe."Postleitzahl"::int in {plz_codes_str} AND '
-            f'spe."Technologie" = \'Pumpspeicher\'  AND spe."EinheitSystemstatus"= \'Aktiviert\' AND spe."Land"= \'Deutschland\' '
+            f"spe.\"Technologie\" = 'Pumpspeicher'  AND spe.\"EinheitSystemstatus\"= 'Aktiviert' AND spe.\"Land\"= 'Deutschland' "
             f'AND "Nettonennleistung" > 500'
         )
 
@@ -607,7 +607,7 @@ class InfrastructureInterface:
         df["VMax"] = df["VMax"].fillna(0)
         for index, row in df[df["VMax"] == 0].iterrows():
             # storage_volumes is in [MWh]
-            for key in mastr_storage.keys(): #Todo: Check value Code or String
+            for key in mastr_storage.keys():  # Todo: Check value Code or String
                 if key in row["name"]:
                     df.at[index, "VMax"] = mastr_storage[key] * 1e3
                     break
@@ -650,9 +650,24 @@ class InfrastructureInterface:
             return self.get_demand_in_area("DEB16")
         elif area == "DEB1D":
             return self.get_demand_in_area("DEB19")
+        ## changes from NUTS2021 to NUTS2024
+        elif area == "DEG0S":
+            return self.get_demand_in_area("DEG04")
+        elif area == "DEG0T":
+            return self.get_demand_in_area("DEG0F")
+        elif area == "DEG0Q":
+            return self.get_demand_in_area("DEG0B")
+        elif area == "DEG0R":
+            DEG0P = self.get_demand_in_area("DEG0P")
+            DEG0N = self.get_demand_in_area("DEG0N")
+            return DEG0N + DEG0P
+        elif area == "DEG0V":
+            return self.get_demand_in_area("DEG0H")
+        elif area == "DEG0U":
+            return self.get_demand_in_area("DEG0I")
         query = f"""select sum(sector_consumption_residential) as household, sum(sector_consumption_retail) as business,
                 sum(sector_consumption_industrial) as industry, sum(sector_consumption_agricultural) as agriculture
-                from demand where version='v0.4.5' and nuts LIKE '{area}%%'
+                from ego_demand where version='v0.4.5' and nuts LIKE '{area}%%'
                 """
         with self.databases["oep"].connect() as conn:
             df = pd.read_sql(query, conn)
@@ -709,22 +724,29 @@ WHERE so."Postleitzahl" in {plz_codes_str}
             return df
 
         df["VMax"] = df["VMax"].fillna(10)
-        df["ownConsumption"] = df["ownConsumption"].replace(689, 1)
-        df["ownConsumption"] = df["ownConsumption"].replace(688, 0)
-        df["limited"] = [
-            mastr_solar_azimuth[str(code)] for code in df["limited"]
+        df["ownConsumption"] = df["ownConsumption"].apply(
+            lambda x: 1
+            if "Teileinspeisung" in str(x)
+            or "Eigenverbrauch" in str(x)
+            or str(x) == "689"
+            or str(x) == "1"
+            or x is True
+            or x == 1
+            else 0
+        )
+        df["limit_factor"] = [
+            mastr_solar_power_limit[str(code)] for code in df["limited"]
         ]
 
         # all PVs with nan are south oriented assets
-        df["azimuth"] = [
-            mastr_solar_azimuth[str(code)] for code in df["azimuthCode"]
-        ]
+        df["azimuth"] = [mastr_solar_azimuth[str(code)] for code in df["azimuthCode"]]
         del df["azimuthCode"]
         # all PVs with nan have a tilt angle of 30°
-        df["tilt"] = [
-            mastr_solar_azimuth[str(code)] for code in df["tiltCode"]
-        ]
+        df["tilt"] = [mastr_solar_azimuth[str(code)] for code in df["tiltCode"]]
         del df["tiltCode"]
+
+        # apply limit to maxPower
+        df["maxPower"] *= df["limit_factor"]
         # assumption "regenerative Energiesysteme":
         # a year has 1000 hours peak
         df["demandP"] = df["maxPower"] * 1e3
@@ -1077,15 +1099,16 @@ if __name__ == "__main__":
     uri = f"postgresql://{y}@{x}"
     interface = InfrastructureInterface("test", uri)
 
-    year = 2020
+    year = 2023
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31)
     area = "DE221"
-    area= "DE2"
+    area = "DE2"
     biomass = interface.get_biomass_systems_in_area(area=area)
     water = interface.get_run_river_systems_in_area(area=area)
     storage = interface.get_water_storage_systems(area)
-    solar, wind = interface.get_renewables_series_in_area("DE221", start, end)
+    solar, wind, battery = interface.get_renewables_series_in_area("DE221", start, end)
+    solar_systems = interface.get_solar_systems_in_area("DE221", "roof_top", start, end)
     interface.get_plz_codes("DEF")
     interface.get_lat_lon(52379)
     # x = interface.get_power_plant_in_area(area='DEA2D', fuel_type='gas')
@@ -1139,7 +1162,7 @@ if __name__ == "__main__":
         assert (dem_a < 1e-10).all().all()
 
     ## infra tests
-    year = 2020
+    year = 2023
     start = datetime(year, 1, 1)
     end = datetime(year, 12, 31)
     index = pd.date_range(
@@ -1154,7 +1177,9 @@ if __name__ == "__main__":
     infra_uri = f"postgresql://{login}@{database}"
     infra_interface = InfrastructureInterface("test", infra_uri)
 
-    solar, wind = infra_interface.get_renewables_series_in_area("DE221", start, end)
+    solar, wind, battery = infra_interface.get_renewables_series_in_area(
+        "DE221", start, end
+    )
 
     solar = infra_interface.get_solar_storage_systems_in_area("DE123")
     solar_sys = infra_interface.get_solar_systems_in_area("DE127")

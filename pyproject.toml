@@ -167,4 +167,4 @@ ignore_missing_imports = true
 [tool.codespell]
 quiet-level = 3
 skip = "*.csv, *.html, *.json, *.orig, *.svg, ./docs/build"
-ignore-words-list = "DED,esy,flexable,Meger,ore"
+ignore-words-list = "DED,esy,flexable,Meger,ore,vertikal,unter"
