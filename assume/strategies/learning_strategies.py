@@ -389,7 +389,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # when constructing the observations.
         foresight = kwargs.pop("foresight", 12)
         act_dim = kwargs.pop("act_dim", 2)
-        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 8)
         super().__init__(
             foresight=foresight,
             act_dim=act_dim,
@@ -730,7 +730,7 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
         # we select 24 to be in line with the storage strategies
         foresight = kwargs.pop("foresight", 24)
         act_dim = kwargs.pop("act_dim", 1)
-        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 8)
         super().__init__(
             foresight=foresight,
             act_dim=act_dim,
@@ -875,7 +875,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         # when constructing the observations.
         foresight = kwargs.pop("foresight", 12)
         act_dim = kwargs.pop("act_dim", 1)
-        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 8)
         super().__init__(
             foresight=foresight,
             act_dim=act_dim,
@@ -1172,7 +1172,7 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         # when constructing the observations.
         foresight = kwargs.pop("foresight", 12)
         act_dim = kwargs.pop("act_dim", 1)
-        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 8)
         super().__init__(
             foresight=foresight,
             act_dim=act_dim,
