@@ -369,7 +369,9 @@ def test_transform_buffer_data():
         },
     }
 
-    result = transform_buffer_data(data, device=th.device("cpu"))
+    result = transform_buffer_data(
+        data, device=th.device("cpu"), keys_unit_order=["unit_a", "unit_b"]
+    )
 
     # Check output is numpy array
     assert isinstance(result, np.ndarray)
@@ -407,7 +409,9 @@ def test_transform_buffer_data_scalar_values():
         },
     }
 
-    result = transform_buffer_data(data, device=th.device("cpu"))
+    result = transform_buffer_data(
+        data, device=th.device("cpu"), keys_unit_order=["unit_1", "unit_2"]
+    )
 
     # Check shape: (n_timesteps=2, n_units=2, feature_dim=1)
     assert result.shape == (2, 2, 1)
