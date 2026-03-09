@@ -120,7 +120,7 @@ ignore = ["E501", "G004", "E731"]
     "F811", # allow import redeclaration
 ]
 
-[tool.pytest.ini_options]
+[tool.pytest]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
