@@ -47,8 +47,6 @@ class TorchLearningStrategy(LearningStrategy):
         self.learning_mode = self.learning_config.learning_mode
         self.evaluation_mode = self.learning_config.evaluation_mode
 
-        # based on learning config
-        self.algorithm = self.learning_config.algorithm
         self.actor_architecture = self.learning_config.actor_architecture
 
         # check if actor architecture is available
