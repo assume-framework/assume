@@ -140,6 +140,7 @@ async def test_atomic_swap_no_data_loss(learning_role):
 
     learning_role.add_observation_to_cache("unit_1", ts2, obs_ts2)
     learning_role.add_actions_to_cache("unit_1", ts2, action_ts2, noise_ts2)
+    # ts2 has no reward yet
 
     # Verify data is in cache before swap
     assert ts1 in learning_role.all_obs
@@ -181,12 +182,80 @@ async def test_atomic_swap_no_data_loss(learning_role):
     # Verify ts2 carried-over data is still there
     assert ts2 in learning_role.all_obs, "ts2 should still be carried over"
     assert ts2 in learning_role.all_actions, "ts2 actions should still be carried over"
+    assert ts2 in learning_role.all_rewards, "ts2 rewards should still be carried over"
 
     # Verify the actual data content
     assert len(learning_role.all_obs[ts3]["unit_1"]) == 1
     assert th.equal(learning_role.all_obs[ts3]["unit_1"][0], obs_ts3)
     assert len(learning_role.all_actions[ts3]["unit_1"]) == 1
     assert th.equal(learning_role.all_actions[ts3]["unit_1"][0], action_ts3)
+
+    # all timesteps are complete now, so no carry-over should happen in the next swap
+    await learning_role.store_to_buffer_and_update()
+    assert ts2 not in learning_role.all_obs, (
+        "ts2 should have been processed in next swap"
+    )
+    assert ts3 not in learning_role.all_obs, (
+        "ts3 should have been processed in next swap"
+    )
+
+
+@pytest.mark.require_learning
+async def test_atomic_swap_carries_over_two_incomplete_timesteps(learning_role):
+    """
+    Ensure that when two latest timesteps are incomplete (no reward yet),
+    both are carried over after store_to_buffer_and_update().
+    """
+    learning_role, th = learning_role
+
+    ts1, ts2, ts3, ts4 = 1000, 2000, 3000, 4000
+
+    # Complete timesteps
+    learning_role.add_observation_to_cache("unit_1", ts1, th.tensor([1.0, 1.1]))
+    learning_role.add_actions_to_cache(
+        "unit_1", ts1, th.tensor([0.1]), th.tensor([0.01])
+    )
+    learning_role.add_reward_to_cache("unit_1", ts1, 10.0, regret=0.0, profit=10.0)
+
+    learning_role.add_observation_to_cache("unit_1", ts2, th.tensor([2.0, 2.1]))
+    learning_role.add_actions_to_cache(
+        "unit_1", ts2, th.tensor([0.2]), th.tensor([0.02])
+    )
+    learning_role.add_reward_to_cache("unit_1", ts2, 20.0, regret=0.0, profit=20.0)
+
+    # Incomplete timesteps (no reward yet)
+    learning_role.add_observation_to_cache("unit_1", ts3, th.tensor([3.0, 3.1]))
+    learning_role.add_actions_to_cache(
+        "unit_1", ts3, th.tensor([0.3]), th.tensor([0.03])
+    )
+
+    learning_role.add_observation_to_cache("unit_1", ts4, th.tensor([4.0, 4.1]))
+    learning_role.add_actions_to_cache(
+        "unit_1", ts4, th.tensor([0.4]), th.tensor([0.04])
+    )
+
+    await learning_role.store_to_buffer_and_update()
+
+    # Both incomplete timesteps should remain in cache
+    assert ts3 in learning_role.all_obs, "ts3 should be carried over"
+    assert ts4 in learning_role.all_obs, "ts4 should be carried over"
+    assert ts3 in learning_role.all_actions, "ts3 actions should be carried over"
+    assert ts4 in learning_role.all_actions, "ts4 actions should be carried over"
+
+    # Already complete timesteps should be processed and removed from cache
+    assert ts1 not in learning_role.all_obs, "ts1 should have been processed"
+    assert ts2 not in learning_role.all_obs, "ts2 should have been processed"
+
+    # Add missing rewards after carry-over and ensure data consistency
+    learning_role.add_reward_to_cache("unit_1", ts3, 30.0, regret=0.0, profit=30.0)
+    learning_role.add_reward_to_cache("unit_1", ts4, 40.0, regret=0.0, profit=40.0)
+
+    assert ts3 in learning_role.all_obs, (
+        "ts3 reward should be accepted after carry-over"
+    )
+    assert ts4 in learning_role.all_obs, (
+        "ts4 reward should be accepted after carry-over"
+    )
 
 
 @pytest.mark.require_learning
@@ -251,8 +320,8 @@ async def test_atomic_swap_concurrent_writes(learning_role):
     assert ts1 not in learning_role.all_obs, (
         "ts1 should have been processed and moved to buffer"
     )
-    assert ts2 in learning_role.all_obs, (
-        "ts2 should have not been processed since last entry is expected to be incomplete"
+    assert ts2 not in learning_role.all_obs, (
+        "ts2 should have been processed and moved to buffer"
     )
 
     # Verify data content
