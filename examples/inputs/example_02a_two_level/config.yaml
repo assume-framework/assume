@@ -1,0 +1,71 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+tiny:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-01 02:00
+  time_step: 1h
+  save_frequency_hours: null
+  seed: null
+
+  # shared / top-level learning parameters
+  learning_config:
+    training_episodes: 10
+    episodes_collecting_initial_experience: 3
+    device: cpu
+    validation_episodes_interval: 5
+
+  # unit-level RL configuration
+  units_config:
+    learning_config:
+      learning_mode: true
+      continue_learning: false
+      trained_policies_save_path: null
+      trained_policies_load_path: null
+      max_bid_price: 100
+      algorithm: matd3
+      learning_rate: 0.001
+      train_freq: 1h
+      gradient_steps: 24
+      batch_size: 64
+      gamma: 0.99
+      noise_sigma: 0.1
+      noise_scale: 1
+      noise_dt: 1
+      actor_architecture: mlp
+
+  # market-level RL configuration embedded in market definition
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      market_strategy: learn_max_bid_price # TODO: where? and without learning default None?
+      learning_config:
+        learning_mode: true
+        continue_learning: false
+        trained_policies_save_path: null
+        trained_policies_load_path: null
+        max_bid_price: 100
+        algorithm: matd3
+        learning_rate: 0.001
+        train_freq: 2h # only one time at the end of the episode (?)
+        gradient_steps: 24
+        batch_size: 64
+        gamma: 0.99
+        noise_sigma: 0.1
+        noise_scale: 1
+        noise_dt: 1
