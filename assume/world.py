@@ -596,7 +596,7 @@ class World:
 
         # check if makret config has entry learning_config
         if not self.markets[market_id].learning_config:
-            pass
+            return None
         #learning_config is present in the market config indicating that we want to have a market learning strategy for this market
         else:
             strategy = self.markets[market_id].learning_config.strategy
@@ -617,12 +617,11 @@ class World:
                             f"Learning strategy '{strategy}' requires a configured 'learning_config', but none was set. "
                             "Specify learning_config in config.yaml."
                         )
-                    # TODO: what are bidding_params 
+                    
                     strategy_instances[strategy] = self.bidding_strategies[strategy](
                         market_id=market_id,
                         # give learning role to register expereicne etc
                         learning_role=self.learning_role,
-                        **bidding_params,
                     )
                     
                     market_operator.forecaster= self.scenario_data.market_forecast
@@ -731,7 +730,10 @@ class World:
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.market_id}"] = market_config
         
-        self._prepare_market_strategies(market_operator, market_config.market_id)
+        bidding_strategies= self._prepare_market_strategies(market_operator, market_config.market_id)
+
+        market_operator.learning_startegies = bidding_strategies
+
 
     def _validate_setup(self):
         """Validate the consistency of the world configuration and fail early."""

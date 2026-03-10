@@ -99,6 +99,7 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
 try:
     from assume.strategies.learning_strategies import (
         EnergyLearningStrategy,
+        EnergyLearningTwoLevelStrategy,
         EnergyLearningSingleBidStrategy,
         StorageEnergyLearningStrategy,
         RenewableEnergyLearningSingleBidStrategy,
@@ -114,6 +115,7 @@ try:
     deprecated_bidding_strategies["learning_advanced_orders"] = EnergyLearningStrategy
 
     bidding_strategies["powerplant_energy_learning"] = EnergyLearningStrategy
+    bidding_strategies["powerplant_energy_learning_two_level"] = EnergyLearningTwoLevelStrategy
     bidding_strategies["powerplant_energy_learning_single_bid"] = (
         EnergyLearningSingleBidStrategy
     )

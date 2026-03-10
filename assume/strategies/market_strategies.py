@@ -235,8 +235,6 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
             self.learning_role.add_actions_to_cache(self.market_id, actions, noise)
 
         
-        return self.market_role.marketconfig
-        
     def calculate_reward(self, product_end):
         # calculate reward based on the market state and the action taken
         reward = 0
