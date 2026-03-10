@@ -1,0 +1,4 @@
+,efficiency,emission_factor,max_power,min_power,node,simulation,technology,unit_operator
+Unit 1,1,0.3,31,0,north,example_05b_base,steam turbine,Operator 1
+Unit 2,1,0.3,19,0,east,example_05b_base,steam turbine,Operator 1
+Unit 3,1,0.2,50,0,west,example_05b_base,steam turbine,Operator 1

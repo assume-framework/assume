@@ -1,0 +1,7 @@
+variable,ident,value,simulation
+avg_price,EOM,100.58,example_05b_base
+avg_price,redispatch,70.7,example_05b_base
+total_cost,EOM,7.0294e+05,example_05b_base
+total_cost,redispatch,23979,example_05b_base
+total_volume,EOM,6990,example_05b_base
+total_volume,redispatch,601,example_05b_base

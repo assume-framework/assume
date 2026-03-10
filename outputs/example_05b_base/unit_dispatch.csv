@@ -1,0 +1,1081 @@
+time,energy_cashflow,energy_generation_costs,heat,power,simulation,soc,total_costs,unit
+2023-01-01 00:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 01:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 02:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 03:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 04:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 05:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 06:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 07:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 08:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 09:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 10:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 11:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 12:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 13:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 14:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 15:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 16:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 17:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 18:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 19:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 20:00:00,,0,,0,example_05b_base,,,demand_north
+2023-01-01 00:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 01:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 02:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 03:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 04:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 05:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 06:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 07:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 08:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 09:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 10:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 11:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 12:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 13:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 14:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 15:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 16:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 17:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 18:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 19:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 20:00:00,,0,,0,example_05b_base,,,demand_east
+2023-01-01 00:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 01:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 02:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 03:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 04:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 05:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 06:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 07:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 08:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 09:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 10:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 11:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 12:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 13:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 14:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 15:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 16:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 17:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 18:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 19:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 20:00:00,,0,,0,example_05b_base,,,demand_west
+2023-01-01 00:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 01:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 02:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 03:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 04:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 05:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 06:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 07:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 08:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 09:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 10:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 11:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 12:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 13:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 14:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 15:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 16:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 17:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 18:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 19:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 20:00:00,,0,,0,example_05b_base,0.5,,store_3
+2023-01-01 00:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 01:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 02:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 03:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 04:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 05:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 06:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 07:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 08:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 09:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 10:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 11:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 12:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 13:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 14:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 15:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 16:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 17:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 18:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 19:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 20:00:00,,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 00:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 01:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 02:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 03:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 04:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 05:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 06:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 07:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 08:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 09:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 10:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 11:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 12:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 13:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 14:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 15:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 16:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 17:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 18:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 19:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 20:00:00,,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 00:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 01:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 02:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 03:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 04:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 05:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 06:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 07:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 08:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 09:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 10:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 11:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 12:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 13:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 14:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 15:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 16:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 17:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 18:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 19:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 20:00:00,,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 00:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 01:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 02:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 03:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 04:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 05:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 06:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 07:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 08:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 09:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 10:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 11:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 12:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 13:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 14:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 15:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 16:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 17:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 18:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 19:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 20:00:00,,0,,0,example_05b_base,0.5,,store_1
+2023-01-01 00:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 01:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 02:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 03:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 04:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 05:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 06:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 07:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 08:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 09:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 10:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 11:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 12:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 13:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 14:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 15:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 16:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 17:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 18:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 19:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 20:00:00,,0,,0,example_05b_base,0.5,,store_2
+2023-01-01 21:00:00,0,0,,0,example_05b_base,,,demand_north
+2023-01-01 22:00:00,0,0,,0,example_05b_base,,,demand_north
+2023-01-01 23:00:00,0,0,,0,example_05b_base,,,demand_north
+2023-01-01 21:00:00,0,0,,0,example_05b_base,,,demand_east
+2023-01-01 22:00:00,0,0,,0,example_05b_base,,,demand_east
+2023-01-01 23:00:00,0,0,,0,example_05b_base,,,demand_east
+2023-01-01 21:00:00,0,0,,0,example_05b_base,,,demand_west
+2023-01-01 22:00:00,0,0,,0,example_05b_base,,,demand_west
+2023-01-01 23:00:00,0,0,,0,example_05b_base,,,demand_west
+2023-01-01 21:00:00,0,0,,0,example_05b_base,0.5,0,store_3
+2023-01-01 22:00:00,0,0,,0,example_05b_base,0.5,0,store_3
+2023-01-01 23:00:00,0,0,,0,example_05b_base,0.5,0,store_3
+2023-01-01 21:00:00,0,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 22:00:00,0,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 23:00:00,0,0,0,0,example_05b_base,,,Unit 1
+2023-01-01 21:00:00,0,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 22:00:00,0,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 23:00:00,0,0,0,0,example_05b_base,,,Unit 2
+2023-01-01 21:00:00,0,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 22:00:00,0,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 23:00:00,0,0,0,0,example_05b_base,,,Unit 3
+2023-01-01 21:00:00,0,0,,0,example_05b_base,0.5,0,store_1
+2023-01-01 22:00:00,0,0,,0,example_05b_base,0.5,0,store_1
+2023-01-01 23:00:00,0,0,,0,example_05b_base,0.5,0,store_1
+2023-01-01 21:00:00,0,0,,0,example_05b_base,0.5,0,store_2
+2023-01-01 22:00:00,0,0,,0,example_05b_base,0.5,0,store_2
+2023-01-01 23:00:00,0,0,,0,example_05b_base,0.5,0,store_2
+2023-01-02 00:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 01:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 02:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 03:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 04:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 05:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 06:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 07:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 08:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 09:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 10:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 11:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 12:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 13:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 14:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 15:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 16:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 17:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 18:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 19:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 20:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 00:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 01:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 02:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 03:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 04:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 05:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 06:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 07:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 08:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 09:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 10:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 11:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 12:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 13:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 14:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 15:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 16:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 17:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 18:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 19:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 20:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 00:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 01:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 02:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 03:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 04:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 05:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 06:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 07:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 08:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 09:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 10:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 11:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 12:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 13:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 14:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 15:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 16:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 17:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 18:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 19:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 20:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 00:00:00,500,0,,5,example_05b_base,0.5,0,store_3
+2023-01-02 01:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 02:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 03:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 04:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 05:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 06:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 07:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 08:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 09:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 10:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 11:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 12:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 13:00:00,0,0,,0,example_05b_base,0.25,0,store_3
+2023-01-02 14:00:00,500,0,,5,example_05b_base,0.25,0,store_3
+2023-01-02 15:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-02 16:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-02 17:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-02 18:00:00,500,0,,0,example_05b_base,0,0,store_3
+2023-01-02 19:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-02 20:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-02 00:00:00,2405,572.38,0,14,example_05b_base,,,Unit 1
+2023-01-02 01:00:00,2474.9,572.38,0,14,example_05b_base,,,Unit 1
+2023-01-02 02:00:00,2609.4,776.8,0,19,example_05b_base,,,Unit 1
+2023-01-02 03:00:00,2577.1,674.59,0,16.5,example_05b_base,,,Unit 1
+2023-01-02 04:00:00,2609.4,776.8,0,19,example_05b_base,,,Unit 1
+2023-01-02 05:00:00,2577.1,674.59,0,16.5,example_05b_base,,,Unit 1
+2023-01-02 06:00:00,3100,1267.4,0,31,example_05b_base,,,Unit 1
+2023-01-02 07:00:00,2986,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 08:00:00,2916,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 09:00:00,2986,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 10:00:00,3100,1267.4,0,31,example_05b_base,,,Unit 1
+2023-01-02 11:00:00,2986,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 12:00:00,2916,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 13:00:00,2986,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 14:00:00,2916,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 15:00:00,2986,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 16:00:00,2916,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 17:00:00,2986,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 18:00:00,2916,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 19:00:00,2986,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 20:00:00,2916,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 00:00:00,1545.6,992.38,0,14,example_05b_base,,,Unit 2
+2023-01-02 01:00:00,1588.4,992.38,0,14,example_05b_base,,,Unit 2
+2023-01-02 02:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 03:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 04:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 05:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 06:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 07:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 08:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 09:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 10:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 11:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 12:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 13:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 14:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 15:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 16:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 17:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 18:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 19:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 20:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 00:00:00,1227.1,1227.1,0,12,example_05b_base,,,Unit 3
+2023-01-02 01:00:00,715.79,715.79,0,7,example_05b_base,,,Unit 3
+2023-01-02 02:00:00,1227.1,1227.1,0,12,example_05b_base,,,Unit 3
+2023-01-02 03:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 04:00:00,1227.1,1227.1,0,12,example_05b_base,,,Unit 3
+2023-01-02 05:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 06:00:00,1022.6,1022.6,0,10,example_05b_base,,,Unit 3
+2023-01-02 07:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 08:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 09:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 10:00:00,1022.6,1022.6,0,10,example_05b_base,,,Unit 3
+2023-01-02 11:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 12:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 13:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 14:00:00,1482.7,1482.7,0,14.5,example_05b_base,,,Unit 3
+2023-01-02 15:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 16:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 17:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 18:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 19:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 20:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 00:00:00,0,0,,10,example_05b_base,0.5,0,store_1
+2023-01-02 01:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 02:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 03:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 04:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 05:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 06:00:00,500,0,,0,example_05b_base,0,0,store_1
+2023-01-02 07:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 08:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 09:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 10:00:00,500,0,,0,example_05b_base,0,0,store_1
+2023-01-02 11:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 12:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 13:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 14:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 15:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 16:00:00,500,0,,0,example_05b_base,0,0,store_1
+2023-01-02 17:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 18:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 19:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 20:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 00:00:00,0,0,,10,example_05b_base,0.5,0,store_2
+2023-01-02 01:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 02:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-02 03:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 04:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-02 05:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 06:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 07:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 08:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-02 09:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 10:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 11:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 12:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-02 13:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 14:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 15:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 16:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 17:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 18:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 19:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 20:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-02 21:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 22:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 23:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-02 21:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 22:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 23:00:00,-1022.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-02 21:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 22:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 23:00:00,-3579,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-02 21:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-02 22:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-02 23:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-02 21:00:00,2986,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 22:00:00,2916,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 23:00:00,2986,1083.4,0,26.5,example_05b_base,,,Unit 1
+2023-01-02 21:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 22:00:00,1900,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 23:00:00,1942.9,1346.8,0,19,example_05b_base,,,Unit 2
+2023-01-02 21:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 22:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 23:00:00,971.43,971.43,0,9.5,example_05b_base,,,Unit 3
+2023-01-02 21:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 22:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 23:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-02 21:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-02 22:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-02 23:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 00:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 01:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 02:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 03:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 04:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 05:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 06:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 07:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 08:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 09:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 10:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 11:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 12:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 13:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 14:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 15:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 16:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 17:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 18:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 19:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 20:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 00:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 01:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 02:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 03:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 04:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 05:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 06:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 07:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 08:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 09:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 10:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 11:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 12:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 13:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 14:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 15:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 16:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 17:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 18:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 19:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 20:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 00:00:00,-3560,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 01:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 02:00:00,-3560,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 03:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 04:00:00,-3560,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 05:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 06:00:00,-3560,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 07:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 08:00:00,-3560,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 09:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 10:00:00,-3560,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 11:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 12:00:00,-3560,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 13:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 14:00:00,-3560,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 15:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 16:00:00,-3560,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 17:00:00,-3500,1.05e+05,,-35,example_05b_base,,,demand_west
+2023-01-03 18:00:00,-4068.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-03 19:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-03 20:00:00,-4068.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-03 00:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 01:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 02:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 03:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 04:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 05:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 06:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 07:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 08:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 09:00:00,500,0,,0,example_05b_base,0,0,store_3
+2023-01-03 10:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 11:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 12:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 13:00:00,500,0,,0,example_05b_base,0,0,store_3
+2023-01-03 14:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 15:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 16:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 17:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 18:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 19:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 20:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 00:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 01:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 02:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 03:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 04:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 05:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 06:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 07:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 08:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 09:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 10:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 11:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 12:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 13:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 14:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 15:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 16:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 17:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 18:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 19:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 20:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 00:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 01:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 02:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 03:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 04:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 05:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 06:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 07:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 08:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 09:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 10:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 11:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 12:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 13:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 14:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 15:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 16:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 17:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 18:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 19:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 20:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 00:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 01:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 02:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 03:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 04:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 05:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 06:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 07:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 08:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 09:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 10:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 11:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 12:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 13:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 14:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 15:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 16:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 17:00:00,966.28,966.28,0,9.5,example_05b_base,,,Unit 3
+2023-01-03 18:00:00,1474.9,1474.9,0,14.5,example_05b_base,,,Unit 3
+2023-01-03 19:00:00,1474.9,1474.9,0,14.5,example_05b_base,,,Unit 3
+2023-01-03 20:00:00,1474.9,1474.9,0,14.5,example_05b_base,,,Unit 3
+2023-01-03 00:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 01:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 02:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 03:00:00,500,0,,0,example_05b_base,0,0,store_1
+2023-01-03 04:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 05:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 06:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 07:00:00,500,0,,0,example_05b_base,0,0,store_1
+2023-01-03 08:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 09:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 10:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 11:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 12:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 13:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 14:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 15:00:00,500,0,,0,example_05b_base,0,0,store_1
+2023-01-03 16:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 17:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 18:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 19:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 20:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 00:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 01:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-03 02:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 03:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 04:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 05:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-03 06:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 07:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 08:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 09:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 10:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 11:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-03 12:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 13:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 14:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 15:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 16:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 17:00:00,500,0,,0,example_05b_base,0,0,store_2
+2023-01-03 18:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 19:00:00,1000,0,,0,example_05b_base,0,0,store_2
+2023-01-03 20:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 21:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 22:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 23:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-03 21:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 22:00:00,-1017.1,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 23:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-03 21:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-03 22:00:00,-4068.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-03 23:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-03 21:00:00,1000,0,,0,example_05b_base,0,0,store_3
+2023-01-03 22:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 23:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-03 21:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 22:00:00,2972.8,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 23:00:00,2919.7,1061.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-03 21:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 22:00:00,1932.6,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 23:00:00,1900,1331.3,0,19,example_05b_base,,,Unit 2
+2023-01-03 21:00:00,1474.9,1474.9,0,14.5,example_05b_base,,,Unit 3
+2023-01-03 22:00:00,1474.9,1474.9,0,14.5,example_05b_base,,,Unit 3
+2023-01-03 23:00:00,1474.9,1474.9,0,14.5,example_05b_base,,,Unit 3
+2023-01-03 21:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 22:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-03 23:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-03 21:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 22:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-03 23:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 00:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 01:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 02:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 03:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 04:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 05:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 06:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 07:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 08:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 09:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 10:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 11:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 12:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 13:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 14:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 15:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 16:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 17:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 18:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 19:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 20:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 00:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 01:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 02:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 03:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 04:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 05:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 06:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 07:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 08:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 09:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 10:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 11:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 12:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 13:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 14:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 15:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 16:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 17:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 18:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 19:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 20:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 00:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 01:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 02:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 03:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 04:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 05:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 06:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 07:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 08:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 09:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 10:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 11:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 12:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 13:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 14:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 15:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 16:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 17:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 18:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 19:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 20:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 00:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 01:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 02:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 03:00:00,1000,0,,0,example_05b_base,0,0,store_3
+2023-01-04 04:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 05:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 06:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 07:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 08:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 09:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 10:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 11:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 12:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 13:00:00,1000,0,,0,example_05b_base,0,0,store_3
+2023-01-04 14:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 15:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 16:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 17:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 18:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 19:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 20:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 00:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 01:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 02:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 03:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 04:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 05:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 06:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 07:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 08:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 09:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 10:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 11:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 12:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 13:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 14:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 15:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 16:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 17:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 18:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 19:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 20:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 00:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 01:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 02:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 03:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 04:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 05:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 06:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 07:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 08:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 09:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 10:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 11:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 12:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 13:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 14:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 15:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 16:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 17:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 18:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 19:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 20:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 00:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 01:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 02:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 03:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 04:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 05:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 06:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 07:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 08:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 09:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 10:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 11:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 12:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 13:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 14:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 15:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 16:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 17:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 18:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 19:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 20:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 00:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 01:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-04 02:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 03:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 04:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 05:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-04 06:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 07:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-04 08:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 09:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 10:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 11:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 12:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 13:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 14:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 15:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-04 16:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 17:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-04 18:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 19:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 20:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 00:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 01:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 02:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 03:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 04:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 05:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 06:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 07:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 08:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 09:00:00,1000,0,,0,example_05b_base,0,0,store_2
+2023-01-04 10:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 11:00:00,1000,0,,0,example_05b_base,0,0,store_2
+2023-01-04 12:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 13:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 14:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 15:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 16:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 17:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 18:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 19:00:00,1000,0,,0,example_05b_base,0,0,store_2
+2023-01-04 20:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 21:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 22:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 23:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-04 21:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 22:00:00,-1005.6,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 23:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-04 21:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 22:00:00,-4022.2,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 23:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-04 21:00:00,1000,0,,0,example_05b_base,0,0,store_3
+2023-01-04 22:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 23:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-04 21:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 22:00:00,2944.7,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 23:00:00,2927.5,1015.9,0,26.5,example_05b_base,,,Unit 1
+2023-01-04 21:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 22:00:00,1910.6,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 23:00:00,1900,1298.3,0,19,example_05b_base,,,Unit 2
+2023-01-04 21:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 22:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 23:00:00,1458.1,1458.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-04 21:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 22:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-04 23:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-04 21:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 22:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-04 23:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 00:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 01:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 02:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 03:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 04:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 05:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 06:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 07:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 08:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 09:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 10:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 11:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 12:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 13:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 14:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 15:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 16:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 17:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 18:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 19:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 20:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 00:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 01:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 02:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 03:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 04:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 05:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 06:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 07:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 08:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 09:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 10:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 11:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 12:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 13:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 14:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 15:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 16:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 17:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 18:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 19:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 20:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 00:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 01:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 02:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 03:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 04:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 05:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 06:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 07:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 08:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 09:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 10:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 11:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 12:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 13:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 14:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 15:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 16:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 17:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 18:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 19:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 20:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 00:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 01:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 02:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 03:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 04:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 05:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 06:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 07:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 08:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 09:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 10:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 11:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 12:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 13:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 14:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 15:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 16:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 17:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 18:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 19:00:00,1000,0,,0,example_05b_base,0,0,store_3
+2023-01-05 20:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 00:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 01:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 02:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 03:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 04:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 05:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 06:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 07:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 08:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 09:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 10:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 11:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 12:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 13:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 14:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 15:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 16:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 17:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 18:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 19:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 20:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 00:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 01:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 02:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 03:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 04:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 05:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 06:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 07:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 08:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 09:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 10:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 11:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 12:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 13:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 14:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 15:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 16:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 17:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 18:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 19:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 20:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 00:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 01:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 02:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 03:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 04:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 05:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 06:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 07:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 08:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 09:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 10:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 11:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 12:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 13:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 14:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 15:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 16:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 17:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 18:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 19:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 20:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 00:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 01:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-05 02:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 03:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-05 04:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 05:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 06:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 07:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 08:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 09:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-05 10:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 11:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 12:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 13:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 14:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 15:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-05 16:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 17:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-05 18:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 19:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 20:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 00:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 01:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 02:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 03:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 04:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 05:00:00,1000,0,,0,example_05b_base,0,0,store_2
+2023-01-05 06:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 07:00:00,1000,0,,0,example_05b_base,0,0,store_2
+2023-01-05 08:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 09:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 10:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 11:00:00,1000,0,,0,example_05b_base,0,0,store_2
+2023-01-05 12:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 13:00:00,1000,0,,0,example_05b_base,0,0,store_2
+2023-01-05 14:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 15:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 16:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 17:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 18:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 19:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 20:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 21:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 22:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 23:00:00,-1000,30000,,-10,example_05b_base,,,demand_north
+2023-01-05 21:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 22:00:00,-1007.7,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 23:00:00,-1000,30000,,-10,example_05b_base,,,demand_east
+2023-01-05 21:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 22:00:00,-4030.6,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 23:00:00,-4000,1.2e+05,,-40,example_05b_base,,,demand_west
+2023-01-05 21:00:00,1000,0,,0,example_05b_base,0,0,store_3
+2023-01-05 22:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 23:00:00,0,0,,0,example_05b_base,0,0,store_3
+2023-01-05 21:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 22:00:00,2949.8,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 23:00:00,2926.1,1024.2,0,26.5,example_05b_base,,,Unit 1
+2023-01-05 21:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 22:00:00,1914.6,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 23:00:00,1900,1304.3,0,19,example_05b_base,,,Unit 2
+2023-01-05 21:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 22:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 23:00:00,1461.1,1461.1,0,14.5,example_05b_base,,,Unit 3
+2023-01-05 21:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 22:00:00,0,0,,0,example_05b_base,0,0,store_1
+2023-01-05 23:00:00,1000,0,,0,example_05b_base,0,0,store_1
+2023-01-05 21:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 22:00:00,0,0,,0,example_05b_base,0,0,store_2
+2023-01-05 23:00:00,0,0,,0,example_05b_base,0,0,store_2
