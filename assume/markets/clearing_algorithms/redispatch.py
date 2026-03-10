@@ -178,23 +178,46 @@ class RedispatchMarketRole(MarketRole):
             costs.add_suffix("_down") * (-1)
         )
 
-        # run linear powerflow
-        redispatch_network.lpf()
+        # detect whether the network has AC lines and/or controllable links
+        has_lines = not redispatch_network.lines.empty
+        has_links = not redispatch_network.links.empty
 
-        # check lines for congestion where power flow is larger than s_nom * s_max_pu
-        line_loading = redispatch_network.lines_t.p0.abs() / (
-            redispatch_network.lines.s_nom * redispatch_network.lines.s_max_pu
-        )
+        if has_lines:
+            # AC case (or mixed AC+Link case): use LPF to detect congestion on lines
+            redispatch_network.lpf()
 
-        # if any line is congested, perform redispatch
-        if line_loading.max().max() > 1:
-            logger.debug("Congestion detected")
+            line_loading = redispatch_network.lines_t.p0.abs().div(
+                redispatch_network.lines.s_nom * redispatch_network.lines.s_max_pu,
+                axis=1,
+            )
+
+            congestion_detected = line_loading.max().max() > 1
+
+            if congestion_detected:
+                logger.debug("Congestion detected on AC lines")
+
+                status, termination_condition = redispatch_network.optimize(
+                    solver_name=self.solver,
+                    solver_options=self.solver_options,
+                    progress=False,
+                )
+
+                if status != "ok":
+                    logger.error(f"Solver exited with {termination_condition}")
+                    raise Exception("Solver in redispatch market did not converge")
+            else:
+                logger.debug("No AC line congestion detected")
+
+        elif has_links:
+            # Links-only case: no LPF possible/needed for congestion detection
+            # Just solve the constrained dispatch directly.
+            logger.debug(
+                "Links-only network detected: skipping lpf() and solving directly"
+            )
 
             status, termination_condition = redispatch_network.optimize(
                 solver_name=self.solver,
                 solver_options=self.solver_options,
-                # do not show tqdm progress bars for large grids
-                # https://github.com/PyPSA/linopy/pull/375
                 progress=False,
             )
 
@@ -202,9 +225,8 @@ class RedispatchMarketRole(MarketRole):
                 logger.error(f"Solver exited with {termination_condition}")
                 raise Exception("Solver in redispatch market did not converge")
 
-        # if no congestion is detected set accepted volume and price to 0
         else:
-            logger.debug("No congestion detected")
+            raise ValueError("Redispatch network has neither lines nor links.")
 
         # process dispatch data
         self.process_dispatch_data(
