@@ -106,6 +106,69 @@ class TorchLearningStrategy(LearningStrategy):
         ).to(self.device)
         self.actor.load_state_dict(params["actor"])
         self.actor.eval()  # set the actor to evaluation mode
+        
+    def get_actions(self, next_observation):
+        """
+        Determines actions based on the current observation, applying noise for exploration if in learning mode.
+
+        Args
+        ----
+        next_observation : torch.Tensor
+            Observation data influencing bid price and direction.
+
+        Returns
+        -------
+        torch.Tensor
+            Actions that include bid price and direction.
+        torch.Tensor
+            Noise component which is already added to actions for exploration, if applicable.
+
+        Notes
+        -----
+        In learning mode, actions incorporate noise for exploration. Initial exploration relies
+        solely on noise to cover the action space broadly.
+        """
+
+        # distinction whether we are in learning mode or not to handle exploration realised with noise
+        if self.learning_mode and not self.evaluation_mode:
+            # if we are in learning mode the first x episodes we want to explore the entire action space
+            # to get a good initial experience, in the area around the costs of the agent
+            if self.collect_initial_experience_mode:
+                # define current action as solely noise
+                noise = th.normal(
+                    mean=0.0,
+                    std=self.exploration_noise_std,
+                    size=(self.act_dim,),
+                    dtype=self.float_type,
+                    device=self.device,
+                )
+
+                # =============================================================================
+                # 2.1 Get Actions and handle exploration
+                # =============================================================================
+                # only use noise as the action to enforce exploration
+                curr_action = noise
+
+            else:
+                # if we are not in the initial exploration phase we chose the action with the actor neural net
+                # and add noise to the action
+                curr_action = self.actor(next_observation).detach()
+                noise = self.action_noise.noise(
+                    device=self.device, dtype=self.float_type
+                )
+                curr_action += noise
+
+                # make sure that noise adding does not exceed the actual output of the NN as it pushes results in a direction that actor can't even reach
+                curr_action = th.clamp(
+                    curr_action, self.actor.min_output, self.actor.max_output
+                )
+        else:
+            # if we are not in learning mode we just use the actor neural net to get the action without adding noise
+            curr_action = self.actor(next_observation).detach()
+            # noise is an tensor with zeros, because we are not in learning mode
+            noise = th.zeros_like(curr_action, dtype=self.float_type)
+
+        return curr_action, noise
 
 
 
@@ -252,68 +315,6 @@ class TorchUnitLearningStrategy(TorchLearningStrategy):
 
         return np.array([])
 
-    def get_actions(self, next_observation):
-        """
-        Determines actions based on the current observation, applying noise for exploration if in learning mode.
-
-        Args
-        ----
-        next_observation : torch.Tensor
-            Observation data influencing bid price and direction.
-
-        Returns
-        -------
-        torch.Tensor
-            Actions that include bid price and direction.
-        torch.Tensor
-            Noise component which is already added to actions for exploration, if applicable.
-
-        Notes
-        -----
-        In learning mode, actions incorporate noise for exploration. Initial exploration relies
-        solely on noise to cover the action space broadly.
-        """
-
-        # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.evaluation_mode:
-            # if we are in learning mode the first x episodes we want to explore the entire action space
-            # to get a good initial experience, in the area around the costs of the agent
-            if self.collect_initial_experience_mode:
-                # define current action as solely noise
-                noise = th.normal(
-                    mean=0.0,
-                    std=self.exploration_noise_std,
-                    size=(self.act_dim,),
-                    dtype=self.float_type,
-                    device=self.device,
-                )
-
-                # =============================================================================
-                # 2.1 Get Actions and handle exploration
-                # =============================================================================
-                # only use noise as the action to enforce exploration
-                curr_action = noise
-
-            else:
-                # if we are not in the initial exploration phase we chose the action with the actor neural net
-                # and add noise to the action
-                curr_action = self.actor(next_observation).detach()
-                noise = self.action_noise.noise(
-                    device=self.device, dtype=self.float_type
-                )
-                curr_action += noise
-
-                # make sure that noise adding does not exceed the actual output of the NN as it pushes results in a direction that actor can't even reach
-                curr_action = th.clamp(
-                    curr_action, self.actor.min_output, self.actor.max_output
-                )
-        else:
-            # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-            curr_action = self.actor(next_observation).detach()
-            # noise is an tensor with zeros, because we are not in learning mode
-            noise = th.zeros_like(curr_action, dtype=self.float_type)
-
-        return curr_action, noise
 
 
 class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):

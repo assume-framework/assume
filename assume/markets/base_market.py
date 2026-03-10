@@ -732,7 +732,7 @@ class MarketRole(MarketMechanism, Role):
 
         # if learning strats is no null
          
-        self.learning_startegies.calculate_reward(self)
+        self.learning_startegies.calculate_reward(self, product_end=meta["product_end"])
 
         return accepted_orderbook, market_meta
 
