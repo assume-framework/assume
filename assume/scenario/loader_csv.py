@@ -364,7 +364,7 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
         loads = pd.read_csv(network_path / "demand_units.csv", index_col=0)
     if (network_path / "storage_units.csv").exists():
         storage_units = pd.read_csv(network_path / "storage_units.csv", index_col=0)
-    if (network_path / "storage_units.csv").exists():
+    if (network_path / "links.csv").exists():
         storage_units = pd.read_csv(network_path / "links.csv", index_col=0)
 
     return {
