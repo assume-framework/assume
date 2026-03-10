@@ -10,7 +10,7 @@ import pytest
 try:
     from assume.common.base import LearningConfig
     from assume.reinforcement_learning.learning_role import (
-        Learning,
+        LearningRole,
         LearningStrategy,
     )
     from assume.reinforcement_learning.neural_network_architecture import (
@@ -46,7 +46,7 @@ def test_learning_init():
     }
 
     # test init
-    learn = Learning(config["learning_config"], start=start, end=end)
+    learn = LearningRole(config["learning_config"], start=start, end=end)
     assert len(learn.rl_strats) == 0
 
     # we need to add learning strategies first
@@ -97,7 +97,7 @@ async def learning_role():
         ),
     }
 
-    learning_role = Learning(config["learning_config"], start=start, end=end)
+    learning_role = LearningRole(config["learning_config"], start=start, end=end)
     learning_role.rl_strats["unit_1"] = LearningStrategy(
         **config, learning_role=learning_role
     )

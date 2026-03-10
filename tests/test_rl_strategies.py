@@ -11,7 +11,7 @@ from assume.common.base import LearningConfig
 from assume.common.forecaster import PowerplantForecaster
 
 try:
-    from assume.reinforcement_learning import Learning
+    from assume.reinforcement_learning import LearningRole
     from assume.strategies.learning_strategies import (
         EnergyLearningSingleBidStrategy,
         EnergyLearningStrategy,
@@ -44,7 +44,7 @@ def power_plant() -> PowerPlant:
             training_episodes=3,
         ),
     }
-    learning_role = Learning(config["learning_config"], start, end)
+    learning_role = LearningRole(config["learning_config"], start, end)
 
     return PowerPlant(
         id="test_pp",
@@ -101,7 +101,7 @@ def test_learning_strategies_parametrized(
         ),
     }
 
-    learning_role = Learning(config["learning_config"], start, end)
+    learning_role = LearningRole(config["learning_config"], start, end)
     # Override the strategy
     power_plant.bidding_strategies[mc.market_id] = strategy_class(
         learning_role=learning_role, **config

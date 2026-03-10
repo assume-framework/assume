@@ -14,7 +14,7 @@ from assume.common.forecaster import UnitForecaster
 try:
     import torch as th
 
-    from assume.reinforcement_learning import Learning
+    from assume.reinforcement_learning import LearningRole
     from assume.strategies.learning_strategies import StorageEnergyLearningStrategy
 except ImportError:
     th = None
@@ -44,7 +44,7 @@ def storage_unit() -> Storage:
 
     index = pd.date_range("2023-06-30 22:00:00", periods=48, freq="h")
     ff = UnitForecaster(index, market_prices={"test_market": 50})
-    learning_role = Learning(config["learning_config"], index[0], index[-1])
+    learning_role = LearningRole(config["learning_config"], index[0], index[-1])
     return Storage(
         id="test_storage",
         unit_operator="test_operator",

@@ -50,7 +50,7 @@ class LevelView:
     LevelView exactly as they did with the old single-level Learning role.
     """
 
-    def __init__(self, learning_role: "Learning", level: str):
+    def __init__(self, learning_role: "LearningRole", level: str):
         object.__setattr__(self, "_role", learning_role)
         object.__setattr__(self, "_level", level)
 
@@ -126,7 +126,7 @@ class LevelView:
         return getattr(self._role, name)
 
 
-class Learning(Role):
+class LearningRole(Role):
     """
     This class manages the learning process of reinforcement learning agents across
     multiple levels (e.g. "units", "units_operator", "markets", ...). Each level has its

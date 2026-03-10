@@ -311,10 +311,10 @@ class World:
         the RL agent and adds the learning role to it for further processing.
         """
 
-        from assume.reinforcement_learning.learning_role import Learning
+        from assume.reinforcement_learning.learning_role import LearningRole
 
         # create LearningConfig object
-        self.learning_role = Learning(
+        self.learning_role = LearningRole(
             learning_config=self.learning_config, start=self.start, end=self.end
         )
 
