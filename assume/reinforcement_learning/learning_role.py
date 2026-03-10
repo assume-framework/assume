@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_LEVEL = "units"
 
 
-def _new_cache():
+def _new_cache(): # TODO: move to learning utils
     """Create a fresh nested defaultdict for experience caching."""
     return defaultdict(lambda: defaultdict(list))
 

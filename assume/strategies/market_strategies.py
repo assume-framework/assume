@@ -5,6 +5,7 @@
 import logging
 from datetime import datetime
 
+import numpy as np
 import torch as th
 
 from assume.strategies.learning_strategies import TorchLearningStrategy

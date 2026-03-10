@@ -225,9 +225,27 @@ class World:
 
         # TODO: handel multi-leve  learning config  muss zusammengeführt werden heir irgendwie
         if not learning_dict:
-            self.learning_config: LearningConfig = None
+            self.learning_config = None
+            self.shared_learning_config = None
+        elif "levels" in learning_dict:
+            # Multi-level config: build per-level LearningConfig objects
+            shared_lc_dict = learning_dict.get("shared", {})
+            levels = learning_dict["levels"]
+            self.learning_config = {}
+            for level_name, level_dict in levels.items():
+                # Merge shared params as defaults, level-specific params override
+                merged = {**shared_lc_dict, **level_dict}
+                self.learning_config[level_name] = LearningConfig(**merged)
+            # Shared config for episode-level settings
+            self.shared_learning_config = LearningConfig(**{
+                **shared_lc_dict,
+                "learning_mode": learning_dict.get("learning_mode", False),
+                "evaluation_mode": learning_dict.get("evaluation_mode", False),
+            })
         else:
+            # Backward compat: single flat learning_dict
             self.learning_config = LearningConfig(**learning_dict)
+            self.shared_learning_config = None
 
         # initiate learning if the learning mode is on and hence we want to learn new strategies
         self.learning_mode = learning_dict.get("learning_mode", False)
@@ -244,7 +262,14 @@ class World:
 
         # update simulation description when learning
         if self.learning_config:
-            if self.learning_config.evaluation_mode:
+            eval_mode = (
+                self.shared_learning_config.evaluation_mode
+                if self.shared_learning_config
+                else self.learning_config.evaluation_mode
+                if isinstance(self.learning_config, LearningConfig)
+                else False
+            )
+            if eval_mode:
                 self.simulation_desc = f"Evaluation Episode {eval_episode}"
             elif self.learning_mode:
                 self.simulation_desc = f"Training Episode {episode}"
@@ -314,12 +339,23 @@ class World:
 
         from assume.reinforcement_learning.learning_role import LearningRole
 
-        # create LearningConfig object
+        # create LearningRole — accepts dict[str, LearningConfig] or single LearningConfig
         self.learning_role = LearningRole(
-            learning_config=self.learning_config, start=self.start, end=self.end
+            learning_config=self.learning_config,
+            start=self.start,
+            end=self.end,
+            shared_config=self.shared_learning_config,
         )
 
-        if self.learning_config.learning_mode or self.learning_config.evaluation_mode:
+        # Determine if any level has learning or evaluation mode
+        if isinstance(self.learning_config, dict):
+            any_learning = any(c.learning_mode for c in self.learning_config.values())
+            any_eval = any(c.evaluation_mode for c in self.learning_config.values())
+        else:
+            any_learning = self.learning_config.learning_mode
+            any_eval = self.learning_config.evaluation_mode
+
+        if any_learning or any_eval:
             # if so, we initiate the rl learning role with parameters
             rl_agent = agent_composed_of(
                 self.learning_role,
@@ -563,9 +599,13 @@ class World:
                             f"Learning strategy '{strategy}' requires a configured 'learning_config', but none was set. "
                             "Specify learning_config in config.yaml."
                         )
+                    # Pass the "units" level view so the strategy registers at the correct level
+                    learning_role_ref = self.learning_role
+                    if hasattr(learning_role_ref, "get_level_view") and "units" in learning_role_ref.levels:
+                        learning_role_ref = learning_role_ref.get_level_view("units")
                     strategy_instances[strategy] = self.bidding_strategies[strategy](
                         unit_id=unit_id,
-                        learning_role=self.learning_role,
+                        learning_role=learning_role_ref,
                         **bidding_params,
                     )
                 else:
@@ -580,58 +620,53 @@ class World:
 
         return bidding_strategies
     
-    def _prepare_market_strategies(self, market_operator, market_id,  forecaster: UnitForecaster,):
+    def _prepare_market_strategies(self, market_id, market_role):
         """
-        Prepare market learning strategies for the market on the specified parameters.
+        Prepare and attach a market learning strategy to the market role, if the
+        market's config specifies one.
 
         Args:
-            market_operator (MarketOperator): The market operator.
             market_id (str): The identifier for the market.
-
-        Returns:
-            dict[str, BaseStrategy | UnitOperatorStrategy]: The market learning strategies for the market.
+            market_role: The MarketRole instance for this market.
         """
-        market_strategies = {}
-        strategy_instances = {}  # Cache to store created instances
+        market_config = self.markets[market_id]
 
-        # check if makret config has entry learning_config
-        if not self.markets[market_id].learning_config:
-            pass
-        #learning_config is present in the market config indicating that we want to have a market learning strategy for this market
-        else:
-            strategy = self.markets[market_id].learning_config.strategy
-            if strategy not in self.bidding_strategies:
-                # raise a deprecated warning for learning_advanced_orders
+        # No learning_config or no market_strategy → nothing to do
+        if not market_config.learning_config:
+            return
+
+        strategy_name = market_config.market_strategy
+        if strategy_name not in self.bidding_strategies:
+            raise ValueError(
+                f"Market strategy '{strategy_name}' not registered. "
+                f"Available strategies: {list(self.bidding_strategies.keys())}"
+            )
+
+        strategy_class = self.bidding_strategies[strategy_name]
+
+        if issubclass(strategy_class, LearningStrategy):
+            if self.learning_config is None:
                 raise ValueError(
-                    f"""Market strategy {strategy} not registered. Please check the name of
-                        the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                    f"Market learning strategy '{strategy_name}' requires a configured "
+                    "'learning_config', but none was set."
                 )
+            # Pass the "markets" level view so the strategy registers at the correct level
+            learning_role_ref = self.learning_role
+            if hasattr(learning_role_ref, "get_level_view") and "markets" in learning_role_ref.levels:
+                learning_role_ref = learning_role_ref.get_level_view("markets")
 
+            strategy_instance = strategy_class(
+                unit_id=market_id,
+                learning_role=learning_role_ref
+            )
+            market_role.forecaster = self.scenario_data.market_forecast
 
-            if strategy not in strategy_instances:
-                # check if created cache has learning_strategy
-                if issubclass(self.bidding_strategies[strategy], LearningStrategy):
-                    # add learning role to the strategy to have access to store training data etc
-                    if self.learning_config is None:
-                        raise ValueError(
-                            f"Learning strategy '{strategy}' requires a configured 'learning_config', but none was set. "
-                            "Specify learning_config in config.yaml."
-                        )
-                    # TODO: what are bidding_params 
-                    strategy_instances[strategy] = self.bidding_strategies[strategy](
-                        market_id=market_id,
-                        # give learning role to register expereicne etc
-                        learning_role=self.learning_role,
-                        **bidding_params,
-                    )
-                    
-                    market_operator.forecaster= self.scenario_data.market_forecast
-
-
-            # Use the cached instance for this market
-            bidding_strategies[market_id] = strategy_instances[strategy]
-
-        return bidding_strategies
+        else:
+            raise ValueError(
+                f"Market strategy '{strategy_name}' must be a subclass of LearningStrategy."
+            )
+        # Use the cached instance for this market
+        market_role.learning_strategy = strategy_instance
 
     def _validate_unit_addition(self, id, unit_type, unit_operator_id):
         """
@@ -731,7 +766,7 @@ class World:
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.market_id}"] = market_config
         
-        self._prepare_market_strategies(market_operator, market_config.market_id)
+        self._prepare_market_strategies(market_config.market_id, market_role)
 
     def _validate_setup(self):
         """Validate the consistency of the world configuration and fail early."""

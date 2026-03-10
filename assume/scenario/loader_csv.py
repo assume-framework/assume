@@ -283,7 +283,7 @@ def replace_paths(config: dict, inputs_path: str):
 
 def make_market_config(
     id: str,
-    market_params: dict,
+    market_config_dict: dict,
     world_start: datetime,
     world_end: datetime,
 ) -> MarketConfig:
@@ -292,16 +292,16 @@ def make_market_config(
 
     Args:
     id (str): The id of the market.
-    market_params (dict): The market parameters.
+    market_config_dict (dict): The market parameters.
     world_start (datetime.datetime): The start time of the world.
     world_end (datetime.datetime): The end time of the world.
 
     Returns:
     MarketConfig: The market config.
     """
-    freq, interval = convert_to_rrule_freq(market_params["opening_frequency"])
-    start = market_params.get("start_date")
-    end = market_params.get("end_date")
+    freq, interval = convert_to_rrule_freq(market_config_dict["opening_frequency"])
+    start = market_config_dict.get("start_date")
+    end = market_config_dict.get("end_date")
     if start:
         start = pd.Timestamp(start)
     if end:
@@ -315,12 +315,12 @@ def make_market_config(
             count=product["count"],
             first_delivery=pd.Timedelta(product["first_delivery"]),
         )
-        for product in market_params["products"]
+        for product in market_config_dict["products"]
     ]
     market_config = MarketConfig(
         market_id=id,
         market_products=market_products,
-        product_type=market_params.get("product_type", "energy"),
+        product_type=market_config_dict.get("product_type", "energy"),
         opening_hours=rr.rrule(
             freq=freq,
             interval=interval,
@@ -328,19 +328,21 @@ def make_market_config(
             until=end,
             cache=True,
         ),
-        opening_duration=pd.Timedelta(market_params["opening_duration"]),
-        market_mechanism=market_params["market_mechanism"],
-        maximum_bid_volume=market_params.get("maximum_bid_volume", 1e6),
-        maximum_bid_price=market_params.get("maximum_bid_price", 3000),
-        minimum_bid_price=market_params.get("minimum_bid_price", -3000),
-        maximum_gradient=market_params.get("max_gradient"),
-        volume_unit=market_params.get("volume_unit", "MW"),
-        volume_tick=market_params.get("volume_tick"),
-        price_unit=market_params.get("price_unit", "€/MWh"),
-        price_tick=market_params.get("price_tick"),
-        additional_fields=market_params.get("additional_fields", []),
-        supports_get_unmatched=market_params.get("supports_get_unmatched", False),
-        param_dict=market_params.get("param_dict", {}),
+        opening_duration=pd.Timedelta(market_config_dict["opening_duration"]),
+        market_mechanism=market_config_dict["market_mechanism"],
+        maximum_bid_volume=market_config_dict.get("maximum_bid_volume", 1e6), # TODO: there are multiple defaults
+        maximum_bid_price=market_config_dict.get("maximum_bid_price", 3000),
+        minimum_bid_price=market_config_dict.get("minimum_bid_price", -3000),
+        maximum_gradient=market_config_dict.get("max_gradient"),
+        volume_unit=market_config_dict.get("volume_unit", "MW"),
+        volume_tick=market_config_dict.get("volume_tick"),
+        price_unit=market_config_dict.get("price_unit", "€/MWh"),
+        price_tick=market_config_dict.get("price_tick"),
+        additional_fields=market_config_dict.get("additional_fields", []),
+        supports_get_unmatched=market_config_dict.get("supports_get_unmatched", False),
+        param_dict=market_config_dict.get("param_dict", {}),
+        learning_config=market_config_dict.get("learning_config"),
+        market_strategy=market_config_dict.get("market_strategy"),
     )
 
     return market_config
@@ -589,7 +591,7 @@ def load_config_and_create_forecaster(
         buses=buses,
         lines=lines,
         fuel_prices=fuel_prices_df,
-        market_configs=config["markets_config"],
+        market_configs=config["markets_config"], # TODO: is the additional learning_config doing any harm?
         forecasts=forecasts_df,
         demand=demand_df,
         availability=availability,
@@ -790,32 +792,73 @@ def setup_world(
             "The 'learning_mode' parameter in the top-level of the config.yaml has been moved to 'learning_config'. "
             "Please adjust your config file accordingly."
         )
-
+    # TODO: multi-level learning dicts (*first* here, then in world.setup())
     # handle initial learning parameters before learning_role exists
-    learning_dict = config.get("learning_config", {})
-    # those settings need to be overridden before passing to the LearningConfig
-    if learning_dict:
-        # make sure that continue_learning implies learning_mode
-        if learning_dict.get("continue_learning"):
-            learning_dict["learning_mode"] = True
-        # determined by learning loop in run_learning()
-        learning_dict["evaluation_mode"] = evaluation_mode
+    shared_learning_dict = config.get("learning_config", {})
+
+    # Collect per-level learning configs: units_config and market-level
+    learning_levels = {}
+
+    # Unit-level learning config from units_config section
+    units_config = config.get("units_config", {})
+    units_lc = units_config.get("learning_config", {})
+    if units_lc:
+        learning_levels["units"] = dict(units_lc)
+
+    # Market-level learning config(s) from each market's learning_config
+    for market_id, market_cfg in config.get("markets_config", {}).items():
+        market_lc = market_cfg.get("learning_config")
+        if market_lc:
+            learning_levels["markets"] = dict(market_lc)
+            break  # currently supporting one market-level learner
+
+    # Apply override logic to each level's dict
+    for level_name, level_dict in learning_levels.items():
+        if level_dict.get("continue_learning"):
+            level_dict["learning_mode"] = True
+        level_dict["evaluation_mode"] = evaluation_mode
 
         if terminate_learning:
-            learning_dict["learning_mode"] = False
-            learning_dict["evaluation_mode"] = False
+            level_dict["learning_mode"] = False
+            level_dict["evaluation_mode"] = False
 
-        # default path for saving trained policies is set here because
-        # a) depends on the simulation_id
-        # b) it is set relative to inputs_path in replace_paths() below
-        # TODO: sind learning config level specific, cannot be checked here 
-        if not learning_dict.get("trained_policies_save_path"):
-            learning_dict["trained_policies_save_path"] = (
+        if not level_dict.get("trained_policies_save_path"):
+            level_dict["trained_policies_save_path"] = (
                 f"learned_strategies/{simulation_id}"
             )
 
-    # learning mode always needed for reading units below
-    learning_mode = learning_dict.get("learning_mode", False)
+    # Determine overall learning_mode from any level being active
+    learning_mode = any(
+        ld.get("learning_mode", False) for ld in learning_levels.values()
+    )
+
+    # Build a flat learning_dict for backward compat (used by world.setup)
+    # If multi-level, we pass the structured data; if single-level, fall back to old behavior
+    if learning_levels:
+        # Pass the multi-level structure to world.setup()
+        learning_dict = {
+            "shared": shared_learning_dict,
+            "levels": learning_levels,
+            "learning_mode": learning_mode,
+            "evaluation_mode": evaluation_mode,
+        }
+    else:
+        # Backward compat: single flat learning_dict (old-style config)
+        learning_dict = shared_learning_dict
+        if learning_dict:
+            if learning_dict.get("continue_learning"):
+                learning_dict["learning_mode"] = True
+            learning_dict["evaluation_mode"] = evaluation_mode
+
+            if terminate_learning:
+                learning_dict["learning_mode"] = False
+                learning_dict["evaluation_mode"] = False
+
+            if not learning_dict.get("trained_policies_save_path"):
+                learning_dict["trained_policies_save_path"] = (
+                    f"learned_strategies/{simulation_id}"
+                )
+        learning_mode = learning_dict.get("learning_mode", False)
 
     # all paths should be relative to the inputs_path
     config = replace_paths(config, scenario_data["path"])
@@ -827,7 +870,7 @@ def setup_world(
         end=end,
         save_frequency_hours=save_frequency_hours,
         simulation_id=simulation_id,
-        learning_dict=learning_dict,
+        learning_dict=learning_dict, # TODO: multi-level learning dicts
         episode=episode,
         eval_episode=eval_episode,
         bidding_params=bidding_params,
@@ -836,10 +879,10 @@ def setup_world(
 
     # get the market config from the config file and add the markets
     logger.info("Adding markets")
-    for market_id, market_params in config["markets_config"].items():
-        market_config = make_market_config(
+    for market_id, market_config_dict in config["markets_config"].items():
+        market_config = make_market_config( # TODO: move up?
             id=market_id,
-            market_params=market_params,
+            market_config_dict=market_config_dict,
             world_start=start,
             world_end=end,
         )
@@ -847,7 +890,7 @@ def setup_world(
             grid_data = read_grid(market_config.param_dict["network_path"])
             market_config.param_dict["grid_data"] = grid_data
 
-        operator_id = str(market_params["operator"])
+        operator_id = str(market_config_dict["operator"])
         if operator_id not in world.market_operators:
             world.add_market_operator(id=operator_id)
 
@@ -944,7 +987,7 @@ def setup_world(
     if (
         world.learning_mode
         and world.learning_role is not None
-        and len(world.learning_role.rl_strats) == 0
+        and not any(world.learning_role.rl_strats[level] for level in world.learning_role.levels)
     ):
         raise ValueError("No RL units/strategies were provided!")
 
@@ -1084,11 +1127,11 @@ def run_learning(
     world.export_csv_path = ""
 
     # initialize policies already here to set the obs_dim and act_dim in the learning role
-    world.learning_role.rl_algorithm.initialize_policy()
+    world.learning_role.initialize_policy()
 
     # check if we already stored policies for this simulation
-    save_path = world.learning_role.learning_config.trained_policies_save_path
-    continue_learning = world.learning_role.learning_config.continue_learning
+    save_path = world.learning_role.shared_config.trained_policies_save_path
+    continue_learning = world.learning_role.shared_config.continue_learning
     confirm_learning_save_path(save_path, continue_learning)
 
     # also remove tensorboard logs
@@ -1099,35 +1142,49 @@ def run_learning(
     # -----------------------------------------
     # Information that needs to be stored across episodes, aka one simulation run
     inter_episodic_data = {
-        "buffer": ReplayBuffer(
-            buffer_size=world.learning_role.learning_config.replay_buffer_size,
-            obs_dim=world.learning_role.rl_algorithm.obs_dim,
-            act_dim=world.learning_role.rl_algorithm.act_dim,
-            n_rl_units=len(world.learning_role.rl_strats),
-            device=world.learning_role.device,
-            float_type=world.learning_role.float_type,
-        ),
-        "actors_and_critics": None,
+        "episodes_done": 0,
+        "eval_episodes_done": 0,
         "max_eval": defaultdict(lambda: -1e9),
         "all_eval": defaultdict(list),
         "avg_all_eval": [],
-        "episodes_done": 0,
-        "eval_episodes_done": 0,
+        "buffer": {},
+        "actors_and_critics": None,
     }
+
+    for level in world.learning_role.active_levels:
+        algo = world.learning_role.rl_algorithm[level]
+        inter_episodic_data["buffer"][level] = ReplayBuffer(
+            buffer_size=world.learning_role.learning_config[level].replay_buffer_size,
+            obs_dim=algo.obs_dim,
+            act_dim=algo.act_dim,
+            n_rl_units=len(world.learning_role.rl_strats[level]),
+            device=world.learning_role.device,
+            float_type=world.learning_role.float_type,
+        )
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
 
     validation_interval = world.learning_role.determine_validation_interval()
 
-    # sync train frequency with simulation horizon once at the beginning of training and overwrite scenario data
-    world.scenario_data["config"]["learning_config"]["train_freq"] = (
-        world.learning_role.sync_train_freq_with_simulation_horizon()
-    )
+    # sync train frequency with simulation horizon once at the beginning of training
+    train_freq_per_level = world.learning_role.sync_train_freq_with_simulation_horizon()
+    # Write back per-level train_freq into scenario data config
+    for level, freq in train_freq_per_level.items():
+        if freq is not None:
+            if level == "units" and "units_config" in world.scenario_data["config"]:
+                world.scenario_data["config"]["units_config"].setdefault("learning_config", {})["train_freq"] = freq
+            elif level == "markets":
+                for mkt_id, mkt_cfg in world.scenario_data["config"].get("markets_config", {}).items():
+                    if "learning_config" in mkt_cfg:
+                        mkt_cfg["learning_config"]["train_freq"] = freq
 
     eval_episode = 1
 
+    training_episodes = world.learning_role.shared_config.training_episodes
+    episodes_collecting = world.learning_role.shared_config.episodes_collecting_initial_experience # TODO: move to level-wise
+
     for episode in tqdm(
-        range(1, world.learning_role.learning_config.training_episodes + 1),
+        range(1, training_episodes + 1),
         desc="Training Episodes",
     ):
         # -----------------------------------------
@@ -1152,8 +1209,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            >= world.learning_role.learning_config.episodes_collecting_initial_experience
-            + validation_interval
+            >= episodes_collecting + validation_interval
         ):
             world.reset()
 
@@ -1198,14 +1254,12 @@ def run_learning(
         world.reset()
 
         # save the policies after each episode in case the simulation is stopped or crashes
-        if (
-            episode
-            >= world.learning_role.learning_config.episodes_collecting_initial_experience
-            + validation_interval
-        ):
-            world.learning_role.rl_algorithm.save_params(
-                directory=f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
-            )
+        if episode >= episodes_collecting + validation_interval:
+            for level in world.learning_role.active_levels:
+                cfg = world.learning_role.learning_config[level]
+                world.learning_role.rl_algorithm[level].save_params(
+                    directory=f"{cfg.trained_policies_save_path}/last_policies"
+                )
 
     # container shutdown implicitly with new initialisation
     logger.info("################")
@@ -1214,10 +1268,24 @@ def run_learning(
 
     world.reset()
 
-    # latest policies for final simulation run
-    world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
-        f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
-    )
+    # latest policies for final simulation run — write back per-level load paths
+    for level in world.learning_role.active_levels:
+        cfg = world.learning_role.learning_config[level]
+        load_path = f"{cfg.trained_policies_save_path}/last_policies"
+        if level == "units" and "units_config" in world.scenario_data["config"]:
+            world.scenario_data["config"]["units_config"].setdefault("learning_config", {})["trained_policies_load_path"] = load_path
+        elif level == "markets":
+            for mkt_id, mkt_cfg in world.scenario_data["config"].get("markets_config", {}).items():
+                if "learning_config" in mkt_cfg:
+                    mkt_cfg["learning_config"]["trained_policies_load_path"] = load_path
+    # Also write a fallback for old-style flat config
+    if "learning_config" in world.scenario_data["config"]:
+        first_level = world.learning_role.active_levels[0] if world.learning_role.active_levels else None
+        if first_level:
+            cfg = world.learning_role.learning_config[first_level]
+            world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
+                f"{cfg.trained_policies_save_path}/last_policies"
+            )
 
     # load scenario for evaluation
     setup_world(

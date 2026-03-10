@@ -143,6 +143,8 @@ class MarketConfig:
     eligible_obligations_lambda: eligible_lambda = lambda x: True
     param_dict: dict = field(default_factory=dict)
     addr: AgentAddress | None = None
+    learning_config: dict | None = None
+    market_strategy: str | None = None
 
 
 class OpeningMessage(TypedDict):

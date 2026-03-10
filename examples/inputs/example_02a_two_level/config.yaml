@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 tiny:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-01 02:00
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-02 00:00
   time_step: 1h
   save_frequency_hours: null
   seed: null
@@ -40,7 +40,7 @@ tiny:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 00:00
+      start_date: 2019-03-01 00:00
       products:
         - duration: 1h
           count: 1
@@ -53,7 +53,7 @@ tiny:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-      market_strategy: learn_max_bid_price # TODO: where? and without learning default None?
+      market_strategy: market_learning
       learning_config:
         learning_mode: true
         continue_learning: false
@@ -62,7 +62,7 @@ tiny:
         max_bid_price: 100
         algorithm: matd3
         learning_rate: 0.001
-        train_freq: 2h # only one time at the end of the episode (?)
+        train_freq: 24h # only one time at the end of the episode (?)
         gradient_steps: 24
         batch_size: 64
         gamma: 0.99

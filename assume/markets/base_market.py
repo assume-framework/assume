@@ -101,6 +101,7 @@ class MarketRole(MarketMechanism, Role):
         self.open_auctions = set()
         self.all_orders = []
         self.results = []
+        self.learning_strategy = None
         if marketconfig.price_tick:
             if marketconfig.maximum_bid_price % marketconfig.price_tick != 0:
                 logger.warning(
@@ -208,10 +209,12 @@ class MarketRole(MarketMechanism, Role):
             self.context.subscribe_message(
                 self, self.handle_get_unmatched, accept_get_unmatched
             )
-            
-        self.learning_startegies.adjust_market_config()
 
     def on_ready(self):
+        # If a market learning strategy is set, adjust market config at episode start
+        if self.learning_strategy is not None:
+            self.learning_strategy.adjust_market_config()
+
         current = timestamp2datetime(self.context.current_timestamp)
         next_opening = self.marketconfig.opening_hours.after(current, inc=True)
         opening_ts = datetime2timestamp(next_opening)
