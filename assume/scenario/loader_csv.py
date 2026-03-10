@@ -19,6 +19,7 @@ from tqdm import tqdm
 from assume.common.exceptions import AssumeException
 from assume.common.forecast_initialisation import ForecastInitialisation
 from assume.common.forecaster import (
+    BaseForecaster,
     BuildingForecaster,
     CustomUnitForecaster,
     DemandForecaster,
@@ -598,6 +599,13 @@ def load_config_and_create_forecaster(
     unit_forecasts: dict[str, UnitForecaster] = {}
     market_prices, residual_loads = initializer.calculate_market_forecasts()
     congestion_signal, renewable_utilization = initializer.calc_node_forecasts()
+    # create forecaster for all maarkets
+    if config["markets_config"]["product_type"] == "energy":
+            market_forecaster = BaseForecaster(
+                index=index,
+                market_prices=market_prices,
+                residual_load=residual_loads,
+            )
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
@@ -704,6 +712,7 @@ def load_config_and_create_forecaster(
         "exchange_units": exchange_units,
         "dsm_units": dsm_units,
         "unit_forecasts": unit_forecasts,
+        "market_forecaster": market_forecaster,
         "index": index,
     }
 
@@ -799,6 +808,7 @@ def setup_world(
         # default path for saving trained policies is set here because
         # a) depends on the simulation_id
         # b) it is set relative to inputs_path in replace_paths() below
+        # TODO: sind learning config level specific, cannot be checked here 
         if not learning_dict.get("trained_policies_save_path"):
             learning_dict["trained_policies_save_path"] = (
                 f"learned_strategies/{simulation_id}"

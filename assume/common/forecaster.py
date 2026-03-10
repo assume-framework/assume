@@ -11,7 +11,44 @@ ForecastIndex: TypeAlias = FastIndex | pd.DatetimeIndex | pd.Series
 ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 
 
-class UnitForecaster:
+class BaseForecaster:
+    """
+    A generalized forecaster for units
+
+    Attributes:
+        index (ForecastIndex): the index of all forecast series in this unit
+        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
+    """
+    
+    def __init__(
+        self,
+        index: ForecastIndex,
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
+    ):
+        if not isinstance(index, FastIndex):
+            index = FastIndex(start=index[0], end=index[-1], freq=pd.infer_freq(index))
+        if market_prices is None:
+            market_prices = {"EOM": 50}  # default value for tests
+        if residual_load is None:
+            residual_load = {}
+        self.index: FastIndex = index
+        self.price = self._dict_to_series(market_prices)
+        self.residual_load = self._dict_to_series(residual_load)
+
+    def _to_series(self, item: ForecastSeries) -> FastSeries:
+        if isinstance(item, FastSeries):
+            return item
+        return FastSeries(index=self.index, value=item)
+
+    def _dict_to_series(self, d: dict[str, ForecastSeries]) -> dict[str, FastSeries]:
+        result: dict[str, FastSeries] = {}
+        for key, value in d.items():
+            result[key] = self._to_series(value)
+        return result
+
+class UnitForecaster(BaseForecaster):
     """
     A generalized forecaster for units
 

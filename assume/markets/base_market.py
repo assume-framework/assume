@@ -208,6 +208,8 @@ class MarketRole(MarketMechanism, Role):
             self.context.subscribe_message(
                 self, self.handle_get_unmatched, accept_get_unmatched
             )
+            
+        self.learning_startegies.adjust_market_config()
 
     def on_ready(self):
         current = timestamp2datetime(self.context.current_timestamp)
@@ -727,6 +729,10 @@ class MarketRole(MarketMechanism, Role):
 
         if flows is not None and len(flows) > 0:
             await self.store_flows(flows)
+
+        # if learning strats is no null
+         
+        self.learning_startegies.calculate_reward(self)
 
         return accepted_orderbook, market_meta
 

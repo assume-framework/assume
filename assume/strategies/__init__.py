@@ -103,6 +103,8 @@ try:
         StorageEnergyLearningStrategy,
         RenewableEnergyLearningSingleBidStrategy,
     )
+    
+    from assume.strategies.market_strategies import MarketLearningMaxPriceStrategy
 
     deprecated_bidding_strategies["pp_learning"] = EnergyLearningStrategy
     deprecated_bidding_strategies["storage_learning"] = StorageEnergyLearningStrategy
@@ -119,7 +121,7 @@ try:
     bidding_strategies["renewable_energy_learning_single_bid"] = (
         RenewableEnergyLearningSingleBidStrategy
     )
-
+    bidding_strategies["market_learning"] = MarketLearningMaxPriceStrategy
 
 except ImportError:
     pass

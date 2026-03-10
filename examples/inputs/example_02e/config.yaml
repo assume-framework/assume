@@ -8,7 +8,7 @@ base:
   time_step: 1h
   save_frequency_hours: null
   seed: null
-  learning_config:
+  shared_learning_config:
 	    training_episodes: 100
 	    device: cpu
 	    validation_episodes_interval: 5
@@ -22,23 +22,6 @@ base:
 	    trained_policies_load_path: null
 	    max_bid_price: 100
 	    algorithm: MATD3
-	    learning_rate: 0.001
-	    train_freq: 100h
-	    gradient_steps: 10
-	    batch_size: 128
-	    gamma: 0.99
-	    action_noise_schedule: linear
-	    noise_sigma: 0.1
-	    noise_scale: 1
-	    noise_dt: 1
-  units_operator_config:
-  	learning_config:
-	    learning_mode: true
-	    continue_learning: false
-	    trained_policies_save_path: null
-	    trained_policies_load_path: null
-	    max_bid_price: 100
-	    algorithm: matd3
 	    learning_rate: 0.001
 	    train_freq: 100h
 	    gradient_steps: 10
@@ -65,3 +48,20 @@ base:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
+      learning_config:
+        learning_mode: true
+        continue_learning: false
+        strategy: market_learning
+        trained_policies_save_path: null
+        trained_policies_load_path: null
+        max_bid_price: 100
+        algorithm: matd3
+        learning_rate: 0.001
+        train_freq: 100h
+        gradient_steps: 10
+        batch_size: 128
+        gamma: 0.99
+        action_noise_schedule: linear
+        noise_sigma: 0.1
+        noise_scale: 1
+        noise_dt: 1

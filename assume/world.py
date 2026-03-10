@@ -223,6 +223,7 @@ class World:
         self.start = start
         self.end = end
 
+        # TODO: handel multi-leve  learning config  muss zusammengeführt werden heir irgendwie
         if not learning_dict:
             self.learning_config: LearningConfig = None
         else:
@@ -578,6 +579,59 @@ class World:
             bidding_strategies[market_id] = strategy_instances[strategy]
 
         return bidding_strategies
+    
+    def _prepare_market_strategies(self, market_operator, market_id,  forecaster: UnitForecaster,):
+        """
+        Prepare market learning strategies for the market on the specified parameters.
+
+        Args:
+            market_operator (MarketOperator): The market operator.
+            market_id (str): The identifier for the market.
+
+        Returns:
+            dict[str, BaseStrategy | UnitOperatorStrategy]: The market learning strategies for the market.
+        """
+        market_strategies = {}
+        strategy_instances = {}  # Cache to store created instances
+
+        # check if makret config has entry learning_config
+        if not self.markets[market_id].learning_config:
+            pass
+        #learning_config is present in the market config indicating that we want to have a market learning strategy for this market
+        else:
+            strategy = self.markets[market_id].learning_config.strategy
+            if strategy not in self.bidding_strategies:
+                # raise a deprecated warning for learning_advanced_orders
+                raise ValueError(
+                    f"""Market strategy {strategy} not registered. Please check the name of
+                        the bidding strategy or register the bidding strategy in the world.bidding_strategies dict."""
+                )
+
+
+            if strategy not in strategy_instances:
+                # check if created cache has learning_strategy
+                if issubclass(self.bidding_strategies[strategy], LearningStrategy):
+                    # add learning role to the strategy to have access to store training data etc
+                    if self.learning_config is None:
+                        raise ValueError(
+                            f"Learning strategy '{strategy}' requires a configured 'learning_config', but none was set. "
+                            "Specify learning_config in config.yaml."
+                        )
+                    # TODO: what are bidding_params 
+                    strategy_instances[strategy] = self.bidding_strategies[strategy](
+                        market_id=market_id,
+                        # give learning role to register expereicne etc
+                        learning_role=self.learning_role,
+                        **bidding_params,
+                    )
+                    
+                    market_operator.forecaster= self.scenario_data.market_forecast
+
+
+            # Use the cached instance for this market
+            bidding_strategies[market_id] = strategy_instances[strategy]
+
+        return bidding_strategies
 
     def _validate_unit_addition(self, id, unit_type, unit_operator_id):
         """
@@ -669,10 +723,15 @@ class World:
                 f"World start: {self.start}, end: {self.end}.)"
             )
             raise ValueError(msg)
+        
+
 
         market_operator.add_role(market_role)
+        
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.market_id}"] = market_config
+        
+        self._prepare_market_strategies(market_operator, market_config.market_id)
 
     def _validate_setup(self):
         """Validate the consistency of the world configuration and fail early."""

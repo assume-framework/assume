@@ -34,12 +34,6 @@ class TorchLearningStrategy(LearningStrategy):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.unit_id = kwargs["unit_id"]
-
-        # defines bounds of actions space
-        self.min_bid_price = self.learning_config.min_bid_price
-        self.max_bid_price = self.learning_config.max_bid_price
-
         # tells us whether we are training the agents or just executing per-learning strategies
         self.learning_mode = self.learning_config.learning_mode
         self.evaluation_mode = self.learning_config.evaluation_mode
@@ -113,6 +107,24 @@ class TorchLearningStrategy(LearningStrategy):
         self.actor.load_state_dict(params["actor"])
         self.actor.eval()  # set the actor to evaluation mode
 
+
+
+
+class TorchUnitLearningStrategy(TorchLearningStrategy):
+    """
+    A strategy to enable machine learning with pytorch.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.unit_id = kwargs["unit_id"]
+
+        # defines bounds of actions space
+        self.min_bid_price = self.learning_config.min_bid_price
+        self.max_bid_price = self.learning_config.max_bid_price
+
+        
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
         # Note: These scaling factors could be interpreted as information leakage. However as we are in a simulation environment and not a purley forecasting setting
