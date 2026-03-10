@@ -1,0 +1,8 @@
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,unit_operator
+pp_1,nuclear,powerplant_energy_naive,uranium,0.0,1000,1,0.36,10.0,Operator 1
+pp_2,nuclear,powerplant_energy_naive,uranium,0,1000,1,0.36,10,Operator 1
+pp_3,lignite,powerplant_energy_naive,lignite,0.406,1000,1,0.41,2.0,Operator 1
+pp_4,hard coal,powerplant_energy_naive,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_5,hard coal,powerplant_energy_naive,hard coal,0.335,1000,1,0.48,1.0,Operator 1
+pp_6,combined cycle gas turbine,powerplant_energy_learning,natural gas,0.201,2500,1,0.60,4.0,Operator-RL
+pp_7,combined cycle gas turbine,powerplant_energy_naive,natural gas,0.201,5000,1,0.60,34.0,Operator 1
