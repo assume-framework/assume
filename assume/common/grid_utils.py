@@ -273,6 +273,8 @@ def read_pypsa_grid(
         network.add("Bus", buses.index, **buses)
 
     def add_lines(network: pypsa.Network, lines: pd.DataFrame) -> None:
+        if lines is None or len(lines) == 0:
+            return
         network.add("Line", lines.index, **lines)
 
     def add_links(network: pypsa.Network, links: pd.DataFrame) -> None:
@@ -290,7 +292,7 @@ def read_pypsa_grid(
         if "efficiency" not in links_c.columns:
             links_c["efficiency"] = 1.0
         if "p_min_pu" not in links_c.columns:
-            links_c["p_min_pu"] = 0.0
+            links_c["p_min_pu"] = -1.0
         if "p_max_pu" not in links_c.columns:
             links_c["p_max_pu"] = 1.0
         if "carrier" not in links_c.columns:
@@ -302,7 +304,7 @@ def read_pypsa_grid(
     add_buses(network, grid_dict["buses"])
     add_lines(network, grid_dict["lines"])
     add_links(network, grid_dict.get("links"))
-    network.add("Carrier", "AC")
+    # network.add("Carrier", "AC")
     return network
 
 
