@@ -660,8 +660,7 @@ class GenericStorage:
         model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
         model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
         model_block.initial_soc = pyo.Param(
-            initialize=self.initial_soc * self.max_capacity
-        )
+            initialize=self.initial_soc)
         model_block.storage_loss_rate = pyo.Param(initialize=self.storage_loss_rate)
 
         # Define variables
@@ -2525,6 +2524,973 @@ class Kiln:
 
         return model_block
 
+class DigestateSeparation:
+    """
+    Digestate separation / dewatering / solid-liquid split.
+
+    Control variable:
+        power_in[t]  (MW)
+
+    Material throughput is linked to electricity:
+        feed_in[t] = power_in[t] / specific_electricity     (if specific_electricity > 0)
+
+    Material flows (t/h):
+        feed_in  ->  solid_out (to dryer)  +  liquid_out (export / waste)
+
+    Ramping + min up/down:
+        Uses add_ramping_constraints() and add_min_up_down_time_constraints()
+        which act on power_in[t].
+    """
+
+    def __init__(
+        self,
+        # sizing
+        max_feed_in: float,  # [t/h] cap (wet feed to separator)
+        solid_share: float,  # [-] mass fraction to solid outlet
+        time_steps: list[int],
+        # operations / electricity coupling
+        specific_electricity: float,  # [MWh_el per t_wet_feed]; must be > 0 to use power-based control
+        # ramping on power_in
+        ramp_up: float | None = None,    # [MW/step]
+        ramp_down: float | None = None,  # [MW/step]
+        # on/off (via helper, on power_in)
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        # economics (optional)
+        liquid_disposal_cost: float = 0.0,  # [EUR per t_liquid]
+        name: str = "digestate_separation",
+    ):
+        super().__init__()
+        self.time_steps = time_steps
+
+        self.max_feed_in = max_feed_in
+        self.solid_share = solid_share
+        assert 0.0 <= self.solid_share <= 1.0
+
+        # For helper-based ramping, we need a meaningful power_in variable.
+        # Therefore, specific_electricity must be > 0.
+        self.spec_el = specific_electricity
+        if self.spec_el <= 0:
+            raise ValueError(
+                "DigestateSeparation: specific_electricity must be > 0 when using power-based ramping/on-off helpers."
+            )
+
+        # Derive max_power from max_feed_in and specific electricity (MW):
+        # [MWh/t] * [t/h] = [MW]
+        self.max_power = self.max_feed_in * self.spec_el
+        self.min_power = 0.0  # separator can be off; keep 0 unless you want a technical minimum load
+
+        self.rup = self.max_power if ramp_up is None else ramp_up
+        self.rdn = self.max_power if ramp_down is None else ramp_down
+
+        self.min_up = min_operating_steps
+        self.min_dn = min_down_steps
+        self.init_on = initial_operational_status
+
+        self.liquid_disposal_cost = liquid_disposal_cost
+        self.name = name
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+
+        # price stream present?
+        if not hasattr(model, "electricity_price"):
+            raise ValueError("DigestateSeparation requires electricity_price.")
+
+        # params
+        model_block.max_feed_in = pyo.Param(initialize=self.max_feed_in)
+        model_block.solid_share = pyo.Param(
+            initialize=self.solid_share, within=pyo.UnitInterval
+        )
+        model_block.specific_electricity = pyo.Param(initialize=self.spec_el)
+
+        # helper-required params (power-based)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.ramp_up = pyo.Param(initialize=self.rup)
+        model_block.ramp_down = pyo.Param(initialize=self.rdn)
+
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_up)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_dn)
+        model_block.initial_operational_status = pyo.Param(initialize=self.init_on)
+
+        model_block.liquid_disposal_cost = pyo.Param(initialize=self.liquid_disposal_cost)
+
+        # vars
+        # power is the actuated variable (helpers act here)
+        model_block.power_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, self.max_power),
+        )
+
+        # material streams (t/h)
+        model_block.feed_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, self.max_feed_in),
+        )
+        model_block.solid_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.liquid_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
+
+        # --- link material throughput to power ---
+        @model_block.Constraint(self.time_steps)
+        def feed_from_power(b, t):
+            # power_in = specific_electricity * feed_in  -> feed_in = power_in / specific_electricity
+            return b.power_in[t] == b.feed_in[t] * b.specific_electricity
+
+        # --- material split ---
+        @model_block.Constraint(self.time_steps)
+        def solid_split(b, t):
+            return b.solid_out[t] == b.feed_in[t] * b.solid_share
+
+        @model_block.Constraint(self.time_steps)
+        def liquid_split(b, t):
+            return b.liquid_out[t] == b.feed_in[t] * (1 - b.solid_share)
+
+        @model_block.Constraint(self.time_steps)
+        def mass_balance(b, t):
+            return b.feed_in[t] == b.solid_out[t] + b.liquid_out[t]
+
+        # --- apply generic operational constraints (your helpers) ---
+        add_ramping_constraints(model_block, self.time_steps)
+        add_min_up_down_time_constraints(model_block, self.time_steps)
+
+        # --- operating cost ---
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_rule(b, t):
+            cost = 0
+            cost += b.power_in[t] * model.electricity_price[t]
+            if self.liquid_disposal_cost != 0.0:
+                cost += b.liquid_out[t] * b.liquid_disposal_cost
+            return b.operating_cost[t] == cost
+
+        return model_block
+
+class Dryer:
+    """
+    Fuel-switchable dryer for solid digestate.
+
+    Material flows (t/h):
+        wet_in  ->  dry_out (to TCR)  +  water_removed (export / waste)
+
+    Moisture relation (mass fractions):
+        dry_out = wet_in * (1 - w_in) / (1 - w_target)
+        water_removed = wet_in - dry_out
+
+    Thermal duty:
+        heat_out = specific_heat_per_t_water * water_removed
+        (MWh_th/t_water * t_water/h = MW_th)
+
+    Supply modes:
+      - fuel_type = "electricity":
+            heat_out = eta_electric * power_in
+      - fuel_type = "natural_gas":
+            heat_out = eta_ng * natural_gas_in
+      - fuel_type = "both":
+            heat_out = eta_electric * power_in + eta_ng * natural_gas_in
+
+    Includes on/off, ramping on heat_out, and optional min up/down time.
+    """
+
+    def __init__(
+        self,
+        # sizing
+        max_wet_in: float,  # [t/h] wet inlet cap
+        time_steps: list[int],
+        # moisture
+        moisture_in: float,      # [-] water fraction in wet_in
+        moisture_target: float,  # [-] water fraction in dry_out
+        # thermal requirement
+        specific_heat_per_t_water: float,  # [MWh_th per t_water_removed]
+        # operations (fuel switching)
+        fuel_type: str = "electricity",  # "electricity" | "natural_gas" | "both"
+        eta_electric: float = 0.95,      # [-] electric-to-heat effectiveness
+        eta_ng: float = 0.90,            # [-] NG burner effectiveness
+        max_power: float | None = None,  # [MW_e] cap if electric present
+        max_ng_in: float | None = None,  # [MW_th] cap if NG present
+        ramp_up: float | None = None,    # [MW_th/step] on heat_out
+        ramp_down: float | None = None,  # [MW_th/step] on heat_out
+        # on/off
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        # economics (optional)
+        water_disposal_cost: float = 0.0,  # [EUR per t_water_removed]
+        name: str = "dryer",
+    ):
+        super().__init__()
+        self.time_steps = time_steps
+
+        self.max_wet_in = max_wet_in
+
+        self.w_in = moisture_in
+        self.w_tar = moisture_target
+        assert 0.0 <= self.w_in < 1.0
+        assert 0.0 <= self.w_tar < 1.0
+        if self.w_tar >= self.w_in:
+            raise ValueError("Dryer: moisture_target must be < moisture_in.")
+
+        self.q_w = specific_heat_per_t_water
+        if self.q_w <= 0:
+            raise ValueError("Dryer: specific_heat_per_t_water must be > 0.")
+
+        self.fuel_type = fuel_type.lower()
+        assert self.fuel_type in ["electricity", "natural_gas", "both"]
+
+        self.eta_electric = eta_electric
+        self.eta_ng = eta_ng
+
+        # worst-case water removal at max_wet_in (t/h)
+        # dry_out = wet_in*(1-w_in)/(1-w_tar)
+        # water_removed = wet_in - dry_out
+        max_water_removed = self.max_wet_in - self.max_wet_in * (1 - self.w_in) / (1 - self.w_tar)
+
+        # worst-case heat duty (MW_th)
+        self.max_heat_out = self.q_w * max_water_removed
+
+        # caps for inputs if present
+        self.max_power = (
+            max_power if max_power is not None else self.max_heat_out / max(1e-6, self.eta_electric)
+        )
+        self.max_ng_in = (
+            max_ng_in if max_ng_in is not None else self.max_heat_out / max(1e-6, self.eta_ng)
+        )
+
+        self.rup = self.max_heat_out if ramp_up is None else ramp_up
+        self.rdn = self.max_heat_out if ramp_down is None else ramp_down
+
+        self.min_up = min_operating_steps
+        self.min_dn = min_down_steps
+        self.init_on = initial_operational_status
+
+        self.water_disposal_cost = water_disposal_cost
+        self.name = name
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+
+        # price streams present?
+        if self.fuel_type in ["electricity", "both"] and not hasattr(model, "electricity_price"):
+            raise ValueError("Dryer requires electricity_price for electric operation.")
+        if self.fuel_type in ["natural_gas", "both"] and not hasattr(model, "natural_gas_price"):
+            raise ValueError("Dryer requires natural_gas_price for natural gas operation.")
+
+        # params
+        model_block.max_wet_in = pyo.Param(initialize=self.max_wet_in)
+        model_block.moisture_in = pyo.Param(initialize=self.w_in, within=pyo.UnitInterval)
+        model_block.moisture_target = pyo.Param(initialize=self.w_tar, within=pyo.UnitInterval)
+
+        model_block.specific_heat_per_t_water = pyo.Param(initialize=self.q_w)
+        model_block.max_heat_out = pyo.Param(initialize=self.max_heat_out)
+
+        model_block.eta_electric = pyo.Param(initialize=self.eta_electric)
+        model_block.eta_ng = pyo.Param(initialize=self.eta_ng)
+
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.max_ng_in = pyo.Param(initialize=self.max_ng_in)
+
+        model_block.ramp_up = pyo.Param(initialize=self.rup)
+        model_block.ramp_down = pyo.Param(initialize=self.rdn)
+
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_up)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_dn)
+        model_block.initial_operational_status = pyo.Param(initialize=self.init_on)
+
+        model_block.water_disposal_cost = pyo.Param(initialize=self.water_disposal_cost)
+
+        # vars (material)
+        model_block.wet_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_wet_in)
+        )
+        model_block.dry_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.water_removed = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+
+        # vars (energy)
+        model_block.heat_out = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_heat_out)
+        )
+        model_block.power_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
+        )
+        model_block.natural_gas_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_ng_in)
+        )
+
+        # cost + on/off
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
+        model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
+
+        # optional start/shutdown vars only if min up/down used
+        if self.min_up > 0 or self.min_dn > 0:
+            model_block.start_up = pyo.Var(self.time_steps, within=pyo.Binary)
+            model_block.shut_down = pyo.Var(self.time_steps, within=pyo.Binary)
+
+        # --- moisture / mass relations ---
+        @model_block.Constraint(self.time_steps)
+        def dry_mass_relation(b, t):
+            return b.dry_out[t] == b.wet_in[t] * (1 - b.moisture_in) / (1 - b.moisture_target)
+
+        @model_block.Constraint(self.time_steps)
+        def water_removed_def(b, t):
+            return b.water_removed[t] == b.wet_in[t] - b.dry_out[t]
+
+        # --- thermal duty driven by evaporation ---
+        @model_block.Constraint(self.time_steps)
+        def heat_duty(b, t):
+            # [MWh_th/t_water] * [t_water/h] = [MW_th]
+            return b.heat_out[t] == b.water_removed[t] * b.specific_heat_per_t_water
+
+        # --- heat balance by fuel mode ---
+        @model_block.Constraint(self.time_steps)
+        def heat_balance(b, t):
+            if self.fuel_type == "electricity":
+                return b.heat_out[t] == b.power_in[t] * b.eta_electric
+            elif self.fuel_type == "natural_gas":
+                return b.heat_out[t] == b.natural_gas_in[t] * b.eta_ng
+            elif self.fuel_type == "both":
+                return (
+                    b.heat_out[t]
+                    == b.power_in[t] * b.eta_electric + b.natural_gas_in[t] * b.eta_ng
+                )
+
+        # zero unused inputs in pure modes
+        if self.fuel_type == "electricity":
+
+            @model_block.Constraint(self.time_steps)
+            def zero_ng_when_electric(b, t):
+                return b.natural_gas_in[t] == 0
+
+        elif self.fuel_type == "natural_gas":
+
+            @model_block.Constraint(self.time_steps)
+            def zero_power_when_ng(b, t):
+                return b.power_in[t] == 0
+
+        # --- on/off binding on heat_out ---
+        @model_block.Constraint(self.time_steps)
+        def max_heat_if_on(b, t):
+            return b.heat_out[t] <= b.max_heat_out * b.operational_status[t]
+
+        # --- ramping on heat_out (MW_th/step), in your style ---
+        @model_block.Constraint(self.time_steps)
+        def heat_ramp_up(b, t):
+            if t == self.time_steps.at(1):
+                return pyo.Constraint.Skip
+            return b.heat_out[t] - b.heat_out[t - 1] <= b.ramp_up
+
+        @model_block.Constraint(self.time_steps)
+        def heat_ramp_down(b, t):
+            if t == self.time_steps.at(1):
+                return pyo.Constraint.Skip
+            return b.heat_out[t - 1] - b.heat_out[t] <= b.ramp_down
+
+        # --- min up/down time (only if requested) ---
+        if self.min_up > 0 or self.min_dn > 0:
+
+            @model_block.Constraint(self.time_steps)
+            def state_transition_rule(b, t):
+                if t == self.time_steps.at(1):
+                    return (
+                        b.operational_status[t] - model_block.initial_operational_status
+                        == b.start_up[t] - b.shut_down[t]
+                    )
+                else:
+                    return (
+                        b.operational_status[t] - b.operational_status[t - 1]
+                        == b.start_up[t] - b.shut_down[t]
+                    )
+
+            @model_block.Constraint(self.time_steps)
+            def prevent_simultaneous_startup_shutdown(b, t):
+                return b.start_up[t] + b.shut_down[t] <= 1
+
+        if self.min_up > 0:
+
+            @model_block.Constraint(self.time_steps)
+            def start_up_def_rule(b, t):
+                if t == self.time_steps.at(1):
+                    return b.start_up[t] >= b.operational_status[t] - model_block.initial_operational_status
+                else:
+                    return b.start_up[t] >= b.operational_status[t] - b.operational_status[t - 1]
+
+            @model_block.Constraint(self.time_steps)
+            def min_operating_time_constraint(b, t):
+                if t < model_block.min_operating_steps:
+                    return pyo.Constraint.Skip
+                return (
+                    sum(
+                        b.start_up[i]
+                        for i in range(t - model_block.min_operating_steps + 1, t + 1)
+                    )
+                    <= b.operational_status[t]
+                )
+
+        if self.min_dn > 0:
+
+            @model_block.Constraint(self.time_steps)
+            def shut_down_def_rule(b, t):
+                if t == self.time_steps.at(1):
+                    return b.shut_down[t] >= model_block.initial_operational_status - b.operational_status[t]
+                else:
+                    return b.shut_down[t] >= b.operational_status[t - 1] - b.operational_status[t]
+
+            @model_block.Constraint(self.time_steps)
+            def min_downtime_constraint(b, t):
+                if t < model_block.min_down_steps:
+                    return pyo.Constraint.Skip
+                return (
+                    sum(
+                        b.shut_down[i]
+                        for i in range(t - model_block.min_down_steps + 1, t + 1)
+                    )
+                    <= 1 - b.operational_status[t]
+                )
+
+        # --- cost ---
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_rule(b, t):
+            cost = 0
+            if self.fuel_type in ["electricity", "both"]:
+                cost += b.power_in[t] * model.electricity_price[t]
+            if self.fuel_type in ["natural_gas", "both"]:
+                cost += b.natural_gas_in[t] * model.natural_gas_price[t]
+            if self.water_disposal_cost != 0.0:
+                cost += b.water_removed[t] * b.water_disposal_cost
+            return b.operating_cost[t] == cost
+
+        return model_block
+
+class TCRBooster:
+    """
+    Thermo Catalytic Reforming (TCR) Booster: pyrolysis + post-reforming.
+
+    Material flows (t/h):
+        feed_in (dry) -> gas_out + oil_out + char_out + water_out
+
+    Product yields:
+        gas_out   = y_gas   * feed_in
+        oil_out   = y_oil   * feed_in
+        char_out  = y_char  * feed_in
+        water_out = y_water * feed_in
+        with y_* summing to 1 (recommended, use normalised yields)
+
+    Thermal requirement:
+        heat_out = specific_heat_demand * feed_in      [MWh_th/t * t/h = MW_th]
+
+    Supply modes:
+      - fuel_type = "electricity":
+            heat_out = eta_electric * power_in
+      - fuel_type = "natural_gas":
+            heat_out = eta_ng * natural_gas_in
+      - fuel_type = "both":
+            heat_out = eta_electric * power_in + eta_ng * natural_gas_in
+
+    Includes on/off, ramping on heat_out, and optional min up/down time.
+    """
+
+    def __init__(
+        self,
+        # sizing
+        max_feed_in: float,  # [t/h] dried feed cap
+        time_steps: list[int],
+        # yields on feed_in (mass basis; recommended to sum to 1)
+        yield_gas: float,
+        yield_oil: float,
+        yield_char: float,
+        yield_water: float,
+        # thermal requirement
+        specific_heat_demand: float,  # [MWh_th per t_feed]
+        # operations (fuel switching)
+        fuel_type: str = "electricity",  # "electricity" | "natural_gas" | "both"
+        eta_electric: float = 0.95,
+        eta_ng: float = 0.90,
+        max_power: float | None = None,  # [MW_e] cap if electric present
+        max_ng_in: float | None = None,  # [MW_th] cap if NG present
+        ramp_up: float | None = None,    # [MW_th/step] on heat_out
+        ramp_down: float | None = None,  # [MW_th/step] on heat_out
+        # on/off
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        # emissions (optional; include if you want energy CO2 here)
+        ng_co2_factor: float = 0.202,  # [tCO2/MWh_th]
+        # economics (optional product handling as negative costs is done at plant level; here just costs)
+        name: str = "tcr_booster",
+    ):
+        super().__init__()
+        self.time_steps = time_steps
+
+        self.max_feed_in = max_feed_in
+
+        # yields
+        self.y_gas = yield_gas
+        self.y_oil = yield_oil
+        self.y_char = yield_char
+        self.y_water = yield_water
+        for y in [self.y_gas, self.y_oil, self.y_char, self.y_water]:
+            if y < 0:
+                raise ValueError("TCRBooster: yields must be non-negative.")
+        # allow tiny numeric tolerance
+        if abs((self.y_gas + self.y_oil + self.y_char + self.y_water) - 1.0) > 1e-3:
+            raise ValueError("TCRBooster: yields should sum to 1 (use normalised yields).")
+
+        self.specific_heat_demand = specific_heat_demand
+        if self.specific_heat_demand <= 0:
+            raise ValueError("TCRBooster: specific_heat_demand must be > 0.")
+
+        self.fuel_type = fuel_type.lower()
+        assert self.fuel_type in ["electricity", "natural_gas", "both"]
+
+        self.eta_electric = eta_electric
+        self.eta_ng = eta_ng
+
+        # derived max heat duty
+        self.max_heat_out = self.max_feed_in * self.specific_heat_demand  # [MW_th]
+
+        # caps for inputs if present
+        self.max_power = (
+            max_power if max_power is not None else self.max_heat_out / max(1e-6, self.eta_electric)
+        )
+        self.max_ng_in = (
+            max_ng_in if max_ng_in is not None else self.max_heat_out / max(1e-6, self.eta_ng)
+        )
+
+        self.rup = self.max_heat_out if ramp_up is None else ramp_up
+        self.rdn = self.max_heat_out if ramp_down is None else ramp_down
+
+        self.min_up = min_operating_steps
+        self.min_dn = min_down_steps
+        self.init_on = initial_operational_status
+
+        self.ng_ef = ng_co2_factor
+        self.name = name
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+
+        # price streams present?
+        if self.fuel_type in ["electricity", "both"] and not hasattr(model, "electricity_price"):
+            raise ValueError("TCRBooster requires electricity_price for electric operation.")
+        if self.fuel_type in ["natural_gas", "both"] and not hasattr(model, "natural_gas_price"):
+            raise ValueError("TCRBooster requires natural_gas_price for natural gas operation.")
+        if not hasattr(model, "co2_price"):
+            raise ValueError("TCRBooster requires co2_price (for NG energy CO2 if enabled).")
+
+        # params
+        model_block.max_feed_in = pyo.Param(initialize=self.max_feed_in)
+        model_block.max_heat_out = pyo.Param(initialize=self.max_heat_out)
+        model_block.specific_heat_demand = pyo.Param(initialize=self.specific_heat_demand)
+
+        model_block.yield_gas = pyo.Param(initialize=self.y_gas)
+        model_block.yield_oil = pyo.Param(initialize=self.y_oil)
+        model_block.yield_char = pyo.Param(initialize=self.y_char)
+        model_block.yield_water = pyo.Param(initialize=self.y_water)
+
+        model_block.eta_electric = pyo.Param(initialize=self.eta_electric)
+        model_block.eta_ng = pyo.Param(initialize=self.eta_ng)
+
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.max_ng_in = pyo.Param(initialize=self.max_ng_in)
+
+        model_block.ramp_up = pyo.Param(initialize=self.rup)
+        model_block.ramp_down = pyo.Param(initialize=self.rdn)
+
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_up)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_dn)
+        model_block.initial_operational_status = pyo.Param(initialize=self.init_on)
+
+        model_block.ng_co2_factor = pyo.Param(initialize=self.ng_ef)
+
+        # vars (material)
+        model_block.feed_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_feed_in)
+        )
+        model_block.gas_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.oil_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.char_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.water_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+
+        # vars (energy)
+        model_block.heat_out = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_heat_out)
+        )
+        model_block.power_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_power)
+        )
+        model_block.natural_gas_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals, bounds=(0, self.max_ng_in)
+        )
+
+        # emissions + cost + on/off
+        model_block.co2_energy = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
+        model_block.operational_status = pyo.Var(self.time_steps, within=pyo.Binary)
+
+        if self.min_up > 0 or self.min_dn > 0:
+            model_block.start_up = pyo.Var(self.time_steps, within=pyo.Binary)
+            model_block.shut_down = pyo.Var(self.time_steps, within=pyo.Binary)
+
+        # --- product yields ---
+        @model_block.Constraint(self.time_steps)
+        def gas_yield(b, t):
+            return b.gas_out[t] == b.feed_in[t] * b.yield_gas
+
+        @model_block.Constraint(self.time_steps)
+        def oil_yield(b, t):
+            return b.oil_out[t] == b.feed_in[t] * b.yield_oil
+
+        @model_block.Constraint(self.time_steps)
+        def char_yield(b, t):
+            return b.char_out[t] == b.feed_in[t] * b.yield_char
+
+        @model_block.Constraint(self.time_steps)
+        def water_yield(b, t):
+            return b.water_out[t] == b.feed_in[t] * b.yield_water
+
+        # explicit mass balance (redundant but clear)
+        @model_block.Constraint(self.time_steps)
+        def mass_balance(b, t):
+            return b.feed_in[t] == b.gas_out[t] + b.oil_out[t] + b.char_out[t] + b.water_out[t]
+
+        # --- thermal duty ---
+        @model_block.Constraint(self.time_steps)
+        def heat_demand(b, t):
+            return b.heat_out[t] == b.feed_in[t] * b.specific_heat_demand
+
+        # --- heat balance by fuel mode ---
+        @model_block.Constraint(self.time_steps)
+        def heat_balance(b, t):
+            if self.fuel_type == "electricity":
+                return b.heat_out[t] == b.power_in[t] * b.eta_electric
+            elif self.fuel_type == "natural_gas":
+                return b.heat_out[t] == b.natural_gas_in[t] * b.eta_ng
+            elif self.fuel_type == "both":
+                return (
+                    b.heat_out[t]
+                    == b.power_in[t] * b.eta_electric + b.natural_gas_in[t] * b.eta_ng
+                )
+
+        # zero unused inputs in pure modes
+        if self.fuel_type == "electricity":
+
+            @model_block.Constraint(self.time_steps)
+            def zero_ng_when_electric(b, t):
+                return b.natural_gas_in[t] == 0
+
+        elif self.fuel_type == "natural_gas":
+
+            @model_block.Constraint(self.time_steps)
+            def zero_power_when_ng(b, t):
+                return b.power_in[t] == 0
+
+        # --- on/off binding on heat_out ---
+        @model_block.Constraint(self.time_steps)
+        def max_heat_if_on(b, t):
+            return b.heat_out[t] <= b.max_heat_out * b.operational_status[t]
+
+        # --- ramping on heat_out (MW_th/step), using your idiom ---
+        @model_block.Constraint(self.time_steps)
+        def heat_ramp_up(b, t):
+            if t == self.time_steps.at(1):
+                return pyo.Constraint.Skip
+            return b.heat_out[t] - b.heat_out[t - 1] <= b.ramp_up
+
+        @model_block.Constraint(self.time_steps)
+        def heat_ramp_down(b, t):
+            if t == self.time_steps.at(1):
+                return pyo.Constraint.Skip
+            return b.heat_out[t - 1] - b.heat_out[t] <= b.ramp_down
+
+        # --- min up/down time (same structure as your helper) ---
+        if self.min_up > 0 or self.min_dn > 0:
+
+            @model_block.Constraint(self.time_steps)
+            def state_transition_rule(b, t):
+                if t == self.time_steps.at(1):
+                    return (
+                        b.operational_status[t] - model_block.initial_operational_status
+                        == b.start_up[t] - b.shut_down[t]
+                    )
+                else:
+                    return (
+                        b.operational_status[t] - b.operational_status[t - 1]
+                        == b.start_up[t] - b.shut_down[t]
+                    )
+
+            @model_block.Constraint(self.time_steps)
+            def prevent_simultaneous_startup_shutdown(b, t):
+                return b.start_up[t] + b.shut_down[t] <= 1
+
+        if self.min_up > 0:
+
+            @model_block.Constraint(self.time_steps)
+            def start_up_def_rule(b, t):
+                if t == self.time_steps.at(1):
+                    return b.start_up[t] >= b.operational_status[t] - model_block.initial_operational_status
+                else:
+                    return b.start_up[t] >= b.operational_status[t] - b.operational_status[t - 1]
+
+            @model_block.Constraint(self.time_steps)
+            def min_operating_time_constraint(b, t):
+                if t < model_block.min_operating_steps:
+                    return pyo.Constraint.Skip
+                return (
+                    sum(
+                        b.start_up[i]
+                        for i in range(t - model_block.min_operating_steps + 1, t + 1)
+                    )
+                    <= b.operational_status[t]
+                )
+
+        if self.min_dn > 0:
+
+            @model_block.Constraint(self.time_steps)
+            def shut_down_def_rule(b, t):
+                if t == self.time_steps.at(1):
+                    return b.shut_down[t] >= model_block.initial_operational_status - b.operational_status[t]
+                else:
+                    return b.shut_down[t] >= b.operational_status[t - 1] - b.operational_status[t]
+
+            @model_block.Constraint(self.time_steps)
+            def min_downtime_constraint(b, t):
+                if t < model_block.min_down_steps:
+                    return pyo.Constraint.Skip
+                return (
+                    sum(
+                        b.shut_down[i]
+                        for i in range(t - model_block.min_down_steps + 1, t + 1)
+                    )
+                    <= 1 - b.operational_status[t]
+                )
+
+        # --- emissions (NG only) ---
+        @model_block.Constraint(self.time_steps)
+        def energy_co2(b, t):
+            # electricity assumed zero direct CO2 here
+            return b.co2_energy[t] == b.natural_gas_in[t] * b.ng_co2_factor
+
+        # --- operating cost ---
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_rule(b, t):
+            cost = 0
+            if self.fuel_type in ["electricity", "both"]:
+                cost += b.power_in[t] * model.electricity_price[t]
+            if self.fuel_type in ["natural_gas", "both"]:
+                cost += b.natural_gas_in[t] * model.natural_gas_price[t]
+            # CO2 price on energy CO2 (NG)
+            cost += b.co2_energy[t] * model.co2_price[t]
+            return b.operating_cost[t] == cost
+
+        return model_block
+
+class PSA:
+    """
+    Pressure Swing Adsorption (PSA) for hydrogen separation.
+
+    Inputs / outputs (t/h):
+        gas_in  ->  h2_out (product) + tail_gas_out
+
+    Linearised composition:
+        h2_in  = x_h2_in * gas_in
+        imp_in = (1 - x_h2_in) * gas_in
+
+    Recovery:
+        h2_out <= h2_recovery * h2_in
+
+    Tail gas mass balance:
+        tail_gas_out = (h2_in - h2_out) + imp_in
+
+    Minimum purity on product (mass basis):
+        h2_out >= min_h2_purity * (h2_out + h2_impurities_out)
+        h2_impurities_out <= imp_in
+
+    Electricity:
+        power_in = specific_electricity * h2_out
+
+    Installed capacity:
+        max_power is an explicit sizing input [MW]. If not provided, it is derived.
+
+    Uses generic helpers from dsm_load_shift:
+        add_ramping_constraints(model_block, time_steps)
+        add_min_up_down_time_constraints(model_block, time_steps)
+    """
+
+    def __init__(
+        self,
+        # sizing
+        max_gas_in: float,  # [t/h] inlet cap
+        time_steps: list[int],
+        # separation performance
+        h2_mass_fraction_in_syngas: float,  # [-] mass fraction of H2 in incoming gas
+        h2_recovery: float,  # [-] fraction of incoming H2 recovered to product
+        min_h2_purity: float,  # [-] minimum H2 purity in product (mass basis)
+        # electricity
+        specific_electricity: float,  # [MWh_el per t_H2_product]
+        max_power: float | None = None,  # [MW] installed electric capacity (IMPORTANT)
+        # operations (ramping on power_in)
+        ramp_up: float | None = None,  # [MW/step]
+        ramp_down: float | None = None,  # [MW/step]
+        # on/off
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        name: str = "psa",
+    ):
+        super().__init__()
+        self.time_steps = time_steps
+
+        self.max_gas_in = float(max_gas_in)
+        if self.max_gas_in <= 0:
+            raise ValueError("PSA: max_gas_in must be > 0.")
+
+        self.x_h2 = float(h2_mass_fraction_in_syngas)
+        if not (0.0 <= self.x_h2 <= 1.0):
+            raise ValueError("PSA: h2_mass_fraction_in_syngas must be in [0, 1].")
+
+        self.rec = float(h2_recovery)
+        if not (0.0 <= self.rec <= 1.0):
+            raise ValueError("PSA: h2_recovery must be in [0, 1].")
+
+        self.purity_min = float(min_h2_purity)
+        if not (0.0 < self.purity_min <= 1.0):
+            raise ValueError("PSA: min_h2_purity must be in (0, 1].")
+
+        self.spec_el = float(specific_electricity)
+        if self.spec_el <= 0:
+            raise ValueError("PSA: specific_electricity must be > 0.")
+
+        # Derived feasible max H2 production (t/h) from inlet sizing (upper bound)
+        self.max_h2_out = self.rec * self.x_h2 * self.max_gas_in  # [t/h]
+
+        # Installed capacity (MW): explicit if provided, else derived
+        derived_max_power = self.spec_el * self.max_h2_out  # [MW] (assuming 1h time step)
+        if max_power is None:
+            self.max_power = float(derived_max_power)
+        else:
+            self.max_power = float(max_power)
+            if self.max_power <= 0:
+                raise ValueError("PSA: max_power must be > 0.")
+            # Safety check: if max_power is below what inlet sizing would allow, model remains feasible
+            # but PSA will be power-limited. That is often intended (installed capacity constraint).
+
+        self.rup = self.max_power if ramp_up is None else float(ramp_up)
+        self.rdn = self.max_power if ramp_down is None else float(ramp_down)
+
+        self.min_up = int(min_operating_steps)
+        self.min_dn = int(min_down_steps)
+        self.init_on = int(initial_operational_status)
+
+        self.name = name
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        if not hasattr(model, "electricity_price"):
+            raise ValueError("PSA requires electricity_price.")
+
+        # params
+        model_block.max_gas_in = pyo.Param(initialize=self.max_gas_in)
+
+        model_block.h2_mass_fraction_in_syngas = pyo.Param(
+            initialize=self.x_h2, within=pyo.UnitInterval
+        )
+        model_block.h2_recovery = pyo.Param(initialize=self.rec, within=pyo.UnitInterval)
+        model_block.min_h2_purity = pyo.Param(
+            initialize=self.purity_min, within=pyo.UnitInterval
+        )
+
+        model_block.specific_electricity = pyo.Param(initialize=self.spec_el)
+
+        # helper-required params (power-based)
+        model_block.min_power = pyo.Param(initialize=0.0)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.ramp_up = pyo.Param(initialize=self.rup)
+        model_block.ramp_down = pyo.Param(initialize=self.rdn)
+
+        model_block.min_operating_steps = pyo.Param(initialize=self.min_up)
+        model_block.min_down_steps = pyo.Param(initialize=self.min_dn)
+        model_block.initial_operational_status = pyo.Param(initialize=self.init_on)
+
+        # vars
+        model_block.gas_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, self.max_gas_in),
+        )
+
+        model_block.h2_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.tail_gas_out = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+
+        # internal bookkeeping
+        model_block.h2_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.imp_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.h2_impurities_out = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+
+        model_block.power_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, self.max_power),
+        )
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
+
+        # --- composition ---
+        @model_block.Constraint(self.time_steps)
+        def h2_in_def(b, t):
+            return b.h2_in[t] == b.gas_in[t] * b.h2_mass_fraction_in_syngas
+
+        @model_block.Constraint(self.time_steps)
+        def imp_in_def(b, t):
+            return b.imp_in[t] == b.gas_in[t] * (1 - b.h2_mass_fraction_in_syngas)
+
+        # --- recovery ---
+        @model_block.Constraint(self.time_steps)
+        def h2_recovery_limit(b, t):
+            return b.h2_out[t] <= b.h2_recovery * b.h2_in[t]
+
+        # --- tail gas balance ---
+        @model_block.Constraint(self.time_steps)
+        def tail_gas_balance(b, t):
+            return b.tail_gas_out[t] == (b.h2_in[t] - b.h2_out[t]) + b.imp_in[t]
+
+        # --- purity ---
+        @model_block.Constraint(self.time_steps)
+        def purity_constraint(b, t):
+            return b.h2_out[t] >= b.min_h2_purity * (b.h2_out[t] + b.h2_impurities_out[t])
+
+        @model_block.Constraint(self.time_steps)
+        def impurities_bound(b, t):
+            return b.h2_impurities_out[t] <= b.imp_in[t]
+
+        # --- electricity coupling + installed capacity binding ---
+        @model_block.Constraint(self.time_steps)
+        def power_rule(b, t):
+            return b.power_in[t] == b.h2_out[t] * b.specific_electricity
+
+        # Enforce that the electrical capacity actually limits throughput (redundant due to bounds, but explicit)
+        @model_block.Constraint(self.time_steps)
+        def capacity_limit(b, t):
+            return b.power_in[t] <= b.max_power
+
+        # --- operational constraints (helpers) ---
+        add_ramping_constraints(model_block, self.time_steps)
+        add_min_up_down_time_constraints(model_block, self.time_steps)
+
+        # --- cost ---
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_rule(b, t):
+            return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+
+        return model_block
+
 
 class ElectricVehicle(GenericStorage):
     """
@@ -2897,6 +3863,11 @@ demand_side_technologies: dict = {
     "preheater": Preheater,
     "calciner": Calciner,
     "kiln": Kiln,
+    "digestate_separation": DigestateSeparation,
+    "dryer": Dryer,
+    "tcr_booster": TCRBooster,
+    "psa": PSA,
+    "battery_storage": GenericStorage,
 }
 
 

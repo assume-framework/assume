@@ -121,7 +121,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.coal_price = self.forecaster["coal_price"]
         self.electricity_price = self.forecaster["electricity_price"]
         self.electricity_price_flex = self.forecaster["electricity_price_flex"]
-        self.co2_price = self.forecaster.get_price("co2")
+        self.co2_price = self.forecaster["co2_price"]
         self.demand = demand
         self.objective = objective
         self.flexibility_measure = flexibility_measure
@@ -200,6 +200,8 @@ class CementPlant(DSMFlex, SupportsMinMax):
         self.model.clinker_rate = pyo.Var(
             self.model.time_steps, within=pyo.NonNegativeReals
         )
+        self.model.total_co2_emission = pyo.Var(self.model.time_steps, within=pyo.NonNegativeReals)
+
 
         # ---- Hydrogen routing vars (active only if electrolyser exists) ----
         self.model.h2_to_calciner = pyo.Var(
@@ -273,7 +275,8 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 # default WH params if not set externally
                 if not hasattr(self.model, "wh_per_t_clinker"):
                     self.model.wh_per_t_clinker = pyo.Param(
-                        initialize=0.802
+                        initialize= 0.802    # 0.061
+
                     )  # [MWh_th/t]
                 if not hasattr(self.model, "wh_util_eff"):
                     self.model.wh_util_eff = pyo.Param(initialize=0.90)
@@ -348,24 +351,43 @@ class CementPlant(DSMFlex, SupportsMinMax):
                         routed += m.h2_to_kiln[t]
                     return el.hydrogen_out[t] >= routed + m.h2_unutilised[t]
 
-            # ---------------- Dynamic E‑TES coupling to Calciner ----------------
+            # ---------------- Dynamic E-TES coupling to Calciner ----------------
             if self.has_calciner:
                 cc = self.model.dsm_blocks["calciner"]
 
                 if self.has_thermal_storage:
                     ts = self.model.dsm_blocks["thermal_storage"]
 
-                    @self.model.Constraint(self.model.time_steps)
-                    def tes_to_calciner_effective_heat(m, t):
-                        # TES buffers calciner: usable calciner heat = burner heat + TES discharge - TES charge
-                        return (
-                            cc.effective_heat_in[t] == cc.heat_out[t] + ts.discharge[t]
-                        )
+                    # Decide mode once (Param is fixed, so this is safe)
+                    is_gen_mode = False
+                    if hasattr(ts, "is_generator_mode"):
+                        is_gen_mode = bool(pyo.value(ts.is_generator_mode))
+
+                    if is_gen_mode:
+                        # Generator mode: TES charge comes from its own electric heater (charge == power_in * eta)
+                        @self.model.Constraint(self.model.time_steps)
+                        def tes_to_calciner_effective_heat(m, t):
+                            return cc.effective_heat_in[t] == cc.heat_out[t] + ts.discharge[t]
+
+                    else:
+                        # Non-generator mode: TES can ONLY charge from calciner-produced heat
+                        # → charging diverts heat away from calciner process in the same timestep
+                        @self.model.Constraint(self.model.time_steps)
+                        def tes_charge_limited_by_calciner(m, t):
+                            return ts.charge[t] <= cc.heat_out[t]
+
+                        @self.model.Constraint(self.model.time_steps)
+                        def tes_to_calciner_effective_heat(m, t):
+                            return (
+                                cc.effective_heat_in[t]
+                                == cc.heat_out[t] - ts.charge[t] + ts.discharge[t]
+                            )
+
                 else:
-                    # No TES present → bind effective heat directly to burner heat (zero-config behavior)
                     @self.model.Constraint(self.model.time_steps)
                     def bind_eff_no_tes(m, t):
                         return cc.effective_heat_in[t] == cc.heat_out[t]
+
 
     def define_constraints(self):
         if self.is_prosumer:
@@ -447,6 +469,35 @@ class CementPlant(DSMFlex, SupportsMinMax):
                     "thermal_storage"
                 ].operating_cost[t]
             return self.model.variable_cost[t] == variable_cost
+
+        @self.model.Constraint(self.model.time_steps)
+        def total_co2_emission_constraint(m, t):
+            total = 0.0
+
+            # Preheater (energy CO2)
+            if self.has_preheater and ("preheater" in m.dsm_blocks):
+                ph = m.dsm_blocks["preheater"]
+                if hasattr(ph, "co2_emission"):
+                    total += ph.co2_emission[t]
+
+            # Calciner (process + energy CO2; fallback to co2_emission if alternative model)
+            if self.has_calciner and ("calciner" in m.dsm_blocks):
+                cc = m.dsm_blocks["calciner"]
+                if hasattr(cc, "co2_proc"):
+                    total += cc.co2_proc[t]
+                if hasattr(cc, "co2_energy"):
+                    total += cc.co2_energy[t]
+                if (not hasattr(cc, "co2_proc")) and (not hasattr(cc, "co2_energy")) and hasattr(cc, "co2_emission"):
+                    total += cc.co2_emission[t]
+
+            # Kiln (energy CO2)
+            if self.has_kiln and ("kiln" in m.dsm_blocks):
+                rk = m.dsm_blocks["kiln"]
+                if hasattr(rk, "co2_energy"):
+                    total += rk.co2_energy[t]
+
+            return m.total_co2_emission[t] == total
+
 
     def calculate_marginal_cost(self, start: datetime, power: float) -> float:
         """
@@ -1155,6 +1206,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
 
         # ------- series -------
         # Electric inputs (MW_e)
+        ph_P = series_or_none(ph, "power_in")                 # preheater
         cc_P = series_or_none(cc, "power_in")
         rk_P = series_or_none(rk, "power_in")
         el_P = series_or_none(el, "power_in")
@@ -1212,6 +1264,40 @@ class CementPlant(DSMFlex, SupportsMinMax):
             if hasattr(instance, "variable_cost")
             else None
         )
+
+        # Emissions (tCO2 per time step) – presence-aware
+        ph_co2 = series_or_none(ph, "co2_emission")
+        rk_co2 = series_or_none(rk, "co2_energy")
+        cc_co2_proc = series_or_none(cc, "co2_proc")
+        cc_co2_energy = series_or_none(cc, "co2_energy")
+        cc_co2_alt = series_or_none(cc, "co2_emission")
+
+        cc_co2_total = None
+        if (cc_co2_proc is not None) or (cc_co2_energy is not None):
+            cc_co2_total = [
+                (cc_co2_proc[i] if cc_co2_proc is not None else 0.0)
+                + (cc_co2_energy[i] if cc_co2_energy is not None else 0.0)
+                for i in range(len(T))
+            ]
+        elif cc_co2_alt is not None:
+            cc_co2_total = cc_co2_alt
+
+        # Prefer plant-level aggregation if available; else compute from components
+        total_co2 = (
+            [safe_value(instance.total_co2_emission[t]) for t in T]
+            if hasattr(instance, "total_co2_emission")
+            else (
+                [
+                    (ph_co2[i] if ph_co2 is not None else 0.0)
+                    + (cc_co2_total[i] if cc_co2_total is not None else 0.0)
+                    + (rk_co2[i] if rk_co2 is not None else 0.0)
+                    for i in range(len(T))
+                ]
+                if (ph_co2 is not None) or (cc_co2_total is not None) or (rk_co2 is not None)
+                else None
+            )
+        )
+
         # Optional plant aggregates
         total_power = (
             [safe_value(instance.total_power_input[t]) for t in T]
@@ -1265,8 +1351,8 @@ class CementPlant(DSMFlex, SupportsMinMax):
             lp += axp.plot(T, ng_price, label="NG Price [€/MWhₜₕ]", color="C11", linestyle=":")
         if coal_price:
             lp += axp.plot(T, coal_price, label="Coal Price [€/MWhₜₕ]", color="C12", linestyle="-.")
-        if h2_price:
-            lp += axp.plot(T, h2_price, label="H₂ Price [€/MWhₜₕ]", color="C13", linestyle="-")
+        # if h2_price:
+        #     lp += axp.plot(T, h2_price, label="H₂ Price [€/MWhₜₕ]", color="C13", linestyle="-")
         axp.set_ylabel("Energy Price", color="gray")
         axp.tick_params(axis="y", labelcolor="gray")
 
@@ -1321,6 +1407,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
             {
                 "t": T,
                 # Electric inputs
+                "Preheater Power [MW_e]": ph_P if ph_P else None,
                 "Calciner Power [MW_e]": cc_P if cc_P else None,
                 "Kiln Power [MW_e]": rk_P if rk_P else None,
                 "Electrolyser Power [MW_e]": el_P if el_P else None,
@@ -1342,17 +1429,26 @@ class CementPlant(DSMFlex, SupportsMinMax):
                 "TES Charge [MW_th]": ts_ch if ts_ch else None,
                 "TES Discharge [MW_th]": ts_ds if ts_ds else None,
                 "TES SOC [MWh_th]": ts_soc if ts_soc else None,
+
+                # Emissions
+                "Preheater CO2 [tCO2/step]": ph_co2 if ph_co2 else None,
+                "Calciner CO2 process [tCO2/step]": cc_co2_proc if cc_co2_proc else None,
+                "Calciner CO2 energy [tCO2/step]": cc_co2_energy if cc_co2_energy else None,
+                "Calciner CO2 total [tCO2/step]": cc_co2_total if cc_co2_total else None,
+                "Kiln CO2 [tCO2/step]": rk_co2 if rk_co2 else None,
+                "Total CO2 [tCO2/step]": total_co2 if total_co2 else None,
+
                 # Prices & plant-level
                 "Elec Price [€/MWh_e]": elec_price if elec_price else None,
                 "NG Price [€/MWh_th]": ng_price if ng_price else None,
                 "Coal Price [€/MWh_th]": coal_price if coal_price else None,
-                "H2 Price [€/MWh_th]": h2_price if h2_price else None,
+                # "H2 Price [€/MWh_th]": h2_price if h2_price else None,
                 "CO2 Price [€/tCO2]": co2_price if co2_price else None,
                 "Total Variable Cost [€]": variable_cost if variable_cost else None,
                 "Total Power Input [MW_e]": total_power if total_power else None,
                 "Clinker Rate [t/h]": clinker_rate if clinker_rate else None,
                 "Variable Cost [€/h]": var_cost if var_cost else None,
-"               Marginal Cost [€/t clinker]": marg_cost if marg_cost else None,
+                "Marginal Cost [€/t clinker]": marg_cost if marg_cost else None,
 
             }
         )
@@ -1641,34 +1737,58 @@ class CementPlant(DSMFlex, SupportsMinMax):
     def _add_reserve_capacity_market_threshold_guardrail(self, model):
         """
         Reserve capacity market with threshold/guardrail strategy (cement variant).
-        - calciner, kiln (only if electrically heated in the chosen config),
-            electrolyser, cement mill, TES heater (power_in).
+
+        Key rule for ThermalStorage:
+        - storage_type == "short-term": NO electric actuator -> must NOT contribute to max_cap/min_cap or total_power_input
+        - storage_type == "short-term_with_generator": electric heater exists -> include ts.max_power (MW_e) and ts.power_in[t]
+
+        Products:
         One 4h-block product per block: FCR (symmetric) OR aFRR (up XOR down).
         Block is ineligible if ANY hour in it has el-price <= threshold.
 
         Revenue (block-based) is added as Expression: m.reserve_revenue.
-        If self.objective == 'max_net_income', your objective should already
-        be using reserve_revenue - sum(variable_cost[t]).
         """
         import math
+        import pyomo.environ as pyo
 
         m = model
 
         # ---------------- helpers ----------------
         def _as_float_list(x, N):
-            if x is None: return [0.0] * N
+            if x is None:
+                return [0.0] * N
             v = [float(xx) for xx in x]
-            if len(v) < N: v = v + [v[-1]] * (N - len(v))
-            elif len(v) > N: v = v[:N]
+            if len(v) < N:
+                v = v + [v[-1]] * (N - len(v))
+            elif len(v) > N:
+                v = v[:N]
             return v
 
         def _hourly_to_block_sum(hourly, starts, L):
             ps = [0.0]
-            for x in hourly: ps.append(ps[-1] + x)
+            for x in hourly:
+                ps.append(ps[-1] + x)
             return {b: ps[b + L] - ps[b] for b in starts}
 
         def _safe_getattr(obj, name, default=None):
             return getattr(obj, name) if hasattr(obj, name) else default
+
+        def _pval(x, default=0.0):
+            try:
+                return float(pyo.value(x))
+            except Exception:
+                return float(default)
+
+        def _get_comp_fuel(name):
+            if hasattr(self, "components") and isinstance(self.components, dict) and name in self.components:
+                return getattr(self.components[name], "fuel_type", None)
+            return None
+
+        def _get_storage_type():
+            if hasattr(self, "components") and isinstance(self.components, dict) and "thermal_storage" in self.components:
+                st = getattr(self.components["thermal_storage"], "storage_type", None)
+                return (st or "").lower()
+            return ""
 
         enable_fcr  = bool(getattr(self, "enable_fcr", False))
         enable_afrr = bool(getattr(self, "enable_afrr", True))
@@ -1680,15 +1800,15 @@ class CementPlant(DSMFlex, SupportsMinMax):
         price_threshold = float(getattr(self, "reserve_price_threshold", 0.0))  # €/MWh_e
 
         # ---------------- time base & 4h blocks ----------------
-        ts = self.index                       # pandas.DatetimeIndex aligned to m.time_steps
+        ts = self.index
         Tn = len(ts)
-        starts = [i for i, t in enumerate(ts[: -L + 1]) if (t.hour % 4 == 0 and t.minute == 0)]
+        starts = [i for i, dt in enumerate(ts[: -L + 1]) if (dt.hour % 4 == 0 and dt.minute == 0)]
         starts = [i for i in starts if i + L <= Tn]
         m.fcr_blocks = pyo.Set(initialize=starts, ordered=True)
 
         # ---------------- price series (hourly) ----------------
         if hasattr(m, "electricity_price"):
-            el_price_hour = [float(m.electricity_price[t]) for t in m.time_steps]
+            el_price_hour = [float(pyo.value(m.electricity_price[t])) for t in m.time_steps]
         else:
             el_price_hour = _as_float_list(_safe_getattr(self, "electricity_price", None), Tn)
 
@@ -1696,14 +1816,13 @@ class CementPlant(DSMFlex, SupportsMinMax):
         price_pos_hour = _as_float_list(_safe_getattr(self, "afrr_price_pos", None), Tn)    # €/MW/h
         price_neg_hour = _as_float_list(_safe_getattr(self, "afrr_price_neg", None), Tn)    # €/MW/h
 
-        # block-summed (€/MW per 4h block)
-        fcr_block_price = (_hourly_to_block_sum(price_fcr_hour, starts, L) if enable_fcr else {b:0.0 for b in starts})
-        pos_block_price = (_hourly_to_block_sum(price_pos_hour, starts, L) if enable_afrr else {b:0.0 for b in starts})
-        neg_block_price = (_hourly_to_block_sum(price_neg_hour, starts, L) if enable_afrr else {b:0.0 for b in starts})
+        fcr_block_price = _hourly_to_block_sum(price_fcr_hour, starts, L) if enable_fcr else {b: 0.0 for b in starts}
+        pos_block_price = _hourly_to_block_sum(price_pos_hour, starts, L) if enable_afrr else {b: 0.0 for b in starts}
+        neg_block_price = _hourly_to_block_sum(price_neg_hour, starts, L) if enable_afrr else {b: 0.0 for b in starts}
 
-        m.fcr_block_price       = pyo.Param(m.fcr_blocks, initialize=fcr_block_price, mutable=False)
-        m.afrr_block_price_pos  = pyo.Param(m.fcr_blocks, initialize=pos_block_price, mutable=False)
-        m.afrr_block_price_neg  = pyo.Param(m.fcr_blocks, initialize=neg_block_price, mutable=False)
+        m.fcr_block_price      = pyo.Param(m.fcr_blocks, initialize=fcr_block_price, mutable=False)
+        m.afrr_block_price_pos = pyo.Param(m.fcr_blocks, initialize=pos_block_price, mutable=False)
+        m.afrr_block_price_neg = pyo.Param(m.fcr_blocks, initialize=neg_block_price, mutable=False)
 
         # ---------------- eligibility (guardrail) ----------------
         eligible = {}
@@ -1712,104 +1831,124 @@ class CementPlant(DSMFlex, SupportsMinMax):
             eligible[b] = 1 if ok else 0
         m.block_eligible = pyo.Param(m.fcr_blocks, initialize=eligible, within=pyo.Boolean, mutable=False)
 
-        # ---------------- capacity envelope (cement electric head/foot room) ----------------
-        # If not provided by user, compute from present electric blocks and their caps.
+        # ---------------- thermal storage mode ----------------
+        storage_type = _get_storage_type()
+        tes_gen_mode = (storage_type == "short-term_with_generator")
+
+        # ---------------- capacity envelope (electric head/foot room), in MW_e ----------------
         max_cap = float(getattr(self, "max_plant_capacity", 0.0))
         min_cap = float(getattr(self, "min_plant_capacity", 0.0))
 
         if (max_cap <= 0.0) and hasattr(m, "dsm_blocks"):
-            B = m.dsm_blocks  # IndexedBlock
-            # helper to add caps if block exists and is electrically driven
-            def _add_block(name):
-                nonlocal max_cap, min_cap
-                if name in B:
-                    blk = B[name]
-                    # Treat as electric if it has a 'max_power' attribute;
-                    # for kiln/calciner we check fuel_type on the component if present.
-                    is_electric = True
-                    if name in ("calciner", "kiln") and hasattr(self, "components") and name in self.components:
-                        is_electric = (getattr(self.components[name], "fuel_type", None) == "electricity")
-                    if hasattr(blk, "max_power") and is_electric:
-                        max_cap += float(blk.max_power)
-                        if hasattr(blk, "min_power"):
-                            min_cap += float(blk.min_power)
+            B = m.dsm_blocks
 
-            _add_block("calciner")
-            _add_block("kiln")
-            _add_block("electrolyser")
-            _add_block("cement_mill")
-            _add_block("thermal_storage")   # heater capacity if your TES supports electric charging
+            def _add_block_cap(name):
+                nonlocal max_cap, min_cap
+                if name not in B:
+                    return
+                blk = B[name]
+
+                # Calciner/kiln are only "electric" if fuel_type == electricity
+                if name in ("calciner", "kiln"):
+                    if _get_comp_fuel(name) != "electricity":
+                        return
+
+                # Thermal storage: include ONLY if generator mode; use MW_e cap = blk.max_power
+                if name == "thermal_storage":
+                    if not tes_gen_mode:
+                        return
+                    if hasattr(blk, "max_power"):
+                        max_cap += _pval(blk.max_power)
+                    else:
+                        # should not happen in generator mode, but keep safe:
+                        max_cap += 0.0
+                    if hasattr(blk, "min_power"):
+                        min_cap += _pval(blk.min_power)
+                    return
+
+                # Other electric blocks: include if they expose max_power
+                if hasattr(blk, "max_power"):
+                    max_cap += _pval(blk.max_power)
+                    if hasattr(blk, "min_power"):
+                        min_cap += _pval(blk.min_power)
+
+            _add_block_cap("calciner")
+            _add_block_cap("kiln")
+            _add_block_cap("electrolyser")
+            _add_block_cap("cement_mill")
+            _add_block_cap("thermal_storage")
 
         # Persist for transparency
         self.max_plant_capacity = max_cap
         self.min_plant_capacity = min_cap
 
-        # ---------------- total electric load per hour (for feasibility) ----------------
-        # If user/model already defined it, reuse. Else build an Expression that sums 'power_in'
-        # of relevant electric blocks + optional grid import.
+        # ---------------- total electric load per hour (MW_e) ----------------
+        # Reuse if present; else build Expression with correct TES handling.
         if not hasattr(m, "total_power_input"):
             def _total_P_rule(mm, t):
                 P = 0.0
                 if hasattr(mm, "dsm_blocks"):
                     B = mm.dsm_blocks
-                    # sum electric 'power_in' if block present AND electric in current config
-                    if "calciner" in B and getattr(self.components.get("calciner", object()), "fuel_type", None) == "electricity":
+
+                    if "calciner" in B and _get_comp_fuel("calciner") == "electricity" and hasattr(B["calciner"], "power_in"):
                         P += B["calciner"].power_in[t]
-                    if "kiln" in B and getattr(self.components.get("kiln", object()), "fuel_type", None) == "electricity":
+                    if "kiln" in B and _get_comp_fuel("kiln") == "electricity" and hasattr(B["kiln"], "power_in"):
                         P += B["kiln"].power_in[t]
                     if "electrolyser" in B and hasattr(B["electrolyser"], "power_in"):
                         P += B["electrolyser"].power_in[t]
                     if "cement_mill" in B and hasattr(B["cement_mill"], "power_in"):
                         P += B["cement_mill"].power_in[t]
-                    if "thermal_storage" in B and hasattr(B["thermal_storage"], "power_in"):
+
+                    # TES electric actuator ONLY if generator mode
+                    if tes_gen_mode and "thermal_storage" in B and hasattr(B["thermal_storage"], "power_in"):
                         P += B["thermal_storage"].power_in[t]
-                # Add grid import if modeled explicitly (kept positive as import)
+
                 if hasattr(mm, "grid_power"):
                     P += mm.grid_power[t]
                 return P
+
             m.total_power_input = pyo.Expression(m.time_steps, rule=_total_P_rule)
 
         # ---------------- decision variables (integerized steps + binaries) ----------------
         M_blocks = int(math.ceil(max(1.0, max_cap) / step)) if step > 0 else 0
 
         # FCR symmetric
-        m.k_sym  = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
-        m.cap_sym= pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
-        m.bid_sym= pyo.Var(m.fcr_blocks, within=pyo.Binary)
+        m.k_sym   = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.cap_sym = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.bid_sym = pyo.Var(m.fcr_blocks, within=pyo.Binary)
 
-        # aFRR up/down (asymmetric)
-        m.k_up   = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
-        m.k_dn   = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
-        m.cap_up = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
-        m.cap_dn = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
-        m.bid_up = pyo.Var(m.fcr_blocks, within=pyo.Binary)
-        m.bid_dn = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+        # aFRR up/down
+        m.k_up    = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.k_dn    = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeIntegers)
+        m.cap_up  = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.cap_dn  = pyo.Var(m.fcr_blocks, within=pyo.NonNegativeReals)
+        m.bid_up  = pyo.Var(m.fcr_blocks, within=pyo.Binary)
+        m.bid_dn  = pyo.Var(m.fcr_blocks, within=pyo.Binary)
 
-        # step mapping and min-bid
         @m.Constraint(m.fcr_blocks)
         def step_sym(mm, b): return mm.cap_sym[b] == step * mm.k_sym[b]
         @m.Constraint(m.fcr_blocks)
-        def step_up(mm, b):  return mm.cap_up[b] == step * mm.k_up[b]
+        def step_up(mm, b):  return mm.cap_up[b]  == step * mm.k_up[b]
         @m.Constraint(m.fcr_blocks)
-        def step_dn(mm, b):  return mm.cap_dn[b] == step * mm.k_dn[b]
+        def step_dn(mm, b):  return mm.cap_dn[b]  == step * mm.k_dn[b]
 
         @m.Constraint(m.fcr_blocks)
-        def min_sym(mm, b):  return mm.cap_sym[b] >= min_bid * mm.bid_sym[b]
+        def min_sym(mm, b): return mm.cap_sym[b] >= min_bid * mm.bid_sym[b]
         @m.Constraint(m.fcr_blocks)
-        def min_up(mm, b):   return mm.cap_up[b]  >= min_bid * mm.bid_up[b]
+        def min_up(mm, b):  return mm.cap_up[b]  >= min_bid * mm.bid_up[b]
         @m.Constraint(m.fcr_blocks)
-        def min_dn(mm, b):   return mm.cap_dn[b]  >= min_bid * mm.bid_dn[b]
+        def min_dn(mm, b):  return mm.cap_dn[b]  >= min_bid * mm.bid_dn[b]
 
         @m.Constraint(m.fcr_blocks)
-        def act_sym(mm, b):  return mm.k_sym[b] <= M_blocks * mm.bid_sym[b]
+        def act_sym(mm, b): return mm.k_sym[b] <= M_blocks * mm.bid_sym[b]
         @m.Constraint(m.fcr_blocks)
-        def act_up(mm, b):   return mm.k_up[b]  <= M_blocks * mm.bid_up[b]
+        def act_up(mm, b):  return mm.k_up[b]  <= M_blocks * mm.bid_up[b]
         @m.Constraint(m.fcr_blocks)
-        def act_dn(mm, b):   return mm.k_dn[b]  <= M_blocks * mm.bid_dn[b]
+        def act_dn(mm, b):  return mm.k_dn[b]  <= M_blocks * mm.bid_dn[b]
 
-        # mutual exclusivity (one product per block; aFRR only one side)
+        # mutual exclusivity
         @m.Constraint(m.fcr_blocks)
-        def one_product(mm, b):   return mm.bid_sym[b] + mm.bid_up[b] + mm.bid_dn[b] <= 1
+        def one_product(mm, b): return mm.bid_sym[b] + mm.bid_up[b] + mm.bid_dn[b] <= 1
         @m.Constraint(m.fcr_blocks)
         def afrr_one_side(mm, b): return mm.bid_up[b] + mm.bid_dn[b] <= 1
 
@@ -1823,7 +1962,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
             @m.Constraint(m.fcr_blocks)
             def no_afrr_dn(mm, b): return mm.bid_dn[b] == 0
 
-        # block eligibility via threshold guardrail
+        # eligibility via threshold guardrail
         @m.Constraint(m.fcr_blocks)
         def eligible_sym(mm, b): return mm.cap_sym[b] <= max_cap * m.block_eligible[b]
         @m.Constraint(m.fcr_blocks)
@@ -1832,47 +1971,50 @@ class CementPlant(DSMFlex, SupportsMinMax):
         def eligible_dn(mm, b):  return mm.cap_dn[b]  <= max_cap * m.block_eligible[b]
 
         # feasibility inside each block hour (headroom/footroom)
-        m.fcr_up_feas  = pyo.ConstraintList()
-        m.fcr_down_feas= pyo.ConstraintList()
-        m.fcr_sym_feas = pyo.ConstraintList()
+        m.fcr_up_feas    = pyo.ConstraintList()
+        m.fcr_down_feas  = pyo.ConstraintList()
+        m.fcr_sym_feas   = pyo.ConstraintList()
+
         for b in starts:
             for k in range(L):
                 t = b + k
-                m.fcr_up_feas.add(  m.cap_up[b]  <= (max_cap - m.total_power_input[t]) )
-                m.fcr_down_feas.add(m.cap_dn[b]  <= (m.total_power_input[t] - min_cap) )
-                # symmetric must satisfy both
-                m.fcr_sym_feas.add(m.cap_sym[b] <= (max_cap - m.total_power_input[t]))
-                m.fcr_sym_feas.add(m.cap_sym[b] <= (m.total_power_input[t] - min_cap))
+                m.fcr_up_feas.add(   m.cap_up[b]  <= (max_cap - m.total_power_input[t]) )
+                m.fcr_down_feas.add( m.cap_dn[b]  <= (m.total_power_input[t] - min_cap) )
+                m.fcr_sym_feas.add(  m.cap_sym[b] <= (max_cap - m.total_power_input[t]) )
+                m.fcr_sym_feas.add(  m.cap_sym[b] <= (m.total_power_input[t] - min_cap) )
 
-        # ---------------- revenue expression (block-based) ----------------
+        # ---------------- revenue expression ----------------
         @m.Expression()
         def reserve_revenue(mm):
             return (
-                sum(mm.fcr_block_price[b]      * mm.cap_sym[b] for b in mm.fcr_blocks)
-            + sum(mm.afrr_block_price_pos[b] * mm.cap_up[b]  for b in mm.fcr_blocks)
-            + sum(mm.afrr_block_price_neg[b] * mm.cap_dn[b]  for b in mm.fcr_blocks)
+                sum(mm.fcr_block_price[b]       * mm.cap_sym[b] for b in mm.fcr_blocks)
+                + sum(mm.afrr_block_price_pos[b] * mm.cap_up[b]  for b in mm.fcr_blocks)
+                + sum(mm.afrr_block_price_neg[b] * mm.cap_dn[b]  for b in mm.fcr_blocks)
             )
 
-        # ---------------- hourly variable cost (linear Expression) ----------------
-        # Reuse if it already exists; otherwise build a minimal one.
+        # ---------------- hourly variable cost (fallback Expression) ----------------
         if not hasattr(m, "variable_cost"):
             def _pE(mm, t):
                 return mm.electricity_price[t] if hasattr(mm, "electricity_price") else el_price_hour[int(t)]
+
             def _vc_rule(mm, t):
                 cost = 0.0
-                if hasattr(mm, "grid_power"): cost += _pE(mm, t) * mm.grid_power[t]
+                if hasattr(mm, "grid_power"):
+                    cost += _pE(mm, t) * mm.grid_power[t]
                 if hasattr(mm, "dsm_blocks"):
                     B = mm.dsm_blocks
-                    for name in ("calciner","kiln","electrolyser","cement_mill","thermal_storage"):
+                    for name in ("calciner", "kiln", "electrolyser", "cement_mill", "thermal_storage"):
                         if name in B and hasattr(B[name], "operating_cost"):
                             cost += B[name].operating_cost[t]
                 return cost
+
             m.variable_cost = pyo.Expression(m.time_steps, rule=_vc_rule)
 
-        # Optional: block-sum variable cost (handy for diagnostics)
+        # Optional: block-sum variable cost (diagnostics)
         def _blk_cost(mm, b):
             return sum(mm.variable_cost[t] for t in mm.time_steps if (t >= b and t < b + L))
         m.block_var_cost = pyo.Expression(m.fcr_blocks, rule=_blk_cost)
+
 
     def _reserve_series(self, instance, T, block_len):
         """

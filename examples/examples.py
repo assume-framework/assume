@@ -126,6 +126,7 @@ available_examples = {
         "scenario": "example_06b",  
         "study_case": "base",
     },
+    "use_case_O45strom_EEM": {"scenario": "example_06a_EEM", "study_case": "base"},
 }
 
 
@@ -133,7 +134,7 @@ available_examples = {
 if __name__ == "__main__":
     """
     Available examples:
-    - local_db: without database and grafana
+    - local_db: without database and grafana    
     - timescale: with database and grafana (note: you need docker installed)
     """
 
@@ -152,7 +153,7 @@ if __name__ == "__main__":
     # list of examples you want to run
     examples_to_run = [
         # "redisp_storage_3_nodes",
-        "use_case_O45H2",
+        "use_case_O45strom_EEM",
         # "cement_plant_use_case",
     ]
     # examples_to_run = [example]
