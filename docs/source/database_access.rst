@@ -90,22 +90,48 @@ To retrieve market clearing data (prices, volumes) for a specific simulation:
 Connecting via VSCode
 =====================
 
-The `PostgreSQL extension <https://marketplace.visualstudio.com/items?itemName=ckolkman.vscode-postgres>`_
-for Visual Studio Code allows you to browse and query the database directly from the editor.
+The `SQLTools extension <https://marketplace.visualstudio.com/items?itemName=mtxr.sqltools>`_
+for Visual Studio Code supports both PostgreSQL and SQLite, allowing you to browse and query
+the database directly from the editor.
 
-1. Install the **PostgreSQL** extension (by Chris Kolkman) from the VSCode marketplace.
-2. Open the Command Palette (``Ctrl+Shift+P``) and select **PostgreSQL: Add Connection**.
-3. Enter the connection parameters:
+1. Install the **SQLTools** extension (by Matheus Teixeira) from the VSCode marketplace.
+2. Install the appropriate driver extension:
 
-   - **Host**: ``localhost``
+   - For PostgreSQL: `SQLTools PostgreSQL/Cockroach Driver <https://marketplace.visualstudio.com/items?itemName=mtxr.sqltools-driver-pg>`_
+   - For SQLite: `SQLTools SQLite Driver <https://marketplace.visualstudio.com/items?itemName=mtxr.sqltools-driver-sqlite>`_
+
+3. After installing, VSCode may show pop-ups asking to install additional dependencies or to
+   reload the window. Accept these prompts to complete the setup.
+4. Open the Command Palette (``Ctrl+Shift+P``) and select **SQLTools Management: Add New Connection**.
+
+5. **For PostgreSQL:** Select **PostgreSQL** as the driver and enter the connection parameters:
+
+   - **Connection Name**: ``ASSUME``
+   - **Server**: ``localhost``
    - **Port**: ``5432``
    - **Database**: ``assume``
    - **Username**: ``assume``
    - **Password**: ``assume``
-   - **Use SSL**: No
 
-4. Once connected, you can browse tables in the PostgreSQL Explorer sidebar.
-5. Right-click a table to select rows, or open a new SQL editor to run custom queries.
+   **For SQLite:** Select **SQLite** as the driver. If prompted to install the SQLite binary or
+   Node dependencies, accept the installation and reload the window when asked. Enter the
+   connection parameters:
+
+   - **Connection Name**: ``ASSUME Local``
+   - **Database File**: path to your SQLite file, e.g. ``./examples/local_db/assume_db.db``
+
+6. Click **Test Connection** to verify, then **Save Connection**.
+
+.. note::
+   The ASSUME database uses the ``public`` schema. TimescaleDB creates additional internal
+   schemas (e.g. ``timescaledb_information``, ``_timescaledb_internal``). These can be ignored.
+   If the SQLTools explorer shows multiple schemas, only browse tables under **public**.
+
+Browsing and Querying
+----------------------
+
+Once connected, you can browse tables in the SQLTools sidebar.
+Click a table to preview its data, or open a new SQL editor to run custom queries.
 
 Example query in the SQL editor:
 
@@ -134,5 +160,8 @@ PyCharm Professional includes a built-in Database tool that supports PostgreSQL.
    - **Password**: ``assume``
 
 5. Click **Test Connection** to verify, then **OK**.
-6. The database tables appear in the Database tool window. Double-click a table to view its contents.
-7. Right-click the data source and select **New > Console** to open a SQL console for custom queries.
+6. In the **Schemas** tab, ensure only the ``public`` schema is checked. Uncheck any
+   TimescaleDB internal schemas (e.g. ``timescaledb_information``, ``_timescaledb_internal``)
+   to keep the database explorer clean.
+7. The database tables appear in the Database tool window. Double-click a table to view its contents.
+8. Right-click the data source and select **New > Console** to open a SQL console for custom queries.
