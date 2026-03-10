@@ -78,6 +78,7 @@ User Guide
 * :doc:`market_mechanism`
 * :doc:`scenario_loader`
 * :doc:`outputs`
+* :doc:`database_access`
 * :doc:`unit_operator`
 * :doc:`units`
 * :doc:`unit_forecasts`
@@ -100,6 +101,7 @@ User Guide
    market_mechanism
    scenario_loader
    outputs
+   database_access
    unit_operator
    units
    unit_forecasts
