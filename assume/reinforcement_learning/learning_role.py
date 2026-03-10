@@ -5,6 +5,7 @@
 import logging
 from collections import defaultdict
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 import pandas as pd
@@ -28,48 +29,178 @@ from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
 
 logger = logging.getLogger(__name__)
 
+# Default level name used for backward compatibility (single LearningConfig)
+DEFAULT_LEVEL = "units"
+
+
+def _new_cache():
+    """Create a fresh nested defaultdict for experience caching."""
+    return defaultdict(lambda: defaultdict(list))
+
+
+class LevelView:
+    """
+    Provides a per-level view of the Learning role.
+
+    Strategies and RL algorithms receive a LevelView instead of the full Learning role,
+    so they transparently access only their level's data (strats, buffer, config, caches)
+    while shared data (episodes, device, timestamps) is delegated to the actual Learning role.
+
+    This means TD3 (and other RL algorithms) need NO code changes — they interact with
+    LevelView exactly as they did with the old single-level Learning role.
+    """
+
+    def __init__(self, learning_role: "Learning", level: str):
+        object.__setattr__(self, "_role", learning_role)
+        object.__setattr__(self, "_level", level)
+
+    @property
+    def level(self) -> str:
+        return self._level
+
+    # --- Per-level properties ---
+
+    @property
+    def rl_strats(self):
+        return self._role.rl_strats[self._level]
+
+    @property
+    def buffer(self):
+        return self._role.buffer[self._level]
+
+    @buffer.setter
+    def buffer(self, value):
+        self._role.buffer[self._level] = value
+
+    @property
+    def learning_config(self):
+        return self._role.learning_config[self._level]
+
+    @property
+    def calc_lr_from_progress(self):
+        return self._role.calc_lr_from_progress[self._level]
+
+    @property
+    def calc_noise_from_progress(self):
+        return self._role.calc_noise_from_progress[self._level]
+
+    @property
+    def update_steps(self):
+        return self._role.update_steps[self._level]
+
+    @update_steps.setter
+    def update_steps(self, value):
+        self._role.update_steps[self._level] = value
+
+    # --- Per-level methods (called by strategies) ---
+
+    def register_strategy(self, strategy: LearningStrategy) -> None:
+        self._role.rl_strats[self._level][strategy.unit_id] = strategy
+
+    def add_observation_to_cache(self, unit_id, start, observation) -> None:
+        self._role.all_obs[self._level][start][unit_id].append(observation)
+
+    def add_actions_to_cache(self, unit_id, start, action, noise) -> None:
+        if unit_id == 0 or unit_id is None:
+            logger.warning(
+                f"Got invalid unit_id while storing learning experience: {unit_id}"
+            )
+            return
+        self._role.all_actions[self._level][start][unit_id].append(action)
+        self._role.all_noises[self._level][start][unit_id].append(noise)
+
+    def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
+        self._role.all_rewards[self._level][start][unit_id].append(reward)
+        self._role.all_regrets[self._level][start][unit_id].append(regret)
+        self._role.all_profits[self._level][start][unit_id].append(profit)
+
+    def write_rl_grad_params_to_output(self, learning_rate, unit_params_list) -> None:
+        """Forward to Learning role with level context."""
+        self._role.write_rl_grad_params_to_output(
+            learning_rate, unit_params_list, level=self._level
+        )
+
+    # --- Delegate everything else to the actual Learning role ---
+
+    def __getattr__(self, name):
+        return getattr(self._role, name)
+
 
 class Learning(Role):
     """
-    This class manages the learning process of reinforcement learning agents, including initializing key components such as
-    neural networks, replay buffer, and learning hyperparameters. It handles both training and evaluation modes based on
-    the provided learning configuration.
+    This class manages the learning process of reinforcement learning agents across
+    multiple levels (e.g. "units", "units_operator", "markets", ...). Each level has its
+    own strategies, replay buffer, RL algorithm, and experience caches. Episode counters
+    and evaluation metrics are shared across levels.
+
+    The set of levels is determined dynamically from the keys of the learning_config dict.
 
     Args:
-        learning_config (LearningConfig): The configuration for the learning process.
+        learning_config (dict[str, LearningConfig] | LearningConfig): Per-level learning
+            configurations keyed by arbitrary level names. A single LearningConfig is
+            accepted for backward compatibility and is treated as DEFAULT_LEVEL ("units").
         start (datetime.datetime): The start datetime for the simulation.
         end (datetime.datetime): The end datetime for the simulation.
-
+        shared_config (LearningConfig | None): Shared configuration for episode-level
+            settings (training_episodes, episodes_collecting_initial_experience,
+            validation_episodes_interval, early_stopping_*, device, continue_learning).
+            If None, falls back to the first per-level config (backward compatibility).
     """
 
     def __init__(
         self,
-        learning_config: LearningConfig,
+        learning_config: dict[str, LearningConfig] | LearningConfig,
         start: datetime,
         end: datetime,
+        shared_config: LearningConfig | None = None,
     ):
         super().__init__()
 
-        # how many learning roles do exist and how are they named
-        self.buffer: ReplayBuffer = None
-        self.episodes_done = 0
-        self.rl_strats: dict[int, LearningStrategy] = {}
-        self.learning_config = learning_config
-        self.critics = {}
-        self.target_critics = {}
+        # Accept single LearningConfig for backward compatibility
+        if isinstance(learning_config, LearningConfig):
+            learning_config = {DEFAULT_LEVEL: learning_config}
+        self.learning_config: dict[str, LearningConfig] = learning_config
 
+        # Shared config holds episode-level settings (training_episodes, early_stopping, etc.)
+        # Falls back to first per-level config for backward compatibility.
+        self.shared_config: LearningConfig = (
+            shared_config
+            if shared_config is not None
+            else next(iter(self.learning_config.values()))
+        )
+
+        # The set of levels is derived from the config keys
+        self.levels: tuple[str, ...] = tuple(self.learning_config.keys())
+
+        # Shared episode counters
+        self.episodes_done = 0
+
+        # Per-level: strategies, buffers, algorithms
+        self.rl_strats: dict[str, dict[int, LearningStrategy]] = {
+            level: {} for level in self.levels
+        }
+        self.buffer: dict[str, ReplayBuffer | None] = {
+            level: None for level in self.levels
+        }
+        self.rl_algorithm: dict[str, RLAlgorithm] = {}
+        self.critics = {level: {} for level in self.levels}
+        self.target_critics = {level: {} for level in self.levels}
+
+        # Level views: pass these to strategies/algorithms instead of `self`
+        self.level_views: dict[str, LevelView] = {
+            level: LevelView(self, level) for level in self.levels
+        }
+
+        # Device setup (from shared config)
         device = "cpu"
-        if self.learning_config:
-            if "cuda" in self.learning_config.device and th.cuda.is_available():
-                device = self.learning_config.device
-            elif (
-                "mps" in self.learning_config.device and th.backends.mps.is_available()
-            ):
-                device = self.learning_config.device
+        if self.shared_config:
+            if "cuda" in self.shared_config.device and th.cuda.is_available():
+                device = self.shared_config.device
+            elif "mps" in self.shared_config.device and th.backends.mps.is_available():
+                device = self.shared_config.device
         self.device = th.device(device)
 
         # future: add option to choose between float16 and float32
-        # float_type = learning_config.float_type
         self.float_type = th.float
 
         th.backends.cuda.matmul.allow_tf32 = True
@@ -81,169 +212,222 @@ class Learning(Role):
         self.end_datetime = end
 
         self.datetime = None
-        if self.learning_config.learning_mode:
-            # configure additional learning parameters if we are in learning or evaluation mode
-            if self.learning_config.learning_rate_schedule == "linear":
-                self.calc_lr_from_progress = linear_schedule_func(
-                    self.learning_config.learning_rate
-                )
-            else:
-                self.calc_lr_from_progress = (
-                    lambda x: self.learning_config.learning_rate
-                )
 
-            if self.learning_config.action_noise_schedule == "linear":
-                self.calc_noise_from_progress = linear_schedule_func(
-                    self.learning_config.noise_dt
-                )
-            else:
-                self.calc_noise_from_progress = lambda x: self.learning_config.noise_dt
+        # Check if any level has learning_mode enabled
+        any_learning_mode = any(
+            cfg.learning_mode for cfg in self.learning_config.values()
+        )
+
+        if any_learning_mode:
+            # Per-level: learning rate schedules, noise schedules, algorithms
+            self.calc_lr_from_progress: dict[str, callable] = {}
+            self.calc_noise_from_progress: dict[str, callable] = {}
+
+            for level, cfg in self.learning_config.items():
+                if not cfg.learning_mode:
+                    continue
+
+                if cfg.learning_rate_schedule == "linear":
+                    self.calc_lr_from_progress[level] = linear_schedule_func(
+                        cfg.learning_rate
+                    )
+                else:
+                    self.calc_lr_from_progress[level] = (
+                        lambda x, lr=cfg.learning_rate: lr
+                    )
+
+                if cfg.action_noise_schedule == "linear":
+                    self.calc_noise_from_progress[level] = linear_schedule_func(
+                        cfg.noise_dt
+                    )
+                else:
+                    self.calc_noise_from_progress[level] = lambda x, nd=cfg.noise_dt: nd
+
+                # Create RL algorithm for this level (receives a LevelView)
+                self.create_learning_algorithm(cfg.algorithm, level)
 
             self.eval_episodes_done = 0
 
-            # function that initializes learning, needs to be an extra function so that it can be called after buffer is given to Role
-            self.create_learning_algorithm(self.learning_config.algorithm)
-
-            # store evaluation values
+            # Shared evaluation tracking
             self.max_eval = defaultdict(lambda: -1e9)
             self.rl_eval = defaultdict(list)
-            # list of avg_changes
             self.avg_rewards = []
 
             self.tensor_board_logger = None
-            self.update_steps = None
+            self.update_steps: dict[str, int | None] = {
+                level: None for level in self.levels
+            }
 
-            # init dictionaries for all learning instances in this role
-            # Note: we use atomic-swaps later to ensure no overwrites while we write the data into the buffer
-            # this works since we do not use multi-threading, otherwise threading.locks would be needed here.
-            self.all_obs = defaultdict(lambda: defaultdict(list))
-            self.all_actions = defaultdict(lambda: defaultdict(list))
-            self.all_noises = defaultdict(lambda: defaultdict(list))
-            self.all_rewards = defaultdict(lambda: defaultdict(list))
-            self.all_regrets = defaultdict(lambda: defaultdict(list))
-            self.all_profits = defaultdict(lambda: defaultdict(list))
+            # Per-level experience cache dicts
+            # We use atomic-swaps later to avoid overwrites while writing into the buffer.
+            self.all_obs = {level: _new_cache() for level in self.levels}
+            self.all_actions = {level: _new_cache() for level in self.levels}
+            self.all_noises = {level: _new_cache() for level in self.levels}
+            self.all_rewards = {level: _new_cache() for level in self.levels}
+            self.all_regrets = {level: _new_cache() for level in self.levels}
+            self.all_profits = {level: _new_cache() for level in self.levels}
+
+    @property
+    def active_levels(self) -> list[str]:
+        """Return levels that have registered strategies."""
+        return [level for level in self.levels if self.rl_strats[level]]
+
+    def get_level_view(self, level: str) -> LevelView:
+        """
+        Get the LevelView for a given level.
+
+        Pass this to strategies and RL algorithms instead of the Learning role itself,
+        so they transparently access only their level's data.
+
+        Args:
+            level (str): The level name (must be a key in learning_config).
+
+        Returns:
+            LevelView: The per-level view.
+        """
+        if level not in self.level_views:
+            raise KeyError(
+                f"Unknown level '{level}'. Available levels: {list(self.levels)}"
+            )
+        return self.level_views[level]
 
     def on_ready(self):
         """
         Set up the learning role for reinforcement learning training.
 
-        Notes:
-            This method prepares the learning role for the reinforcement learning training process. It subscribes to relevant messages
-            for handling the training process and schedules recurrent tasks for policy updates based on the specified training frequency.
-            This cannot happen in the init since the context (compare mango agents) is not yet available there.To avoid inconsistent replay buffer states (e.g. observation and action has been stored but not the reward), this
-            slightly shifts the timing of the buffer updates.
+        Schedules a recurrent buffer-update task for each active level based on its train_freq.
+        This cannot happen in __init__ since the mango context is not yet available there.
         """
         super().on_ready()
 
-        shifted_start = self.start_datetime + pd.Timedelta(
-            self.learning_config.train_freq
-        )  # shift start by hours in time frequency
+        for level in self.active_levels:
+            cfg = self.learning_config[level]
+            shifted_start = self.start_datetime + pd.Timedelta(cfg.train_freq)
 
-        recurrency_task = create_rrule(
-            start=shifted_start,
-            end=self.end_datetime,
-            freq=self.learning_config.train_freq,
-        )
+            recurrency_task = create_rrule(
+                start=shifted_start,
+                end=self.end_datetime,
+                freq=cfg.train_freq,
+            )
 
-        self.context.schedule_recurrent_task(
-            self.store_to_buffer_and_update,
-            recurrency_task,
-            src="no_wait",
-        )
+            self.context.schedule_recurrent_task(
+                partial(self.store_to_buffer_and_update, level=level),
+                recurrency_task,
+                src="no_wait",
+            )
 
-    def sync_train_freq_with_simulation_horizon(self) -> str | None:
+    def sync_train_freq_with_simulation_horizon(self) -> dict[str, str | None]:
         """
-        Ensure self.train_freq evenly divides the simulation length.
-        If not, adjust self.train_freq (in-place) and return the new string, otherwise return None.
-        Uses self.start_datetime/self.end_datetime when available, otherwise falls back to timestamp fields.
+        Ensure train_freq evenly divides the simulation length for each active level.
+        If not, adjust train_freq (in-place) and return the (possibly adjusted) values.
+
+        Returns:
+            dict[str, str | None]: The train_freq per level (None if not in learning mode).
         """
+        result = {}
+        for level, cfg in self.learning_config.items():
+            if not cfg.learning_mode:
+                result[level] = None
+                continue
 
-        # ensure train_freq evenly divides simulation length (may adjust self.train_freq)
+            train_freq_str = str(cfg.train_freq)
+            try:
+                train_freq = pd.Timedelta(train_freq_str)
+            except Exception:
+                logger.warning(
+                    f"Invalid train_freq '{train_freq_str}' for level '{level}' — skipping adjustment."
+                )
+                result[level] = None
+                continue
 
-        if not self.learning_config.learning_mode:
-            return None
-
-        train_freq_str = str(self.learning_config.train_freq)
-        try:
-            train_freq = pd.Timedelta(train_freq_str)
-        except Exception:
-            logger.warning(
-                f"Invalid train_freq '{train_freq_str}' — skipping adjustment."
+            total_length = self.end_datetime - self.start_datetime
+            assert total_length >= train_freq, (
+                f"Simulation length ({total_length}) must be at least as long as "
+                f"train_freq ({train_freq_str}) for level '{level}'"
             )
-            return None
-        total_length = self.end_datetime - self.start_datetime
-        assert total_length >= train_freq, (
-            f"Simulation length ({total_length}) must be at least as long as train_freq ({train_freq_str})"
-        )
-        quotient, remainder = divmod(total_length, train_freq)
+            quotient, remainder = divmod(total_length, train_freq)
 
-        if remainder != pd.Timedelta(0):
-            n_intervals = int(quotient) + 1
-            new_train_freq_hours = int(
-                (total_length / n_intervals).total_seconds() / 3600
-            )
-            new_train_freq_str = f"{new_train_freq_hours}h"
-            self.learning_config.train_freq = new_train_freq_str
+            if remainder != pd.Timedelta(0):
+                n_intervals = int(quotient) + 1
+                new_train_freq_hours = int(
+                    (total_length / n_intervals).total_seconds() / 3600
+                )
+                new_train_freq_str = f"{new_train_freq_hours}h"
+                cfg.train_freq = new_train_freq_str
 
-            logger.warning(
-                f"Simulation length ({total_length}) is not divisible by train_freq ({train_freq_str}). "
-                f"Adjusting train_freq to {new_train_freq_str}."
-            )
+                logger.warning(
+                    f"Simulation length ({total_length}) is not divisible by train_freq "
+                    f"({train_freq_str}) for level '{level}'. "
+                    f"Adjusting train_freq to {new_train_freq_str}."
+                )
 
-        return self.learning_config.train_freq
+            result[level] = cfg.train_freq
+
+        return result
 
     def determine_validation_interval(self) -> int:
         """
         Compute and validate validation_interval.
+
+        Uses episode-related config from the first level (these should be identical across levels).
 
         Returns:
             validation_interval (int)
         Raises:
             ValueError if training_episodes is too small.
         """
-        default_interval = self.learning_config.validation_episodes_interval
-        training_episodes = self.learning_config.training_episodes
+        default_interval = self.shared_config.validation_episodes_interval
+        training_episodes = self.shared_config.training_episodes
         validation_interval = min(training_episodes, default_interval)
 
         min_required_episodes = (
-            self.learning_config.episodes_collecting_initial_experience
+            self.shared_config.episodes_collecting_initial_experience
             + validation_interval
         )
 
-        if self.learning_config.training_episodes < min_required_episodes:
+        if self.shared_config.training_episodes < min_required_episodes:
             raise ValueError(
-                f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({self.learning_config.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
+                f"Training episodes ({training_episodes}) must be greater than the sum "
+                f"of initial experience episodes ({self.shared_config.episodes_collecting_initial_experience}) "
+                f"and evaluation interval ({validation_interval})."
             )
 
         return validation_interval
 
-    def register_strategy(self, strategy: LearningStrategy) -> None:
+    def register_strategy(
+        self, strategy: LearningStrategy, level: str = DEFAULT_LEVEL
+    ) -> None:
         """
-        Register a learning strategy with this learning role.
+        Register a learning strategy with this learning role at the specified level.
 
         Args:
             strategy (LearningStrategy): The learning strategy to register.
-
+            level (str): The level name (must be a key in learning_config).
         """
+        self.rl_strats[level][strategy.unit_id] = strategy
 
-        self.rl_strats[strategy.unit_id] = strategy
+    async def store_to_buffer_and_update(self, level: str) -> None:
+        """
+        Collect cached experience for one level, store in buffer, and trigger policy update.
 
-    async def store_to_buffer_and_update(self) -> None:
+        Args:
+            level (str): The level to process.
+        """
         # Atomic dict operations - create new references
-        current_obs = self.all_obs
-        current_actions = self.all_actions
-        current_rewards = self.all_rewards
-        current_noises = self.all_noises
-        current_regrets = self.all_regrets
-        current_profits = self.all_profits
+        current_obs = self.all_obs[level]
+        current_actions = self.all_actions[level]
+        current_rewards = self.all_rewards[level]
+        current_noises = self.all_noises[level]
+        current_regrets = self.all_regrets[level]
+        current_profits = self.all_profits[level]
 
         # Reset cache dicts immediately with new defaultdicts
-        self.all_obs = defaultdict(lambda: defaultdict(list))
-        self.all_actions = defaultdict(lambda: defaultdict(list))
-        self.all_rewards = defaultdict(lambda: defaultdict(list))
-        self.all_noises = defaultdict(lambda: defaultdict(list))
-        self.all_regrets = defaultdict(lambda: defaultdict(list))
-        self.all_profits = defaultdict(lambda: defaultdict(list))
+        self.all_obs[level] = _new_cache()
+        self.all_actions[level] = _new_cache()
+        self.all_rewards[level] = _new_cache()
+        self.all_noises[level] = _new_cache()
+        self.all_regrets[level] = _new_cache()
+        self.all_profits[level] = _new_cache()
 
         # Get timestamps from cache we took
         all_timestamps = sorted(current_obs.keys())
@@ -259,9 +443,9 @@ class Learning(Role):
             ]
             # Carry over incomplete timesteps to new cache dicts
             for ts in incomplete_timestamps:
-                self.all_obs[ts] = current_obs[ts]
-                self.all_actions[ts] = current_actions[ts]
-                self.all_noises[ts] = current_noises[ts]
+                self.all_obs[level][ts] = current_obs[ts]
+                self.all_actions[level][ts] = current_actions[ts]
+                self.all_noises[level][ts] = current_noises[ts]
 
             # Create filtered cache (only complete timesteps)
             cache = {
@@ -274,123 +458,148 @@ class Learning(Role):
             }
 
             # write data to output agent
-            self.write_rl_params_to_output(cache)
+            self.write_rl_params_to_output(cache, level)
 
             # if we are training also update the policy and write data into buffer
-            if not self.learning_config.evaluation_mode:
-                # Process cache in background
-                await self._store_to_buffer_and_update_sync(cache, self.device)
+            cfg = self.learning_config[level]
+            if not cfg.evaluation_mode:
+                await self._store_to_buffer_and_update_sync(cache, self.device, level)
         else:
-            logger.warning("No experience retrieved to store in buffer at update step!")
+            logger.warning(
+                f"No experience retrieved to store in buffer at update step for level '{level}'!"
+            )
 
-    async def _store_to_buffer_and_update_sync(self, cache, device) -> None:
+    async def _store_to_buffer_and_update_sync(self, cache, device, level: str) -> None:
         """
-        This function takes all the information that the strategies wrote into the learning_role cache dicts and post_processes them to fit into the buffer.
-        Further triggers the next policy update
-
+        Post-process cached experience for one level into the replay buffer
+        and trigger the next policy update.
         """
+        strats = self.rl_strats[level]
         first_start = next(iter(cache["obs"]))
         for name, buffer in [
             ("observations", cache["obs"]),
             ("actions", cache["actions"]),
             ("rewards", cache["rewards"]),
         ]:
-            # check if all entries for the buffers have the same number of unit_ids as rl_strats
-            if len(buffer[first_start]) != len(self.rl_strats):
+            if len(buffer[first_start]) != len(strats):
                 logger.error(
-                    f"Number of unit_ids with {name} in learning role ({len(buffer[first_start])}) does not match number of rl_strats ({len(self.rl_strats)}). "
-                    "It seems like some learning_instances are not reporting experience. Cannot store to buffer and update policy!"
+                    f"Number of unit_ids with {name} in learning role level '{level}' "
+                    f"({len(buffer[first_start])}) does not match number of rl_strats "
+                    f"({len(strats)}). It seems like some learning_instances are not "
+                    "reporting experience. Cannot store to buffer and update policy!"
                 )
                 return
 
-        # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
-        self.buffer.add(
-            obs=transform_buffer_data(cache["obs"], device, self.rl_strats.keys()),
-            actions=transform_buffer_data(
-                cache["actions"], device, self.rl_strats.keys()
-            ),
-            reward=transform_buffer_data(
-                cache["rewards"], device, self.rl_strats.keys()
-            ),
+        # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and store in buffer
+        self.buffer[level].add(
+            obs=transform_buffer_data(cache["obs"], device, strats.keys()),
+            actions=transform_buffer_data(cache["actions"], device, strats.keys()),
+            reward=transform_buffer_data(cache["rewards"], device, strats.keys()),
         )
 
-        if (
-            self.episodes_done
-            >= self.learning_config.episodes_collecting_initial_experience
-        ):
-            self.rl_algorithm.update_policy()
+        cfg = self.learning_config[level]
+        if self.episodes_done >= cfg.episodes_collecting_initial_experience:
+            self.rl_algorithm[level].update_policy()
 
-    def add_observation_to_cache(self, unit_id, start, observation) -> None:
+    def add_observation_to_cache(
+        self, unit_id, start, observation, level: str = DEFAULT_LEVEL
+    ) -> None:
         """
-        Add the observation to the cache dict, per unit_id.
+        Add the observation to the cache dict for the given level.
 
         Args:
             unit_id (str): The id of the unit.
             observation (torch.Tensor): The observation to be added.
-
+            level (str): The level name.
         """
-        self.all_obs[start][unit_id].append(observation)
+        self.all_obs[level][start][unit_id].append(observation)
 
-    def add_actions_to_cache(self, unit_id, start, action, noise) -> None:
+    def add_actions_to_cache(
+        self, unit_id, start, action, noise, level: str = DEFAULT_LEVEL
+    ) -> None:
         """
-        Add the action and noise to the cache dict, per unit_id.
+        Add the action and noise to the cache dict for the given level.
 
         Args:
             unit_id (str): The id of the unit.
             action (torch.Tensor): The action to be added.
             noise (torch.Tensor): The noise to be added.
-
+            level (str): The level name.
         """
-
-        # Add validation to catch unexpected unit_ids
         if unit_id == 0 or unit_id is None:
             logger.warning(
                 f"Got invalid unit_id while storing learning experience: {unit_id}"
             )
             return
 
-        self.all_actions[start][unit_id].append(action)
-        self.all_noises[start][unit_id].append(noise)
+        self.all_actions[level][start][unit_id].append(action)
+        self.all_noises[level][start][unit_id].append(noise)
 
-    def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
+    def add_reward_to_cache(
+        self, unit_id, start, reward, regret, profit, level: str = DEFAULT_LEVEL
+    ) -> None:
         """
-        Add the reward to the cache dict, per unit_id.
+        Add the reward to the cache dict for the given level.
 
         Args:
             unit_id (str): The id of the unit.
             reward (float): The reward to be added.
-
+            regret (float): The regret to be added.
+            profit (float): The profit to be added.
+            level (str): The level name.
         """
-        self.all_rewards[start][unit_id].append(reward)
-        self.all_regrets[start][unit_id].append(regret)
-        self.all_profits[start][unit_id].append(profit)
+        self.all_rewards[level][start][unit_id].append(reward)
+        self.all_regrets[level][start][unit_id].append(regret)
+        self.all_profits[level][start][unit_id].append(profit)
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """
         Load the inter-episodic data from the dict stored across simulation runs.
 
+        Supports both the new per-level format (buffer/actors_and_critics keyed by level)
+        and the old flat format for backward compatibility.
+
         Args:
             inter_episodic_data (dict): The inter-episodic data to be loaded.
-
         """
         self.episodes_done = inter_episodic_data["episodes_done"]
         self.eval_episodes_done = inter_episodic_data["eval_episodes_done"]
         self.max_eval = inter_episodic_data["max_eval"]
         self.rl_eval = inter_episodic_data["all_eval"]
         self.avg_rewards = inter_episodic_data["avg_all_eval"]
-        self.buffer = inter_episodic_data["buffer"]
 
-        self.initialize_policy(inter_episodic_data["actors_and_critics"])
+        # Load per-level buffers
+        buffers = inter_episodic_data.get("buffer", {})
+        if isinstance(buffers, ReplayBuffer):
+            # Backward compat: single buffer -> assign to first active level
+            first_level = (
+                self.active_levels[0] if self.active_levels else self.levels[0]
+            )
+            self.buffer[first_level] = buffers
+        elif isinstance(buffers, dict):
+            for level in self.levels:
+                if level in buffers:
+                    self.buffer[level] = buffers[level]
+
+        # Load per-level policies
+        ac = inter_episodic_data.get("actors_and_critics")
+        if ac is not None and "actors" in ac:
+            # Backward compat: old flat format -> wrap to first active level
+            first_level = (
+                self.active_levels[0] if self.active_levels else self.levels[0]
+            )
+            ac = {first_level: ac}
+        self.initialize_policy(ac)
 
         # Disable initial exploration if initial experience collection is complete
         if (
             self.episodes_done
-            >= self.learning_config.episodes_collecting_initial_experience
+            >= self.shared_config.episodes_collecting_initial_experience
         ):
             self.turn_off_initial_exploration()
 
         # In continue_learning mode, disable it only for loaded strategies
-        elif self.learning_config.continue_learning:
+        elif self.shared_config.continue_learning:
             self.turn_off_initial_exploration(loaded_only=True)
 
     def get_inter_episodic_data(self):
@@ -400,50 +609,54 @@ class Learning(Role):
         Returns:
             dict: The inter-episodic data to be stored.
         """
-
         return {
             "episodes_done": self.episodes_done,
             "eval_episodes_done": self.eval_episodes_done,
             "max_eval": self.max_eval,
             "all_eval": self.rl_eval,
             "avg_all_eval": self.avg_rewards,
-            "buffer": self.buffer,
-            "actors_and_critics": self.rl_algorithm.extract_policy(),
+            "buffer": {level: self.buffer[level] for level in self.levels},
+            "actors_and_critics": {
+                level: self.rl_algorithm[level].extract_policy()
+                for level in self.active_levels
+            },
         }
 
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """
-        Disable initial exploration mode.
+        Disable initial exploration mode for all active levels.
 
-        If `loaded_only=True`, only turn off exploration for strategies that were loaded (used in continue_learning mode).
-        If `loaded_only=False`, turn it off for all strategies.
+        If `loaded_only=True`, only turn off exploration for strategies that were loaded
+        (used in continue_learning mode).
+        If `loaded_only=False`, turn it off for all strategies at all active levels.
 
         Args:
             loaded_only (bool): Whether to disable exploration only for loaded strategies.
         """
-        for strategy in self.rl_strats.values():
-            if loaded_only:
-                if strategy.actor.loaded:
+        for level in self.active_levels:
+            for strategy in self.rl_strats[level].values():
+                if loaded_only:
+                    if strategy.actor.loaded:
+                        strategy.collect_initial_experience_mode = False
+                else:
                     strategy.collect_initial_experience_mode = False
-            else:
-                strategy.collect_initial_experience_mode = False
 
     def get_progress_remaining(self) -> float:
         """
         Get the remaining learning progress from the simulation run.
-
+        Uses shared episode counters and shared_config for episode settings.
         """
         total_duration = self.end - self.start
         elapsed_duration = self.context.current_timestamp - self.start
 
         learning_episodes = (
-            self.learning_config.training_episodes
-            - self.learning_config.episodes_collecting_initial_experience
+            self.shared_config.training_episodes
+            - self.shared_config.episodes_collecting_initial_experience
         )
 
         if (
             self.episodes_done
-            < self.learning_config.episodes_collecting_initial_experience
+            < self.shared_config.episodes_collecting_initial_experience
         ):
             progress_remaining = 1
         else:
@@ -452,7 +665,7 @@ class Learning(Role):
                 - (
                     (
                         self.episodes_done
-                        - self.learning_config.episodes_collecting_initial_experience
+                        - self.shared_config.episodes_collecting_initial_experience
                     )
                     / learning_episodes
                 )
@@ -461,71 +674,63 @@ class Learning(Role):
 
         return progress_remaining
 
-    def create_learning_algorithm(self, algorithm: RLAlgorithm):
+    def create_learning_algorithm(self, algorithm: str, level: str):
         """
-        Create and initialize the reinforcement learning algorithm.
+        Create and initialize the reinforcement learning algorithm for a given level.
 
-        This method creates and initializes the reinforcement learning algorithm based on the specified algorithm name. The algorithm
-        is associated with the learning role and configured with relevant hyperparameters.
+        The algorithm receives a LevelView so it transparently accesses only its level's
+        strategies, buffer, and config — no changes needed in the algorithm code.
 
         Args:
-            algorithm (RLAlgorithm): The name of the reinforcement learning algorithm.
+            algorithm (str): The name of the reinforcement learning algorithm.
+            level (str): The level name (must be a key in learning_config).
         """
         if algorithm == "matd3":
-            self.rl_algorithm = TD3(learning_role=self)
+            self.rl_algorithm[level] = TD3(learning_role=self.get_level_view(level))
         else:
             logger.error(f"Learning algorithm {algorithm} not implemented!")
 
     def initialize_policy(self, actors_and_critics: dict = None) -> None:
         """
-        Initialize the policy of the reinforcement learning agent considering the respective algorithm.
+        Initialize the policies for all active levels.
 
-        This method initializes the policy (actor) of the reinforcement learning agent. It tests if we want to continue the learning process with
-        stored policies from a former training process. If so, it loads the policies from the specified directory. Otherwise, it initializes the
-        respective new policies.
+        Args:
+            actors_and_critics (dict | None): Per-level dict of actor/critic networks,
+                keyed by level name. None to initialize fresh networks.
         """
+        for level in self.active_levels:
+            level_ac = None
+            if actors_and_critics and level in actors_and_critics:
+                level_ac = actors_and_critics[level]
 
-        self.rl_algorithm.initialize_policy(actors_and_critics)
+            self.rl_algorithm[level].initialize_policy(level_ac)
 
-        if (
-            self.learning_config.continue_learning is True
-            and actors_and_critics is None
-        ):
-            directory = self.learning_config.trained_policies_load_path
-            if directory and Path(directory).is_dir():
-                logger.info(f"Loading pretrained policies from {directory}!")
-                self.rl_algorithm.load_params(directory)
-            else:
-                raise FileNotFoundError(
-                    f"Directory {directory} does not exist! Cannot load pretrained policies from trained_policies_load_path!"
-                )
+            cfg = self.learning_config[level]
+            if cfg.continue_learning is True and level_ac is None:
+                directory = cfg.trained_policies_load_path
+                if directory and Path(directory).is_dir():
+                    logger.info(
+                        f"Loading pretrained policies for level '{level}' from {directory}!"
+                    )
+                    self.rl_algorithm[level].load_params(directory)
+                else:
+                    raise FileNotFoundError(
+                        f"Directory {directory} does not exist! Cannot load pretrained "
+                        f"policies for level '{level}' from trained_policies_load_path!"
+                    )
 
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """
-        Compare evaluation metrics and save policies based on the best achieved performance according to the metrics calculated.
-
-        This method compares the evaluation metrics, such as reward, profit, and regret, and saves the policies if they achieve the
-        best performance in their respective categories. It iterates through the specified modes, compares the current evaluation
-        value with the previous best, and updates the best value if necessary. If an improvement is detected, it saves the policy
-        and associated parameters.
-
-        metrics contain a metric key like "reward" and the current value.
-        This function stores the policies with the highest metric.
-        So if minimize is required one should add for example "minus_regret" which is then maximized.
+        Compare evaluation metrics and save policies for all active levels based on best
+        achieved performance.
 
         Returns:
             bool: True if early stopping criteria is triggered.
-
-        Note:
-            This method is typically used during the evaluation phase to save policies that achieve superior performance.
-            Currently the best evaluation metric is still assessed by the development team and preliminary we use the average rewards.
         """
         if not metrics:
             logger.error("tried to save policies but did not get any metrics")
-            return
-        # if the current values are a new max in one of the metrics - we store them in the default folder
+            return False
 
-        # add current reward to list of all rewards
         for metric, value in metrics.items():
             self.rl_eval[metric].append(value)
 
@@ -535,10 +740,12 @@ class Learning(Role):
 
                 # use first metric as default
                 if metric == list(metrics.keys())[0]:
-                    # store the best for our current metric in its folder
-                    self.rl_algorithm.save_params(
-                        directory=f"{self.learning_config.trained_policies_save_path}/{metric}_eval_policies"
-                    )
+                    # store the best for all active levels
+                    for level in self.active_levels:
+                        cfg = self.learning_config[level]
+                        self.rl_algorithm[level].save_params(
+                            directory=f"{cfg.trained_policies_save_path}/{metric}_eval_policies"
+                        )
 
                     logger.info(
                         f"New best policy saved, episode: {self.eval_episodes_done + 1}, {metric=}, value={value:.2f}"
@@ -549,19 +756,17 @@ class Learning(Role):
                 )
 
             # if we do not see any improvement in the last x evaluation runs we stop the training
-            if len(self.rl_eval[metric]) >= self.learning_config.early_stopping_steps:
+            if len(self.rl_eval[metric]) >= self.shared_config.early_stopping_steps:
                 self.avg_rewards.append(
                     sum(
-                        self.rl_eval[metric][
-                            -self.learning_config.early_stopping_steps :
-                        ]
+                        self.rl_eval[metric][-self.shared_config.early_stopping_steps :]
                     )
-                    / self.learning_config.early_stopping_steps
+                    / self.shared_config.early_stopping_steps
                 )
 
-                if len(self.avg_rewards) >= self.learning_config.early_stopping_steps:
+                if len(self.avg_rewards) >= self.shared_config.early_stopping_steps:
                     recent_rewards = self.avg_rewards[
-                        -self.learning_config.early_stopping_steps :
+                        -self.shared_config.early_stopping_steps :
                     ]
                     min_reward = min(recent_rewards)
                     max_reward = max(recent_rewards)
@@ -573,21 +778,28 @@ class Learning(Role):
 
                     avg_change = abs((max_reward - min_reward) / denominator)
 
-                    if avg_change < self.learning_config.early_stopping_threshold:
+                    if avg_change < self.shared_config.early_stopping_threshold:
                         logger.info(
-                            f"Stopping training as no improvement above {self.learning_config.early_stopping_threshold * 100}% in last {self.learning_config.early_stopping_steps} evaluations for {metric}"
+                            f"Stopping training as no improvement above "
+                            f"{self.shared_config.early_stopping_threshold * 100}% in last "
+                            f"{self.shared_config.early_stopping_steps} evaluations for {metric}"
                         )
                         if (
-                            self.learning_config.learning_rate_schedule
-                            or self.learning_config.action_noise_schedule
+                            self.shared_config.learning_rate_schedule
+                            or self.shared_config.action_noise_schedule
                         ) is not None:
                             logger.info(
-                                f"Learning rate schedule ({self.learning_config.learning_rate_schedule}) or action noise schedule ({self.learning_config.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
+                                f"Learning rate schedule ({self.shared_config.learning_rate_schedule}) "
+                                f"or action noise schedule ({self.shared_config.action_noise_schedule}) "
+                                f"were scheduled to decay, further learning improvement can "
+                                f"be possible. End value of schedule may not have been reached."
                             )
 
-                        self.rl_algorithm.save_params(
-                            directory=f"{self.learning_config.trained_policies_save_path}/last_policies"
-                        )
+                        for level in self.active_levels:
+                            cfg = self.learning_config[level]
+                            self.rl_algorithm[level].save_params(
+                                directory=f"{cfg.trained_policies_save_path}/last_policies"
+                            )
 
                         return True
             return False
@@ -604,9 +816,6 @@ class Learning(Role):
         """
         Initialize the logging for the reinforcement learning agent.
 
-        This method initializes the tensor board logger for the reinforcement learning agent.
-        It also initializes the parameters required for sending data to the output role.
-
         Args:
             simulation_id (str): The unique identifier for the simulation.
             episode (int): The current training episode number.
@@ -615,15 +824,14 @@ class Learning(Role):
             output_agent_addr (str): The address of the output agent.
             train_start (str): The start time of simulation.
         """
-
         self.tensor_board_logger = TensorBoardLogger(
             simulation_id=simulation_id,
             db_uri=db_uri,
-            learning_mode=self.learning_config.learning_mode,
-            evaluation_mode=self.learning_config.evaluation_mode,
+            learning_mode=self.shared_config.learning_mode,
+            evaluation_mode=self.shared_config.evaluation_mode,
             episode=episode,
             eval_episode=eval_episode,
-            episodes_collecting_initial_experience=self.learning_config.episodes_collecting_initial_experience,
+            episodes_collecting_initial_experience=self.shared_config.episodes_collecting_initial_experience,
         )
 
         # Parameters required for sending data to the output role
@@ -631,15 +839,15 @@ class Learning(Role):
 
         self.datetime = pd.to_datetime(train_start)
 
-        self.update_steps = 0
+        self.update_steps = {level: 0 for level in self.levels}
 
-    def write_rl_params_to_output(self, cache):
+    def write_rl_params_to_output(self, cache, level: str = DEFAULT_LEVEL):
         """
-        Sends the current rl_strategy update to the output agent.
+        Sends the current rl_strategy update to the output agent for the given level.
 
         Args:
-            products_index (pandas.DatetimeIndex): The index of all products.
-            marketconfig (MarketConfig): The market configuration.
+            cache (dict): The cached experience data.
+            level (str): The level name.
         """
         output_agent_list = []
 
@@ -649,6 +857,7 @@ class Learning(Role):
                 output_dict = {
                     "datetime": start,
                     "unit": unit_id,
+                    "level": level,
                     "reward": cache["rewards"][start][unit_id][0],
                     "regret": cache["regret"][start][unit_id][0],
                     "profit": cache["profit"][start][unit_id][0],
@@ -679,14 +888,13 @@ class Learning(Role):
             )
 
     def write_rl_grad_params_to_output(
-        self, learning_rate: float, unit_params_list: list[dict]
+        self,
+        learning_rate: float,
+        unit_params_list: list[dict],
+        level: str = DEFAULT_LEVEL,
     ) -> None:
         """
-        Writes learning parameters and critic losses to output at specified time intervals.
-
-        This function processes training metrics for each critic over multiple time steps and
-        sends them to a database for storage. It tracks the learning rate and critic losses
-        across training iterations, associating each record with a timestamp.
+        Writes learning parameters and critic losses to output for a given level.
 
         Parameters
         ----------
@@ -694,29 +902,32 @@ class Learning(Role):
             The current learning rate used in training.
         unit_params_list : list[dict]
             A list of dictionaries containing critic losses for each time step.
-            Each dictionary maps critic names to their corresponding loss values.
+        level : str
+            The level name.
         """
+        cfg = self.learning_config[level]
+
         # gradient steps performed in previous training episodes
         gradient_steps_done = (
             max(
-                self.episodes_done
-                - self.learning_config.episodes_collecting_initial_experience,
+                self.episodes_done - cfg.episodes_collecting_initial_experience,
                 0,
             )
             * int(
                 (timestamp2datetime(self.end) - timestamp2datetime(self.start))
-                / pd.Timedelta(self.learning_config.train_freq)
+                / pd.Timedelta(cfg.train_freq)
             )
-            * self.learning_config.gradient_steps
+            * cfg.gradient_steps
         )
 
         output_list = [
             {
                 "step": gradient_steps_done
-                + self.update_steps
-                * self.learning_config.gradient_steps  # gradient steps performed in current training episode
+                + self.update_steps[level]
+                * cfg.gradient_steps  # gradient steps performed in current training episode
                 + gradient_step,
                 "unit": u_id,
+                "level": level,
                 "actor_loss": params["actor_loss"],
                 "actor_total_grad_norm": params["actor_total_grad_norm"],
                 "actor_max_grad_norm": params["actor_max_grad_norm"],
@@ -725,7 +936,7 @@ class Learning(Role):
                 "critic_max_grad_norm": params["critic_max_grad_norm"],
                 "learning_rate": learning_rate,
             }
-            for gradient_step in range(self.learning_config.gradient_steps)
+            for gradient_step in range(cfg.gradient_steps)
             for u_id, params in unit_params_list[gradient_step].items()
         ]
 
@@ -739,5 +950,5 @@ class Learning(Role):
                 },
             )
 
-        # Number of network updates (with `self.gradient_steps`) during this episode
-        self.update_steps += 1
+        # Number of network updates (with `gradient_steps`) during this episode
+        self.update_steps[level] += 1
