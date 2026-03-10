@@ -1,4 +1,3 @@
-name,bus0,bus1,s_nom,x,r
-Line_N_W,north,west,14,0.01,0.00001
-Line_N_E,north,east,14,0.01,0.00001
-Line_W_E,west,east,14,0.01,0.00001
+version https://git-lfs.github.com/spec/v1
+oid sha256:fbe8d4637f2526b472e8825747b1342416e7e80a0cddfff53d6dfd53d1fc4c2d
+size 132

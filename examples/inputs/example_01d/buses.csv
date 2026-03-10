@@ -1,6 +1,3 @@
-name,v_nom,zone_id,x,y
-north_1,380.0,DE_1,10.0,54.0
-north_2,380.0,DE_1,9.5,53.5
-east,380.0,DE_1,13.4,52.5
-south,380.0,DE_2,11.6,48.1
-west,380.0,DE_2,7.0,51.5
+version https://git-lfs.github.com/spec/v1
+oid sha256:35bc9a1b1f8aaad7b0423334e7959244535f8d1878e84a3d9589f5a8264970fb
+size 158

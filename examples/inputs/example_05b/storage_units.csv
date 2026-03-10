@@ -1,4 +1,3 @@
-﻿name,technology,bidding_EOM,bidding_redispatch,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,initial_soc,ramp_up_charge,ramp_down_charge,ramp_up_discharge,ramp_down_discharge,additional_cost_charge,additional_cost_discharge,node,unit_operator
-store_1,li-ion,flexable_eom_storage,flexible_storage_redispatch_strategy,10,10,1,1,0,20,10,10,10,10,10,0,0,north,storage_operator0
-store_2,li-ion,flexable_eom_storage,flexible_storage_redispatch_strategy,10,10,1,1,0,20,10,10,10,10,10,0,0,east,storage_operator1
-store_3,li-ion,flexable_eom_storage,flexible_storage_redispatch_strategy,10,10,1,1,0,20,10,10,10,10,10,0,0,west,storage_operator2
+version https://git-lfs.github.com/spec/v1
+oid sha256:0930064ad72fbd83f81858cca177b42571dffd2efeda377e8020883f5851b2e6
+size 683

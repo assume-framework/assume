@@ -1,2 +1,3 @@
-name,technology,bidding_EOM,max_power,min_power,unit_operator
-demand_EOM,inflex_demand,naive_eom,1000000,0,eom_de
+version https://git-lfs.github.com/spec/v1
+oid sha256:0206424c23060432dc7931458932e6a3745a6997febc0e9a5b42eb4227df4fbd
+size 114

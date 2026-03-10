@@ -1,6 +1,3 @@
-name,unit_type,technology,node,bidding_EOM,unit_operator,objective,flexibility_measure,cost_tolerance,demand,fuel_type,max_feed_in,max_gas_in,h2_mass_fraction_in_syngas,h2_recovery,min_h2_purity,solid_share,max_wet_in,moisture_in,moisture_target,specific_heat_per_t_water,specific_heat_demand,max_power,min_power,ramp_up,ramp_down,min_operating_steps,min_down_steps,eta_electric,eta_ng,ng_co2_factor,specific_electricity,liquid_disposal_cost,yield_gas,yield_oil,yield_char,yield_water,max_capacity,min_capacity,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_power_charge,max_power_discharge,is_prosumer
-A360,tcr_plant,digestate_separation,south,naive_da_dsm,dsm_operator_1,max_net_income,cost_based_load_shift,20,0,,30,,,,,0.6,,,,,,,,30,30,0,0,,,,0.0001,0,,,,,,,,,,,,,Yes
-A360,tcr_plant,dryer,south,,,,,,,electricity,,,,,,,136.98,0.7,0.1,0.75,,8.8,,,,0,0,0.95,0.9,,,,,,,,,,,,,,,,
-A360,tcr_plant,tcr_booster,south,,,,,,,electricity,51,,,,,,,,,,0.43,2.5,,,,0,,0.95,0.9,0.202,,,0.216,0.0905,0.424,0.2695,,,,,,,,,
-A360,tcr_plant,psa,south,,,,,,,,,1.32,0.05,0.9,0.999,,,,,,,0.03,,,,,,,,,0.017,,,,,,,,,,,,,,
-A360,tcr_plant,battery_storage,south,,,,,,,,,,,,,,,,,,,10,,10,10,,,,,,,,,,,,40,0,0,0.0001,0.99,0.99,10,10,
+version https://git-lfs.github.com/spec/v1
+oid sha256:cc0b52a634d4101998a968bfc9a0bc2873ed773c3594b06712f99b9e56230be9
+size 1235

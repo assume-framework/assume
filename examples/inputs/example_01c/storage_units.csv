@@ -1,2 +1,3 @@
-name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,additional_cost_charge,additional_cost_discharge,natural_inflow,unit_operator
-Storage 1,PSPP,flexable_eom_storage,flexable_pos_crm_storage,flexable_neg_crm_storage,1000.0,992.0,0.86,0.9,0.0,6076.0,0.28,0.28,0.0,Operator 1
+version https://git-lfs.github.com/spec/v1
+oid sha256:7cf39baf9ef32be9d0e76c39211800333187c5a71a41b059ce7213888055d7ba
+size 374

@@ -1,12 +1,3 @@
-name,bidding_EOM,price_import,price_export,unit_operator
-DE_NL,naive_exchange,0,2999,Exchanges Operator
-DE_CH,naive_exchange,0,2999,Exchanges Operator
-DE_DK,naive_exchange,0,2999,Exchanges Operator
-DE_CZ,naive_exchange,0,2999,Exchanges Operator
-DE_LU,naive_exchange,0,2999,Exchanges Operator
-DE_SE,naive_exchange,0,2999,Exchanges Operator
-DE_AT,naive_exchange,0,2999,Exchanges Operator
-DE_FR,naive_exchange,0,2999,Exchanges Operator
-DE_PL,naive_exchange,0,2999,Exchanges Operator
-DE_NO,naive_exchange,0,2999,Exchanges Operator
-DE_BE,naive_exchange,0,2999,Exchanges Operator
+version https://git-lfs.github.com/spec/v1
+oid sha256:e354b989218ee20fc367f467ef9b50e1cb749b26b387cc0815de9774f7801acd
+size 574

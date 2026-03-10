@@ -1,3 +1,3 @@
-﻿name,technology,bidding_energy,bidding_capacity_pos,bidding_capacity_neg,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,variable_cost_charge,variable_cost_discharge,natural_inflow,unit_operator
-storage_unit,PSPP,flexable_eom_storage,-,-,490,452.9,0.87,0.92,1,3528.8,0.28,0.28,0,storage_operator
-battery_unit,li-ion_battery,flexable_eom_storage,-,-,100,90,0.95,0.95,1,190,30,30,0,battery_operator
+version https://git-lfs.github.com/spec/v1
+oid sha256:780420c4fea00aed0bc98f5ab13c91c690e12dc79bd8916c40885f4ff7399220
+size 444
