@@ -54,8 +54,6 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         Maximum allowable bid price. Defaults to 100.
     min_bid_price : float
         Maximum allowable bid price. Defaults to -100.
-    max_demand : float
-        Maximum demand capacity of the unit. Defaults to 10e3.
     device : str
         Device for computation, such as "cpu" or "cuda". Defaults to "cpu".
     float_type : str
@@ -64,12 +62,8 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         Indicates whether the agent is in learning mode. Defaults to False.
     algorithm : str
         Name of the RL algorithm in use. Defaults to "matd3".
-    actor_architecture_class : type[torch.nn.Module]
-        Class of the neural network architecture used for the actor network. Defaults to MLPActor.
     actor : torch.nn.Module
         Actor network for determining actions.
-    order_types : list[str]
-        Types of market orders supported by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
         Noise model added to actions during learning to encourage exploration. Defaults to None.
     collect_initial_experience_mode : bool
@@ -86,29 +80,26 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         # when constructing the observations. This value is fixed for each strategy, as the
         # neural network architecture is predefined, and the size of the observations must remain consistent.
 
-        self.foresight = kwargs.pop("foresight", 12)  # number of forecasting step
+        foresight = kwargs.pop("foresight", 12)  # number of forecasting step
         self.nbins = kwargs.pop("nbins", 4)  # numbers of cost bins
         self.steps = kwargs.pop("steps", 1)  # numbers of steps to bid
         act_dim = self.nbins * self.steps  # actions for each time step in the foresight
         unique_obs_dim = (
             self.nbins * 2 + 2
         )  # tuple of volumes and costs for each quantile plus time encodings
-        obs_dim = 3 * self.foresight + unique_obs_dim
+        obs_dim = 3 * foresight + unique_obs_dim
         # Hyperparameters for action and reward
         self.min_markup = kwargs.pop("min_markup", 1)  # min markup on marginal cost
         self.max_markup = kwargs.pop("max_markup", 3)  # max markup on marginal cost
 
         super().__init__(
-            foresight=self.foresight,
+            foresight=foresight,
             obs_dim=obs_dim,
             act_dim=act_dim,
             unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
-
-        # define allowed order types
-        self.order_types = kwargs.get("order_types", ["SB"])
 
     def calculate_bids(
         self,

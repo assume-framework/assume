@@ -349,8 +349,6 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         Number of time steps for which the agent forecasts market conditions. Defaults to 12.
     max_bid_price : float
         Maximum allowable bid price. Defaults to 100.
-    max_demand : float
-        Maximum demand capacity of the unit. Defaults to 10e3.
     device : str
         Device for computation, such as "cpu" or "cuda". Defaults to "cpu".
     float_type : str
@@ -363,8 +361,6 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         Class of the neural network architecture used for the actor network. Defaults to MLPActor.
     actor : torch.nn.Module
         Actor network for determining actions.
-    order_types : list[str]
-        Types of market orders supported by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
         Noise model added to actions during learning to encourage exploration. Defaults to None.
     collect_initial_experience_mode : bool
@@ -389,9 +385,6 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
             *args,
             **kwargs,
         )
-
-        # define allowed order types
-        self.order_types = kwargs.get("order_types", ["SB"])
 
     def calculate_bids(
         self,
@@ -835,8 +828,6 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         Number of time steps for forecasting market conditions. Defaults to 24.
     max_bid_price : float
         Maximum allowable bid price. Defaults to 100.
-    max_demand : float
-        Maximum demand capacity of the storage. Defaults to 10e3.
     device : str
         Device used for computation ("cpu" or "cuda"). Defaults to "cpu".
     float_type : str
@@ -849,8 +840,6 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         Class of the neural network for the actor network. Defaults to MLPActor.
     actor : torch.nn.Module
         The neural network used to predict actions.
-    order_types : list[str]
-        Types of market orders used by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
         Noise model added to actions during learning for exploration. Defaults to None.
     collect_initial_experience_mode : bool
@@ -875,9 +864,6 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
             *args,
             **kwargs,
         )
-
-        # define allowed order types
-        self.order_types = kwargs.get("order_types", ["SB"])
 
     def get_individual_observations(
         self, unit: SupportsMinMaxCharge, start: datetime, end: datetime
@@ -1146,8 +1132,6 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         Class of the neural network for the actor network. Defaults to MLPActor.
     actor : torch.nn.Module
         The neural network used to predict actions.
-    order_types : list[str]
-        Types of market orders used by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
         Noise model added to actions during learning for exploration. Defaults to None.
     collect_initial_experience_mode : bool
@@ -1172,9 +1156,6 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
             *args,
             **kwargs,
         )
-
-        # define allowed order types
-        self.order_types = kwargs.get("order_types", ["SB"])
 
     def get_individual_observations(
         self, unit: SupportsMinMaxCharge, start: datetime, end: datetime
