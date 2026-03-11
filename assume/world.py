@@ -174,9 +174,9 @@ class World:
         self.addresses = []
         # required for jupyter notebooks
         # as they already have a running loop
-        import nest_asyncio
+        import nest_asyncio2
 
-        nest_asyncio.apply()
+        nest_asyncio2.apply()
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
 
