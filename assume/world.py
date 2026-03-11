@@ -204,6 +204,8 @@ class World:
             save_frequency_hours (int): The frequency (in hours) at which to save simulation data.
             bidding_params (dict, optional): Parameters for bidding. Defaults to an empty dictionary.
             learning_dict (dict, optional): Configuration for the learning process. Defaults to an empty dictionary.
+            episode (int, optional): The episode number for learning. Defaults to 1.
+            eval_episode (int, optional): The episode number for evaluation. Defaults to 1.
             manager_address: The address of the manager.
             **kwargs: Additional keyword arguments.
 
