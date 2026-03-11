@@ -12,9 +12,7 @@ from pandas._testing import assert_series_equal
 
 from assume.common.fast_pandas import FastIndex
 from assume.common.forecast_algorithms import (
-    calculate_naive_congestion_signal,
     calculate_naive_price,
-    calculate_naive_renewable_utilisation,
     calculate_naive_residual_load,
     get_forecast_registries,
     sort_units,
@@ -239,15 +237,11 @@ def test_forecast_interface__cache_hits(forecast_setup):
     # clear cache uses
     calculate_naive_price.cache_clear()
     calculate_naive_residual_load.cache_clear()
-    calculate_naive_congestion_signal.cache_clear()
-    calculate_naive_renewable_utilisation.cache_clear()
     sort_units.cache_clear()
 
-    forecasts = forecast_setup["forecast_df"]
-    index = forecast_setup["index"]
     for i, unit in enumerate(forecast_setup["units"]):
         unit.forecaster.initialize(
-            forecast_setup["units"], forecast_setup["market_configs"], forecasts, unit
+            forecast_setup["units"], forecast_setup["market_configs"], None, unit
         )
 
         assert calculate_naive_price.cache_info().hits == i

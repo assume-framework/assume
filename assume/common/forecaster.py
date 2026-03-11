@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from typing import TYPE_CHECKING, TypeAlias
 
 import pandas as pd
@@ -18,6 +19,61 @@ ForecastIndex: TypeAlias = FastIndex | pd.DatetimeIndex | pd.Series
 ForecastSeries: TypeAlias = FastSeries | list | float | pd.Series
 
 log = logging.getLogger(__name__)
+
+
+def _ensure_not_none(
+    df: pd.DataFrame | None, index: ForecastIndex, check_index=False
+) -> pd.DataFrame:
+    if isinstance(index, FastIndex):
+        index = index.as_datetimeindex()
+
+    if df is None:
+        return pd.DataFrame(index=index)
+    if check_index and index.freq != df.index.inferred_freq:
+        raise ValueError("Forecast frequency does not match index frequency.")
+    return df
+
+
+def calculate_price_forecasts(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    market_configs: list[MarketConfig],
+    price_forecast_algorithm: Callable,
+    forecast_df: ForecastSeries = None,
+    preprocess_information=None,
+) -> dict[str, ForecastSeries]:
+    """
+    Naive price forecast that calculates prices based on merit order with marginal costs.
+    Does not take account: Storages, DSM units.
+    TODO: further documentation
+    """
+
+    # _, demand_units, exchange_units, _, _ = sort_units(units)
+    forecast_df = _ensure_not_none(forecast_df, index)
+
+    price_forecasts: dict[str, pd.Series] = {}
+
+    for config in market_configs:
+        market_id = config.market_id
+        if config.product_type != "energy":
+            log.warning(
+                f"Price forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
+            )
+            continue
+
+        price_forecasts[market_id] = forecast_df.get(f"price_{market_id}")
+        if price_forecasts[market_id] is not None:
+            # go next if forecast existing
+            continue
+
+        price_forecasts[market_id] = price_forecast_algorithm(
+            index,
+            units,
+            config,
+            # forecast_df,
+            preprocess_information,
+        )
+    return price_forecasts
 
 
 class UnitForecaster:
@@ -167,10 +223,11 @@ class UnitForecaster:
             price_forecast_algorithm_name
         )
         if price_forecast_algorithm is not None:  # None if one wants to keep forecasts
-            self.price = price_forecast_algorithm(
+            self.price = calculate_price_forecasts(
                 self.index,
                 units,
                 market_configs,
+                price_forecast_algorithm,
                 forecast_df,
                 self.preprocess_information["price"],
             )

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
@@ -13,7 +12,10 @@ import pandas as pd
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import ForecastIndex, ForecastSeries
-from assume.common.market_objects import MarketConfig
+from assume.common.market_objects import MarketConfig, is_renewable
+from assume.common.utils import get_available_products
+from assume.markets.clearing_algorithms.simple import PayAsClearRole
+from assume.strategies import EnergyHeuristicElasticStrategy
 from assume.units.demand import Demand
 from assume.units.dsm_load_shift import DSMFlex
 from assume.units.exchange import Exchange
@@ -78,13 +80,6 @@ def custom_lru_cache(func_or_None=None, maxsize=128, typed=False, hasher=id):
     return decorator if func_or_None is None else decorator(func_or_None)
 
 
-def is_renewable(string, pattern=r"\b(?:wind|solar|bio)\b") -> bool:
-    """
-    Returns whether a string contains any of the renewable technology keywords (wind, solar, bio).
-    """
-    return re.search(pattern, string, flags=re.IGNORECASE) is not None
-
-
 def _ensure_not_none(
     df: pd.DataFrame | None, index: ForecastIndex, check_index=False
 ) -> pd.DataFrame:
@@ -144,6 +139,13 @@ def calculate_sum_demand(
         axis=0
     )
 
+    return sum_demand + calculate_exchange_volume(exchange_units)
+
+
+def calculate_exchange_volume(exchange_units: list[Exchange]):
+    """Returns summed exchange volume at every timestep (imports - exports)"""
+    sum_demand = 0
+
     # get exchanges if exchange_units are available
     if exchange_units:  # if not empty
         # get sum of imports as name of exchange_unit_import
@@ -160,93 +162,213 @@ def calculate_sum_demand(
     return sum_demand
 
 
-@custom_lru_cache
-def calculate_naive_price(
+@lru_cache
+def calculate_naive_price_inelastic(
     index: ForecastIndex,
     units: list[BaseUnit],
-    market_configs: list[MarketConfig],
-    forecast_df: ForecastSeries = None,
-    preprocess_information=None,
+    config: MarketConfig,
 ) -> dict[str, ForecastSeries]:
-    """
-    Naive price forecast that calculates prices based on merit order with marginal costs.
-    Does not take account: Storages, DSM units.
-    TODO: further documentation
-    """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
 
-    _, demand_units, exchange_units, _, _ = sort_units(units)
-    forecast_df = _ensure_not_none(forecast_df, index)
+    # 1. Sort units by type and filter for units with bidding strategy for the given market_id
+    powerplants_units, demand_units, exchange_units, _, _ = sort_units(
+        units, config.market_id
+    )
 
-    price_forecasts: dict[str, pd.Series] = {}
+    # 2. Calculate marginal costs for each unit and time step.
+    #    The resulting DataFrame has rows = time steps and columns = units.
+    #    shape: (index_len, num_pp_units)
+    marginal_costs = pd.DataFrame(
+        [unit.marginal_cost for unit in powerplants_units]
+    ).T.set_index(index)
 
-    for config in market_configs:
-        market_id = config.market_id
-        if config.product_type != "energy":
-            log.warning(
-                f"Price forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
+    # 3. Compute available power for each unit at each time step.
+    #    shape: (index_len, num_pp_units)
+    power = calculate_max_power(powerplants_units).T.set_index(index)
+
+    # 4. Process the demand.
+    #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
+    sum_demand = pd.DataFrame(
+        calculate_sum_demand(demand_units, exchange_units), index=index
+    )
+
+    # 5. Initialize the price forecast series.
+    price_forecast = pd.Series(index=index, data=0.0)
+
+    # 6. Loop over each time step
+    for t in index:
+        # Get marginal costs and available power for time t (both are Series indexed by unit)
+        mc_t = marginal_costs.loc[t]
+        power_t = power.loc[t]
+        demand_t = sum_demand.loc[t].item()
+
+        # Sort units by their marginal cost in ascending order for time t.
+        sorted_units = mc_t.sort_values().index
+        sorted_mc = mc_t.loc[sorted_units]
+        sorted_power = power_t.loc[sorted_units]
+
+        # Compute the cumulative sum of available power in the sorted order.
+        cumsum_power = sorted_power.cumsum()
+        # Find the first unit where the cumulative available power meets or exceeds demand.
+        matching_units = cumsum_power[cumsum_power >= demand_t]
+        if matching_units.empty:
+            # If available capacity is insufficient, set the price to 1000.
+            price = 1000.0
+        else:
+            # The marginal cost of the first unit that meets demand becomes the price.
+            price = sorted_mc.loc[matching_units.index[0]]
+
+        price_forecast.loc[t] = price
+
+    return price_forecast
+
+
+@lru_cache
+def calculate_naive_price_elastic(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    config: MarketConfig,
+    elastic_demand_units: list[Demand],
+) -> dict[str, ForecastSeries]:
+    if isinstance(index, FastIndex):
+        index = index.as_datetimeindex()
+
+    market_id = config.market_id
+
+    elastic_demand_bids = []
+    # 1. Sort units by type and filter for units with bidding strategy for the given market_id
+    powerplants_units, demand_units, exchange_units, _, _ = sort_units(units, market_id)
+
+    start = config.opening_hours[0]
+    end = start + config.market_products[0].duration
+
+    product_tuples = {(start, end, None)}
+
+    for unit in elastic_demand_units:
+        elastic_demand_bids.extend(
+            unit.bidding_strategies[market_id].calculate_bids(
+                unit,
+                config,
+                product_tuples=product_tuples,
             )
-            continue
-
-        price_forecasts[market_id] = forecast_df.get(f"price_{market_id}")
-        if price_forecasts[market_id] is not None:
-            # go next if forecast existing
-            continue
-
-        # 1. Sort units by type and filter for units with bidding strategy for the given market_id
-        powerplants_units, demand_units, exchange_units, storage_units, dsm_units = (
-            sort_units(units, market_id)
         )
 
-        # 2. Calculate marginal costs for each unit and time step.
-        #    The resulting DataFrame has rows = time steps and columns = units.
-        #    shape: (index_len, num_pp_units)
-        marginal_costs = pd.DataFrame(
-            [unit.marginal_cost for unit in powerplants_units]
-        ).T.set_index(index)
+    # sort all bids by price descending
+    all_bids = (
+        pd.DataFrame(elastic_demand_bids)
+        .sort_values(by="price", ascending=False)
+        .reset_index(drop=True)
+    )
 
-        # 3. Compute available power for each unit at each time step.
-        #    shape: (index_len, num_pp_units)
-        power = calculate_max_power(powerplants_units).T.set_index(index)
+    elastic_demand_prices = all_bids["price"]
+    elastic_demand_volumes = all_bids["volume"]
 
-        # 4. Process the demand.
-        #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
-        sum_demand = pd.DataFrame(
-            calculate_sum_demand(demand_units, exchange_units), index=index
+    # elastic_demand_units = [unit for unit in demand_units
+    #                        if isinstance(unit.bidding_strategies[market_id], EnergyHeuristicElasticStrategy)]
+
+    # 2. Calculate marginal costs for each unit and time step.
+    #    The resulting DataFrame has rows = time steps and columns = units.
+    #    shape: (index_len, num_pp_units)
+    marginal_costs = pd.DataFrame(
+        [unit.marginal_cost for unit in powerplants_units]
+    ).T.set_index(index)
+
+    # 3. Compute available power for each unit at each time step.
+    #    shape: (index_len, num_pp_units)
+    power = calculate_max_power(powerplants_units).T.set_index(index)
+
+    # 4. Process the demand.
+    #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
+    sum_demand = pd.DataFrame(
+        calculate_sum_demand(demand_units, exchange_units), index=index
+    )
+
+    # 5. Initialize the price forecast series.
+    price_forecast = pd.Series(index=index, data=0.0)
+
+    # clear the market forecast including elastic demand bids using the PayAsClearRole
+    for t in index:
+        # get the supply offers
+        mc_t = marginal_costs.loc[t]
+        power_t = power.loc[t]
+        sorted_units = mc_t.sort_values().index
+        sorted_mc = mc_t.loc[sorted_units]
+        sorted_power = power_t.loc[sorted_units]
+        start = t
+        end = start + pd.Timedelta(config.market_products[0].duration)
+        # Compute the cumulative sum of available power in the sorted order.
+        # cumsum_power = sorted_power.cumsum()
+        supply_offers = (
+            pd.DataFrame(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "node": "node0",  # TODO: ask gugrimm
+                    "price": sorted_mc,  # TODO: ask gugrimm if this should be sorted_mc or mc_t
+                    "volume": sorted_power,
+                }
+            )
+            .reset_index()
+            .rename(columns={"index": "unit_id"})
         )
+        # get the demand bids
+        demand_t = sum_demand.loc[t]
+        demand_bids = (
+            pd.DataFrame(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "node": "node0",  # TODO: ask gugrimm
+                    "price": elastic_demand_prices,
+                    "volume": elastic_demand_volumes,
+                }
+            )
+            .reset_index()
+            .rename(columns={"index": "bid_id"})
+        )
+        # create an orderbook containing all supply offers and demand bids
+        orderbook = []
+        orderbook.extend(supply_offers.to_dict("records"))
+        orderbook.extend(demand_bids.to_dict("records"))
+        if demand_t > 0:
+            orderbook.append({"price": 3000.0, "volume": demand_t})
 
-        # 5. Initialize the price forecast series.
-        price_forecast = pd.Series(index=index, data=0.0)
+        mps = get_available_products(
+            config.market_products, pd.Timestamp(start) - pd.Timedelta("1h")
+        )
+        pac = PayAsClearRole(config)
 
-        # 6. Loop over each time step
-        for t in index:
-            # Get marginal costs and available power for time t (both are Series indexed by unit)
-            mc_t = marginal_costs.loc[t]
-            power_t = power.loc[t]
-            demand_t = sum_demand.loc[t].item()
+        accepted, rejected, meta, flows = pac.clear(orderbook, mps)
+        price_forecast.loc[t] = meta[0]["price"]
 
-            # Sort units by their marginal cost in ascending order for time t.
-            sorted_units = mc_t.sort_values().index
-            sorted_mc = mc_t.loc[sorted_units]
-            sorted_power = power_t.loc[sorted_units]
+    return price_forecast
 
-            # Compute the cumulative sum of available power in the sorted order.
-            cumsum_power = sorted_power.cumsum()
-            # Find the first unit where the cumulative available power meets or exceeds demand.
-            matching_units = cumsum_power[cumsum_power >= demand_t]
-            if matching_units.empty:
-                # If available capacity is insufficient, set the price to 1000.
-                price = 1000.0
-            else:
-                # The marginal cost of the first unit that meets demand becomes the price.
-                price = sorted_mc.loc[matching_units.index[0]]
 
-            price_forecast.loc[t] = price
+@lru_cache
+def calculate_naive_price(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    config: MarketConfig,
+    preprocess_information=None,
+):
+    # 1. Sort units by type and filter for units with bidding strategy for the given market_id
+    _, demand_units, _, _, _ = sort_units(units, config.market_id)
 
-        price_forecasts[market_id] = price_forecast
+    elastic_demand_units = [
+        unit
+        for unit in demand_units
+        if isinstance(
+            unit.bidding_strategies[config.market_id], EnergyHeuristicElasticStrategy
+        )
+    ]
 
-    return price_forecasts
+    if len(elastic_demand_units) > 0:
+        return calculate_naive_price_elastic(index, units, config, elastic_demand_units)
+
+    return calculate_naive_price_inelastic(index, units, config)
 
 
 @custom_lru_cache
