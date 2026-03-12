@@ -25,11 +25,9 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 3,
   "links": [],
   "panels": [
     {
-      "description": "",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -50,12 +48,11 @@
         "content": "# Welcome to Learning Dashboard by ASSUME\n",
         "mode": "markdown"
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "title": "",
       "type": "text"
     },
     {
-      "description": "",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -76,12 +73,11 @@
         "content": "## How to Use the Dashboard  \n\nThis interactive tool provides insights into the learning process of our reinforcement learning (RL) agent. While the TensorBoard integration (compare ReadMe) provides an overview of the general learning performance of all agents, this dashboard gives you the option to inspect **each agent individually or in comparison**. To effectively navigate the dashboard, keep the following key points in mind:  \n\n### 1. Dashboard Structure  \n\nThe dashboard is divided into two main rows and two columns:  \n\n**COLUMNS**  \n- **Training Episode:** Depicts the results of the selected training episodes at the top of the dashboard. Note that training episodes have special properties such as noise added for exploration purposes.  \n- **Evaluation Episode:** Depicts the results of the selected evaluation episodes.  \n\n**ROWS**  \n- **Per Simulation:** Summarizes results across all simulated episodes, distinguishing between \"training\" and \"evaluation\" episodes.  \n- **Per Episode:** Focuses on specific units and episodes, allowing for detailed analysis.  \n\n### 2. Selecting Metrics and Simulations  \n\nAt the top of the dashboard, you can filter data using the following options:  \n\n- **Simulation ID:** Choose the simulation run you want to analyze.  \n- **Unit & Episode:** Select specific units and episodes for detailed insights. You can also select all units, but be cautious—visualizing a large number of agents may cause performance issues.  \n\nThe selected metrics will be displayed in corresponding visualization areas.  \n\n### 3. Interacting with Plots  \n\nThe plots are fully interactive:  \n\n- **Zoom** in and out to explore trends.  \n- **Click** on data points for detailed values.  \n- **Hover** over the upper-left corner of each plot for additional insights.  \n\n### How to Interpret the Data  \n\nTo make the most of the dashboard, follow these key steps:  \n\n1. **Understand Learning Trends:**  \n   - Observe how **reward** and **profitability** metrics evolve over time.  \n   - Look for an upward trend in evaluation runs (where exploration is off). Unlike fluctuating training rewards, evaluation rewards should show a steady increase.  \n\n2. **Analyze Policy & Action Patterns:**  \n   - Examine the agent's learned policy and action distribution.  \n   - Identify patterns and assess whether they align with\n",
         "mode": "markdown"
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "title": "",
       "type": "text"
     },
     {
-      "description": "",
       "fieldConfig": {
         "defaults": {},
         "overrides": []
@@ -102,7 +98,7 @@
         "content": "## Training Episode ",
         "mode": "markdown"
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "title": "",
       "type": "text"
     },
@@ -127,7 +123,7 @@
         "content": "## Evaluation Episode",
         "mode": "markdown"
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "title": "",
       "type": "text"
     },
@@ -239,7 +235,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -251,7 +247,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "WITH rewards_by_unit AS (\n    SELECT \n        episode,\n        unit, \n        SUM(reward) AS total_reward\n    FROM rl_params\n    WHERE simulation = '${simulation}'\n      AND evaluation_mode = FALSE\n    GROUP BY episode, unit\n),\nepisode_avg_rewards AS (\n    SELECT \n        episode, \n        SUM(total_reward) / COUNT(DISTINCT unit) AS avg_reward\n    FROM rewards_by_unit\n    GROUP BY episode\n)\nSELECT episode, avg_reward\nFROM episode_avg_rewards\nORDER BY episode;",
+          "rawSql": "SELECT \n    episode, \n    SUM(reward) / COUNT(DISTINCT unit) AS avg_reward\nFROM rl_params\nWHERE simulation = '${simulation}'\n    AND evaluation_mode = FALSE\nGROUP BY episode\nORDER BY episode;",
           "refId": "A",
           "select": [
             [
@@ -438,7 +434,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -450,7 +446,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "WITH rewards_by_unit AS (\n    SELECT \n        episode,\n        unit, \n        SUM(reward) AS total_reward\n    FROM rl_params\n    WHERE simulation = '${simulation}'\n      AND evaluation_mode = TRUE\n    GROUP BY episode, unit\n),\nepisode_avg_rewards AS (\n    SELECT \n        episode, \n        SUM(total_reward) / COUNT(DISTINCT unit) AS avg_reward\n    FROM rewards_by_unit\n    GROUP BY episode\n)\nSELECT episode, avg_reward\nFROM episode_avg_rewards\nORDER BY episode;",
+          "rawSql": "SELECT \n    episode, \n    SUM(reward) / COUNT(DISTINCT unit) AS avg_reward\nFROM rl_params\nWHERE simulation = '${simulation}'\n    AND evaluation_mode = TRUE\nGROUP BY episode\nORDER BY episode;",
           "refId": "A",
           "select": [
             [
@@ -650,7 +646,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -662,7 +658,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "WITH rewards_by_unit AS (\n    SELECT \n        episode,\n        unit, \n        SUM(reward) AS total_reward\n    FROM rl_params\n    WHERE simulation = '${simulation}'\n      AND evaluation_mode = FALSE\n      AND unit IN (${rl_unit})\n    GROUP BY episode, unit\n)\nSELECT \n    episode, \n    unit, \n    total_reward\nFROM rewards_by_unit\nORDER BY episode, unit;\n",
+          "rawSql": "SELECT \n    episode, \n    unit, \n    SUM(reward) AS total_reward\nFROM rl_params\nWHERE simulation = '${simulation}'\n    AND evaluation_mode = FALSE\n    AND unit IN (${rl_unit})\nGROUP BY episode, unit\nORDER BY episode, unit;",
           "refId": "A",
           "select": [
             [
@@ -849,7 +845,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -861,7 +857,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "WITH rewards_by_unit AS (\n    SELECT \n        episode,\n        unit, \n        SUM(reward) AS total_reward\n    FROM rl_params\n    WHERE simulation = '${simulation}'\n      AND evaluation_mode = TRUE\n      AND unit IN (${rl_unit})\n    GROUP BY episode, unit\n)\nSELECT \n    episode, \n    unit, \n    total_reward\nFROM rewards_by_unit\nORDER BY episode, unit;\n",
+          "rawSql": "SELECT \n    episode, \n    unit, \n    SUM(reward) AS total_reward\nFROM rl_params\nWHERE simulation = '${simulation}'\n    AND evaluation_mode = TRUE\n    AND unit IN (${rl_unit})\nGROUP BY episode, unit\nORDER BY episode, unit;",
           "refId": "A",
           "select": [
             [
@@ -1048,7 +1044,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1247,7 +1243,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1460,7 +1456,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1472,7 +1468,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    reward\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)  -- Ensures time filtering aligns with Grafana's dashboard\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit, \n    avg(reward) AS \"Reward\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)  -- Ensures time filtering aligns with Grafana's dashboard\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nGROUP BY 1, unit\nORDER BY 1, unit;\n",
           "refId": "A",
           "select": [
             [
@@ -1657,7 +1653,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1669,7 +1665,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    reward\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit, \n    avg(reward) AS \"Reward\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nGROUP BY 1, unit\nORDER BY 1, unit;\n",
           "refId": "A",
           "select": [
             [
@@ -1760,6 +1756,194 @@
     },
     {
       "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "max": 1,
+          "min": -1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 49
+      },
+      "id": 55,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n    --datetime,\r\n    unit as unit, \r\n    reward as reward\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)  -- Ensures time filtering aligns with Grafana's dashboard\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = FALSE\r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${episode}  -- Filtering for the specific episode\r\n\r\n--ORDER BY datetime, unit;\r\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Training REWARD during Episode ${episode}",
+      "type": "histogram"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "max": 1,
+          "min": -1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 49
+      },
+      "id": 56,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n    datetime,\r\n    unit, \r\n    reward\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = TRUE\r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\r\nORDER BY datetime, unit;\r\n",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Evaluation REWARD during Eval Episode ${eval_episode}",
+      "type": "histogram"
+    },
+    {
+      "datasource": {
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
@@ -1832,7 +2016,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 57
       },
       "id": 44,
       "options": {
@@ -1854,7 +2038,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -1866,7 +2050,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    profit / 1000 as profit\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)  -- Ensures time filtering aligns with Grafana's dashboard\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit, \n    avg(profit / 1000) as \"Profit\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)  -- Ensures time filtering aligns with Grafana's dashboard\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nGROUP BY 1, unit\nORDER BY 1, unit;\n",
           "refId": "A",
           "select": [
             [
@@ -2029,7 +2213,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 49
+        "y": 57
       },
       "id": 45,
       "options": {
@@ -2051,7 +2235,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -2063,7 +2247,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    profit / 1000 as profit\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)  -- Ensures time filtering aligns with Grafana's dashboard\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit, \n    avg(profit / 1000) as \"Profit\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)  -- Ensures time filtering aligns with Grafana's dashboard\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE\n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nGROUP BY 1, unit\nORDER BY 1, unit;\n",
           "refId": "A",
           "select": [
             [
@@ -2215,7 +2399,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 57
+        "y": 65
       },
       "id": 46,
       "options": {
@@ -2236,7 +2420,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -2248,7 +2432,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_0 AS noisy_action_0,\n    actions_0 - exploration_noise_0 AS action_0\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit AS \"Unit\", \n    avg(actions_0) AS \"noisy_action_0\",\n    avg(actions_0 - exploration_noise_0) AS \"action_0\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})\n    AND episode = ${episode}\nGROUP BY 1, unit\nORDER BY 1, unit;",
           "refId": "A",
           "select": [
             [
@@ -2329,9 +2513,8 @@
           },
           "editorMode": "code",
           "format": "table",
-          "hide": false,
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_1 AS noisy_action_1,  -- Handle missing actions_1\n    actions_1 - exploration_noise_1 AS action_1\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;",
+          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit AS \"Unit\", \n    avg(actions_1) AS \"noisy_action_1\",\n    avg(actions_1 - exploration_noise_1) AS \"action_1\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = FALSE \n    AND unit IN (${rl_unit})\n    AND episode = ${episode}\nGROUP BY 1, unit\nORDER BY 1, unit;",
           "refId": "B",
           "sql": {
             "columns": [
@@ -2365,7 +2548,7 @@
     },
     {
       "datasource": {
-        "type": "postgres",
+        "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
       },
       "fieldConfig": {
@@ -2426,9 +2609,9 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 57
+        "y": 65
       },
-      "id": 47,
+      "id": 60,
       "options": {
         "legend": {
           "calcs": [
@@ -2447,7 +2630,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.2.1",
+      "pluginVersion": "12.4.1",
       "targets": [
         {
           "datasource": {
@@ -2459,7 +2642,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_0\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit AS \"Unit\", \n    avg(actions_0 - exploration_noise_0) AS \"action_0\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE \n    AND unit IN (${rl_unit})\n    AND episode = ${eval_episode}\nGROUP BY 1, unit\nORDER BY 1, unit;",
           "refId": "A",
           "select": [
             [
@@ -2540,9 +2723,264 @@
           },
           "editorMode": "code",
           "format": "table",
-          "hide": false,
           "rawQuery": true,
-          "rawSql": "SELECT \n    datetime,\n    unit, \n    actions_1\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE \n    AND unit IN (${rl_unit})  -- Supports multiple units\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\nORDER BY datetime, unit;\n",
+          "rawSql": "SELECT \n    $__timeGroupAlias(datetime, $__interval),\n    unit AS \"Unit\", \n    avg(actions_1 - exploration_noise_1) AS \"action_1\"\nFROM rl_params\nWHERE \n    $__timeFilter(datetime)\n    AND simulation = '$simulation'\n    AND evaluation_mode = TRUE \n    AND unit IN (${rl_unit})\n    AND episode = ${eval_episode}\nGROUP BY 1, unit\nORDER BY 1, unit;",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Evaluation ACTIONS during Episode ${eval_episode}",
+      "transformations": [
+        {
+          "id": "prepareTimeSeries",
+          "options": {
+            "format": "multi"
+          }
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "max": 1,
+          "min": -1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 73
+      },
+      "id": 53,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n    datetime,\r\n    unit,\r\n    --actions_1 AS noisy_action_1,  -- Handle missing actions_1\r\n    actions_0 - exploration_noise_0 AS action_0\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = FALSE \r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${episode}  -- Filtering for the specific episode\r\n--ORDER BY datetime, unit;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "dataset": "assume",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n    datetime,\r\n    unit,\r\n    --actions_1 AS noisy_action_1,  -- Handle missing actions_1\r\n    actions_1 - exploration_noise_1 AS action_1\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = FALSE \r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${episode}  -- Filtering for the specific episode\r\n--ORDER BY datetime, unit;",
+          "refId": "B",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Histrogram of Training ACTIONS during Episode ${episode}",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {}
+        }
+      ],
+      "type": "histogram"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            }
+          },
+          "mappings": [],
+          "max": 1,
+          "min": -1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 73
+      },
+      "id": 54,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n    datetime,\r\n    unit,\r\n    --actions_1 AS noisy_action_1,  -- Handle missing actions_1\r\n    actions_0 - exploration_noise_0 AS action_0\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = TRUE \r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\r\n--ORDER BY datetime, unit;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        },
+        {
+          "dataset": "assume",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \r\n    datetime,\r\n    unit,\r\n    --actions_1 AS noisy_action_1,  -- Handle missing actions_1\r\n    actions_1 - exploration_noise_1 AS action_1\r\nFROM rl_params\r\nWHERE \r\n    $__timeFilter(datetime)\r\n    AND simulation = '$simulation'\r\n    AND evaluation_mode = TRUE \r\n    AND unit IN (${rl_unit})  -- Supports multiple units\r\n    AND episode = ${eval_episode}  -- Filtering for the specific episode\r\n--ORDER BY datetime, unit;",
           "refId": "B",
           "sql": {
             "columns": [
@@ -2564,15 +3002,7 @@
         }
       ],
       "title": "Evaluation ACTIONS during Eval Episode ${eval_episode}",
-      "transformations": [
-        {
-          "id": "prepareTimeSeries",
-          "options": {
-            "format": "multi"
-          }
-        }
-      ],
-      "type": "timeseries"
+      "type": "histogram"
     }
   ],
   "preload": false,
@@ -2583,8 +3013,8 @@
     "list": [
       {
         "current": {
-          "text": "example_02a_base",
-          "value": "example_02a_base"
+          "text": "example_02e_base",
+          "value": "example_02e_base"
         },
         "datasource": {
           "type": "postgres",
@@ -2599,13 +3029,14 @@
         "query": "SELECT DISTINCT simulation\nFROM rl_meta",
         "refresh": 2,
         "regex": "",
+        "regexApplyTo": "value",
         "sort": 1,
         "type": "query"
       },
       {
         "current": {
-          "text": "1",
-          "value": "1"
+          "text": "30",
+          "value": "30"
         },
         "datasource": {
           "type": "grafana-postgresql-datasource",
@@ -2619,12 +3050,13 @@
         "query": "SELECT episode\nFROM rl_meta\nWHERE simulation = '$simulation' \nAND evaluation_mode = False\nORDER BY episode;",
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       },
       {
         "current": {
-          "text": "1",
-          "value": "1"
+          "text": "5",
+          "value": "5"
         },
         "datasource": {
           "type": "grafana-postgresql-datasource",
@@ -2638,15 +3070,16 @@
         "query": "SELECT eval_episode\nFROM rl_meta\nWHERE simulation = '$simulation'\nAND evaluation_mode = True\nORDER BY eval_episode;",
         "refresh": 1,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       },
       {
         "current": {
           "text": [
-            "pp_6"
+            "Storage 2"
           ],
           "value": [
-            "pp_6"
+            "Storage 2"
           ]
         },
         "datasource": {
@@ -2663,6 +3096,7 @@
         "query": "SELECT DISTINCT unit \nFROM rl_params\nWHERE simulation = '$simulation'\nAND episode = 1\nAND evaluation_mode = False;",
         "refresh": 2,
         "regex": "",
+        "regexApplyTo": "value",
         "type": "query"
       }
     ]
