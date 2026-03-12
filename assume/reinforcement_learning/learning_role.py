@@ -431,7 +431,7 @@ class LearningRole(Role):
 
         # Get timestamps from cache we took
         all_timestamps = sorted(current_obs.keys())
-        if len(all_timestamps) > 1:
+        if len(all_timestamps) >= 1:
             # Identify all incomplete timesteps (no reward yet)
             incomplete_timestamps = [
                 ts for ts in all_timestamps if ts not in current_rewards
@@ -447,6 +447,13 @@ class LearningRole(Role):
                 self.all_actions[level][ts] = current_actions[ts]
                 self.all_noises[level][ts] = current_noises[ts]
 
+            if not timestamps_to_process:
+                logger.warning(
+                    f"No complete experience to store in buffer at update step for level '{level}'! "
+                    f"All {len(all_timestamps)} timesteps are incomplete (missing rewards)."
+                )
+                return
+            
             # Create filtered cache (only complete timesteps)
             cache = {
                 "obs": {t: current_obs[t] for t in timestamps_to_process},
