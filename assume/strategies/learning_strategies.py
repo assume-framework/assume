@@ -179,9 +179,9 @@ class TorchUnitLearningStrategy(TorchLearningStrategy):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        self.unit_id = kwargs["unit_id"] # TODO: needs to be set before strategy registration
 
-        self.unit_id = kwargs["unit_id"]
+        super().__init__(*args, **kwargs)
 
         # defines bounds of actions space
         self.min_bid_price = self.learning_config.min_bid_price
@@ -317,7 +317,7 @@ class TorchUnitLearningStrategy(TorchLearningStrategy):
 
 
 
-class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
+class EnergyLearningStrategy(TorchUnitLearningStrategy, MinMaxStrategy):
     """
     Reinforcement Learning Strategy that enables the agent to learn optimal bidding strategies
     on an Energy-Only Market.
@@ -683,7 +683,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # Dynamic regret scaling:
         # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
         # - If no dispatch happens, apply higher regret (0.5) to discourage idle behavior, if it could have been profitable.
-        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 0.5
+        regret_scale = 1 #0.1 if accepted_volume_total > unit.min_power else 0.5 #TODO: revert
 
         # --------------------
         # 4.1 Calculate Reward
@@ -712,7 +712,7 @@ class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrateg
         # 'foresight' represents the number of time steps into the future that we will consider
         # when constructing the observations.
         foresight = kwargs.pop("foresight", 1)
-        act_dim = kwargs.pop("act_dim", 2)
+        act_dim = kwargs.pop("act_dim", 1)
         unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
             foresight=foresight,
@@ -784,7 +784,7 @@ class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrateg
             / self.max_bid_price
         )
         
-        max_bid_price_scaled = market_config.max_bid_price / self.max_bid_price
+        max_bid_price_scaled = market_config.maximum_bid_price / self.max_bid_price
 
         # --- 3. Individual observations ---
         individual_observations = self.get_individual_observations(unit, start, end)
@@ -795,7 +795,7 @@ class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrateg
                 scaled_res_load_forecast,
                 scaled_price_forecast,
                 scaled_price_history,
-                max_bid_price_scaled,
+                np.array([max_bid_price_scaled]),
                 individual_observations,
             ]
         )

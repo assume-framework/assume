@@ -374,7 +374,7 @@ class MarketRole(MarketMechanism, Role):
 
         # Process separated orders
         sep_orders = separate_orders(orderbook.copy())
-        for order in sep_orders:
+        for order in sep_orders: # TODO: how to overwrite values?
             # Adjust order price if it exceeds max_price or is below min_price
             if order["price"] > max_price:
                 logger.warning(
@@ -733,9 +733,11 @@ class MarketRole(MarketMechanism, Role):
         if flows is not None and len(flows) > 0:
             await self.store_flows(flows)
 
-        # if learning strats is no null
-         
-        self.learning_startegies.calculate_reward(self, product_end=meta["product_end"])
+        if self.learning_strategy is not None:
+            self.learning_strategy.calculate_reward(
+                accepted_orderbook=accepted_orderbook,
+                market_meta=market_meta,
+            )
 
         return accepted_orderbook, market_meta
 

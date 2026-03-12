@@ -602,7 +602,7 @@ def load_config_and_create_forecaster(
     market_prices, residual_loads = initializer.calculate_market_forecasts()
     congestion_signal, renewable_utilization = initializer.calc_node_forecasts()
     # create forecaster for all maarkets
-    if config["markets_config"]["product_type"] == "energy":
+    if config["markets_config"]["EOM"]["product_type"] == "energy": # TODO: this is static
             market_forecaster = BaseForecaster(
                 index=index,
                 market_prices=market_prices,
@@ -824,7 +824,7 @@ def setup_world(
 
         if not level_dict.get("trained_policies_save_path"):
             level_dict["trained_policies_save_path"] = (
-                f"learned_strategies/{simulation_id}"
+                f"learned_strategies/{simulation_id}/{level_name}"
             )
 
     # Determine overall learning_mode from any level being active
@@ -1130,9 +1130,13 @@ def run_learning(
     world.learning_role.initialize_policy()
 
     # check if we already stored policies for this simulation
-    save_path = world.learning_role.shared_config.trained_policies_save_path
     continue_learning = world.learning_role.shared_config.continue_learning
-    confirm_learning_save_path(save_path, continue_learning)
+    checked_paths = set()
+    for level in world.learning_role.active_levels:
+        save_path = world.learning_role.learning_config[level].trained_policies_save_path
+        if save_path and save_path not in checked_paths:
+            confirm_learning_save_path(save_path, continue_learning)
+            checked_paths.add(save_path)
 
     # also remove tensorboard logs
     tensorboard_path = f"tensorboard/{world.scenario_data['simulation_id']}"

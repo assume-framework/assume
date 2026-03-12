@@ -664,9 +664,11 @@ class World:
                 learning_role_ref = learning_role_ref.get_level_view("markets")
 
             strategy_instance = strategy_class(
-                unit_id=market_id, learning_role=learning_role_ref
+                unit_id=market_id,
+                market_role=market_role,
+                learning_role=learning_role_ref,
             )
-            market_role.forecaster = self.scenario_data.market_forecast
+            market_role.forecaster = self.scenario_data["market_forecaster"]
 
         else:
             raise ValueError(
