@@ -1,4 +1,4 @@
-name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,max_power,min_power,unit_operator
-demand_EOM,inflex_demand,demand_energy_naive,,,1000000.0,0.0,eom_de
-demand_CRM_pos,reserve_capacity,,demand_energy_naive_balancing,,1000000.0,0.0,crm_de
-demand_CRM_neg,reserve_capacity,,,demand_energy_naive_balancing,1000000.0,0.0,crm_de
+name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,max_power,min_power,unit_operator,elasticity_model,elasticity,num_bids,max_price
+demand_EOM,inflex_demand,demand_energy_heuristic_elastic,,,1000000.0,0.0,eom_de,isoelastic,-0.05,10,3000
+demand_CRM_pos,reserve_capacity,,demand_energy_naive_balancing,,1000000.0,0.0,crm_de,,,,
+demand_CRM_neg,reserve_capacity,,,demand_energy_naive_balancing,1000000.0,0.0,crm_de,,,,
