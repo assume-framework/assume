@@ -22,6 +22,7 @@ Upcoming Release
   - **Added reward calculation for unit operators**: Unit operators have now the opportunity to calculate rewards based on the returned orderbooks for their own purposes. This enables learning strategies on unit operator level / portfolio learning strategies.
   - **Upgrade to Pandas 3**
   - **Structured Validation Error**: Introduces the new ValidationError to represent a failing validation. Since it derives from the base ValidationError, all existing error handling remains compatible, but users can now also catch this specific error type to handle validation errors separately if desired.
+  - **Support for Python 3.14**
 
 **Bug Fixes:**
   - **Fix buffer and update order**: Fixed the order of buffer writing and policy updating in the learning role to ensure that both have the exact same order, which is necessary so that during updates the correct data is used. Thisbug will have compormised learning with very heterogeneous units after the last release.
