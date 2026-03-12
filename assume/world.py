@@ -237,11 +237,13 @@ class World:
                 merged = {**shared_lc_dict, **level_dict}
                 self.learning_config[level_name] = LearningConfig(**merged)
             # Shared config for episode-level settings
-            self.shared_learning_config = LearningConfig(**{
-                **shared_lc_dict,
-                "learning_mode": learning_dict.get("learning_mode", False),
-                "evaluation_mode": learning_dict.get("evaluation_mode", False),
-            })
+            self.shared_learning_config = LearningConfig(
+                **{
+                    **shared_lc_dict,
+                    "learning_mode": learning_dict.get("learning_mode", False),
+                    "evaluation_mode": learning_dict.get("evaluation_mode", False),
+                }
+            )
         else:
             # Backward compat: single flat learning_dict
             self.learning_config = LearningConfig(**learning_dict)
@@ -601,7 +603,10 @@ class World:
                         )
                     # Pass the "units" level view so the strategy registers at the correct level
                     learning_role_ref = self.learning_role
-                    if hasattr(learning_role_ref, "get_level_view") and "units" in learning_role_ref.levels:
+                    if (
+                        hasattr(learning_role_ref, "get_level_view")
+                        and "units" in learning_role_ref.levels
+                    ):
                         learning_role_ref = learning_role_ref.get_level_view("units")
                     strategy_instances[strategy] = self.bidding_strategies[strategy](
                         unit_id=unit_id,
@@ -619,7 +624,7 @@ class World:
             bidding_strategies[market_id] = strategy_instances[strategy]
 
         return bidding_strategies
-    
+
     def _prepare_market_strategies(self, market_id, market_role):
         """
         Prepare and attach a market learning strategy to the market role, if the
@@ -652,12 +657,14 @@ class World:
                 )
             # Pass the "markets" level view so the strategy registers at the correct level
             learning_role_ref = self.learning_role
-            if hasattr(learning_role_ref, "get_level_view") and "markets" in learning_role_ref.levels:
+            if (
+                hasattr(learning_role_ref, "get_level_view")
+                and "markets" in learning_role_ref.levels
+            ):
                 learning_role_ref = learning_role_ref.get_level_view("markets")
 
             strategy_instance = strategy_class(
-                unit_id=market_id,
-                learning_role=learning_role_ref
+                unit_id=market_id, learning_role=learning_role_ref
             )
             market_role.forecaster = self.scenario_data.market_forecast
 
@@ -758,14 +765,12 @@ class World:
                 f"World start: {self.start}, end: {self.end}.)"
             )
             raise ValueError(msg)
-        
-
 
         market_operator.add_role(market_role)
-        
+
         market_operator.markets.append(market_config)
         self.markets[f"{market_config.market_id}"] = market_config
-        
+
         self._prepare_market_strategies(market_config.market_id, market_role)
 
     def _validate_setup(self):

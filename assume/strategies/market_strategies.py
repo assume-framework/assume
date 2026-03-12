@@ -8,10 +8,10 @@ from datetime import datetime
 import numpy as np
 import torch as th
 
-from assume.strategies.learning_strategies import TorchLearningStrategy
-from assume.markets.base_market import MarketRole
-from assume.common.utils import min_max_scale
 from assume.common.fast_pandas import FastSeries
+from assume.common.utils import min_max_scale
+from assume.markets.base_market import MarketRole
+from assume.strategies.learning_strategies import TorchLearningStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class TorchMarketLearningStrategy(TorchLearningStrategy):
 
     def adjust_market_config(self, action):
         """This is the actual actions function, mirroring calculate_bids of the learning units and unit operator."""
-        
+
         return self.market.market_config
 
     def calculate_reward(self):
@@ -43,9 +43,7 @@ class TorchMarketLearningStrategy(TorchLearningStrategy):
     def prepare_observations(self, unit, market_id):
         pass  # TODO: implement
 
-    def create_observation(
-        self, unit, market_id: str, start: datetime, end: datetime
-    ):
+    def create_observation(self, unit, market_id: str, start: datetime, end: datetime):
         # create an observation for the given unit and market
         # example: observation could be the current order book state, recent trades, etc.
         observation = {}
@@ -115,21 +113,23 @@ class TorchMarketLearningStrategy(TorchLearningStrategy):
             noise = th.zeros_like(curr_action, dtype=self.float_type)
 
         return curr_action, noise
-    
+
+
 class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
     """
     A specific implementation of the TorchMarketLearningStrategy that focuses on learning to set the maximum bid price in a market.
     """
+
     def __init__(self, *args, market_role: MarketRole | None = None, **kwargs):
         super().__init__(*args, market_role=market_role, **kwargs)
-        
+
         self.initial_max_bid_price = self.market_role.marketconfig.maximum_bid_price
 
     def prepare_observations(self, market):
         """
         Prepares the observation for the market learning strategy, which could include features such as current market price, order book state, recent trades, etc.
         """
-        
+
         upper_scaling_factor_price = max(market.forecaster.price[market.market_id])
         lower_scaling_factor_price = min(market.forecaster.price[market.market_id])
         residual_load = market.forecaster.residual_load.get(
@@ -149,13 +149,8 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
             lower_scaling_factor_price,
             upper_scaling_factor_price,
         )
-        
-        
-    def create_observation(
-        self, market_id: str, start: datetime, end: datetime
-    ):
-    
 
+    def create_observation(self, market_id: str, start: datetime, end: datetime):
         """
         Constructs a scaled observation tensor based on the unit's forecast data and internal state.
 
@@ -197,17 +192,14 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         scaled_res_load_forecast_max = self.scaled_res_load_obs.window(
             start, foresight, direction="forward"
         ).max()
-        
+
         scaled_price_forecast_max = self.scaled_prices_obs.window(
             start, foresight, direction="forward"
         ).max()
 
         # concat all observations into one array
         observation = np.concatenate(
-            [
-                scaled_res_load_forecast_max,
-                scaled_price_forecast_max
-            ]
+            [scaled_res_load_forecast_max, scaled_price_forecast_max]
         )
 
         # transfer array to GPU for NN processing
@@ -221,23 +213,22 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
             )
 
         return observation
-    
+
     def adjust_market_config(self):
         """Adjusts the market configuration by setting the maximum bid price based on the action taken."""
-        
-        next_observation = self.create_observation(market_id=self.market_role.market_id, start=self.start, end=self.end)
+
+        next_observation = self.create_observation(
+            market_id=self.market_role.market_id, start=self.start, end=self.end
+        )
         actions, noise = self.get_actions(next_observation)
-        
+
         self.market_role.marketconfig.maximum_bid_price = (
             actions * self.initial_max_bid_price
         )
-        
+
         if self.learning_mode:
             self.learning_role.add_actions_to_cache(self.market_id, actions, noise)
 
-        
-        return self.market_role.marketconfig
-        
     def calculate_reward(self, product_end):
         # calculate reward based on the market state and the action taken
         reward = 0
@@ -246,10 +237,9 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
 
         # write to learning role
         # TODO: integrate with learning_role reward tracking
-        
-        # wenn wir laut learning role am ende sind 
-        if self.learning_role.end == product_end: 
 
+        # wenn wir laut learning role am ende sind
+        if self.learning_role.end == product_end:
             self.learning_role.add_reward_to_cache(self.market_id, reward, 0, 0)
-        
+
         return reward

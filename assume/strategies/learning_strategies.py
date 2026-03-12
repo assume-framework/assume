@@ -705,6 +705,177 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
             self.learning_role.add_reward_to_cache(
                 unit.id, start, reward, regret, profit
             )
+            
+class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrategy):
+    
+    def __init__(self, *args, **kwargs):
+        # 'foresight' represents the number of time steps into the future that we will consider
+        # when constructing the observations.
+        foresight = kwargs.pop("foresight", 1)
+        act_dim = kwargs.pop("act_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            foresight=foresight,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
+
+        # define allowed order types
+        self.order_types = kwargs.get("order_types", ["SB"])
+        # add max_price of market operator adjustment to avoid non_stationarity
+        self.obs_dim = self.num_timeseries_obs_dim * foresight + unique_obs_dim + 1
+        
+    def create_observation(
+        self, unit: BaseUnit, market_config: MarketConfig, start: datetime, end: datetime
+    ):
+        """
+        Constructs a scaled observation tensor based on the unit's forecast data and internal state.
+
+        Args
+        ----
+        unit : BaseUnit
+            The unit providing forecast and internal state data.
+        market_id : str
+            Identifier for the specific market.
+        start : datetime
+            Start time for the observation period.
+        end : datetime
+            End time for the observation period.
+
+        Returns
+        -------
+        torch.Tensor
+            Observation tensor with data on forecasted residual load, price, and unit-specific values.
+
+        Notes
+        -----
+        Observations are constructed from forecasted residual load and price over the foresight period,
+        scaled by maximum demand and bid price. The last values in the observation vector represent
+        unit-specific values, depending on the strategy and unit-type.
+        """
+
+        # ensure scaled observations are prepared
+        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
+            self, "scaled_prices_obs"
+        ):
+            self.prepare_observations(unit, market_config.market_id)
+
+        # =============================================================================
+        # 1.1 Get the Observations, which are the basis of the action decision
+        # =============================================================================
+
+        # --- 1. Forecasted residual load and price (forward-looking) ---
+        scaled_res_load_forecast = self.scaled_res_load_obs.window(
+            start, self.foresight, direction="forward"
+        )
+        scaled_price_forecast = self.scaled_prices_obs.window(
+            start, self.foresight, direction="forward"
+        )
+
+        # --- 2. Historical actual prices (backward-looking) ---
+        # Note: We scale with the max_bid_price here in comparison to the scaling of the forecast where we use the max price of the forecast period
+        # this is not consistent but has worked well so far. Future work could look into this in more detail.
+        scaled_price_history = (
+            unit.outputs["energy_accepted_price"].window(
+                start, self.foresight, direction="backward"
+            )
+            / self.max_bid_price
+        )
+        
+        max_bid_price_scaled = market_config.max_bid_price / self.max_bid_price
+
+        # --- 3. Individual observations ---
+        individual_observations = self.get_individual_observations(unit, start, end)
+
+        # concat all observations into one array
+        observation = np.concatenate(
+            [
+                scaled_res_load_forecast,
+                scaled_price_forecast,
+                scaled_price_history,
+                max_bid_price_scaled,
+                individual_observations,
+            ]
+        )
+
+        # transfer array to GPU for NN processing
+        observation = th.as_tensor(
+            observation, dtype=self.float_type, device=self.device
+        ).flatten()
+
+        if self.learning_mode:
+            self.learning_role.add_observation_to_cache(
+                self.unit_id, start, observation
+            )
+
+        return observation
+    
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Generates a single price bid for the full available capacity (max_power).
+
+        The method observes market and unit state, derives an action (bid price) from
+        the actor network, and constructs one bid covering the entire capacity, without
+        distinguishing between flexible and inflexible components.
+
+        Returns
+        -------
+        Orderbook
+            A list containing one bid with start/end time, full volume, and calculated price.
+        """
+
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        # get technical bounds for the unit output from the unit
+        _, max_power = unit.calculate_min_max_power(start, end)
+        max_power = max_power[0]
+
+        # =============================================================================
+        # 1. Get the Observations, which are the basis of the action decision
+        # =============================================================================
+        next_observation = self.create_observation(
+            unit=unit,
+            market_config=market_config,
+            start=start,
+            end=end,
+        )
+
+        # =============================================================================
+        # 2. Get the Actions, based on the observations
+        # =============================================================================
+        actions, noise = self.get_actions(next_observation)
+
+        # =============================================================================
+        # 3. Transform Actions into bids
+        # =============================================================================
+        # actions are in the range [-1,1] + noise, we need to transform them into actual bids
+        # we can use our domain knowledge to guide the bid formulation
+        bid_price = actions[0] * self.max_bid_price
+
+        # actually formulate bids in orderbook format
+        bids = [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price,
+                "volume": max_power,
+                "node": unit.node,
+            },
+        ]
+
+        if self.learning_mode:
+            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
+
+        return bids
 
 
 class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
