@@ -34,46 +34,87 @@ def _ensure_not_none(
     return df
 
 
-def calculate_price_forecasts(
+def calculate_base_forecasts(
     index: ForecastIndex,
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
-    price_forecast_algorithm: Callable,
+    forecast_algorithm: Callable,
     forecast_df: ForecastSeries = None,
     preprocess_information=None,
+    prefix="",
 ) -> dict[str, ForecastSeries]:
     """
-    Naive price forecast that calculates prices based on merit order with marginal costs.
-    Does not take account: Storages, DSM units.
-    TODO: further documentation
+    Check if forecasts for the given prefix / metric (e.g. price or residual_load) and market are provided in the forecast_df.
+    If not, calculate forecasts using the given forecast_algorithm.
     """
-
-    # _, demand_units, exchange_units, _, _ = sort_units(units)
+    # print(prefix, hash(prefix), hash(index), hash(market_configs), hash(units), hash(preprocess_information))
     forecast_df = _ensure_not_none(forecast_df, index)
 
-    price_forecasts: dict[str, pd.Series] = {}
+    forecast: dict[str, pd.Series] = {}
 
     for config in market_configs:
         market_id = config.market_id
         if config.product_type != "energy":
             log.warning(
-                f"Price forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
+                f"Forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
             )
             continue
 
-        price_forecasts[market_id] = forecast_df.get(f"price_{market_id}")
-        if price_forecasts[market_id] is not None:
+        forecast[market_id] = forecast_df.get(f"{prefix}_{market_id}")
+        if forecast[market_id] is not None:
             # go next if forecast existing
             continue
 
-        price_forecasts[market_id] = price_forecast_algorithm(
+        forecast[market_id] = forecast_algorithm(
             index,
             units,
             config,
             # forecast_df,
             preprocess_information,
         )
-    return price_forecasts
+    return forecast
+
+
+def calculate_node_wise_forecasts(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    market_configs: list[MarketConfig],
+    forecast_algorithm: Callable,
+    forecast_df: ForecastSeries = None,
+    preprocess_information=None,
+    prefix="",
+):
+    forecast_df = _ensure_not_none(forecast_df, index)
+
+    forecast = forecast_algorithm(
+        index,
+        units,
+        market_configs,
+        preprocess_information,
+    )
+
+    # FIXME: make prefix coherent to the forecast!!!!
+    prefix_alias = "congestion_severity" if prefix == "congestion_signal" else prefix
+
+    buses = list(market_configs)[0].param_dict.get("grid_data", {}).get("buses")
+
+    # check if forecast exists in forecast_df for each node
+    # if calculated forecast also expects this node: overwrite else ignore
+    for node in buses.index:
+        if (
+            forecast_df.get(f"{node}_{prefix}") is not None
+            and forecast.get(f"{node}_{prefix_alias}") is not None
+        ):
+            forecast[f"{node}_{prefix_alias}"] = forecast_df[f"{node}_{prefix}"]
+
+    # Also check if there is an aggregated forecasts over all nodes
+    if (
+        forecast_df.get(f"all_nodes_{prefix}") is not None
+        and forecast.get(f"all_nodes_{prefix_alias}") is not None
+    ):
+        forecast[f"all_nodes_{prefix_alias}"] = forecast_df[f"all_nodes_{prefix}"]
+
+    return forecast
 
 
 class UnitForecaster:
@@ -223,13 +264,14 @@ class UnitForecaster:
             price_forecast_algorithm_name
         )
         if price_forecast_algorithm is not None:  # None if one wants to keep forecasts
-            self.price = calculate_price_forecasts(
+            self.price = calculate_base_forecasts(
                 self.index,
                 units,
                 market_configs,
                 price_forecast_algorithm,
                 forecast_df,
                 self.preprocess_information["price"],
+                prefix="price",
             )
             self.price = self._dict_to_series(self.price)
 
@@ -243,12 +285,14 @@ class UnitForecaster:
         if (
             residual_load_forecast_algorithm is not None
         ):  # None if one wants to keep forecasts
-            self.residual_load = residual_load_forecast_algorithm(
+            self.residual_load = calculate_base_forecasts(
                 self.index,
                 units,
                 market_configs,
+                residual_load_forecast_algorithm,
                 forecast_df,
                 self.preprocess_information["residual_load"],
+                prefix="residual_load",
             )
             self.residual_load = self._dict_to_series(self.residual_load)
 
@@ -536,12 +580,14 @@ class DsmUnitForecaster(UnitForecaster):
         if (
             congestion_signal_forecast_algorithm is not None
         ):  # None if one wants to keep forecasts
-            self.congestion_signal = congestion_signal_forecast_algorithm(
+            self.congestion_signal = calculate_node_wise_forecasts(
                 self.index,
                 units,
                 market_configs,
+                congestion_signal_forecast_algorithm,
                 forecast_df,
                 self.preprocess_information["congestion_signal"],
+                prefix="congestion_signal",
             )
             self.congestion_signal = self._dict_to_series(self.congestion_signal)
 
@@ -555,14 +601,14 @@ class DsmUnitForecaster(UnitForecaster):
         if (
             renewable_utilisation_forecast_algorithm is not None
         ):  # None if one wants to keep forecasts
-            self.renewable_utilisation_signal = (
-                renewable_utilisation_forecast_algorithm(
-                    self.index,
-                    units,
-                    market_configs,
-                    forecast_df,
-                    self.preprocess_information["congestion_signal"],
-                )
+            self.renewable_utilisation_signal = calculate_node_wise_forecasts(
+                self.index,
+                units,
+                market_configs,
+                renewable_utilisation_forecast_algorithm,
+                forecast_df,
+                self.preprocess_information["renewable_utilisation"],
+                prefix="renewable_utilisation",
             )
             self.renewable_utilisation_signal = self._dict_to_series(
                 self.renewable_utilisation_signal

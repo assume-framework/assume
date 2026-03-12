@@ -146,8 +146,12 @@ class MarketConfig:
 
     def __hash__(self):
         return hash(
-            i for i in self.__dict__.values() if type(i) not in [list, dict]
-        )  # lists and dicts are not hashable, but they are not used for equality checks
+            tuple(
+                i
+                for i in self.__dict__.values()
+                if type(i) not in [list, dict] and not callable(i)
+            )
+        )
 
 
 class OpeningMessage(TypedDict):

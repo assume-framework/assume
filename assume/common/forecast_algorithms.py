@@ -28,71 +28,6 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
-# advanced on: https://discuss.python.org/t/memoizing-based-on-id-to-avoid-implementing-and-computing-hash-method/87701/7
-def custom_lru_cache(func_or_None=None, maxsize=128, typed=False, hasher=id):
-    """
-    Implements a wrap for lru cache that enables to use non-hashable inputs for initialization:
-    NOTE: Be careful in using this! If unhashable object changes between calls,
-          this might give incorrect (old) results that do not get updated!
-      hashifies inputs, than does lru_cache, than turns inputs back to normal and calls function
-
-    wrapper(inputs) -> 'decorated'/cache(hashified_inputs) -> unwrapper(hashified_inputs) -> func(inputs)
-    """
-
-    def decorator(func):
-        class Hashified:
-            def __init__(self, obj):
-                self.obj = obj
-
-            def __eq__(self, other):
-                return hasher(self.obj) == hasher(other.obj)
-
-            def __hash__(self):
-                return hasher(self.obj)
-
-        def unwrapper(*args, **kwargs):
-            # returns hashable inputs back to normal state
-            return func(
-                *(arg.obj if isinstance(arg, Hashified) else arg for arg in args),
-                **{
-                    name: value.obj if isinstance(value, Hashified) else value
-                    for name, value in kwargs.items()
-                },
-            )
-
-        def wrapper(*args, **kwargs):
-            return decorated(
-                *(Hashified(arg) if arg.__hash__ is None else arg for arg in args),
-                **{
-                    name: Hashified(value) if value.__hash__ is None else value
-                    for name, value in kwargs.items()
-                },
-            )
-
-        # wrap lru_cache with hashable inputs and afterwards turn them back to normal
-        decorated = lru_cache(maxsize=maxsize, typed=typed)(unwrapper)
-        wrapper.cache_info = decorated.cache_info
-        wrapper.cache_clear = decorated.cache_clear
-        if hasattr(decorated, "cache_parameters"):
-            wrapper.cache_parameters = decorated.cache_parameters
-        return wrapper
-
-    return decorator if func_or_None is None else decorator(func_or_None)
-
-
-def _ensure_not_none(
-    df: pd.DataFrame | None, index: ForecastIndex, check_index=False
-) -> pd.DataFrame:
-    if isinstance(index, FastIndex):
-        index = index.as_datetimeindex()
-
-    if df is None:
-        return pd.DataFrame(index=index)
-    if check_index and index.freq != df.index.inferred_freq:
-        raise ValueError("Forecast frequency does not match index frequency.")
-    return df
-
-
 def calculate_max_power(units, index=None):
     """
     Returns: max available power: shape (num_units, forecast_len)
@@ -102,7 +37,7 @@ def calculate_max_power(units, index=None):
     )
 
 
-@custom_lru_cache
+@lru_cache
 def sort_units(units: list[BaseUnit], market_id: str | None = None):
     pps: list[PowerPlant] = []
     demands: list[Demand] = []
@@ -371,54 +306,36 @@ def calculate_naive_price(
     return calculate_naive_price_inelastic(index, units, config)
 
 
-@custom_lru_cache
+@lru_cache
 def calculate_naive_residual_load(
     index: ForecastIndex,
     units: list[BaseUnit],
-    market_configs: list[MarketConfig],
-    forecast_df: ForecastSeries = None,
+    config: MarketConfig,
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
-    _, demand_units, exchange_units, _, _ = sort_units(units)
+    powerplants_units, demand_units, exchange_units, _, _ = sort_units(
+        units, config.market_id
+    )
 
-    forecast_df = _ensure_not_none(forecast_df, index)
+    sum_demand = calculate_sum_demand(demand_units, exchange_units)
 
-    residual_loads: dict[str, pd.Series] = {}
+    # shape: (num_pp_units, index_len) -> (index_len)
+    renewable_units = [
+        unit for unit in powerplants_units if is_renewable(unit.technology)
+    ]
+    vre_feed_in_df = calculate_max_power(renewable_units).sum(axis=0)
 
-    for config in market_configs:
-        market_id = config.market_id
-        if config.product_type != "energy":
-            log.warning(
-                f"Load forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
-            )
-            continue
+    if vre_feed_in_df.empty:
+        vre_feed_in_df = 0
+    res_demand_df = sum_demand - vre_feed_in_df
 
-        residual_loads[market_id] = forecast_df.get(f"residual_load_{market_id}")
-        if residual_loads[market_id] is not None:
-            # go next if forecast existing
-            continue
-
-        powerplants_units, demand_units, exchange_units, storage_units, dsm_units = (
-            sort_units(units, market_id)
-        )
-
-        sum_demand = calculate_sum_demand(demand_units, exchange_units)
-
-        # shape: (num_pp_units, index_len) -> (index_len)
-        renewable_units = [
-            unit for unit in powerplants_units if is_renewable(unit.technology)
-        ]
-        vre_feed_in_df = pd.DataFrame(calculate_max_power(renewable_units)).sum(axis=0)
-
-        if vre_feed_in_df.empty:
-            vre_feed_in_df = 0
-        res_demand_df = sum_demand - vre_feed_in_df
-
-        residual_loads[market_id] = res_demand_df
-    return residual_loads
+    return res_demand_df
 
 
 def extract_buses_and_lines(market_configs: list[MarketConfig]):
+    """
+    TODO: Recently sure that all market_configs have the same grid data
+    """
     buses, lines = None, None
 
     for market_config in market_configs:
@@ -435,12 +352,11 @@ def extract_buses_and_lines(market_configs: list[MarketConfig]):
     return buses, lines
 
 
-@custom_lru_cache
+@lru_cache
 def calculate_naive_congestion_signal(
     index: ForecastIndex,
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
-    forecast_df: ForecastSeries = None,
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
     if isinstance(index, FastIndex):
@@ -452,15 +368,7 @@ def calculate_naive_congestion_signal(
     if buses is None or lines is None:
         return {}
 
-    (
-        powerplants_units,
-        demand_units,
-        exchange_units,
-        storage_units,
-        dsm_units,
-    ) = sort_units(units)
-
-    forecast_df = _ensure_not_none(forecast_df, index)
+    powerplants_units, demand_units, _, _, _ = sort_units(units)
 
     demand_unit_nodes = {demand.node for demand in demand_units}
     if not all(node in buses.index for node in demand_unit_nodes):
@@ -521,13 +429,6 @@ def calculate_naive_congestion_signal(
     node_congestion_signal = pd.DataFrame(index=index)
 
     for node in demand_unit_nodes:
-        congestion_signal = forecast_df.get(f"{node}_congestion_severity")
-
-        if congestion_signal is not None:
-            node_congestion_signal[f"{node}_congestion_severity"] = congestion_signal
-            # go next if forecast existing
-            continue
-
         # Find all lines connected to this node
         connected_lines = lines[(lines["bus0"] == node) | (lines["bus1"] == node)].index
 
@@ -550,18 +451,15 @@ def calculate_naive_congestion_signal(
     return node_congestion_signal
 
 
-@custom_lru_cache
+@lru_cache
 def calculate_naive_renewable_utilisation(
     index: ForecastIndex,
     units: list[BaseUnit],
     market_configs: list[MarketConfig],
-    forecast_df: ForecastSeries = None,
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
-
-    forecast_df = _ensure_not_none(forecast_df, index)
 
     # Lines and buses should be everywhere the same
     buses, lines = extract_buses_and_lines(market_configs)
@@ -569,9 +467,7 @@ def calculate_naive_renewable_utilisation(
     if buses is None or lines is None:
         return {}
 
-    powerplants_units, demand_units, exchange_units, storage_units, dsm_units = (
-        sort_units(units)
-    )
+    powerplants_units, demand_units, _, _, _ = sort_units(units)
 
     demand_unit_nodes = {demand.node for demand in demand_units}
     if not all(node in buses.index for node in demand_unit_nodes):
@@ -594,29 +490,17 @@ def calculate_naive_renewable_utilisation(
 
     # Calculate utilisation based on availability and max power for each node
     for node in demand_unit_nodes:
-        utilisation = forecast_df.get(f"{node}_renewable_utilisation")
-
-        if utilisation is not None:
-            renewable_utilisation[f"{node}_renewable_utilisation"] = utilisation
-            # go next if forecast existing
-            continue
         node_renewable_units = [
             unit.id for unit in renewable_units if unit.node == node
         ]
         utilisation = power[node_renewable_units].sum(axis=1)
         renewable_utilisation[f"{node}_renewable_utilisation"] = utilisation.values
 
-    # Calculate the total renewable utilisation across all nodes if not in forecast_df
-    all_node_utilisation = forecast_df.get("all_nodes_renewable_utilisation")
-    if all_node_utilisation is None:
-        all_node_utilisation = renewable_utilisation.sum(axis=1)
-        renewable_utilisation["all_nodes_renewable_utilisation"] = (
-            all_node_utilisation.values
-        )
-    else:
-        renewable_utilisation["all_nodes_renewable_utilisation"] = (
-            all_node_utilisation.values
-        )
+    # Calculate the total renewable utilisation across all nodes
+    all_node_utilisation = renewable_utilisation.sum(axis=1)
+    renewable_utilisation["all_nodes_renewable_utilisation"] = (
+        all_node_utilisation.values
+    )
 
     return renewable_utilisation
 
