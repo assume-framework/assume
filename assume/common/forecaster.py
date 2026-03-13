@@ -139,30 +139,35 @@ def calculate_node_wise_forecasts(
 
 
 class UnitForecaster:
-    """
-    A generalized forecaster to provide units with static input data, such as availability or market price predictions.
+    """A generalized forecaster to provide units with static input data, such as availability or market price predictions.
 
     Forecast data is typically provided as time series data, either loaded from a CSV file or calculated
-    internally from imported data. This class implements the basic forecaster interface, which relies on three main
-    methods to manage the lifecycle of forecasts:
+    internally from imported data. This class implements the basic forecaster interface, which relies on three
+    lifecycle methods:
 
-    1. ``preprocess``: Prepares information/forecasts for the initialization and update steps.
-    2. ``initialize``: Initializes all forecast timeseries. This should be called once all units are created.
-    3. ``update``: Used to change forecasts during runtime. This shall be called during the bid calculation of
-       bidding strategies.
+    1. ``preprocess``: Prepares intermediate information for the initialization and update steps.
+    2. ``initialize``: Computes all forecast timeseries. Should be called once after all units are created.
+    3. ``update``: Revises forecasts during runtime (e.g. during bid calculation of bidding strategies).
 
-    These methods call functions that can be specified in the ``config.yaml`` or the unit CSV files via
-    the ``forecast_algorithms`` dictionary. The functions are specified using the pattern ``{prefix}_{forecast_metric}``,
-    where ``prefix`` is ``preprocess``, ``update``, or empty for ``initialize``.
+    Algorithm resolution:
+        Each lifecycle method looks up which algorithm to run via two dictionaries:
+
+        - ``forecast_algorithms`` maps a **key** (e.g. ``"price"``, ``"update_price"``) to an
+          **algorithm_id** (e.g. ``"price_naive_forecast"``). Keys follow the pattern
+          ``{prefix}_{forecast_metric}`` where *prefix* is ``preprocess``, ``update``, or empty
+          for ``initialize``.
+        - ``_registries`` (populated from ``forecast_registries``) maps each **algorithm_id** to
+          the actual callable. It contains three sub-dicts: ``"init"``, ``"preprocess"``, and
+          ``"update"``, typically provided by ``get_forecast_registries()`` in ``forecast_algorithms.py``.
 
     Attributes:
         index (ForecastIndex): The time index for all forecast series in this unit.
         availability (ForecastSeries): Forecasted availability of the unit.
-        forecast_algorithms (dict[str, str]): Map specifying the forecast algorithms to use. Keys generally follow
-            the format ``{prefix}_{forecast_metric}`` mapping to an ``algorithm_id``.
-        price (dict[str, ForecastSeries]): Map of ``market_id`` to forecasted prices. (Initialized from ``market_prices``)
+        forecast_algorithms (dict[str, str]): Map of ``{prefix}_{metric}`` keys to algorithm IDs.
+        price (dict[str, ForecastSeries]): Map of ``market_id`` to forecasted prices (initialized from ``market_prices``).
         residual_load (dict[str, ForecastSeries]): Map of ``market_id`` to forecasted residual load.
-        preprocess_information (dict): Dictionary storing information prepared during the ``preprocess`` step.
+        preprocess_information (dict): Intermediate data prepared during the ``preprocess`` step,
+            keyed by metric name (e.g. ``"price"``, ``"residual_load"``).
     """
 
     def __init__(
@@ -194,11 +199,13 @@ class UnitForecaster:
         self.preprocess_information = {}
 
     def _to_series(self, item: ForecastSeries) -> FastSeries:
+        """Wrap *item* in a ``FastSeries`` aligned to ``self.index`` (no-op if already one)."""
         if isinstance(item, FastSeries):
             return item
         return FastSeries(index=self.index, value=item)
 
     def _dict_to_series(self, d: dict[str, ForecastSeries]) -> dict[str, FastSeries]:
+        """Apply ``_to_series`` to every value in *d*."""
         result: dict[str, FastSeries] = {}
         for key, value in d.items():
             result[key] = self._to_series(value)
@@ -211,22 +218,20 @@ class UnitForecaster:
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
     ):
-        """
-        Applies preprocessing algorithms to the given data.
+        """Prepare intermediate data needed by ``initialize`` and ``update``.
 
-        This method prepares information and intermediate forecasts required for the
-        subsequent `initialize` and `update` steps. The results are stored in the
-        `self.preprocess_information` dictionary.
+        Runs the preprocess algorithms for *price* and *residual_load* and stores results
+        in ``self.preprocess_information``.
 
-        The specific preprocessing algorithms are configured in `self.forecast_algorithms`
-        using the keys `preprocess_price` (default: `price_default`) and
-        `preprocess_residual_load` (default: `residual_load_default`).
+        Algorithm keys (defaults):
+            - ``preprocess_price`` (``price_default``)
+            - ``preprocess_residual_load`` (``residual_load_default``)
 
         Args:
-            units (list[BaseUnit]): List of all units in the simulation.
-            market_configs (list[MarketConfig]): List of available market configurations.
-            forecast_df (ForecastSeries, optional): Dataframe containing explicitly provided forecasts.
-            initializing_unit (BaseUnit, optional): The unit that is currently being initialized.
+            units (list[BaseUnit]): All units in the simulation.
+            market_configs (list[MarketConfig]): Available market configurations.
+            forecast_df (ForecastSeries, optional): Explicitly provided forecasts (columns override calculated ones).
+            initializing_unit (BaseUnit, optional): The unit currently being initialized.
         """
 
         price_preprocess_algorithm_name = self.forecast_algorithms.get(
@@ -258,22 +263,21 @@ class UnitForecaster:
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
     ):
-        """
-        Initializes all forecast metric timeseries for the unit.
+        """Compute all forecast timeseries for the unit. Call once after all units are created.
 
-        This method should be called exactly once after all units in the simulation are created.
-        It first delegates to `preprocess()` to prepare data, then computes the initial
-        forecasts (e.g., `price` and `residual_load`).
+        Delegates to ``preprocess()`` first, then computes *price* and *residual_load*
+        forecasts via ``calculate_base_forecasts``. If an algorithm resolves to ``None``
+        (e.g. ``price_keep_given``), the existing forecast is kept unchanged.
 
-        The specific forecast algorithms are configured in `self.forecast_algorithms`
-        using the keys `price` (default: `price_naive_forecast`) and
-        `residual_load` (default: `residual_load_naive_forecast`).
+        Algorithm keys (defaults):
+            - ``price`` (``price_naive_forecast``)
+            - ``residual_load`` (``residual_load_naive_forecast``)
 
         Args:
-            units (list[BaseUnit]): List of all units in the simulation.
-            market_configs (list[MarketConfig]): List of available market configurations.
-            forecast_df (ForecastSeries, optional): Dataframe containing explicitly provided forecasts.
-            initializing_unit (BaseUnit, optional): The unit that is currently being initialized.
+            units (list[BaseUnit]): All units in the simulation.
+            market_configs (list[MarketConfig]): Available market configurations.
+            forecast_df (ForecastSeries, optional): Explicitly provided forecasts (columns override calculated ones).
+            initializing_unit (BaseUnit, optional): The unit currently being initialized.
         """
         self.preprocess(units, market_configs, forecast_df, initializing_unit)
 
@@ -284,7 +288,7 @@ class UnitForecaster:
         price_forecast_algorithm = self._registries["init"].get(
             price_forecast_algorithm_name
         )
-        if price_forecast_algorithm is not None:  # None if one wants to keep forecasts
+        if price_forecast_algorithm is not None:  # None means keep existing forecast
             self.price = calculate_base_forecasts(
                 self.index,
                 units,
@@ -305,7 +309,7 @@ class UnitForecaster:
         )
         if (
             residual_load_forecast_algorithm is not None
-        ):  # None if one wants to keep forecasts
+        ):  # None means keep existing forecast
             self.residual_load = calculate_base_forecasts(
                 self.index,
                 units,
@@ -318,20 +322,17 @@ class UnitForecaster:
             self.residual_load = self._dict_to_series(self.residual_load)
 
     def update(self, *args, **kwargs):
-        """
-        Dynamically updates the forecast timeseries during runtime.
+        """Revise forecast timeseries during runtime (e.g. during bid calculation).
 
-        This method is designed to be called periodically during the simulation (e.g., during
-        the bid calculation of bidding strategies) to change the unit's forecasts based on
-        sliding horizons or new runtime data.
+        Called periodically to adjust forecasts based on sliding horizons or new data.
 
-        The specific update algorithms are configured in `self.forecast_algorithms`
-        using the keys `update_price` (default: `price_default`) and
-        `update_residual_load` (default: `residual_load_default`).
+        Algorithm keys (defaults):
+            - ``update_price`` (``price_default``)
+            - ``update_residual_load`` (``residual_load_default``)
 
         Args:
-            *args: Variable length argument list passed to the underlying update algorithms.
-            **kwargs: Arbitrary keyword arguments passed to the underlying update algorithms.
+            *args: Passed through to the underlying update algorithms.
+            **kwargs: Passed through to the underlying update algorithms.
         """
 
         price_update_algorithm_name = self.forecast_algorithms.get(
@@ -361,12 +362,14 @@ class UnitForecaster:
 
 
 class CustomUnitForecaster(UnitForecaster):
-    """
-    A more general unit forecaster used e.g. for csv imports
+    """A generic forecaster that sets arbitrary keyword arguments as attributes.
 
-    Attributes:
-        index (ForecastIndex): the index of all forecast series in this unit
-        **kwargs: The desired attributes for this forecast
+    Used primarily for CSV-imported forecasts. Any ``pd.Series`` values are automatically
+    converted to ``FastSeries``.
+
+    Args:
+        index (ForecastIndex): The time index for all forecast series.
+        **kwargs: Arbitrary forecast attributes to set on the instance.
     """
 
     def __init__(
@@ -382,15 +385,13 @@ class CustomUnitForecaster(UnitForecaster):
 
 
 class DemandForecaster(UnitForecaster):
-    """
-    A forecaster for demand units
+    """Forecaster for demand units.
+
+    Provides price, residual load, and availability forecasts (see :class:`UnitForecaster`)
+    plus a demand timeseries specific to demand units.
 
     Attributes:
-        index (ForecastIndex): the index of all forecast series in this unit
-        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
-        demand (ForecastSeries): Forecasted demand (must be negative)
-        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
-        availability (ForecastSeries): Forecasted availability of a unit
+        demand (ForecastSeries): Forecasted demand (must be negative).
     """
 
     def __init__(
@@ -417,14 +418,13 @@ class DemandForecaster(UnitForecaster):
 
 
 class PowerplantForecaster(UnitForecaster):
-    """
-    A forecaster for powerplant units
+    """Forecaster for powerplant units.
+
+    Provides price, residual load, and availability forecasts (see :class:`UnitForecaster`)
+    plus per-fuel-type price timeseries.
+
     Attributes:
-        index (ForecastIndex): the index of all forecast series in this unit
-        fuel_prices (dict[str, ForecastSeries]): Map of fuel type -> forecasted fuel prices
-        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
-        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
-        availability (ForecastSeries): Forecasted availability of a unit
+        fuel_prices (dict[str, ForecastSeries]): Map of fuel type to forecasted fuel prices.
     """
 
     def __init__(
@@ -456,23 +456,17 @@ class PowerplantForecaster(UnitForecaster):
 
 
 class DsmUnitForecaster(UnitForecaster):
-    """
-    A forecaster for demand side management (DSM) units.
+    """Forecaster for demand side management (DSM) units.
 
-    This class extends the `UnitForecaster` to include metrics specifically relevant to
-    DSM units, such as congestion signals, renewable utilisation signals, and electricity prices.
-    It overrides the base interface (`preprocess`, `initialize`, `update`) to prepare and
-    maintain forecasts for these additional metrics.
+    Extends :class:`UnitForecaster` with metrics relevant to DSM units: congestion signals,
+    renewable utilisation signals, and electricity prices. Overrides ``preprocess``,
+    ``initialize``, and ``update`` to handle these additional forecasts via
+    ``calculate_node_wise_forecasts``.
 
     Attributes:
-        index (ForecastIndex): The index of all forecast series in this unit.
-        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices.
-        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load.
-        availability (ForecastSeries): Forecasted availability of a unit.
-        congestion_signal (ForecastSeries): Forecasted congestion signal.
-        renewable_utilisation_signal (ForecastSeries): Forecasted renewable utilisation signal.
-        electricity_price (ForecastSeries): Forecasted electricity price.
-        forecast_algorithms (dict[str, str]): Map specifying the forecast algorithms to use.
+        congestion_signal (ForecastSeries): Forecasted per-node congestion signal.
+        renewable_utilisation_signal (ForecastSeries): Forecasted per-node renewable utilisation.
+        electricity_price (ForecastSeries): Forecasted electricity price (derived from EOM price).
     """
 
     def __init__(
@@ -510,20 +504,19 @@ class DsmUnitForecaster(UnitForecaster):
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
     ):
-        """
-        Applies preprocessing to the given data for congestion signal and renewable utilization.
+        """Prepare intermediate data for DSM-specific metrics (congestion signal, renewable utilisation).
 
-        Preprocess information is stored in the `self.preprocess_information` dictionary.
+        Results are stored in ``self.preprocess_information``.
 
-        The specific preprocessing algorithms are configured in `self.forecast_algorithms`
-        using the keys `preprocess_congestion_signal` (default: `congestion_signal_default`) and
-        `preprocess_renewable_utilisation` (default: `renewable_utilisation_default`).
+        Algorithm keys (defaults):
+            - ``preprocess_congestion_signal`` (``congestion_signal_default``)
+            - ``preprocess_renewable_utilisation`` (``renewable_utilisation_default``)
 
         Args:
-            units (list[BaseUnit]): List of all units in the simulation.
-            market_configs (list[MarketConfig]): List of available market configurations.
-            forecast_df (ForecastSeries, optional): Dataframe containing explicitly provided forecasts.
-            initializing_unit (BaseUnit, optional): The unit that is currently being initialized.
+            units (list[BaseUnit]): All units in the simulation.
+            market_configs (list[MarketConfig]): Available market configurations.
+            forecast_df (ForecastSeries, optional): Explicitly provided forecasts.
+            initializing_unit (BaseUnit, optional): The unit currently being initialized.
         """
 
         congestion_signal_preprocess_algorithm_name = self.forecast_algorithms.get(
@@ -561,27 +554,28 @@ class DsmUnitForecaster(UnitForecaster):
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
     ):
-        """
-        Initializes forecast metric timeseries specific to DSM units.
+        """Initialize all forecast timeseries including DSM-specific metrics.
 
-        This calls the parent class initialization and additionally initializes the
-        `electricity_price`, `congestion_signal`, and `renewable_utilisation_signal`.
+        Calls parent preprocessing and initialization for price / residual load, then
+        additionally computes ``electricity_price`` (from EOM price), ``congestion_signal``,
+        and ``renewable_utilisation_signal`` via ``calculate_node_wise_forecasts``.
+        Matching columns in *forecast_df* overwrite calculated forecasts.
 
-        The specific forecast algorithms for the new metrics are configured in
-        `self.forecast_algorithms` using the keys `congestion_signal`
-        (default: `congestion_signal_naive_forecast`) and `renewable_utilisation`
-        (default: `renewable_utilisation_naive_forecast`).
+        Algorithm keys (defaults):
+            - ``congestion_signal`` (``congestion_signal_naive_forecast``)
+            - ``renewable_utilisation`` (``renewable_utilisation_naive_forecast``)
 
         Args:
-            units (list[BaseUnit]): List of all units in the simulation.
-            market_configs (list[MarketConfig]): List of available market configurations.
-            forecast_df (ForecastSeries, optional): Dataframe containing explicitly provided forecasts.
-            initializing_unit (BaseUnit, optional): The unit that is currently being initialized.
+            units (list[BaseUnit]): All units in the simulation.
+            market_configs (list[MarketConfig]): Available market configurations.
+            forecast_df (ForecastSeries, optional): Explicitly provided forecasts.
+            initializing_unit (BaseUnit, optional): The unit currently being initialized.
         """
-        # 1. preprocess of price and residual load forecast
+        # 1. Preprocess price and residual load (parent)
         super().preprocess(units, market_configs, forecast_df, initializing_unit)
 
-        # 2. Own preprocess and 3. Initialization and of price and load forecasts
+        # 2. Own preprocess (congestion_signal, renewable_utilisation)
+        #    and 3. Initialize price and residual load forecasts (parent)
         super().initialize(
             units,
             market_configs,
@@ -589,8 +583,8 @@ class DsmUnitForecaster(UnitForecaster):
             initializing_unit,
         )
 
-        # 4. Get electricity price forecast
-        # TODO how to handle other markets?
+        # 4. Derive electricity price from EOM market price
+        # TODO: how to handle other markets?
         self.electricity_price = self.price.get("EOM")
 
         # 5. Get congestion signal forecast
@@ -602,7 +596,7 @@ class DsmUnitForecaster(UnitForecaster):
         )
         if (
             congestion_signal_forecast_algorithm is not None
-        ):  # None if one wants to keep forecasts
+        ):  # None means keep existing forecast
             self.congestion_signal = calculate_node_wise_forecasts(
                 self.index,
                 units,
@@ -623,7 +617,7 @@ class DsmUnitForecaster(UnitForecaster):
         )
         if (
             renewable_utilisation_forecast_algorithm is not None
-        ):  # None if one wants to keep forecasts
+        ):  # None means keep existing forecast
             self.renewable_utilisation_signal = calculate_node_wise_forecasts(
                 self.index,
                 units,
@@ -638,19 +632,18 @@ class DsmUnitForecaster(UnitForecaster):
             )
 
     def update(self, *args, **kwargs):
-        """
-        Dynamically updates the DSM-specific forecast timeseries during runtime.
+        """Update DSM-specific forecast timeseries during runtime.
 
-        Calls the parent class update method and additionally updates the
-        `congestion_signal` and `renewable_utilisation_signal` forecasts.
+        Calls parent update for price / residual load, then additionally updates
+        ``congestion_signal`` and ``renewable_utilisation_signal``.
 
-        The specific update algorithms are configured in `self.forecast_algorithms`
-        using the keys `update_congestion_signal` (default: `congestion_signal_default`)
-        and `update_renewable_utilisation` (default: `renewable_utilisation_default`).
+        Algorithm keys (defaults):
+            - ``update_congestion_signal`` (``congestion_signal_default``)
+            - ``update_renewable_utilisation`` (``renewable_utilisation_default``)
 
         Args:
-            *args: Variable length argument list passed to the underlying update algorithms.
-            **kwargs: Arbitrary keyword arguments passed to the underlying update algorithms.
+            *args: Passed through to the underlying update algorithms.
+            **kwargs: Passed through to the underlying update algorithms.
         """
 
         super().update(*args, **kwargs)
@@ -687,16 +680,13 @@ class DsmUnitForecaster(UnitForecaster):
 
 
 class SteelplantForecaster(DsmUnitForecaster):
-    """
-    A forecaster for steelplant units
+    """Forecaster for steelplant units.
+
+    Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus fuel prices.
+    After initialization, DSM signals are copied to the unit and ``setup_model()`` is called.
+
     Attributes:
-        index (ForecastIndex): the index of all forecast series in this unit
-        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
-        fuel_prices (dict[str, ForecastSeries]): Map of fuel type -> forecasted fuel prices
-        availability (ForecastSeries): Forecasted availability of a unit
-        congestion_signal (ForecastSeries): Forecasted congestion signal
-        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
-        renewable_utilisation_signal (ForecastSeries): Forecasted renewable utilisation signal
+        fuel_prices (dict[str, ForecastSeries]): Map of fuel type to forecasted fuel prices.
     """
 
     def __init__(
@@ -754,21 +744,18 @@ class SteelplantForecaster(DsmUnitForecaster):
 
 
 class SteamgenerationForecaster(DsmUnitForecaster):
-    """
-    A forecaster for steam generation units
+    """Forecaster for steam generation units.
+
+    Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus fuel prices and
+    thermal-process-specific timeseries. After initialization, DSM signals are copied
+    to the unit and ``setup_model()`` is called.
+
     Attributes:
-        index (ForecastIndex): the index of all forecast series in this unit
-        electricity_price (ForecastSeries): Forecasted electricity price
-        fuel_prices (dict[str, ForecastSeries]): Map of fuel type -> forecasted fuel prices
-        demand (ForecastSeries): Forecasted electricity demand
-        electricity_price_flex (ForecastSeries): Forecasted flexible electricity price
-        thermal_demand (ForecastSeries): Forecasted thermal demand
-        congestion_signal (ForecastSeries): Forecasted congestion signal
-        renewable_utilisation_signal (ForecastSeries): Forecasted renewable utilisation signal
-        thermal_storage_schedule (ForecastSeries): Forecasted thermal storage schedule
-        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
-        availability (ForecastSeries): Forecasted availability of a unit
-        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+        fuel_prices (dict[str, ForecastSeries]): Map of fuel type to forecasted fuel prices.
+        demand (ForecastSeries): Forecasted electricity demand.
+        electricity_price_flex (ForecastSeries): Forecasted flexible electricity price.
+        thermal_demand (ForecastSeries): Forecasted thermal demand.
+        thermal_storage_schedule (ForecastSeries): Forecasted thermal storage schedule.
     """
 
     def __init__(
@@ -834,20 +821,19 @@ class SteamgenerationForecaster(DsmUnitForecaster):
 
 
 class BuildingForecaster(DsmUnitForecaster):
-    """
-    A forecaster for building units
+    """Forecaster for building units.
+
+    Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus fuel prices and
+    building-specific load/generation profiles. After initialization, electricity price
+    is copied to the unit and ``setup_model(presolve=True)`` is called.
+
     Attributes:
-        index (ForecastIndex): the index of all forecast series in this unit
-        fuel_prices (dict[str, ForecastSeries]): Map of fuel type -> forecasted fuel prices
-        heat_demand (ForecastSeries): Forecasted heat demand
-        ev_load_profile (ForecastSeries): Forecasted electric vehicle load profile
-        battery_load_profile (ForecastSeries): Forecasted battery load profile
-        pv_profile (ForecastSeries): Forecasted photovoltaic profile
-        load_profile (ForecastSeries): Forecasted overall load profile
-        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
-        availability (ForecastSeries): Forecasted availability of a unit
-        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
-        load_profile (ForecastSeries): Forecasted load profile
+        fuel_prices (dict[str, ForecastSeries]): Map of fuel type to forecasted fuel prices.
+        heat_demand (ForecastSeries): Forecasted heat demand.
+        ev_load_profile (ForecastSeries): Forecasted electric vehicle load profile.
+        battery_load_profile (ForecastSeries): Forecasted battery load profile.
+        pv_profile (ForecastSeries): Forecasted photovoltaic generation profile.
+        load_profile (ForecastSeries): Forecasted overall load profile.
     """
 
     def __init__(
@@ -913,16 +899,15 @@ class BuildingForecaster(DsmUnitForecaster):
 
 
 class HydrogenForecaster(DsmUnitForecaster):
-    """
-    A forecaster for hydrogen units
+    """Forecaster for hydrogen units.
+
+    Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus hydrogen-specific
+    timeseries. After initialization, electricity price is copied to the unit and
+    ``setup_model()`` is called.
+
     Attributes:
-        index (ForecastIndex): the index of all forecast series in this unit
-        electricity_price (ForecastSeries): Forecasted electricity price
-        hydrogen_demand (ForecastSeries): Forecasted hydrogen demand
-        seasonal_storage_schedule (ForecastSeries): Forecasted seasonal storage schedule
-        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
-        availability (ForecastSeries): Forecasted availability of a unit
-        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+        hydrogen_demand (ForecastSeries): Forecasted hydrogen demand.
+        seasonal_storage_schedule (ForecastSeries): Forecasted seasonal storage schedule.
     """
 
     def __init__(
@@ -946,7 +931,6 @@ class HydrogenForecaster(DsmUnitForecaster):
             residual_load=residual_load,
             electricity_price=electricity_price,
         )
-        # self.electricity_price = self._to_series(electricity_price)
         self.hydrogen_demand = self._to_series(hydrogen_demand)
         self.seasonal_storage_schedule = self._to_series(seasonal_storage_schedule)
 
@@ -972,15 +956,14 @@ class HydrogenForecaster(DsmUnitForecaster):
 
 
 class ExchangeForecaster(UnitForecaster):
-    """
-    A forecaster for exchange units
+    """Forecaster for exchange (import/export) units.
+
+    Provides price, residual load, and availability forecasts (see :class:`UnitForecaster`)
+    plus import and export volume timeseries.
+
     Attributes:
-        index (ForecastIndex): the index of all forecast series in this unit
-        volume_import (ForecastSeries): Forecasted import volume
-        volume_export (ForecastSeries): Forecasted export volume
-        residual_load (dict[str, ForecastSeries]): Map of market_id -> forecasted residual load
-        availability (ForecastSeries): Forecasted availability of a unit
-        market_prices (dict[str, ForecastSeries]): Map of market_id -> forecasted prices
+        volume_import (ForecastSeries): Forecasted import volume.
+        volume_export (ForecastSeries): Forecasted export volume.
     """
 
     def __init__(
