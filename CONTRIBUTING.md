@@ -113,4 +113,4 @@ cd docs/source && python -m sphinx . ../build && cd ../.. && python -m http.serv
 
 Reach out to us with your questions:
 
-kim.miskiw@kit.edu / manish.khanra@isi.fraunhofer.de / maurer@fh-aachen.de / nick.harder@inatech.uni-freiburg.de
+kim.miskiw@kit.edu / manish.khanra@isi.fraunhofer.de / maurer@fh-aachen.de / gunter.grimm@inatech.uni-freiburg.de

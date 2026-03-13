@@ -62,6 +62,14 @@ class UnitOperatorStrategy:
 
         return total_capacity
 
+    def calculate_reward(
+        self,
+        units_operator,  # type: UnitsOperator
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        pass
+
 
 class UnitsOperatorDirectStrategy(UnitOperatorStrategy):
     def calculate_bids(
