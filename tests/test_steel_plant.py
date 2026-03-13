@@ -70,7 +70,7 @@ def create_steel_plant(dsm_components, flexibility_measure):
         "RD": DsmEnergyNaiveRedispatchStrategy(),
     }
 
-    return SteelPlant(
+    plant = SteelPlant(
         id=f"test_steel_plant_{flexibility_measure}",
         unit_operator="test_operator",
         objective="min_variable_cost",
@@ -85,6 +85,8 @@ def create_steel_plant(dsm_components, flexibility_measure):
         congestion_threshold=0.8,
         peak_load_cap=95,
     )
+    plant.setup_model()
+    return plant
 
 
 @pytest.fixture
@@ -287,7 +289,7 @@ def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
     )
 
     dsm_components.pop("electrolyser", None)
-    return SteelPlant(
+    plant = SteelPlant(
         id="test_steel_plant_no_electrolyser",
         unit_operator="test_operator",
         objective="min_variable_cost",
@@ -302,6 +304,8 @@ def steel_plant_without_electrolyser(dsm_components) -> SteelPlant:
         demand=1000,
         technology="steel_plant",
     )
+    plant.setup_model()
+    return plant
 
 
 # --- Initialization Tests ---

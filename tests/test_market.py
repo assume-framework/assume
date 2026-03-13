@@ -20,6 +20,26 @@ start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
 
 
+def test_market_config_hash_consistent():
+    """Hash of the same MarketConfig instance is stable across calls."""
+    mc = MarketConfig(market_id="EOM")
+    assert hash(mc) == hash(mc)
+
+
+def test_market_config_hash_equal_instances():
+    """Two MarketConfig instances with identical values hash the same."""
+    mc1 = MarketConfig(market_id="EOM", minimum_bid_price=-100.0)
+    mc2 = MarketConfig(market_id="EOM", minimum_bid_price=-100.0)
+    assert hash(mc1) == hash(mc2)
+
+
+def test_market_config_hash_different_instances():
+    """MarketConfig instances with different values hash differently."""
+    mc1 = MarketConfig(market_id="EOM")
+    mc2 = MarketConfig(market_id="OTHER")
+    assert hash(mc1) != hash(mc2)
+
+
 @pytest.fixture
 async def market_role() -> MarketRole:
     market_id = "Test"

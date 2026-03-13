@@ -29,6 +29,9 @@ Upcoming Release
   - **Fix data loss in RL learning role**: Fixed data loss in RL learning role by implementing atomic swap with carry-over for incomplete timesteps in cache
 
 
+  **New Features:**
+  - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+
 0.5.6 - (23th December 2025)
 ============================
 

@@ -142,7 +142,7 @@ class Building(DSMFlex, SupportsMinMax):
             self.components["pv_plant"][key] = self.forecaster.pv_profile
 
         # Initialize the model
-        self.setup_model(presolve=True)
+        # self.setup_model(presolve=True)  # NOTE: called in forecaster initialization again!!!
 
     def define_parameters(self):
         """
