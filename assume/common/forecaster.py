@@ -24,6 +24,7 @@ log = logging.getLogger(__name__)
 def _ensure_not_none(
     df: pd.DataFrame | None, index: ForecastIndex, check_index=False
 ) -> pd.DataFrame:
+    """Return *df* as-is or create an empty DataFrame with the given *index* if *df* is None."""
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
 
@@ -43,9 +44,14 @@ def calculate_base_forecasts(
     preprocess_information=None,
     prefix="",
 ) -> dict[str, ForecastSeries]:
-    """
-    Check if forecasts for the given prefix / metric (e.g. price or residual_load) and market are provided in the forecast_df.
-    If not, calculate forecasts using the given forecast_algorithm.
+    """Compute per-market forecasts for a single metric (e.g. price, residual_load).
+
+    For each energy market in *market_configs*, returns the corresponding column
+    from *forecast_df* if it exists (keyed as ``{prefix}_{market_id}``), otherwise
+    falls back to *forecast_algorithm* to calculate the forecast.
+
+    Returns:
+        dict[str, ForecastSeries]: Map of ``market_id`` to forecast series.
     """
     # print(prefix, hash(prefix), hash(index), hash(market_configs), hash(units), hash(preprocess_information))
     forecast_df = _ensure_not_none(forecast_df, index)
@@ -60,6 +66,7 @@ def calculate_base_forecasts(
             )
             continue
 
+        # NOTE: if given forecast_df will currently always prevent other forecast calculations
         forecast[market_id] = forecast_df.get(f"{prefix}_{market_id}")
         if forecast[market_id] is not None:
             # go next if forecast existing
@@ -84,6 +91,15 @@ def calculate_node_wise_forecasts(
     preprocess_information=None,
     prefix="",
 ):
+    """Compute per-node forecasts for a spatial metric (e.g. congestion_signal, renewable_utilisation).
+
+    Runs *forecast_algorithm* to produce forecasts keyed by node, then overwrites
+    individual entries with columns from *forecast_df* (keyed as ``{node}_{prefix}``)
+    when both the provided and calculated forecast exist for the same node.
+
+    Returns:
+        dict[str, ForecastSeries]: Map of ``{node}_{prefix_alias}`` to forecast series.
+    """
     forecast_df = _ensure_not_none(forecast_df, index)
 
     forecast = forecast_algorithm(
@@ -96,10 +112,15 @@ def calculate_node_wise_forecasts(
     # FIXME: make prefix coherent to the forecast!!!!
     prefix_alias = "congestion_severity" if prefix == "congestion_signal" else prefix
 
-    buses = list(market_configs)[0].param_dict.get("grid_data", {}).get("buses")
+    buses = (
+        list(market_configs)[0]
+        .param_dict.get("grid_data", {})
+        .get("buses", pd.DataFrame())
+    )
 
     # check if forecast exists in forecast_df for each node
     # if calculated forecast also expects this node: overwrite else ignore
+    # NOTE: currently forecast_df will always overwrite calculated forecasts
     for node in buses.index:
         if (
             forecast_df.get(f"{node}_{prefix}") is not None
@@ -474,6 +495,8 @@ class DsmUnitForecaster(UnitForecaster):
             market_prices=market_prices,
             residual_load=residual_load,
         )
+
+        # FIXME: currently default is series while calculations are dict of series
         self.congestion_signal = self._to_series(congestion_signal)
         self.electricity_price = self._to_series(electricity_price)
         self.renewable_utilisation_signal = self._to_series(

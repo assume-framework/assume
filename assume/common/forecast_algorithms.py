@@ -39,6 +39,11 @@ def calculate_max_power(units, index=None):
 
 @lru_cache
 def sort_units(units: list[BaseUnit], market_id: str | None = None):
+    """
+    Classify units into powerplants, demands, exchanges, storages, and DSM units.
+
+    If *market_id* is given, only units with a bidding strategy for that market are included.
+    """
     pps: list[PowerPlant] = []
     demands: list[Demand] = []
     storages: list[Storage] = []
@@ -103,6 +108,19 @@ def calculate_naive_price_inelastic(
     units: list[BaseUnit],
     config: MarketConfig,
 ) -> dict[str, ForecastSeries]:
+    """
+    Forecast market clearing prices using a merit-order stack against inelastic demand.
+
+    Storages and DSM units are ignored in this calculation.
+
+    Steps:
+        1. **Sort units** by type, keeping only those with a bidding strategy for the market.
+        2-4. **Build supply and demand curves** — compute per-unit marginal costs and
+            available power, then sum demand (including exchange volumes) for each timestep.
+        5-6. **Merit-order dispatch** — sort supply by ascending marginal cost, stack capacity
+            until demand is met, and set the clearing price to the marginal unit's cost
+            (defaults to 1000 if capacity is insufficient).
+    """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
 
@@ -166,6 +184,20 @@ def calculate_naive_price_elastic(
     config: MarketConfig,
     elastic_demand_units: list[Demand],
 ) -> dict[str, ForecastSeries]:
+    """
+    Forecast market clearing prices with price-elastic demand via pay-as-clear matching.
+
+    Storages and DSM units are ignored in this calculation.
+
+    Steps:
+        1. **Sort units and collect elastic bids** — classify units by type and compute
+            demand bids from elastic demand units for the first product interval.
+        2-4. **Build supply and demand curves** — compute per-unit marginal costs and
+            available power, then sum inelastic demand (including exchange volumes).
+        5-6. **Pay-as-clear dispatch** — for each timestep, assemble an orderbook from
+            supply offers, elastic demand bids, and the inelastic demand block, then
+            clear via ``PayAsClearRole`` to obtain the equilibrium price.
+    """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
 
@@ -248,8 +280,11 @@ def calculate_naive_price_elastic(
             .reset_index()
             .rename(columns={"index": "unit_id"})
         )
+
+        # shape of sum_demand: (time_steps, 1)
+        demand_t = sum_demand.loc[t][0]
+
         # get the demand bids
-        demand_t = sum_demand.loc[t]
         demand_bids = (
             pd.DataFrame(
                 {
@@ -269,7 +304,16 @@ def calculate_naive_price_elastic(
         orderbook.extend(supply_offers.to_dict("records"))
         orderbook.extend(demand_bids.to_dict("records"))
         if demand_t > 0:
-            orderbook.append({"price": 3000.0, "volume": demand_t})
+            orderbook.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "node": "node0",
+                    "price": 3000.0,
+                    "volume": demand_t,
+                }
+            )
 
         mps = get_available_products(
             config.market_products, pd.Timestamp(start) - pd.Timedelta("1h")
@@ -289,19 +333,22 @@ def calculate_naive_price(
     config: MarketConfig,
     preprocess_information=None,
 ):
+    """Calculates elastic or inelastic naive price forecast depending on demand unit types."""
     # 1. Sort units by type and filter for units with bidding strategy for the given market_id
     _, demand_units, _, _, _ = sort_units(units, config.market_id)
 
-    elastic_demand_units = [
-        unit
+    elastic_demand_units = {
+        unit.id: unit
         for unit in demand_units
         if isinstance(
             unit.bidding_strategies[config.market_id], EnergyHeuristicElasticStrategy
         )
-    ]
+    }
 
     if len(elastic_demand_units) > 0:
-        return calculate_naive_price_elastic(index, units, config, elastic_demand_units)
+        return calculate_naive_price_elastic(
+            index, units, config, elastic_demand_units.values()
+        )
 
     return calculate_naive_price_inelastic(index, units, config)
 
@@ -313,6 +360,7 @@ def calculate_naive_residual_load(
     config: MarketConfig,
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
+    """Compute residual load as total demand minus renewable generation for each timestep."""
     powerplants_units, demand_units, exchange_units, _, _ = sort_units(
         units, config.market_id
     )
@@ -334,7 +382,8 @@ def calculate_naive_residual_load(
 
 def extract_buses_and_lines(market_configs: list[MarketConfig]):
     """
-    TODO: Recently sure that all market_configs have the same grid data
+    Extract bus and line DataFrames from the first market config that carries grid data.
+    NOTE: Currently all scenario loaders give grid data to all markets so this is maybe overkill
     """
     buses, lines = None, None
 
@@ -359,6 +408,19 @@ def calculate_naive_congestion_signal(
     market_configs: list[MarketConfig],
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
+    """
+    Compute per-node congestion severity signals from net load and line capacities.
+
+    Steps:
+        1. **Net load per node** — for each demand node, subtract local generation from
+            local demand to obtain the net load timeseries.
+        2. **Line congestion severity** — for each transmission line, divide the combined
+            net load of its two endpoint nodes by the line's thermal capacity.
+        3. **Node aggregation** — for each node, take the maximum congestion severity
+            across all connected lines as the node's congestion signal.
+
+    Returns an empty dict if grid data (buses/lines) is unavailable.
+    """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
 
@@ -458,6 +520,13 @@ def calculate_naive_renewable_utilisation(
     market_configs: list[MarketConfig],
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
+    """
+    Compute per-node renewable generation (availability * max_power) and an all-nodes total.
+
+    Returns a DataFrame with columns ``{node}_renewable_utilisation`` for each demand node
+    and ``all_nodes_renewable_utilisation`` for the aggregate. Returns an empty dict if
+    grid data is unavailable.
+    """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
 
