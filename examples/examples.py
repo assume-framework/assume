@@ -103,7 +103,10 @@ available_examples = {
         "scenario": "example_03",
         "study_case": "base_case_2019_with_DSM",
     },
-    "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019_old8459abd_singel"},
+    "large_2019_rl": {
+        "scenario": "example_03a",
+        "study_case": "base_case_2019_old8459abd_singel",
+    },
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
     "large_2019_storage": {
         "scenario": "example_03c",
@@ -141,7 +144,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "large_2019_rl"
+    example = "small_learning_with_storage"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db_8459abd.db"
@@ -158,7 +161,6 @@ if __name__ == "__main__":
         scenario=available_examples[example]["scenario"],
         study_case=available_examples[example]["study_case"],
     )
-
 
     if world.learning_mode:
         # run learning if learning mode is enabled

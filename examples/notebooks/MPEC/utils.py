@@ -8,12 +8,11 @@ import numpy as np
 import pandas as pd
 import pyomo.environ as pyo
 import yaml
-from matplotlib import pyplot as plt
-from pyomo.opt import SolverFactory
-
 from bilevel_opt import (
     find_optimal_dispatch_quadratic,
 )
+from matplotlib import pyplot as plt
+from pyomo.opt import SolverFactory
 from uc_problem import solve_uc_problem
 
 
@@ -357,9 +356,9 @@ def create_storage_df(storage_units, dispatch_df):
     storage_df = storage_units.copy()
 
     # check if max_power_charge and max_power_discharge columns are the same value otherwise throw error that this wont work
-    assert all(
-        storage_df["max_power_charge"] == storage_df["max_power_discharge"]
-    ), "max_power_charge and max_power_discharge must be the same value for this to work"
+    assert all(storage_df["max_power_charge"] == storage_df["max_power_discharge"]), (
+        "max_power_charge and max_power_discharge must be the same value for this to work"
+    )
     storage_df["g_max"] = storage_df["max_power_discharge"]
     storage_df["u_0"] = 0  # storage units always can produce power
     storage_df["g_0"] = 0  # start with no power output
@@ -428,11 +427,8 @@ def join_demand_market_orders(demand_df, market_orders_df):
 
 
 def obtain_k_values(k_df, gens_df):
-    mc_mapping = dict(zip(gens_df["index"], gens_df["mc"]))
-    k_df["gens_df_mc"] = k_df["unit_id"].map(mc_mapping)
-
     # transformed actions into k_values, one per generator
-    k_df["k"] = k_df["price"] / k_df["gens_df_mc"]
+    k_df["k"] = k_df["price"] / k_df["marginal_cost"]
 
     # replace inf with 0
     k_df["k"] = k_df["k"].replace(np.inf, 0)
