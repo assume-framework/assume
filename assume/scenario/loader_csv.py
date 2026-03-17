@@ -574,10 +574,19 @@ def load_config_and_create_forecaster(
     )
     demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
     if demand_df is None:
+        # no demand timeseries exist, all demand is elastic. Fill missing demand timeseries with zeros and raise a warning.
         logger.warning(
             "!! No demand_df timeseries provided !! Filling demand_df with zeros. Make sure this is what you actually want."
         )
         demand_df = pd.DataFrame(index=index, columns=demand_units.index, data=0.0)
+    elif not demand_df.columns.equals(demand_units.index):
+        # there exist demand timeseries, but not for all demand units. Some demand is elastic, some is not. Fill missing demand timeseries with zeros and raise a warning.
+        logger.warning(
+            "!! Incomplete demand_df timeseries provided !! Filling demand_df for some units with zeros. Make sure this is what you actually want."
+        )
+        missing_columns = demand_units.index.difference(demand_df.columns)
+        for col in missing_columns:
+            demand_df[col] = 0.0
 
     exchanges_df = load_file(
         path=path, config=config, file_name="exchanges_df", index=index
