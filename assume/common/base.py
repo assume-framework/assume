@@ -627,23 +627,6 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
-    def get_soc_before(self, dt: datetime) -> float:
-        """
-        Returns the State of Charge (SoC) before the given datetime.
-        If datetime is before the start of the index, the initial SoC is returned.
-        The SoC is a float between 0 and 1.
-
-        Args:
-            dt (datetime.datetime): The current datetime.
-
-        Returns:
-            float: The SoC before the given datetime.
-        """
-        if dt - self.index.freq < self.index[0]:
-            return self.initial_soc
-        else:
-            return self.outputs["soc"].at[dt - self.index.freq]
-
     def set_dispatch_plan(
         self, marketconfig: MarketConfig, orderbook: Orderbook
     ) -> None:

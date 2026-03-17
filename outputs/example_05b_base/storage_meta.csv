@@ -1,4 +1,0 @@
-,capacity,efficiency_charge,efficiency_discharge,max_power_charge,max_power_discharge,max_soc,min_power_charge,min_power_discharge,min_soc,node,simulation,technology,unit_operator
-store_3,20,1,1,-10,10,1,0,0,0,west,example_05b_base,li-ion,storage_operator2
-store_1,20,1,1,-10,10,1,0,0,0,north,example_05b_base,li-ion,storage_operator0
-store_2,20,1,1,-10,10,1,0,0,0,east,example_05b_base,li-ion,storage_operator1

@@ -563,7 +563,14 @@ class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
 
         # Seeds from (already run) EOM
         previous_power = unit.get_output_before(start0)  # MW
-        soc_theory = unit.get_soc_before(start0)  # MWh
+        try:
+            soc_theory = unit.outputs["soc"].at[start0]
+        except Exception:
+            # Fallback for storage outputs that may not include this timestamp yet
+            if len(unit.outputs["soc"]):
+                soc_theory = float(unit.outputs["soc"].iloc[0])
+            else:
+                soc_theory = 0.0
 
         # SoC- and power-feasible envelopes (no ramp yet)
         min_power_charge_values, max_power_charge_values = (
