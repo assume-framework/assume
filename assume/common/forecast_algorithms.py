@@ -167,8 +167,8 @@ def calculate_naive_price_inelastic(
         # Find the first unit where the cumulative available power meets or exceeds demand.
         matching_units = cumsum_power[cumsum_power >= demand_t]
         if matching_units.empty:
-            # If available capacity is insufficient, set the price to 1000.
-            price = 1000.0
+            # If available capacity is insufficient, set the price to max willingnes to pay.
+            price = max([unit.price for unit in demand_units])
         else:
             # The marginal cost of the first unit that meets demand becomes the price.
             price = sorted_mc.loc[matching_units.index[0]]
