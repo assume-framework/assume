@@ -9,11 +9,12 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+import pypsa
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import ForecastIndex, ForecastSeries
 from assume.common.market_objects import MarketConfig, is_renewable
-from assume.common.utils import get_available_products
+from assume.common.utils import get_available_products, create_incidence_matrix
 from assume.markets.clearing_algorithms.simple import PayAsClearRole, PayAsBidRole
 from assume.markets.clearing_algorithms.complex_clearing import ComplexClearingRole
 from assume.strategies import EnergyHeuristicElasticStrategy
@@ -366,6 +367,171 @@ def calculate_naive_price(
 
     return calculate_naive_price_inelastic(index, units, config)
 
+@lru_cache
+def calculate_locational_marginal_price(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    config: MarketConfig,
+    preprocess_information=None,
+) -> dict[str, ForecastSeries]:
+    """
+    Forecast for locational marginal prices (LMPs) using PyPSA.
+    It follows an optimal power flow approach taking into account renewable availability, demand, storages and marginal costs of power plants at each location.
+    Solving might require many ressources for large networks and many timesteps.
+    """
+
+    network = pypsa.Network()
+    snapshots = pd.DatetimeIndex(index)
+    network.set_snapshots(snapshots)
+    incidence_matrix = None
+
+    if config.market_id != "redispatch":
+        # does not make sense for zonal redispatch markets
+        zones_id = config.param_dict.get('zones_identifier')
+        node_to_zone = None
+        lines = config.param_dict.get('grid_data')['lines']
+        buses = config.param_dict.get('grid_data')['buses']
+        
+        # Generate the incidence matrix and set the nodes based on zones or individual buses
+        if zones_id:
+            # Zonal Case
+            incidence_matrix = create_incidence_matrix(lines, buses, zones_id = zones_id)
+            nodes = buses[zones_id].unique()
+            node_to_zone = buses[zones_id].to_dict()
+        else:
+            # Nodal Case
+            incidence_matrix = create_incidence_matrix(lines, buses)
+            nodes = buses.index.values
+    # if buses and lines dont contain carrier, set it to AC to silence PyPSA warning
+    if "carrier" not in lines.columns:
+        lines["carrier"] = "AC"
+    if "carrier" not in buses.columns:
+        buses["carrier"] = "AC"
+    network.add("Bus", buses.index, **buses)
+    network.add("Line", lines.index, **lines)
+    
+    # add all units to the PyPSA network
+    
+    # step 1: sort units by type and filter for units with bidding strategy for the given market_id
+    # disregard dsm_units for now
+    powerplant_units, demand_units, exchange_units, storage_units, _ = sort_units(
+        units, config.market_id
+    )
+    
+    # step 2: calculate marginal costs and power for each unit and time step.
+    #TODO: do really calculate this for each timestep! not only take mc from units df. unclear how.
+    marginal_costs = pd.DataFrame(index=snapshots, columns=[pp.id for pp in powerplant_units])
+    power = pd.DataFrame(index=snapshots, columns=[pp.id for pp in powerplant_units])
+    for col in range(0, len(marginal_costs.columns)):
+        #TODO check mc calculation
+        marginal_costs.loc[:, col] = powerplants_units[col].marginal_cost
+        #TODO check power calculation. include availability_df. where did _calc_power() move? was previously a function in forecast initialisation
+        #TODO also for demand
+        power.loc[:, col] = calculate_max_power([powerplants_units[col]], index=snapshots).T
+    
+    # step 3: add units
+    # generators have p_min_pu - p_max_pu 0 to 1
+    network.add(
+        "Generator",
+        powerplants_units.index,
+        bus=powerplants_units["node"],
+        p_nom=powerplants_units["max_power"],
+        p_min_pu=0,
+        p_max_pu=power.div(powerplants_units["max_power"], axis=1),
+        marginal_cost=marginal_costs,
+    )
+
+    sum_demand = self.demand[demand_units.index]
+    # demand units have p_min_pu - p_max_pu -1 to 0
+    network.add(
+        "Generator",
+        demand_units.index,
+        bus=demand_units["node"],
+        p_nom=demand_units["max_power"],
+        p_min_pu=-1*sum_demand.div(demand_units["max_power"], axis=1),
+        p_max_pu=0,
+        # temporarily set to max bid price
+        marginal_cost=config.maximum_bid_price,
+    )
+    # storage units
+    # we take the max of discharging and charging power as p_nom for PyPSA.
+    if storage_units.empty:
+        p_nom = np.maximum(
+            storage_units["max_power_discharge"].values,
+            storage_units["max_power_charge"].values,
+        )
+        max_hours = storage_units["capacity"].values / p_nom
+        network.add(
+            "StorageUnit",
+            storage_units.index,
+            bus=storage_units["node"],
+            p_nom=p_nom,
+            max_hours=max_hours,
+            # check
+            marginal_cost=storage_units.get("marginal_cost", 0.0),
+        )
+
+    if exchange_units is not None:
+        # get sum of imports as name of exchange_unit_import
+        import_units = [f"{unit}_import" for unit in exchange_units.index]
+        sum_imports = exchanges[import_units].sum(axis=1)
+        # get sum of exports as name of exchange_unit_export
+        export_units = [f"{unit}_export" for unit in exchange_units.index]
+        sum_exports = exchanges[export_units].sum(axis=1)
+        # add imports and exports to the sum_demand
+        sum_demand += sum_imports - sum_exports
+
+        network.add(
+            "Generator",
+            import_units,
+            bus=exchange_units["node"],
+            p_nom=exchange_units["max_import_power"],
+            p_min_pu=0,
+            p_max_pu=1,
+            # TODO add p as timeseries?
+        )
+        network.add(
+            "Generator",
+            export_units,
+            bus=exchange_units["node"],
+            p_nom=exchange_units["max_export_power"],
+            p_min_pu=-1,
+            p_max_pu=0,
+            # TODO add p as timeseries?
+        )
+
+    solver = config.param_dict.get("solver", "highs")
+    if solver == "gurobi":
+        solver_options = {"LogToConsole": 0, "OutputFlag": 0}
+    elif solver == "highs":
+        solver_options = {"output_flag": False, "log_to_console": False}
+    else:
+        solver_options = {}
+
+    # step 4: run linear optimal powerflow
+    network.optimize.fix_optimal_capacities()
+    status, termination_condition = network.optimize(
+        solver=solver,
+        solver_options=solver_options,
+        progress=False,
+    )
+
+    if status != "ok":
+        _logger.error(f"Solver exited with {termination_condition}")
+        raise Exception("Solver in nodal clearing forecast did not converge")
+    
+    # step 5: extract lmps
+    # make sure the order of the columns is same as in the buses csv
+    lmp_forecast = network.buses_t.marginal_price.copy()[network.buses.index]
+    if zones_id:
+        # map zonal prices to nodes
+        lmp_forecast_nodes = pd.DataFrame(index=lmp_forecast.index, columns=buses.index)
+        for node in buses.index:
+            zone = node_to_zone[node]
+            lmp_forecast_nodes[node] = lmp_forecast[zone]
+        lmp_forecast = lmp_forecast_nodes
+
+    return lmp_forecast
 
 @lru_cache
 def calculate_naive_residual_load(
@@ -590,6 +756,7 @@ def calculate_naive_renewable_utilisation(
 
 forecast_algorithms = {
     "price_naive_forecast": calculate_naive_price,
+    "price_nodal_forecast": calculate_locational_marginal_price,
     "price_default_test": lambda index, *args: {
         "EOM": FastSeries(index=index, value=50)
     },
