@@ -84,9 +84,9 @@ class Demand(SupportsMinMax):
 
         # Elastic demand parameters
         self.max_price = price
-        self.elasticity = kwargs.get("elasticity")
-        self.elasticity_model = kwargs.get("elasticity_model")
-        self.num_bids = int(kwargs.get("num_bids"))
+        self.elasticity = kwargs.get("elasticity", 0)
+        self.elasticity_model = kwargs.get("elasticity_model", 0)
+        self.num_bids = int(kwargs.get("num_bids", 0))
 
         # Validate elastic configuration if elasticity_model is provided
         if self.elasticity_model != 0:
