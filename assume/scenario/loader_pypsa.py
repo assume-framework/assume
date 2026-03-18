@@ -172,7 +172,6 @@ def load_pypsa(
                 "capacity": storage.p_nom * storage.max_hours,
                 "bidding_strategies": bidding_strategies[unit_type][storage.name],
                 "technology": storage.carrier,
-                "emission_factor": storage.emission_factor or 0,
                 "node": storage.bus,
             },
             UnitForecaster(index),
