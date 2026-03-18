@@ -12,6 +12,15 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+  **New Features:**
+  - **Storage Redispatch Bidding Strategy**: A new bidding strategy ``StorageRedispatchFlexableStrategy`` that enables storage units to participate in redispatch markets. The strategy calculates feasible bid ranges around day-ahead (EOM) dispatch baselines, maximizing flexibility while respecting operational constraints including SoC limits, ramp rates, and power limits. Key features:
+    - Bid flexibility guaranteed: always offers ``max_power - min_power > 0`` flexibility range
+    - Volume baseline invariant: ensures ``bid.volume == EOM dispatch`` across all scenarios
+    - Supports all storage modes: charging, discharging, and idle states
+    - Intelligent constraint handling: automatically reduces flexibility when SoC approaches limits
+    - Sign convention consistency: negative (charging) → positive (discharging) → zero (neutral)
+    - Comprehensive validation tests verify correct behavior for full 24-hour market cycle (EOM market 0-19h → Redispatch market 21-22h)
+
   **Improvements:**
   - **Deterministic behavior with seed setting**: Simulations are now deterministic by default for improved reproducibility. This can be controlled via a seed setting in `config.yaml` files, therefore it only applies for scenarios loaded via `load_scenario_folder`. Note that complete determinism is not guaranteed for all hardware and software configurations, especially with PyTorch-based learning strategies. It may also decrease performance of reinforcement learning due to disabled non-deterministic optimizations.
     - ``seed`` not set in top-level of config: Sets the seed to a fixed default value (42) for deterministic behavior.
@@ -22,6 +31,7 @@ Upcoming Release
   - **Added reward calculation for unit operators**: Unit operators have now the opportunity to calculate rewards based on the returned orderbooks for their own purposes. This enables learning strategies on unit operator level / portfolio learning strategies.
   - **Upgrade to Pandas 3**
   - **Structured Validation Error**: Introduces the new ValidationError to represent a failing validation. Since it derives from the base ValidationError, all existing error handling remains compatible, but users can now also catch this specific error type to handle validation errors separately if desired.
+  - **Code Optimization for Storage Strategies**: Simplified ``StorageRedispatchFlexableStrategy`` by removing defensive helper methods and replaced deprecated API calls, improving code maintainability while preserving all functionality.
 
 **Bug Fixes:**
   - **Fix buffer and update order**: Fixed the order of buffer writing and policy updating in the learning role to ensure that both have the exact same order, which is necessary so that during updates the correct data is used. Thisbug will have compormised learning with very heterogeneous units after the last release.
@@ -32,14 +42,8 @@ Upcoming Release
 ==========================
 
 **New Features:**
-  - **Storage Redispatch Bidding Strategy Validation**: Comprehensive test suite for ``StorageRedispatchFlexableStrategy`` to validate redispatch market participation. Tests verify:
-    - Bid flexibility exists for all scenarios (charging, discharging, idle)
-    - Edge cases handled correctly when storage reaches SoC limits
-    - Volume baseline invariant: ``bid.volume == EOM dispatch`` across all scenarios
-    - Sign convention consistency: negative (charging) → positive (discharging) → zero (neutral)
-    - Operational constraints enforced: SoC limits, ramp rates, device capabilities
-    - Full 24-hour market cycle: EOM market (0-19h) → Redispatch market (21-22h) integration
-
+  - **Storage Redispatch Bidding Strategy**: A new bidding strategy ``StorageRedispatchFlexableStrategy`` that enables storage units to participate in redispatch markets. The strategy calculates feasible bid ranges around day-ahead (EOM) dispatch baselines, maximizing flexibility while respecting operational constraints including SoC limits, ramp rates, and power limits.
+  - **Comprehensive validation tests**: verify correct behavior for full 24-hour market cycle (EOM market 0-19h → Redispatch market 21-22h)
 
 0.5.6 - (23th December 2025)
 ============================
