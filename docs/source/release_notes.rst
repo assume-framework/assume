@@ -28,6 +28,19 @@ Upcoming Release
   - **Fix data loss in RL learning role**: Fixed data loss in RL learning role by implementing atomic swap with carry-over for incomplete timesteps in cache
 
 
+0.5.7 - (18th March 2026)
+==========================
+
+**New Features:**
+  - **Storage Redispatch Bidding Strategy Validation**: Comprehensive test suite for ``StorageRedispatchFlexableStrategy`` to validate redispatch market participation. Tests verify:
+    - Bid flexibility exists for all scenarios (charging, discharging, idle)
+    - Edge cases handled correctly when storage reaches SoC limits
+    - Volume baseline invariant: ``bid.volume == EOM dispatch`` across all scenarios
+    - Sign convention consistency: negative (charging) → positive (discharging) → zero (neutral)
+    - Operational constraints enforced: SoC limits, ramp rates, device capabilities
+    - Full 24-hour market cycle: EOM market (0-19h) → Redispatch market (21-22h) integration
+
+
 0.5.6 - (23th December 2025)
 ============================
 
