@@ -567,26 +567,12 @@ class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
                 current_power_discharge,
                 float(min_power_discharge),
             )
-            min_power_discharge_ramp = unit.calculate_ramp_discharge(
-                soc_theory,
-                previous_power,
-                float(min_power_discharge),
-                current_power_discharge,
-                float(min_power_discharge),
-            )
 
             # Charge side (negative powers)
             max_power_charge_ramp = unit.calculate_ramp_charge(
                 soc_theory,
                 previous_power,
                 float(max_power_charge),
-                current_power_charge,
-                float(min_power_charge),
-            )
-            min_power_charge_ramp = unit.calculate_ramp_charge(
-                soc_theory,
-                previous_power,
-                float(min_power_charge),
                 current_power_charge,
                 float(min_power_charge),
             )
