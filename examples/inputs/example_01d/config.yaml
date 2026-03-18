@@ -98,6 +98,9 @@ nodal_case:
   time_step: 1h
   save_frequency_hours: 24
 
+  forecast_algorithms:
+    price: price_nodal_forecast
+    
   markets_config:
     nodal:
       start_date: 2019-01-01 00:00
