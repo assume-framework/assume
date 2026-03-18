@@ -153,12 +153,10 @@ class WriteOutput(Role):
             # ignore spatial_ref_sys table
             if table_name == "spatial_ref_sys":
                 continue
-            # only delete rl_params_*, rl_grad_params_* and rl_meta during the first episode of learning
-            if (
-                table_name.startswith("rl_params_")
-                or table_name.startswith("rl_grad_params_")
-                or table_name == "rl_meta"
-            ) and not (self.learning_mode and self.episode == 1):
+            # only delete rl_params and rl_meta during the first episode of learning
+            if table_name in ["rl_params", "rl_grad_params", "rl_meta"] and not (
+                self.learning_mode and self.episode == 1
+            ):
                 continue
             try:
                 with self.db.begin() as db:
@@ -234,17 +232,11 @@ class WriteOutput(Role):
             "market_meta",
             "market_dispatch",
             "unit_dispatch",
+            "rl_params",
+            "rl_grad_params",
         ]:
             # these can be processed as a single dataframe
             self.write_buffers[content_type].extend(content_data)
-        elif content_type in ["rl_params", "rl_grad_params"]:
-            # route to per-level tables: rl_params_{level}, rl_grad_params_{level}
-            by_level: dict[str, list] = defaultdict(list)
-            for record in content_data:
-                level = record.get("level", "units")
-                by_level[level].append(record)
-            for level, records in by_level.items():
-                self.write_buffers[f"{content_type}_{level}"].extend(records)
         elif content_type == "store_units":
             table_name = content_data["unit_type"] + "_meta"
             self.write_buffers[table_name].append(content_data)
@@ -473,39 +465,38 @@ class WriteOutput(Role):
                     data_list.clear()
                     continue
 
-                if table.startswith("rl_params_"):
-                    df = self.convert_rl_params(data_list)
-                elif table.startswith("rl_grad_params_"):
-                    df = self.convert_rl_grad_params(data_list)
-                else:
-                    match table:
-                        case "market_meta":
-                            df = self.convert_market_results(data_list)
-                        case "market_dispatch":
-                            df = self.convert_market_dispatch(data_list)
-                        case "unit_dispatch":
-                            df = self.convert_unit_dispatch(data_list)
-                        case "rl_meta":
-                            df = pd.DataFrame(data_list)
-                        case "grid_flows":
-                            dfs = []
-                            for data in data_list:
-                                df = self.convert_flows(data)
-                                dfs.append(df)
-                            df = pd.concat(dfs, axis=0, join="outer")
-                        case "market_orders":
-                            dfs = []
-                            for market_data, market_id in data_list:
-                                df = self.convert_market_orders(market_data, market_id)
-                                dfs.append(df)
-                            df = pd.concat(dfs, axis=0, join="outer")
-                        case _:
-                            # store_units has the name of the units_meta
-                            dfs = []
-                            for data in data_list:
-                                df = self.convert_units_definition(data)
-                                dfs.append(df)
-                            df = pd.concat(dfs, axis=0, join="outer")
+                match table:
+                    case "market_meta":
+                        df = self.convert_market_results(data_list)
+                    case "market_dispatch":
+                        df = self.convert_market_dispatch(data_list)
+                    case "unit_dispatch":
+                        df = self.convert_unit_dispatch(data_list)
+                    case "rl_params":
+                        df = self.convert_rl_params(data_list)
+                    case "rl_grad_params":
+                        df = self.convert_rl_grad_params(data_list)
+                    case "rl_meta":
+                        df = pd.DataFrame(data_list)
+                    case "grid_flows":
+                        dfs = []
+                        for data in data_list:
+                            df = self.convert_flows(data)
+                            dfs.append(df)
+                        df = pd.concat(dfs, axis=0, join="outer")
+                    case "market_orders":
+                        dfs = []
+                        for market_data, market_id in data_list:
+                            df = self.convert_market_orders(market_data, market_id)
+                            dfs.append(df)
+                        df = pd.concat(dfs, axis=0, join="outer")
+                    case _:
+                        # store_units has the name of the units_meta
+                        dfs = []
+                        for data in data_list:
+                            df = self.convert_units_definition(data)
+                            dfs.append(df)
+                        df = pd.concat(dfs, axis=0, join="outer")
                 data_list.clear()
             # concat all dataframes
             # use join='outer' to keep all columns and fill missing values with NaN
@@ -676,16 +667,13 @@ class WriteOutput(Role):
             )
 
         if self.episode:
-            # query KPIs from all per-level rl_params tables
-            rl_params_tables = self._get_rl_params_tables()
-            for rl_table in rl_params_tables:
-                queries.extend(
-                    [
-                        f"SELECT 'sum_reward' as variable, '{rl_table}' as ident, sum(reward) as value FROM {rl_table} WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                        f"SELECT 'sum_regret' as variable, '{rl_table}' as ident, sum(regret) as value FROM {rl_table} WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                        f"SELECT 'sum_profit' as variable, '{rl_table}' as ident, sum(profit) as value FROM {rl_table} WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                    ]
-                )
+            queries.extend(
+                [
+                    f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                    f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                    f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                ]
+            )
 
         dfs = []
         for query in queries:
@@ -722,61 +710,31 @@ class WriteOutput(Role):
             with self.db.begin() as db:
                 df.to_sql("kpis", db, if_exists="append", index=None)
 
-    def _get_rl_params_tables(self) -> list[str]:
-        """
-        Get all rl_params_* table names from the database.
-
-        Returns:
-            list[str]: Table names matching rl_params_*.
-        """
-        if self.db is None:
-            return []
-        table_names = inspect(self.db).get_table_names()
-        return [t for t in table_names if t.startswith("rl_params_")]
-
-    def get_sum_reward(
-        self, episode: int, evaluation_mode=True, level: str | None = None
-    ):
+    def get_sum_reward(self, episode: int, evaluation_mode=True):
         """
         Retrieves the total reward for each learning unit.
-
-        Args:
-            episode (int): The episode number.
-            evaluation_mode (bool): Whether to query evaluation mode data.
-            level (str | None): If given, query only rl_params_{level}.
-                If None, query all rl_params_* tables.
 
         Returns:
             np.ndarray: The total reward for each learning unit.
         """
+        query = text(
+            f"SELECT unit, SUM(reward) FROM rl_params "
+            f"WHERE simulation='{self.simulation_id}' "
+            f"AND evaluation_mode={evaluation_mode} "
+            f"AND episode={episode} "
+            f"GROUP BY unit"
+        )
         if self.db is None:
             return []
 
-        if level is not None:
-            tables = [f"rl_params_{level}"]
-        else:
-            tables = self._get_rl_params_tables()
+        with self.db.begin() as db:
+            rewards_by_unit = db.execute(query).fetchall()
 
-        all_rewards = []
-        for table in tables:
-            query = text(
-                f"SELECT unit, SUM(reward) FROM {table} "
-                f"WHERE simulation=:sim "
-                f"AND evaluation_mode=:eval_mode "
-                f"AND episode=:ep "
-                f"GROUP BY unit"
-            )
-            with self.db.begin() as db:
-                try:
-                    rows = db.execute(
-                        query,
-                        {"sim": self.simulation_id, "eval_mode": evaluation_mode, "ep": episode},
-                    ).fetchall()
-                    all_rewards.extend(r[1] for r in rows)
-                except (ProgrammingError, OperationalError):
-                    continue
+        # convert into a numpy array
+        rewards_by_unit = [r[1] for r in rewards_by_unit]
+        rewards_by_unit = np.array(rewards_by_unit)
 
-        return np.array(all_rewards) if all_rewards else np.array([])
+        return rewards_by_unit
 
 
 class DatabaseMaintenance:
