@@ -332,7 +332,7 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
         check_freq=False,
     )
 
-    assert np.isclose(list(market_forecast["EOM"]), [71/3] * 24).all()
+    assert np.isclose(list(market_forecast["EOM"]), [71 / 3] * 24).all()
 
     # Check congestion signal and renewable_utilization are as expected
     for key in congestion_signal:
