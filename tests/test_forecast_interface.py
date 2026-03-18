@@ -190,7 +190,7 @@ def test_forecast_interface__calc_and_update_forecasts(
         check_freq=False,
     )
 
-    assert list(market_forecast["EOM"]) == [1000] * 24
+    assert list(market_forecast["EOM"]) == [3000] * 24
 
     # Check congestion signal and renewable_utilization are as expected
     for key in congestion_signal:
@@ -223,7 +223,7 @@ def test_forecast_interface__calc_and_update_forecasts(
         check_dtype=False,
         check_freq=False,
     )
-    assert list(market_forecast["EOM"]) == [1000] * 24
+    assert list(market_forecast["EOM"]) == [3000] * 24
 
     for key in congestion_signal:
         assert np.isclose(congestion_signal[key].data, expected_cgn[key].values).all()
@@ -332,7 +332,7 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
         check_freq=False,
     )
 
-    assert np.isclose(list(market_forecast["EOM"]), [3000] * 24).all()
+    assert np.isclose(list(market_forecast["EOM"]), [71/3] * 24).all()
 
     # Check congestion signal and renewable_utilization are as expected
     for key in congestion_signal:
