@@ -413,7 +413,7 @@ def solve_uc_problem_with_storage(
     # solve
     instance = model.create_instance()
 
-    solver = SolverFactory("highs")
+    solver = SolverFactory("gurobi")
     solver.solve(instance, tee=False)
 
     # make new instance with fixed u

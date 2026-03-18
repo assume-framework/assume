@@ -523,7 +523,7 @@ def find_optimal_dispatch_linearized(
     # solve
     instance = model.create_instance()
 
-    solver = SolverFactory("highs")
+    solver = SolverFactory("gurobi")
     options = {
         "LogToConsole": print_results,
         "TimeLimit": time_limit,
@@ -593,7 +593,6 @@ def find_optimal_dispatch_quadratic(
     big_w=10000,
     time_limit=60,
     print_results=False,
-    K=5,  # number of discrete binary steps considered in the linearisation
     big_M=10e6,
     demand_bids=1,
 ):
@@ -1079,7 +1078,7 @@ def find_optimal_dispatch_quadratic(
     # solve
     instance = model.create_instance()
 
-    solver = SolverFactory("highs")
+    solver = SolverFactory("gurobi")
     options = {
         "LogToConsole": print_results,
         "TimeLimit": time_limit,
@@ -1877,7 +1876,7 @@ def find_optimal_dispatch_storage_leader_quadratic(
     # SOLVE
     # -------------------------------------------------------------------------
     instance = model.create_instance()
-    solver = SolverFactory("highs")
+    solver = SolverFactory("gurobi")
     options = {
         "LogToConsole": print_results,
         "TimeLimit": time_limit,

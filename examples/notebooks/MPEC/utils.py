@@ -9,6 +9,7 @@ import pandas as pd
 import pyomo.environ as pyo
 import yaml
 from bilevel_opt import (
+    find_optimal_dispatch_linearized,
     find_optimal_dispatch_quadratic,
 )
 from matplotlib import pyplot as plt
@@ -445,6 +446,137 @@ def obtain_k_values(k_df, gens_df):
     return k_values_df
 
 
+def extract_marginal_costs(world, operator_name, time_index):
+    """
+    Extract marginal costs for all units of an operator from a loaded World object.
+
+    For power plants, uses `marginal_cost`; for storages without marginal cost,
+    falls back to the average of charge/discharge additional costs.
+
+    Args:
+        world: A loaded ASSUME World instance.
+        operator_name (str): Key in world.unit_operators.
+        time_index (pd.DatetimeIndex): Desired time index for the result DataFrame.
+
+    Returns:
+        pd.DataFrame: Columns = unit names, index = time_index (truncated to mc length).
+    """
+    units = world.unit_operators[operator_name].units
+    costs_dict = {}
+    for name, unit in units.items():
+        mc = getattr(unit, "marginal_cost", None)
+        if mc is not None and np.all(np.array(mc) != 0):
+            costs_dict[name] = np.array(mc)
+        else:
+            charge = getattr(unit, "additional_cost_charge", None)
+            discharge = getattr(unit, "additional_cost_discharge", None)
+            if charge is not None and discharge is not None:
+                n = len(time_index)
+                costs_dict[name] = np.full(n, (charge + discharge) / 2)
+
+    if not costs_dict:
+        return pd.DataFrame(index=time_index)
+
+    n = len(next(iter(costs_dict.values())))
+    return pd.DataFrame(costs_dict, index=time_index[:n])
+
+
+def load_availabilities(inputs_dir, scenario):
+    """
+    Load availability_df.csv from the scenario folder, resampling to hourly if needed.
+
+    Args:
+        inputs_dir (str): Root inputs directory.
+        scenario (str): Scenario folder name.
+
+    Returns:
+        pd.DataFrame: Availability factors (empty DataFrame if file not found).
+    """
+    path = os.path.join(inputs_dir, scenario, "availability_df.csv")
+    try:
+        availabilities = pd.read_csv(path, index_col=0)
+        availabilities.index = pd.to_datetime(availabilities.index)
+        availabilities = availabilities.sort_index()
+
+        deltas = availabilities.index.to_series().diff().dropna()
+        min_delta = deltas.min() if not deltas.empty else None
+        if min_delta is not None and min_delta < pd.Timedelta(hours=1):
+            availabilities = availabilities.resample("1h").mean()
+            print("Resampled availability_df to hourly using mean().")
+
+        return availabilities
+    except FileNotFoundError:
+        print("No availability_df.csv found — assuming full availability (1.0).")
+        return pd.DataFrame()
+
+
+def build_availability_df(raw_availabilities, time_index, unit_names):
+    """
+    Build a per-timestep availability DataFrame for the given units.
+
+    Missing units default to 1.0. Reindexes raw_availabilities to time_index.
+
+    Args:
+        raw_availabilities (pd.DataFrame): Output of load_availabilities().
+        time_index (pd.DatetimeIndex): Desired time index.
+        unit_names (list): Unit names (column order matches gens_df).
+
+    Returns:
+        pd.DataFrame: Shape (len(time_index), len(unit_names)), values in [0, 1].
+    """
+    availability_df = pd.DataFrame(1.0, index=time_index, columns=unit_names)
+    for col in unit_names:
+        if col in raw_availabilities.columns:
+            availability_df[col] = (
+                raw_availabilities[col].reindex(time_index).fillna(1.0)
+            )
+    return availability_df
+
+
+def add_exchange_bids_to_demand(demand_df, exchange_bids):
+    """
+    Append exchange-unit bids as additional volume/price columns in demand_df.
+
+    Each unique bid_id in exchange_bids gets its own volume_N / price_N column pair,
+    continuing the numbering already present in demand_df.
+
+    Args:
+        demand_df (pd.DataFrame): Output of join_demand_market_orders(), with
+            columns volume_1, price_1 [, volume_2, price_2, …] and a "date" column.
+        exchange_bids (pd.DataFrame): Rows from market_orders for exchange units,
+            indexed by start_time. Must have columns "bid_id", "volume", "price".
+
+    Returns:
+        pd.DataFrame: demand_df with additional bid columns filled in.
+    """
+    import re
+
+    demand_df = demand_df.copy()
+    if exchange_bids.empty:
+        return demand_df
+
+    if "start_time" in exchange_bids.columns:
+        exchange_bids = exchange_bids.set_index("start_time")
+
+    bid_nums = [
+        int(m.group(1))
+        for col in demand_df.columns
+        if (m := re.match(r"^volume_(\d+)$", str(col)))
+    ]
+    start_idx = max(bid_nums) if bid_nums else 1
+
+    unique_bid_ids = sorted(exchange_bids["bid_id"].unique())
+    bid_id_to_idx = {bid_id: start_idx + i + 1 for i, bid_id in enumerate(unique_bid_ids)}
+
+    for ts, group in exchange_bids.groupby(exchange_bids.index):
+        for _, row in group.iterrows():
+            idx = bid_id_to_idx[row["bid_id"]]
+            demand_df.loc[ts, f"volume_{idx}"] = row["volume"] * -1
+            demand_df.loc[ts, f"price_{idx}"] = row["price"]
+
+    return demand_df.sort_index()
+
+
 def run_MPEC(
     opt_gen,
     gens_df,
@@ -454,31 +586,54 @@ def run_MPEC(
     k_max,
     big_w,
     demand_bids=1,
+    use_quadratic=True,
 ):
     """
-    Run the MPEC optimization for the given unit and return the profits before and after the optimization.
+    Run the MPEC optimisation for a single strategic unit.
 
     Args:
-        opt_gen (str): The unit to optimize.
-        index (pd.Index): The index of the time series data.
-        gens_df (pd.DataFrame): The generator data.
-        demand_df (pd.DataFrame): The demand data.
-        k_values_df (pd.DataFrame): The k-values data.
-        availability_df (pd.DataFrame): The availability data [0,1].
-        k_max (float): The maximum k-value.
-        big_w (float): The big W value.
+        opt_gen (int): Integer index into gens_df for the unit to optimise.
+        gens_df (pd.DataFrame): Generator data (output of create_gens_df).
+        demand_df (pd.DataFrame): Demand data without a "date" column
+            (columns: volume_1, price_1 [, volume_2, price_2, …]).
+        k_values_df (pd.DataFrame): k-multipliers per unit, without "date" column.
+        availability_df (pd.DataFrame): Availability factors in [0,1],
+            columns = unit names (matching gens_df order).
+        k_max (float): Maximum allowed bidding multiplier.
+        big_w (float): Penalty weight for the duality-gap objective term.
+        demand_bids (int): Number of demand bid steps. Only used for the
+            quadratic formulation.
+        use_quadratic (bool): If True (default), use the quadratic MPEC
+            (find_optimal_dispatch_quadratic). If False, use the linearised
+            formulation (find_optimal_dispatch_linearized). Note: the
+            linearised version does not support availabilities or multiple
+            demand bids.
 
     Returns:
-        tuple: The profits before and after the optimization.
+        tuple: (profits_1, profits_2, results_main_df, results_supp_df)
+            profits_1 — profits from the diagonalised MPEC solution
+            profits_2 — profits re-computed via a clean UC solve with the
+                        optimised k-values
+            results_main_df, results_supp_df — UC output DataFrames
     """
-    print("We now optimize the decison for unit index", gens_df.index[opt_gen])
+    if not use_quadratic:
+        errors = []
+        if demand_bids > 1:
+            errors.append(f"demand_bids={demand_bids} (linearised MPEC only supports demand_bids=1)")
+        if not (availability_df == 1.0).all().all():
+            errors.append("availability_df contains values != 1.0 (linearised MPEC ignores availabilities)")
+        if errors:
+            raise ValueError(
+                "Incompatible settings for linearised MPEC (use_quadratic=False):\n"
+                + "\n".join(f"  - {e}" for e in errors)
+                + "\nEither set use_quadratic=True or fix the conflicting settings."
+            )
 
-    demand_df = demand_df.copy(deep=True)
-    # reset index to start at 0
-    demand_df = demand_df.reset_index(drop=True)
+    print(f"Optimising unit '{gens_df.at[opt_gen, 'unit']}' (index {opt_gen})")
+
+    demand_df = demand_df.reset_index(drop=True).copy(deep=True)
 
     k_values_df = k_values_df.copy(deep=True)
-    # rename columns to match index of gens_df
     k_values_df.columns = gens_df.index
     k_values_df.reset_index(inplace=True)
 
@@ -488,22 +643,41 @@ def run_MPEC(
 
     gens_df = gens_df.copy(deep=True)
 
-    main_df, supp_df, k_values = find_optimal_dispatch_quadratic(
-        gens_df=gens_df,
-        k_values_df=k_values_df,
-        availabilities_df=availability_df,
-        demand_df=demand_df,
-        k_max=k_max,
-        opt_gen=opt_gen,
-        big_w=big_w,
-        time_limit=3600,
-        print_results=True,
-        K=5,
-        big_M=10e6,
-        demand_bids=demand_bids,
-    )
+    if use_quadratic:
+        main_df, supp_df, k_values = find_optimal_dispatch_quadratic(
+            gens_df=gens_df,
+            k_values_df=k_values_df,
+            availabilities_df=availability_df,
+            demand_df=demand_df,
+            k_max=k_max,
+            opt_gen=opt_gen,
+            big_w=big_w,
+            time_limit=3600,
+            print_results=True,
+            K=5,
+            big_M=10e6,
+            demand_bids=demand_bids,
+        )
+    else:
+        # The linearised function expects old-style "volume" / "price" column names
+        # (single demand bid only); rename from the numbered format used elsewhere.
+        demand_df_linear = demand_df.rename(
+            columns={"volume_1": "volume", "price_1": "price"}
+        )
+        main_df, supp_df, k_values = find_optimal_dispatch_linearized(
+            gens_df=gens_df,
+            k_values_df=k_values_df,
+            demand_df=demand_df_linear,
+            k_max=k_max,
+            opt_gen=opt_gen,
+            big_w=big_w,
+            time_limit=3600,
+            print_results=True,
+            K=5,
+            big_M=10e6,
+        )
 
-    # calculate actual market clearing prices
+    # Re-solve UC with the optimised k-values to get accurate market prices
     k_values_df_2 = k_values_df.copy()
     k_values_df_2[opt_gen] = k_values
 
@@ -511,7 +685,6 @@ def run_MPEC(
         gens_df, demand_df, k_values_df_2, availability_df, demand_bids=demand_bids
     )
 
-    # Calculate profits
     profits_1 = calculate_profits(main_df=main_df, supp_df=supp_df, gens_df=gens_df)
     profits_2 = calculate_profits(
         main_df=updated_main_df_2, supp_df=updated_supp_df_2, gens_df=gens_df
