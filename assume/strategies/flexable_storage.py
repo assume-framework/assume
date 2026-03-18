@@ -5,7 +5,6 @@
 from datetime import timedelta
 
 import numpy as np
-import pandas as pd
 
 from assume.common.base import MinMaxChargeStrategy, SupportsMinMaxCharge
 from assume.common.market_objects import MarketConfig, Orderbook, Product
@@ -485,65 +484,14 @@ class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
         self.foresight = parse_duration(kwargs.get("eom_foresight", "24h"))
         self.lookahead = parse_duration(kwargs.get("lookahead", "0h"))
 
-    def _unit_dt_index(self, unit):
-        try:
-            idx = unit.outputs.index
-            if isinstance(idx, pd.DatetimeIndex):
-                return idx
-        except Exception:
-            pass
-
-        for candidate in (
-            getattr(unit, "index", None),
-            getattr(unit, "snapshots", None),
-        ):
-            if candidate is None:
-                continue
-            try:
-                return pd.DatetimeIndex(candidate)
-            except Exception:
-                continue
-
-        try:
-            return pd.DatetimeIndex(unit.outputs["energy"].index)
-        except Exception:
-            return pd.DatetimeIndex([])
-
-    def _as_series(self, unit, price_like):
-        idx = self._unit_dt_index(unit)
-        if price_like is None:
-            return pd.Series(0.0, index=idx)
-
-        if hasattr(price_like, "reindex"):
-            try:
-                ser = price_like.reindex(idx)
-            except Exception:
-                ser = pd.Series(price_like, index=idx)
-        else:
-            try:
-                ser = pd.Series(price_like, index=idx)
-            except Exception:
-                ser = pd.Series(0.0, index=idx)
-
-        return pd.to_numeric(ser, errors="coerce").fillna(0.0)
-
-    def _select_forecast(self, unit, market_config):
-        try:
-            raw = unit.forecaster[f"price_{market_config.market_id}"]
-        except Exception:
-            try:
-                raw = unit.forecaster["price_EOM"]
-            except Exception:
-                raw = None
-        return self._as_series(unit, raw)
-
     def _avg_price(self, series, t, window):
-        if series is None or series.empty:
+        """Calculate average price over foresight window."""
+        if series is None or (hasattr(series, "empty") and series.empty):
             return 0.0
         left = max(t - window, series.index[0])
         right = min(t + window, series.index[-1])
         if left > right:
-            return float(series.get(t, 0.0))
+            return float(series.get(t, 0.0)) if hasattr(series, "get") else 0.0
         return float(series.loc[left:right].mean())
 
     # ---------- main: used ONLY in redispatch market ----------
@@ -580,7 +528,14 @@ class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
             unit.calculate_min_max_discharge(start0, end_all, soc=soc_theory)
         )
 
-        price_series = self._select_forecast(unit, market_config)
+        # Get price forecast (primary: market-specific, fallback: EOM)
+        try:
+            price_series = unit.forecaster[f"price_{market_config.market_id}"]
+        except (KeyError, TypeError):
+            try:
+                price_series = unit.forecaster["price_EOM"]
+            except (KeyError, TypeError):
+                price_series = None
 
         for (
             product,
