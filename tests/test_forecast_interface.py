@@ -176,12 +176,13 @@ def test_forecast_interface__calc_and_update_forecasts(
     rn_utilization = mock_dsm_forecaster.renewable_utilisation_signal
 
     # 2. Assert that results are generated like expected
-    expected = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
+    expected_price = pd.read_csv(path / "results/price.csv", **parse_date)
+    expected_load = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
     expected_cgn = pd.read_csv(path / "results/congestion_signal.csv", **parse_date)
     expected_uti = pd.read_csv(path / "results/renewable_utilization.csv", **parse_date)
 
     assert_series_equal(
-        expected["load_forecast"],
+        expected_load["load_forecast"],
         pd.Series(
             load_forecast["EOM"], index
         ),  # convert FastSeries to pd.Series for comparison
@@ -190,7 +191,15 @@ def test_forecast_interface__calc_and_update_forecasts(
         check_freq=False,
     )
 
-    assert list(market_forecast["EOM"]) == [3000] * 24
+    assert_series_equal(
+        expected_price["price"],
+        pd.Series(
+            market_forecast["EOM"], index
+        ),  # convert FastSeries to pd.Series for comparison
+        check_names=False,
+        check_dtype=False,
+        check_freq=False,
+    )
 
     # Check congestion signal and renewable_utilization are as expected
     for key in congestion_signal:
@@ -215,7 +224,7 @@ def test_forecast_interface__calc_and_update_forecasts(
     rn_utilization = mock_dsm_forecaster.renewable_utilisation_signal
 
     assert_series_equal(
-        expected["load_forecast"],
+        expected_load["load_forecast"],
         pd.Series(
             load_forecast["EOM"], index
         ),  # convert FastSeries to pd.Series for comparison
@@ -223,7 +232,16 @@ def test_forecast_interface__calc_and_update_forecasts(
         check_dtype=False,
         check_freq=False,
     )
-    assert list(market_forecast["EOM"]) == [3000] * 24
+
+    assert_series_equal(
+        expected_price["price"],
+        pd.Series(
+            market_forecast["EOM"], index
+        ),  # convert FastSeries to pd.Series for comparison
+        check_names=False,
+        check_dtype=False,
+        check_freq=False,
+    )
 
     for key in congestion_signal:
         assert np.isclose(congestion_signal[key].data, expected_cgn[key].values).all()
@@ -318,12 +336,12 @@ def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup)
     rn_utilization = mock_dsm_forecaster.renewable_utilisation_signal
 
     # 2. Assert that results are generated like expected
-    expected = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
+    expected_load = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
     expected_cgn = pd.read_csv(path / "results/congestion_signal.csv", **parse_date)
     expected_uti = pd.read_csv(path / "results/renewable_utilization.csv", **parse_date)
 
     assert_series_equal(
-        expected["load_forecast"],
+        expected_load["load_forecast"],
         pd.Series(
             load_forecast["EOM"], index
         ),  # convert FastSeries to pd.Series for comparison

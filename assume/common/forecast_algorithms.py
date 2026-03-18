@@ -567,6 +567,10 @@ def calculate_naive_renewable_utilisation(
     renewable_units = [
         unit for unit in powerplants_units if is_renewable(unit.technology)
     ]
+
+    if len(renewable_units) == 0:
+        return {}
+
     power = calculate_max_power(
         renewable_units, index=[pp.id for pp in renewable_units]
     ).T
