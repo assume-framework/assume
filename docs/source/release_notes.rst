@@ -14,9 +14,6 @@ Upcoming Release
 
 
 0.6.0 - (18th March 2026)
-=========================
-
-**Improvements:**
   - **Deterministic behavior with seed setting**: Simulations are now deterministic by default for improved reproducibility. This can be controlled via a seed setting in `config.yaml` files, therefore it only applies for scenarios loaded via `load_scenario_folder`. Note that complete determinism is not guaranteed for all hardware and software configurations, especially with PyTorch-based learning strategies. It may also decrease performance of reinforcement learning due to disabled non-deterministic optimizations.
     - ``seed`` not set in top-level of config: Sets the seed to a fixed default value (42) for deterministic behavior.
     - ``seed: <int>``: Sets the seed for all random number generators to provided <int>.
@@ -46,7 +43,7 @@ Upcoming Release
 **Bug Fixes:**
 
 - **Changed action clamping**: The action clamping was changed to extreme values defined by dicts. Instead of using the min and max of a forward pass in the NN, the clamping is now based on the activation function of the actor network. Previously, the output range was incorrectly assumed based only on the input, which failed when weights were negative due to Xavier initialization.
-- **Adjusted reward scaling**: Reward scaling now considers current available power instead of the unit’s max_power, reducing reward distortion when availability limits capacity. Available power is now derived from offered_order_volume instead of unit.calculate_min_max_power. Because dispatch is set before reward calculation, the previous method left available power at 0 whenever the unit was dispatched.
+- **Adjusted reward scaling**: Reward scaling now considers current available power instead of the unit's max_power, reducing reward distortion when availability limits capacity. Available power is now derived from offered_order_volume instead of unit.calculate_min_max_power. Because dispatch is set before reward calculation, the previous method left available power at 0 whenever the unit was dispatched.
 - **Update pytest dependency**: Tests now run with Pytest 9
 - **Add new docs feature**: dependencies to build docs can now be installed with `pip install -e .[docs]`
 - **Fix tests on Windows**: One test was always failing on Windows, which is fixed so that all tests succeed on all archs
@@ -134,7 +131,7 @@ Upcoming Release
 - **Add single bid RL strategy:** Added a new reinforcement learning strategy that allows agents to submit bids based on one action value only that determines the price at which the full capacity is offered.
 - **Bidding Strategy for Elastic Demand**: The new `EnergyHeuristicElasticStrategy` enables demand units to submit multiple bids that approximate a marginal utility curve, using
   either linear or isoelastic price elasticity models. Unlike other strategies, it does **not** rely on predefined volumes—bids are dynamically generated based on the
-  unit’s elasticity configuration. To use this strategy, set `bidding_strategy` to `"demand_energy_heuristic_elastic"` in the `demand_units.csv` file and specify the following
+  unit's elasticity configuration. To use this strategy, set `bidding_strategy` to `"demand_energy_heuristic_elastic"` in the `demand_units.csv` file and specify the following
   parameters: `elasticity` (must be negative), `elasticity_model` (`"linear"` or `"isoelastic"`), `num_bids`, and `price` (which acts as `max_price`). The `elasticity_model`
   defines the shape of the demand curve, with `"linear"` producing a straight-line decrease and `"isoelastic"` generating a hyperbolic curve. `num_bids` determines how many
   bid steps are submitted, allowing control over the granularity of demand flexibility.
