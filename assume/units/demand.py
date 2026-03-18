@@ -92,7 +92,7 @@ class Demand(SupportsMinMax):
         if self.elasticity_model != 0:
             if self.elasticity_model not in ("linear", "isoelastic"):
                 raise ValueError(
-                f"Invalid elasticity_model '{self.elasticity_model}' at unit {self.id}. Choose 'linear' or 'isoelastic'."
+                    f"Invalid elasticity_model '{self.elasticity_model}' at unit {self.id}. Choose 'linear' or 'isoelastic'."
                 )
             if self.num_bids is not None and self.num_bids <= 1:
                 raise ValueError(

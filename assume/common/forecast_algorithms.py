@@ -14,8 +14,8 @@ from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import ForecastIndex, ForecastSeries
 from assume.common.market_objects import MarketConfig, is_renewable
 from assume.common.utils import get_available_products
-from assume.markets.clearing_algorithms.simple import PayAsClearRole, PayAsBidRole
 from assume.markets.clearing_algorithms.complex_clearing import ComplexClearingRole
+from assume.markets.clearing_algorithms.simple import PayAsBidRole, PayAsClearRole
 from assume.strategies import EnergyHeuristicElasticStrategy
 from assume.units.demand import Demand
 from assume.units.dsm_load_shift import DSMFlex
@@ -207,7 +207,9 @@ def calculate_naive_price_elastic(
     elastic_demand_bids = []
     # 1. Sort units by type and filter for units with bidding strategy for the given market_id
     powerplants_units, demand_units, exchange_units, _, _ = sort_units(units, market_id)
-    inelastic_demand_units = [unit for unit in demand_units if unit not in elastic_demand_units]
+    inelastic_demand_units = [
+        unit for unit in demand_units if unit not in elastic_demand_units
+    ]
 
     start = config.opening_hours[0]
     end = start + config.market_products[0].duration
@@ -272,7 +274,7 @@ def calculate_naive_price_elastic(
                     "price": mc_t,
                     "volume": power_t,
                     "bid_type": "SB",
-                    #"bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
+                    # "bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
                 }
             )
             .reset_index()
@@ -293,7 +295,7 @@ def calculate_naive_price_elastic(
                     "price": elastic_demand_prices,
                     "volume": elastic_demand_volumes,
                     "bid_type": "SB",
-                    #"bid_id": [f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))],
+                    # "bid_id": [f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))],
                 }
             )
             .reset_index()
@@ -321,7 +323,7 @@ def calculate_naive_price_elastic(
         mps = get_available_products(
             config.market_products, pd.Timestamp(start) - pd.Timedelta("1h")
         )
-        
+
         if config.market_mechanism == "pay_as_bid":
             # the forecast price is the volume-weighted average price of matched orders of each timestep
             mechanism = PayAsBidRole(config)
