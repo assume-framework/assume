@@ -12,16 +12,11 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
-  **New Features:**
-  - **Storage Redispatch Bidding Strategy**: A new bidding strategy ``StorageRedispatchFlexableStrategy`` that enables storage units to participate in redispatch markets. The strategy calculates feasible bid ranges around day-ahead (EOM) dispatch baselines, maximizing flexibility while respecting operational constraints including SoC limits, ramp rates, and power limits. Key features:
-    - Bid flexibility guaranteed: always offers ``max_power - min_power > 0`` flexibility range
-    - Volume baseline invariant: ensures ``bid.volume == EOM dispatch`` across all scenarios
-    - Supports all storage modes: charging, discharging, and idle states
-    - Intelligent constraint handling: automatically reduces flexibility when SoC approaches limits
-    - Sign convention consistency: negative (charging) → positive (discharging) → zero (neutral)
-    - Comprehensive validation tests verify correct behavior for full 24-hour market cycle (EOM market 0-19h → Redispatch market 21-22h)
 
-  **Improvements:**
+0.6.0 - (18th March 2026)
+=========================
+
+**Improvements:**
   - **Deterministic behavior with seed setting**: Simulations are now deterministic by default for improved reproducibility. This can be controlled via a seed setting in `config.yaml` files, therefore it only applies for scenarios loaded via `load_scenario_folder`. Note that complete determinism is not guaranteed for all hardware and software configurations, especially with PyTorch-based learning strategies. It may also decrease performance of reinforcement learning due to disabled non-deterministic optimizations.
     - ``seed`` not set in top-level of config: Sets the seed to a fixed default value (42) for deterministic behavior.
     - ``seed: <int>``: Sets the seed for all random number generators to provided <int>.
@@ -29,21 +24,21 @@ Upcoming Release
   - **Delete environment.yaml**: The environment.yaml file has been removed from the repository to simplify maintenance and was completely redundant with the `pyproject.toml`. Users can as before create their own environment using the provided pip installation instructions, which allows for more flexibility and easier updates.
   - **Add validation for simulation setup**: Added checks to validate the simulation setup for common issues, such as missing bidding strategies or inconsistent market configurations. Warnings are issued to inform users of potential problems that could affect simulation results.
   - **Added reward calculation for unit operators**: Unit operators have now the opportunity to calculate rewards based on the returned orderbooks for their own purposes. This enables learning strategies on unit operator level / portfolio learning strategies.
-  - **Upgrade to Pandas 3**
   - **Structured Validation Error**: Introduces the new ValidationError to represent a failing validation. Since it derives from the base ValidationError, all existing error handling remains compatible, but users can now also catch this specific error type to handle validation errors separately if desired.
-  - **Code Optimization for Storage Strategies**: Simplified ``StorageRedispatchFlexableStrategy`` by removing defensive helper methods and replaced deprecated API calls, improving code maintainability while preserving all functionality.
+  - **Add support for Pandas 3**
+  - **Add support for Python 3.14**
 
 **Bug Fixes:**
   - **Fix buffer and update order**: Fixed the order of buffer writing and policy updating in the learning role to ensure that both have the exact same order, which is necessary so that during updates the correct data is used. Thisbug will have compormised learning with very heterogeneous units after the last release.
   - **Fix data loss in RL learning role**: Fixed data loss in RL learning role by implementing atomic swap with carry-over for incomplete timesteps in cache
+  - **Update notebooks to always install latest repo version from Google Colab**: This ensures that the latest version is always used
 
-
-0.5.7 - (18th March 2026)
-==========================
+0.5.7 - (January 2026)
+=======================
 
 **New Features:**
   - **Storage Redispatch Bidding Strategy**: A new bidding strategy ``StorageRedispatchFlexableStrategy`` that enables storage units to participate in redispatch markets. The strategy calculates feasible bid ranges around day-ahead (EOM) dispatch baselines, maximizing flexibility while respecting operational constraints including SoC limits, ramp rates, and power limits.
-  - **Comprehensive validation tests**: verify correct behavior for full 24-hour market cycle (EOM market 0-19h → Redispatch market 21-22h)
+    - Comprehensive validation tests verify correct behavior for full 24-hour market cycle (EOM market 0-19h → Redispatch market 21-22h)
 
 0.5.6 - (23th December 2025)
 ============================
