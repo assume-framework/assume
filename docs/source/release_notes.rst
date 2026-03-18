@@ -23,12 +23,12 @@ Upcoming Release
   - **Delete environment.yaml**: The environment.yaml file has been removed from the repository to simplify maintenance and was completely redundant with the `pyproject.toml`. Users can as before create their own environment using the provided pip installation instructions, which allows for more flexibility and easier updates.
   - **Add validation for simulation setup**: Added checks to validate the simulation setup for common issues, such as missing bidding strategies or inconsistent market configurations. Warnings are issued to inform users of potential problems that could affect simulation results.
   - **Added reward calculation for unit operators**: Unit operators have now the opportunity to calculate rewards based on the returned orderbooks for their own purposes. This enables learning strategies on unit operator level / portfolio learning strategies.
-  - **Structured Validation Error**: Introduces the new ValidationError to represent a failing validation. Since it derives from the base ValidationError, all existing error handling remains compatible, but users can now also catch this specific error type to
-  - **Add support for Pandas 3**handle validation errors separately if desired.
+  - **Structured Validation Error**: Introduces the new ValidationError to represent a failing validation. Since it derives from the base ValidationError, all existing error handling remains compatible, but users can now also catch this specific error type to handle validation errors separately if desired.
+  - **Add support for Pandas 3**
   - **Add support for Python 3.14**
 
 **Bug Fixes:**
-  - **Fix buffer and update order**: Fixed the order of buffer writing and policy updating in the learning role to ensure that both have the exact same order, which is necessary so that during updates the correct data is used. Thisbug will have compormised learning with very heterogeneous units after the last release.
+  - **Fix buffer and update order**: Fixed the order of buffer writing and policy updating in the learning role to ensure that both have the exact same order, which is necessary so that during updates the correct data is used. This bug will have compromised learning with very heterogeneous units after the last release.
   - **Fix data loss in RL learning role**: Fixed data loss in RL learning role by implementing atomic swap with carry-over for incomplete timesteps in cache
   - **Update notebooks to always install latest repo version from Google Colab**: This ensures that the latest version is always used
 
