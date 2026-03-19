@@ -35,6 +35,10 @@ scenario = {
     "simple_with_storage_opt_cc_price_48h" : {"scenario":"simple_with_storage_opt", "study_case":"cc_price_48h_foresight"},
     "simple_with_storage_opt_cc_price_336h" : {"scenario":"simple_with_storage_opt", "study_case":"cc_price_336h_foresight"},
     "simple_with_storage_opt_cc_price_8760h" : {"scenario":"simple_with_storage_opt", "study_case":"cc_price_8760h_foresight"},
+    
+    "simple_with_storage_learning_cc_price_12h" : {"scenario":"simple_with_storage_learning", "study_case":"cc_price_12h_foresight"},
+    "simple_with_storage_learning_cc_price_24h" : {"scenario":"simple_with_storage_learning", "study_case":"cc_price_24h_foresight"},
+    "simple_with_storage_learning_cc_price_48h" : {"scenario":"simple_with_storage_learning", "study_case":"cc_price_48h_foresight"},
 
     "stylized": {"scenario":"stylized", "study_case":"base_case"},
     "stylized_complex": {"scenario":"stylized", "study_case":"complex_clearing"},
@@ -59,7 +63,7 @@ if __name__ == "__main__":
 
     data_format = "timescale"  # "local_db" or "timescale"
 
-    example = "stylized_opt_cc_price_24h"  # "simple", "simple_complex", "simple_with_storage", "simple_with_storage_complex", "stylized"
+    example = "simple_with_storage_learning_cc_price_12h"  # "simple", "simple_complex", "simple_with_storage", "simple_with_storage_complex", "stylized"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
