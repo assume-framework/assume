@@ -12,10 +12,8 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
-0.6.0 - (18th March 2026)
-=========================
 
-  **Improvements:**
+0.6.0 - (18th March 2026)
   - **Deterministic behavior with seed setting**: Simulations are now deterministic by default for improved reproducibility. This can be controlled via a seed setting in `config.yaml` files, therefore it only applies for scenarios loaded via `load_scenario_folder`. Note that complete determinism is not guaranteed for all hardware and software configurations, especially with PyTorch-based learning strategies. It may also decrease performance of reinforcement learning due to disabled non-deterministic optimizations.
     - ``seed`` not set in top-level of config: Sets the seed to a fixed default value (42) for deterministic behavior.
     - ``seed: <int>``: Sets the seed for all random number generators to provided <int>.
@@ -32,6 +30,12 @@ Upcoming Release
   - **Fix data loss in RL learning role**: Fixed data loss in RL learning role by implementing atomic swap with carry-over for incomplete timesteps in cache
   - **Update notebooks to always install latest repo version from Google Colab**: This ensures that the latest version is always used
 
+0.5.7 - (January 2026)
+=======================
+
+**New Features:**
+  - **Storage Redispatch Bidding Strategy**: A new bidding strategy ``StorageRedispatchFlexableStrategy`` that enables storage units to participate in redispatch markets. The strategy calculates feasible bid ranges around day-ahead (EOM) dispatch baselines, maximizing flexibility while respecting operational constraints including SoC limits, ramp rates, and power limits.
+    - Comprehensive validation tests verify correct behavior for full 24-hour market cycle (EOM market 0-19h → Redispatch market 21-22h)
 
   **New Features:**
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.

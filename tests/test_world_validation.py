@@ -61,8 +61,16 @@ def grid_data():
     generators = pd.DataFrame(generator_data).set_index("name")
     load_data = {"name": "load1", "node": ["node1"], "max_power": [5.0]}
     loads = pd.DataFrame(load_data).set_index("name")
+    storage_data = {"name": [], "node": [], "max_power": []}
+    storage_units = pd.DataFrame(storage_data).set_index("name")
 
-    return {"buses": buses, "lines": lines, "generators": generators, "loads": loads}
+    return {
+        "buses": buses,
+        "lines": lines,
+        "generators": generators,
+        "loads": loads,
+        "storage_units": storage_units,
+    }
 
 
 def test_warning_no_generation(world, demand):
@@ -240,3 +248,8 @@ def test_redispatch_too_early(grid_data, world):
 
     with pytest.raises(ValueError):
         world.run()
+
+
+if __name__ == "__main__":
+    # run pytest and enable prints
+    pytest.main(["-s", __file__])

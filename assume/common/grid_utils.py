@@ -167,6 +167,110 @@ def add_backup_generators(
     )
 
 
+def add_redispatch_storage_units(
+    network: pypsa.Network,
+    storage_units: pd.DataFrame,
+) -> None:
+    """
+    Make storage redispatchable: add a fixed Load for the scheduled profile
+    and two redispatch Generators per storage (up & down).
+
+    Required columns in `storage_units`:
+      - 'node'
+      - 'max_power_discharge'  (MW)  → used for <name>_up  (more discharge / less charge)
+      - 'max_power_charge'     (MW)  → used for <name>_down (less discharge / more charge)
+    """
+    if storage_units is None or storage_units.empty:
+        return
+
+    missing = [
+        c
+        for c in ["node", "max_power_discharge", "max_power_charge"]
+        if c not in storage_units.columns
+    ]
+    if missing:
+        raise KeyError(f"storage_units is missing required cols: {missing}")
+
+    # scheduled profile container (filled later via network.loads_t["p_set"])
+    p_set = pd.DataFrame(
+        np.zeros((len(network.snapshots), len(storage_units.index))),
+        index=network.snapshots,
+        columns=storage_units.index,
+    )
+
+    # 1) fixed Load with sign=+1 (mirrors generator path)
+    network.add(
+        "Load",
+        name=storage_units.index,
+        bus=storage_units["node"],
+        p_set=p_set,
+        sign=-1,
+    )
+
+    # 2) upward redispatch generator (more discharge / less charge)
+    #    capacity = max feasible discharge power
+    network.add(
+        "Generator",
+        name=storage_units.index,
+        suffix="_up",
+        bus=storage_units["node"],
+        p_nom=storage_units["max_power_discharge"],  # MW
+        p_min_pu=p_set,
+        p_max_pu=p_set + 1,
+        marginal_cost=p_set,
+    )
+
+    # 3) downward redispatch generator (less discharge / more charge)
+    #    capacity = max feasible charge power (positive MW)
+    network.add(
+        "Generator",
+        name=storage_units.index,
+        suffix="_down",
+        bus=storage_units["node"],
+        p_nom=storage_units["max_power_charge"],  # MW
+        p_min_pu=p_set,
+        p_max_pu=p_set + 1,
+        marginal_cost=p_set,
+        sign=-1,
+    )
+
+
+def add_fix_units(
+    network: pypsa.Network,
+    units: pd.DataFrame,
+) -> None:
+    """
+    This adds the loads as fix units to the nodal PyPSA network. It also adds storage units & exchange units
+    as fix_units because in the current redispatch market/mechanism these units are not allowed to do redispatch.
+
+    Args:
+        network (pypsa.Network): the pypsa network to which the units are added
+        loads (pandas.DataFrame): the loads dataframe
+    """
+    if units is None or units.empty:
+        return
+
+    units_c = units.copy()
+    if "sign" in units_c.columns:
+        del units_c["sign"]
+
+    # add loads with opposite sign (default for loads is -1). This is needed to properly model the redispatch
+    network.add(
+        "Load",
+        name=units.index,
+        bus=units["node"],  # bus to which the generator is connected to
+        sign=1,
+        **units_c,
+    )
+
+    if "p_set" not in units.columns:
+        network.loads_t["p_set"] = pd.DataFrame(
+            np.zeros((len(network.snapshots), len(units.index))),
+            index=network.snapshots,
+            columns=units.index,
+        )
+
+
 def add_loads(
     network: pypsa.Network,
     loads: pd.DataFrame,
