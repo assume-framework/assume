@@ -52,7 +52,7 @@ def hydrogen_plant(hydrogen_components) -> HydrogenPlant:
         market_prices={"EOM": [60] * 24},
     )
     bidding_strategy = {"EOM": DsmEnergyOptimizationStrategy()}
-    return HydrogenPlant(
+    plant = HydrogenPlant(
         id="test_hydrogen_plant",
         unit_operator="test_operator",
         objective="min_variable_cost",
@@ -63,6 +63,9 @@ def hydrogen_plant(hydrogen_components) -> HydrogenPlant:
         forecaster=forecast,
         demand=400,  # Total hydrogen demand over the horizon
     )
+
+    plant.setup_model()
+    return plant
 
 
 def test_optimal_operation_without_flex_initialization(hydrogen_plant):
@@ -262,7 +265,7 @@ def hydrogen_plant_no_storage(hydrogen_components_no_storage) -> HydrogenPlant:
         market_prices={"EOM": [60] * 24},
     )
     bidding_strategy = {"EOM": DsmEnergyOptimizationStrategy()}
-    return HydrogenPlant(
+    plant = HydrogenPlant(
         id="test_hydrogen_plant_no_storage",
         unit_operator="test_operator",
         objective="min_variable_cost",
@@ -272,6 +275,9 @@ def hydrogen_plant_no_storage(hydrogen_components_no_storage) -> HydrogenPlant:
         forecaster=forecast,
         demand=800,
     )
+
+    plant.setup_model()
+    return plant
 
 
 def test_electrolyser_only_operation(hydrogen_plant_no_storage):

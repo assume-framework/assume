@@ -37,6 +37,9 @@ Upcoming Release
   - **Storage Redispatch Bidding Strategy**: A new bidding strategy ``StorageRedispatchFlexableStrategy`` that enables storage units to participate in redispatch markets. The strategy calculates feasible bid ranges around day-ahead (EOM) dispatch baselines, maximizing flexibility while respecting operational constraints including SoC limits, ramp rates, and power limits.
     - Comprehensive validation tests verify correct behavior for full 24-hour market cycle (EOM market 0-19h → Redispatch market 21-22h)
 
+  **New Features:**
+  - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+
 0.5.6 - (23th December 2025)
 ============================
 
