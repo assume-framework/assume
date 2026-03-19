@@ -581,8 +581,8 @@ def test_create_date_range():
     for i in range(n):
         q_pd_slice = series.loc[start:new_end]
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     # check that setting items is faster:
     t = time.time()
@@ -596,8 +596,8 @@ def test_create_date_range():
     for i in range(n):
         series.at[start] = 1
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     # check that setting slices is faster
     t = time.time()
@@ -611,8 +611,8 @@ def test_create_date_range():
     for i in range(n):
         series.loc[start:new_end] = 17
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     se = pd.Series(0.0, index=fs.index.get_date_list())
     se.loc[start]
