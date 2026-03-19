@@ -26,7 +26,7 @@ Upcoming Release
   - **Add support for Python 3.14**
 
 **Bug Fixes:**
-  - **Fix buffer and update order**: Fixed the order of buffer writing and policy updating in the learning role to ensure that both have the exact same order, which is necessary so that during updates the correct data is used. Thisbug will have compormised learning with very heterogeneous units after the last release.
+  - **Fix buffer and update order**: Fixed the order of buffer writing and policy updating in the learning role to ensure that both have the exact same order, which is necessary so that during updates the correct data is used. This bug will have compromised learning with very heterogeneous units after the last release.
   - **Fix data loss in RL learning role**: Fixed data loss in RL learning role by implementing atomic swap with carry-over for incomplete timesteps in cache
   - **Update notebooks to always install latest repo version from Google Colab**: This ensures that the latest version is always used
 
