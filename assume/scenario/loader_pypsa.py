@@ -94,7 +94,9 @@ def load_pypsa(
             unit_type,
             "powerplant_operator",
             {
-                "min_power": generator.p_nom_min,
+                "min_power": max_power * generator.p_min_pu
+                if generator.p_min_pu is not None
+                else 0,
                 "max_power": max_power,
                 "bidding_strategies": bidding_strategies[unit_type][generator.name],
                 "technology": "conventional",
@@ -146,8 +148,16 @@ def load_pypsa(
             continue
 
         unit_type = "storage"
-        max_power_charge = storage.p_nom * storage.p_min_pu
-        max_power_discharge = storage.p_nom * storage.p_max_pu
+        max_power_charge = (
+            storage.p_nom * storage.p_min_pu
+            if storage.p_min_pu is not None
+            else storage.p_nom
+        )
+        max_power_discharge = (
+            storage.p_nom * storage.p_max_pu
+            if storage.p_max_pu is not None
+            else storage.p_nom
+        )
 
         world.add_unit(
             f"StorageTrader_{storage.name}",
@@ -162,7 +172,6 @@ def load_pypsa(
                 "capacity": storage.p_nom * storage.max_hours,
                 "bidding_strategies": bidding_strategies[unit_type][storage.name],
                 "technology": storage.carrier,
-                "emission_factor": storage.emission_factor or 0,
                 "node": storage.bus,
             },
             UnitForecaster(index),
