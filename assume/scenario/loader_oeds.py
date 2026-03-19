@@ -13,14 +13,11 @@ import pandas as pd
 from dateutil import rrule as rr
 
 from assume import World
-from assume.common.forecast_algorithms import get_forecast_registries
 from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.oeds.infrastructure import InfrastructureInterface
 
 logger = logging.getLogger(__name__)
-
-_forecast_registries = get_forecast_registries()
 
 
 def load_oeds(
@@ -121,7 +118,6 @@ def load_oeds(
                     index,
                     availability=offshore_wind / offshore_wind.max(),
                     fuel_prices={"others": 0.2},
-                    forecast_registries=_forecast_registries,
                 ),
             )
 
@@ -205,7 +201,8 @@ def load_oeds(
                 "price": 1e3,
             },
             DemandForecaster(
-                index, demand=-abs(demand), forecast_registries=_forecast_registries
+                index,
+                demand=-abs(demand),
             ),
         )
 
@@ -227,7 +224,6 @@ def load_oeds(
                 index,
                 availability=solar / solar.max(),
                 fuel_prices={"others": 0.1},
-                forecast_registries=_forecast_registries,
             ),
         )
         if wind.max() > 0:
@@ -248,7 +244,6 @@ def load_oeds(
                     index,
                     availability=wind / wind.max(),
                     fuel_prices={"others": 0.2},
-                    forecast_registries=_forecast_registries,
                 ),
             )
 
@@ -278,7 +273,6 @@ def load_oeds(
                 index,
                 availability=1,
                 fuel_prices={"others": fuel_prices["biomass"] + randomness},
-                forecast_registries=_forecast_registries,
             ),
         )
         water = infra_interface.get_run_river_systems_in_area(area=area)
@@ -302,7 +296,6 @@ def load_oeds(
                 index,
                 availability=1,
                 fuel_prices={"others": 0.2},
-                forecast_registries=_forecast_registries,
             ),
         )
 
@@ -379,7 +372,6 @@ def load_oeds(
                             "others": fuel_prices[fuel_type] + randomness,
                             "co2": fuel_prices["co2"],
                         },
-                        forecast_registries=_forecast_registries,
                     ),
                 )
 

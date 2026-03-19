@@ -10,7 +10,6 @@ import pypsa
 from dateutil import rrule as rr
 
 from assume import World
-from assume.common.forecast_algorithms import get_forecast_registries
 from assume.common.forecaster import (
     DemandForecaster,
     PowerplantForecaster,
@@ -19,8 +18,6 @@ from assume.common.forecaster import (
 from assume.common.market_objects import MarketConfig, MarketProduct
 
 logger = logging.getLogger(__name__)
-
-_forecast_registries = get_forecast_registries()
 
 
 def load_pypsa(
@@ -115,7 +112,6 @@ def load_pypsa(
                 index,
                 fuel_prices={generator.carrier: generator.marginal_cost},
                 availability=av,
-                forecast_registries=_forecast_registries,
             ),
         )
 
@@ -141,7 +137,8 @@ def load_pypsa(
                 "price": 1e3,
             },
             DemandForecaster(
-                index, demand=-abs(load_t), forecast_registries=_forecast_registries
+                index,
+                demand=-abs(load_t),
             ),
         )
 
@@ -178,9 +175,10 @@ def load_pypsa(
                 "capacity": storage.p_nom * storage.max_hours,
                 "bidding_strategies": bidding_strategies[unit_type][storage.name],
                 "technology": storage.carrier,
+                "emission_factor": storage.emission_factor or 0,
                 "node": storage.bus,
             },
-            UnitForecaster(index, forecast_registries=_forecast_registries),
+            UnitForecaster(index),
         )
 
     world.init_forecasts()

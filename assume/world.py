@@ -36,6 +36,7 @@ from assume.common import (
     mango_codec_factory,
 )
 from assume.common.base import LearningConfig
+from assume.common.forecast_algorithms import get_forecast_registries
 from assume.common.forecaster import UnitForecaster
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
@@ -934,8 +935,10 @@ class World:
     ):
         units = self.units.values()  # make same object for cache
         markets = self.markets.values()  # make same object for cache
-
+        registries = get_forecast_registries()
         for unit in self.units.values():
+            if unit.forecaster._registries is None:
+                unit.forecaster._registries = registries
             unit.forecaster.initialize(
                 units,
                 markets,

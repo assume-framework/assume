@@ -185,8 +185,6 @@ class UnitForecaster:
         self.index: FastIndex = index
         self.availability: FastSeries = self._to_series(availability)
         self.forecast_algorithms = forecast_algorithms
-        if forecast_registries is None:
-            forecast_registries = {"init": {}, "preprocess": {}, "update": {}}
         self._registries = forecast_registries
         if market_prices is None:
             market_prices = {"EOM": 50}  # default value for tests
