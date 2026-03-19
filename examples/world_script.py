@@ -80,6 +80,8 @@ def init(world, n=1):
             nuclear_forecast,
         )
 
+    world.init_forecasts()
+
 
 if __name__ == "__main__":
     db_uri = "postgresql://assume:assume@localhost:5432/assume"

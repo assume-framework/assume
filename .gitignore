@@ -151,3 +151,4 @@ examples/notebooks/outputs
 *.jar
 *.nbconvert.ipynb
 fameSetup.yaml
+.claude
