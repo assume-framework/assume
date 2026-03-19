@@ -7,12 +7,23 @@ import pandas as pd
 import pytest
 
 from assume.common.forecaster import UnitForecaster
+from assume.common.grid_utils import add_fix_units, add_redispatch_storage_units
 from assume.common.market_objects import MarketConfig, Product
 from assume.strategies.flexable_storage import (
     StorageEnergyHeuristicFlexableStrategy,
     StorageRedispatchFlexableStrategy,
 )
 from assume.units import Storage
+
+
+class DummyNetwork:
+    def __init__(self, snapshots):
+        self.snapshots = snapshots
+        self.loads_t = {}
+        self.calls = []
+
+    def add(self, component, **kwargs):
+        self.calls.append((component, kwargs))
 
 
 def test_storage_redispatch_strategy_feasible_bounds_and_modes():
@@ -1314,6 +1325,156 @@ def test_sign_consistency():
     assert neutral_bid["volume"] == 0.0, "Neutral baseline should be exactly zero"
     assert neutral_bid["min_power"] < 0.0, "Should allow charging (negative)"
     assert neutral_bid["max_power"] > 0.0, "Should allow discharge (positive)"
+
+
+def test_redispatch_avg_price_fallback_branches():
+    """Cover _avg_price edge paths used by redispatch strategy."""
+    strategy = StorageRedispatchFlexableStrategy()
+    t0 = pd.Timestamp("2025-01-01 00:00:00")
+
+    assert strategy._avg_price(None, t0, pd.Timedelta(hours=1)) == 0.0
+
+    empty_series = pd.Series(dtype=float)
+    assert strategy._avg_price(empty_series, t0, pd.Timedelta(hours=1)) == 0.0
+
+    # Negative window forces left > right and hits the direct fallback branch.
+    one_point = pd.Series([7.5], index=[t0])
+    assert strategy._avg_price(one_point, t0, pd.Timedelta(hours=-1)) == 7.5
+
+
+def test_redispatch_calculate_bids_fallbacks_for_soc_and_price():
+    """Cover fallback branches when soc timestamp and market price forecast are missing."""
+
+    class _DummyUnit:
+        def __init__(self):
+            t0 = pd.Timestamp("2025-01-01 01:00:00")
+            # soc at a different timestamp -> .at[t0] raises and fallback path is used.
+            self.outputs = {
+                "soc": pd.Series([0.6], index=[pd.Timestamp("2025-01-01 00:00:00")]),
+                "energy": pd.Series([1.0], index=[t0]),
+            }
+            self.forecaster = {}
+            self.id = "dummy_storage"
+            self.node = "node0"
+            self.efficiency_charge = 0.9
+            self.efficiency_discharge = 0.95
+            self.capacity = 10.0
+
+        def get_output_before(self, _):
+            return 0.0
+
+        def calculate_min_max_charge(self, *_args, **_kwargs):
+            return [0.0], [-2.0]
+
+        def calculate_min_max_discharge(self, *_args, **_kwargs):
+            return [0.0], [2.0]
+
+        def calculate_ramp_discharge(self, *_args, **_kwargs):
+            return float(_args[2])
+
+        def calculate_ramp_charge(self, *_args, **_kwargs):
+            return float(_args[2])
+
+    strategy = StorageRedispatchFlexableStrategy()
+    market_config = MarketConfig(market_id="redispatch", product_type="energy")
+    t0 = pd.Timestamp("2025-01-01 01:00:00")
+    product_tuples = [Product(start=t0, end=t0 + pd.Timedelta(hours=1))]
+
+    bids = strategy.calculate_bids(_DummyUnit(), market_config, product_tuples)
+
+    assert len(bids) == 1
+    assert bids[0]["volume"] == 1.0
+    # No forecast available in forecaster fallback chain -> _avg_price(None) = 0.
+    assert bids[0]["price"] == 0.0
+
+
+def test_redispatch_grid_utils_storage_network_integration():
+    """Cover redispatch grid helper behavior for storage-specific network setup."""
+    network = DummyNetwork(snapshots=range(3))
+    storage_units = pd.DataFrame(
+        {
+            "node": ["node1"],
+            "max_power_discharge": [6.0],
+            "max_power_charge": [4.0],
+        },
+        index=["storage_1"],
+    )
+
+    add_redispatch_storage_units(network=network, storage_units=storage_units)
+
+    assert len(network.calls) == 3
+
+    load_component, load_kwargs = network.calls[0]
+    assert load_component == "Load"
+    assert load_kwargs["sign"] == -1
+
+    up_component, up_kwargs = network.calls[1]
+    assert up_component == "Generator"
+    assert up_kwargs["suffix"] == "_up"
+    assert up_kwargs["p_nom"]["storage_1"] == 6.0
+
+    down_component, down_kwargs = network.calls[2]
+    assert down_component == "Generator"
+    assert down_kwargs["suffix"] == "_down"
+    assert down_kwargs["sign"] == -1
+    assert down_kwargs["p_nom"]["storage_1"] == 4.0
+
+
+def test_redispatch_grid_utils_storage_validation_and_fix_units_defaults():
+    """Cover storage grid helper validation plus fixed-unit default p_set creation."""
+    network = DummyNetwork(snapshots=range(2))
+
+    empty_storage_units = pd.DataFrame(
+        columns=["node", "max_power_discharge", "max_power_charge"]
+    )
+    add_redispatch_storage_units(network=network, storage_units=empty_storage_units)
+    assert network.calls == []
+
+    invalid_storage_units = pd.DataFrame(
+        {"node": ["node1"], "max_power_discharge": [5.0]},
+        index=["storage_1"],
+    )
+    with pytest.raises(KeyError, match="storage_units is missing required cols"):
+        add_redispatch_storage_units(
+            network=network, storage_units=invalid_storage_units
+        )
+
+    units = pd.DataFrame(
+        {
+            "node": ["node1"],
+            "max_power": [5.0],
+            "sign": [1],
+        },
+        index=["load_1"],
+    )
+    add_fix_units(network=network, units=units)
+
+    assert len(network.calls) == 1
+    component, kwargs = network.calls[0]
+    assert component == "Load"
+    assert kwargs["sign"] == 1
+    assert "p_set" in network.loads_t
+    assert list(network.loads_t["p_set"].columns) == ["load_1"]
+
+
+def test_redispatch_grid_utils_fix_units_preserves_existing_p_set():
+    """Cover add_fix_units branch where p_set already exists and should not be overwritten."""
+    network = DummyNetwork(snapshots=range(2))
+    network.loads_t["p_set"] = "keep_me"
+
+    units = pd.DataFrame(
+        {
+            "node": ["node1"],
+            "max_power": [5.0],
+            "p_set": [0.0],
+        },
+        index=["load_1"],
+    )
+
+    add_fix_units(network=network, units=units)
+
+    assert len(network.calls) == 1
+    assert network.loads_t["p_set"] == "keep_me"
 
 
 if __name__ == "__main__":
