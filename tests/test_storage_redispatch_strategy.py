@@ -7,7 +7,6 @@ import pandas as pd
 import pytest
 
 from assume.common.forecaster import UnitForecaster
-from assume.common.grid_utils import add_fix_units, add_redispatch_storage_units
 from assume.common.market_objects import MarketConfig, Product
 from assume.strategies.flexable_storage import (
     StorageEnergyHeuristicFlexableStrategy,
@@ -1388,8 +1387,11 @@ def test_redispatch_calculate_bids_fallbacks_for_soc_and_price():
     assert bids[0]["price"] == 0.0
 
 
+@pytest.mark.require_network
 def test_redispatch_grid_utils_storage_network_integration():
     """Cover redispatch grid helper behavior for storage-specific network setup."""
+    from assume.common.grid_utils import add_redispatch_storage_units
+
     network = DummyNetwork(snapshots=range(3))
     storage_units = pd.DataFrame(
         {
@@ -1420,8 +1422,11 @@ def test_redispatch_grid_utils_storage_network_integration():
     assert down_kwargs["p_nom"]["storage_1"] == 4.0
 
 
+@pytest.mark.require_network
 def test_redispatch_grid_utils_storage_validation_and_fix_units_defaults():
     """Cover storage grid helper validation plus fixed-unit default p_set creation."""
+    from assume.common.grid_utils import add_fix_units, add_redispatch_storage_units
+
     network = DummyNetwork(snapshots=range(2))
 
     empty_storage_units = pd.DataFrame(
@@ -1457,8 +1462,11 @@ def test_redispatch_grid_utils_storage_validation_and_fix_units_defaults():
     assert list(network.loads_t["p_set"].columns) == ["load_1"]
 
 
+@pytest.mark.require_network
 def test_redispatch_grid_utils_fix_units_preserves_existing_p_set():
     """Cover add_fix_units branch where p_set already exists and should not be overwritten."""
+    from assume.common.grid_utils import add_fix_units
+
     network = DummyNetwork(snapshots=range(2))
     network.loads_t["p_set"] = "keep_me"
 
