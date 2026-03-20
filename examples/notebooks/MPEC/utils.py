@@ -533,7 +533,7 @@ def build_availability_df(raw_availabilities, time_index, unit_names):
     return availability_df
 
 
-def add_exchange_bids_to_demand(demand_df, exchange_bids):
+def add_export_bids_to_demand(demand_df, export_bids):
     """
     Append exchange-unit bids as additional volume/price columns in demand_df.
 
@@ -552,11 +552,11 @@ def add_exchange_bids_to_demand(demand_df, exchange_bids):
     import re
 
     demand_df = demand_df.copy()
-    if exchange_bids.empty:
+    if export_bids.empty:
         return demand_df
 
-    if "start_time" in exchange_bids.columns:
-        exchange_bids = exchange_bids.set_index("start_time")
+    if "start_time" in export_bids.columns:
+        export_bids = export_bids.set_index("start_time")
 
     bid_nums = [
         int(m.group(1))
@@ -565,16 +565,96 @@ def add_exchange_bids_to_demand(demand_df, exchange_bids):
     ]
     start_idx = max(bid_nums) if bid_nums else 1
 
-    unique_bid_ids = sorted(exchange_bids["bid_id"].unique())
+    unique_bid_ids = sorted(export_bids["bid_id"].unique())
     bid_id_to_idx = {bid_id: start_idx + i + 1 for i, bid_id in enumerate(unique_bid_ids)}
 
-    for ts, group in exchange_bids.groupby(exchange_bids.index):
+    for ts, group in export_bids.groupby(export_bids.index):
         for _, row in group.iterrows():
             idx = bid_id_to_idx[row["bid_id"]]
             demand_df.loc[ts, f"volume_{idx}"] = row["volume"] * -1
             demand_df.loc[ts, f"price_{idx}"] = row["price"]
 
     return demand_df.sort_index()
+
+
+def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df):
+    """
+    Add import exchange units (positive volume bids) as non-strategic virtual generators.
+
+    Export units always bid at k=0 (effective price 0) and are dispatched up to their
+    available capacity. Time-varying capacity is encoded in availability_df as
+    volume(t) / g_max, so the existing MPEC availability mechanism handles it.
+
+    Args:
+        import_bids (pd.DataFrame): Rows from market_orders where unit is an exchange
+            unit AND volume > 0, indexed by start_time. Must have columns
+            "unit_id" and "volume".
+        gens_df (pd.DataFrame): Generator DataFrame from create_gens_df.
+        k_values_df (pd.DataFrame): k-multipliers, DatetimeIndex,
+            columns = unit names [+ "date"].
+        availability_df (pd.DataFrame): Availability factors, DatetimeIndex,
+            columns = unit names.
+
+    Returns:
+        tuple: (gens_df, k_values_df, availability_df) — updated with export units
+            appended in consistent order.
+    """
+    if import_bids.empty:
+        return gens_df, k_values_df, availability_df
+
+    gens_df = gens_df.copy()
+    k_values_df = k_values_df.copy()
+    availability_df = availability_df.copy()
+
+    time_index = availability_df.index
+
+    # Insert new unit columns before the "date" column if it exists
+    date_insert_pos = (
+        k_values_df.columns.get_loc("date")
+        if "date" in k_values_df.columns
+        else len(k_values_df.columns)
+    )
+
+    for unit_id in import_bids["unit_id"].unique():
+        unit_vol = (
+            import_bids[import_bids["unit_id"] == unit_id]["volume"]
+            .reindex(time_index)
+            .fillna(0)
+        )
+        g_max = unit_vol.max()
+        if g_max <= 0:
+            continue
+
+        # Append a new row to gens_df with the required MPEC fields
+        new_row = {col: np.nan for col in gens_df.columns}
+        new_row.update({
+            "unit": unit_id,
+            "technology": "exchange",
+            "fuel_type": "exchange",
+            "g_max": g_max,
+            "u_0": 0,
+            "g_0": 0,
+            "r_up": g_max,
+            "r_down": g_max,
+            "k_up": 0,
+            "k_down": 0,
+            "mc": 1.0,  # nominal; effective bid = mc * k = 1 * 0 = 0
+        })
+        gens_df = pd.concat(
+            [gens_df, pd.DataFrame([new_row])], ignore_index=True
+        )
+        
+        # fill nan values in gens_df with 0
+        gens_df = gens_df.fillna(0)
+
+        # k = 0 for all timesteps (non-strategic, always bids at effective price 0)
+        k_values_df.insert(date_insert_pos, unit_id, 0.0)
+        date_insert_pos += 1  # keep "date" at the end for subsequent units
+
+        # availability = volume(t) / g_max, clipped to [0, 1]
+        availability_df[unit_id] = (unit_vol / g_max).clip(0, 1)
+
+    return gens_df, k_values_df, availability_df
 
 
 def run_MPEC(
@@ -654,7 +734,6 @@ def run_MPEC(
             big_w=big_w,
             time_limit=3600,
             print_results=True,
-            K=5,
             big_M=10e6,
             demand_bids=demand_bids,
         )

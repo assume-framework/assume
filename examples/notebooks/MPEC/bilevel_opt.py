@@ -1096,11 +1096,13 @@ def find_optimal_dispatch_quadratic(
     # ---------------------------------------------------------------------------
     # extract results
     generation_df = pd.DataFrame(
-        index=demand_df.index, columns=[f"gen_{gen}" for gen in gens_df.index]
+        index=demand_df.index, columns=[f"gen_{gens_df.at[gen, 'unit']}" for gen in gens_df.index]
     )
     for gen in gens_df.index:
+        unit_name = gens_df.at[gen, "unit"]
         for t in demand_df.index:
-            generation_df.at[t, f"gen_{gen}"] = instance.g[gen, t].value
+            generation_df.at[t, f"gen_{unit_name}"] = instance.g[gen, t].value
+
 
     demand_df = pd.DataFrame(index=demand_df.index, columns=["demand"])
     for t in demand_df.index:
@@ -1119,19 +1121,21 @@ def find_optimal_dispatch_quadratic(
     main_df = pd.concat([generation_df, demand_df, mcp, mcp_hat], axis=1)
 
     start_up_cost = pd.DataFrame(
-        index=demand_df.index, columns=[f"start_up_{gen}" for gen in gens_df.index]
+        index=demand_df.index, columns=[f"start_up_{gens_df.at[gen, 'unit']}" for gen in gens_df.index]
     )
     for gen in gens_df.index:
+        unit_name = gens_df.at[gen, "unit"]
         for t in demand_df.index:
-            start_up_cost.at[t, f"start_up_{gen}"] = instance.c_up[gen, t].value
+            start_up_cost.at[t, f"start_up_{unit_name}"] = instance.c_up[gen, t].value
 
     shut_down_cost = pd.DataFrame(
-        index=demand_df.index, columns=[f"shut_down_{gen}" for gen in gens_df.index]
+        index=demand_df.index, columns=[f"shut_down_{gens_df.at[gen, 'unit']}" for gen in gens_df.index]
     )
     for gen in gens_df.index:
+        unit_name = gens_df.at[gen, "unit"]
         for t in demand_df.index:
-            shut_down_cost.at[t, f"shut_down_{gen}"] = instance.c_down[gen, t].value
-
+            shut_down_cost.at[t, f"shut_down_{unit_name}"] = instance.c_down[gen, t].value
+    
     supp_df = pd.concat([start_up_cost, shut_down_cost], axis=1)
 
     k_values = pd.DataFrame(index=demand_df.index, columns=["k"])

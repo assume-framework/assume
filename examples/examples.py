@@ -75,7 +75,7 @@ available_examples = {
     },
     #
     # DRL references case for learning advancement testing
-    "small_learning_1": {"scenario": "example_02a", "study_case": "base"},
+    "small_learning_1": {"scenario": "example_02a_EE", "study_case": "base"},
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     # DRL cases with lstm instead of mlp as actor neural network architecture
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_learning_with_storage"
+    example = "small_learning_1"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db_8459abd.db"
