@@ -106,7 +106,7 @@ class TorchLearningStrategy(LearningStrategy):
         ).to(self.device)
         self.actor.load_state_dict(params["actor"])
         self.actor.eval()  # set the actor to evaluation mode
-        
+
     def get_actions(self, next_observation):
         """
         Determines actions based on the current observation, applying noise for exploration if in learning mode.
@@ -171,15 +171,15 @@ class TorchLearningStrategy(LearningStrategy):
         return curr_action, noise
 
 
-
-
 class TorchUnitLearningStrategy(TorchLearningStrategy):
     """
     A strategy to enable machine learning with pytorch.
     """
 
     def __init__(self, *args, **kwargs):
-        self.unit_id = kwargs["unit_id"] # TODO: needs to be set before strategy registration
+        self.unit_id = kwargs[
+            "unit_id"
+        ]  # TODO: needs to be set before strategy registration
 
         super().__init__(*args, **kwargs)
 
@@ -187,7 +187,6 @@ class TorchUnitLearningStrategy(TorchLearningStrategy):
         self.min_bid_price = self.learning_config.min_bid_price
         self.max_bid_price = self.learning_config.max_bid_price
 
-        
     def prepare_observations(self, unit, market_id):
         # scaling factors for the observations
         # Note: These scaling factors could be interpreted as information leakage. However as we are in a simulation environment and not a purley forecasting setting
@@ -314,7 +313,6 @@ class TorchUnitLearningStrategy(TorchLearningStrategy):
         """
 
         return np.array([])
-
 
 
 class EnergyLearningStrategy(TorchUnitLearningStrategy, MinMaxStrategy):
@@ -683,7 +681,9 @@ class EnergyLearningStrategy(TorchUnitLearningStrategy, MinMaxStrategy):
         # Dynamic regret scaling:
         # - If accepted volume is positive, apply lower regret (0.1) to avoid punishment for being on the edge of the merit order.
         # - If no dispatch happens, apply higher regret (0.5) to discourage idle behavior, if it could have been profitable.
-        regret_scale = 1 #0.1 if accepted_volume_total > unit.min_power else 0.5 #TODO: revert
+        regret_scale = (
+            1  # 0.1 if accepted_volume_total > unit.min_power else 0.5 #TODO: revert
+        )
 
         # --------------------
         # 4.1 Calculate Reward
@@ -705,15 +705,15 @@ class EnergyLearningStrategy(TorchUnitLearningStrategy, MinMaxStrategy):
             self.learning_role.add_reward_to_cache(
                 unit.id, start, reward, regret, profit
             )
-            
+
+
 class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrategy):
-    
     def __init__(self, *args, **kwargs):
         # 'foresight' represents the number of time steps into the future that we will consider
         # when constructing the observations.
         foresight = kwargs.pop("foresight", 1)
         act_dim = kwargs.pop("act_dim", 1)
-        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 3)
         super().__init__(
             foresight=foresight,
             act_dim=act_dim,
@@ -725,10 +725,14 @@ class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrateg
         # define allowed order types
         self.order_types = kwargs.get("order_types", ["SB"])
         # add max_price of market operator adjustment to avoid non_stationarity
-        self.obs_dim = self.num_timeseries_obs_dim * foresight + unique_obs_dim + 1
-        
+        self.obs_dim = self.num_timeseries_obs_dim * foresight + unique_obs_dim
+
     def create_observation(
-        self, unit: BaseUnit, market_config: MarketConfig, start: datetime, end: datetime
+        self,
+        unit: BaseUnit,
+        market_config: MarketConfig,
+        start: datetime,
+        end: datetime,
     ):
         """
         Constructs a scaled observation tensor based on the unit's forecast data and internal state.
@@ -783,11 +787,13 @@ class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrateg
             )
             / self.max_bid_price
         )
-        
+
         max_bid_price_scaled = market_config.maximum_bid_price / self.max_bid_price
 
         # --- 3. Individual observations ---
-        individual_observations = self.get_individual_observations(unit, start, end)
+        individual_observations = np.append(
+            self.get_individual_observations(unit, start, end), max_bid_price_scaled
+        )
 
         # concat all observations into one array
         observation = np.concatenate(
@@ -795,7 +801,6 @@ class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrateg
                 scaled_res_load_forecast,
                 scaled_price_forecast,
                 scaled_price_history,
-                np.array([max_bid_price_scaled]),
                 individual_observations,
             ]
         )
@@ -811,7 +816,7 @@ class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrateg
             )
 
         return observation
-    
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,

@@ -330,7 +330,9 @@ def make_market_config(
         ),
         opening_duration=pd.Timedelta(market_config_dict["opening_duration"]),
         market_mechanism=market_config_dict["market_mechanism"],
-        maximum_bid_volume=market_config_dict.get("maximum_bid_volume", 1e6), # TODO: there are multiple defaults
+        maximum_bid_volume=market_config_dict.get(
+            "maximum_bid_volume", 1e6
+        ),  # TODO: there are multiple defaults
         maximum_bid_price=market_config_dict.get("maximum_bid_price", 3000),
         minimum_bid_price=market_config_dict.get("minimum_bid_price", -3000),
         maximum_gradient=market_config_dict.get("max_gradient"),
@@ -591,7 +593,9 @@ def load_config_and_create_forecaster(
         buses=buses,
         lines=lines,
         fuel_prices=fuel_prices_df,
-        market_configs=config["markets_config"], # TODO: is the additional learning_config doing any harm?
+        market_configs=config[
+            "markets_config"
+        ],  # TODO: is the additional learning_config doing any harm?
         forecasts=forecasts_df,
         demand=demand_df,
         availability=availability,
@@ -602,12 +606,14 @@ def load_config_and_create_forecaster(
     market_prices, residual_loads = initializer.calculate_market_forecasts()
     congestion_signal, renewable_utilization = initializer.calc_node_forecasts()
     # create forecaster for all maarkets
-    if config["markets_config"]["EOM"]["product_type"] == "energy": # TODO: this is static
-            market_forecaster = BaseForecaster(
-                index=index,
-                market_prices=market_prices,
-                residual_load=residual_loads,
-            )
+    if (
+        config["markets_config"]["EOM"]["product_type"] == "energy"
+    ):  # TODO: this is static
+        market_forecaster = BaseForecaster(
+            index=index,
+            market_prices=market_prices,
+            residual_load=residual_loads,
+        )
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
@@ -803,13 +809,13 @@ def setup_world(
     units_config = config.get("units_config", {})
     units_lc = units_config.get("learning_config", {})
     if units_lc:
-        learning_levels["units"] = dict(units_lc)
+        learning_levels["units"] = units_lc
 
     # Market-level learning config(s) from each market's learning_config
     for market_id, market_cfg in config.get("markets_config", {}).items():
         market_lc = market_cfg.get("learning_config")
         if market_lc:
-            learning_levels["markets"] = dict(market_lc)
+            learning_levels["markets"] = market_lc
             break  # currently supporting one market-level learner
 
     # Apply override logic to each level's dict
@@ -870,7 +876,7 @@ def setup_world(
         end=end,
         save_frequency_hours=save_frequency_hours,
         simulation_id=simulation_id,
-        learning_dict=learning_dict, # TODO: multi-level learning dicts
+        learning_dict=learning_dict,  # TODO: multi-level learning dicts
         episode=episode,
         eval_episode=eval_episode,
         bidding_params=bidding_params,
@@ -880,7 +886,7 @@ def setup_world(
     # get the market config from the config file and add the markets
     logger.info("Adding markets")
     for market_id, market_config_dict in config["markets_config"].items():
-        market_config = make_market_config( # TODO: move up?
+        market_config = make_market_config(  # TODO: move up?
             id=market_id,
             market_config_dict=market_config_dict,
             world_start=start,
@@ -987,7 +993,9 @@ def setup_world(
     if (
         world.learning_mode
         and world.learning_role is not None
-        and not any(world.learning_role.rl_strats[level] for level in world.learning_role.levels)
+        and not any(
+            world.learning_role.rl_strats[level] for level in world.learning_role.levels
+        )
     ):
         raise ValueError("No RL units/strategies were provided!")
 
@@ -1133,7 +1141,9 @@ def run_learning(
     continue_learning = world.learning_role.shared_config.continue_learning
     checked_paths = set()
     for level in world.learning_role.active_levels:
-        save_path = world.learning_role.learning_config[level].trained_policies_save_path
+        save_path = world.learning_role.learning_config[
+            level
+        ].trained_policies_save_path
         if save_path and save_path not in checked_paths:
             confirm_learning_save_path(save_path, continue_learning)
             checked_paths.add(save_path)
@@ -1176,16 +1186,22 @@ def run_learning(
     for level, freq in train_freq_per_level.items():
         if freq is not None:
             if level == "units" and "units_config" in world.scenario_data["config"]:
-                world.scenario_data["config"]["units_config"].setdefault("learning_config", {})["train_freq"] = freq
+                world.scenario_data["config"]["units_config"].setdefault(
+                    "learning_config", {}
+                )["train_freq"] = freq
             elif level == "markets":
-                for mkt_id, mkt_cfg in world.scenario_data["config"].get("markets_config", {}).items():
+                for mkt_id, mkt_cfg in (
+                    world.scenario_data["config"].get("markets_config", {}).items()
+                ):
                     if "learning_config" in mkt_cfg:
                         mkt_cfg["learning_config"]["train_freq"] = freq
 
     eval_episode = 1
 
     training_episodes = world.learning_role.shared_config.training_episodes
-    episodes_collecting = world.learning_role.shared_config.episodes_collecting_initial_experience # TODO: move to level-wise
+    episodes_collecting = (
+        world.learning_role.shared_config.episodes_collecting_initial_experience
+    )  # TODO: move to level-wise
 
     for episode in tqdm(
         range(1, training_episodes + 1),
@@ -1212,8 +1228,7 @@ def run_learning(
         # evaluation run:
         if (
             episode % validation_interval == 0
-            and episode
-            >= episodes_collecting + validation_interval
+            and episode >= episodes_collecting + validation_interval
         ):
             world.reset()
 
@@ -1277,19 +1292,28 @@ def run_learning(
         cfg = world.learning_role.learning_config[level]
         load_path = f"{cfg.trained_policies_save_path}/last_policies"
         if level == "units" and "units_config" in world.scenario_data["config"]:
-            world.scenario_data["config"]["units_config"].setdefault("learning_config", {})["trained_policies_load_path"] = load_path
+            world.scenario_data["config"]["units_config"].setdefault(
+                "learning_config", {}
+            )["trained_policies_load_path"] = load_path
         elif level == "markets":
-            for mkt_id, mkt_cfg in world.scenario_data["config"].get("markets_config", {}).items():
+            for mkt_id, mkt_cfg in (
+                world.scenario_data["config"].get("markets_config", {}).items()
+            ):
                 if "learning_config" in mkt_cfg:
                     mkt_cfg["learning_config"]["trained_policies_load_path"] = load_path
-    # Also write a fallback for old-style flat config
-    if "learning_config" in world.scenario_data["config"]:
-        first_level = world.learning_role.active_levels[0] if world.learning_role.active_levels else None
-        if first_level:
-            cfg = world.learning_role.learning_config[first_level]
-            world.scenario_data["config"]["learning_config"]["trained_policies_load_path"] = (
-                f"{cfg.trained_policies_save_path}/last_policies"
+    # Fallback for old-style flat config (no per-level learning configs)
+    if not world.learning_role.active_levels:
+        if "learning_config" in world.scenario_data["config"]:
+            first_level = (
+                list(world.learning_role.learning_config.keys())[0]
+                if world.learning_role.learning_config
+                else None
             )
+            if first_level:
+                cfg = world.learning_role.learning_config[first_level]
+                world.scenario_data["config"]["learning_config"][
+                    "trained_policies_load_path"
+                ] = f"{cfg.trained_policies_save_path}/last_policies"
 
     # load scenario for evaluation
     setup_world(
