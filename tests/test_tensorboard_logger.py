@@ -105,28 +105,31 @@ def test_update_tensorboard_training_mode(
         learning_mode=True,
     )
     logger.db = mock_db
-    logger.writer = mock_writer
+    # Inject mock writer for the "units" level (default)
+    logger.writers["units"] = mock_writer
 
-    # Execute
-    logger.update_tensorboard()
+    # Mock _get_rl_levels to avoid DB introspection
+    with patch.object(logger, "_get_rl_levels", return_value=["units"]):
+        # Execute
+        logger.update_tensorboard()
 
-    # Verify
-    assert mock_writer.add_scalar.called
-    # Verify specific metrics were logged
-    calls = mock_writer.add_scalar.call_args_list
-    metrics_logged = [call[0][0] for call in calls]
-    expected_metrics = [
-        "02_train/01_episode_reward",
-        "02_train/02_reward",
-        "02_train/03_profit",
-        "02_train/04_regret",
-        "02_train/05_noise",
-        "03_grad/06_learning_rate",
-        "03_grad/07_actor_loss",
-        "03_grad/08_actor_total_grad_norm",
-        "03_grad/09_actor_max_grad_norm",
-        "03_grad/10_critic_loss",
-        "03_grad/11_critic_total_grad_norm",
-        "03_grad/12_critic_max_grad_norm",
-    ]
-    assert all(metric in metrics_logged for metric in expected_metrics)
+        # Verify
+        assert mock_writer.add_scalar.called
+        # Verify specific metrics were logged
+        calls = mock_writer.add_scalar.call_args_list
+        metrics_logged = [call[0][0] for call in calls]
+        expected_metrics = [
+            "02_train/01_episode_reward",
+            "02_train/02_reward",
+            "02_train/03_profit",
+            "02_train/04_regret",
+            "02_train/05_noise",
+            "03_grad/06_learning_rate",
+            "03_grad/07_actor_loss",
+            "03_grad/08_actor_total_grad_norm",
+            "03_grad/09_actor_max_grad_norm",
+            "03_grad/10_critic_loss",
+            "03_grad/11_critic_total_grad_norm",
+            "03_grad/12_critic_max_grad_norm",
+        ]
+        assert all(metric in metrics_logged for metric in expected_metrics)

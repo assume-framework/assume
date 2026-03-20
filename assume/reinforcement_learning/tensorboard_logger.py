@@ -113,7 +113,7 @@ class TensorBoardLogger:
             episodes_collecting_initial_experience
         )
 
-        self.writer = None  # Delay creation of SummaryWriter
+        self.writers: dict[str, SummaryWriter] = {}  # per-level writers
         self.db_uri = db_uri
         if self.db_uri:
             self.db = create_engine(self.db_uri)
@@ -121,37 +121,72 @@ class TensorBoardLogger:
         # get episode number if in learning or evaluation mode
         self.episode = episode if not evaluation_mode else eval_episode
 
-    def update_tensorboard(self):
-        """Store episodic evaluation data in tensorboard"""
-        if not self.learning_mode or not self.db_uri:
-            return
-
-        if self.writer is None:
-            self.writer = SummaryWriter(
-                log_dir=os.path.join("tensorboard", self.simulation_id)
+    def _get_writer(self, level: str) -> SummaryWriter:
+        """Get or create a SummaryWriter for the given level."""
+        if level not in self.writers:
+            self.writers[level] = SummaryWriter(
+                log_dir=os.path.join("tensorboard", self.simulation_id, level)
             )
+        return self.writers[level]
 
-        mode = "02_train" if not self.evaluation_mode else "01_eval"
+    def _get_rl_levels(self) -> list[str]:
+        """Discover all levels from the level column in the rl_params table."""
+        try:
+            df = pd.read_sql(
+                f"SELECT DISTINCT level FROM rl_params WHERE simulation = '{self.simulation_id}'",
+                self.db,
+            )
+            levels = df["level"].tolist()
+        except Exception:
+            levels = []
+        return levels if levels else ["units"]  # fallback for backward compat
 
-        ##############################
-        # Values per simulation step #
-        ##############################
-        # Dynamically detect noise columns in database
+    def _get_table_columns(self, table: str) -> list[str]:
+        """Get column names for a table."""
         query_columns = (
-            "PRAGMA table_info(rl_params)"
+            f"PRAGMA table_info({table})"
             if self.db.dialect.name == "sqlite"
-            else """
+            else f"""
             SELECT column_name FROM information_schema.columns
-            WHERE table_name = 'rl_params'
+            WHERE table_name = '{table}'
         """
         )
         columns_df = pd.read_sql(query_columns, self.db)
-
-        column_names = (
+        return (
             columns_df["name"].tolist()
             if self.db.dialect.name == "sqlite"
             else columns_df["column_name"].tolist()
         )
+
+    def update_tensorboard(self):
+        """Store episodic evaluation data in tensorboard, per level."""
+        if not self.learning_mode or not self.db_uri:
+            return
+
+        mode = "02_train" if not self.evaluation_mode else "01_eval"
+
+        levels = self._get_rl_levels()
+
+        for level in levels:
+            self._update_tensorboard_for_level(level, mode)
+
+    def _update_tensorboard_for_level(self, level: str, mode: str):
+        """Store episodic evaluation data for a single level."""
+        rl_params_table = "rl_params"
+        rl_grad_table = "rl_grad_params"
+        writer = self._get_writer(level)
+
+        ##############################
+        # Values per simulation step #
+        ##############################
+        try:
+            column_names = self._get_table_columns(rl_params_table)
+        except Exception:
+            logger.warning(
+                f"Table {rl_params_table} not found, skipping level '{level}'"
+            )
+            return
+
         noise_columns = [
             col for col in column_names if col.startswith("exploration_noise_")
         ]
@@ -187,10 +222,11 @@ class TensorBoardLogger:
         query_sim = f"""
             SELECT
                 {", ".join(query_parts)}
-            FROM rl_params
+            FROM {rl_params_table}
             WHERE episode = '{self.episode}'
             AND simulation = '{self.simulation_id}'
             AND evaluation_mode = {self.evaluation_mode}
+            AND level = '{level}'
             GROUP BY dt, unit
             ORDER BY dt
         """
@@ -214,10 +250,11 @@ class TensorBoardLogger:
         query_grad = (
             f"""
             SELECT {rl_grad_columns}
-            FROM rl_grad_params
+            FROM {rl_grad_table}
             WHERE episode = '{self.episode}'
             AND simulation = '{self.simulation_id}'
             AND evaluation_mode = {self.evaluation_mode}
+            AND level = '{level}'
             GROUP BY step, unit
             ORDER BY step
             """
@@ -229,7 +266,7 @@ class TensorBoardLogger:
         try:
             # Add TensorBoard introduction text only in the first training episode
             if self.episode == 1 and mode == "02_train":
-                self.writer.add_text("TensorBoard Introduction", tensorboard_intro)
+                writer.add_text("TensorBoard Introduction", tensorboard_intro)
 
             ##############################
             # Values per simulation step #
@@ -289,7 +326,7 @@ class TensorBoardLogger:
                 # Log metrics in the specified order using prefixed names
                 for prefixed_name, metric in metric_order_sim.items():
                     if metric in metric_dicts_sim:
-                        self.writer.add_scalar(
+                        writer.add_scalar(
                             f"{mode}/{prefixed_name}",
                             metric_dicts_sim[metric]["avg"],
                             x_index + i,
@@ -332,7 +369,7 @@ class TensorBoardLogger:
                 for step, row in grouped_data_grad.iterrows():
                     for prefixed_name, metric_col in metric_order_grad.items():
                         value = row.get(metric_col, default_values[metric_col])
-                        self.writer.add_scalar(f"03_grad/{prefixed_name}", value, step)
+                        writer.add_scalar(f"03_grad/{prefixed_name}", value, step)
 
                 # Handle missing steps (i.e., if a column was missing entirely)
                 all_steps = df_grad["step"].unique()
@@ -341,7 +378,7 @@ class TensorBoardLogger:
 
                 for step in missing_steps:
                     for prefixed_name, metric_col in metric_order_grad.items():
-                        self.writer.add_scalar(f"03_grad/{prefixed_name}", 0.0, step)
+                        writer.add_scalar(f"03_grad/{prefixed_name}", 0.0, step)
 
             episode_index = (
                 self.episode - self.episodes_collecting_initial_experience
@@ -350,23 +387,25 @@ class TensorBoardLogger:
             )
             # Log episode-level reward
             episode_reward_avg = df_sim.groupby("unit")["reward"].sum().mean()
-            self.writer.add_scalar(
+            writer.add_scalar(
                 f"{mode}/01_episode_reward",
                 episode_reward_avg,
                 episode_index,
             )
 
         except (ProgrammingError, OperationalError, DataError) as db_error:
-            logger.error(f"Database error while reading query: {db_error}")
+            logger.error(f"Database error for level '{level}': {db_error}")
             return
         except Exception as e:
-            logger.error(f"Unexpected error in update_tensorboard: {e}")
+            logger.error(
+                f"Unexpected error in update_tensorboard for level '{level}': {e}"
+            )
             return
 
     def __del__(self):
         """
-        Deletes the WriteOutput instance.
+        Cleans up all SummaryWriter instances.
         """
-        if hasattr(self, "writer") and self.writer is not None:
-            self.writer.flush()
-            self.writer.close()
+        for writer in getattr(self, "writers", {}).values():
+            writer.flush()
+            writer.close()
