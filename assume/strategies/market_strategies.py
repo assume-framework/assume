@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import numpy as np
 import torch as th
@@ -143,10 +143,12 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         self.initial_max_bid_price = self.market_role.marketconfig.maximum_bid_price
 
         # Per-episode accumulators (reset each episode in adjust_market_config)
-        self._episode_total_cost = 0.0
-        self._episode_total_energy = 0.0
-        self._episode_price_penalty = 0.0
-        self._episode_n_products = 0
+        self._episode_sw = 0.0  # realised weighted social welfare
+        self._episode_max_sw = (
+            0.0  # maximum attainable SW (all demand served at zero cost)
+        )
+        self._episode_price_volume = 0.0  # sum of P* * Q* across clearings
+        self._episode_cleared_volume = 0.0  # sum of Q* across clearings
 
     def prepare_observations(self, market):
         """
@@ -209,7 +211,7 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         # =============================================================================
         # 1.1 Get the Observations, which are the basis of the action decision
         # =============================================================================
-        # as market learning only changes market wokrings one per episode the forecast is always the entrie episode from start to end
+        # as market learning only changes market wokrings one per episode the forecast is always the entire episode from start to end
         foresight = int((end - start).total_seconds() / 3600)  # convert to hours
         # --- 1. Forecasted residual load and price (forward-looking) ---
         scaled_res_load_forecast_max = self.scaled_res_load_obs.window(
@@ -241,10 +243,11 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         """Adjusts the market configuration by setting the maximum bid price based on the action taken."""
 
         # Reset episode accumulators at the start of each episode
-        self._episode_total_cost = 0.0
-        self._episode_total_energy = 0.0
-        self._episode_price_penalty = 0.0
-        self._episode_n_products = 0
+        self._episode_sw = 0.0
+        self._episode_max_sw = 0.0
+        self._episode_error = 0.0
+        self._episode_price_volume = 0.0
+        self._episode_cleared_volume = 0.0
 
         next_observation = self.create_observation(
             market_id=self.market_role.marketconfig.market_id,
@@ -255,7 +258,7 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
 
         self.market_role.marketconfig.maximum_bid_price = (
             actions[0]
-            * 200  # TODO: what scaling for reduced action space instead of [-3000, 3000]
+            * 100  # TODO: what scaling for reduced action space instead of [-3000, 3000]
         )
 
         logger.info(
@@ -267,80 +270,132 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
                 self.unit_id, self.learning_role.start_datetime, actions, noise
             )
 
-    def calculate_reward(self, accepted_orderbook, market_meta):
+    def calculate_reward(self, orderbook, market_meta):
         """
-        Calculate reward that minimizes overall system costs and punishes market power abuse.
+        Calculate reward using a weighted social welfare (SW) function.
 
-        Called after every clearing (e.g., once per hour). Accumulates cost and market power
-        metrics internally, then writes the final reward to the learning role at episode end.
+        Called after every clearing (e.g., once per hour). Accumulates SW internally,
+        then writes the normalised reward to the learning role at episode end.
 
-        The reward has two components:
-        1. **Cost component**: Negative of total procurement cost normalized per MWh.
-           Lower system cost -> higher reward.
-        2. **Market power penalty**: For each cleared product, compares the realized clearing
-           price to the merit-order price forecast. Penalizes when clearing price exceeds
-           the forecast, indicating potential market power abuse.
+        The SW formula is the discrete analogue of equation (5) from the price-cap
+        literature:
+
+            SW = alpha  * sum_{accepted demand}  price_d * |v_d*|
+               - (1-alpha) * sum_{accepted supply}  price_s * v_s*
+               + (1 - 2*alpha) * P* * Q*
+
+        where alpha in [0,1] encodes the regulator's preference:
+          - alpha = 1  -> pure consumer welfare (penalises high P*)
+          - alpha = 0  -> pure producer welfare (rewards high P*)
+          - alpha = 0.5 -> standard allocative efficiency (transfer term cancels)
+
+        Lost load is handled implicitly: rejected demand orders have accepted_volume=0,
+        so their bid value is never added to SW. With alpha > 0.5 these forgone values
+        cost more than the supply savings, naturally discouraging a cap that causes
+        lost load without any hand-tuned penalty weight.
+
+        The reward submitted to the learning role is SW / max_SW, normalised to (-inf, 1].
 
         Args:
-            accepted_orderbook (list[dict]): Orders accepted in this clearing.
+            orderbook (list[dict]): All orders in the market (accepted and rejected).
             market_meta (list[dict]): Clearing metadata per product (prices, volumes, etc.).
         """
-        if not market_meta:
+        if not orderbook and not market_meta:
             return 0.0
 
-        market_id = self.market_role.marketconfig.market_id
-        price_forecast = self.market_role.forecaster.price[market_id]
+        # alpha in [0, 1]: 1 = pure consumer welfare, 0 = pure producer welfare,
+        # 0.5 = standard allocative efficiency (transfer term cancels).
+        # Values > 0.5 penalise high clearing prices (market power).
+        alpha = 1
+        # price_penalty_weight controls how strongly the agent is penalised for
+        # high clearing prices, independently of VOLL.  With alpha=1 and VOLL=3000,
+        # the raw transfer term is ~1% of max_sw for typical prices.  A weight of
+        # e.g. 30 makes a 50€/MWh clearing price cost ~40% of max_sw, giving the
+        # agent a meaningful gradient to reduce prices.
+        price_penalty_weight = 1
+        sw = 0.0
+        max_sw = 0.0
+        error = 0.0
+        price_volume = 0.0
+        cleared_volume = 0.0
 
+        # --- Demand side ---
+        # Accepted demand contributes alpha * bid_price * accepted_volume.
+        # Rejected demand contributes 0 — this is the implicit lost-load penalty.
+        # max_sw is the theoretical SW ceiling: all demand served AND clearing price=0
+        # (zero-cost supply, e.g. fully renewable dispatch). The demand bid price is VOLL
+        # (e.g. 3000 €/MWh), so max_sw = alpha * VOLL * Q_demand. This makes the
+        # normalised reward = (Q*/Q_D) * (1 - P*/VOLL), the product of service ratio
+        # and price efficiency, both in [0,1].
+        for order in orderbook:
+            if order["volume"] < 0:
+                accepted_vol = abs(order.get("accepted_volume") or 0.0)
+                bid_vol = abs(order["volume"])
+                sw += alpha * order["price"] * accepted_vol
+                max_sw += alpha * order["price"] * bid_vol
+
+        # --- Supply side ---
+        # Accepted supply subtracts (1-alpha) * bid_price * accepted_volume (supply cost).
+        for order in orderbook:
+            if order["volume"] > 0:
+                accepted_vol = order.get("accepted_volume") or 0.0
+                sw -= (1 - alpha) * order["price"] * accepted_vol
+
+        # --- Transfer term (per product from market_meta) ---
+        # (1 - 2*alpha) * P* * Q*: positive when alpha < 0.5 (favour producers),
+        # negative when alpha > 0.5 (penalise high clearing prices / market power).
+        # With price_penalty_weight the transfer term is amplified so price
+        # changes are visible relative to the VOLL-dominated demand value.
         for meta in market_meta:
-            duration_hours = (meta["product_end"] - meta["product_start"]) / timedelta(
-                hours=1
-            )
             clearing_price = meta.get("price", 0.0)
-            supply_volume = meta.get("supply_volume", 0.0)
+            meta_cleared_volume = meta.get("supply_volume", 0.0)
+            sw += (
+                price_penalty_weight
+                * (1 - 2 * alpha)
+                * clearing_price
+                * meta_cleared_volume
+            )
+            price_volume += clearing_price * meta_cleared_volume
+            cleared_volume += meta_cleared_volume
 
-            # Accumulate total system cost
-            self._episode_total_cost += clearing_price * supply_volume * duration_hours
-            self._episode_total_energy += meta.get("supply_volume_energy", 0.0)
+            forecast_price = 36.2 + self.scaled_prices_obs[meta["product_start"]] * (
+                55.7 - 36.2
+            )
+            error += -1 * max(
+                (clearing_price - forecast_price) / forecast_price, 0
+            )  # TODO: handle zero forecast price case?
 
-            # Compare clearing price to merit-order forecast price
-            merit_price = price_forecast.at[meta["product_start"]]
-            price_excess = max(clearing_price - merit_price, 0.0)
-            # Normalize by initial max bid price so penalty is in [0, 1] range
-            self._episode_price_penalty += price_excess / self.initial_max_bid_price
-            self._episode_n_products += 1
+        self._episode_sw += sw
+        self._episode_max_sw += max_sw
+        self._episode_price_volume += price_volume
+        self._episode_cleared_volume += cleared_volume
 
-        # Only compute and submit the final reward at the end of the episode
-        last_product_end = market_meta[-1]["product_end"]
+        self._episode_error += error
+
+        # Only compute and submit the final reward at the end of the episode.
+        if market_meta:
+            last_product_end = market_meta[-1]["product_end"]
+        else:
+            last_product_end = max(order["end_time"] for order in orderbook)
 
         from assume.common.utils import datetime2timestamp
 
         if datetime2timestamp(last_product_end) < self.learning_role.end:
             return 0.0
 
-        # --- Final reward computation ---
-        # 1. Cost component: average cost per MWh, scaled to [-1, 0] range
-        avg_cost = (
-            self._episode_total_cost / self._episode_total_energy
-            if self._episode_total_energy > 0
-            else 0.0
+        # Normalise by max attainable SW so the reward is in (-inf, 1].
+        # A reward of 1 means perfect welfare (all demand served, zero supply cost).
+        reward = (
+            self._episode_sw / self._episode_max_sw if self._episode_max_sw > 0 else 0.0
         )
-        cost_reward = -avg_cost / self.initial_max_bid_price
+        reward = (
+            self._episode_error + 2 * reward
+        )  # TODO: consider how to best combine error and SW into a single reward signal, e.g. with a weighting factor
 
-        # 2. Market power penalty: average price excess across all products
-        avg_price_penalty = (
-            self._episode_price_penalty / self._episode_n_products
-            if self._episode_n_products > 0
-            else 0.0
-        )
-
-        market_power_weight = 1.0
-        reward = -market_power_weight * avg_price_penalty
-
-        # Write to learning role
         start = self.learning_role.start_datetime
         if self.learning_mode:
             self.learning_role.add_reward_to_cache(
-                self.unit_id, start, reward, avg_price_penalty, -avg_cost
-            )
+                self.unit_id, start, reward, self._episode_sw, self._episode_max_sw
+            ) # logging episode SW and max SW just as placeholders
 
         return reward
