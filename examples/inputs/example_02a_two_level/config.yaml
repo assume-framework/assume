@@ -3,17 +3,17 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 tiny:
-  simulation_id: 02a_two_level_debug
+  simulation_id: 02a_two_level_ok_results
   start_date: 2019-03-01 00:00
-  end_date: 2019-03-02 00:00
+  end_date: 2019-03-03 00:00
   time_step: 1h
   save_frequency_hours: null
   seed: null
 
   # shared / top-level learning parameters
   learning_config:
-    training_episodes: 200
-    episodes_collecting_initial_experience: 20
+    training_episodes: 400
+    episodes_collecting_initial_experience: 40
     device: cpu
     validation_episodes_interval: 5
 
@@ -27,7 +27,7 @@ tiny:
       max_bid_price: 100
       algorithm: matd3
       learning_rate: 0.00005
-      train_freq: 1h
+      train_freq: 12h
       gradient_steps: 24
       batch_size: 64
       gamma: 0.99
@@ -62,9 +62,9 @@ tiny:
         trained_policies_load_path: null
         max_bid_price: 100
         algorithm: matd3
-        learning_rate: 0.001
+        learning_rate: 0.0001
         train_freq: 24h
-        gradient_steps: 24
+        gradient_steps: 10
         batch_size: 64
         gamma: 0.99
         noise_sigma: 0.1
