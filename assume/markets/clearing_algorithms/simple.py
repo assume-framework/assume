@@ -75,6 +75,21 @@ class PayAsClearRole(MarketRole):
                 rejected_product_orders.extend(product_orders)
                 # logger.debug(f'found unwanted bids for {product} should be {market_products}')
                 continue
+            # reject orders with bid price out of bounds [min_bid_price, max_bid_price
+            oub_orders = [
+                order
+                for order in product_orders
+                if (
+                    order["price"] < self.marketconfig.minimum_bid_price
+                    or order["price"] > self.marketconfig.maximum_bid_price
+                )
+                and order["volume"]
+                > 0  # only for supply orders so that results in uncleared demand?
+            ]
+            rejected_product_orders.extend(oub_orders)
+            product_orders = [
+                order for order in product_orders if order not in oub_orders
+            ]  # TODO: also for other clearing mechanisms?
 
             supply_orders = [x for x in product_orders if x["volume"] > 0]
             demand_orders = [x for x in product_orders if x["volume"] < 0]
@@ -156,9 +171,10 @@ class PayAsClearRole(MarketRole):
 
             # set clearing price - merit order - uniform pricing
             if accepted_supply_orders:
-                clear_price = float(
-                    max(map(itemgetter("price"), accepted_supply_orders))
-                )
+                clear_price = min(
+                    float(max(map(itemgetter("price"), accepted_supply_orders))),
+                    self.marketconfig.maximum_bid_price,
+                )  # cap it at maximum bid price to avoid outliers, can also be self.marketconfig.minimum_bid_price..?
             else:
                 clear_price = 0
 

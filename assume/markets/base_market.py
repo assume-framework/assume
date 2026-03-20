@@ -374,18 +374,16 @@ class MarketRole(MarketMechanism, Role):
 
         # Process separated orders
         sep_orders = separate_orders(orderbook.copy())
-        for order in sep_orders: # TODO: how to overwrite values?
+        for order in sep_orders:  # TODO: how to overwrite values?
             # Adjust order price if it exceeds max_price or is below min_price
             if order["price"] > max_price:
                 logger.warning(
-                    f"Order price {order['price']} exceeds maximum price {max_price} in market '{market_id}'. Setting to max_price."
+                    f"Order price {order['price']} exceeds maximum price {max_price} in market '{market_id}'."
                 )
-                order["price"] = max_price
             elif order["price"] < min_price:
                 logger.warning(
-                    f"Order price {order['price']} is below minimum price {min_price} in market '{market_id}'. Setting to min_price."
+                    f"Order price {order['price']} is below minimum price {min_price} in market '{market_id}'."
                 )
-                order["price"] = min_price
 
             # Check that the product is part of an open auction
             product = (order["start_time"], order["end_time"], order["only_hours"])
@@ -735,7 +733,7 @@ class MarketRole(MarketMechanism, Role):
 
         if self.learning_strategy is not None:
             self.learning_strategy.calculate_reward(
-                accepted_orderbook=accepted_orderbook,
+                orderbook=accepted_orderbook + rejected_orderbook,
                 market_meta=market_meta,
             )
 
