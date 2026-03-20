@@ -41,7 +41,7 @@ services:
     environment:
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_AUTH_ANONYMOUS_ENABLED: "true"
-      GF_INSTALL_PLUGINS: "marcusolsson-dynamictext-panel,orchestracities-map-panel"
+      GF_INSTALL_PLUGINS: "marcusolsson-dynamictext-panel,orchestracities-map-panel,volkovlabs-variable-panel"
       GF_SECURITY_ADMIN_USER: assume
       GF_SECURITY_ADMIN_PASSWORD: "assume"
       GF_RENDERING_SERVER_URL: http://renderer:8081/render

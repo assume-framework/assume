@@ -251,7 +251,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "WITH rewards_by_unit AS (\n    SELECT \n        episode,\n        unit, \n        SUM(reward) AS total_reward\n    FROM rl_params\n    WHERE simulation = '${simulation}'\n      AND evaluation_mode = FALSE\n    GROUP BY episode, unit\n),\nepisode_avg_rewards AS (\n    SELECT \n        episode, \n        SUM(total_reward) / COUNT(DISTINCT unit) AS avg_reward\n    FROM rewards_by_unit\n    GROUP BY episode\n)\nSELECT episode, avg_reward\nFROM episode_avg_rewards\nORDER BY episode;",
+          "rawSql": "WITH rewards_by_unit AS (\n    SELECT \n        episode,\n        unit, \n        SUM(reward) AS total_reward, \n        level\n    FROM rl_params\n    WHERE simulation = '${simulation}'\n      AND evaluation_mode = FALSE\n    GROUP BY episode, unit, level\n),\nepisode_avg_rewards AS (\n    SELECT \n        episode, \n        SUM(total_reward) / COUNT(DISTINCT unit) AS avg_reward, \n        level\n    FROM rewards_by_unit\n    GROUP BY episode, level\n)\nSELECT level, episode, avg_reward\nFROM episode_avg_rewards\nORDER BY episode;",
           "refId": "A",
           "select": [
             [
@@ -332,7 +332,7 @@
           "id": "partitionByValues",
           "options": {
             "fields": [
-              "unit"
+              "level"
             ],
             "keepFields": false,
             "naming": {
@@ -450,7 +450,7 @@
           "group": [],
           "metricColumn": "simulation",
           "rawQuery": true,
-          "rawSql": "WITH rewards_by_unit AS (\n    SELECT \n        episode,\n        unit, \n        SUM(reward) AS total_reward\n    FROM rl_params\n    WHERE simulation = '${simulation}'\n      AND evaluation_mode = TRUE\n    GROUP BY episode, unit\n),\nepisode_avg_rewards AS (\n    SELECT \n        episode, \n        SUM(total_reward) / COUNT(DISTINCT unit) AS avg_reward\n    FROM rewards_by_unit\n    GROUP BY episode\n)\nSELECT episode, avg_reward\nFROM episode_avg_rewards\nORDER BY episode;",
+          "rawSql": "WITH rewards_by_unit AS (\n    SELECT \n        episode,\n        unit, \n        SUM(reward) AS total_reward, \n        level\n    FROM rl_params\n    WHERE simulation = '${simulation}'\n      AND evaluation_mode = TRUE\n    GROUP BY episode, unit, level\n),\nepisode_avg_rewards AS (\n    SELECT \n        episode, \n        SUM(total_reward) / COUNT(DISTINCT unit) AS avg_reward,\n        level\n    FROM rewards_by_unit\n    GROUP BY episode, level\n)\nSELECT level, episode, avg_reward\nFROM episode_avg_rewards\nORDER BY episode;",
           "refId": "A",
           "select": [
             [
@@ -531,7 +531,7 @@
           "id": "partitionByValues",
           "options": {
             "fields": [
-              "unit"
+              "level"
             ],
             "keepFields": false,
             "naming": {
@@ -1352,17 +1352,524 @@
       "type": "xychart"
     },
     {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlRd",
+            "seriesBy": "last"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "pointShape": "circle",
+            "pointSize": {
+              "fixed": 5
+            },
+            "pointStrokeWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "show": "points"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "series_label"
+            },
+            "properties": []
+          },
+          {
+            "__systemRef": "hideSeriesFrom",
+            "matcher": {
+              "id": "byNames",
+              "options": {
+                "mode": "exclude",
+                "names": [
+                  "reward_mean pp_6 · actions_0"
+                ],
+                "prefix": "All except:",
+                "readOnly": true
+              }
+            },
+            "properties": [
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": true,
+                  "viz": true
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "id": 56,
+      "maxPerRow": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "mapping": "auto",
+        "series": [
+          {
+            "color": {
+              "matcher": {
+                "id": "byName",
+                "options": "episode"
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "action_mean"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "reward_mean"
+              }
+            }
+          }
+        ],
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.2.1",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH unpivoted AS (\r\n    SELECT\r\n        episode,\r\n        unit,\r\n        reward,\r\n        kv.key                         AS action_col,\r\n        kv.value::double precision     AS action_value\r\n    FROM rl_params,\r\n    LATERAL (\r\n        SELECT key, value\r\n        FROM jsonb_each_text(to_jsonb(rl_params))\r\n        WHERE key LIKE 'actions_%'\r\n          AND value IS NOT NULL\r\n    ) AS kv\r\n    WHERE simulation = '${simulation}'\r\n      AND evaluation_mode = FALSE\r\n      AND unit IN (${rl_unit})\r\n),\r\nepisode_scatter AS (\r\n    SELECT\r\n        episode,\r\n        unit || ' · ' || action_col    AS series_label,\r\n        AVG(action_value)              AS action_mean,\r\n        AVG(reward)                    AS reward_mean\r\n    FROM unpivoted\r\n    GROUP BY episode, unit, action_col\r\n),\r\nepisode_scaled AS (\r\n    SELECT\r\n        series_label,\r\n        episode,\r\n        action_mean,\r\n        reward_mean\r\n    FROM episode_scatter\r\n)\r\nSELECT series_label, action_mean, reward_mean, episode\r\nFROM episode_scaled\r\nORDER BY series_label, episode;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Progression of mean training ACTION VS. REWARD",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "series_label"
+            ],
+            "keepFields": true,
+            "naming": {
+              "asLabels": true
+            }
+          }
+        }
+      ],
+      "type": "xychart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-YlRd",
+            "seriesBy": "last"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "pointShape": "circle",
+            "pointSize": {
+              "fixed": 5
+            },
+            "pointStrokeWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "show": "points"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "series_label"
+            },
+            "properties": []
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "id": 55,
+      "maxPerRow": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "mapping": "auto",
+        "series": [
+          {
+            "color": {
+              "matcher": {
+                "id": "byName",
+                "options": "episode"
+              }
+            },
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "action_mean"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "reward_mean"
+              }
+            }
+          }
+        ],
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.2.1",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH unpivoted AS (\r\n    SELECT\r\n        episode,\r\n        unit,\r\n        reward,\r\n        kv.key                         AS action_col,\r\n        kv.value::double precision     AS action_value\r\n    FROM rl_params,\r\n    LATERAL (\r\n        SELECT key, value\r\n        FROM jsonb_each_text(to_jsonb(rl_params))\r\n        WHERE key LIKE 'actions_%'\r\n          AND value IS NOT NULL\r\n    ) AS kv\r\n    WHERE simulation = '${simulation}'\r\n      AND evaluation_mode = TRUE\r\n      AND unit IN (${rl_unit})\r\n),\r\nepisode_scatter AS (\r\n    SELECT\r\n        episode,\r\n        unit || ' · ' || action_col    AS series_label,\r\n        AVG(action_value)              AS action_mean,\r\n        AVG(reward)                    AS reward_mean\r\n    FROM unpivoted\r\n    GROUP BY episode, unit, action_col\r\n),\r\nepisode_scaled AS (\r\n    SELECT\r\n        series_label,\r\n        episode,\r\n        action_mean,\r\n        reward_mean,\r\n        (episode - MIN(episode) OVER ())::double precision\r\n        / NULLIF((MAX(episode) OVER () - MIN(episode) OVER ()), 0)\r\n            AS episode_intensity\r\n    FROM episode_scatter\r\n)\r\nSELECT series_label, action_mean, reward_mean, episode\r\nFROM episode_scaled\r\nORDER BY series_label, episode;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Progression of evaluation mean ACTION VS. REWARD",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "series_label"
+            ],
+            "keepFields": true,
+            "naming": {
+              "asLabels": true
+            }
+          }
+        }
+      ],
+      "type": "xychart"
+    },
+    {
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 48
       },
       "id": 42,
       "panels": [],
       "title": "Per episode per unit",
       "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "color",
+              "thresholds": []
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 12,
+        "x": 0,
+        "y": 49
+      },
+      "id": 53,
+      "options": {
+        "alertCustomMessage": "",
+        "alwaysVisibleFilter": false,
+        "autoScroll": false,
+        "browserTabNamePattern": "",
+        "collapsedByDefault": false,
+        "customValue": false,
+        "displayMode": "slider",
+        "emptyValue": false,
+        "favorites": {
+          "enabled": false,
+          "storage": "browser"
+        },
+        "filter": false,
+        "groupSelection": false,
+        "header": true,
+        "isMinimizeForTable": false,
+        "isMinimizeViewShowCustomIcon": false,
+        "isPinTabsEnabled": false,
+        "isUseLocalTime": false,
+        "minimizeOutputFormat": "text",
+        "minimizeViewCustomIcon": "",
+        "minimizeViewNativeIcon": "gf-movepane-right",
+        "padding": 10,
+        "persistent": false,
+        "requestLatency": "low",
+        "saveSelectedGroup": false,
+        "saveSelectedGroupKey": "",
+        "selectedValues": {
+          "showSelected": false
+        },
+        "showGroupTotal": false,
+        "showLabel": true,
+        "showName": false,
+        "showResetButton": false,
+        "showTotal": false,
+        "statusSort": false,
+        "tableViewPosition": "normal",
+        "tabsInOrder": true,
+        "toolbarMode": "tabs",
+        "variable": "episode",
+        "wordBreak": "normal"
+      },
+      "pluginVersion": "5.1.1",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "builder",
+          "format": "table",
+          "rawSql": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Training Episode",
+      "type": "volkovlabs-variable-panel"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "color",
+              "thresholds": []
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 12,
+        "x": 12,
+        "y": 49
+      },
+      "id": 54,
+      "options": {
+        "alertCustomMessage": "",
+        "alwaysVisibleFilter": false,
+        "autoScroll": false,
+        "browserTabNamePattern": "",
+        "collapsedByDefault": false,
+        "customValue": false,
+        "displayMode": "slider",
+        "emptyValue": false,
+        "favorites": {
+          "enabled": false,
+          "storage": "browser"
+        },
+        "filter": false,
+        "groupSelection": false,
+        "header": true,
+        "isMinimizeForTable": false,
+        "isMinimizeViewShowCustomIcon": false,
+        "isPinTabsEnabled": false,
+        "isUseLocalTime": false,
+        "minimizeOutputFormat": "text",
+        "minimizeViewCustomIcon": "",
+        "minimizeViewNativeIcon": "gf-movepane-right",
+        "padding": 10,
+        "persistent": false,
+        "requestLatency": "low",
+        "saveSelectedGroup": false,
+        "saveSelectedGroupKey": "",
+        "selectedValues": {
+          "showSelected": false
+        },
+        "showGroupTotal": false,
+        "showLabel": true,
+        "showName": false,
+        "showResetButton": false,
+        "showTotal": false,
+        "statusSort": false,
+        "tableViewPosition": "normal",
+        "tabsInOrder": true,
+        "toolbarMode": "tabs",
+        "variable": "eval_episode",
+        "wordBreak": "normal"
+      },
+      "pluginVersion": "5.1.1",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "builder",
+          "format": "table",
+          "rawSql": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Evaluation Episode",
+      "type": "volkovlabs-variable-panel"
     },
     {
       "datasource": {
@@ -1438,7 +1945,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 52
       },
       "id": 41,
       "options": {
@@ -1635,7 +2142,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 52
       },
       "id": 43,
       "options": {
@@ -1832,7 +2339,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 60
       },
       "id": 44,
       "options": {
@@ -2029,7 +2536,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 49
+        "y": 60
       },
       "id": 45,
       "options": {
@@ -2215,7 +2722,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 57
+        "y": 68
       },
       "id": 46,
       "options": {
@@ -2426,7 +2933,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 57
+        "y": 68
       },
       "id": 47,
       "options": {
@@ -2573,6 +3080,294 @@
         }
       ],
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic",
+            "seriesBy": "last"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "pointShape": "circle",
+            "pointSize": {
+              "fixed": 5
+            },
+            "pointStrokeWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "show": "points"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "series_label"
+            },
+            "properties": []
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 76
+      },
+      "id": 57,
+      "maxPerRow": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "mapping": "auto",
+        "series": [
+          {
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "action_value"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "reward"
+              }
+            }
+          }
+        ],
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.2.1",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH unpivoted AS (\r\n    SELECT\r\n        rp.episode,\r\n        rp.datetime,\r\n        rp.unit,\r\n        kv.key AS action_col,\r\n        kv.value::double precision AS action_value,\r\n        rp.reward\r\n    FROM rl_params rp\r\n    CROSS JOIN LATERAL (\r\n        SELECT key, value\r\n        FROM jsonb_each_text(to_jsonb(rp))\r\n        WHERE key LIKE 'actions_%'\r\n          AND value IS NOT NULL\r\n    ) AS kv\r\n    WHERE rp.simulation = '${simulation}'\r\n      AND rp.evaluation_mode = FALSE\r\n      AND rp.episode = ${episode}\r\n      AND rp.unit IN (${rl_unit})\r\n)\r\nSELECT\r\n    unit || ' · ' || action_col AS series_label,\r\n    action_value,\r\n    reward,\r\n    episode,\r\n    datetime\r\nFROM unpivoted\r\nORDER BY series_label, datetime;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Progression of mean training ACTION VS. REWARD",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "series_label"
+            ],
+            "keepFields": true,
+            "naming": {
+              "asLabels": true
+            }
+          }
+        }
+      ],
+      "type": "xychart"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic",
+            "seriesBy": "last"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 50,
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "pointShape": "circle",
+            "pointSize": {
+              "fixed": 5
+            },
+            "pointStrokeWidth": 0,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "show": "points"
+          },
+          "fieldMinMax": false,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "series_label"
+            },
+            "properties": []
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 76
+      },
+      "id": 58,
+      "maxPerRow": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "mapping": "auto",
+        "series": [
+          {
+            "x": {
+              "matcher": {
+                "id": "byName",
+                "options": "action_value"
+              }
+            },
+            "y": {
+              "matcher": {
+                "id": "byName",
+                "options": "reward"
+              }
+            }
+          }
+        ],
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.2.1",
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH unpivoted AS (\r\n    SELECT\r\n        rp.episode,\r\n        rp.datetime,\r\n        rp.unit,\r\n        kv.key AS action_col,\r\n        kv.value::double precision AS action_value,\r\n        rp.reward\r\n    FROM rl_params rp\r\n    CROSS JOIN LATERAL (\r\n        SELECT key, value\r\n        FROM jsonb_each_text(to_jsonb(rp))\r\n        WHERE key LIKE 'actions_%'\r\n          AND value IS NOT NULL\r\n    ) AS kv\r\n    WHERE rp.simulation = '${simulation}'\r\n      AND rp.evaluation_mode = TRUE\r\n      AND rp.episode = ${eval_episode}\r\n      AND rp.unit IN (${rl_unit})\r\n)\r\nSELECT\r\n    unit || ' · ' || action_col AS series_label,\r\n    action_value,\r\n    reward,\r\n    episode,\r\n    datetime\r\nFROM unpivoted\r\nORDER BY series_label, datetime;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Progression of mean evaluation ACTION VS. REWARD",
+      "transformations": [
+        {
+          "id": "partitionByValues",
+          "options": {
+            "fields": [
+              "series_label"
+            ],
+            "keepFields": true,
+            "naming": {
+              "asLabels": true
+            }
+          }
+        }
+      ],
+      "type": "xychart"
     }
   ],
   "preload": false,
@@ -2685,5 +3480,5 @@
   "timezone": "",
   "title": "ASSUME: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 13
+  "version": 1
 }
