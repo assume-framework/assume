@@ -396,6 +396,12 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         if self.learning_mode:
             self.learning_role.add_reward_to_cache(
                 self.unit_id, start, reward, self._episode_sw, self._episode_max_sw
-            ) # logging episode SW and max SW just as placeholders
+            )  # logging episode SW and max SW just as placeholders
+            # The recurrent store_to_buffer_and_update fires at the same simulation
+            # timestamp as this final clearing, so it may run before the reward is
+            # in the cache. Scheduling an instant task here guarantees it runs after
+            # this synchronous call returns, by which point obs+action+reward are all
+            # present in the cache.
+            self.learning_role.trigger_buffer_flush()
 
         return reward

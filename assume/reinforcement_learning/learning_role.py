@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_LEVEL = "units"
 
 
-def _new_cache(): # TODO: move to learning utils
+def _new_cache():  # TODO: move to learning utils
     """Create a fresh nested defaultdict for experience caching."""
     return defaultdict(lambda: defaultdict(list))
 
@@ -113,6 +113,18 @@ class LevelView:
         self._role.all_rewards[self._level][start][unit_id].append(reward)
         self._role.all_regrets[self._level][start][unit_id].append(regret)
         self._role.all_profits[self._level][start][unit_id].append(profit)
+
+    def trigger_buffer_flush(self) -> None:
+        """Schedule an immediate store_to_buffer_and_update for this level.
+
+        Use this when the caller knows the full experience tuple (obs, action,
+        reward) is now in the cache and the recurrent task may not pick it up
+        in time (e.g. because it fires at the same simulation timestamp as the
+        final market clearing).
+        """
+        self._role.context.schedule_instant_task(
+            coroutine=self._role.store_to_buffer_and_update(level=self._level)
+        )
 
     def write_rl_grad_params_to_output(self, learning_rate, unit_params_list) -> None:
         """Forward to Learning role with level context."""
@@ -241,7 +253,7 @@ class LearningRole(Role):
                         cfg.noise_dt
                     )
                 else:
-                    self.calc_noise_from_progress[level] = lambda x, nd=cfg.noise_dt: nd
+                    self.calc_noise_from_progress[level] = lambda x, n=cfg.noise_dt: n
 
                 # Create RL algorithm for this level (receives a LevelView)
                 self.create_learning_algorithm(cfg.algorithm, level)
@@ -453,7 +465,7 @@ class LearningRole(Role):
                     f"All {len(all_timestamps)} timesteps are incomplete (missing rewards)."
                 )
                 return
-            
+
             # Create filtered cache (only complete timesteps)
             cache = {
                 "obs": {t: current_obs[t] for t in timestamps_to_process},
