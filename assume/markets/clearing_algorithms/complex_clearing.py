@@ -12,7 +12,11 @@ from mango import AgentAddress
 from pyomo.opt import SolverFactory, TerminationCondition
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import create_incidence_matrix, get_supported_solver
+from assume.common.utils import (
+    aggregate_line_capacities,
+    create_incidence_matrix,
+    get_supported_solver,
+)
 from assume.markets.base_market import MarketRole
 
 # Set the log level to WARNING
@@ -31,6 +35,7 @@ def market_clearing_opt_constraints(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame,
     lines: pd.DataFrame,
+    directional_capacities: pd.DataFrame = None,
 ):
     """
     Adds the constraints to the model.
@@ -181,17 +186,27 @@ def market_clearing_opt_constraints(
         model.transmission_constr = pyo.ConstraintList()
         for t in model.T:
             for line in model.lines:
-                # s_max_pu might also be time variant. but for now we assume it is static
-                s_max_pu = (
-                    lines.at[line, "s_max_pu"]
-                    if "s_max_pu" in lines.columns
-                    and not pd.isna(lines.at[line, "s_max_pu"])
-                    else 1.0
-                )
-                capacity = lines.at[line, "s_nom"] * s_max_pu
-                # Limit the flow on each line
-                model.transmission_constr.add(model.flows[t, line] <= capacity)
-                model.transmission_constr.add(model.flows[t, line] >= -capacity)
+                # If precomputed directional capacities are provided, use them
+                if (
+                    directional_capacities is not None
+                    and line in directional_capacities.index
+                ):
+                    cap_forward = directional_capacities.at[line, "cap_forward"]
+                    cap_reverse = directional_capacities.at[line, "cap_reverse"]
+                    model.transmission_constr.add(model.flows[t, line] <= cap_forward)
+                    model.transmission_constr.add(model.flows[t, line] >= -cap_reverse)
+                else:
+                    # s_max_pu might also be time variant. but for now we assume it is static
+                    s_max_pu = (
+                        lines.at[line, "s_max_pu"]
+                        if "s_max_pu" in lines.columns
+                        and not pd.isna(lines.at[line, "s_max_pu"])
+                        else 1.0
+                    )
+                    capacity = lines.at[line, "s_nom"] * s_max_pu
+                    # Limit the flow on each line (symmetric fallback)
+                    model.transmission_constr.add(model.flows[t, line] <= capacity)
+                    model.transmission_constr.add(model.flows[t, line] >= -capacity)
 
 
 def market_clearing_opt_objective(model: pyo.ConcreteModel, orders: Orderbook):
@@ -217,6 +232,7 @@ def market_clearing_opt(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame = None,
     lines: pd.DataFrame = None,
+    directional_capacities: pd.DataFrame = None,
     solver: str = "appsi_highs",
     solver_options: dict = {},
     func_constraints=market_clearing_opt_constraints,
@@ -264,7 +280,14 @@ def market_clearing_opt(
     model = pyo.ConcreteModel()
 
     func_constraints(
-        model, orders, market_products, mode, with_linked_bids, incidence_matrix, lines
+        model,
+        orders,
+        market_products,
+        mode,
+        with_linked_bids,
+        incidence_matrix,
+        lines,
+        directional_capacities,
     )
 
     func_objective(model, orders)
@@ -377,7 +400,27 @@ class ComplexClearingRole(MarketRole):
                 # Nodal Case
                 self.incidence_matrix = create_incidence_matrix(self.lines, buses)
                 self.nodes = buses.index.values
+            # Pre-compute directional capacities for use in the clearing constraints
+            try:
+                self.directional_capacities = aggregate_line_capacities(
+                    self.lines,
+                    self.incidence_matrix,
+                    zones_id=self.zones_id,
+                    node_mapping=self.node_to_zone,
+                )
+            except Exception:
+                self.directional_capacities = None
 
+            # Informational log if input contains directional columns
+            if self.lines is not None:
+                has_directional = (
+                    "s_nom_forward" in self.lines.columns
+                    or "s_nom_reverse" in self.lines.columns
+                )
+                if has_directional:
+                    logger.info(
+                        "Directional NTC columns detected in lines data. Asymmetric transfer limits will be applied."
+                    )
         self.log_flows = self.marketconfig.param_dict.get("log_flows", False)
         self.pricing_mechanism = self.marketconfig.param_dict.get(
             "pricing_mechanism", "pay_as_clear"
@@ -513,6 +556,7 @@ class ComplexClearingRole(MarketRole):
                 with_linked_bids=with_linked_bids,
                 incidence_matrix=self.incidence_matrix,
                 lines=self.lines,
+                directional_capacities=getattr(self, "directional_capacities", None),
                 solver=self.solver,
                 solver_options=self.solver_options,
             )

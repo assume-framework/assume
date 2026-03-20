@@ -544,6 +544,130 @@ def create_incidence_matrix(lines, buses, zones_id=None):
     return incidence_matrix
 
 
+def aggregate_line_capacities(
+    lines: pd.DataFrame,
+    incidence_matrix: pd.DataFrame,
+    zones_id: str = None,
+    node_mapping: dict = None,
+) -> pd.DataFrame:
+    """
+    Compute forward and reverse capacities for each line (or aggregated edge) used
+    by the transport-model clearing (`complex_clearing`).
+
+    The function returns a DataFrame indexed by the columns of `incidence_matrix`
+    with columns `cap_forward` and `cap_reverse` (absolute MW). If a column in
+    `incidence_matrix` matches a line index in `lines`, the capacities are taken
+    from that physical line. Otherwise the function attempts a zone-pair style
+    aggregation: physical lines are mapped to node pairs using `node_mapping`
+    (or by treating buses as nodes), and capacities are summed per zone-pair.
+
+    Directional columns in `lines` take precedence:
+      - `s_nom_forward` used for forward (bus0 -> bus1)
+      - `s_nom_reverse` used for reverse (bus1 -> bus0)
+    If missing, fallback to `s_nom * s_max_pu` for that direction.
+
+    Args:
+        lines: DataFrame of lines (indexed by line id).
+        incidence_matrix: Incidence matrix whose columns identify edges/lines.
+        zones_id: Optional zones identifier (unused here, kept for API compatibility).
+        node_mapping: Optional mapping from bus id -> node/zone id.
+
+    Returns:
+        pd.DataFrame: indexed by `incidence_matrix.columns` with columns
+            ['cap_forward', 'cap_reverse'].
+    """
+
+    # prepare defaults for each physical line
+    per_line_caps = {}
+    for line_idx, line in lines.iterrows():
+        s_max_pu = (
+            lines.at[line_idx, "s_max_pu"]
+            if "s_max_pu" in lines.columns
+            and not pd.isna(lines.at[line_idx, "s_max_pu"])
+            else 1.0
+        )
+        default_capacity = lines.at[line_idx, "s_nom"] * s_max_pu
+
+        if "s_nom_forward" in lines.columns and not pd.isna(
+            lines.at[line_idx, "s_nom_forward"]
+        ):
+            cap_f = lines.at[line_idx, "s_nom_forward"]
+        else:
+            cap_f = default_capacity
+
+        if "s_nom_reverse" in lines.columns and not pd.isna(
+            lines.at[line_idx, "s_nom_reverse"]
+        ):
+            cap_r = lines.at[line_idx, "s_nom_reverse"]
+        else:
+            cap_r = default_capacity
+
+        per_line_caps[line_idx] = {
+            "cap_forward": float(cap_f),
+            "cap_reverse": float(cap_r),
+        }
+
+    # If all incidence columns directly match physical lines, return per-line caps
+    cols = list(incidence_matrix.columns)
+    if all(col in per_line_caps for col in cols):
+        df = pd.DataFrame.from_dict(per_line_caps, orient="index")
+        # Ensure ordering matches incidence_matrix.columns
+        return df.reindex(cols)
+
+    # Otherwise, attempt to aggregate by node-pair keys (zone-pair aggregation)
+    # Build mapping from physical line -> node pair key
+    if node_mapping is None:
+        # identity mapping: bus id -> bus id
+        node_mapping = {}
+        for _, row in lines.iterrows():
+            node_mapping[row["bus0"]] = row["bus0"]
+            node_mapping[row["bus1"]] = row["bus1"]
+
+    agg_caps = {col: {"cap_forward": 0.0, "cap_reverse": 0.0} for col in cols}
+
+    for line_idx, line in lines.iterrows():
+        bus0 = line["bus0"]
+        bus1 = line["bus1"]
+        node0 = node_mapping.get(bus0, bus0)
+        node1 = node_mapping.get(bus1, bus1)
+
+        # Determine forward/reverse capacities for this physical line
+        caps = per_line_caps[line_idx]
+
+        # Try matching a column that corresponds to the node0->node1 direction
+        key_f = f"{node0}_{node1}"
+        key_r = f"{node1}_{node0}"
+
+        if key_f in agg_caps:
+            agg_caps[key_f]["cap_forward"] += caps["cap_forward"]
+            agg_caps[key_f]["cap_reverse"] += caps["cap_reverse"]
+        elif key_r in agg_caps:
+            # If the aggregated column uses reversed ordering, still add capacities
+            agg_caps[key_r]["cap_forward"] += caps["cap_forward"]
+            agg_caps[key_r]["cap_reverse"] += caps["cap_reverse"]
+        else:
+            # final fallback: if no matching aggregated key, try to add to any column
+            # that contains either node name (best-effort)
+            matched = False
+            for col in cols:
+                if str(node0) in str(col) and str(node1) in str(col):
+                    agg_caps[col]["cap_forward"] += caps["cap_forward"]
+                    agg_caps[col]["cap_reverse"] += caps["cap_reverse"]
+                    matched = True
+                    break
+            if not matched:
+                # give up and skip mapping this physical line
+                logger.debug(
+                    f"aggregate_line_capacities: could not map line {line_idx} to incidence column"
+                )
+
+    df = pd.DataFrame.from_dict(agg_caps, orient="index")
+    # ensure numeric types
+    df["cap_forward"] = df["cap_forward"].astype(float)
+    df["cap_reverse"] = df["cap_reverse"].astype(float)
+    return df
+
+
 def normalize_availability(powerplants_df, availability_df):
     # Create a copy of the availability dataframe to avoid modifying the original
     normalized_df = availability_df.copy()
