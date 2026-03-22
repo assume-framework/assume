@@ -20,7 +20,14 @@ def find_optimal_dispatch_linearized(
     print_results=False,
     K=5,  # number of discrete binary steps considered in the linearisation
     big_M=10e6,
+    mc_df=None,
 ):
+    gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
+    if mc_df is None:
+        mc_df = pd.DataFrame(
+            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index}, index=demand_df.index
+        )
+
     model = pyo.ConcreteModel()
 
     # sets
@@ -79,7 +86,7 @@ def find_optimal_dispatch_linearized(
     model.mu_max_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
 
     model.M = pyo.Param(initialize=max(gens_df["mc"]) * k_max)
-    delta = [gens_df.at[gen, "g_max"] / (pow(2, K) - 1) for gen in gens_df.index]
+    delta = {gen: gens_df.at[gen, "g_max"] / (pow(2, K) - 1) for gen in gens_df.index}
 
     # ---------------------------------------------------------------------------
     # binary expansion constraints
@@ -137,7 +144,7 @@ def find_optimal_dispatch_linearized(
         # (7a) (1st line)
         return sum(
             delta[opt_gen] * sum(pow(2, n) * model.z_lambda[t, n] for n in range(K))
-            - gens_df.at[opt_gen, "mc"] * model.g[opt_gen, t]
+            - mc_df.at[t, opt_gen] * model.g[opt_gen, t]
             - model.c_up[opt_gen, t]
             - model.c_down[opt_gen, t]
             for t in model.time
@@ -149,7 +156,7 @@ def find_optimal_dispatch_linearized(
         expr = sum(
             (
                 (
-                    gens_df.at[gen, "mc"]
+                    mc_df.at[t, gen]
                     * delta[gen]
                     * sum(pow(2, n) * model.z_k[t, n] for n in range(K))
                     + model.c_up[gen, t]
@@ -157,7 +164,7 @@ def find_optimal_dispatch_linearized(
                 )
                 if gen == opt_gen
                 else (
-                    k_values_df.at[t, gen] * gens_df.at[gen, "mc"] * model.g[gen, t]
+                    k_values_df.at[t, gen] * mc_df.at[t, gen] * model.g[gen, t]
                     + model.c_up[gen, t]
                     + model.c_down[gen, t]
                 )
@@ -301,7 +308,7 @@ def find_optimal_dispatch_linearized(
 
         # Combined expression
         return (
-            k_term * gens_df.at[i, "mc"]
+            k_term * mc_df.at[t, i]
             - model.lambda_[t]
             + model.mu_max[i, t]
             - model.mu_min[i, t]
@@ -354,7 +361,7 @@ def find_optimal_dispatch_linearized(
 
         # Combined expression
         return (
-            k_term * gens_df.at[i, "mc"]
+            k_term * mc_df.at[t, i]
             - model.lambda_hat[t]
             + model.mu_max_hat[i, t]
             - model.mu_min_hat[i, t]
@@ -539,45 +546,46 @@ def find_optimal_dispatch_linearized(
 
     # ---------------------------------------------------------------------------
     # extract results
+    time_index = demand_df.index
     generation_df = pd.DataFrame(
-        index=demand_df.index, columns=[f"gen_{gen}" for gen in gens_df.index]
+        index=time_index, columns=[f"gen_{gen}" for gen in gens_df.index]
     )
     for gen in gens_df.index:
-        for t in demand_df.index:
+        for t in time_index:
             generation_df.at[t, f"gen_{gen}"] = instance.g[gen, t].value
 
-    demand_df = pd.DataFrame(index=demand_df.index, columns=["demand"])
-    for t in demand_df.index:
-        demand_df.at[t, "demand"] = instance.d[t].value
+    cleared_demand = pd.DataFrame(index=time_index, columns=["demand"])
+    for t in time_index:
+        cleared_demand.at[t, "demand"] = instance.d[t].value
 
-    mcp = pd.DataFrame(index=demand_df.index, columns=["mcp"])
-    for t in demand_df.index:
+    mcp = pd.DataFrame(index=time_index, columns=["mcp"])
+    for t in time_index:
         mcp.at[t, "mcp"] = instance.lambda_[t].value
 
-    mcp_hat = pd.DataFrame(index=demand_df.index, columns=["mcp_hat"])
-    for t in demand_df.index:
+    mcp_hat = pd.DataFrame(index=time_index, columns=["mcp_hat"])
+    for t in time_index:
         mcp_hat.at[t, "mcp_hat"] = instance.lambda_hat[t].value
 
-    main_df = pd.concat([generation_df, demand_df, mcp, mcp_hat], axis=1)
+    main_df = pd.concat([generation_df, cleared_demand, mcp, mcp_hat], axis=1)
 
     start_up_cost = pd.DataFrame(
-        index=demand_df.index, columns=[f"start_up_{gen}" for gen in gens_df.index]
+        index=time_index, columns=[f"start_up_{gen}" for gen in gens_df.index]
     )
     for gen in gens_df.index:
-        for t in demand_df.index:
+        for t in time_index:
             start_up_cost.at[t, f"start_up_{gen}"] = instance.c_up[gen, t].value
 
     shut_down_cost = pd.DataFrame(
-        index=demand_df.index, columns=[f"shut_down_{gen}" for gen in gens_df.index]
+        index=time_index, columns=[f"shut_down_{gen}" for gen in gens_df.index]
     )
     for gen in gens_df.index:
-        for t in demand_df.index:
+        for t in time_index:
             shut_down_cost.at[t, f"shut_down_{gen}"] = instance.c_down[gen, t].value
 
     supp_df = pd.concat([start_up_cost, shut_down_cost], axis=1)
 
-    k_values = pd.DataFrame(index=demand_df.index, columns=["k"])
-    for t in demand_df.index:
+    k_values = pd.DataFrame(index=time_index, columns=["k"])
+    for t in time_index:
         k_values.at[t, "k"] = instance.k[t].value
 
     return main_df, supp_df, k_values
@@ -595,7 +603,14 @@ def find_optimal_dispatch_quadratic(
     print_results=False,
     big_M=10e6,
     demand_bids=1,
+    mc_df=None,
 ):
+    gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
+    if mc_df is None:
+        mc_df = pd.DataFrame(
+            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index}, index=demand_df.index
+        )
+
     model = pyo.ConcreteModel()
 
     # sets
@@ -663,7 +678,7 @@ def find_optimal_dispatch_quadratic(
         # (7a) (1st line)
         return sum(
             model.lambda_hat[t] * model.g[opt_gen, t]
-            - gens_df.at[opt_gen, "mc"] * model.g[opt_gen, t]
+            - mc_df.at[t, opt_gen] * model.g[opt_gen, t]
             - model.c_up[opt_gen, t]
             - model.c_down[opt_gen, t]
             for t in model.time
@@ -675,13 +690,13 @@ def find_optimal_dispatch_quadratic(
         expr = sum(
             (
                 (
-                    gens_df.at[gen, "mc"] * model.k[t]
+                    mc_df.at[t, gen] * model.k[t]
                     + model.c_up[gen, t]
                     + model.c_down[gen, t]
                 )
                 if gen == opt_gen
                 else (
-                    k_values_df.at[t, gen] * gens_df.at[gen, "mc"] * model.g[gen, t]
+                    k_values_df.at[t, gen] * mc_df.at[t, gen] * model.g[gen, t]
                     + model.c_up[gen, t]
                     + model.c_down[gen, t]
                 )
@@ -840,7 +855,7 @@ def find_optimal_dispatch_quadratic(
 
         # Combined expression
         return (
-            k_term * gens_df.at[i, "mc"]
+            k_term * mc_df.at[t, i]
             - model.lambda_[t]
             + model.mu_max[i, t]
             - model.mu_min[i, t]
@@ -901,7 +916,7 @@ def find_optimal_dispatch_quadratic(
 
         # Combined expression
         return (
-            k_term * gens_df.at[i, "mc"]
+            k_term * mc_df.at[t, i]
             - model.lambda_hat[t]
             + model.mu_max_hat[i, t]
             - model.mu_min_hat[i, t]
@@ -1095,51 +1110,48 @@ def find_optimal_dispatch_quadratic(
 
     # ---------------------------------------------------------------------------
     # extract results
+    time_index = demand_df.index
     generation_df = pd.DataFrame(
-        index=demand_df.index, columns=[f"gen_{gens_df.at[gen, 'unit']}" for gen in gens_df.index]
+        index=time_index, columns=[f"gen_{gen}" for gen in gens_df.index]
     )
     for gen in gens_df.index:
-        unit_name = gens_df.at[gen, "unit"]
-        for t in demand_df.index:
-            generation_df.at[t, f"gen_{unit_name}"] = instance.g[gen, t].value
+        for t in time_index:
+            generation_df.at[t, f"gen_{gen}"] = instance.g[gen, t].value
 
-
-    demand_df = pd.DataFrame(index=demand_df.index, columns=["demand"])
-    for t in demand_df.index:
-        demand_df.at[t, "demand"] = sum(
+    cleared_demand = pd.DataFrame(index=time_index, columns=["demand"])
+    for t in time_index:
+        cleared_demand.at[t, "demand"] = sum(
             instance.d[t, n].value for n in instance.demand_bids
         )
 
-    mcp = pd.DataFrame(index=demand_df.index, columns=["mcp"])
-    for t in demand_df.index:
+    mcp = pd.DataFrame(index=time_index, columns=["mcp"])
+    for t in time_index:
         mcp.at[t, "mcp"] = instance.lambda_[t].value
 
-    mcp_hat = pd.DataFrame(index=demand_df.index, columns=["mcp_hat"])
-    for t in demand_df.index:
+    mcp_hat = pd.DataFrame(index=time_index, columns=["mcp_hat"])
+    for t in time_index:
         mcp_hat.at[t, "mcp_hat"] = instance.lambda_hat[t].value
 
-    main_df = pd.concat([generation_df, demand_df, mcp, mcp_hat], axis=1)
+    main_df = pd.concat([generation_df, cleared_demand, mcp, mcp_hat], axis=1)
 
     start_up_cost = pd.DataFrame(
-        index=demand_df.index, columns=[f"start_up_{gens_df.at[gen, 'unit']}" for gen in gens_df.index]
+        index=time_index, columns=[f"start_up_{gen}" for gen in gens_df.index]
     )
     for gen in gens_df.index:
-        unit_name = gens_df.at[gen, "unit"]
-        for t in demand_df.index:
-            start_up_cost.at[t, f"start_up_{unit_name}"] = instance.c_up[gen, t].value
+        for t in time_index:
+            start_up_cost.at[t, f"start_up_{gen}"] = instance.c_up[gen, t].value
 
     shut_down_cost = pd.DataFrame(
-        index=demand_df.index, columns=[f"shut_down_{gens_df.at[gen, 'unit']}" for gen in gens_df.index]
+        index=time_index, columns=[f"shut_down_{gen}" for gen in gens_df.index]
     )
     for gen in gens_df.index:
-        unit_name = gens_df.at[gen, "unit"]
-        for t in demand_df.index:
-            shut_down_cost.at[t, f"shut_down_{unit_name}"] = instance.c_down[gen, t].value
-    
+        for t in time_index:
+            shut_down_cost.at[t, f"shut_down_{gen}"] = instance.c_down[gen, t].value
+
     supp_df = pd.concat([start_up_cost, shut_down_cost], axis=1)
 
-    k_values = pd.DataFrame(index=demand_df.index, columns=["k"])
-    for t in demand_df.index:
+    k_values = pd.DataFrame(index=time_index, columns=["k"])
+    for t in time_index:
         k_values.at[t, "k"] = instance.k[t].value
 
     return main_df, supp_df, k_values
@@ -1159,6 +1171,7 @@ def find_optimal_dispatch_storage_leader_quadratic(
     demand_bids=1,
     big_M=10e6,
     print_results=False,
+    mc_df=None,
 ):
     """
     Monolithic quadratic MPEC with one strategic storage leader.
@@ -1179,6 +1192,12 @@ def find_optimal_dispatch_storage_leader_quadratic(
     if opt_storage not in storage_k_values_df.columns:
         raise ValueError(
             f"opt_storage '{opt_storage}' not found in storage_k_values_df columns"
+        )
+
+    gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
+    if mc_df is None:
+        mc_df = pd.DataFrame(
+            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index}, index=demand_df.index
         )
 
     model = pyo.ConcreteModel()
@@ -1305,7 +1324,7 @@ def find_optimal_dispatch_storage_leader_quadratic(
     def duality_gap_part_1_rule(model):
         # Lower-level Wohlfahrt (19, Wang) (1st and 2nd line)
         expr = sum(
-            gens_df.at[gen, "mc"] * model.g[gen, t]
+            mc_df.at[t, gen] * model.g[gen, t]
             + model.c_up[gen, t]
             + model.c_down[gen, t]
             for gen in model.gens
@@ -1536,7 +1555,7 @@ def find_optimal_dispatch_storage_leader_quadratic(
         pi_u_next_term = 0 if t == model.time.at(-1) else model.pi_u[i, t + 1]
         pi_d_next_term = 0 if t == model.time.at(-1) else model.pi_d[i, t + 1]
         return (
-            gens_df.at[i, "mc"] * k_values_df.at[t, i]
+            mc_df.at[t, i] * k_values_df.at[t, i]
             - model.lambda_[t]
             + model.mu_max[i, t]
             - model.mu_min[i, t]
@@ -1621,7 +1640,7 @@ def find_optimal_dispatch_storage_leader_quadratic(
         pi_u_hat_next_term = 0 if t == model.time.at(-1) else model.pi_u_hat[i, t + 1]
         pi_d_hat_next_term = 0 if t == model.time.at(-1) else model.pi_d_hat[i, t + 1]
         return (
-            gens_df.at[i, "mc"]
+            mc_df.at[t, i]
             - model.lambda_hat[t]
             + model.mu_max_hat[i, t]
             - model.mu_min_hat[i, t]

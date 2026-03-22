@@ -19,7 +19,13 @@ from pyomo.opt import SolverFactory
 
 
 # %%
-def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_bids=1):
+def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_bids=1, mc_df=None):
+    gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
+    if mc_df is None:
+        mc_df = pd.DataFrame(
+            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index}, index=demand_df.index
+        )
+
     model = pyo.ConcreteModel()
 
     # sets
@@ -50,7 +56,7 @@ def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_
         for gen in model.gens:
             for t in model.time:
                 expr += (
-                    k_values_df.at[t, gen] * gens_df.at[gen, "mc"] * model.g[gen, t]
+                    k_values_df.at[t, gen] * mc_df.at[t, gen] * model.g[gen, t]
                     + model.c_up[gen, t]
                     + model.c_down[gen, t]
                 )
@@ -215,6 +221,7 @@ def solve_uc_problem_with_storage(
     storage_k_values_df,
     availabilities_df,
     demand_bids=1,
+    mc_df=None,
 ):
     """
     Draft UC problem with storage units.
@@ -241,6 +248,12 @@ def solve_uc_problem_with_storage(
     - To keep the formulation simple and linear, there is no binary variable that
       forbids simultaneous charging and discharging.
     """
+    gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
+    if mc_df is None:
+        mc_df = pd.DataFrame(
+            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index}, index=demand_df.index
+        )
+
     model = pyo.ConcreteModel()
 
     # sets
@@ -277,7 +290,7 @@ def solve_uc_problem_with_storage(
         for gen in model.gens:
             for t in model.time:
                 expr += (
-                    k_values_df.at[t, gen] * gens_df.at[gen, "mc"] * model.g[gen, t]
+                    k_values_df.at[t, gen] * mc_df.at[t, gen] * model.g[gen, t]
                     + model.c_up[gen, t]
                     + model.c_down[gen, t]
                 )

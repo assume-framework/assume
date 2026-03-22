@@ -17,12 +17,12 @@ from pyomo.opt import SolverFactory
 from uc_problem import solve_uc_problem
 
 
-def calculate_profits(main_df, gens_df, price_column="mcp", supp_df=None):
+def calculate_profits(main_df, gens_df, price_column="mcp", supp_df=None, mc_df=None):
+    gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
     profits = pd.DataFrame(index=main_df.index, columns=gens_df.index)
     for gen in gens_df.index:
-        profits[gen] = main_df[f"gen_{gen}"] * (
-            main_df[price_column] - gens_df.at[gen, "mc"]
-        )
+        mc = mc_df[gen] if mc_df is not None else gens_df.at[gen, "mc"]
+        profits[gen] = main_df[f"gen_{gen}"] * (main_df[price_column] - mc)
         if supp_df is not None:
             profits[gen] -= supp_df[f"start_up_{gen}"] + supp_df[f"shut_down_{gen}"]
 
@@ -406,22 +406,18 @@ def join_demand_market_orders(demand_df, market_orders_df):
     demand_bids = demand_bids.copy()
     demand_bids["bid_num"] = demand_bids["bid_id"].str.extract(r"(\d+)$").fillna("1")
     demand_bids["bid_num"] = demand_bids["bid_num"].astype(int)
-    demand_bids = demand_bids.sort_values("bid_num")
+    demand_bids = demand_bids.sort_values(["bid_num", demand_bids.index.name or "index"])
 
-    # For each bid, create price_X and volume_X columns
-    merged = demand_df.copy()
-    merged = merged.drop(columns=["date"])
+    # Build merged from unique bid timestamps to avoid length mismatches when
+    # demand_df has a non-unique index (e.g. constructed from market_orders index)
+    unique_times = pd.to_datetime(demand_bids.index.unique().sort_values())
+    merged = pd.DataFrame(index=unique_times)
     merged.index.name = "datetime"
-    merged.index = pd.to_datetime(merged.index)
 
     for bid_num in sorted(demand_bids["bid_num"].unique()):
-        bid_mask = demand_bids["bid_num"] == bid_num
-        price_col = f"price_{bid_num}"
-        volume_col = f"volume_{bid_num}"
-        merged[price_col] = demand_bids.loc[bid_mask, "price"].values
-        merged[volume_col] = (
-            demand_bids.loc[bid_mask, "volume"].values * -1
-        )  # make volume positive
+        bid_data = demand_bids[demand_bids["bid_num"] == bid_num].sort_index()
+        merged[f"price_{bid_num}"] = bid_data["price"].values
+        merged[f"volume_{bid_num}"] = bid_data["volume"].values * -1  # make positive
 
     merged["date"] = merged.index.date
     return merged
@@ -667,18 +663,20 @@ def run_MPEC(
     big_w,
     demand_bids=1,
     use_quadratic=True,
+    mc_df=None,
 ):
     """
     Run the MPEC optimisation for a single strategic unit.
 
     Args:
-        opt_gen (int): Integer index into gens_df for the unit to optimise.
+        opt_gen (str): Unit name of the strategic unit to optimise (must be in
+            gens_df["unit"] or gens_df.index if already indexed by unit name).
         gens_df (pd.DataFrame): Generator data (output of create_gens_df).
         demand_df (pd.DataFrame): Demand data without a "date" column
             (columns: volume_1, price_1 [, volume_2, price_2, …]).
         k_values_df (pd.DataFrame): k-multipliers per unit, without "date" column.
         availability_df (pd.DataFrame): Availability factors in [0,1],
-            columns = unit names (matching gens_df order).
+            columns = unit names.
         k_max (float): Maximum allowed bidding multiplier.
         big_w (float): Penalty weight for the duality-gap objective term.
         demand_bids (int): Number of demand bid steps. Only used for the
@@ -688,6 +686,8 @@ def run_MPEC(
             formulation (find_optimal_dispatch_linearized). Note: the
             linearised version does not support availabilities or multiple
             demand bids.
+        mc_df (pd.DataFrame | None): Time-varying marginal costs with datetime
+            index and unit-name columns. If None, uses constant mc from gens_df.
 
     Returns:
         tuple: (profits_1, profits_2, results_main_df, results_supp_df)
@@ -709,19 +709,24 @@ def run_MPEC(
                 + "\nEither set use_quadratic=True or fix the conflicting settings."
             )
 
-    print(f"Optimising unit '{gens_df.at[opt_gen, 'unit']}' (index {opt_gen})")
+    gens_df = gens_df.set_index("unit").copy() if "unit" in gens_df.columns else gens_df.copy(deep=True)
+    print(f"Optimising unit '{opt_gen}'")
 
     demand_df = demand_df.reset_index(drop=True).copy(deep=True)
 
+    if mc_df is None:
+        mc_df_aligned = pd.DataFrame(
+            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index},
+            index=demand_df.index,
+        )
+    else:
+        mc_df_aligned = mc_df.reset_index(drop=True).copy()
+
     k_values_df = k_values_df.copy(deep=True)
-    k_values_df.columns = gens_df.index
     k_values_df.reset_index(inplace=True)
 
     availability_df = availability_df.copy(deep=True)
-    availability_df.columns = gens_df.index
     availability_df.reset_index(inplace=True)
-
-    gens_df = gens_df.copy(deep=True)
 
     if use_quadratic:
         main_df, supp_df, k_values = find_optimal_dispatch_quadratic(
@@ -736,6 +741,7 @@ def run_MPEC(
             print_results=True,
             big_M=10e6,
             demand_bids=demand_bids,
+            mc_df=mc_df_aligned,
         )
     else:
         # The linearised function expects old-style "volume" / "price" column names
@@ -754,19 +760,21 @@ def run_MPEC(
             print_results=True,
             K=5,
             big_M=10e6,
+            mc_df=mc_df_aligned,
         )
 
     # Re-solve UC with the optimised k-values to get accurate market prices
     k_values_df_2 = k_values_df.copy()
-    k_values_df_2[opt_gen] = k_values
+    k_values_df_2[opt_gen] = k_values["k"]
 
     updated_main_df_2, updated_supp_df_2 = solve_uc_problem(
-        gens_df, demand_df, k_values_df_2, availability_df, demand_bids=demand_bids
+        gens_df, demand_df, k_values_df_2, availability_df, demand_bids=demand_bids,
+        mc_df=mc_df_aligned,
     )
 
-    profits_1 = calculate_profits(main_df=main_df, supp_df=supp_df, gens_df=gens_df)
+    profits_1 = calculate_profits(main_df=main_df, supp_df=supp_df, gens_df=gens_df, mc_df=mc_df_aligned)
     profits_2 = calculate_profits(
-        main_df=updated_main_df_2, supp_df=updated_supp_df_2, gens_df=gens_df
+        main_df=updated_main_df_2, supp_df=updated_supp_df_2, gens_df=gens_df, mc_df=mc_df_aligned,
     )
 
     return profits_1, profits_2, updated_main_df_2, updated_supp_df_2

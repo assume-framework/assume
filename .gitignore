@@ -80,6 +80,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+data_prep_hack.ipynb
 
 # IPython
 profile_default/

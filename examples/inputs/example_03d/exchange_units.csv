@@ -1,0 +1,11 @@
+name,bidding_EOM,price_import,price_export,unit_operator
+DE_NL,exchange_energy_naive,90,2999,Exchanges Operator
+DE_CH,exchange_energy_naive,114,2999,Exchanges Operator
+DE_DK_1,exchange_energy_naive,90,2999,Exchanges Operator
+DE_DK_2,exchange_energy_naive,86,2999,Exchanges Operator
+DE_CZ,exchange_energy_naive,107,2999,Exchanges Operator
+DE_SE,exchange_energy_naive,57,2999,Exchanges Operator
+DE_AT,exchange_energy_naive,102,2999,Exchanges Operator
+DE_FR,exchange_energy_naive,58,2999,Exchanges Operator
+DE_PL,exchange_energy_naive,91,2999,Exchanges Operator
+DE_BE,exchange_energy_naive,85,2999,Exchanges Operator
