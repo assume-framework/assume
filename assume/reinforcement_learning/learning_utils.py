@@ -230,7 +230,9 @@ def copy_layer_data(dst, src):
             dst[k].data.copy_(src[k].data)
 
 
-def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
+def transform_buffer_data(
+    nested_dict: dict, device: th.device, keys_unit_order: list
+) -> np.ndarray:
     """
     Transform nested dict {datetime -> {unit_id -> [values]}} into
     torch tensor of shape (timesteps, powerplants, values). Compatible with buffer storage.
@@ -244,9 +246,6 @@ def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
     """
     # Get sorted lists of units and timestamps (for consistent ordering)
     all_times = sorted(nested_dict.keys())
-    unit_ids = sorted(
-        set(dt for unit_data in nested_dict.values() for dt in unit_data.keys())
-    )
 
     # Get feature dimension from first non-empty value
     feature_dim = None
@@ -267,11 +266,13 @@ def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
         )
 
     # Pre-allocate tensor (keep on same device as input data)
-    result = th.zeros((len(all_times), len(unit_ids), feature_dim), device=device)
+    result = th.zeros(
+        (len(all_times), len(keys_unit_order), feature_dim), device=device
+    )
 
     # Fill tensor with values (stays on same device as input so if on GPU it stays there during filling)
     for t, timestamp in enumerate(all_times):
-        for u, unit_id in enumerate(unit_ids):
+        for u, unit_id in enumerate(keys_unit_order):
             values = nested_dict[timestamp].get(unit_id, [])
             if values:  # if we have values for this timestamp
                 result[t, u] = values[0]

@@ -1,0 +1,2 @@
+name,technology,bidding_EOM,bidding_CRM_pos,bidding_CRM_neg,max_power,min_power,unit_operator
+demand_EOM,inflex_demand,demand_energy_naive,,,1000000.0,0.0,eom_de

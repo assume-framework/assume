@@ -75,7 +75,11 @@ available_examples = {
     },
     #
     # DRL references case for learning advancement testing
+<<<<<<< HEAD
     "small_learning_1": {"scenario": "example_02a", "study_case": "base_all_RL_fix"},
+=======
+    "small_learning_1": {"scenario": "example_02a_EE", "study_case": "base"},
+>>>>>>> 83df02299248711ea3418b41e1f8252e7c6f6c98
     "small_learning_2": {"scenario": "example_02b", "study_case": "base"},
     "small_learning_3": {"scenario": "example_02c", "study_case": "base"},
     # DRL cases with lstm instead of mlp as actor neural network architecture
@@ -103,7 +107,14 @@ available_examples = {
         "scenario": "example_03",
         "study_case": "base_case_2019_with_DSM",
     },
+<<<<<<< HEAD
     "large_2019_rl": {"scenario": "example_03a", "study_case": "base_case_2019"},
+=======
+    "large_2019_rl": {
+        "scenario": "example_03a",
+        "study_case": "base_case_2019_old8459abd_singel",
+    },
+>>>>>>> 83df02299248711ea3418b41e1f8252e7c6f6c98
     "large_2021_rl": {"scenario": "example_03b", "study_case": "base_case_2021"},
     "large_2019_storage": {
         "scenario": "example_03c",
@@ -125,6 +136,10 @@ available_examples = {
         "scenario": "future_markets_paper",
         "study_case": "base_case_2013_pp_bat",
     },
+    "case_study_2025": {
+        "scenario": "example_03d",
+        "study_case": "base_heu",
+    },
 }
 
 
@@ -141,7 +156,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "large_2019_rl"
+    example = "case_study_2025"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db_8459abd.db"
@@ -158,7 +173,6 @@ if __name__ == "__main__":
         scenario=available_examples[example]["scenario"],
         study_case=available_examples[example]["study_case"],
     )
-
 
     if world.learning_mode:
         # run learning if learning mode is enabled

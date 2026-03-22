@@ -248,8 +248,20 @@ class Learning(Role):
         # Get timestamps from cache we took
         all_timestamps = sorted(current_obs.keys())
         if len(all_timestamps) > 1:
-            # Remove last timestamp that has no reward yet
-            timestamps_to_process = all_timestamps[:-1]
+            # Identify all incomplete timesteps (no reward yet)
+            incomplete_timestamps = [
+                ts for ts in all_timestamps if ts not in current_rewards
+            ]
+
+            # Process only complete timesteps
+            timestamps_to_process = [
+                ts for ts in all_timestamps if ts not in incomplete_timestamps
+            ]
+            # Carry over incomplete timesteps to new cache dicts
+            for ts in incomplete_timestamps:
+                self.all_obs[ts] = current_obs[ts]
+                self.all_actions[ts] = current_actions[ts]
+                self.all_noises[ts] = current_noises[ts]
 
             # Create filtered cache (only complete timesteps)
             cache = {
@@ -293,9 +305,13 @@ class Learning(Role):
 
         # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
         self.buffer.add(
-            obs=transform_buffer_data(cache["obs"], device),
-            actions=transform_buffer_data(cache["actions"], device),
-            reward=transform_buffer_data(cache["rewards"], device),
+            obs=transform_buffer_data(cache["obs"], device, self.rl_strats.keys()),
+            actions=transform_buffer_data(
+                cache["actions"], device, self.rl_strats.keys()
+            ),
+            reward=transform_buffer_data(
+                cache["rewards"], device, self.rl_strats.keys()
+            ),
         )
 
         if (

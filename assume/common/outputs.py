@@ -262,16 +262,13 @@ class WriteOutput(Role):
         Args:
             rl_params (dict): The RL parameters.
         """
+        # check for tensors and convert them to floats
+        rl_params = convert_tensors(rl_params)
 
         df = pd.DataFrame.from_records(rl_params, index="datetime")
         df["simulation"] = self.simulation_id
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
-
-        # check for tensors and convert them to floats
-        # apply per column to ensure correct restructering after conversion
-        for col in df.columns:
-            df[col] = df[col].apply(convert_tensors)
 
         return df
 
@@ -282,14 +279,13 @@ class WriteOutput(Role):
         Args:
             rl_grad_params (dict): The RL parameters per gradient step.
         """
+        # check for tensors and convert them to floats
+        rl_grad_params = convert_tensors(rl_grad_params)
 
         df = pd.DataFrame.from_records(rl_grad_params, index="step")
         df["simulation"] = self.simulation_id
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
-
-        # check for tensors and convert them to floats
-        df = df.apply(convert_tensors)
 
         return df
 
