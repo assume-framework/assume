@@ -1,7 +1,7 @@
-name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_costs,hot_start_cost,warm_start_cost,cold_start_cost,unit_operator
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,ramp_up,ramp_down,additional_cost,hot_start_cost,warm_start_cost,cold_start_cost,unit_operator
 Wind Onshore,wind_onshore,powerplant_energy_heuristic_flexable,renewable,0.0,68200,0,1.0,,,1.0,0.0,0.0,0.0,renewables_operator
 Wind Offshore,wind_offshore,powerplant_energy_heuristic_flexable,renewable,0.0,9700,0,1.0,,,1.5,0.0,0.0,0.0,renewables_operator
-Solar,solar,powerplant_energy_heuristic_flexable,renewable,0.0,117700,0,1.0,,,0.5,0.0,0.0,0.0,renewables_operator
+Solar,solar,powerplant_energy_heuristic_flexable,renewable,0.0,107700,0,1.0,,,0.5,0.0,0.0,0.0,renewables_operator
 Hydro,hydro,powerplant_energy_heuristic_flexable,renewable,0.0,4940,0,1.0,,,0.5,0.0,0.0,0.0,renewables_operator
 Biomass,biomass,powerplant_energy_heuristic_flexable,renewable,0.0,8340,0,1.0,,,0.25,0.0,0.0,0.0,renewables_operator
 NEURATH F,lignite,powerplant_energy_learning,lignite,0.406,1120,560,0.434,590.0,590.0,1.65,30.4,47.5,69.3,RL_operator
