@@ -89,3 +89,48 @@ base_case_2019_old8459abd_dispatch:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
+base_case_2019_old8459abd_dispatch:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-09 00:00
+  time_step: 1h
+  learning_mode: false
+  save_frequency_hours: null
+  seed: null
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_load_path: learned_strategies/base_dispatch/avg_reward_eval_policies
+    trained_policies_save_path: learned_strategies/base_dispatch/last_policies
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.0001
+    learning_rate_schedule: linear
+    training_episodes: 0
+    episodes_collecting_initial_experience: 0
+    train_freq: 10h
+    gradient_steps: 1
+    batch_size: 128
+    gamma: 0.99
+    device: cuda:0
+    action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+      - duration: 1h
+        count: 1
+        first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
