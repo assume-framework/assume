@@ -32,6 +32,11 @@ def ev_model_with_availability(ev_config):
     model = pyo.ConcreteModel()
     model.time_steps = pyo.Set(initialize=[idx for idx, _ in enumerate(range(10))])
 
+    # Add electricity price parameter required by EV component
+    model.electricity_price = pyo.Param(
+        model.time_steps, initialize={t: 50 for t in model.time_steps}, mutable=True
+    )
+
     # Create an availability profile as a pandas Series (1 = available, 0 = unavailable)
     availability_profile = pd.Series(
         [1, 0, 1, 1, 0, 1, 1, 0, 1, 1], index=model.time_steps
@@ -56,7 +61,7 @@ def ev_model_with_availability(ev_config):
 
     # Solve the model
     solver = pyo.SolverFactory(use_solver)
-    results = solver.solve(model, tee=True)
+    results = solver.solve(model)
 
     return model, results
 
@@ -67,8 +72,13 @@ def ev_model_with_charging_profile(ev_config):
     model = pyo.ConcreteModel()
     model.time_steps = pyo.Set(initialize=[idx for idx, _ in enumerate(range(10))])
 
-    # Provide an availability profile where the EV is always available (1 for all time steps)
-    availability_profile = pd.Series([1] * 10, index=model.time_steps)
+    # Add electricity price parameter required by EV component
+    model.electricity_price = pyo.Param(
+        model.time_steps, initialize={t: 50 for t in model.time_steps}, mutable=True
+    )
+
+    # No availability profile when using charging profile (only one or the other accepted)
+    availability_profile = None
 
     # Create a charging profile as a pandas Series (predefined charging schedule)
     charging_profile = pd.Series(
@@ -91,7 +101,7 @@ def ev_model_with_charging_profile(ev_config):
 
     # Solve the model
     solver = pyo.SolverFactory(use_solver)
-    results = solver.solve(model, tee=True)
+    results = solver.solve(model)
 
     return model, results
 
@@ -116,8 +126,9 @@ def test_ev_availability_profile(ev_model_with_availability):
             assert discharge == 0
         # When available, check if charge and discharge are within allowable limits
         else:
-            assert charge <= model.ev.max_power_charge
-            assert discharge <= model.ev.max_power_discharge
+            # Use a small tolerance for floating-point comparison
+            assert charge <= pyo.value(model.ev.max_power_charge) + 1e-5
+            assert discharge <= pyo.value(model.ev.max_power_discharge) + 1e-5
 
 
 # Test for EV with charging profile
