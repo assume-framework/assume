@@ -160,8 +160,8 @@ class DSMFlex:
     def electricity_price_signal(self, model):
         """
         Determine the optimal operation using a new electricity price signal.
+        Allows power flexibility within cost tolerance limits.
         """
-
         # Replace electricity price parameter
         if hasattr(model, "electricity_price"):
             model.del_component(model.electricity_price)
@@ -177,13 +177,27 @@ class DSMFlex:
             ),
         )
 
-        # Rebuild variable cost constraint so it uses the updated electricity_price
+        # Add cost tolerance parameter
+        model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
+        model.total_cost = pyo.Param(initialize=0.0, mutable=True)
+
+        # Delete old cost constraints that may conflict
         if hasattr(model, "variable_cost_constraint"):
             model.del_component(model.variable_cost_constraint)
+        if hasattr(model, "cost_per_time_step"):
+            model.del_component(model.cost_per_time_step)
 
+        # Define new variable cost constraint based on electricity price
         @model.Constraint(model.time_steps)
         def variable_cost_constraint(m, t):
             return m.variable_cost[t] == m.total_power_input[t] * m.electricity_price[t]
+
+        # Add cost tolerance constraint
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
 
         @model.Objective(sense=pyo.minimize)
         def obj_rule_flex(m):
@@ -832,12 +846,18 @@ class DSMFlex:
         """
         # deactivate the optimal constraints and objective
         instance.obj_rule_opt.deactivate()
-        instance.total_power_input_constraint.deactivate()
 
-        # fix values of model.total_power_input
-        for t in instance.time_steps:
-            instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
-        instance.total_cost = self.total_cost
+        # For electricity_price_signal, don't fix power input - let it vary within cost tolerance
+        if self.flexibility_measure != "electricity_price_signal":
+            instance.total_power_input_constraint.deactivate()
+
+            # fix values of model.total_power_input
+            for t in instance.time_steps:
+                instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
+            instance.total_cost = self.total_cost
+        else:
+            # For electricity_price_signal, set the cost upper limit that was computed
+            instance.total_cost = self.total_cost
 
         return instance
 
