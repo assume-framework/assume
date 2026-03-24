@@ -672,5 +672,117 @@ def test_without_charging_stations_evs_directly_affect_power_balance(
         assert abs(_val(instance.total_power_input[t]) - expected) <= 1e-5
 
 
+def test_building_forecaster_getitem_returns_component_profile(
+    building_forecaster_with_ev_cs,
+):
+    prof = building_forecaster_with_ev_cs[
+        "A360_electric_vehicle_1_availability_profile"
+    ]
+    rng = building_forecaster_with_ev_cs["A360_electric_vehicle_1_range"]
+
+    assert len(prof) == 8
+    assert len(rng) == 8
+    assert prof.iloc[2] == 0
+    assert rng.iloc[2] == 5
+
+
+def test_building_forecaster_getitem_missing_key_raises_keyerror(
+    building_forecaster_with_ev_cs,
+):
+    with pytest.raises(KeyError):
+        _ = building_forecaster_with_ev_cs["A360_non_existing_profile"]
+
+
+def test_building_classifies_components_by_prefix(
+    building_forecaster_with_ev_cs,
+    building_components_with_cs,
+):
+    building = _make_building(
+        building_forecaster_with_ev_cs, building_components_with_cs
+    )
+
+    assert building.evs == ["electric_vehicle_1", "electric_vehicle_2"]
+    assert building.charging_stations == ["charging_station_1", "charging_station_2"]
+    assert building.has_ev is True
+    assert building.has_charging_station is True
+
+
+def test_building_no_charging_station_mode_has_no_assignment_vars(
+    building_forecaster_with_ev_cs,
+    building_components_without_cs,
+):
+    building = _make_building(
+        building_forecaster_with_ev_cs, building_components_without_cs
+    )
+    _, instance, _ = _solve_building_opt(building)
+
+    assert building.has_charging_station is False
+    assert not hasattr(instance, "is_assigned")
+    assert not hasattr(instance, "charge_assignment")
+
+
+def test_building_with_charging_station_mode_has_assignment_vars(
+    building_forecaster_with_ev_cs,
+    building_components_with_cs,
+):
+    building = _make_building(
+        building_forecaster_with_ev_cs, building_components_with_cs
+    )
+    _, instance, _ = _solve_building_opt(building)
+
+    assert building.has_charging_station is True
+    assert hasattr(instance, "is_assigned")
+    assert hasattr(instance, "charge_assignment")
+
+
+def test_electricity_price_signal_replaces_building_price_signal(
+    building_forecaster_with_ev_cs,
+    building_components_without_cs,
+):
+    building = _make_building(
+        building_forecaster_with_ev_cs, building_components_without_cs
+    )
+
+    # setup model with flex logic included
+    building.setup_model(presolve=True)
+
+    for t in building.model.time_steps:
+        assert (
+            abs(
+                _val(building.model.electricity_price[t])
+                - float(building.forecaster.electricity_price_flex.iloc[t])
+            )
+            <= 1e-5
+        )
+
+
+def test_variable_cost_uses_flex_price_signal_in_building_mode(
+    building_forecaster_with_ev_cs,
+    building_components_without_cs,
+):
+    building = _make_building(
+        building_forecaster_with_ev_cs, building_components_without_cs
+    )
+    _, instance, _ = _solve_building_opt(building)
+
+    for t in instance.time_steps:
+        expected = _val(instance.total_power_input[t]) * _val(
+            instance.electricity_price[t]
+        )
+        assert abs(_val(instance.variable_cost[t]) - expected) <= 1e-5
+
+
+def test_assignment_variables_have_expected_dimensions(
+    solved_building_with_cs,
+):
+    _, instance, _ = solved_building_with_cs
+
+    for ev in instance.evs:
+        for cs in instance.charging_stations:
+            for t in instance.time_steps:
+                _ = instance.is_assigned[ev, cs, t]
+                _ = instance.charge_assignment[ev, cs, t]
+
+
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
