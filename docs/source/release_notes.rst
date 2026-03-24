@@ -12,6 +12,30 @@ Upcoming Release
   The features in this section are not released yet, but will be part of the next release! To use the features already you have to install the main branch,
   e.g. ``pip install git+https://github.com/assume-framework/assume``
 
+0.6.1 - (25th March 2026)
+=========================
+
+  **Improvements:**
+  - **Extend building units to support multiple sub-assets**: Building units can now include multiple components of the same technology type using prefix-based component handling. This enables configurations with multiple electric vehicles and multiple charging stations within the same building unit.
+  - **Improve building forecast handling**: The building forecasting workflow has been extended to support aggregate building profiles as well as component-specific profiles such as EV availability, EV range, charging-station availability, and flexible electricity-price signals.
+  - **Clarify building forecast naming conventions**: Aggregate building forecast columns now use explicit names such as ``<building_id>_load_profile`` instead of ambiguous bare building identifiers.
+  - **Extend DSM component initialization**: DSM component initialization now supports prefixed component names such as ``electric_vehicle_1`` and ``charging_station_2`` and forwards EV-specific external range data during model construction.
+  - **Expand building test coverage**: Building tests were extended to cover both core building assets and the new EV and charging-station integration logic, including direct-grid fallback when no charging station is present.
+
+  **Bug Fixes:**
+  - **Fix building flexibility initialization under electricity price signals**: Fixed building flexibility initialization so that the ``electricity_price_signal`` flexibility measure works with building-specific flexible electricity-price inputs.
+  - **Fix model switching for flexibility modes**: Fixed the optimization mode switching logic in ``DSMFlex.switch_to_opt()`` so that it no longer assumes the presence of flexibility constraints that are not created for all flexibility measures.
+  - **Fix variable-cost evaluation under flexible electricity-price signals**: Fixed variable-cost calculation when flexible electricity-price signals are activated by rebuilding the relevant cost linkage after replacing the active price parameter.
+  - **Fix malformed example input handling during testing**: Corrected issues caused by malformed or incomplete example forecast and fuel-price input files used for testing and validation.
+
+  **New Features:**
+  - **Electric vehicle model for buildings**: Added an updated ``ElectricVehicle`` DSM component with explicit mobility-related energy use, availability-dependent operation, external range input, bidirectional or unidirectional power flow, and binary non-simultaneity for charging and discharging.
+  - **Charging station model for buildings**: Added a dedicated ``ChargingStation`` DSM component with optional availability profiles, ramp constraints, and support for unidirectional or bidirectional operation.
+  - **Integrated EV and charging-station building topology**: Buildings now support two connection modes:
+    - If no charging station is included, EVs connect directly to the building/grid balance.
+    - If charging stations are included, charging stations connect to the building/grid and EVs connect to the charging stations through assignment variables.
+  - **Building-specific flexible electricity-price support**: Added support for ``electricity_price_flex`` in ``BuildingForecaster`` for use with the ``electricity_price_signal`` flexibility measure.
+
 0.6.0 - (18th March 2026)
 =========================
 

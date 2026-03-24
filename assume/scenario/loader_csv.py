@@ -677,6 +677,62 @@ def load_config_and_create_forecaster(
                     forecast_algorithms, unit
                 )
                 if type == "building":
+                    # Base aggregate building profiles
+                    building_load_profile = (
+                        forecasts_df[f"{id}_load_profile"]
+                        if forecasts_df is not None
+                        and f"{id}_load_profile" in forecasts_df.columns
+                        else pd.Series(0.0, index=index, name=f"{id}_load_profile")
+                    )
+
+                    building_heat_demand = (
+                        forecasts_df[f"{id}_heat_demand"]
+                        if forecasts_df is not None
+                        and f"{id}_heat_demand" in forecasts_df.columns
+                        else pd.Series(0.0, index=index, name=f"{id}_heat_demand")
+                    )
+
+                    building_pv_profile = (
+                        forecasts_df[f"{id}_pv_profile"]
+                        if forecasts_df is not None
+                        and f"{id}_pv_profile" in forecasts_df.columns
+                        else pd.Series(0.0, index=index, name=f"{id}_pv_profile")
+                    )
+
+                    building_battery_profile = (
+                        forecasts_df[f"{id}_battery_load_profile"]
+                        if forecasts_df is not None
+                        and f"{id}_battery_load_profile" in forecasts_df.columns
+                        else pd.Series(
+                            0.0, index=index, name=f"{id}_battery_load_profile"
+                        )
+                    )
+
+                    building_ev_profile = (
+                        forecasts_df[f"{id}_ev_load_profile"]
+                        if forecasts_df is not None
+                        and f"{id}_ev_load_profile" in forecasts_df.columns
+                        else pd.Series(0.0, index=index, name=f"{id}_ev_load_profile")
+                    )
+
+                    building_electricity_price_flex = (
+                        forecasts_df[f"{id}_electricity_price_flex"]
+                        if forecasts_df is not None
+                        and f"{id}_electricity_price_flex" in forecasts_df.columns
+                        else pd.Series(
+                            0.0, index=index, name=f"{id}_electricity_price_flex"
+                        )
+                    )
+
+                    # collect arbitrary component-level forecasts for this building
+                    extra_building_profiles = {}
+
+                    if forecasts_df is not None:
+                        building_prefix = f"{id}_"
+                        for col in forecasts_df.columns:
+                            if col.startswith(building_prefix):
+                                extra_building_profiles[col] = forecasts_df[col]
+
                     unit_forecasts[id] = BuildingForecaster(
                         index=shared_unit_index,
                         availability=availability.get(
@@ -685,11 +741,13 @@ def load_config_and_create_forecaster(
                         forecast_algorithms=unit_forecast_algorithms,
                         forecast_registries=forecast_registries,
                         fuel_prices=fuel_prices_df,
-                        load_profile=0,  # TODO
-                        ev_load_profile=0,  # TODO
-                        heat_demand=0,  # TODO
-                        battery_load_profile=0,  # TODO
-                        pv_profile=0,  # TODO
+                        load_profile=building_load_profile,
+                        ev_load_profile=building_ev_profile,
+                        heat_demand=building_heat_demand,
+                        battery_load_profile=building_battery_profile,
+                        pv_profile=building_pv_profile,
+                        electricity_price_flex=building_electricity_price_flex,
+                        **extra_building_profiles,
                     )
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(

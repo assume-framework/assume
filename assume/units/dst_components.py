@@ -1390,40 +1390,62 @@ class ElectricArcFurnace:
 
 class ElectricVehicle(GenericStorage):
     """
-    A class to represent an Electric Vehicle (EV) unit in an energy system model.
+    Electric vehicle model for multi-asset applications.
 
-    The class encapsulates the parameters, variables, and constraints necessary to model
-    the behavior of an EV, including charging and discharging, battery storage limits, availability
-    profiles, and ramp rates.
+    Extends GenericStorage with:
+    - vehicle availability
+    - optional predefined charging profile
+    - transport energy use via `external_range`
+    - unidirectional / bidirectional operation
+    - binary non-simultaneity of charging and discharging
 
-    Inherits from GenericStorage and adds EV-specific functionality, such as availability profiles
-    and predefined charging profiles.
-
-    Args:
-        capacity (float): Energy capacity of the EV battery in MWh.
-        min_soc (float): Minimum soc of the EV battery (between 0 and 1).
-        max_soc (float): Maximum soc of the EV battery (between 0 and 1).
-        max_power_charge (float): Maximum allowable charging power.
-        max_power_discharge (float): Maximum allowable discharging power. Defaults to 0 (no discharging allowed).
-        availability_profile (pd.Series): A pandas Series indicating the EV's availability, where 1 means available and 0 means unavailable.
-        time_steps (list[int]): A list of time steps over which the EV operates.
-        efficiency_charge (float, optional): Charging efficiency of the EV. Defaults to 1.0.
-        efficiency_discharge (float, optional): Discharging efficiency of the EV. Defaults to 1.0.
-        initial_soc (float, optional): Initial state of charge (SOC) of the EV, represented as a fraction of `capacity`. Defaults to 1.0.
-        ramp_up (float, optional): Maximum allowed increase in charging power per time step. Defaults to None (no ramp constraint).
-        ramp_down (float, optional): Maximum allowed decrease in charging power per time step. Defaults to None (no ramp constraint).
-        charging_profile (pd.Series | None, optional): A predefined charging profile. If provided, the EV follows this profile instead of optimizing the charge. Defaults to None.
+    Parameters
+    ----------
+    capacity : float
+        Battery energy capacity [same energy unit as charge/discharge integration].
+    time_steps : list[int]
+        Optimisation time steps.
+    availability_profile : pd.Series | None
+        1 when vehicle is connected/available at the charging location, 0 otherwise.
+    max_power_charge : float
+        Maximum charging power.
+    min_soc : float, default 0.0
+        Minimum SOC in fraction of capacity.
+    max_soc : float, default 1.0
+        Maximum SOC in fraction of capacity.
+    max_power_discharge : float, default 0.0
+        Maximum discharging power.
+    efficiency_charge : float, default 1.0
+        Charging efficiency.
+    efficiency_discharge : float, default 1.0
+        Discharging efficiency.
+    initial_soc : float, default 1.0
+        Initial SOC in fraction of capacity.
+    ramp_up : float | None
+        Max increase in charge/discharge power between consecutive steps.
+    ramp_down : float | None
+        Max decrease in charge/discharge power between consecutive steps.
+    charging_profile : pd.Series | None
+        Optional fixed charging profile.
+    storage_loss_rate : float, default 0.0
+        Fractional storage loss per time step.
+    mileage : float | None
+        Specific electricity consumption for driving.
+        Interpreted here as energy per unit of external_range.
+        Example: if external_range is km, mileage should be MWh/km.
+    power_flow_directionality : str, default "unidirectional"
+        Either "unidirectional" or "bidirectional".
     """
 
     def __init__(
         self,
         capacity: float,
         time_steps: list[int],
-        availability_profile: pd.Series,
         max_power_charge: float,
+        availability_profile: pd.Series | None = None,
         min_soc: float = 0.0,
         max_soc: float = 1.0,
-        max_power_discharge: float = 0,
+        max_power_discharge: float = 0.0,
         efficiency_charge: float = 1.0,
         efficiency_discharge: float = 1.0,
         initial_soc: float = 1.0,
@@ -1431,9 +1453,10 @@ class ElectricVehicle(GenericStorage):
         ramp_down: float | None = None,
         charging_profile: pd.Series | None = None,
         storage_loss_rate: float = 0.0,
+        mileage: float | None = None,
+        power_flow_directionality: str = "unidirectional",
         **kwargs,
     ):
-        # Call the parent class (GenericStorage) __init__ method
         super().__init__(
             capacity=capacity,
             time_steps=time_steps,
@@ -1450,75 +1473,314 @@ class ElectricVehicle(GenericStorage):
             **kwargs,
         )
 
-        # EV-specific attributes
         self.availability_profile = availability_profile
         self.charging_profile = charging_profile
+        self.mileage = mileage
+        self.power_flow_directionality = power_flow_directionality.lower()
+
+        if self.power_flow_directionality not in ["unidirectional", "bidirectional"]:
+            raise ValueError(
+                "power_flow_directionality must be either 'unidirectional' or 'bidirectional'."
+            )
+
+        if availability_profile is not None and charging_profile is not None:
+            raise ValueError(
+                "Provide either `availability_profile` or `charging_profile`, not both."
+            )
 
     def add_to_model(
-        self, model: pyo.ConcreteModel, model_block: pyo.Block
+        self,
+        model: pyo.ConcreteModel,
+        model_block: pyo.Block,
+        external_range: pyo.Param | None = None,
     ) -> pyo.Block:
         """
-        Adds an EV block to the Pyomo model, defining parameters, variables, and constraints.
+        Add EV to Pyomo model.
 
-        Pyomo Components:
-            - **Parameters**:
-                - `capacity`: Energy capacity of the EV battery in MWh.
-                - `min_soc`: Minimum allowable state of charge (SOC) of the EV battery (between 0 and 1).
-                - `max_soc`: Maximum allowable state of charge (SOC) of the EV battery (between 0 and 1).
-                - `max_power_charge`: Maximum charging power.
-                - `max_power_discharge`: Maximum discharging power.
-                - `efficiency_charge`: Charging efficiency.
-                - `efficiency_discharge`: Discharging efficiency.
-
-            - **Variables**:
-                - `charge[t]`: Charging power input at each time step `t`.
-                - `discharge[t]`: Discharging power output at each time step `t`.
-                - `soc[t]`: State of charge (SOC) of the EV battery at each time step `t`.
-
-            - **Constraints**:
-                - `availability_constraints`: Ensures charging and discharging occur only during available periods.
-                - `charging_profile_constraints`: Enforces predefined charging profiles if provided.
-                - `soc_constraints`: Keeps SOC between `min_soc` and `max_soc`.
-                - `ramp_constraints`: Limits ramp-up and ramp-down rates for charging.
-
-        Args:
-            model (pyo.ConcreteModel): A Pyomo ConcreteModel object representing the optimization model.
-            model_block (pyo.Block): A Pyomo Block object to which the EV component will be added.
-
-        Returns:
-            pyo.Block: A Pyomo block representing the EV with variables and constraints.
+        Parameters
+        ----------
+        model : pyo.ConcreteModel
+        model_block : pyo.Block
+        external_range : pyo.Param | None
+            Exogenous driving requirement per time step.
+            Required if mobility-related usage should be modelled.
+            usage[t] = (1 - availability[t]) * external_range[t] * mileage
         """
-
-        # Call the parent class (GenericStorage) add_to_model method
+        # Start from generic storage structure
         model_block = super().add_to_model(model, model_block)
 
-        # Apply availability profile constraints if provided
+        # Extra parameters
+        model_block.mileage = pyo.Param(
+            initialize=0.0 if self.mileage is None else self.mileage,
+            mutable=False,
+        )
+
+        # Extra variables
+        model_block.operating_cost = pyo.Var(self.time_steps, within=pyo.Reals)
+        model_block.usage = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.status = pyo.Var(
+            self.time_steps,
+            within=pyo.Binary,
+            doc="1 => charging mode, 0 => discharging mode",
+        )
+
+        # Replace the GenericStorage SOC equation with EV-specific one
+        if hasattr(model_block, "soc_balance_rule"):
+            model_block.del_component(model_block.soc_balance_rule)
+
+        @model_block.Constraint(self.time_steps)
+        def soc_balance_rule(b, t):
+            if t == self.time_steps.at(1):
+                prev_soc = b.initial_soc
+            else:
+                prev_soc = b.soc[t - 1]
+
+            return b.soc[t] == (
+                prev_soc
+                + (
+                    b.efficiency_charge * b.charge[t]
+                    - (1 / b.efficiency_discharge) * b.discharge[t]
+                    - b.storage_loss_rate * prev_soc * b.capacity
+                    - b.usage[t]
+                )
+                / b.capacity
+            )
+
+        # No simultaneous charging and discharging
+        @model_block.Constraint(self.time_steps)
+        def charge_mode_constraint(b, t):
+            return b.charge[t] <= b.max_power_charge * b.status[t]
+
+        if self.power_flow_directionality == "bidirectional":
+
+            @model_block.Constraint(self.time_steps)
+            def discharge_mode_constraint(b, t):
+                return b.discharge[t] <= b.max_power_discharge * (1 - b.status[t])
+
+        else:
+
+            @model_block.Constraint(self.time_steps)
+            def unidirectional_discharge_constraint(b, t):
+                return b.discharge[t] == 0
+
+        # Availability logic
         if self.availability_profile is not None:
             if len(self.availability_profile) != len(self.time_steps):
                 raise ValueError(
-                    "Length of `availability_profile` must match the number of `time_steps`."
+                    "Length of `availability_profile` must match number of `time_steps`."
                 )
-
-            @model_block.Constraint(self.time_steps)
-            def discharge_availability_constraint(b, t):
-                availability = self.availability_profile.iat[t]
-                return b.discharge[t] <= availability * b.max_power_discharge
 
             @model_block.Constraint(self.time_steps)
             def charge_availability_constraint(b, t):
                 availability = self.availability_profile.iat[t]
                 return b.charge[t] <= availability * b.max_power_charge
 
-        # Apply predefined charging profile constraints if provided
+            @model_block.Constraint(self.time_steps)
+            def discharge_availability_constraint(b, t):
+                availability = self.availability_profile.iat[t]
+                if self.power_flow_directionality == "bidirectional":
+                    return b.discharge[t] <= availability * b.max_power_discharge
+                return b.discharge[t] == 0
+
+            # Driving usage only when unavailable
+            if external_range is not None:
+                if self.mileage is None:
+                    raise ValueError(
+                        "`mileage` must be provided when `external_range` is used."
+                    )
+
+                @model_block.Constraint(self.time_steps)
+                def usage_constraint(b, t):
+                    availability = self.availability_profile.iat[t]
+                    return b.usage[t] == (1 - availability) * (
+                        external_range[t] * b.mileage
+                    )
+
+            else:
+
+                @model_block.Constraint(self.time_steps)
+                def usage_constraint(b, t):
+                    return b.usage[t] == 0
+
+        else:
+            # No availability profile: no exogenous mobility depletion
+            @model_block.Constraint(self.time_steps)
+            def usage_constraint(b, t):
+                return b.usage[t] == 0
+
+        # Optional fixed charging profile
         if self.charging_profile is not None:
             if len(self.charging_profile) != len(self.time_steps):
                 raise ValueError(
-                    "Length of `charging_profile` must match the number of `time_steps`."
+                    "Length of `charging_profile` must match number of `time_steps`."
                 )
 
             @model_block.Constraint(self.time_steps)
             def charging_profile_constraint(b, t):
                 return b.charge[t] == self.charging_profile.iat[t]
+
+        # Operating costs: charging cost minus discharge revenue
+        # If you want pure charging cost only, remove the second term.
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_constraint_rule(b, t):
+            return b.operating_cost[t] == (
+                b.charge[t] * model.electricity_price[t]
+                - b.discharge[t] * model.electricity_price[t]
+            )
+
+        return model_block
+
+
+class ChargingStation:
+    """
+    Charging station model for EV fleets / depots.
+
+    Supports:
+    - unidirectional or bidirectional power flow
+    - ramp constraints
+    - optional availability profile
+    - non-simultaneous charging/discharging in bidirectional mode
+
+    Parameters
+    ----------
+    time_steps : list[int]
+        Optimisation time steps.
+    max_power : float
+        Maximum charging/discharging power.
+    min_power : float, default 0.0
+        Minimum non-zero operating power, if used.
+    ramp_up : float | None
+        Max increase in power between steps.
+    ramp_down : float | None
+        Max decrease in power between steps.
+    availability_profile : pd.Series | None
+        Optional availability profile.
+    power_flow_directionality : str, default "unidirectional"
+        Either "unidirectional" or "bidirectional".
+    """
+
+    def __init__(
+        self,
+        time_steps: list[int],
+        max_power: float,
+        min_power: float = 0.0,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        availability_profile: pd.Series | None = None,
+        power_flow_directionality: str = "unidirectional",
+        **kwargs,
+    ):
+        self.time_steps = time_steps
+        self.max_power = max_power
+        self.min_power = min_power
+        self.ramp_up = max_power if ramp_up is None else ramp_up
+        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.availability_profile = availability_profile
+        self.power_flow_directionality = power_flow_directionality.lower()
+        self.kwargs = kwargs
+
+        if self.power_flow_directionality not in ["unidirectional", "bidirectional"]:
+            raise ValueError(
+                "power_flow_directionality must be either 'unidirectional' or 'bidirectional'."
+            )
+
+    def add_to_model(
+        self,
+        model: pyo.ConcreteModel,
+        model_block: pyo.Block,
+    ) -> pyo.Block:
+        # Parameters
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+
+        # Variables
+        # In this convention:
+        # - charge: power drawn from grid to EVs
+        # - discharge: power fed from EVs/depot back outward
+        model_block.charge = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+        )
+        model_block.discharge = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+        )
+
+        if self.power_flow_directionality == "bidirectional":
+            model_block.charging_mode = pyo.Var(self.time_steps, within=pyo.Binary)
+
+            @model_block.Constraint(self.time_steps)
+            def prevent_simultaneous_charge_discharge(b, t):
+                return b.charge[t] <= b.max_power * b.charging_mode[t]
+
+            @model_block.Constraint(self.time_steps)
+            def discharge_only_when_not_charging_mode(b, t):
+                return b.discharge[t] <= b.max_power * (1 - b.charging_mode[t])
+
+        else:
+
+            @model_block.Constraint(self.time_steps)
+            def unidirectional_no_discharge(b, t):
+                return b.discharge[t] == 0
+
+        # Availability
+        if self.availability_profile is not None:
+            if len(self.availability_profile) != len(self.time_steps):
+                raise ValueError(
+                    "Length of `availability_profile` must match number of `time_steps`."
+                )
+
+            @model_block.Constraint(self.time_steps)
+            def charge_availability_constraint(b, t):
+                availability = self.availability_profile.iat[t]
+                return b.charge[t] <= availability * b.max_power
+
+            @model_block.Constraint(self.time_steps)
+            def discharge_availability_constraint(b, t):
+                availability = self.availability_profile.iat[t]
+                return b.discharge[t] <= availability * b.max_power
+
+        # Minimum power only if active
+        # This is optional and only enforced in bidirectional mode where an activity binary exists.
+        if self.min_power > 0 and self.power_flow_directionality == "bidirectional":
+
+            @model_block.Constraint(self.time_steps)
+            def min_charge_if_active(b, t):
+                return b.charge[t] >= b.min_power * b.charging_mode[t]
+
+            @model_block.Constraint(self.time_steps)
+            def min_discharge_if_active(b, t):
+                return b.discharge[t] >= b.min_power * (1 - b.charging_mode[t])
+
+        # Ramping: charge
+        @model_block.Constraint(self.time_steps)
+        def charge_ramp_up_constraint(b, t):
+            if t == self.time_steps.at(1):
+                return b.charge[t] <= b.ramp_up
+            return b.charge[t] - b.charge[t - 1] <= b.ramp_up
+
+        @model_block.Constraint(self.time_steps)
+        def charge_ramp_down_constraint(b, t):
+            if t == self.time_steps.at(1):
+                return b.charge[t] <= b.ramp_down
+            return b.charge[t - 1] - b.charge[t] <= b.ramp_down
+
+        # Ramping: discharge
+        @model_block.Constraint(self.time_steps)
+        def discharge_ramp_up_constraint(b, t):
+            if t == self.time_steps.at(1):
+                return b.discharge[t] <= b.ramp_up
+            return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
+
+        @model_block.Constraint(self.time_steps)
+        def discharge_ramp_down_constraint(b, t):
+            if t == self.time_steps.at(1):
+                return b.discharge[t] <= b.ramp_down
+            return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
 
         return model_block
 
@@ -1769,6 +2031,7 @@ demand_side_technologies: dict = {
     "heat_pump": HeatPump,
     "boiler": Boiler,
     "electric_vehicle": ElectricVehicle,
+    "charging_station": ChargingStation,
     "generic_storage": GenericStorage,
     "pv_plant": PVPlant,
     "thermal_storage": ThermalStorage,
