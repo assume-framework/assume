@@ -329,3 +329,138 @@ async def test_atomic_swap_concurrent_writes(learning_role):
     assert th.equal(
         learning_role.all_obs[concurrent_data_ts]["unit_1"][0], concurrent_obs
     )
+
+
+@pytest.mark.require_learning
+def test_per_level_initial_experience():
+    """Test that episodes_collecting_initial_experience works independently per level.
+
+    Units should exit exploration mode before markets when units has a lower
+    episodes_collecting_initial_experience value (curriculum learning).
+    """
+    units_cfg = LearningConfig(
+        train_freq="1h",
+        algorithm="matd3",
+        actor_architecture="mlp",
+        learning_mode=True,
+        evaluation_mode=False,
+        training_episodes=10,
+        episodes_collecting_initial_experience=2,
+        continue_learning=False,
+        trained_policies_save_path=None,
+        early_stopping_steps=10,
+        early_stopping_threshold=0.05,
+    )
+    markets_cfg = LearningConfig(
+        train_freq="1h",
+        algorithm="matd3",
+        actor_architecture="mlp",
+        learning_mode=True,
+        evaluation_mode=False,
+        training_episodes=10,
+        episodes_collecting_initial_experience=5,
+        continue_learning=False,
+        trained_policies_save_path=None,
+        early_stopping_steps=10,
+        early_stopping_threshold=0.05,
+    )
+    learning_config = {"units": units_cfg, "markets": markets_cfg}
+    shared_cfg = LearningConfig(
+        training_episodes=10,
+        validation_episodes_interval=5,
+    )
+
+    learn = LearningRole(
+        learning_config, start=start, end=end, shared_config=shared_cfg
+    )
+
+    # Register strategies per level; set collect_initial_experience_mode like
+    # TorchLearningStrategy would do at init.
+    unit_strat = LearningStrategy(
+        foresight=1,
+        act_dim=2,
+        unique_obs_dim=0,
+        learning_config=units_cfg,
+        learning_role=learn.get_level_view("units"),
+    )
+    unit_strat.collect_initial_experience_mode = True
+    learn.rl_strats["units"]["unit_1"] = unit_strat
+
+    market_strat = LearningStrategy(
+        foresight=1,
+        act_dim=2,
+        unique_obs_dim=0,
+        learning_config=markets_cfg,
+        learning_role=learn.get_level_view("markets"),
+    )
+    market_strat.collect_initial_experience_mode = True
+    learn.rl_strats["markets"]["market_1"] = market_strat
+
+    # Both should start in initial experience mode
+    assert unit_strat.collect_initial_experience_mode is True
+    assert market_strat.collect_initial_experience_mode is True
+
+    # Simulate 2 episodes done — units threshold reached, markets not yet
+    learn.episodes_done = 2
+    learn.turn_off_initial_exploration()
+
+    assert unit_strat.collect_initial_experience_mode is False, (
+        "Unit strategy should have exited exploration after 2 episodes"
+    )
+    assert market_strat.collect_initial_experience_mode is True, (
+        "Market strategy should still be exploring (needs 5 episodes)"
+    )
+
+    # Simulate 5 episodes done — both thresholds now met
+    learn.episodes_done = 5
+    learn.turn_off_initial_exploration()
+
+    assert market_strat.collect_initial_experience_mode is False, (
+        "Market strategy should have exited exploration after 5 episodes"
+    )
+
+
+@pytest.mark.require_learning
+def test_determine_validation_interval_uses_max():
+    """Test that determine_validation_interval uses the max initial experience across levels."""
+    units_cfg = LearningConfig(
+        learning_mode=True,
+        training_episodes=10,
+        episodes_collecting_initial_experience=2,
+        validation_episodes_interval=5,
+    )
+    markets_cfg = LearningConfig(
+        learning_mode=True,
+        training_episodes=10,
+        episodes_collecting_initial_experience=5,
+        validation_episodes_interval=5,
+    )
+    shared_cfg = LearningConfig(
+        training_episodes=10,
+        validation_episodes_interval=5,
+    )
+
+    learn = LearningRole(
+        {"units": units_cfg, "markets": markets_cfg},
+        start=start,
+        end=end,
+        shared_config=shared_cfg,
+    )
+
+    # Should not raise: 10 >= 5 (max initial) + 5 (validation interval)
+    interval = learn.determine_validation_interval()
+    assert interval == 5
+
+    # Now make training_episodes too small for the max initial experience
+    shared_cfg_bad = LearningConfig(
+        training_episodes=8,
+        validation_episodes_interval=5,
+    )
+    learn_bad = LearningRole(
+        {"units": units_cfg, "markets": markets_cfg},
+        start=start,
+        end=end,
+        shared_config=shared_cfg_bad,
+    )
+    with pytest.raises(ValueError, match="max initial experience episodes"):
+        learn_bad.determine_validation_interval()

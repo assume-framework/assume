@@ -91,7 +91,9 @@ class TensorBoardLogger:
     simulation_id (str): The unique identifier for the simulation.
     tensorboard_path (str, optional): Path for storing tensorboard logs.
     learning_mode (bool, optional): Whether the simulation is in learning mode. Defaults to False.
-    episodes_collecting_initial_experience (int, optional): Number of episodes for initial experience collection. Defaults to 0.
+    episodes_collecting_initial_experience (dict[str, int] | int, optional): Per-level number of
+        episodes for initial experience collection, keyed by level name. A plain int is accepted
+        for backward compatibility and applied to all levels. Defaults to 0.
     evaluation_mode (bool, optional): Whether the simulation is in evaluation mode. Defaults to False.
 
     """
@@ -104,14 +106,22 @@ class TensorBoardLogger:
         evaluation_mode: bool = False,
         episode: int = 1,
         eval_episode: int = 1,
-        episodes_collecting_initial_experience: int = 0,
+        episodes_collecting_initial_experience: dict[str, int] | int = 0,
     ):
         self.simulation_id = simulation_id
         self.learning_mode = learning_mode
         self.evaluation_mode = evaluation_mode
-        self.episodes_collecting_initial_experience = (
-            episodes_collecting_initial_experience
-        )
+        # Accept both a per-level dict and a plain int (backward compat)
+        if isinstance(episodes_collecting_initial_experience, int):
+            self._episodes_collecting_initial_experience_default = (
+                episodes_collecting_initial_experience
+            )
+            self.episodes_collecting_initial_experience: dict[str, int] = {}
+        else:
+            self._episodes_collecting_initial_experience_default = 0
+            self.episodes_collecting_initial_experience = (
+                episodes_collecting_initial_experience
+            )
 
         self.writers: dict[str, SummaryWriter] = {}  # per-level writers
         self.db_uri = db_uri
@@ -169,6 +179,12 @@ class TensorBoardLogger:
 
         for level in levels:
             self._update_tensorboard_for_level(level, mode)
+
+    def _get_initial_experience_episodes(self, level: str) -> int:
+        """Return the initial-experience episode count for level."""
+        return self.episodes_collecting_initial_experience.get(
+            level, self._episodes_collecting_initial_experience_default
+        )
 
     def _update_tensorboard_for_level(self, level: str, mode: str):
         """Store episodic evaluation data for a single level."""
@@ -259,7 +275,7 @@ class TensorBoardLogger:
             ORDER BY step
             """
             if mode == "02_train"
-            and self.episode > self.episodes_collecting_initial_experience
+            and self.episode > self._get_initial_experience_episodes(level)
             else None
         )
 
@@ -288,7 +304,7 @@ class TensorBoardLogger:
             datetimes = df_sim["dt"].unique()
             x_index = (self.episode - 1) * len(datetimes)
             if mode == "02_train":
-                x_index -= self.episodes_collecting_initial_experience * len(datetimes)
+                x_index -= self._get_initial_experience_episodes(level) * len(datetimes)
 
             # Define metric order explicitly
             metric_order_sim = {
@@ -381,7 +397,7 @@ class TensorBoardLogger:
                         writer.add_scalar(f"03_grad/{prefixed_name}", 0.0, step)
 
             episode_index = (
-                self.episode - self.episodes_collecting_initial_experience
+                self.episode - self._get_initial_experience_episodes(level)
                 if mode == "02_train"
                 else self.episode
             )

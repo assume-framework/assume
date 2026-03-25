@@ -1199,9 +1199,14 @@ def run_learning(
     eval_episode = 1
 
     training_episodes = world.learning_role.shared_config.training_episodes
-    episodes_collecting = (
-        world.learning_role.shared_config.episodes_collecting_initial_experience
-    )  # TODO: move to level-wise
+    episodes_collecting = max(
+        [
+            world.learning_role.learning_config[
+                level
+            ].episodes_collecting_initial_experience
+            for level in world.learning_role.active_levels
+        ]
+    )
 
     for episode in tqdm(
         range(1, training_episodes + 1),

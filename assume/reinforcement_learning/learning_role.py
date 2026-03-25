@@ -132,6 +132,10 @@ class LevelView:
             learning_rate, unit_params_list, level=self._level
         )
 
+    def get_progress_remaining(self) -> float:
+        """Return progress remaining scoped to this level."""
+        return self._role.get_progress_remaining(level=self._level)
+
     # --- Delegate everything else to the actual Learning role ---
 
     def __getattr__(self, name):
@@ -381,7 +385,9 @@ class LearningRole(Role):
         """
         Compute and validate validation_interval.
 
-        Uses episode-related config from the first level (these should be identical across levels).
+        Uses the maximum ``episodes_collecting_initial_experience`` across
+        all levels so that ``training_episodes`` is guaranteed to be
+        sufficient even for the slowest-starting level.
 
         Returns:
             validation_interval (int)
@@ -392,15 +398,17 @@ class LearningRole(Role):
         training_episodes = self.shared_config.training_episodes
         validation_interval = min(training_episodes, default_interval)
 
-        min_required_episodes = (
-            self.shared_config.episodes_collecting_initial_experience
-            + validation_interval
+        max_initial_experience = max(
+            cfg.episodes_collecting_initial_experience
+            for cfg in self.learning_config.values()
         )
+
+        min_required_episodes = max_initial_experience + validation_interval
 
         if self.shared_config.training_episodes < min_required_episodes:
             raise ValueError(
                 f"Training episodes ({training_episodes}) must be greater than the sum "
-                f"of initial experience episodes ({self.shared_config.episodes_collecting_initial_experience}) "
+                f"of max initial experience episodes ({max_initial_experience}) "
                 f"and evaluation interval ({validation_interval})."
             )
 
@@ -610,15 +618,11 @@ class LearningRole(Role):
             ac = {first_level: ac}
         self.initialize_policy(ac)
 
-        # Disable initial exploration if initial experience collection is complete
-        if (
-            self.episodes_done
-            >= self.shared_config.episodes_collecting_initial_experience
-        ):
-            self.turn_off_initial_exploration()
+        # Disable initial exploration per-level where collection is complete
+        self.turn_off_initial_exploration()
 
-        # In continue_learning mode, disable it only for loaded strategies
-        elif self.shared_config.continue_learning:
+        # In continue_learning mode, also disable it for loaded strategies
+        if self.shared_config.continue_learning:
             self.turn_off_initial_exploration(loaded_only=True)
 
     def get_inter_episodic_data(self):
@@ -643,16 +647,25 @@ class LearningRole(Role):
 
     def turn_off_initial_exploration(self, loaded_only=False) -> None:
         """
-        Disable initial exploration mode for all active levels.
+        Disable initial exploration mode for active levels whose initial
+        experience collection phase is complete.
+
+        Each level is checked independently against its own
+        ``episodes_collecting_initial_experience`` threshold, enabling
+        curriculum learning (e.g. unit agents can start learning before
+        market agents).
 
         If `loaded_only=True`, only turn off exploration for strategies that were loaded
         (used in continue_learning mode).
-        If `loaded_only=False`, turn it off for all strategies at all active levels.
+        If `loaded_only=False`, turn it off for all strategies at eligible levels.
 
         Args:
             loaded_only (bool): Whether to disable exploration only for loaded strategies.
         """
         for level in self.active_levels:
+            cfg = self.learning_config[level]
+            if self.episodes_done < cfg.episodes_collecting_initial_experience:
+                continue
             for strategy in self.rl_strats[level].values():
                 if loaded_only:
                     if strategy.actor.loaded:
@@ -660,32 +673,39 @@ class LearningRole(Role):
                 else:
                     strategy.collect_initial_experience_mode = False
 
-    def get_progress_remaining(self) -> float:
+    def get_progress_remaining(self, level: str | None = None) -> float:
         """
         Get the remaining learning progress from the simulation run.
-        Uses shared episode counters and shared_config for episode settings.
+
+        When level is given, the level's own
+        ``episodes_collecting_initial_experience`` is used so that LR / noise
+        schedules decay independently per level.  Falls back to
+        ``shared_config`` for backward compatibility.
+
+        Args:
+            level: Optional level name.  When called via a ``LevelView`` the
+                level is supplied automatically.
         """
+        cfg = (
+            self.learning_config[level]
+            if level is not None and level in self.learning_config
+            else self.shared_config
+        )
         total_duration = self.end - self.start
         elapsed_duration = self.context.current_timestamp - self.start
 
         learning_episodes = (
             self.shared_config.training_episodes
-            - self.shared_config.episodes_collecting_initial_experience
+            - cfg.episodes_collecting_initial_experience
         )
 
-        if (
-            self.episodes_done
-            < self.shared_config.episodes_collecting_initial_experience
-        ):
+        if self.episodes_done < cfg.episodes_collecting_initial_experience:
             progress_remaining = 1
         else:
             progress_remaining = (
                 1
                 - (
-                    (
-                        self.episodes_done
-                        - self.shared_config.episodes_collecting_initial_experience
-                    )
+                    (self.episodes_done - cfg.episodes_collecting_initial_experience)
                     / learning_episodes
                 )
                 - ((1 / learning_episodes) * (elapsed_duration / total_duration))
@@ -850,7 +870,10 @@ class LearningRole(Role):
             evaluation_mode=self.shared_config.evaluation_mode,
             episode=episode,
             eval_episode=eval_episode,
-            episodes_collecting_initial_experience=self.shared_config.episodes_collecting_initial_experience,
+            episodes_collecting_initial_experience={
+                level: cfg.episodes_collecting_initial_experience
+                for level, cfg in self.learning_config.items()
+            },
         )
 
         # Parameters required for sending data to the output role

@@ -82,7 +82,8 @@ def test_initialization():
     assert logger.simulation_id == "sim_1"
     assert logger.learning_mode is True
     assert logger.evaluation_mode is False
-    assert logger.episodes_collecting_initial_experience == 0
+    assert logger.episodes_collecting_initial_experience == {}
+    assert logger._episodes_collecting_initial_experience_default == 0
     assert logger.episode == 1
 
 
