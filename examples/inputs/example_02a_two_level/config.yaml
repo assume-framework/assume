@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 tiny:
-  simulation_id: 02a_two_level_ok_results
+  simulation_id: 02a_two_level_abm_curriculum_no_noise
   start_date: 2019-03-01 00:00
   end_date: 2019-03-03 00:00
   time_step: 1h
@@ -12,8 +12,7 @@ tiny:
 
   # shared / top-level learning parameters
   learning_config:
-    training_episodes: 400
-    episodes_collecting_initial_experience: 40
+    training_episodes: 600
     device: cpu
     validation_episodes_interval: 5
 
@@ -24,9 +23,10 @@ tiny:
       continue_learning: false
       trained_policies_save_path: null
       trained_policies_load_path: null
+      episodes_collecting_initial_experience: 20
       max_bid_price: 100
       algorithm: matd3
-      learning_rate: 0.00005
+      learning_rate: 0.0005
       train_freq: 12h
       gradient_steps: 24
       batch_size: 64
@@ -60,6 +60,8 @@ tiny:
         continue_learning: false
         trained_policies_save_path: null
         trained_policies_load_path: null
+        episodes_collecting_initial_experience: 100
+        exploration_noise_std: 0.0
         max_bid_price: 100
         algorithm: matd3
         learning_rate: 0.0001

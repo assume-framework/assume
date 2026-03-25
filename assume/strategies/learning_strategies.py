@@ -792,7 +792,7 @@ class EnergyLearningTwoLevelStrategy(EnergyLearningStrategy, MinMaxChargeStrateg
 
         # --- 3. Individual observations ---
         individual_observations = np.append(
-            self.get_individual_observations(unit, start, end), max_bid_price_scaled
+            max_bid_price_scaled, self.get_individual_observations(unit, start, end)
         )
 
         # concat all observations into one array

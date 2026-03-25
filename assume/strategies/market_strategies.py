@@ -82,7 +82,7 @@ class TorchMarketLearningStrategy(TorchLearningStrategy):
             if self.collect_initial_experience_mode:
                 # define current action as solely noise
                 noise = th.normal(
-                    mean=0.0,
+                    mean=1.0,  # exploration "without price cap"
                     std=self.exploration_noise_std,
                     size=(self.act_dim,),
                     dtype=self.float_type,
@@ -155,8 +155,14 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         Prepares the observation for the market learning strategy, which could include features such as current market price, order book state, recent trades, etc.
         """
         market_id = market
-        upper_scaling_factor_price = max(self.market_role.forecaster.price[market_id])
-        lower_scaling_factor_price = min(self.market_role.forecaster.price[market_id])
+        self.upper_scaling_factor_price = max(
+            self.market_role.forecaster.price[market_id]
+        )
+        self.lower_scaling_factor_price = min(
+            self.market_role.forecaster.price[market_id]
+        )
+        upper_scaling_factor_price = self.upper_scaling_factor_price
+        lower_scaling_factor_price = self.lower_scaling_factor_price
         residual_load = self.market_role.forecaster.residual_load.get(
             market_id, FastSeries(index=self.market_role.forecaster.index, value=0)
         )
@@ -248,6 +254,8 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         self._episode_error = 0.0
         self._episode_price_volume = 0.0
         self._episode_cleared_volume = 0.0
+        self._episode_served_volume = 0.0
+        self._episode_demanded_volume = 0.0
 
         next_observation = self.create_observation(
             market_id=self.market_role.marketconfig.market_id,
@@ -308,10 +316,7 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         # Values > 0.5 penalise high clearing prices (market power).
         alpha = 1
         # price_penalty_weight controls how strongly the agent is penalised for
-        # high clearing prices, independently of VOLL.  With alpha=1 and VOLL=3000,
-        # the raw transfer term is ~1% of max_sw for typical prices.  A weight of
-        # e.g. 30 makes a 50€/MWh clearing price cost ~40% of max_sw, giving the
-        # agent a meaningful gradient to reduce prices.
+        # high clearing prices, independently of VOLL.
         price_penalty_weight = 1
         sw = 0.0
         max_sw = 0.0
@@ -327,12 +332,16 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         # (e.g. 3000 €/MWh), so max_sw = alpha * VOLL * Q_demand. This makes the
         # normalised reward = (Q*/Q_D) * (1 - P*/VOLL), the product of service ratio
         # and price efficiency, both in [0,1].
+        served_volume = 0.0
+        demanded_volume = 0.0
         for order in orderbook:
             if order["volume"] < 0:
                 accepted_vol = abs(order.get("accepted_volume") or 0.0)
                 bid_vol = abs(order["volume"])
                 sw += alpha * order["price"] * accepted_vol
                 max_sw += alpha * order["price"] * bid_vol
+                served_volume += accepted_vol
+                demanded_volume += bid_vol
 
         # --- Supply side ---
         # Accepted supply subtracts (1-alpha) * bid_price * accepted_volume (supply cost).
@@ -358,17 +367,24 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
             price_volume += clearing_price * meta_cleared_volume
             cleared_volume += meta_cleared_volume
 
-            forecast_price = 36.2 + self.scaled_prices_obs[meta["product_start"]] * (
-                55.7 - 36.2
+            # Unscale forecast price from [0,1] back to €/MWh
+            scaled_forecast = self.scaled_prices_obs[meta["product_start"]]
+            forecast_price = self.lower_scaling_factor_price + scaled_forecast * (
+                self.upper_scaling_factor_price - self.lower_scaling_factor_price
             )
             error += -1 * max(
-                (clearing_price - forecast_price) / forecast_price, 0
-            )  # TODO: handle zero forecast price case?
+                (clearing_price - forecast_price) / forecast_price
+                if forecast_price > 0
+                else 0.0,
+                0,
+            )
 
         self._episode_sw += sw
         self._episode_max_sw += max_sw
         self._episode_price_volume += price_volume
         self._episode_cleared_volume += cleared_volume
+        self._episode_served_volume += served_volume
+        self._episode_demanded_volume += demanded_volume
 
         self._episode_error += error
 
@@ -383,20 +399,39 @@ class MarketLearningMaxPriceStrategy(TorchMarketLearningStrategy):
         if datetime2timestamp(last_product_end) < self.learning_role.end:
             return 0.0
 
+        # # similar to Renshaw-Whitman et al. (2024) ?
+        # reward = self._episode_sw / 24 / 1000
+
         # Normalise by max attainable SW so the reward is in (-inf, 1].
         # A reward of 1 means perfect welfare (all demand served, zero supply cost).
         reward = (
             self._episode_sw / self._episode_max_sw if self._episode_max_sw > 0 else 0.0
         )
+
+        # reward hacking to check whether learning is successful
         reward = (
-            self._episode_error + 2 * reward
+            self._episode_error / 24 + reward
         )  # TODO: consider how to best combine error and SW into a single reward signal, e.g. with a weighting factor
+
+        # # Simple reward: serve all load, minimize cap.
+        # # service_ratio ∈ [0,1] rewards dispatch; max(cap, 0) ∈ [0,cap] penalises a loose cap.
+        # # Optimal point: lowest cap that still clears all demand.
+        # service_ratio = (
+        #     self._episode_served_volume / self._episode_demanded_volume
+        #     if self._episode_demanded_volume > 0 else 0.0
+        # )
+        # cap = self.market_role.marketconfig.maximum_bid_price
+        # reward = service_ratio - max(cap, 0) / 300.0
 
         start = self.learning_role.start_datetime
         if self.learning_mode:
             self.learning_role.add_reward_to_cache(
-                self.unit_id, start, reward, self._episode_sw, self._episode_max_sw
-            )  # logging episode SW and max SW just as placeholders
+                self.unit_id,
+                start,
+                reward,
+                1 - reward,
+                self._episode_sw / self._episode_max_sw,
+            )
             # The recurrent store_to_buffer_and_update fires at the same simulation
             # timestamp as this final clearing, so it may run before the reward is
             # in the cache. Scheduling an instant task here guarantees it runs after

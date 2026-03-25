@@ -1180,6 +1180,7 @@ def run_learning(
 
     validation_interval = world.learning_role.determine_validation_interval()
 
+    # TODO: revise train_freq logic
     # sync train frequency with simulation horizon once at the beginning of training
     train_freq_per_level = world.learning_role.sync_train_freq_with_simulation_horizon()
     # Write back per-level train_freq into scenario data config
