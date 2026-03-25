@@ -784,5 +784,28 @@ def test_assignment_variables_have_expected_dimensions(
                 _ = instance.charge_assignment[ev, cs, t]
 
 
+def test_building_without_cs_uses_ev_names_as_expected(
+    building_forecaster_with_ev_cs,
+    building_components_without_cs,
+):
+    building = _make_building(
+        building_forecaster_with_ev_cs, building_components_without_cs
+    )
+    assert sorted(building.evs) == ["electric_vehicle_1", "electric_vehicle_2"]
+
+
+def test_building_with_cs_uses_station_names_as_expected(
+    building_forecaster_with_ev_cs,
+    building_components_with_cs,
+):
+    building = _make_building(
+        building_forecaster_with_ev_cs, building_components_with_cs
+    )
+    assert sorted(building.charging_stations) == [
+        "charging_station_1",
+        "charging_station_2",
+    ]
+
+
 if __name__ == "__main__":
     pytest.main(["-s", __file__])
