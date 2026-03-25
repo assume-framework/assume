@@ -269,7 +269,6 @@ class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
         start = product_tuples[0][0]
         # end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
-        min_power, max_power = unit.min_power, unit.max_power
 
         bids = []
         for product in product_tuples:
@@ -278,6 +277,13 @@ class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
             marginal_cost = unit.calculate_marginal_cost(
                 start, previous_power
             )  # calculation of the marginal costs
+
+            available_power = unit.forecaster.availability.loc[start]
+            max_power = available_power * unit.max_power
+            min_power = min(
+                unit.min_power, max_power
+            )  # TODO: choice relates to discussion in github.com/assume-framework/assume/pull/737
+            p_nom = unit.max_power
 
             bids.append(
                 {
@@ -288,6 +294,7 @@ class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
                     "volume": current_power,
                     "max_power": max_power,
                     "min_power": min_power,
+                    "p_nom": p_nom,
                     "node": unit.node,
                 }
             )

@@ -122,18 +122,21 @@ class RedispatchMarketRole(MarketRole):
         price_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="price"
         )
+        p_nom_pivot = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="p_nom"
+        )
 
         # Calculate p_set, p_max_pu_up, and p_max_pu_down directly using DataFrame operations
         p_set = volume_pivot
 
         # Calculate p_max_pu_up as difference between max_power and accepted volume
         p_max_pu_up = (max_power_pivot - volume_pivot).div(
-            max_power_pivot.where(max_power_pivot != 0, np.inf)
+            p_nom_pivot.where(max_power_pivot != 0, np.inf)
         )
 
         # Calculate p_max_pu_down as difference between accepted volume and min_power
         p_max_pu_down = (volume_pivot - min_power_pivot).div(
-            max_power_pivot.where(max_power_pivot != 0, np.inf)
+            p_nom_pivot.where(max_power_pivot != 0, np.inf)
         )
         p_max_pu_down = p_max_pu_down.clip(lower=0)  # Ensure no negative values
 
@@ -155,6 +158,7 @@ class RedispatchMarketRole(MarketRole):
         p_max_pu_up.reset_index(inplace=True, drop=True)
         p_max_pu_down.reset_index(inplace=True, drop=True)
         costs.reset_index(inplace=True, drop=True)
+        p_nom_pivot.reset_index(inplace=True, drop=True)
 
         # Update the network parameters
         redispatch_network = self.network.copy()
