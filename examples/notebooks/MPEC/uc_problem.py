@@ -20,6 +20,28 @@ from pyomo.opt import SolverFactory
 
 # %%
 def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_bids=1, mc_df=None):
+    print("=== NaN-Check ===")
+    print(f"k_values_df NaNs: {k_values_df.isna().sum().sum()}")
+    print(f"mc_df NaNs: {mc_df.isna().sum().sum()}")
+    print(f"demand_df NaNs: {demand_df.isna().sum().sum()}")
+    print(f"availability_df NaNs: {availabilities_df.isna().sum().sum()}")
+    print(f"gens_df NaNs: {gens_df.isna().sum().sum()}")
+    
+    for gen in gens_df.index:
+        if gen not in k_values_df.columns:
+            print(f"❌ Unit '{gen}' fehlt in k_values_df!")
+        if gen not in mc_df.columns:
+            print(f"❌ Unit '{gen}' fehlt in mc_df!")
+        if gen not in availabilities_df.columns:
+            print(f"❌ Unit '{gen}' fehlt in availabilities_df!")
+
+    for n in range(1, demand_bids + 1):
+        if f"volume_{n}" not in demand_df.columns:
+            print(f"❌ Spalte 'volume_{n}' fehlt in demand_df!")
+        if f"price_{n}" not in demand_df.columns:
+            print(f"❌ Spalte 'price_{n}' fehlt in demand_df!")
+    
+    
     gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
     if mc_df is None:
         mc_df = pd.DataFrame(

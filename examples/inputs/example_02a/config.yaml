@@ -25,6 +25,28 @@ base:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
+  learning_config:
+    learning_mode: false
+    continue_learning: false
+    trained_policies_save_path: null
+    trained_policies_load_path: learned_strategies\example_02a_base\last_policies
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 50
+    episodes_collecting_initial_experience: 5
+    train_freq: 24h
+    gradient_steps: 24
+    batch_size: 256
+    gamma: 0.99
+    device: cpu
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+    early_stopping_steps: 10
+    early_stopping_threshold: 0.05
+    actor_architecture: mlp
 
 base_lstm:
   start_date: 2019-03-01 00:00

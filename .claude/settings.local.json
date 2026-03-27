@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(/c/Users/tg3533/AppData/Local/miniconda3/python.exe -c \":*)"
+    ]
+  }
+}
