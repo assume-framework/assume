@@ -153,14 +153,30 @@ def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_
     instance = model.create_instance()
 
     solver = SolverFactory("gurobi")
-    solver.solve(instance, tee=False)
+    results = solver.solve(instance, tee=False)
+
+    # Check that the MILP found a feasible solution before fixing binaries.
+    # If the solver returns infeasible or error, instance.u[gen,t].value is None,
+    # which would produce InvalidNumber(None) in the LP for instance_fixed_u.
+    milp_status = results.solver.termination_condition
+    from pyomo.opt import TerminationCondition
+    if milp_status not in (TerminationCondition.optimal, TerminationCondition.feasible):
+        raise RuntimeError(
+            f"UC MILP solve failed with status '{milp_status}'. "
+            "Cannot fix binary variables — check feasibility of the UC problem "
+            "(demand vs. available capacity, mc values, etc.)."
+        )
 
     # make new instance with fixed u
     instance_fixed_u = model.create_instance()
     instance_fixed_u.dual = pyo.Suffix(direction=pyo.Suffix.IMPORT)
     for gen in gens_df.index:
         for t in demand_df.index:
-            instance_fixed_u.u[gen, t].fix(instance.u[gen, t].value)
+            u_val = instance.u[gen, t].value
+            if u_val is None:
+                u_val = 0  # fallback: unit off, gurobi will chose None if the binary value does not alter result
+                # for example if I have a generation bid of an exchange unit with volume_n = 0, then the binary variable for that unit can be either 0 or 1 without changing the objective or feasibility. 
+            instance_fixed_u.u[gen, t].fix(round(u_val))
 
     solver.solve(instance_fixed_u, tee=False)
 

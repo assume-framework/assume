@@ -325,6 +325,14 @@ def sample_seasonal_weeks(datetime_index):
             random_week = random.choice(complete_weeks)
             week_idx = datetime_index[datetime_index.isocalendar().week == random_week]
             sampled_dates.extend([d.date() for d in week_idx])
+            
+        # if there is no complete week just use one randome day from the season
+        if not complete_weeks:
+            seasonal_days = datetime_index[datetime_index.month.isin(months)]
+            if not seasonal_days.empty:
+                random_day = random.choice(seasonal_days)
+                sampled_dates.append(random_day.date())
+
 
         print(f"{season} complete weeks: {complete_weeks}")
 
@@ -433,7 +441,7 @@ def obtain_k_values(k_df, gens_df):
     # delete rows where unit_id is none
     k_df = k_df[k_df["unit_id"].notna()]
 
-    k_values_df = k_df.pivot(index="time", columns="unit_id", values="k")
+    k_values_df = k_df.pivot_table(index="time", columns="unit_id", values="k", aggfunc="max")
     # k_values_df.reset_index(inplace=True)
 
     # sort columns to match the order of the columns in the gens_df
@@ -573,7 +581,7 @@ def add_export_bids_to_demand(demand_df, export_bids):
     return demand_df.sort_index()
 
 
-def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df):
+def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df, marginal_costs_df):
     """
     Add import exchange units (positive volume bids) as non-strategic virtual generators.
 
@@ -590,18 +598,20 @@ def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df
             columns = unit names [+ "date"].
         availability_df (pd.DataFrame): Availability factors, DatetimeIndex,
             columns = unit names.
+        marginal_costs_df (pd.DataFrame): Marginal costs, DatetimeIndex,
+            columns = dates.
 
     Returns:
-        tuple: (gens_df, k_values_df, availability_df) — updated with export units
+        tuple: (gens_df, k_values_df, availability_df, marginal_costs_df) — updated with export units
             appended in consistent order.
     """
     if import_bids.empty:
-        return gens_df, k_values_df, availability_df
+        return gens_df, k_values_df, availability_df, marginal_costs_df
 
     gens_df = gens_df.copy()
     k_values_df = k_values_df.copy()
     availability_df = availability_df.copy()
-
+    marginal_costs_df = marginal_costs_df.copy()
     time_index = availability_df.index
 
     # Insert new unit columns before the "date" column if it exists
@@ -620,6 +630,12 @@ def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df
         g_max = unit_vol.max()
         if g_max <= 0:
             continue
+        
+        unit_price = (
+            import_bids[import_bids["unit_id"] == unit_id]["price"] 
+            .reindex(time_index)
+            .fillna(0)
+        )
 
         # Append a new row to gens_df with the required MPEC fields
         new_row = {col: np.nan for col in gens_df.columns}
@@ -634,7 +650,7 @@ def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df
             "r_down": g_max,
             "k_up": 0,
             "k_down": 0,
-            "mc": 1.0,  # nominal; effective bid = mc * k = 1 * 0 = 0
+            "mc": 1.0,  # nominal; effective bid = mc * k = 1 * k
         })
         gens_df = pd.concat(
             [gens_df, pd.DataFrame([new_row])], ignore_index=True
@@ -643,14 +659,18 @@ def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df
         # fill nan values in gens_df with 0
         gens_df = gens_df.fillna(0)
 
-        # k = 0 for all timesteps (non-strategic, always bids at effective price 0)
-        k_values_df.insert(date_insert_pos, unit_id, 0.0)
+        # k = bid price for all timesteps (non-strategic, always bids at fixed price)
+        # if not differently defined in exchanges_units_df this will always be zero, but we allow it to be set in the input data for flexibility
+        k_values_df.insert(date_insert_pos, unit_id, unit_price)
         date_insert_pos += 1  # keep "date" at the end for subsequent units
 
         # availability = volume(t) / g_max, clipped to [0, 1]
         availability_df[unit_id] = (unit_vol / g_max).clip(0, 1)
+        
+        # add marginal costs column for the new unit, set to 1.0 (nominal; effective bid = mc * k = 1 * k)
+        marginal_costs_df[unit_id] = 1.0
 
-    return gens_df, k_values_df, availability_df
+    return gens_df, k_values_df, availability_df, marginal_costs_df
 
 
 def run_MPEC(
@@ -765,8 +785,22 @@ def run_MPEC(
 
     # Re-solve UC with the optimised k-values to get accurate market prices
     k_values_df_2 = k_values_df.copy()
-    k_values_df_2[opt_gen] = k_values["k"]
+    # k_values["k"] is object dtype (None for unsolved timesteps); convert to
+    # float and fall back to the original observed k for any None/NaN entries
+    # so the UC re-solve never receives InvalidNumber(None) as a coefficient.
+    k_series = pd.to_numeric(k_values["k"], errors="coerce")
+    fallback = pd.to_numeric(k_values_df[opt_gen], errors="coerce").fillna(1.0)
+    k_values_df_2[opt_gen] = k_series.fillna(fallback).astype(float).values
+    # Ensure all generator columns are float — Pyomo cannot handle None/NaN as
+    # LP coefficients and will produce InvalidNumber(None) in the LP file.
+    gen_cols = [c for c in k_values_df_2.columns if c not in ("date", "time", "index", "level_0")]
+    for col in gen_cols:
+        k_values_df_2[col] = pd.to_numeric(k_values_df_2[col], errors="coerce").fillna(1.0)
 
+    print(k_values_df_2.dtypes)
+    print("None-Werte:", {c: (k_values_df_2[c].apply(lambda x: x is None)).sum() for c in k_values_df_2.columns})
+
+    
     updated_main_df_2, updated_supp_df_2 = solve_uc_problem(
         gens_df, demand_df, k_values_df_2, availability_df, demand_bids=demand_bids,
         mc_df=mc_df_aligned,
