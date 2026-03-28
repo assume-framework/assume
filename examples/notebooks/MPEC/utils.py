@@ -325,6 +325,14 @@ def sample_seasonal_weeks(datetime_index):
             random_week = random.choice(complete_weeks)
             week_idx = datetime_index[datetime_index.isocalendar().week == random_week]
             sampled_dates.extend([d.date() for d in week_idx])
+            
+        # if there is no complete week just use one randome day from the season
+        if not complete_weeks:
+            seasonal_days = datetime_index[datetime_index.month.isin(months)]
+            if not seasonal_days.empty:
+                random_day = random.choice(seasonal_days)
+                sampled_dates.append(random_day.date())
+
 
         print(f"{season} complete weeks: {complete_weeks}")
 
@@ -781,9 +789,18 @@ def run_MPEC(
     # float and fall back to the original observed k for any None/NaN entries
     # so the UC re-solve never receives InvalidNumber(None) as a coefficient.
     k_series = pd.to_numeric(k_values["k"], errors="coerce")
-    k_values_df_2[opt_gen] = k_series.fillna(k_values_df[opt_gen]).values
-    k_values_df_2.reset_index(inplace=True)
+    fallback = pd.to_numeric(k_values_df[opt_gen], errors="coerce").fillna(1.0)
+    k_values_df_2[opt_gen] = k_series.fillna(fallback).astype(float).values
+    # Ensure all generator columns are float — Pyomo cannot handle None/NaN as
+    # LP coefficients and will produce InvalidNumber(None) in the LP file.
+    gen_cols = [c for c in k_values_df_2.columns if c not in ("date", "time", "index", "level_0")]
+    for col in gen_cols:
+        k_values_df_2[col] = pd.to_numeric(k_values_df_2[col], errors="coerce").fillna(1.0)
 
+    print(k_values_df_2.dtypes)
+    print("None-Werte:", {c: (k_values_df_2[c].apply(lambda x: x is None)).sum() for c in k_values_df_2.columns})
+
+    
     updated_main_df_2, updated_supp_df_2 = solve_uc_problem(
         gens_df, demand_df, k_values_df_2, availability_df, demand_bids=demand_bids,
         mc_df=mc_df_aligned,
