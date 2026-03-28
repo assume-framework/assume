@@ -2,18 +2,18 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-base_heu:
-  start_date: 2025-01-02 00:00
-  end_date: 2025-01-31 00:00
+base_heu_jan_linear_max300:
+  start_date: 2025-01-26 00:00
+  end_date: 2025-02-02 00:00
   time_step: 1h
   save_frequency_hours: null
   seed: null
   learning_config:
-    learning_mode: false
+    learning_mode: true
     continue_learning: false
-    trained_policies_load_path: learned_strategies/example_03d_base_heu/last_policies
+    trained_policies_load_path: null
     trained_policies_save_path: null
-    max_bid_price: 100
+    max_bid_price: 300
     algorithm: matd3
     learning_rate: 0.0001
     learning_rate_schedule: linear

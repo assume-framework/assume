@@ -465,7 +465,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # =============================================================================
         # actions are in the range [-1,1], we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
-        bid_prices = actions * self.max_bid_price
+        bid_prices = -10 +(1 + actions) * self.max_bid_price/2
 
         # 3.1 formulate the bids for Pmin
         # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
@@ -529,9 +529,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
                 # Assumes last dimension of the observation corresponds to marginal cost
                 marginal_cost = next_observation[
                     -1
-                ].detach()  # ensure no gradients flow through
+                ].detach() * self.max_bid_price  # ensure no gradients flow through
                 # Add marginal cost to the action directly for initial random exploration
-                curr_action += marginal_cost
+                curr_action += 2 * (marginal_cost + 10) / 150 - 1
 
         return curr_action, noise
 
