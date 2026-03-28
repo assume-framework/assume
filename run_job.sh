@@ -13,7 +13,7 @@
 #SBATCH --mem=64G                     # Memory
 
 # Load modules or activate environment
-source ~/venvs/assume-framework/bin/activate
+source ../assume-case/bin/activate
 
 
 # Run your Python script
