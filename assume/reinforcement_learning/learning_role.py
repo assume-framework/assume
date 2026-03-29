@@ -616,6 +616,14 @@ class Learning(Role):
             train_start (str): The start time of simulation.
         """
 
+        # Explicitly close the previous logger to release its DB engine
+        # and SummaryWriter file handles before creating a new one.
+        if (
+            hasattr(self, "tensor_board_logger")
+            and self.tensor_board_logger is not None
+        ):
+            self.tensor_board_logger.close()
+
         self.tensor_board_logger = TensorBoardLogger(
             simulation_id=simulation_id,
             db_uri=db_uri,

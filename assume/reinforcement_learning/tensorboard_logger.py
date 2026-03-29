@@ -363,10 +363,28 @@ class TensorBoardLogger:
             logger.error(f"Unexpected error in update_tensorboard: {e}")
             return
 
+    def close(self):
+        """
+        Explicitly release resources held by this logger.
+        Call this before discarding the instance to avoid leaked
+        file handles (SummaryWriter) and DB connection pools.
+        """
+        if hasattr(self, "writer") and self.writer is not None:
+            try:
+                self.writer.flush()
+                self.writer.close()
+            except Exception:
+                pass
+            self.writer = None
+        if hasattr(self, "db") and self.db is not None:
+            try:
+                self.db.dispose()
+            except Exception:
+                pass
+            self.db = None
+
     def __del__(self):
         """
         Deletes the WriteOutput instance.
         """
-        if hasattr(self, "writer") and self.writer is not None:
-            self.writer.flush()
-            self.writer.close()
+        self.close()

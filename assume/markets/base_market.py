@@ -670,7 +670,7 @@ class MarketRole(MarketMechanism, Role):
                         0,
                     )
 
-        self.open_auctions - set(market_products)
+        self.open_auctions -= set(market_products)
 
         accepted_orderbook = sorted(
             accepted_orderbook, key=lambda x: str(x["agent_addr"])
@@ -724,6 +724,12 @@ class MarketRole(MarketMechanism, Role):
             self.results.append(meta)
 
         await self.store_market_results(market_meta)
+
+        # Prevent unbounded growth of in-memory results.
+        # Keep only results that data-request handlers may still need
+        # (those whose product_start has not yet passed).
+        now = timestamp2datetime(self.context.current_timestamp)
+        self.results = [r for r in self.results if r.get("product_start", now) >= now]
 
         if flows is not None and len(flows) > 0:
             await self.store_flows(flows)

@@ -864,6 +864,7 @@ class World:
     def reset(self):
         """
         Reset the market operators, markets, unit operators, and forecast providers to empty dictionaries.
+        Also clears caches and large data structures to prevent memory leaks across episodes.
 
         Returns:
             None
@@ -873,6 +874,26 @@ class World:
         self.unit_operators = {}
         self.units = {}
         self.forecast_providers = {}
+
+        # Clear forecast algorithm lru_caches that retain full DataFrames
+        # and references to old unit/config objects from previous episodes.
+        from assume.common.forecast_algorithms import (
+            calculate_naive_congestion_signal,
+            calculate_naive_price,
+            calculate_naive_price_elastic,
+            calculate_naive_price_inelastic,
+            calculate_naive_renewable_utilisation,
+            calculate_naive_residual_load,
+            sort_units,
+        )
+
+        sort_units.cache_clear()
+        calculate_naive_price_inelastic.cache_clear()
+        calculate_naive_price_elastic.cache_clear()
+        calculate_naive_price.cache_clear()
+        calculate_naive_residual_load.cache_clear()
+        calculate_naive_congestion_signal.cache_clear()
+        calculate_naive_renewable_utilisation.cache_clear()
 
     def add_unit(
         self,
