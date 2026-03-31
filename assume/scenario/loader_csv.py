@@ -35,6 +35,7 @@ from assume.common.utils import (
     adjust_unit_operator_for_learning,
     confirm_learning_save_path,
     convert_to_rrule_freq,
+    load_index_file,
     normalize_availability,
     set_random_seed,
 )
@@ -106,72 +107,40 @@ def load_file(
     if file_name in config:
         if config[file_name] is None:
             return None
-        file_path = f"{path}/{config[file_name]}"
+        file_path = Path(path) / config[file_name]
     else:
-        file_path = f"{path}/{file_name}.csv"
+        file_path = Path(path) / f"{file_name}.csv"
 
     try:
-        df = pd.read_csv(
-            file_path,
-            index_col=0,
-            encoding="utf-8",
-            na_values=["n.a.", "None", "-", "none", "nan"],
-            parse_dates=index is not None,
-        )
-        for col in df:
-            # check if the column is of dtype int
-            if df[col].dtype == "int":
-                # convert the column to float
-                df[col] = df[col].astype(float)
-
         if index is not None:
-            if len(df.index) == 1:
-                return df
+            df = load_index_file(file_path, index)
+        else:
+            df = pd.read_csv(
+                file_path,
+                index_col=0,
+                encoding="utf-8",
+                na_values=["n.a.", "None", "-", "none", "nan"],
+                parse_dates=index is not None,
+            )
+            for col in df:
+                # check if the column is of dtype int
+                if df[col].dtype == "int":
+                    # convert the column to float
+                    df[col] = df[col].astype(float)
 
-            if len(df.index) != len(index) and not isinstance(
-                df.index, pd.DatetimeIndex
-            ):
-                logger.warning(
-                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
-                )
-                return None
+            if check_duplicates:
+                # Check if duplicate unit names exist and raise an error
+                duplicates = df.index[df.index.duplicated()].unique()
 
-            df.index.freq = df.index.inferred_freq
-
-            if len(df.index) < len(index) and df.index.freq == index.freq:
-                logger.warning(
-                    f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
-                )
-                return None
-
-            if df.index.freq < index.freq:
-                logger.warning(
-                    f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
-                    "Resampling using mean(). Make sure this is what you want."
-                )
-                df = df.resample(index.freq).mean()
-                logger.info(f"Downsampling {file_name} successful.")
-
-            elif df.index.freq > index.freq or len(df.index) < len(index):
-                logger.warning("Upsampling not implemented yet. Returning None.")
-                return None
-
-            df = df.loc[index]
-
-        elif check_duplicates:
-            # Check if duplicate unit names exist and raise an error
-            duplicates = df.index[df.index.duplicated()].unique()
-
-            if len(duplicates) > 0:
-                duplicate_names = ", ".join(map(str, duplicates))
-                raise ValueError(
-                    f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
-                )
-
+                if len(duplicates) > 0:
+                    duplicate_names = ", ".join(map(str, duplicates))
+                    raise ValueError(
+                        f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
+                    )
         return df
 
     except FileNotFoundError:
-        logger.info(f"{file_name} not found. Returning None")
+        logger.info(f"{file_path} not found. Returning None")
         return None
 
 

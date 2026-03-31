@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, TypeAlias
 
 import pandas as pd
 
+from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.market_objects import MarketConfig
 
@@ -184,6 +185,10 @@ class UnitForecaster:
 
         self.index: FastIndex = index
         self.availability: FastSeries = self._to_series(availability)
+        if any(self.availability < 0) or any(self.availability > 1):
+            raise ValidationError(
+                message="Availability must be between 0 and 1", field="availability"
+            )
         self.forecast_algorithms = forecast_algorithms
         if forecast_registries is None:
             forecast_registries = {"init": {}, "preprocess": {}, "update": {}}
@@ -414,7 +419,7 @@ class DemandForecaster(UnitForecaster):
         )
         self.demand = self._to_series(demand)
         if any(self.demand > 0):
-            raise ValueError(f"{demand=} must be negative")
+            raise ValidationError(message="demand must be negative", field="demand")
 
 
 class PowerplantForecaster(UnitForecaster):
