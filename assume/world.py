@@ -449,7 +449,7 @@ class World:
         self.unit_operators[id] = units_operator
 
         # after creation of an agent - we set additional context params
-        if not self.learning_mode:
+        if self.output_agent_addr:
             unit_operator_agent._role_context.data.update(
                 {
                     "output_agent_addr": self.output_agent_addr,
