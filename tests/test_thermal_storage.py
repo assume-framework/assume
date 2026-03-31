@@ -19,8 +19,9 @@ def price_profile():
 @pytest.fixture
 def storage_config():
     return {
-        "max_capacity": 200,
-        "min_capacity": 0,
+        "capacity": 200,
+        "min_soc": 0,
+        "max_soc": 1,
         "max_power_charge": 40,
         "max_power_discharge": 40,
         "efficiency_charge": 0.95,
@@ -145,21 +146,17 @@ def test_long_term_storage_follows_schedule(
 
 def test_long_term_storage_soc_limits(long_term_storage_model, storage_config):
     model, _ = long_term_storage_model
-    max_capacity = storage_config["max_capacity"]
-    min_capacity = storage_config["min_capacity"]
+    max_soc = storage_config["max_soc"]
+    min_soc = storage_config["min_soc"]
     for t in model.time_steps:
         soc = pyo.value(model.storage.soc[t])
-        assert soc <= max_capacity + 1e-5
-        assert soc >= min_capacity - 1e-5
+        assert soc <= max_soc + 1e-5
+        assert soc >= min_soc - 1e-5
 
 
 def test_long_term_storage_initial_soc(long_term_storage_model, storage_config):
     model, _ = long_term_storage_model
-    initial_soc = (
-        storage_config["initial_soc"] * storage_config["max_capacity"]
-        if storage_config["initial_soc"] <= 1
-        else storage_config["initial_soc"]
-    )
+    initial_soc = storage_config["initial_soc"]
     soc_0 = pyo.value(model.storage.soc[0])
     assert soc_0 == initial_soc
 

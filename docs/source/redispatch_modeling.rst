@@ -56,7 +56,8 @@ Attributes
 
 4. **Line**: Transmission grids that transmit electricity
     - **name**: Unique identifier of the line
-    - **s_nom**: Nominal transmission capacity
+    - **s_nom**: Nominal transmission capacity of apparent power in MVA
+    - **s_max_pu**: Maximum loading as a fraction of s_nom (value between 0 and 1)
     - **capital_cost**: Capital cost for extending lines by 1 MVA
     - **r**: Resistance in Ohms
     - **bus0**: First node the line is connected to
@@ -68,7 +69,7 @@ Attributes
     - **name**: Unique identifier of the network
     - **snapshots**: List of timesteps (e.g., hourly, quarter-hourly, daily, etc.)
 
-A PyPSA network model can be created by defining nodes as locations for power generation and consumption, interconnected by transmission lines with nominal transmission capacity (`s_nom`). These components can be further constrained operationally, for instance, by nominal power, efficiency, ramp rates, and other factors.
+A PyPSA network model can be created by defining nodes as locations for power generation and consumption, interconnected by transmission lines with nominal transmission capacity (`s_nom` * `s_max_pu`). These components can be further constrained operationally, for instance, by nominal power, efficiency, ramp rates, and other factors.
 
 Currently, a limitation of the PyPSA model is the inability to define flexible loads.
 
@@ -82,10 +83,10 @@ Congestion Identification
 
 The first step is to check for congestion in the network. The linear power flow (LPF) method is particularly useful for quick assessments of congestion and redispatch needs. PyPSA provides the `network.lpf()` function for running linear power flow. This method is significantly faster than a full non-linear AC power flow, making it suitable for real-time analysis or large network studies.
 
-The active power flows through the lines can be retrieved using `network.lines_t.p0`. These can be compared to the nominal capacity of the lines (`s_nom`) to determine whether there is congestion.
+The active power flows through the lines can be retrieved using `network.lines_t.p0`. These can be compared to the nominal capacity of the lines (`s_nom` * `s_max_pu`) to determine whether there is congestion.
 
 ```python
-line_loading = network.lines_t.p0 / network.lines.s_nom
+line_loading = network.lines_t.p0 / (network.lines.s_nom * network.lines.s_max_pu)
 ```
 
 If line loading exceeds 1, it suggests there is congestion.

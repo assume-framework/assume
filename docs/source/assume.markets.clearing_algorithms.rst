@@ -53,6 +53,12 @@ Redispatch Clearing Algorithm
    :undoc-members:
    :show-inheritance:
 
+Nodal Clearing Algorithm
+------------------------
+.. automodule:: assume.markets.clearing_algorithms.nodal_clearing
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Additional Details
 ------------------

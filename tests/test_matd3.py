@@ -30,11 +30,15 @@ end = datetime(2023, 7, 2)
 
 @pytest.fixture
 def base_learning_config() -> dict:
+    foresight = 2
+    unique_obs_dim = 2
+    num_timeseries_obs_dim = 4
     return {
-        "obs_dim": 10,
+        "foresight": foresight,
         "act_dim": 3,
-        "unique_obs_dim": 2,
-        "num_timeseries_obs_dim": 4,
+        "unique_obs_dim": unique_obs_dim,
+        "num_timeseries_obs_dim": num_timeseries_obs_dim,
+        "obs_dim": foresight * num_timeseries_obs_dim + unique_obs_dim,
         "learning_config": LearningConfig(
             train_freq="1h",
             algorithm="matd3",
@@ -409,7 +413,7 @@ def test_td3_load_corrupted_or_incomplete_critic(tmp_path, base_learning_config)
 @pytest.mark.parametrize(
     "mod_field, mod_value, expected_error",
     [
-        ("obs_dim", 99, "All observation dimensions must be the same"),
+        ("foresight", 99, "All foresight values must be the same"),
         ("act_dim", 99, "All action dimensions must be the same"),
         ("unique_obs_dim", 99, "All unique_obs_dim values must be the same"),
         (

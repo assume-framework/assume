@@ -139,7 +139,7 @@ class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
             time_range, within=pyo.Reals, bounds=(0, unit.max_power_discharge)
         )
         self.model.volume = pyo.Var(
-            time_range, within=pyo.NonNegativeReals, bounds=(0, unit.max_soc)
+            time_range, within=pyo.NonNegativeReals, bounds=(0, unit.capacity)
         )
 
         self.power = np.array(
@@ -151,7 +151,7 @@ class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
         )
 
         self.model.vol_con = pyo.ConstraintList()
-        v0 = unit.outputs["soc"].at[start]
+        v0 = unit.outputs["soc"].at[start] * unit.capacity
 
         for t in time_range:
             if t == 0:
@@ -162,7 +162,7 @@ class StorageEnergyOptimizationDmasStrategy(MinMaxChargeStrategy):
                 )
 
         # always end with half full SoC
-        self.model.vol_con.add(self.model.volume[hour_count - 1] == unit.max_soc / 2)
+        self.model.vol_con.add(self.model.volume[hour_count - 1] == unit.capacity / 2)
         return self.power
 
     def optimize(

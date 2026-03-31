@@ -6,6 +6,7 @@ import calendar
 import inspect
 import logging
 import os
+import random
 import re
 import shutil
 import sys
@@ -843,3 +844,84 @@ def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
                 "Simulation aborted by user not to overwrite existing learned strategies. "
                 "You can set a different 'simulation_id' or 'trained_policies_save_path' in the config."
             )
+
+
+def set_random_seed(seed: int | None, torch_deterministic: bool = True):
+    """
+    Args:
+     seed (int | None): Integer seed for random number generators or None to disable seeding.
+     torch_deterministic (bool): If True, enforces PyTorch deterministic algorithms.
+                           May reduce performance. Default is True.
+
+     Notes:
+         - Completely reproducible results are not guaranteed across different PyTorch versions, hardware, or CUDA configurations.
+         - See https://docs.pytorch.org/docs/stable/notes/randomness.html
+    """
+    if seed is None:
+        return
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    try:
+        import torch as th
+
+        if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
+        th.manual_seed(seed)
+
+        if torch_deterministic:
+            th.backends.cudnn.deterministic = True
+            th.backends.cudnn.benchmark = False
+
+            th.use_deterministic_algorithms(True)
+
+            logger.warning(
+                "PyTorch set to use deterministic algorithms. This may impact performance but ensures reproducibility. For better performance, consider setting 'deterministic' to False when set_random_seed() is called."
+            )
+    except ImportError:
+        pass
+
+
+def load_index_file(file_name: Path, index: pd.DatetimeIndex):
+    if not file_name.is_file():
+        return None
+    df = pd.read_csv(
+        file_name,
+        index_col=0,
+        encoding="utf-8",
+        na_values=["n.a.", "None", "-", "none", "nan"],
+        parse_dates=True,
+    )
+
+    if len(df.index) == 1:
+        return df
+
+    if len(df.index) != len(index) and not isinstance(df.index, pd.DatetimeIndex):
+        logger.warning(
+            f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
+        )
+        return None
+
+    df.index.freq = df.index.inferred_freq
+
+    if len(df.index) < len(index) and df.index.freq == index.freq:
+        logger.warning(
+            f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
+        )
+        return None
+
+    if df.index.freq < index.freq:
+        logger.warning(
+            f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
+            "Resampling using mean(). Make sure this is what you want."
+        )
+        df = df.resample(index.freq).mean()
+        logger.info(f"Downsampling {file_name} successful.")
+
+    elif df.index.freq > index.freq or len(df.index) < len(index):
+        logger.warning("Upsampling not implemented yet. Returning None.")
+        return None
+
+    return df.loc[index]

@@ -1,6 +1,4 @@
 name,v_nom,zone_id,x,y
-north_1,380.0,DE_1,10.0,54.0
-north_2,380.0,DE_1,9.5,53.5
-east,380.0,DE_1,13.4,52.5
-south,380.0,DE_2,11.6,48.1
-west,380.0,DE_2,7.0,51.5
+north_1,380.0,north_1,10.0,54.0
+north_2,380.0,north_2,9.5,53.5
+south,380.0,south,11.6,48.1

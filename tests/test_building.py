@@ -17,13 +17,14 @@ from assume.units.building import Building
 @pytest.fixture
 def generic_storage_config():
     return {
-        "max_capacity": 100,  # Maximum energy capacity in MWh
-        "min_capacity": 0,  # Minimum SOC in MWh
+        "capacity": 100,  # Maximum energy capacity in MWh
+        "min_soc": 0,  # Minimum SOC
+        "max_soc": 1,  # Maximum SOC
         "max_power_charge": 100,  # Maximum charging power in MW
         "max_power_discharge": 100,  # Maximum discharging power in MW
         "efficiency_charge": 0.9,  # Charging efficiency
         "efficiency_discharge": 0.9,  # Discharging efficiency
-        "initial_soc": 0,  # Initial SOC in MWh
+        "initial_soc": 0,  # Initial SOC
         "ramp_up": 10,  # Maximum ramp-up rate in MW
         "ramp_down": 10,  # Maximum ramp-down rate in MW
         "storage_loss_rate": 0.01,  # 1% storage loss per time step
@@ -38,13 +39,14 @@ def thermal_storage_config(generic_storage_config):
 @pytest.fixture
 def ev_config():
     return {
-        "max_capacity": 10.0,
-        "min_capacity": 0,
+        "capacity": 10.0,  # EV battery capacity in MWh
+        "min_soc": 0,
+        "max_soc": 1,
         "max_power_charge": 3,  # Charge values will reflect a fraction of the capacity
         "max_power_discharge": 2,  # Discharge values will also be a fraction of the capacity
         "efficiency_charge": 0.95,
         "efficiency_discharge": 0.9,
-        "initial_soc": 0,  # SOC initialized to 50% of capacity
+        "initial_soc": 0,  # initial SOC
     }
 
 
@@ -280,6 +282,8 @@ def test_building_optimization_heatpump(
         forecaster=forecaster,  # Passed via **kwargs
     )
 
+    building.setup_model(presolve=True)
+
     # Perform optimization
     building.determine_optimal_operation_without_flex()
 
@@ -311,6 +315,8 @@ def test_building_optimization_boiler(
         forecaster=forecaster,
     )
 
+    building.setup_model(presolve=True)
+
     # Perform optimization
     building.determine_optimal_operation_without_flex()
 
@@ -340,6 +346,8 @@ def test_building_marginal_cost_calculation_heatpump(
         components=building_components_heatpump,
         forecaster=forecaster,  # Passed via **kwargs
     )
+
+    building.setup_model(presolve=True)
 
     building.determine_optimal_operation_without_flex()
 
@@ -374,6 +382,8 @@ def test_building_marginal_cost_calculation_boiler(
         forecaster=forecaster,  # Passed via **kwargs
     )
 
+    building.setup_model(presolve=True)
+
     building.determine_optimal_operation_without_flex()
 
     # Select a timestamp to test
@@ -407,6 +417,8 @@ def test_building_objective_function_heatpump(
         forecaster=forecaster,  # Passed via **kwargs
     )
 
+    building.setup_model(presolve=True)
+
     # Access the objective function
     objective = building.model.obj_rule_opt
 
@@ -419,7 +431,7 @@ def test_building_objective_function_invalid(
     building_components_heatpump,
 ):
     with pytest.raises(ValueError) as exc_info:
-        Building(
+        building = Building(
             id="building",
             unit_operator="operator_invalid",
             bidding_strategies={},
@@ -427,6 +439,7 @@ def test_building_objective_function_invalid(
             objective="unknown_objective",
             forecaster=forecaster,  # Passed via **kwargs
         )
+        building.setup_model(presolve=True)
 
     assert "Unknown objective: unknown_objective" in str(exc_info.value)
 
@@ -446,6 +459,8 @@ def test_building_define_constraints_heatpump(
         components=building_components_heatpump,
         forecaster=forecaster,  # Passed via **kwargs
     )
+
+    building.setup_model(presolve=True)
 
     # Check if constraints are defined
     constraints = list(building.model.component_map(pyo.Constraint).keys())
@@ -510,6 +525,8 @@ def test_building_solver_infeasibility_logging(
         forecaster=forecaster,
     )
 
+    building.setup_model(presolve=True)
+
     # Mock the solver to simulate infeasibility
     class MockResults:
         class Solver:
@@ -551,6 +568,8 @@ def test_building_bidding_strategy_execution(
         forecaster=forecaster,
     )
 
+    building.setup_model(presolve=True)
+
     # Create dummy market configuration and product tuples
     market_config = MarketConfig(
         product_type="electricity",
@@ -589,7 +608,7 @@ def test_building_unknown_flexibility_measure(
     invalid_flexibility_measure = "invalid_flex_measure"
 
     with pytest.raises(ValueError) as exc_info:
-        Building(
+        building = Building(
             id="building",
             unit_operator="operator_hp",
             bidding_strategies={},
@@ -598,6 +617,7 @@ def test_building_unknown_flexibility_measure(
             flexibility_measure=invalid_flexibility_measure,
             forecaster=forecaster,
         )
+        building.setup_model(presolve=True)
 
     # Assert the correct error message
     assert f"Unknown flexibility measure: {invalid_flexibility_measure}" in str(
@@ -619,6 +639,8 @@ def test_building_prosumer_constraint(forecaster, building_components_heatpump):
         is_prosumer="No",
     )
 
+    building.setup_model(presolve=True)
+
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "grid_export_constraint" in constraints, (
         "Non-prosumer should have grid export constraint."
@@ -638,6 +660,7 @@ def test_building_prosumer_no_constraint(forecaster, building_components_heatpum
         is_prosumer="Yes",
     )
 
+    building.setup_model(presolve=True)
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "grid_export_constraint" not in constraints, (
         "Prosumer should not have grid export constraint."
@@ -656,6 +679,7 @@ def test_prosumer_energy_export(forecaster, building_components_heatpump):
         forecaster=forecaster,
         is_prosumer="Yes",
     )
+    building.setup_model(presolve=True)
 
     # Run optimization
     building.determine_optimal_operation_without_flex()
@@ -677,6 +701,8 @@ def test_non_prosumer_no_energy_export(forecaster, building_components_heatpump)
         forecaster=forecaster,
         is_prosumer="No",
     )
+
+    building.setup_model(presolve=True)
 
     # Run optimization
     building.determine_optimal_operation_without_flex()
@@ -705,6 +731,8 @@ def test_building_constraint_enforcement(forecaster, building_components_heatpum
         components=building_components_heatpump,
         forecaster=forecaster,
     )
+
+    building.setup_model(presolve=True)
 
     constraints = list(building.model.component_map(pyo.Constraint).keys())
     assert "total_power_input_constraint" in constraints, (

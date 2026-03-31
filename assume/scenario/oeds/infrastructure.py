@@ -676,16 +676,18 @@ class InfrastructureInterface:
                 "startDate": pd.to_datetime(data["startDate"].to_numpy()[0]),
                 "max_power_discharge": data["PMinus_max"].sum(),
                 "max_power_charge": -data["PPlus_max"].sum(),
-                "max_soc": data["VMax"].to_numpy()[0],
+                "capacity": data["VMax"].to_numpy()[0],
+                "max_soc": 1,
                 "min_soc": 0,
-                "V0": data["VMax"].to_numpy()[0] / 2,
+                "initial_soc": 0.5,
+                "V0": 0.5 * data["VMax"].to_numpy()[0],
                 "lat": data["lat"].to_numpy()[0],
                 "lon": data["lon"].to_numpy()[0],
                 "efficiency_charge": 0.88,
                 "efficiency_discharge": 0.92,
             }
             # https://energie.ch/pumpspeicherkraftwerk/
-            if storage["max_soc"] > 0:
+            if storage["capacity"] > 0:
                 storages.append(storage)
         return storages
 

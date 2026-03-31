@@ -152,14 +152,22 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             # calculate theoretic SOC
             time_delta = (end - start) / timedelta(hours=1)
             if bid_quantity + current_power > 0:
-                delta_soc = -(
-                    (bid_quantity + current_power)
-                    * time_delta
-                    / unit.efficiency_discharge
+                delta_soc = (
+                    -(
+                        (bid_quantity + current_power)
+                        * time_delta
+                        / unit.efficiency_discharge
+                    )
+                    / unit.capacity
                 )
             elif bid_quantity + current_power < 0:
-                delta_soc = -(
-                    (bid_quantity + current_power) * time_delta * unit.efficiency_charge
+                delta_soc = (
+                    -(
+                        (bid_quantity + current_power)
+                        * time_delta
+                        * unit.efficiency_charge
+                    )
+                    / unit.capacity
                 )
             else:
                 delta_soc = 0
@@ -329,10 +337,13 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
                 )
                 # calculate theoretic SOC
                 time_delta = (end - start) / timedelta(hours=1)
-                delta_soc = -(
-                    (bid_quantity + current_power)
-                    * time_delta
-                    / unit.efficiency_discharge
+                delta_soc = (
+                    -(
+                        (bid_quantity + current_power)
+                        * time_delta
+                        / unit.efficiency_discharge
+                    )
+                    / unit.capacity
                 )
                 theoretic_SOC += delta_soc
                 previous_power = bid_quantity + current_power
@@ -440,7 +451,7 @@ class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
                 time_delta = (end - start) / timedelta(hours=1)
                 delta_soc = (
                     (bid_quantity + current_power) * time_delta * unit.efficiency_charge
-                )
+                ) / unit.capacity
                 theoretic_SOC += delta_soc
                 previous_power = bid_quantity + current_power
             else:

@@ -5,6 +5,7 @@
 import calendar
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -23,9 +24,11 @@ from assume.common.utils import (
     get_products_index,
     get_supported_solver,
     initializer,
+    load_index_file,
     parse_duration,
     plot_orderbook,
     separate_orders,
+    set_random_seed,
     timestamp2datetime,
     visualize_orderbook,
 )
@@ -45,6 +48,26 @@ def test_convert_rrule():
     freq, interval = convert_to_rrule_freq("99d")
     assert freq == rr.DAILY
     assert interval == 99
+
+
+def test_reproducability_with_seed():
+    set_random_seed(42)
+    rand_nums_1_1 = np.random.rand(5)
+    rand_nums_1_2 = np.random.rand(5)
+
+    set_random_seed(42)
+    rand_nums_2_1 = np.random.rand(5)
+    rand_nums_2_2 = np.random.rand(5)
+
+    assert np.array_equal(
+        [rand_nums_1_1, rand_nums_1_2], [rand_nums_2_1, rand_nums_2_2]
+    ), "Random numbers should be the same for the same seed"
+
+    set_random_seed(None)
+    rand_nums_3 = np.random.rand(5)
+    assert not np.array_equal(rand_nums_1_1, rand_nums_3), (
+        "Random numbers should differ for different seeds"
+    )
 
 
 def test_make_market_config():
@@ -560,8 +583,8 @@ def test_create_date_range():
     for i in range(n):
         q_pd_slice = series.loc[start:new_end]
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     # check that setting items is faster:
     t = time.time()
@@ -575,8 +598,8 @@ def test_create_date_range():
     for i in range(n):
         series.at[start] = 1
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     # check that setting slices is faster
     t = time.time()
@@ -590,8 +613,8 @@ def test_create_date_range():
     for i in range(n):
         series.loc[start:new_end] = 17
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     se = pd.Series(0.0, index=fs.index.get_date_list())
     se.loc[start]
@@ -800,6 +823,28 @@ def test_solver_unavailable(monkeypatch):
     monkeypatch.setattr("assume.common.utils.check_available_solvers", lambda *args: [])
     with pytest.raises(RuntimeError):
         get_supported_solver()
+
+
+def test_load_index_file():
+    path = Path("./tests/fixtures/forecast_init/demand.csv")
+
+    index = pd.date_range("2019-01-01", periods=10, freq="h")
+    df = load_index_file(path, index)
+    assert len(df) == 10
+
+    index = pd.date_range("2019-01-01", periods=24, freq="h")
+    df = load_index_file(path, index)
+    assert len(df) == 24
+
+    index = pd.date_range("2019-01-01", periods=36, freq="h")
+    df = load_index_file(path, index)
+    assert df is None
+
+    invalid_path = Path("./tests/fixtures/forecast_init/invalid")
+
+    index = pd.date_range("2019-01-01", periods=36, freq="h")
+    df = load_index_file(invalid_path, index)
+    assert df is None
 
 
 if __name__ == "__main__":

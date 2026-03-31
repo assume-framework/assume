@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 RUN useradd -m -s /bin/bash admin
 
@@ -22,7 +22,8 @@ COPY examples /src/examples
 ENV PATH=/home/admin/.local/bin:$PATH
 RUN chown -R admin /src /home/admin
 USER admin
-RUN pip install -e .
+ARG PSEUDO_VERSION=0.1
+RUN SETUPTOOLS_SCM_PRETEND_VERSION_FOR_ASSUME_FRAMEWORK=${PSEUDO_VERSION} pip install -e .
 ENV PYTHONUNBUFFERED=1
 EXPOSE 9099
 ENTRYPOINT ["assume"]

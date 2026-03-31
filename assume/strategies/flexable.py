@@ -503,7 +503,12 @@ def calculate_EOM_price_if_off(
     # if we split starting_cost across av_operating_time
     # we are never adding the other parts of the cost to the following hours
 
-    markup = starting_cost / avg_operating_time / bid_quantity_inflex
+    # if unit never operated before and min_operating_time is 0, set avg_operating_time is considered to be 1 and hence neglected to avoid division by zero
+    # this lets the power plant only start if it can recover the starting costs in the first hour, which is quite restrictive
+    if avg_operating_time == 0:
+        markup = starting_cost / bid_quantity_inflex
+    else:
+        markup = starting_cost / avg_operating_time / bid_quantity_inflex
 
     bid_price_inflex = min(marginal_cost_inflex + markup, 3000.0)
 
@@ -546,7 +551,13 @@ def calculate_EOM_price_if_on(
     # check the starting cost if the unit were turned off for min_down_time
     starting_cost = unit.get_starting_costs(-unit.min_down_time)
 
-    price_reduction_restart = starting_cost / unit.min_down_time / bid_quantity_inflex
+    # disregard unit.min_down_time of 0 to avoid division by zero
+    if unit.min_down_time == 0:
+        price_reduction_restart = starting_cost / bid_quantity_inflex
+    else:
+        price_reduction_restart = (
+            starting_cost / unit.min_down_time / bid_quantity_inflex
+        )
 
     if unit.outputs["heat"].at[start] > 0:
         heat_gen_cost = (

@@ -270,23 +270,25 @@ class TD3(RLAlgorithm):
         Also check if the unique observation dimensions are the same. If not, raise a ValueError.
         This is important for the TD3 algorithm, as it uses a centralized critic that requires consistent dimensions across all agents.
         """
+        foresight_list = []
         obs_dim_list = []
         act_dim_list = []
         unique_obs_dim_list = []
         num_timeseries_obs_dim_list = []
 
         for strategy in self.learning_role.rl_strats.values():
+            foresight_list.append(strategy.foresight)
             obs_dim_list.append(strategy.obs_dim)
             act_dim_list.append(strategy.act_dim)
             unique_obs_dim_list.append(strategy.unique_obs_dim)
             num_timeseries_obs_dim_list.append(strategy.num_timeseries_obs_dim)
 
-        if len(set(obs_dim_list)) > 1:
+        if len(set(foresight_list)) > 1:
             raise ValueError(
-                f"All observation dimensions must be the same for all RL agents. The defined learning strategies have the following observation dimensions: {obs_dim_list}"
+                f"All foresight values must be the same for all RL agents. The defined learning strategies have the following foresight values: {foresight_list}"
             )
         else:
-            self.obs_dim = obs_dim_list[0]
+            self.foresight = foresight_list[0]
 
         if len(set(act_dim_list)) > 1:
             raise ValueError(
@@ -308,6 +310,14 @@ class TD3(RLAlgorithm):
             )
         else:
             self.num_timeseries_obs_dim = num_timeseries_obs_dim_list[0]
+
+        # Check last, as other cases should fail before!
+        if len(set(obs_dim_list)) > 1:
+            raise ValueError(
+                f"All observation dimensions must be the same for all RL agents. The defined learning strategies have the following observation dimensions: {obs_dim_list}"
+            )
+        else:
+            self.obs_dim = obs_dim_list[0]
 
     def create_actors(self) -> None:
         """

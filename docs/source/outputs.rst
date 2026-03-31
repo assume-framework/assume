@@ -86,7 +86,7 @@ When the outputs are stored in CSV files, the data is organized in a similar str
 
    * - storage_meta
      - Storage unit metadata.
-     - simulation, unit_id, unit_type ("storage"), max_soc, min_soc, max_power_charge, max_power_discharge, min_power_charge, min_power_discharge, efficiency_charge, efficiency_discharge
+     - simulation, unit_id, unit_type ("storage"), capacity, max_soc, min_soc, max_power_charge, max_power_discharge, min_power_charge, min_power_discharge, efficiency_charge, efficiency_discharge
 
    * - rl_params
      - Reinforcement learning parameters.

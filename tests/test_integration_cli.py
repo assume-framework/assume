@@ -21,14 +21,22 @@ def test_cli():
     got = {}
     with db.begin() as conn:
         got = {
-            "market_meta": pd.read_sql("SELECT * FROM market_meta", conn),
-            "demand_meta": pd.read_sql("SELECT * FROM demand_meta", conn),
-            "exchange_meta": pd.read_sql("SELECT * FROM exchange_meta", conn),
+            "market_meta": pd.read_sql("SELECT * FROM market_meta", conn).fillna(""),
+            "demand_meta": pd.read_sql("SELECT * FROM demand_meta", conn).fillna(""),
+            "exchange_meta": pd.read_sql("SELECT * FROM exchange_meta", conn).fillna(
+                ""
+            ),
         }
     expected = {
-        "market_meta": pd.read_csv("./tests/fixtures/01a_results/market_meta.csv"),
-        "demand_meta": pd.read_csv("./tests/fixtures/01a_results/demand_meta.csv"),
-        "exchange_meta": pd.read_csv("./tests/fixtures/01a_results/exchange_meta.csv"),
+        "market_meta": pd.read_csv(
+            "./tests/fixtures/01a_results/market_meta.csv", keep_default_na=False
+        ),
+        "demand_meta": pd.read_csv(
+            "./tests/fixtures/01a_results/demand_meta.csv", keep_default_na=False
+        ),
+        "exchange_meta": pd.read_csv(
+            "./tests/fixtures/01a_results/exchange_meta.csv", keep_default_na=False
+        ),
     }
     for key in expected.keys():
         assert_frame_equal(got[key], expected[key], check_dtype=False)
