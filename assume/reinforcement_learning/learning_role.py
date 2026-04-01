@@ -331,8 +331,11 @@ class Learning(Role):
 
         # Add data to buffer - type depends on algorithm category
         if is_on_policy(self.learning_config.algorithm):
-            # For on-policy algorithms (PPO/MAPPO), use RolloutBuffer
+            # Using RolloutBuffer for on-policy algorithms (PPO/MAPPO).
             for timestamp in sorted(cache["obs"].keys()):
+                sorted_unit_ids = sorted(cache["obs"][timestamp].keys())
+                n_rl_agents = len(sorted_unit_ids)
+
                 obs_data = transform_buffer_data(
                     {
                         timestamp: cache["obs"][timestamp]
@@ -351,13 +354,43 @@ class Learning(Role):
                     },
                     device
                 )
-                
-                values_data = transform_buffer_data(
-                    {
-                        timestamp: cache["values"][timestamp]
-                    },
-                    device
-                )
+
+                # Computing MAPPO value targets with the centralized critic
+                #using the joint observation available at this timestamp.
+                if self.learning_config.algorithm == "mappo":
+                    values_data = np.zeros((1, n_rl_agents, 1), dtype=np.float32)
+                    obs_step = obs_data[0]
+                    unique_obs_all = obs_step[
+                        :, self.rl_algorithm.obs_dim - self.rl_algorithm.unique_obs_dim :
+                    ]
+
+                    with th.no_grad():
+                        for i, unit_id in enumerate(sorted_unit_ids):
+                            strategy = self.rl_strats[unit_id]
+                            obs_i = obs_step[i : i + 1]
+                            other_unique = np.concatenate(
+                                (unique_obs_all[:i], unique_obs_all[i + 1 :]),
+                                axis=0,
+                            )
+                            centralized_obs = np.concatenate(
+                                (obs_i, other_unique.reshape(1, -1)),
+                                axis=1,
+                            )
+                            obs_tensor = th.as_tensor(
+                                centralized_obs,
+                                device=self.device,
+                                dtype=self.float_type,
+                            )
+                            values_data[0, i, 0] = (
+                                strategy.critics(obs_tensor).cpu().numpy().reshape(-1)[0]
+                            )
+                else:
+                    values_data = transform_buffer_data(
+                        {
+                            timestamp: cache["values"][timestamp]
+                        },
+                        device
+                    )
                 
                 log_probs_data = transform_buffer_data(
                     {
@@ -373,7 +406,7 @@ class Learning(Role):
                     device
                 )
 
-                # Add to rollout buffer
+                # Adding data to the rollout buffer.
                 self.buffer.add(
                     obs = obs_data,
                     action = actions_data,
@@ -383,8 +416,8 @@ class Learning(Role):
                     log_prob = log_probs_data
                 )
         else:
-            # For off-policy algorithms (TD3/DDPG), use ReplayBuffer
-            # rewrite dict so that obs.shape == (n_rl_units, obs_dim) and sorted by keys and store in buffer
+            # Using ReplayBuffer for off-policy algorithms (TD3/DDPG).
+            # Rewriting the dict so obs.shape == (n_rl_units, obs_dim), sorting by keys, and storing it in the buffer.
             self.buffer.add(
                 obs = transform_buffer_data(cache["obs"], device),
                 actions = transform_buffer_data(cache["actions"], device),

@@ -73,8 +73,8 @@ class TorchLearningStrategy(LearningStrategy):
         self.exploration_noise_std = self.learning_config.exploration_noise_std
 
         if self.learning_mode or self.evaluation_mode:
-            # learning role overwrites this if loaded from file or after initial experience episodes
-            self.collect_initial_experience_mode = True
+            # Keeping initial random exploration only for off-policy methods.
+            self.collect_initial_experience_mode = is_off_policy(self.algorithm)
 
             
             if is_off_policy(self.algorithm):
@@ -290,30 +290,20 @@ class TorchLearningStrategy(LearningStrategy):
                 # =============================================================================
                 # 2.1 Get Actions and handle exploration
                 # =============================================================================
-                # only use noise as the action to enforce exploration
+                # Using only noise as the action to enforce exploration.
                 curr_action = noise
                 
-                # For PPO, store dummy log_prob and value during initial exploration
-                if self.algorithm == "mappo":
-                    self._last_log_prob = th.tensor(0.0, device=self.device)
-                    self._last_value = th.tensor(0.0, device=self.device)
-
             else:
-                # For PPO/MAPPO, always use the policy (no initial random exploration)
+                # Using the policy forMAPPO (no initial random exploration).
                 if self.algorithm == "mappo":
-                    # PPO: use get_action_and_log_prob for proper stochastic sampling
+                    # Using get_action_and_log_prob for proper PPO stochastic sampling.
                     curr_action, log_prob = self.actor.get_action_and_log_prob(next_observation.unsqueeze(0))
                     curr_action = curr_action.squeeze(0).detach()
                     self._last_log_prob = log_prob.squeeze(0).detach()
+                    # Computing the value later from centralized observations in learning_role.
+                    self._last_value = th.tensor(0.0, device=self.device)
                     
-                    # Get value estimate from critic (if available)
-                    if hasattr(self.learning_role, 'critics') and self.unit_id in self.learning_role.critics:
-                        critic = self.learning_role.critics[self.unit_id]
-                        self._last_value = critic(next_observation.unsqueeze(0)).squeeze().detach()
-                    else:
-                        self._last_value = th.tensor(0.0, device=self.device)
-                    
-                    # PPO uses stochastic policy, no external noise needed
+                    # Using stochastic PPO policy with no external noise.
                     noise = th.zeros_like(curr_action, dtype=self.float_type)
                 else:
                     # TD3/DDPG: if we are not in the initial exploration phase we chose the action with the actor neural net

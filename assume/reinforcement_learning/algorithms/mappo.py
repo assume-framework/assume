@@ -48,12 +48,12 @@ class PPO(A2CAlgorithm):
     def __init__(
         self,
         learning_role,
-        clip_range=0.2,
-        clip_range_vf=0.1,
-        n_epochs=50,
-        entropy_coef=0.05,
-        vf_coef=1.0,
-        max_grad_norm=0.5,
+        clip_range=None,
+        clip_range_vf=None,
+        n_epochs=None,
+        entropy_coef=None,
+        vf_coef=None,
+        max_grad_norm=None,
     ):
         """Initialize PPO algorithm with specific hyperparameters.
         
@@ -73,15 +73,25 @@ class PPO(A2CAlgorithm):
         self.critic_architecture_class = CriticPPO
 
         config = self.learning_config
-        ppo_config = getattr(config, "ppo", None)
+        on_policy_config = config.on_policy
 
-        # Use PPO-specific config if available, otherwise use defaults
-        self.clip_range = clip_range if clip_range is not None else getattr(ppo_config, "clip_ratio", 0.2)
-        self.clip_range_vf = clip_range_vf if clip_range_vf is not None else getattr(ppo_config, "clip_range_vf", None)
-        self.n_epochs = n_epochs if n_epochs is not None else getattr(ppo_config, "n_epochs", 10)
-        self.entropy_coef = entropy_coef if entropy_coef is not None else getattr(ppo_config, "entropy_coef", 0.01)
-        self.vf_coef = vf_coef if vf_coef is not None else getattr(ppo_config, "vf_coef", 0.5)
-        self.max_grad_norm = max_grad_norm if max_grad_norm is not None else getattr(ppo_config, "max_grad_norm", 0.5)
+        # Using on-policy config unless explicitly overridden via constructor args.
+        self.clip_range = (
+            clip_range if clip_range is not None else on_policy_config.clip_ratio
+        )
+        self.clip_range_vf = clip_range_vf
+        self.n_epochs = n_epochs if n_epochs is not None else on_policy_config.n_epochs
+        self.entropy_coef = (
+            entropy_coef
+            if entropy_coef is not None
+            else on_policy_config.entropy_coef
+        )
+        self.vf_coef = vf_coef if vf_coef is not None else on_policy_config.vf_coef
+        self.max_grad_norm = (
+            max_grad_norm
+            if max_grad_norm is not None
+            else on_policy_config.max_grad_norm
+        )
 
         # Update counter
         self.n_updates = 0
@@ -107,9 +117,7 @@ class PPO(A2CAlgorithm):
             >>> ppo.create_actors()
             >>> # Creates actor network and optimizer for each strategy
         """
-        config = self.learning_config
-        ppo_config = getattr(config, "ppo", None)
-        actor_architecture = getattr(ppo_config, "actor_architecture", "mlp")
+        actor_architecture = self.learning_config.on_policy.actor_architecture
 
         for strategy in self.learning_role.rl_strats.values():
             # Create PPO Actor
@@ -212,10 +220,12 @@ class PPO(A2CAlgorithm):
         """
         logger.debug("Updating Policy")
 
-        strategies = list(self.learning_role.rl_strats.values())
+        # Keeping strategy order aligned with rollout-buffer column order.
+        sorted_unit_ids = sorted(self.learning_role.rl_strats.keys())
+        strategies = [self.learning_role.rl_strats[u_id] for u_id in sorted_unit_ids]
         n_rl_agents = len(strategies)
 
-        # Get buffer (will be RolloutBuffer for on-policy algorithms)
+        # Getting the buffer, this will be a RolloutBuffer for on-policy algorithms.
         rollout_buffer = self.learning_role.buffer
 
         # Check if rollout buffer has data
