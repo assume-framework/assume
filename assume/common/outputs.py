@@ -458,6 +458,11 @@ class WriteOutput(Role):
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:
                 continue
+
+            # dont save market orders & dispatch for learning mode
+            if table in ["market_orders", "market_dispatch"] and (self.learning_mode or self.evaluation_mode):
+                continue
+
             df = None
             with self.locks[table]:
                 if table == "grid_topology":
@@ -660,22 +665,21 @@ class WriteOutput(Role):
         if self.db is None:
             return
 
-        queries = []
-        for variable, kpi_def in self.kpi_defs.items():
-            group_bys = ",".join(kpi_def.get("group_bys", ["market_id"]))
-            simulation_col = kpi_def.get("simulation_col", "simulation")
-            queries.append(
-                f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where {simulation_col} = '{self.simulation_id}' group by {group_bys}"
-            )
 
         if self.learning_mode or self.evaluation_mode:
-            queries.extend(
-                [
-                    f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                    f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                    f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                ]
-            )
+            queries = [
+                f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+            ]
+        else:
+            queries = []
+            for variable, kpi_def in self.kpi_defs.items():
+                group_bys = ",".join(kpi_def.get("group_bys", ["market_id"]))
+                simulation_col = kpi_def.get("simulation_col", "simulation")
+                queries.append(
+                    f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where {simulation_col} = '{self.simulation_id}' group by {group_bys}"
+                )
 
         dfs = []
         for query in queries:
