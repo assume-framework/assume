@@ -127,7 +127,7 @@ available_examples = {
     },
     "case_study_2025": {
         "scenario": "example_03d",
-        "study_case": "base_heu",
+        "study_case": "base_heu_jan_linear_max300",
     },
 }
 
@@ -148,7 +148,7 @@ if __name__ == "__main__":
     example = "small_learning_2"
 
     if data_format == "local_db":
-        db_uri = "sqlite:///./examples/local_db/assume_db_8459abd.db"
+        db_uri = "sqlite:///./examples/local_db/assume_db.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
