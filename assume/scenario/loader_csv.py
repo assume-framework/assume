@@ -76,6 +76,39 @@ def get_unit_forecast_algorithms(
     return forecast_algorithms | unit_forecast_algorithms  # merge dicts together
 
 
+def resolve_forecast_source(value: str, forecasts_df: pd.DataFrame | None = None):
+    """Resolve forecast source: algorithm name OR direct column from forecasts_df.
+
+    Args:
+        value (str): Either algorithm name (e.g., "adaptive", "price_default")
+                    or direct column name from forecasts_df (e.g., "A360_electricity_price")
+        forecasts_df (pd.DataFrame, optional): Forecasts dataframe to check for columns.
+
+    Returns:
+        str (algorithm name) or pd.Series (actual data) or None
+
+    Examples:
+        "adaptive" → "price_from_cleared_history" (algorithm)
+        "A360_electricity_price" → pd.Series from forecasts_df (direct data)
+        "price_naive_forecast" → "price_naive_forecast" (algorithm)
+    """
+    if value is None or pd.isna(value):
+        return None
+
+    value = str(value).strip()
+
+    # Check if it exists as a column in forecasts_df (direct data reference)
+    if forecasts_df is not None and value in forecasts_df.columns:
+        return forecasts_df[value]  # Return actual data series
+
+    # Map friendly names to algorithm identifiers
+    if value.lower() == "adaptive":
+        return "price_from_cleared_history"
+
+    # Otherwise treat as algorithm name and return as-is
+    return value
+
+
 def load_file(
     path: str,
     config: dict,
@@ -148,6 +181,7 @@ def load_dsm_units(
     path: str,
     config: dict,
     file_name: str,
+    dsm_optimisation_config: dict | None = None,
 ) -> dict:
     """
     Loads and processes a CSV file containing DSM unit data, where each unit may consist of multiple components
@@ -196,6 +230,7 @@ def load_dsm_units(
         "is_prosumer",
         "congestion_threshold",
         "peak_load_cap",
+        "load_profile_deviation",
     ]
     # Filter the common columns to only include those that exist in the DataFrame
     common_columns = [col for col in common_columns if col in dsm_units.columns]
@@ -229,6 +264,8 @@ def load_dsm_units(
                 components[tech] = cleaned_data.to_dict(orient="records")[0]
 
         dsm_unit["components"] = components
+        if dsm_optimisation_config is not None:
+            dsm_unit["dsm_optimisation_config"] = dsm_optimisation_config
         dsm_units_dict[name] = dsm_unit
 
     # Convert the structured dictionary into a DataFrame
@@ -530,10 +567,16 @@ def load_config_and_create_forecaster(
     # Initialize an empty dictionary to combine the DSM units
     dsm_units = {}
     for unit_type in ["industrial_dsm_units", "residential_dsm_units"]:
+        # e.g. "industrial_dsm_units" → "industrial_dsm_optimisation"
+        opt_key = unit_type.replace("_units", "_optimisation")
+        dsm_opt_config = (
+            config.get(opt_key) if isinstance(config.get(opt_key), dict) else None
+        )
         units = load_dsm_units(
             path=path,
             config=config,
             file_name=unit_type,
+            dsm_optimisation_config=dsm_opt_config,
         )
         if units is not None:
             dsm_units.update(units)
@@ -661,14 +704,64 @@ def load_config_and_create_forecaster(
                         pv_profile=0,  # TODO
                     )
                 if type == "steel_plant":
+                    # Fetch ID-prefixed data for operational strategy selection
+                    # Strategy 1: Normalized load profile (profile-guided operation)
+                    normalized_profile = None
+                    profile_col = f"{id}_normalized_load_profile"
+                    if forecasts_df is not None and profile_col in forecasts_df.columns:
+                        normalized_profile = forecasts_df[profile_col]
+                    elif (
+                        forecasts_df is not None
+                        and "normalized_load_profile" in forecasts_df.columns
+                    ):
+                        # Fallback: use generic column if ID-specific not found
+                        normalized_profile = forecasts_df["normalized_load_profile"]
+
+                    # Strategy 2: Hourly minimum steel demand (min-demand operation)
+                    steel_demand = None
+                    demand_col = f"{id}_steel_demand"
+                    if forecasts_df is not None and demand_col in forecasts_df.columns:
+                        steel_demand = forecasts_df[demand_col]
+                    elif (
+                        forecasts_df is not None
+                        and "steel_demand" in forecasts_df.columns
+                    ):
+                        # Fallback: use generic column if ID-specific not found
+                        steel_demand = forecasts_df["steel_demand"]
+
+                    # Resolve electricity price source: either algorithm or direct column
+                    price_update_source = unit.get(
+                        "forecast_electricity_price_update", None
+                    )
+                    price_update_resolved = resolve_forecast_source(
+                        price_update_source, forecasts_df
+                    )
+
+                    # Setup forecast algorithms and initial market prices
+                    final_algorithms = unit_forecast_algorithms.copy()
+                    initial_market_prices = {}
+
+                    if isinstance(price_update_resolved, pd.Series):
+                        # Direct column: use as initial market prices
+                        initial_market_prices["EOM"] = price_update_resolved
+                        # Don't set update_price - will use default update
+                    elif isinstance(price_update_resolved, str):
+                        # Algorithm name: use for price updates
+                        final_algorithms["update_price"] = price_update_resolved
+
                     unit_forecasts[id] = SteelplantForecaster(
                         index=shared_unit_index,
                         availability=availability.get(
                             id, pd.Series(1.0, index, name=id)
                         ),
-                        forecast_algorithms=unit_forecast_algorithms,
+                        market_prices=initial_market_prices
+                        if initial_market_prices
+                        else unit.get("market_prices"),
+                        forecast_algorithms=final_algorithms,
                         forecast_registries=forecast_registries,
                         fuel_prices=fuel_prices_df,
+                        normalized_load_profile=normalized_profile,
+                        steel_demand=steel_demand,
                     )
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(

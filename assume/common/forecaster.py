@@ -687,11 +687,18 @@ class DsmUnitForecaster(UnitForecaster):
 class SteelplantForecaster(DsmUnitForecaster):
     """Forecaster for steelplant units.
 
-    Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus fuel prices.
+    Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus fuel prices and steel demand.
     After initialization, DSM signals are copied to the unit and ``setup_model()`` is called.
+
+    Supports three operational strategies:
+    1. **Profile-guided**: If ``normalized_load_profile`` is provided, production follows the profile shape.
+    2. **Min-demand**: If hourly minimum demand (``steel_demand``) is provided, meets per-hour minimums.
+    3. **Cost-optimized**: If neither is provided, minimizes cost without shape constraints.
 
     Attributes:
         fuel_prices (dict[str, ForecastSeries]): Map of fuel type to forecasted fuel prices.
+        steel_demand (ForecastSeries): Per-timestep steel production demand (optional).
+        normalized_load_profile (ForecastSeries): Normalized profile to guide production shape (optional).
     """
 
     def __init__(
@@ -706,6 +713,8 @@ class SteelplantForecaster(DsmUnitForecaster):
         congestion_signal: ForecastSeries = 0.0,
         renewable_utilisation_signal: ForecastSeries = 0.0,
         electricity_price: ForecastSeries = None,
+        steel_demand: ForecastSeries = None,
+        normalized_load_profile: ForecastSeries = None,
     ):
         super().__init__(
             index=index,
@@ -719,6 +728,14 @@ class SteelplantForecaster(DsmUnitForecaster):
             electricity_price=electricity_price,
         )
         self.fuel_prices = self._dict_to_series(fuel_prices)
+        self.steel_demand = (
+            self._to_series(steel_demand) if steel_demand is not None else None
+        )
+        self.normalized_load_profile = (
+            self._to_series(normalized_load_profile)
+            if normalized_load_profile is not None
+            else None
+        )
 
     def get_price(self, fuel: str) -> FastSeries:
         if fuel not in self.fuel_prices:
@@ -739,13 +756,77 @@ class SteelplantForecaster(DsmUnitForecaster):
             initializing_unit,
         )
 
+        # Always set standard DSM signals
         initializing_unit.electricity_price = self.electricity_price
         initializing_unit.congestion_signal = self.congestion_signal
         initializing_unit.renewable_utilisation_signal = (
             self.renewable_utilisation_signal
         )
 
+        # Get the unit's ID for dynamic attribute naming
+        unit_id = str(getattr(initializing_unit, "id", None))
+
+        # Set ID-prefixed attributes for operational strategy selection
+        # Strategy 1: Normalized load profile (if provided)
+        if self.normalized_load_profile is not None and unit_id:
+            profile_attr = f"{unit_id}_normalized_load_profile"
+            setattr(initializing_unit, profile_attr, self.normalized_load_profile)
+
+        # Strategy 2: Hourly minimum steel demand (if provided)
+        if self.steel_demand is not None and unit_id:
+            demand_attr = f"{unit_id}_steel_demand"
+            setattr(initializing_unit, demand_attr, self.steel_demand)
+
+        # Backward compatibility: also set non-prefixed attributes
+        if self.steel_demand is not None:
+            initializing_unit.steel_demand_per_timestep = self.steel_demand
+
+        if self.normalized_load_profile is not None:
+            initializing_unit.normalized_load_profile = self.normalized_load_profile
+
         initializing_unit.setup_model()
+
+    def update(self, *args, **kwargs):
+        """Update DSM-specific forecasts including adaptive electricity price learning.
+
+        Calls parent update for DSM signals (congestion, renewable utilisation),
+        then updates electricity price using the configured algorithm. If using
+        the adaptive price learning algorithm, clears prices are extracted from
+        the unit's outputs and used to forecast next period.
+
+        Args:
+            *args: Passed through to the underlying update algorithms.
+            **kwargs: Passed through to the underlying update algorithms, must include 'unit'.
+        """
+        # Call parent DsmUnitForecaster.update() for DSM signals
+        super().update(*args, **kwargs)
+
+        # Update electricity price via configured algorithm
+        price_update_algorithm_name = self.forecast_algorithms.get(
+            "update_price", "price_default"
+        )
+        price_update_algorithm = self._registries["update"].get(
+            price_update_algorithm_name
+        )
+
+        if price_update_algorithm is not None:
+            # Call the price update algorithm (may be price_default or price_from_cleared_history)
+            self.price = price_update_algorithm(
+                self.price,
+                self.preprocess_information.get("price", {}),
+                *args,
+                **kwargs,
+            )
+            self.price = self._dict_to_series(self.price)
+
+            # Sync electricity_price with updated price from EOM market
+            if "EOM" in self.price:
+                self.electricity_price = self.price["EOM"]
+
+            # Push updated price to the unit so it uses the latest forecast in optimization
+            unit = kwargs.get("unit")
+            if unit is not None:
+                unit.electricity_price = self.electricity_price
 
 
 class SteamgenerationForecaster(DsmUnitForecaster):
