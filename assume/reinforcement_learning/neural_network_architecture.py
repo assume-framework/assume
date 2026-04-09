@@ -355,7 +355,7 @@ class LSTMActor(Actor):
         outputs = []
 
         for time_step in x1.split(1, dim=2):
-            time_step = time_step.reshape(-1, self.num_timeseris_obs_dim)
+            time_step = time_step.reshape(-1, self.num_timeseries_obs_dim)
             h_t, c_t = self.LSTM1(time_step, (h_t, c_t))
             h_t2, c_t2 = self.LSTM2(h_t, (h_t2, c_t2))
             outputs += [h_t2]
@@ -551,6 +551,13 @@ class LSTMActorPPO(ActorPPO):
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
 
         self.activation = "softsign"
+        if self.activation not in activation_function_limit:
+            raise ValueError(
+                f"Activation '{self.activation}' not supported! Supported: {list(activation_function_limit.keys())}"
+            )
+
+        self.min_output = activation_function_limit[self.activation]["min"]
+        self.max_output = activation_function_limit[self.activation]["max"]
         self.activation_function = activation_function_limit[self.activation]["func"]
 
         # Compute timeseries length for LSTM
@@ -596,8 +603,8 @@ class LSTMActorPPO(ActorPPO):
         nn.init.orthogonal_(self.mean_layer.weight, gain=0.01)
         nn.init.zeros_(self.mean_layer.bias)
 
-    def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
-        """Forward pass"""
+    def _extract_features(self, obs: th.Tensor) -> tuple[th.Tensor, bool]:
+        """Build latent features from timeseries and stationary observations."""
         if obs.dim() not in (1, 2):
             raise ValueError(
                 f"LSTMCell: Expected input to be 1D or 2D, got {obs.dim()}D instead"
@@ -632,24 +639,21 @@ class LSTMActorPPO(ActorPPO):
             h_t2, c_t2 = self.LSTM2(h_t, (h_t2, c_t2))
             outputs.append(h_t2)
 
-        # Concatenate LSTM outputs
+        # Concatenate LSTM outputs with stationary observations
         outputs = th.cat(outputs, dim=1)
-        
-        # Concatenate with stationary observations
         x = th.cat((outputs, x2), dim=1)
-        
-        # FC Layers
         x = F.relu(self.FC1(x))
-        mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
 
-        if not is_batched:
-            mean = mean.squeeze(0)
+        return x, is_batched
+
+    def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
+        """Forward pass"""
+        mean, log_std = self.get_distribution(obs)
 
         if deterministic:
             return mean
         
         # Sample from Gaussian during training
-        log_std = self.log_std.expand_as(mean)
         std = log_std.exp()  # Ensure positive
         # Add small epsilon for numerical stability
         std = std + 1e-6
@@ -658,3 +662,16 @@ class LSTMActorPPO(ActorPPO):
         
         # Clamp to valid range
         return th.clamp(action, -1.0, 1.0)
+
+    def get_distribution(self, obs: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
+        """Get Gaussian policy parameters from LSTM features."""
+        x, is_batched = self._extract_features(obs)
+
+        mean = th.tanh(self.mean_layer(x))
+        log_std = self.log_std.expand_as(mean)
+
+        if not is_batched:
+            mean = mean.squeeze(0)
+            log_std = log_std.squeeze(0)
+
+        return mean, log_std
