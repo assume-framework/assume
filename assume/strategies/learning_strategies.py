@@ -1331,3 +1331,180 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
             self.learning_role.add_reward_to_cache(
                 unit.id, start, reward, regret, profit
             )
+
+
+class RenewableEnergyLearningCompatibleStrategy(EnergyLearningSingleBidStrategy):
+    """
+    Reinforcement Learning Strategy for renewable units that is dimension-compatible
+    with storage and generator learning strategies.
+
+    This strategy inherits from ``EnergyLearningSingleBidStrategy`` and sets
+    ``unique_obs_dim=2`` so that the resulting observation dimension (``obs_dim=74``)
+    matches the storage and generator strategies exactly.  This allows all three
+    unit types to share a single centralised MATD3 critic.
+
+    Compared to ``RenewableEnergyLearningSingleBidStrategy`` (which uses
+    ``unique_obs_dim=3``), this variant drops marginal cost from the individual
+    observations.  Marginal cost is near-zero and essentially constant for
+    renewables, so it provides no useful learning signal.  The availability
+    observation — which tells the agent how much generation capacity is actually
+    available — is retained.
+
+    Individual observations returned:
+        - ``scaled_total_dispatch``  – current output / max_power
+        - ``scaled_available_power`` – available power / max_power
+
+    The ``calculate_reward`` method uses renewable-specific opportunity-cost logic
+    (based on available generation rather than installed capacity), identical to
+    ``RenewableEnergyLearningSingleBidStrategy``.
+
+    Attributes
+    ----------
+    foresight : int
+        Number of forecast look-ahead time steps.  Default 24.
+    act_dim : int
+        Action dimension (single bid price).  Default 1.
+    unique_obs_dim : int
+        Unit-specific observation dimension.  Fixed at 2 for critic compatibility.
+    """
+
+    def __init__(self, *args, **kwargs):
+        foresight = kwargs.pop("foresight", 24)
+        act_dim = kwargs.pop("act_dim", 1)
+        # Force unique_obs_dim=2 so obs_dim matches storage/generator strategies
+        kwargs.pop("unique_obs_dim", None)
+        super().__init__(
+            foresight=foresight,
+            act_dim=act_dim,
+            unique_obs_dim=2,
+            *args,
+            **kwargs,
+        )
+
+    def get_individual_observations(
+        self, unit: SupportsMinMaxCharge, start: datetime, end: datetime
+    ):
+        """
+        Return unit-specific observations for renewable units (compatible variant).
+
+        Only two observations are returned so that ``unique_obs_dim`` equals 2,
+        matching the storage and generator learning strategies.
+
+        Parameters
+        ----------
+        unit : SupportsMinMaxCharge
+            The renewable unit.
+        start : datetime.datetime
+            Start of the observation period.
+        end : datetime.datetime
+            End of the observation period.
+
+        Returns
+        -------
+        np.ndarray
+            ``[scaled_total_dispatch, scaled_available_power]``
+        """
+        current_volume = unit.get_output_before(start)
+        _, available_power = unit.calculate_min_max_power(start, end)
+
+        scaled_total_dispatch = current_volume / unit.max_power
+        scaled_available_power = available_power[0] / unit.max_power
+
+        return np.array([scaled_total_dispatch, scaled_available_power])
+
+    def calculate_reward(
+        self,
+        unit: SupportsMinMaxCharge,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        """
+        Calculate the reward for the renewable unit.
+
+        Uses renewable-specific opportunity-cost logic identical to
+        ``RenewableEnergyLearningSingleBidStrategy``: opportunity cost is
+        computed against the *available* generation (from the offered volume)
+        rather than the full installed capacity.
+
+        Parameters
+        ----------
+        unit : SupportsMinMaxCharge
+            The renewable unit.
+        marketconfig : MarketConfig
+            Market configuration.
+        orderbook : Orderbook
+            Executed orders from market clearing.
+        """
+        product_type = marketconfig.product_type
+
+        start = orderbook[0]["start_time"]
+        end = orderbook[0]["end_time"]
+        end_excl = end - unit.index.freq
+
+        marginal_cost = unit.calculate_marginal_cost(
+            start, unit.outputs[product_type].at[start]
+        )
+        market_clearing_price = orderbook[0]["accepted_price"]
+
+        duration = (end - start) / timedelta(hours=1)
+
+        income = 0.0
+        operational_cost = 0.0
+
+        accepted_volume_total = 0
+        offered_volume_total = 0
+
+        for order in orderbook:
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_volume_total += accepted_volume
+
+            offered_volume_total += order["volume"]
+
+            order_income = market_clearing_price * accepted_volume * duration
+            order_cost = marginal_cost * accepted_volume * duration
+
+            income += order_income
+            operational_cost += order_cost
+
+        if (
+            unit.outputs[product_type].at[start] != 0
+            and unit.outputs[product_type].at[start - unit.index.freq] == 0
+        ):
+            operational_cost += unit.hot_start_cost / 2
+        elif (
+            unit.outputs[product_type].at[start] == 0
+            and unit.outputs[product_type].at[start - unit.index.freq] != 0
+        ):
+            operational_cost += unit.hot_start_cost / 2
+
+        profit = income - operational_cost
+
+        profit_scale = 1
+        profit = min(profit, profit_scale * abs(profit))
+
+        available_power = offered_volume_total
+
+        opportunity_cost = (
+            (market_clearing_price - marginal_cost)
+            * (available_power - accepted_volume_total)
+            * duration
+        )
+        opportunity_cost = max(opportunity_cost, 0)
+
+        regret_scale = 0.1 if accepted_volume_total > unit.min_power else 0.5
+
+        if available_power == 0:
+            scaling = 0
+        else:
+            scaling = 1 / (self.max_bid_price * available_power)
+
+        regret = regret_scale * opportunity_cost
+        reward = scaling * (profit - regret)
+
+        unit.outputs["profit"].loc[start:end_excl] += profit
+        unit.outputs["total_costs"].loc[start:end_excl] += operational_cost
+
+        if self.learning_mode:
+            self.learning_role.add_reward_to_cache(
+                unit.id, start, reward, regret, profit
+            )
