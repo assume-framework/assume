@@ -18,7 +18,6 @@ from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
 from assume.common.fast_pandas import FastIndex
-from assume.common.forecast_algorithms import get_forecast_registries
 from assume.common.forecaster import (
     BuildingForecaster,
     CustomUnitForecaster,
@@ -588,7 +587,6 @@ def load_config_and_create_forecaster(
         fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
 
     forecast_algorithms = config.get("forecast_algorithms", {})
-    forecast_registries = get_forecast_registries()
 
     # create shared unit index for caching!
     shared_unit_index = FastIndex(
@@ -604,7 +602,6 @@ def load_config_and_create_forecaster(
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, plant
                 ),
-                forecast_registries=forecast_registries,
             )
     if demand_units is not None:
         for id, demand in demand_units.iterrows():
@@ -615,7 +612,6 @@ def load_config_and_create_forecaster(
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, demand
                 ),
-                forecast_registries=forecast_registries,
             )
     if storage_units is not None:
         for id, storage in storage_units.iterrows():
@@ -625,7 +621,6 @@ def load_config_and_create_forecaster(
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, storage
                 ),
-                forecast_registries=forecast_registries,
             )
     if exchange_units is not None:
         for id, exchange in exchange_units.iterrows():
@@ -635,7 +630,6 @@ def load_config_and_create_forecaster(
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, exchange
                 ),
-                forecast_registries=forecast_registries,
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
             )
@@ -708,7 +702,6 @@ def load_config_and_create_forecaster(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        forecast_registries=forecast_registries,
                         fuel_prices=fuel_prices_df,
                         load_profile=building_load_profile,
                         ev_load_profile=building_ev_profile,
@@ -725,7 +718,6 @@ def load_config_and_create_forecaster(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        forecast_registries=forecast_registries,
                         fuel_prices=fuel_prices_df,
                     )
                 if type == "hydrogen_plant":
@@ -735,7 +727,6 @@ def load_config_and_create_forecaster(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        forecast_registries=forecast_registries,
                         hydrogen_demand=unit["demand"],
                         seasonal_storage_schedule=0,  # TODO
                     )
@@ -746,7 +737,6 @@ def load_config_and_create_forecaster(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        forecast_registries=forecast_registries,
                         demand=unit["demand"],
                         fuel_prices=fuel_prices_df,
                         electricity_price_flex=0,  # TODO
