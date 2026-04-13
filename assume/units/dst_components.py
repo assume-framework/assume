@@ -1395,7 +1395,7 @@ class ElectricVehicle(GenericStorage):
     Extends GenericStorage with:
     - vehicle availability
     - optional predefined charging profile
-    - transport energy use via `external_range`
+    - transport energy use via `external_trip_distance`
     - unidirectional / bidirectional operation
     - binary non-simultaneity of charging and discharging
 
@@ -1431,8 +1431,8 @@ class ElectricVehicle(GenericStorage):
         Fractional storage loss per time step.
     mileage : float | None
         Specific electricity consumption for driving.
-        Interpreted here as energy per unit of external_range.
-        Example: if external_range is km, mileage should be MWh/km.
+        Interpreted here as energy per unit of external_trip_distance.
+        Example: if external_trip_distance is km, mileage should be MWh/km.
     power_flow_directionality : str, default "unidirectional"
         Either "unidirectional" or "bidirectional".
     """
@@ -1492,7 +1492,7 @@ class ElectricVehicle(GenericStorage):
         self,
         model: pyo.ConcreteModel,
         model_block: pyo.Block,
-        external_range: pyo.Param | None = None,
+        external_trip_distance: pyo.Param | None = None,
     ) -> pyo.Block:
         """
         Add EV to Pyomo model.
@@ -1501,10 +1501,10 @@ class ElectricVehicle(GenericStorage):
         ----------
         model : pyo.ConcreteModel
         model_block : pyo.Block
-        external_range : pyo.Param | None
-            Exogenous driving requirement per time step.
+        external_trip_distance : pyo.Param | None
+            Exogenous trip distance per time step.
             Required if mobility-related usage should be modelled.
-            usage[t] = (1 - availability[t]) * external_range[t] * mileage
+            usage[t] = (1 - availability[t]) * external_trip_distance[t] * mileage
         """
         # Start from generic storage structure
         model_block = super().add_to_model(model, model_block)
@@ -1583,17 +1583,17 @@ class ElectricVehicle(GenericStorage):
                 return b.discharge[t] == 0
 
             # Driving usage only when unavailable
-            if external_range is not None:
+            if external_trip_distance is not None:
                 if self.mileage is None:
                     raise ValueError(
-                        "`mileage` must be provided when `external_range` is used."
+                        "`mileage` must be provided when `external_trip_distance` is used."
                     )
 
                 @model_block.Constraint(self.time_steps)
                 def usage_constraint(b, t):
                     availability = self.availability_profile.iat[t]
                     return b.usage[t] == (1 - availability) * (
-                        external_range[t] * b.mileage
+                        external_trip_distance[t] * b.mileage
                     )
 
             else:

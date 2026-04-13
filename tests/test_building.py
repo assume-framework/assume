@@ -8,6 +8,7 @@ import pytest
 
 from assume.common.forecaster import BuildingForecaster
 from assume.units.building import Building
+from assume.units.dst_components import ElectricVehicle
 
 USE_SOLVER = "appsi_highs"
 
@@ -91,11 +92,15 @@ def building_forecaster_with_ev_cs(time_index):
         A360_electric_vehicle_1_availability_profile=_series(
             [1, 1, 0, 0, 1, 1, 1, 1], time_index
         ),
-        A360_electric_vehicle_1_range=_series([0, 0, 5, 5, 0, 0, 0, 0], time_index),
+        A360_electric_vehicle_1_trip_distance=_series(
+            [0, 0, 5, 5, 0, 0, 0, 0], time_index
+        ),
         A360_electric_vehicle_2_availability_profile=_series(
             [1, 1, 1, 1, 1, 0, 0, 1], time_index
         ),
-        A360_electric_vehicle_2_range=_series([0, 0, 0, 0, 0, 4, 4, 0], time_index),
+        A360_electric_vehicle_2_trip_distance=_series(
+            [0, 0, 0, 0, 0, 4, 4, 0], time_index
+        ),
         A360_charging_station_1_availability_profile=_series(
             [1, 1, 1, 1, 1, 1, 1, 1], time_index
         ),
@@ -431,18 +436,20 @@ def test_building_without_charging_station_detects_direct_ev_mode(
 # ---------------------------------------------------------------------
 # EV functionality
 # ---------------------------------------------------------------------
-def test_ev_usage_matches_unavailability_and_range(solved_building_with_cs):
+def test_ev_usage_matches_unavailability_and_trip_distance(solved_building_with_cs):
     _, instance, _ = solved_building_with_cs
     ts = list(instance.time_steps)
 
     for ev in [k for k in instance.dsm_blocks if k.startswith("electric_vehicle")]:
         block = instance.dsm_blocks[ev]
         availability = getattr(instance, f"{ev}_availability")
-        external_range = getattr(instance, f"{ev}_range")
+        external_trip_distance = getattr(instance, f"{ev}_trip_distance")
         mileage = _val(block.mileage)
 
         for t in ts:
-            expected = (1 - _val(availability[t])) * _val(external_range[t]) * mileage
+            expected = (
+                (1 - _val(availability[t])) * _val(external_trip_distance[t]) * mileage
+            )
             assert abs(_val(block.usage[t]) - expected) <= 1e-5
 
 
@@ -678,12 +685,12 @@ def test_building_forecaster_getitem_returns_component_profile(
     prof = building_forecaster_with_ev_cs[
         "A360_electric_vehicle_1_availability_profile"
     ]
-    rng = building_forecaster_with_ev_cs["A360_electric_vehicle_1_range"]
+    trip_dist = building_forecaster_with_ev_cs["A360_electric_vehicle_1_trip_distance"]
 
     assert len(prof) == 8
-    assert len(rng) == 8
+    assert len(trip_dist) == 8
     assert prof.iloc[2] == 0
-    assert rng.iloc[2] == 5
+    assert trip_dist.iloc[2] == 5
 
 
 def test_building_forecaster_getitem_missing_key_raises_keyerror(
@@ -691,6 +698,95 @@ def test_building_forecaster_getitem_missing_key_raises_keyerror(
 ):
     with pytest.raises(KeyError):
         _ = building_forecaster_with_ev_cs["A360_non_existing_profile"]
+
+
+def test_building_ev_profile_keyerror_triggers_fallback(
+    time_index,
+):
+    """Test that missing EV profile keys trigger fallback to ev_load_profile."""
+    market_prices = {"EOM": _series([50, 40, 30, 20, 20, 30, 40, 50], time_index)}
+
+    # Create forecaster WITHOUT the specific EV profiles, but WITH ev_load_profile
+    forecaster = BuildingForecaster(
+        index=time_index,
+        fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+        market_prices=market_prices,
+        electricity_price_flex=_series([45, 35, 25, 15, 15, 25, 35, 45], time_index),
+        load_profile=_series([5, 5, 5, 5, 5, 5, 5, 5], time_index),
+        heat_demand=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        pv_profile=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        battery_load_profile=_series([0] * 8, time_index),
+        ev_load_profile=_series(
+            [1, 1, 1, 1, 1, 1, 1, 1], time_index
+        ),  # fallback profile
+    )
+
+    components = {
+        "electric_vehicle_1": {
+            "capacity": 50.0,
+            "min_soc": 0.1,
+            "max_soc": 1.0,
+            "max_power_charge": 10.0,
+            "max_power_discharge": 10.0,
+            "initial_soc": 0.5,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "ramp_up": 10.0,
+            "ramp_down": 10.0,
+            "mileage": 1.0,
+            "power_flow_directionality": "bidirectional",
+        }
+    }
+
+    # Should succeed by falling back to ev_load_profile
+    building = _make_building(forecaster, components)
+    assert building.has_ev is True
+
+
+def test_building_ev_trip_distance_keyerror_is_optional(
+    time_index,
+):
+    """Test that missing EV trip distance profile (KeyError) doesn't raise error (it's optional)."""
+    market_prices = {"EOM": _series([50, 40, 30, 20, 20, 30, 40, 50], time_index)}
+
+    # Create forecaster WITHOUT the specific EV trip distance profile
+    forecaster = BuildingForecaster(
+        index=time_index,
+        fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+        market_prices=market_prices,
+        electricity_price_flex=_series([45, 35, 25, 15, 15, 25, 35, 45], time_index),
+        load_profile=_series([5, 5, 5, 5, 5, 5, 5, 5], time_index),
+        heat_demand=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        pv_profile=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        battery_load_profile=_series([0] * 8, time_index),
+        ev_load_profile=_series([1, 1, 1, 1, 1, 1, 1, 1], time_index),
+        # No A360_electric_vehicle_1_trip_distance key - it's optional, so trip_distance should be None
+        A360_electric_vehicle_1_availability_profile=_series(
+            [1, 1, 0, 0, 1, 1, 1, 1], time_index
+        ),
+    )
+
+    components = {
+        "electric_vehicle_1": {
+            "capacity": 50.0,
+            "min_soc": 0.1,
+            "max_soc": 1.0,
+            "max_power_charge": 10.0,
+            "max_power_discharge": 10.0,
+            "initial_soc": 0.5,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "ramp_up": 10.0,
+            "ramp_down": 10.0,
+            "mileage": 1.0,
+            "power_flow_directionality": "bidirectional",
+        }
+    }
+
+    # Should succeed with trip_distance = None (optional behavior)
+    building = _make_building(forecaster, components)
+    assert building.has_ev is True
+    assert building.components["electric_vehicle_1"]["trip_distance"] is None
 
 
 def test_building_classifies_components_by_prefix(
@@ -705,6 +801,22 @@ def test_building_classifies_components_by_prefix(
     assert building.charging_stations == ["charging_station_1", "charging_station_2"]
     assert building.has_ev is True
     assert building.has_charging_station is True
+
+
+def test_building_recognizes_suffixed_required_component_names(
+    monkeypatch,
+    base_building_forecaster,
+    heat_pump_components,
+):
+    monkeypatch.setattr(Building, "required_technologies", ["heat_pump"])
+
+    building = _make_building(
+        base_building_forecaster,
+        {"heat_pump_1": dict(heat_pump_components["heat_pump"])},
+    )
+
+    assert building.heat_pumps == ["heat_pump_1"]
+    assert building.has_heatpump is True
 
 
 def test_building_no_charging_station_mode_has_no_assignment_vars(
@@ -805,6 +917,405 @@ def test_building_with_cs_uses_station_names_as_expected(
         "charging_station_1",
         "charging_station_2",
     ]
+
+
+# ---------------------------------------------------------------------
+# Optimality / economic dispatch tests
+# These tests verify the optimizer finds economically rational solutions
+# given a clear price signal, not just that constraints are satisfied.
+# ---------------------------------------------------------------------
+
+
+def test_battery_charges_at_cheap_hours_discharges_at_expensive(time_index):
+    """
+    Price is cheap in the first half (t=0-3) and expensive in the second half (t=4-7).
+    A prosumer battery should charge when cheap and discharge when expensive to minimise cost.
+    """
+    prices = [10, 10, 10, 10, 100, 100, 100, 100]
+    market_prices = {"EOM": _series(prices, time_index)}
+
+    forecaster = BuildingForecaster(
+        index=time_index,
+        fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+        market_prices=market_prices,
+        electricity_price_flex=_series(prices, time_index),
+        load_profile=_series([3] * 8, time_index),
+        heat_demand=_series([0] * 8, time_index),
+        pv_profile=_series([0] * 8, time_index),
+        battery_load_profile=_series([0] * 8, time_index),
+        ev_load_profile=_series([0] * 8, time_index),
+    )
+
+    components = {
+        "generic_storage": {
+            "capacity": 20.0,
+            "min_soc": 0.0,
+            "max_soc": 1.0,
+            "max_power_charge": 5.0,
+            "max_power_discharge": 5.0,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "initial_soc": 0.0,  # starts empty
+            "ramp_up": 5.0,
+            "ramp_down": 5.0,
+            "storage_loss_rate": 0.0,
+        }
+    }
+
+    building = _make_building(forecaster, components, prosumer="Yes")
+    _, instance, _ = _solve_building_opt(building)
+
+    storage = instance.dsm_blocks["generic_storage"]
+    cheap_hours = [0, 1, 2, 3]
+    expensive_hours = [4, 5, 6, 7]
+
+    total_charge_cheap = sum(_val(storage.charge[t]) for t in cheap_hours)
+    total_charge_expensive = sum(_val(storage.charge[t]) for t in expensive_hours)
+    total_discharge_expensive = sum(_val(storage.discharge[t]) for t in expensive_hours)
+    total_discharge_cheap = sum(_val(storage.discharge[t]) for t in cheap_hours)
+
+    assert total_charge_cheap > total_charge_expensive + 1e-3, (
+        "Battery should charge more at cheap hours"
+    )
+    assert total_discharge_expensive > total_discharge_cheap + 1e-3, (
+        "Battery should discharge more at expensive hours"
+    )
+
+
+def test_battery_arbitrage_reduces_total_cost(time_index):
+    """
+    Total energy cost with battery arbitrage (prosumer) should be lower
+    than the same building without a battery, given a variable price signal.
+    """
+    prices = [10, 10, 10, 10, 100, 100, 100, 100]
+    market_prices = {"EOM": _series(prices, time_index)}
+
+    def make_forecaster():
+        return BuildingForecaster(
+            index=time_index,
+            fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+            market_prices=market_prices,
+            electricity_price_flex=_series(prices, time_index),
+            load_profile=_series([3] * 8, time_index),
+            heat_demand=_series([0] * 8, time_index),
+            pv_profile=_series([0] * 8, time_index),
+            battery_load_profile=_series([0] * 8, time_index),
+            ev_load_profile=_series([0] * 8, time_index),
+        )
+
+    battery = {
+        "generic_storage": {
+            "capacity": 20.0,
+            "min_soc": 0.0,
+            "max_soc": 1.0,
+            "max_power_charge": 5.0,
+            "max_power_discharge": 5.0,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "initial_soc": 0.0,
+            "ramp_up": 5.0,
+            "ramp_down": 5.0,
+            "storage_loss_rate": 0.0,
+        }
+    }
+
+    _, inst_no_bat, _ = _solve_building_opt(
+        _make_building(make_forecaster(), {}, prosumer="Yes")
+    )
+    _, inst_bat, _ = _solve_building_opt(
+        _make_building(make_forecaster(), battery, prosumer="Yes")
+    )
+
+    cost_no_bat = sum(
+        _val(inst_no_bat.variable_cost[t]) for t in inst_no_bat.time_steps
+    )
+    cost_bat = sum(_val(inst_bat.variable_cost[t]) for t in inst_bat.time_steps)
+
+    assert cost_bat < cost_no_bat, (
+        "Battery arbitrage should reduce total cost compared to no battery"
+    )
+
+
+def test_ev_bidirectional_v2g_charges_cheap_discharges_expensive(time_index):
+    """
+    A bidirectional EV (V2G mode) starts empty. With cheap prices early and expensive
+    prices late, the optimizer should charge during cheap hours and discharge to grid
+    during expensive hours (prosumer mode).
+    """
+    prices = [10, 10, 10, 10, 100, 100, 100, 100]
+    market_prices = {"EOM": _series(prices, time_index)}
+
+    forecaster = BuildingForecaster(
+        index=time_index,
+        fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+        market_prices=market_prices,
+        electricity_price_flex=_series(prices, time_index),
+        load_profile=_series([0] * 8, time_index),
+        heat_demand=_series([0] * 8, time_index),
+        pv_profile=_series([0] * 8, time_index),
+        battery_load_profile=_series([0] * 8, time_index),
+        ev_load_profile=_series([0] * 8, time_index),
+        A360_electric_vehicle_1_availability_profile=_series([1] * 8, time_index),
+    )
+
+    components = {
+        "electric_vehicle_1": {
+            "capacity": 20.0,
+            "min_soc": 0.0,
+            "max_soc": 1.0,
+            "max_power_charge": 5.0,
+            "max_power_discharge": 5.0,
+            "initial_soc": 0.0,  # starts empty; must charge before discharging
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "ramp_up": 5.0,
+            "ramp_down": 5.0,
+            "storage_loss_rate": 0.0,
+            "power_flow_directionality": "bidirectional",
+        }
+    }
+
+    building = _make_building(forecaster, components, prosumer="Yes")
+    _, instance, _ = _solve_building_opt(building)
+
+    ev = instance.dsm_blocks["electric_vehicle_1"]
+    cheap_hours = [0, 1, 2, 3]
+    expensive_hours = [4, 5, 6, 7]
+
+    total_charge_cheap = sum(_val(ev.charge[t]) for t in cheap_hours)
+    total_charge_expensive = sum(_val(ev.charge[t]) for t in expensive_hours)
+    total_discharge_expensive = sum(_val(ev.discharge[t]) for t in expensive_hours)
+
+    assert total_charge_cheap > 0, "EV should charge during cheap hours"
+    assert total_discharge_expensive > 0, "EV should discharge during expensive hours"
+    assert total_charge_cheap > total_charge_expensive + 1e-3, (
+        "EV should charge more at cheap hours than expensive hours"
+    )
+
+
+def test_heat_pump_defers_to_cheap_hours_when_thermal_storage_available(time_index):
+    """
+    With thermal storage, the heat pump should run primarily during cheap electricity
+    hours, pre-charging the thermal store, and rely on stored heat during expensive hours.
+    Without storage, the heat pump must run every hour to meet demand directly.
+    """
+    prices = [10, 10, 10, 10, 100, 100, 100, 100]
+    market_prices = {"EOM": _series(prices, time_index)}
+
+    def make_forecaster():
+        return BuildingForecaster(
+            index=time_index,
+            fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+            market_prices=market_prices,
+            electricity_price_flex=_series(prices, time_index),
+            load_profile=_series([0] * 8, time_index),
+            heat_demand=_series([3] * 8, time_index),  # constant 3 kW heat demand
+            pv_profile=_series([0] * 8, time_index),
+            battery_load_profile=_series([0] * 8, time_index),
+            ev_load_profile=_series([0] * 8, time_index),
+        )
+
+    hp_only = {
+        "heat_pump": {
+            "max_power": 5.0,
+            "cop": 3.0,
+            "min_power": 0.0,
+            "ramp_up": 5.0,
+            "ramp_down": 5.0,
+        },
+    }
+    hp_with_storage = {
+        "heat_pump": {
+            "max_power": 5.0,
+            "cop": 3.0,
+            "min_power": 0.0,
+            "ramp_up": 5.0,
+            "ramp_down": 5.0,
+        },
+        "thermal_storage": {
+            "capacity": 50.0,
+            "min_soc": 0.0,
+            "max_soc": 1.0,
+            "max_power_charge": 15.0,
+            "max_power_discharge": 15.0,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "initial_soc": 0.0,
+            "ramp_up": 15.0,
+            "ramp_down": 15.0,
+            "storage_loss_rate": 0.0,
+        },
+    }
+
+    # Without thermal storage: HP must run at every hour to satisfy demand
+    _, inst_no_ts, _ = _solve_building_opt(_make_building(make_forecaster(), hp_only))
+    # With thermal storage: HP can shift operation to cheap hours
+    _, inst_ts, _ = _solve_building_opt(
+        _make_building(make_forecaster(), hp_with_storage)
+    )
+
+    cheap_hours = [0, 1, 2, 3]
+    expensive_hours = [4, 5, 6, 7]
+
+    hp_no_ts = inst_no_ts.dsm_blocks["heat_pump"]
+    hp_ts = inst_ts.dsm_blocks["heat_pump"]
+
+    # Without storage: HP power is distributed fairly evenly (must meet demand every hour)
+    hp_expensive_no_ts = sum(_val(hp_no_ts.power_in[t]) for t in expensive_hours)
+    # With storage: HP runs significantly more at cheap hours
+    hp_cheap_ts = sum(_val(hp_ts.power_in[t]) for t in cheap_hours)
+    hp_expensive_ts = sum(_val(hp_ts.power_in[t]) for t in expensive_hours)
+
+    assert hp_cheap_ts > hp_expensive_ts + 1e-3, (
+        "With thermal storage, heat pump should run more at cheap hours"
+    )
+    # Without storage, HP must run at expensive hours too (no other heat source)
+    assert hp_expensive_no_ts > hp_expensive_ts + 1e-3, (
+        "Without storage, HP is forced to run more during expensive hours than with storage"
+    )
+
+
+def test_pv_generation_reduces_total_energy_cost(time_index):
+    """
+    A building with PV generation should have strictly lower total energy cost
+    than the same building without PV.
+    """
+    prices = [50] * 8
+    market_prices = {"EOM": _series(prices, time_index)}
+
+    def make_forecaster(with_pv: bool):
+        return BuildingForecaster(
+            index=time_index,
+            fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+            market_prices=market_prices,
+            electricity_price_flex=_series(prices, time_index),
+            load_profile=_series([5] * 8, time_index),
+            heat_demand=_series([0] * 8, time_index),
+            pv_profile=_series([2] * 8 if with_pv else [0] * 8, time_index),
+            battery_load_profile=_series([0] * 8, time_index),
+            ev_load_profile=_series([0] * 8, time_index),
+        )
+
+    pv_components = {"pv_plant": {"max_power": 5.0, "uses_power_profile": "false"}}
+
+    _, inst_no_pv, _ = _solve_building_opt(_make_building(make_forecaster(False), {}))
+    _, inst_pv, _ = _solve_building_opt(
+        _make_building(make_forecaster(True), pv_components)
+    )
+
+    cost_no_pv = sum(_val(inst_no_pv.variable_cost[t]) for t in inst_no_pv.time_steps)
+    cost_pv = sum(_val(inst_pv.variable_cost[t]) for t in inst_pv.time_steps)
+
+    assert cost_pv < cost_no_pv, "PV generation should reduce total energy cost"
+
+
+# ---------------------------------------------------------------------
+# EV component — unit tests (migrated from test_ev.py)
+# These tests verify the ElectricVehicle component in isolation.
+# Features like availability-profile are also covered by full-building
+# integration tests (e.g. test_ev_cannot_charge_when_unavailable_if_connected_via_station).
+# ---------------------------------------------------------------------
+@pytest.fixture
+def ev_unit_config():
+    return {
+        "capacity": 10.0,
+        "min_soc": 0,
+        "max_soc": 1,
+        "max_power_charge": 3,
+        "max_power_discharge": 2,
+        "efficiency_charge": 0.95,
+        "efficiency_discharge": 0.9,
+        "initial_soc": 0,
+    }
+
+
+@pytest.fixture
+def ev_model_with_charging_profile(ev_unit_config):
+    model = pyo.ConcreteModel()
+    model.time_steps = pyo.Set(initialize=list(range(10)))
+    model.electricity_price = pyo.Param(
+        model.time_steps, initialize={t: 50 for t in range(10)}, mutable=True
+    )
+    charging_profile = pd.Series(
+        [0.1, 0.05, 0.15, 0.2, 0.0, 0.1, 0.05, 0.1, 0.0, 0.15],
+        index=list(range(10)),
+    )
+    ev = ElectricVehicle(
+        **ev_unit_config,
+        time_steps=model.time_steps,
+        availability_profile=None,
+        charging_profile=charging_profile,
+    )
+    model.ev = pyo.Block()
+    ev.add_to_model(model, model.ev)
+    model.total_charge = pyo.Objective(
+        expr=sum(model.ev.charge[t] for t in model.time_steps), sense=pyo.maximize
+    )
+    solver = pyo.SolverFactory(USE_SOLVER)
+    results = solver.solve(model)
+    return model, results
+
+
+def test_ev_charging_profile(ev_model_with_charging_profile, ev_unit_config):
+    """Charging follows the predefined schedule exactly; SOC stays within bounds."""
+    model, _ = ev_model_with_charging_profile
+    charging_profile = pd.Series(
+        [0.1, 0.05, 0.15, 0.2, 0.0, 0.1, 0.05, 0.1, 0.0, 0.15],
+        index=list(range(10)),
+    )
+    for t in model.time_steps:
+        assert pyo.value(model.ev.charge[t]) == pytest.approx(
+            charging_profile[t], rel=1e-2
+        )
+    for t in model.time_steps:
+        soc = pyo.value(model.ev.soc[t])
+        assert ev_unit_config["min_soc"] <= soc <= ev_unit_config["max_soc"]
+
+
+@pytest.fixture
+def ev_model_with_availability(ev_unit_config):
+    """EV model with availability profile (standalone unit test)."""
+    model = pyo.ConcreteModel()
+    model.time_steps = pyo.Set(initialize=list(range(10)))
+    model.electricity_price = pyo.Param(
+        model.time_steps, initialize={t: 50 for t in range(10)}, mutable=True
+    )
+    availability_profile = pd.Series(
+        [1, 0, 1, 1, 0, 1, 1, 0, 1, 1], index=list(range(10))
+    )
+    charging_profile = None
+    ev = ElectricVehicle(
+        **ev_unit_config,
+        time_steps=model.time_steps,
+        availability_profile=availability_profile,
+        charging_profile=charging_profile,
+    )
+    model.ev = pyo.Block()
+    ev.add_to_model(model, model.ev)
+    model.total_charge = pyo.Objective(
+        expr=sum(model.ev.charge[t] for t in model.time_steps), sense=pyo.maximize
+    )
+    solver = pyo.SolverFactory(USE_SOLVER)
+    results = solver.solve(model)
+    return model, results
+
+
+def test_ev_availability_profile(ev_model_with_availability):
+    """When unavailable, EV cannot charge/discharge; when available, within limits."""
+    model, _ = ev_model_with_availability
+    availability_profile = pd.Series(
+        [1, 0, 1, 1, 0, 1, 1, 0, 1, 1], index=list(range(10))
+    )
+    for t in model.time_steps:
+        availability = availability_profile[t]
+        charge = pyo.value(model.ev.charge[t])
+        discharge = pyo.value(model.ev.discharge[t])
+        if availability == 0:
+            assert charge == 0
+            assert discharge == 0
+        else:
+            assert charge <= pyo.value(model.ev.max_power_charge) + 1e-5
+            assert discharge <= pyo.value(model.ev.max_power_discharge) + 1e-5
 
 
 if __name__ == "__main__":

@@ -95,24 +95,20 @@ class Building(DSMFlex, SupportsMinMax):
                 f"forecaster must be of type {BuildingForecaster.__name__}"
             )
 
+        allowed_technologies = self.required_technologies + self.optional_technologies
+
         # check if the required components are present in the components dictionary
-        for component in self.required_technologies:
-            if component not in components.keys():
+        for technology in self.required_technologies:
+            if not any(component.startswith(technology) for component in components):
                 raise ValueError(
-                    f"Component {component} is required for the building plant unit."
+                    f"Component {technology} is required for the building plant unit."
                 )
 
         # check if the provided components are valid and do not contain any unknown components
-        for component in components.keys():
-            base_component = next(
-                (
-                    tech
-                    for tech in self.required_technologies + self.optional_technologies
-                    if component.startswith(tech)
-                ),
-                None,
-            )
-            if base_component is None:
+        for component in components:
+            if not any(
+                component.startswith(technology) for technology in allowed_technologies
+            ):
                 raise ValueError(
                     f"Component {component} is not a valid component for the building unit."
                 )
@@ -159,10 +155,6 @@ class Building(DSMFlex, SupportsMinMax):
                 "No charging station is included in the building. "
                 "Electric vehicles will be connected directly to the grid."
             )
-            print(
-                "No charging station is included in the building. "
-                "Electric vehicles will be connected directly to the grid."
-            )
 
         # prepare EV-specific profiles
         for ev_key in self.evs:
@@ -171,17 +163,20 @@ class Building(DSMFlex, SupportsMinMax):
             use_charging_profile = str_to_bool(
                 ev_config.get("charging_profile", "false")
             )
-            ev_config.pop("charging_profile", None)
-            ev_config.pop("availability_profile", None)
 
             profile_key_suffix = (
                 "charging_profile" if use_charging_profile else "availability_profile"
             )
+
+            # Remove input config keys; we will fetch the actual profile from forecaster
+            ev_config.pop("charging_profile", None)
+            ev_config.pop("availability_profile", None)
+
             profile_key = f"{self.id}_{ev_key}_{profile_key_suffix}"
 
             try:
                 ev_profile = self.forecaster[profile_key]
-            except Exception:
+            except KeyError:
                 # fallback to building forecaster EV profile if available
                 if (
                     hasattr(self.forecaster, "ev_load_profile")
@@ -195,12 +190,12 @@ class Building(DSMFlex, SupportsMinMax):
 
             ev_config[profile_key_suffix] = ev_profile
 
-            range_key = f"{self.id}_{ev_key}_range"
+            trip_distance_key = f"{self.id}_{ev_key}_trip_distance"
             try:
-                ev_config["range"] = self.forecaster[range_key]
-            except Exception:
-                # optional: if no external range is provided, EV will behave like stationary EV
-                ev_config["range"] = None
+                ev_config["trip_distance"] = self.forecaster[trip_distance_key]
+            except KeyError:
+                # optional: if no trip distance is provided, EV will behave like stationary EV
+                ev_config["trip_distance"] = None
 
         for cs_key in self.charging_stations:
             cs_config = self.components[cs_key]
@@ -208,7 +203,7 @@ class Building(DSMFlex, SupportsMinMax):
             profile_key = f"{self.id}_{cs_key}_availability_profile"
             try:
                 cs_config["availability_profile"] = self.forecaster[profile_key]
-            except Exception:
+            except KeyError:
                 # optional; charging station can remain always available
                 pass
 
@@ -242,43 +237,58 @@ class Building(DSMFlex, SupportsMinMax):
             initialize={t: value for t, value in enumerate(self.inflex_demand)},
         )
 
-        # EV external range parameters
+        # EV trip distance parameters
+        # Trip distance is optional and only used for trip-based EV modeling.
+        # If provided, it represents the distance traveled by the EV in each time step.
+        # This allows the model to estimate energy consumption based on distance and vehicle efficiency.
         for ev_key in self.evs:
-            ev_range = self.components[ev_key].get("range", None)
-            if ev_range is None:
+            ev_trip_distance = self.components[ev_key].get("trip_distance", None)
+            if ev_trip_distance is None:
                 continue
 
-            if hasattr(ev_range, "iloc"):
-                range_init = {
-                    t: ev_range.iloc[t] if t < len(ev_range) else 0
+            # Normalize trip distance data to a dictionary keyed by time step
+            # Handle both pandas Series (with .iloc) and array-like objects (list, numpy array)
+            if hasattr(ev_trip_distance, "iloc"):
+                trip_distance_init = {
+                    t: ev_trip_distance.iloc[t] if t < len(ev_trip_distance) else 0
                     for t in self.model.time_steps
                 }
             else:
-                range_init = {
-                    t: ev_range[t] if t < len(ev_range) else 0
+                trip_distance_init = {
+                    t: ev_trip_distance[t] if t < len(ev_trip_distance) else 0
                     for t in self.model.time_steps
                 }
 
             self.model.add_component(
-                f"{ev_key}_range",
+                f"{ev_key}_trip_distance",
                 pyo.Param(
                     self.model.time_steps,
-                    initialize=range_init,
-                    doc=f"External range profile for {ev_key}",
+                    initialize=trip_distance_init,
+                    doc=f"Trip distance profile for {ev_key} (in km or user-defined units)",
                 ),
             )
 
         # EV availability parameters
+        # An EV can be represented as either "available to charge" or "willing to charge (charging_profile)".
+        # Both are binary profiles: availability_profile indicates when the EV is connected,
+        # while charging_profile (from direct load profile) indicates when it wishes to charge.
+        # We normalize both to a single "availability" parameter for the optimization model.
         for ev_key in self.evs:
-            profile_key = (
-                "availability_profile"
-                if "availability_profile" in self.components[ev_key]
-                else "charging_profile"
-            )
-            profile_data = self.components[ev_key].get(profile_key, None)
+            # Determine which profile type this EV uses
+            if "availability_profile" in self.components[ev_key]:
+                # Explicit availability profile: when EV is connected to the grid
+                profile_data = self.components[ev_key]["availability_profile"]
+            elif "charging_profile" in self.components[ev_key]:
+                # Charging profile (from direct charging mode): use as availability proxy
+                profile_data = self.components[ev_key]["charging_profile"]
+            else:
+                profile_data = None
+
             if profile_data is None:
                 continue
 
+            # Normalize profile data to a dictionary keyed by time step
+            # Handle both pandas Series (with .iloc) and array-like objects (list, numpy array)
             if hasattr(profile_data, "iloc"):
                 profile_init = {
                     t: int(profile_data.iloc[t]) if t < len(profile_data) else 0
@@ -296,7 +306,7 @@ class Building(DSMFlex, SupportsMinMax):
                     self.model.time_steps,
                     initialize=profile_init,
                     within=pyo.Binary,
-                    doc=f"Availability profile for {ev_key}",
+                    doc=f"Availability profile for {ev_key} (binary: 1 if available, 0 otherwise)",
                 ),
             )
 
@@ -304,7 +314,9 @@ class Building(DSMFlex, SupportsMinMax):
         self.model.total_power_input = pyo.Var(self.model.time_steps, within=pyo.Reals)
         self.model.variable_cost = pyo.Var(self.model.time_steps, within=pyo.Reals)
 
-        # only needed when charging stations are present
+        # The following variables are only defined when both EVs and charging stations are present.
+        # They model the assignment of EVs to specific charging stations and the power flow.
+        # Without charging stations, EVs connect directly to the grid and no assignment tracking is needed.
         if self.has_ev and self.has_charging_station:
             self.model.evs = pyo.Set(initialize=self.evs)
             self.model.charging_stations = pyo.Set(initialize=self.charging_stations)

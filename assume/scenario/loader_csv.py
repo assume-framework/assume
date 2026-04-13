@@ -640,51 +640,23 @@ def load_config_and_create_forecaster(
                     forecast_algorithms, unit
                 )
                 if type == "building":
+
+                    def get_building_profile(column_name: str) -> pd.Series:
+                        default_profile = pd.Series(0.0, index=index, name=column_name)
+                        if forecasts_df is None:
+                            return default_profile
+                        return forecasts_df.get(column_name, default_profile)
+
                     # Base aggregate building profiles
-                    building_load_profile = (
-                        forecasts_df[f"{id}_load_profile"]
-                        if forecasts_df is not None
-                        and f"{id}_load_profile" in forecasts_df.columns
-                        else pd.Series(0.0, index=index, name=f"{id}_load_profile")
+                    building_load_profile = get_building_profile(f"{id}_load_profile")
+                    building_heat_demand = get_building_profile(f"{id}_heat_demand")
+                    building_pv_profile = get_building_profile(f"{id}_pv_profile")
+                    building_battery_profile = get_building_profile(
+                        f"{id}_battery_load_profile"
                     )
-
-                    building_heat_demand = (
-                        forecasts_df[f"{id}_heat_demand"]
-                        if forecasts_df is not None
-                        and f"{id}_heat_demand" in forecasts_df.columns
-                        else pd.Series(0.0, index=index, name=f"{id}_heat_demand")
-                    )
-
-                    building_pv_profile = (
-                        forecasts_df[f"{id}_pv_profile"]
-                        if forecasts_df is not None
-                        and f"{id}_pv_profile" in forecasts_df.columns
-                        else pd.Series(0.0, index=index, name=f"{id}_pv_profile")
-                    )
-
-                    building_battery_profile = (
-                        forecasts_df[f"{id}_battery_load_profile"]
-                        if forecasts_df is not None
-                        and f"{id}_battery_load_profile" in forecasts_df.columns
-                        else pd.Series(
-                            0.0, index=index, name=f"{id}_battery_load_profile"
-                        )
-                    )
-
-                    building_ev_profile = (
-                        forecasts_df[f"{id}_ev_load_profile"]
-                        if forecasts_df is not None
-                        and f"{id}_ev_load_profile" in forecasts_df.columns
-                        else pd.Series(0.0, index=index, name=f"{id}_ev_load_profile")
-                    )
-
-                    building_electricity_price_flex = (
-                        forecasts_df[f"{id}_electricity_price_flex"]
-                        if forecasts_df is not None
-                        and f"{id}_electricity_price_flex" in forecasts_df.columns
-                        else pd.Series(
-                            0.0, index=index, name=f"{id}_electricity_price_flex"
-                        )
+                    building_ev_profile = get_building_profile(f"{id}_ev_load_profile")
+                    building_electricity_price_flex = get_building_profile(
+                        f"{id}_electricity_price_flex"
                     )
 
                     # collect arbitrary component-level forecasts for this building
