@@ -289,47 +289,59 @@ class PowerPlant(SupportsMinMax):
         self, start: datetime, end: datetime, product_type="energy"
     ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Calculates the minimum and maximum power output of the unit and returns it,
-        while considering heat demand and positive capacity reserve power.
+        Calculates the additional minimum and maximum power output.
+
+        "Additional" means relative to the already-committed power, e.g. at other markets.
+        Considers heat demand, positive capacity reserve (capacity_pos reduces headroom),
+        and negative capacity reserve (capacity_neg raises the minimum obligation).
+
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
-            product_type (str, optional): The product type of the unit. Defaults to "energy".
+            start (datetime): The start time of the dispatch.
+            end (datetime): The end time of the dispatch (exclusive).
+            product_type (str, optional): The product type. Defaults to "energy".
 
         Returns:
-            tuple[pandas.Series, pandas.Series]: The minimum and maximum power output of the unit.
+            tuple[np.ndarray, np.ndarray]: The additional minimum and maximum power output of the unit.
 
         Note:
             The calculation does not include ramping constraints and can be used for arbitrary start times in the future.
+            Ramping constraints can be applied afterwards via calculate_ramp().
         """
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
         base_load = self.outputs["energy"].loc[start:end_excl]
         heat_demand = self.outputs["heat"].loc[start:end_excl]
+        capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        # needed minimum + capacity_neg - what is already sold is actual minimum
-        min_power = self.min_power + capacity_neg - base_load
-        # min_power should be at least the heat demand at that time
-        min_power = min_power.clip(min=heat_demand)
+        availability = self.forecaster.availability.loc[start:end_excl]
+        available_power = availability * self.max_power
 
-        available_power = self.forecaster.availability.loc[start:end_excl]
-        max_power = available_power * self.max_power
         # check if available power is larger than max_power and raise an error if so
-        if (max_power > self.max_power).any():
+        if (available_power > self.max_power).any():
             raise ValidationError(
                 message=f"Available power is larger than max_power for unit {self.id} at time {start}.",
                 id=self.id,
                 field="availability",
             )
 
-        # provide reserve for capacity_pos
-        max_power = max_power - self.outputs["capacity_pos"].loc[start:end_excl]
-        # remove what has already been bid
-        max_power = max_power - base_load
-        # make sure that max_power is > 0 for all timesteps
+        # subtract positive reserve commitment and already-dispatched base_load from available power
+        max_power = available_power - capacity_pos - base_load
+        # additional power can never be negative
         max_power = max_power.clip(min=0)
+
+        # actual minimum is technical minimum + negative reserve obligation - already dispatched base_load
+        min_power = self.min_power + capacity_neg - base_load
+        # must also cover any heat demand not yet met by base_load
+        # clip to 0: negative values mean base_load already covers heat demand fully
+        heat_demand_still_needed = (heat_demand - base_load).clip(min=0)
+        min_power = min_power.clip(min=heat_demand_still_needed)
+
+        # if additional max_power is below the technical minimum, the unit cannot run at all
+        infeasible = max_power < min_power
+        min_power[infeasible] = 0
+        max_power[infeasible] = 0
 
         return min_power, max_power
 
