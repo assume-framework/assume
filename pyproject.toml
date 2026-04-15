@@ -51,6 +51,7 @@ dependencies = [
 learning = [
     "torch >=2.0.1",
     "tensorboard >=2.7.0",
+    "setuptools <82" # https://github.com/tensorflow/tensorboard/issues/7003
 ]
 network = [
     "pypsa",
