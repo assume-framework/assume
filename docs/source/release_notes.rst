@@ -16,6 +16,8 @@ Upcoming Release
 **New Features:**
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
 
+**Bug Fixes:**
+  - **dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
 
 0.6.0 - (18th March 2026)
 =========================
