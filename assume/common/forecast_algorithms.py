@@ -305,8 +305,8 @@ def calculate_naive_price_elastic(
         orderbook = []
         orderbook.extend(supply_offers.to_dict("records"))
         orderbook.extend(demand_bids.to_dict("records"))
-        inelastic_price_bid = max([unit.price[t] for unit in inelastic_demand_units])
         if demand_t > 0:
+            inelastic_price_bid = max([unit.price[t] for unit in inelastic_demand_units])
             orderbook.append(
                 {
                     "start_time": start,
