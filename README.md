@@ -28,6 +28,8 @@ Developed as an open-source model, its primary objectives are to ensure usabilit
 A unique feature of the ASSUME toolbox is its integration of **Deep Reinforcement Learning** methods into the behavioral strategies of market agents. The model offers various predefined agent representations for both the demand and generation sides, which can be used as plug-and-play modules, simplifying the reinforcement of learning strategies.
 This setup enables research into new market designs and dynamics in energy markets.
 
+**If you have any questions - get in contact on matrix: https://matrix.to/#/#assume-framework:matrix.org**
+
 ### What can the software do?
 The main motivation of ASSUME is to overcome the limitations of fixed, rule-based behaviors in existing ABMs.
 For this, it leverages advancements in artificial intelligence, particularly deep reinforcement learning (DRL), enabling agents to adapt their behavior dynamically in response to market conditions.
