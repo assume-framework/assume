@@ -9,7 +9,7 @@ from operator import itemgetter
 import pandas as pd
 import pyomo.environ as pyo
 from mango import AgentAddress
-from pyomo.opt import SolverFactory, TerminationCondition
+from pyomo.opt import OptSolver, SolverFactory, TerminationCondition
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import create_incidence_matrix, get_supported_solver
@@ -217,7 +217,7 @@ def market_clearing_opt(
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame = None,
     lines: pd.DataFrame = None,
-    solver: str = "appsi_highs",
+    solver: OptSolver = None,
     solver_options: dict = {},
     func_constraints=market_clearing_opt_constraints,
     func_objective=market_clearing_opt_objective,
@@ -232,7 +232,7 @@ def market_clearing_opt(
         with_linked_bids (bool): Whether the market clearing should include linked bids.
         incidence_matrix (pd.DataFrame): The directed incidence matrix of the network.
         lines (pd.DataFrame): The lines and their capacities of the network.
-        solver (str):  Specifies the solver to be used for the optimization problem.
+        solver (pyomo.opt.OptSolver): Specifies the solver instance to be used for the optimization problem.
         solver_options (dict): Additional solver options.
         func_constraints: The function that is executed to add the constraints to the model. Defaults to :meth:`market_clearing_opt_constraints`.
         func_objective: The function that is executed to add the objective function to the model. Defaults to :meth:`market_clearing_opt_objective`.
@@ -253,7 +253,7 @@ def market_clearing_opt(
 
         If linked bids are considered, the acceptance of a child bid is bounded by the acceptance of its parent bid.
 
-        The market clearing is solved using pyomo with the specified solver (HIGHS is used by default).
+        The market clearing is solved using pyomo with the specified solver_name (HIGHS is used by default).
         If the specified solver is not available, the model is solved using available solver.
         If none of the solvers are available, an exception is raised.
 
@@ -269,7 +269,6 @@ def market_clearing_opt(
 
     func_objective(model, orders)
 
-    solver = SolverFactory(solver)
     # Solve the model
     instance = model.create_instance()
     results = solver.solve(instance, options=solver_options)
@@ -312,7 +311,7 @@ class ComplexClearingRole(MarketRole):
         nodes (list): List of nodes or zones in the network, depending on the selected representation.
 
     Supported Parameters in ``param_dict``:
-        - ``solver`` (str): Specifies the solver to be used for the optimization problem. Default is `'appsi_highs'`.
+        - ``solver_name`` (str): Specifies the solver_name to be used for the optimization problem. Default is `'appsi_highs'`.
         - ``log_flows`` (bool): Indicates whether to log the power flows on the lines. Default is `False`.
         - ``pricing_mechanism`` (str): Defines the pricing mechanism to be used. Default is `'pay_as_clear'`, with an alternative option of `'pay_as_bid'`.
         - ``zones_identifier`` (str): The key in the bus data that identifies the zone each bus belongs to. Used for zonal representation.
@@ -323,7 +322,7 @@ class ComplexClearingRole(MarketRole):
 
         market_mechanism: complex_clearing
         param_dict:
-            solver: appsi_highs
+            solver_name: appsi_highs
             log_flows: true
             pricing_mechanism: pay_as_clear
             zones_identifier: zone_id
@@ -340,12 +339,13 @@ class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
 
-        self.solver = get_supported_solver(
-            marketconfig.param_dict.get("solver", "appsi_highs")
+        self.solver_name = get_supported_solver(
+            marketconfig.param_dict.get("solver_name", "appsi_highs")
         )
+        self.solver = SolverFactory(self.solver_name)
         self.solver_options = {}
-        if self.solver == "gurobi":
-            self.solver_options = {"cutoff": -1.0, "MIPGap": EPS}
+        if self.solver_name == "gurobi":
+            self.solver_options = {"cutoff": -1.0, "MIPGap": EPS, "OutputFlag": 0}
 
         # Define grid data
         self.nodes = ["node0"]
