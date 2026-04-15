@@ -43,7 +43,7 @@ dependencies = [
     "pyyaml >=6.0",
     "pyyaml-include >=2.2a",
     "pyomo >=6.8.0",
-    "xarray",
+    "xarray <v2026.04.0", # https://github.com/assume-framework/assume/issues/790
     "highspy",
 ]
 
