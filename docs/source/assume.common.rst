@@ -64,6 +64,14 @@ assume.common.utils module
    :undoc-members:
    :show-inheritance:
 
+assume.common.forecast\_algorithms module
+-----------------------------------------
+
+.. automodule:: assume.common.forecast_algorithms
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 assume.common.grid\_utils module
 ------------------------------------
 

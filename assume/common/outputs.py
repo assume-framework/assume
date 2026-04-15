@@ -120,6 +120,7 @@ class WriteOutput(Role):
                 "value": "avg(power/max_power)",
                 "from_table": 'market_dispatch ud join power_plant_meta um on ud.unit_id = um."index" and ud.simulation=um.simulation',
                 "group_bys": ["market_id", "variable"],
+                "simulation_col": "ud.simulation",
             },
         }
         self.kpi_defs.update(additional_kpis)
@@ -457,6 +458,7 @@ class WriteOutput(Role):
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:
                 continue
+
             df = None
             with self.locks[table]:
                 if table == "grid_topology":
@@ -659,28 +661,25 @@ class WriteOutput(Role):
         if self.db is None:
             return
 
-        queries = []
-        for variable, kpi_def in self.kpi_defs.items():
-            group_bys = ",".join(kpi_def.get("group_bys", ["market_id"]))
-            queries.append(
-                f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where simulation = '{self.simulation_id}' group by {group_bys}"
-            )
-
-        if self.episode:
-            queries.extend(
-                [
-                    f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                    f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                    f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                ]
-            )
+        if self.learning_mode or self.evaluation_mode:
+            queries = [
+                f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+            ]
+        else:
+            queries = []
+            for variable, kpi_def in self.kpi_defs.items():
+                group_bys = ",".join(kpi_def.get("group_bys", ["market_id"]))
+                simulation_col = kpi_def.get("simulation_col", "simulation")
+                queries.append(
+                    f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where {simulation_col} = '{self.simulation_id}' group by {group_bys}"
+                )
 
         dfs = []
         for query in queries:
             try:
                 df = pd.read_sql(query, self.db)
-            except (ProgrammingError, OperationalError, DataError):
-                continue
             except Exception as e:
                 logger.error("could not read query: %s", e)
                 continue

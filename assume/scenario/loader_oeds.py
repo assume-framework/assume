@@ -200,7 +200,10 @@ def load_oeds(
                 "node": area,
                 "price": 1e3,
             },
-            DemandForecaster(index, demand=-abs(demand)),
+            DemandForecaster(
+                index,
+                demand=-abs(demand),
+            ),
         )
 
         world.add_unit_operator(f"renewables{area}")
@@ -238,7 +241,9 @@ def load_oeds(
                     "node": area,
                 },
                 PowerplantForecaster(
-                    index, availability=wind / wind.max(), fuel_prices={"others": 0.2}
+                    index,
+                    availability=wind / wind.max(),
+                    fuel_prices={"others": 0.2},
                 ),
             )
 
@@ -287,7 +292,11 @@ def load_oeds(
                 "location": (lat, lon),
                 "node": area,
             },
-            PowerplantForecaster(index, availability=1, fuel_prices={"others": 0.2}),
+            PowerplantForecaster(
+                index,
+                availability=1,
+                fuel_prices={"others": 0.2},
+            ),
         )
 
         if True:
@@ -365,6 +374,8 @@ def load_oeds(
                         },
                     ),
                 )
+
+    world.init_forecasts()
 
 
 if __name__ == "__main__":
