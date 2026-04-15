@@ -759,6 +759,27 @@ def min_max_scale(x, min_val: float, max_val: float):
     return (x - min_val) / (max_val - min_val)
 
 
+def min_max_rescale(
+    x, min_val: float, max_val: float, lower_bound: float = 0, upper_bound: float = 1
+):
+    """
+    Rescale a value x from range [lower_bound, upper_bound] (default: [0,1]) to [min_val, max_val].
+
+    Args:
+        x: value(s) to rescale
+        min_val: minimum value of the target range
+        max_val: maximum value of the target range
+        lower_bound: minimum value of the original range
+        upper_bound: maximum value of the original range
+    """
+    if lower_bound == upper_bound:
+        return x
+
+    return min_val + ((x - lower_bound) / (upper_bound - lower_bound)) * (
+        max_val - min_val
+    )
+
+
 def str_to_bool(val):
     """Convert a string representation of truth to True or False.
 
