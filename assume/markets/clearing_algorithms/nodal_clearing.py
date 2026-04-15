@@ -161,7 +161,7 @@ class NodalClearingRole(MarketRole):
                 p_max_pu=1,
             )
 
-        self.solver = marketconfig.param_dict.get("solver", "highs")
+        self.solver_name = marketconfig.param_dict.get("solver_name", "highs")
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
@@ -294,7 +294,7 @@ class NodalClearingRole(MarketRole):
         # run linear optimal powerflow
         n.optimize.fix_optimal_capacities()
         status, termination_condition = n.optimize(
-            solver=self.solver,
+            solver_name=self.solver_name,
             log_to_console=False,
             progress=False,
         )
