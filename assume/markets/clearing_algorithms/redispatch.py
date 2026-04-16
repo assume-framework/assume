@@ -69,7 +69,15 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.solver_name = marketconfig.param_dict.get("solver_name", "highs")
+        self.solver_name = marketconfig.param_dict.get("solver_name")
+        if self.solver_name is None:
+            self.solver_name = marketconfig.param_dict.get("solver")
+            if self.solver_name is not None:
+                logger.warning(
+                    f"Market '{marketconfig.market_id}': 'solver' parameter is deprecated, use 'solver_name' instead."
+                )
+        if self.solver_name is None:
+            self.solver_name = "highs"
 
         # set the market clearing principle
         # as pay as bid or pay as clear
