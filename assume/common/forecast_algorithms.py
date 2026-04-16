@@ -264,19 +264,17 @@ def calculate_naive_price_elastic(
         end = start + pd.Timedelta(config.market_products[0].duration)
         # Compute the cumulative sum of available power in the sorted order.
         # cumsum_power = sorted_power.cumsum()
-        supply_offers = (
-            pd.DataFrame(
-                {
-                    "start_time": start,
-                    "end_time": end,
-                    "only_hours": None,
-                    "node": "node0",
-                    "price": mc_t,
-                    "volume": power_t,
-                    "bid_type": "SB",
-                    "bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
-                }
-            )
+        supply_offers = pd.DataFrame(
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "node": "node0",
+                "price": mc_t,
+                "volume": power_t,
+                "bid_type": "SB",
+                "bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
+            }
         )
         # print(supply_offers)
 
@@ -284,19 +282,19 @@ def calculate_naive_price_elastic(
         demand_t = sum_demand.loc[t][0]
 
         # get the demand bids
-        demand_bids = (
-            pd.DataFrame(
-                {
-                    "start_time": start,
-                    "end_time": end,
-                    "only_hours": None,
-                    "node": "node0",
-                    "price": elastic_demand_prices,
-                    "volume": elastic_demand_volumes,
-                    "bid_type": "SB",
-                    "bid_id": [f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))],
-                }
-            )
+        demand_bids = pd.DataFrame(
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "node": "node0",
+                "price": elastic_demand_prices,
+                "volume": elastic_demand_volumes,
+                "bid_type": "SB",
+                "bid_id": [
+                    f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))
+                ],
+            }
         )
         # print(demand_bids)
 

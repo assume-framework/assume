@@ -17,7 +17,7 @@ from assume.markets.base_market import MarketRole
 
 # Set the log level to WARNING
 logging.getLogger("pyomo").setLevel(logging.WARNING)
-logging.getLogger('gurobipy').setLevel(logging.WARNING)
+logging.getLogger("gurobipy").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -370,9 +370,7 @@ class ComplexClearingRole(MarketRole):
                 logger.warning(
                     f"Market '{marketconfig.market_id}': 'solver' parameter is deprecated, use 'solver_name' instead."
                 )
-        self.solver_name = get_supported_solver(
-            self.solver_name
-        )
+        self.solver_name = get_supported_solver(self.solver_name)
         self.solver = SolverFactory(self.solver_name)
         self.solver_options = {}
         if self.solver_name == "gurobi":
