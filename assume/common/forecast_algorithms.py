@@ -274,12 +274,11 @@ def calculate_naive_price_elastic(
                     "price": mc_t,
                     "volume": power_t,
                     "bid_type": "SB",
-                    # "bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
+                    "bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
                 }
             )
-            .reset_index()
-            .rename(columns={"index": "bid_id"})
         )
+        # print(supply_offers)
 
         # shape of sum_demand: (time_steps, 1)
         demand_t = sum_demand.loc[t][0]
@@ -298,9 +297,9 @@ def calculate_naive_price_elastic(
                     # "bid_id": [f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))],
                 }
             )
-            .reset_index()
-            .rename(columns={"index": "bid_id"})
         )
+        # print(demand_bids)
+
         # create an orderbook containing all supply offers and demand bids
         orderbook = []
         orderbook.extend(supply_offers.to_dict("records"))
@@ -319,7 +318,7 @@ def calculate_naive_price_elastic(
                     "bid_id": f"{inelastic_demand_units[0].id}_{t}",
                 }
             )
-
+        
         mps = get_available_products(
             config.market_products, pd.Timestamp(start) - pd.Timedelta("1h")
         )
