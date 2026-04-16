@@ -17,6 +17,7 @@ from assume.markets.base_market import MarketRole
 
 # Set the log level to WARNING
 logging.getLogger("pyomo").setLevel(logging.WARNING)
+logging.getLogger('gurobipy').setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
