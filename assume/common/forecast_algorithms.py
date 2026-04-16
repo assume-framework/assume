@@ -318,7 +318,18 @@ def calculate_naive_price_elastic(
                     "bid_id": f"{inelastic_demand_units[0].id}_{t}",
                 }
             )
-        
+        # print("Orderbook before cleaning:")
+        # print(orderbook)
+        cleaned_orderbook = []
+        for bid in orderbook:
+            if isinstance(bid["volume"], dict):
+                if all(volume == 0 for volume in bid["volume"].values()):
+                    continue
+            elif bid["volume"] == 0:
+                continue
+            cleaned_orderbook.append(bid)
+        # print("Cleaned orderbook:")
+        # print(cleaned_orderbook)
         mps = get_available_products(
             config.market_products, pd.Timestamp(start) - pd.Timedelta("1h")
         )
@@ -335,7 +346,7 @@ def calculate_naive_price_elastic(
                 f"Invalid market mechanism {config.param_dict.get('market_mechanism')}."
             )
 
-        accepted, rejected, meta, flows = mechanism.clear(orderbook, mps)
+        accepted, rejected, meta, flows = mechanism.clear(cleaned_orderbook, mps)
         price_forecast.loc[t] = meta[0]["price"]
 
     return price_forecast
