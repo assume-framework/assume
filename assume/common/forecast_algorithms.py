@@ -294,7 +294,7 @@ def calculate_naive_price_elastic(
                     "price": elastic_demand_prices,
                     "volume": elastic_demand_volumes,
                     "bid_type": "SB",
-                    # "bid_id": [f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))],
+                    "bid_id": [f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))],
                 }
             )
         )
