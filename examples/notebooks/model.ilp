@@ -1,0 +1,21 @@
+\ Model unknown_copy
+\ LP format - for model browsing. Use MPS format to capture full model detail.
+\ Signature: 0x14c847781b75127c
+Minimize
+ 
+Subject To
+ charge_max_p_con(43_6): - 24 b_ch(43_6) + p_ch(43_6) <= 0
+ charge_max_p_con(43_7): - 24 b_ch(43_7) + p_ch(43_7) <= 0
+ soc_con(43_6): - 0.0204081632653061 p_ch(43_6)
+   + 0.0204081632653061 p_ds(43_6) + soc(43_6) = 2.3752357588457951e-04
+ soc_con(43_7): - 0.0204081632653061 p_ch(43_7)
+   + 0.0204081632653061 p_ds(43_7) - soc(43_6) + soc(43_7) = 0
+ soc_target_con(43_7): soc(43_7) >= 0.9903413133417771
+Bounds
+ p_ch(43_6) free
+ p_ch(43_7) free
+ soc(43_6) free
+ soc(43_7) free
+Binaries
+ b_ch(43_6) b_ch(43_7)
+End
