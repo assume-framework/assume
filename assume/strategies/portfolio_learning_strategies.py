@@ -363,8 +363,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         # concat all observations into one array
         observation = np.concatenate(
             [
-                hour_cos,
-                hour_sin,
+                [hour_cos, hour_sin],
                 scaled_res_load_forecast,
                 scaled_price_forecast,
                 scaled_gen_forecast,
