@@ -16,6 +16,7 @@ from assume.common.grid_utils import (
 )
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
+from assume.common.utils import get_supported_solver
 
 logger = logging.getLogger(__name__)
 
@@ -69,15 +70,9 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.solver_name = marketconfig.param_dict.get("solver_name")
-        if self.solver_name is None:
-            self.solver_name = marketconfig.param_dict.get("solver")
-            if self.solver_name is not None:
-                logger.warning(
-                    f"Market '{marketconfig.market_id}': 'solver' parameter is deprecated, use 'solver_name' instead."
-                )
-        if self.solver_name is None:
-            self.solver_name = "highs"
+        self.solver_name = get_supported_solver(
+            marketconfig.param_dict.get("solver_name", "highs")
+        )
 
         # set the market clearing principle
         # as pay as bid or pay as clear

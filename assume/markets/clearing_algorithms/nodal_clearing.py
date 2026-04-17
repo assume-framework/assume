@@ -13,7 +13,7 @@ from mango import AgentAddress
 
 from assume.common.grid_utils import read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import create_incidence_matrix
+from assume.common.utils import create_incidence_matrix, get_supported_solver
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -161,15 +161,9 @@ class NodalClearingRole(MarketRole):
                 p_max_pu=1,
             )
 
-        self.solver_name = marketconfig.param_dict.get("solver_name")
-        if self.solver_name is None:
-            self.solver_name = marketconfig.param_dict.get("solver")
-            if self.solver_name is not None:
-                logger.warning(
-                    f"Market '{marketconfig.market_id}': 'solver' parameter is deprecated, use 'solver_name' instead."
-                )
-        if self.solver_name is None:
-            self.solver_name = "highs"
+        self.solver_name = get_supported_solver(
+            marketconfig.param_dict.get("solver_name", "highs")
+        )
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress

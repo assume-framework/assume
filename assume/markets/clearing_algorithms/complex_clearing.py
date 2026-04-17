@@ -363,14 +363,9 @@ class ComplexClearingRole(MarketRole):
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
-        self.solver_name = marketconfig.param_dict.get("solver_name")
-        if self.solver_name is None:
-            self.solver_name = marketconfig.param_dict.get("solver")
-            if self.solver_name is not None:
-                logger.warning(
-                    f"Market '{marketconfig.market_id}': 'solver' parameter is deprecated, use 'solver_name' instead."
-                )
-        self.solver_name = get_supported_solver(self.solver_name)
+        self.solver_name = get_supported_solver(
+            marketconfig.param_dict.get("solver_name", "highs")
+        )
         self.solver = SolverFactory(self.solver_name)
         self.solver_options = {}
         if self.solver_name == "gurobi":
