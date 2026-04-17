@@ -16,7 +16,7 @@ from assume.common.grid_utils import (
 )
 from assume.common.market_objects import MarketConfig, Orderbook
 from assume.markets.base_market import MarketRole
-from assume.common.utils import get_supported_solver
+from assume.common.utils import get_supported_solver_linopy
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.solver_name = get_supported_solver(
+        self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
         )
 

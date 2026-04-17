@@ -13,7 +13,7 @@ from mango import AgentAddress
 
 from assume.common.grid_utils import read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import create_incidence_matrix, get_supported_solver
+from assume.common.utils import create_incidence_matrix, get_supported_solver_linopy
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -161,7 +161,7 @@ class NodalClearingRole(MarketRole):
                 p_max_pu=1,
             )
 
-        self.solver_name = get_supported_solver(
+        self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
         )
 
@@ -297,7 +297,7 @@ class NodalClearingRole(MarketRole):
         n.optimize.fix_optimal_capacities()
         status, termination_condition = n.optimize(
             solver_name=self.solver_name,
-            log_to_console=False,
+            #log_to_console=False,
             progress=False,
             include_objective_constant=False,
         )
