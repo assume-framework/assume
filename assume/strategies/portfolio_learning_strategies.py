@@ -11,7 +11,7 @@ import torch as th
 
 from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import min_max_rescale, min_max_scale
+from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.learning_utils import encode_time_features
 from assume.strategies.learning_strategies import TorchLearningStrategy
 from assume.strategies.portfolio_strategies import UnitOperatorStrategy
@@ -159,16 +159,20 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
 
         actions, noise = self.get_actions(next_observation)
 
-        costs = min_max_rescale(
-            scaled_costs.cpu().numpy(), min_val=0, max_val=self.max_price
+        costs = min_max_scale(
+            scaled_costs.cpu().numpy(),
+            min_val=0,
+            max_val=1,
+            out_min=0,
+            out_max=self.max_price,
         )
 
-        markups = min_max_rescale(
+        markups = min_max_scale(
             actions.cpu().numpy(),
-            self.min_markup,
-            self.max_markup,
-            lower_bound=-1,
-            upper_bound=1,
+            min_val=-1,
+            max_val=1,
+            out_min=self.min_markup,
+            out_max=self.max_markup,
         )
 
         ### STEP 3. BID UNITS ###
