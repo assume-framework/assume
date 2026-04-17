@@ -29,6 +29,7 @@ from assume.common.forecaster import (
     SteamgenerationForecaster,
     SteelplantForecaster,
     UnitForecaster,
+    UnitsOperatorForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
@@ -780,7 +781,12 @@ def load_config_and_create_forecaster(
                         electricity_price_flex=0,  # TODO
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
-                    )
+                    )       
+    units_operator_forecast_data = {
+        "shared_unit_index": shared_unit_index,
+        "availability": availability,
+        "forecast_algorithms": forecast_algorithms
+    }
     return {
         "config": config,
         "simulation_id": simulation_id,
@@ -796,6 +802,7 @@ def load_config_and_create_forecaster(
         "unit_forecasts": unit_forecasts,
         "index": index,
         "forecasts_df": forecasts_df,
+        "units_operator_forecast_data": units_operator_forecast_data,
     }
 
 
@@ -837,6 +844,7 @@ def setup_world(
     dsm_units = scenario_data["dsm_units"]
     unit_forecasts = scenario_data["unit_forecasts"]
     forecasts_df = scenario_data["forecasts_df"]
+    units_operator_forecast_data = scenario_data["units_operator_forecast_data"]
 
     # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -1004,6 +1012,9 @@ def setup_world(
             unit_operators_strategies[operator] = converted_strategies
     else:
         unit_operators_strategies = {}
+
+
+    # FIXME: Add forecaster to units_operator
 
     # if distributed_role is true - there is a manager available
     # and we can add each units_operator as a separate process
