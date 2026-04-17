@@ -22,7 +22,8 @@ from assume.common.utils import (
     datetime2timestamp,
     get_available_products,
     get_products_index,
-    get_supported_solver,
+    get_supported_solver_linopy,
+    get_supported_solver_pyomo,
     initializer,
     load_index_file,
     parse_duration,
@@ -815,14 +816,16 @@ def test_parse_duration():
 
 
 def test_solver_available():
-    assert get_supported_solver() == "appsi_highs"
-    assert get_supported_solver("unknown_solver") == "appsi_highs"
+    assert get_supported_solver_pyomo() == "appsi_highs"
+    assert get_supported_solver_pyomo("unknown_solver") == "appsi_highs"
+    assert get_supported_solver_linopy() == "highs"
+    assert get_supported_solver_linopy("unknown_solver") == "highs"
 
 
 def test_solver_unavailable(monkeypatch):
     monkeypatch.setattr("assume.common.utils.check_available_solvers", lambda *args: [])
     with pytest.raises(RuntimeError):
-        get_supported_solver()
+        get_supported_solver_pyomo()
 
 
 def test_load_index_file():
