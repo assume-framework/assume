@@ -744,40 +744,33 @@ def calculate_content_size(content: list | dict) -> int:
     return sys.getsizeof(content)
 
 
-def min_max_scale(x, min_val: float, max_val: float):
-    """
-    Min-Max scaling of a value x to the range [0, 1]
-
-    Args:
-        x: value(s) to scale
-        min_val: minimum value of the parameter
-        max_val: maximum value of the parameter
-    """
-    # Avoid division by zero
-    if min_val == max_val:
-        return x
-    return (x - min_val) / (max_val - min_val)
-
-
-def min_max_rescale(
-    x, min_val: float, max_val: float, lower_bound: float = 0, upper_bound: float = 1
+def min_max_scale(
+    val,
+    min_val: float,
+    max_val: float,
+    out_min: float = 0.0,
+    out_max: float = 1.0,
 ):
     """
-    Rescale a value x from range [lower_bound, upper_bound] (default: [0,1]) to [min_val, max_val].
+    Linearly scale value from [min_val, max_val] to [out_min, out_max] (default: [0.0, 1.0]).
 
     Args:
-        x: value(s) to rescale
-        min_val: minimum value of the target range
-        max_val: maximum value of the target range
-        lower_bound: minimum value of the original range
-        upper_bound: maximum value of the original range
+        val: value to scale
+        min_val: minimum value of the input range
+        max_val: maximum value of the input range
+        out_min: minimum value of the output range
+        out_max: maximum value of the output range
     """
-    if lower_bound == upper_bound:
-        return x
-
-    return min_val + ((x - lower_bound) / (upper_bound - lower_bound)) * (
-        max_val - min_val
-    )
+    # Catch values outside the input range
+    if np.any(val < min_val) or np.any(val > max_val):
+        raise ValueError(
+            f"Value {val} is outside the input range [{min_val}, {max_val}]."
+        )
+    # Avoid division by zero
+    if min_val == max_val:
+        return val  # TODO: is that really intended behavior?
+    else:
+        return out_min + (val - min_val) / (max_val - min_val) * (out_max - out_min)
 
 
 def str_to_bool(val):
