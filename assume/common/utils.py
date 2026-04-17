@@ -21,8 +21,8 @@ import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
 import yaml
-from pyomo.opt import check_available_solvers
 from linopy import available_solvers
+from pyomo.opt import check_available_solvers
 
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.common.exceptions import AssumeException
@@ -220,6 +220,7 @@ def plot_orderbook(orderbook: Orderbook, results: list[dict]):
             )
 
         # set x limits to 0 and max of supply or demand
+        print(cum_supply_bids, cum_demand_bids)
         ax[i].set_xlim(0, max(cum_supply_bids, cum_demand_bids))
         ax[i].set_ylim(bottom=0)
     plt.subplots_adjust(wspace=0.3)
@@ -794,6 +795,7 @@ def get_supported_solver_pyomo(default_solver: str | None = None):
         solver = solvers[0]
 
     return solver
+
 
 def get_supported_solver_linopy(default_solver: str | None = None):
     SOLVERS = ["highs", "gurobi", "glpk", "cbc", "cplex"]

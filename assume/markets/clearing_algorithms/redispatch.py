@@ -15,8 +15,8 @@ from assume.common.grid_utils import (
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
-from assume.markets.base_market import MarketRole
 from assume.common.utils import get_supported_solver_linopy
+from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
 

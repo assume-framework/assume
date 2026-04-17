@@ -297,7 +297,7 @@ class NodalClearingRole(MarketRole):
         n.optimize.fix_optimal_capacities()
         status, termination_condition = n.optimize(
             solver_name=self.solver_name,
-            #log_to_console=False,
+            log_to_console=False,
             progress=False,
             include_objective_constant=False,
         )

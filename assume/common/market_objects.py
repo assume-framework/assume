@@ -8,11 +8,11 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from numbers import Number
 from typing import NamedTuple, TypedDict
+from warnings import warn
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 from mango import Agent, AgentAddress
-from warnings import warn
 
 
 class OnlyHours(NamedTuple):
@@ -161,12 +161,13 @@ class MarketConfig:
 
         if "solver" in self.param_dict:
             warn(
-                f"The key 'solver' in 'param_dict' is deprecated and may be removed in future versions. "
-                f"Please update your configuration.",
+                "The key 'solver' in 'param_dict' is deprecated and may be removed in future versions. "
+                "Please update your configuration.",
                 DeprecationWarning,
             )
             # Update param_dict to use 'solver_name' instead of 'solver'
             self.param_dict["solver_name"] = self.param_dict.pop("solver")
+
 
 class OpeningMessage(TypedDict):
     """
