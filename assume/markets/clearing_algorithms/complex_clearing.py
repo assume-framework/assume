@@ -12,7 +12,7 @@ from mango import AgentAddress
 from pyomo.opt import OptSolver, SolverFactory, TerminationCondition
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import create_incidence_matrix, get_supported_solver
+from assume.common.utils import create_incidence_matrix, get_supported_solver_pyomo
 from assume.markets.base_market import MarketRole
 
 # Set the log level to WARNING
@@ -363,7 +363,7 @@ class ComplexClearingRole(MarketRole):
 
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
-        self.solver_name = get_supported_solver(
+        self.solver_name = get_supported_solver_pyomo(
             marketconfig.param_dict.get("solver_name", "highs")
         )
         self.solver = SolverFactory(self.solver_name)
