@@ -299,6 +299,7 @@ class NodalClearingRole(MarketRole):
             solver_name=self.solver_name,
             log_to_console=False,
             progress=False,
+            include_objective_constant=False,
         )
 
         if status != "ok":

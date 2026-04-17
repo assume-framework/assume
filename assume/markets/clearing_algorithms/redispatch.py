@@ -193,6 +193,7 @@ class RedispatchMarketRole(MarketRole):
                 # do not show tqdm progress bars for large grids
                 # https://github.com/PyPSA/linopy/pull/375
                 progress=False,
+                include_objective_constant=False,
             )
 
             if status != "ok":
