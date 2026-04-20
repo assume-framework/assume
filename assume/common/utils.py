@@ -21,7 +21,6 @@ import dateutil.rrule as rr
 import numpy as np
 import pandas as pd
 import yaml
-from linopy import available_solvers
 from pyomo.opt import check_available_solvers
 
 from assume.common.base import BaseStrategy, LearningStrategy
@@ -786,23 +785,6 @@ def get_supported_solver_pyomo(default_solver: str | None = None):
 
     if default_solver == "highs":
         default_solver = "appsi_highs"
-
-    solver = default_solver or solvers[0]
-
-    if solver not in solvers:
-        logger.warning("Solver %s not available, using %s", solver, solvers[0])
-        solver = solvers[0]
-
-    return solver
-
-
-def get_supported_solver_linopy(default_solver: str | None = None):
-    SOLVERS = ["highs", "gurobi", "glpk", "cbc", "cplex"]
-
-    # Check which solver is available and filter to include only those in SOLVERS, preserving the order in SOLVERS
-    solvers = [solver for solver in SOLVERS if solver in available_solvers]
-    if not solvers:
-        raise RuntimeError(f"None of {SOLVERS} are available")
 
     solver = default_solver or solvers[0]
 
