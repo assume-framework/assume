@@ -342,7 +342,7 @@ class ComplexClearingRole(MarketRole):
     def __init__(self, marketconfig: MarketConfig):
         super().__init__(marketconfig)
         self.solver_name = get_supported_solver_pyomo(
-            marketconfig.param_dict.get("solver_name", "highs")
+            marketconfig.param_dict.get("solver_name", "appsi_highs")
         )
         self.solver = SolverFactory(self.solver_name)
         self.solver_options = {}

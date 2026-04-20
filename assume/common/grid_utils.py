@@ -11,6 +11,7 @@ import pypsa
 from linopy import available_solvers
 
 from assume.common.market_objects import MarketProduct
+from assume.common.utils import SUPPORTED_SOLVERS
 
 logger = logging.getLogger(__name__)
 
@@ -340,12 +341,31 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
 
 
 def get_supported_solver_linopy(default_solver: str | None = None):
-    SOLVERS = ["highs", "gurobi", "glpk", "cbc", "cplex"]
+    """
+    Get an available solver for linopy optimization.
 
-    # Check which solver is available and filter to include only those in SOLVERS, preserving the order in SOLVERS
-    solvers = [solver for solver in SOLVERS if solver in available_solvers]
+    Filters the list of supported solvers to find which ones are installed,
+    then returns the default solver if available, otherwise falls back to the first available solver.
+
+    Args:
+        default_solver (str | None, optional): Preferred solver name. If not available,
+            falls back to the first available solver. Defaults to None.
+
+    Returns:
+        str: Name of the selected solver.
+
+    Raises:
+        RuntimeError: If none of the supported solvers (highs, gurobi, glpk, cbc, cplex) are available.
+
+    Warning:
+        Logs a warning if the default_solver is not available and a fallback is used.
+    """
+    solvers_priority = SUPPORTED_SOLVERS
+
+    # Filter available solvers while preserving the shared fallback priority.
+    solvers = [solver for solver in solvers_priority if solver in available_solvers]
     if not solvers:
-        raise RuntimeError(f"None of {SOLVERS} are available")
+        raise RuntimeError(f"None of {solvers_priority} are available")
 
     solver = default_solver or solvers[0]
 

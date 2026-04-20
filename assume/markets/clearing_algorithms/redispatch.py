@@ -193,6 +193,7 @@ class RedispatchMarketRole(MarketRole):
                 # do not show tqdm progress bars for large grids
                 # https://github.com/PyPSA/linopy/pull/375
                 progress=False,
+                # Constant objective terms do not affect dispatch or nodal prices; omit for speed/stability.
                 include_objective_constant=False,
             )
 

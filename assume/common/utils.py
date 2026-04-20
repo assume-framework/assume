@@ -40,6 +40,9 @@ freq_map = {
     "week": rr.WEEKLY,
 }
 
+# Solver priority order for fallback selection.
+SUPPORTED_SOLVERS = ["highs", "gurobi", "glpk", "cbc", "cplex"]
+
 
 def initializer(func):
     """
@@ -776,12 +779,31 @@ def str_to_bool(val):
 
 
 def get_supported_solver_pyomo(default_solver: str | None = None):
-    SOLVERS = ["appsi_highs", "gurobi", "glpk", "cbc", "cplex"]
+    """
+    Get an available solver for Pyomo optimization.
+
+    Filters the list of supported solvers to find which ones are installed,
+    then returns the default solver if available, otherwise falls back to the first available solver.
+    Note: 'highs' is automatically converted to 'appsi_highs' for Pyomo compatibility.
+
+    Args:
+        default_solver (str | None, optional): Preferred solver name. If not available,
+            falls back to the first available solver. Defaults to None.
+
+    Returns:
+        str: Name of the selected solver.
+
+    Raises:
+        RuntimeError: If none of the supported solvers (appsi_highs, gurobi, glpk, cbc, cplex) are available.
+
+    Warning:
+        Logs a warning if the default_solver is not available and a fallback is used.
+    """
 
     # Check if the solver is available
-    solvers = check_available_solvers(*SOLVERS)
+    solvers = check_available_solvers(*SUPPORTED_SOLVERS)
     if not solvers:
-        raise RuntimeError(f"None of {SOLVERS} are available")
+        raise RuntimeError(f"None of {SUPPORTED_SOLVERS} are available")
 
     if default_solver == "highs":
         default_solver = "appsi_highs"

@@ -341,7 +341,7 @@ def calculate_naive_price_elastic(
                 f"Invalid market mechanism {config.param_dict.get('market_mechanism')}."
             )
 
-        accepted, rejected, meta, flows = mechanism.clear(cleaned_orderbook, mps)
+        _, _, meta, _ = mechanism.clear(cleaned_orderbook, mps)
         price_forecast.loc[t] = meta[0]["price"]
 
     return price_forecast

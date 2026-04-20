@@ -299,6 +299,7 @@ class NodalClearingRole(MarketRole):
             solver_name=self.solver_name,
             log_to_console=False,
             progress=False,
+            # Constant objective terms do not affect dispatch or nodal prices; omit for speed/stability.
             include_objective_constant=False,
         )
 
