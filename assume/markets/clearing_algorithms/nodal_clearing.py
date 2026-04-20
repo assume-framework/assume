@@ -11,9 +11,9 @@ import pandas as pd
 import pypsa
 from mango import AgentAddress
 
-from assume.common.grid_utils import read_pypsa_grid
+from assume.common.grid_utils import get_supported_solver_linopy, read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
-from assume.common.utils import create_incidence_matrix, get_supported_solver_linopy
+from assume.common.utils import create_incidence_matrix
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)

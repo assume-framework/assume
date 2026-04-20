@@ -12,10 +12,10 @@ from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
     calculate_network_meta,
+    get_supported_solver_linopy,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
-from assume.common.utils import get_supported_solver_linopy
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)

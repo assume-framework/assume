@@ -9,13 +9,11 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 
+pytest.importorskip("pypsa")
+
 from assume.common.market_objects import MarketConfig, MarketProduct, Order
 from assume.common.utils import get_available_products
-
-try:
-    from assume.markets.clearing_algorithms import NodalClearingRole
-except ImportError:
-    pass
+from assume.markets.clearing_algorithms import NodalClearingRole
 
 simple_nodal_auction_config = MarketConfig(
     market_id="simple_nodal_auction",
