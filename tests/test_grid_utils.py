@@ -3,9 +3,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
-
-from assume.common.grid_utils import get_supported_solver_linopy
-
+try:
+    from assume.common.grid_utils import get_supported_solver_linopy
+except:
+    pass
 
 @pytest.mark.require_network
 def test_solver_available():
