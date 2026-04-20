@@ -6,8 +6,8 @@ import pytest
 
 from assume.common.grid_utils import get_supported_solver_linopy
 
+
 @pytest.mark.require_network
 def test_solver_available():
     assert get_supported_solver_linopy() == "highs"
     assert get_supported_solver_linopy("unknown_solver") == "highs"
-    
