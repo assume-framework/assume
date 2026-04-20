@@ -220,7 +220,6 @@ def plot_orderbook(orderbook: Orderbook, results: list[dict]):
             )
 
         # set x limits to 0 and max of supply or demand
-        print(cum_supply_bids, cum_demand_bids)
         ax[i].set_xlim(0, max(cum_supply_bids, cum_demand_bids))
         ax[i].set_ylim(bottom=0)
     plt.subplots_adjust(wspace=0.3)

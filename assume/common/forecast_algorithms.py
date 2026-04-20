@@ -257,13 +257,12 @@ def calculate_naive_price_elastic(
 
     # clear the market forecast including elastic demand bids using the PayAsClearRole
     for t in index:
-        # get the supply offers
+        # get the supply offers (marginal cost and available power) for time t
         mc_t = marginal_costs.loc[t]
         power_t = power.loc[t]
         start = t
         end = start + pd.Timedelta(config.market_products[0].duration)
-        # Compute the cumulative sum of available power in the sorted order.
-        # cumsum_power = sorted_power.cumsum()
+
         supply_offers = pd.DataFrame(
             {
                 "start_time": start,
@@ -276,7 +275,6 @@ def calculate_naive_price_elastic(
                 "bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
             }
         )
-        # print(supply_offers)
 
         # shape of sum_demand: (time_steps, 1)
         demand_t = sum_demand.loc[t][0]
@@ -296,7 +294,6 @@ def calculate_naive_price_elastic(
                 ],
             }
         )
-        # print(demand_bids)
 
         # create an orderbook containing all supply offers and demand bids
         orderbook = []
@@ -318,8 +315,7 @@ def calculate_naive_price_elastic(
                     "bid_id": f"{inelastic_demand_units[0].id}_{t}",
                 }
             )
-        # print("Orderbook before cleaning:")
-        # print(orderbook)
+
         cleaned_orderbook = []
         for bid in orderbook:
             if isinstance(bid["volume"], dict):
@@ -328,8 +324,7 @@ def calculate_naive_price_elastic(
             elif bid["volume"] == 0:
                 continue
             cleaned_orderbook.append(bid)
-        # print("Cleaned orderbook:")
-        # print(cleaned_orderbook)
+
         mps = get_available_products(
             config.market_products, pd.Timestamp(start) - pd.Timedelta("1h")
         )

@@ -59,9 +59,7 @@ def market_clearing_opt_constraints(
         initialize=[order["bid_id"] for order in orders if order["bid_type"] == "SB"],
         doc="simple_bids",
     )
-    # print("sBids:")
-    # for _ in model.sBids:
-    #     print(_)
+
     model.bBids = pyo.Set(
         initialize=[
             order["bid_id"] for order in orders if order["bid_type"] in ["BB", "LB"]
@@ -79,9 +77,7 @@ def market_clearing_opt_constraints(
         bounds=(0, 1),
         doc="simple_bid_acceptance",
     )
-    # print("xs:")
-    # for _ in model.xs:
-    #     print(_)
+
     model.xb = pyo.Var(
         model.bBids,
         domain=pyo.NonNegativeReals,
@@ -207,9 +203,7 @@ def market_clearing_opt_objective(model: pyo.ConcreteModel, orders: Orderbook):
     Used by :meth:`market_clearing_opt`
     """
     obj_expr = 0
-    # print("Orders in objective function:")
     for order in orders:
-        # print(order)
         if order["bid_type"] == "SB":
             obj_expr += order["price"] * order["volume"] * model.xs[order["bid_id"]]
         elif order["bid_type"] in ["BB", "LB"]:
@@ -278,25 +272,9 @@ def market_clearing_opt(
 
     func_objective(model, orders)
 
-    # print("Objective in market_clearing_opt:")
-    # print(model.objective.expr)
-
     # Solve the model
     instance = model.create_instance()
-    # model.pprint()
     results = solver.solve(instance, options=solver_options)
-    # try:
-    #     results = solver.solve(instance, options=solver_options)
-    #     if orders[0]['start_time'] == pd.Timestamp('2013-01-01 07:00:00'):
-    #         print(results)
-    #         for o in orders:
-    #             print(o)
-    #         input("Press Enter to continue...")
-    # except:
-    #     for o in orders:
-    #         print(o)
-    #     pass
-    # instance.pprint()
 
     # Fix all model.x to the values in the solution
     if mode == "with_min_acceptance_ratio":
@@ -543,10 +521,6 @@ class ComplexClearingRole(MarketRole):
                 solver=self.solver,
                 solver_options=self.solver_options,
             )
-            # print("Solver results:")
-            # print(results)
-            # print("Instance:")
-            # print(instance)
 
             if results.solver.termination_condition == TerminationCondition.infeasible:
                 raise Exception("infeasible")
@@ -601,14 +575,7 @@ class ComplexClearingRole(MarketRole):
             pricing_mechanism=self.pricing_mechanism,
             log_flows=self.log_flows,
         )
-        # if orderbook[0]['start_time'] == pd.Timestamp('2013-01-01 08:00:00'):
-        #     print("Accepted Orders:")
-        #     for o in accepted_orders:
-        #         print(o)
-        #     print("Rejected Orders:")
-        #     for o in rejected_orders:
-        #         print(o)
-        #     input("Press Enter to continue...")
+
         self.all_orders = []
 
         return accepted_orders, rejected_orders, meta, flows
@@ -640,10 +607,6 @@ def calculate_order_surplus(
 
     # calculate the surplus of simple bids
     if order["bid_type"] == "SB":
-        # print("Order:")
-        # print(order)
-        # print("xs:")
-        # print(pyo.value(instance.xs[order["bid_id"]]))
         if (
             pyo.value(instance.xs[order["bid_id"]]) < EPS
             or abs(

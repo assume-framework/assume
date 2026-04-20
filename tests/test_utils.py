@@ -815,6 +815,7 @@ def test_parse_duration():
         parse_duration("100ms")
 
 
+@pytest.mark.require_network
 def test_solver_available():
     assert get_supported_solver_pyomo() == "appsi_highs"
     assert get_supported_solver_pyomo("unknown_solver") == "appsi_highs"
