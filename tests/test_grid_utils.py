@@ -5,7 +5,7 @@
 import pytest
 try:
     from assume.common.grid_utils import get_supported_solver_linopy
-except:
+except ImportError:
     pass
 
 @pytest.mark.require_network
