@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
+
 try:
     from assume.common.grid_utils import get_supported_solver_linopy
 except ImportError:
