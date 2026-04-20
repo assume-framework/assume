@@ -22,7 +22,7 @@ Upcoming Release
   - **Consistently distinguish 'solver' and 'solver_name'**: Users should now use 'solver_name' to specify the solver in the market configs param_dict, as 'solver' now refers to the actual solver instance.
 **Bug Fixes:**
   - **dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
-  - **fixed a bug in forecasts**, that occured when using complex clearing
+  - **fixed a bug in forecasts**, that occurred when using complex clearing
 
 0.6.0 - (18th March 2026)
 =========================
