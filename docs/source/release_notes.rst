@@ -16,8 +16,13 @@ Upcoming Release
 **New Features:**
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
 
+**Improvements:**
+  - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.
+  - **Added a check for available solvers in redispatch & nodal_clearing**, similar to the check in complex clearing.
+  - **Consistently distinguish 'solver' and 'solver_name'**: Users should now use 'solver_name' to specify the solver in the market configs param_dict, as 'solver' now refers to the actual solver instance.
 **Bug Fixes:**
   - **dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
+  - **fixed a bug in forecasts**, that occured when using complex clearing
 
 0.6.0 - (18th March 2026)
 =========================
