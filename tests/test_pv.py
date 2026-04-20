@@ -8,7 +8,7 @@ import pytest
 
 from assume.units.dst_components import PVPlant
 
-use_solver = "appsi_highs"
+solver_name = "appsi_highs"
 
 
 # Fixture for creating an electricity price profile, including negative prices
@@ -57,7 +57,7 @@ def pv_plant_model_with_availability_and_price(pv_plant_config, price_profile):
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
 
     # Solve the model
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=True)
 
     return model, results
@@ -95,7 +95,7 @@ def pv_plant_model_with_power_profile_and_price(pv_plant_config, price_profile):
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
 
     # Solve the model
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=True)
 
     return model, results
