@@ -9,6 +9,7 @@ try:
 except ImportError:
     pass
 
+
 @pytest.mark.require_network
 def test_solver_available():
     assert get_supported_solver_linopy() == "highs"
