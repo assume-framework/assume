@@ -396,7 +396,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  lag(cum_vol, 1, 0) OVER (ORDER BY cum_vol) AS \"Cumulative Volume\",\r\n  price::float AS \"Price\",\r\n  tech AS \"Technology\",\r\n  unit_id::text AS \"Unit\",\r\n  volume::text AS \"Volume\",\r\n  bid_id::text AS \"Bid\",\r\n  5 AS \"Size\"\r\nFROM (\r\n  SELECT\r\n    price,\r\n    unit_id,\r\n    bid_id,\r\n    volume,\r\n    tech,\r\n    sum(volume::float) OVER (ORDER BY price ASC, bid_id) AS cum_vol\r\n  FROM (\r\n    SELECT\r\n      mo.bid_id,\r\n      mo.unit_id,\r\n      mo.price,\r\n      COALESCE(pp.technology, sm.technology, dm.technology, 'unknown') AS tech,\r\n      sum(mo.volume) AS volume\r\n    FROM market_orders mo\r\n    LEFT JOIN power_plant_meta pp ON pp.index = mo.unit_id AND pp.simulation = mo.simulation\r\n    LEFT JOIN storage_meta sm ON sm.index = mo.unit_id AND sm.simulation = mo.simulation\r\n    LEFT JOIN demand_meta dm ON dm.index = mo.unit_id AND dm.simulation = mo.simulation\r\n    WHERE\r\n      mo.start_time = (\r\n        SELECT min(start_time) FROM market_orders\r\n        WHERE market_id = '$market'\r\n          AND simulation = '$simulation'\r\n          AND $__timeFilter(start_time)\r\n      )\r\n      AND mo.volume > 0\r\n      AND mo.market_id = '$market'\r\n      AND mo.simulation = '$simulation'\r\n    GROUP BY mo.bid_id, mo.unit_id, mo.price, tech\r\n  ) bids\r\n) ranked\r\n\r\nUNION ALL\r\n\r\nSELECT\r\n  cum_vol AS \"Cumulative Volume\",\r\n  price::float AS \"Price\",\r\n  tech AS \"Technology\",\r\n  unit_id::text AS \"Unit\",\r\n  volume::text AS \"Volume\",\r\n  bid_id::text AS \"Bid\",\r\n  0 AS \"Size\"\r\nFROM (\r\n  SELECT\r\n    price,\r\n    unit_id,\r\n    bid_id,\r\n    volume,\r\n    tech,\r\n    sum(volume::float) OVER (ORDER BY price ASC, bid_id) AS cum_vol\r\n  FROM (\r\n    SELECT\r\n      mo.bid_id,\r\n      mo.unit_id,\r\n      mo.price,\r\n      COALESCE(pp.technology, sm.technology, dm.technology, 'unknown') AS tech,\r\n      sum(mo.volume) AS volume\r\n    FROM market_orders mo\r\n    LEFT JOIN power_plant_meta pp ON pp.index = mo.unit_id AND pp.simulation = mo.simulation\r\n    LEFT JOIN storage_meta sm ON sm.index = mo.unit_id AND sm.simulation = mo.simulation\r\n    LEFT JOIN demand_meta dm ON dm.index = mo.unit_id AND dm.simulation = mo.simulation\r\n    WHERE\r\n      mo.start_time = (\r\n        SELECT min(start_time) FROM market_orders\r\n        WHERE market_id = '$market'\r\n          AND simulation = '$simulation'\r\n          AND $__timeFilter(start_time)\r\n      )\r\n      AND mo.volume > 0\r\n      AND mo.market_id = '$market'\r\n      AND mo.simulation = '$simulation'\r\n    GROUP BY mo.bid_id, mo.unit_id, mo.price, tech\r\n  ) bids\r\n) ranked\r\n\r\nUNION ALL\r\n\r\nSELECT\r\n  mm.demand_volume::float AS \"Cumulative Volume\",\r\n  0::float AS \"Price\",\r\n  'Demand' AS \"Technology\",\r\n  '' AS \"Unit\",\r\n  '' AS \"Volume\",\r\n  '' AS \"Bid\",\r\n  0 AS \"Size\"\r\nFROM market_meta mm\r\nWHERE mm.market_id = '$market'\r\n  AND mm.simulation = '$simulation'\r\n  AND mm.product_start = (\r\n    SELECT min(start_time) FROM market_orders\r\n    WHERE market_id = '$market'\r\n      AND simulation = '$simulation'\r\n      AND $__timeFilter(start_time)\r\n  )\r\n\r\nUNION ALL\r\n\r\nSELECT\r\n  mm.demand_volume::float AS \"Cumulative Volume\",\r\n  (SELECT max(price::float) FROM market_orders\r\n   WHERE market_id = '$market'\r\n     AND simulation = '$simulation'\r\n     AND accepted_volume > 0\r\n     AND start_time = (\r\n       SELECT min(start_time) FROM market_orders\r\n       WHERE market_id = '$market'\r\n         AND simulation = '$simulation'\r\n         AND $__timeFilter(start_time)\r\n     )\r\n  ) AS \"Price\",\r\n  'Demand' AS \"Technology\",\r\n  '' AS \"Unit\",\r\n  '' AS \"Volume\",\r\n  '' AS \"Bid\",\r\n  0 AS \"Size\"\r\nFROM market_meta mm\r\nWHERE mm.market_id = '$market'\r\n  AND mm.simulation = '$simulation'\r\n  AND mm.product_start = (\r\n    SELECT min(start_time) FROM market_orders\r\n    WHERE market_id = '$market'\r\n      AND simulation = '$simulation'\r\n      AND $__timeFilter(start_time)\r\n  )\r\n\r\nORDER BY \"Cumulative Volume\" ASC, \"Price\" ASC",
+          "rawSql": "SELECT\r\n  lag(cum_vol, 1, 0) OVER (ORDER BY cum_vol) AS \"Cumulative Volume\",\r\n  price::float AS \"Price\",\r\n  tech AS \"Technology\",\r\n  unit_id::text AS \"Unit\",\r\n  volume::text AS \"Volume\",\r\n  bid_id::text AS \"Bid\",\r\n  5 AS \"Size\"\r\nFROM (\r\n  SELECT\r\n    price,\r\n    unit_id,\r\n    bid_id,\r\n    volume,\r\n    tech,\r\n    sum(volume::float) OVER (ORDER BY price ASC, bid_id) AS cum_vol\r\n  FROM (\r\n    SELECT\r\n      mo.bid_id,\r\n      mo.unit_id,\r\n      mo.price,\r\n      COALESCE(pp.technology, sm.technology, dm.technology, 'unknown') AS tech,\r\n      sum(mo.volume) AS volume\r\n    FROM market_orders mo\r\n    LEFT JOIN power_plant_meta pp ON pp.index = mo.unit_id AND pp.simulation = mo.simulation\r\n    LEFT JOIN storage_meta sm ON sm.index = mo.unit_id AND sm.simulation = mo.simulation\r\n    LEFT JOIN demand_meta dm ON dm.index = mo.unit_id AND dm.simulation = mo.simulation\r\n    WHERE\r\n      mo.start_time = '$merit_order_select'   AND mo.volume > 0\r\n      AND mo.market_id = '$market'\r\n      AND mo.simulation = '$simulation'\r\n    GROUP BY mo.bid_id, mo.unit_id, mo.price, tech\r\n  ) bids\r\n) ranked\r\n\r\nUNION ALL\r\n\r\nSELECT\r\n  cum_vol AS \"Cumulative Volume\",\r\n  price::float AS \"Price\",\r\n  tech AS \"Technology\",\r\n  unit_id::text AS \"Unit\",\r\n  volume::text AS \"Volume\",\r\n  bid_id::text AS \"Bid\",\r\n  0 AS \"Size\"\r\nFROM (\r\n  SELECT\r\n    price,\r\n    unit_id,\r\n    bid_id,\r\n    volume,\r\n    tech,\r\n    sum(volume::float) OVER (ORDER BY price ASC, bid_id) AS cum_vol\r\n  FROM (\r\n    SELECT\r\n      mo.bid_id,\r\n      mo.unit_id,\r\n      mo.price,\r\n      COALESCE(pp.technology, sm.technology, dm.technology, 'unknown') AS tech,\r\n      sum(mo.volume) AS volume\r\n    FROM market_orders mo\r\n    LEFT JOIN power_plant_meta pp ON pp.index = mo.unit_id AND pp.simulation = mo.simulation\r\n    LEFT JOIN storage_meta sm ON sm.index = mo.unit_id AND sm.simulation = mo.simulation\r\n    LEFT JOIN demand_meta dm ON dm.index = mo.unit_id AND dm.simulation = mo.simulation\r\n    WHERE\r\n      mo.start_time = (\r\n        SELECT min(start_time) FROM market_orders\r\n        WHERE market_id = '$market'\r\n          AND simulation = '$simulation'\r\n          AND $__timeFilter(start_time)\r\n      )\r\n      AND mo.volume > 0\r\n      AND mo.market_id = '$market'\r\n      AND mo.simulation = '$simulation'\r\n    GROUP BY mo.bid_id, mo.unit_id, mo.price, tech\r\n  ) bids\r\n) ranked\r\n\r\nUNION ALL\r\n\r\nSELECT\r\n  mm.demand_volume::float AS \"Cumulative Volume\",\r\n  0::float AS \"Price\",\r\n  'Demand' AS \"Technology\",\r\n  '' AS \"Unit\",\r\n  '' AS \"Volume\",\r\n  '' AS \"Bid\",\r\n  0 AS \"Size\"\r\nFROM market_meta mm\r\nWHERE mm.market_id = '$market'\r\n  AND mm.simulation = '$simulation'\r\n  AND mm.product_start = (\r\n    SELECT min(start_time) FROM market_orders\r\n    WHERE market_id = '$market'\r\n      AND simulation = '$simulation'\r\n      AND $__timeFilter(start_time)\r\n  )\r\n\r\nUNION ALL\r\n\r\nSELECT\r\n  mm.demand_volume::float AS \"Cumulative Volume\",\r\n  (SELECT max(price::float) FROM market_orders\r\n   WHERE market_id = '$market'\r\n     AND simulation = '$simulation'\r\n     AND accepted_volume > 0\r\n     AND start_time = (\r\n       SELECT min(start_time) FROM market_orders\r\n       WHERE market_id = '$market'\r\n         AND simulation = '$simulation'\r\n         AND $__timeFilter(start_time)\r\n     )\r\n  ) AS \"Price\",\r\n  'Demand' AS \"Technology\",\r\n  '' AS \"Unit\",\r\n  '' AS \"Volume\",\r\n  '' AS \"Bid\",\r\n  0 AS \"Size\"\r\nFROM market_meta mm\r\nWHERE mm.market_id = '$market'\r\n  AND mm.simulation = '$simulation'\r\n  AND mm.product_start = (\r\n    SELECT min(start_time) FROM market_orders\r\n    WHERE market_id = '$market'\r\n      AND simulation = '$simulation'\r\n      AND $__timeFilter(start_time)\r\n  )\r\n\r\nORDER BY \"Cumulative Volume\" ASC, \"Price\" ASC",
           "refId": "A",
           "sql": {
             "columns": [
@@ -417,7 +417,7 @@
           }
         }
       ],
-      "title": "Merit Order $market at $min_time",
+      "title": "Merit Order $market at $merit_order_select",
       "transformations": [
         {
           "id": "partitionByValues",
@@ -5534,24 +5534,19 @@
         "type": "query"
       },
       {
+        "allowCustomValue": false,
         "current": {
-          "text": "2019-01-12 12:00:00",
-          "value": "2019-01-12 12:00:00"
+          "text": "2023-03-01 01:00:00",
+          "value": "2023-03-01 01:00:00"
         },
-        "datasource": {
-          "type": "grafana-postgresql-datasource",
-          "uid": "P7B13B9DF907EC40C"
-        },
-        "definition": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
-        "description": "The minimum time we have in the time range.\nUsed for the merit order plot title",
-        "hide": 2,
-        "includeAll": false,
-        "name": "min_time",
+        "definition": "select start_time::text from market_orders where market_id = '$market' and simulation = '$simulation' and $__timeFilter(start_time)",
+        "label": "merit order plot for",
+        "name": "merit_order_select",
         "options": [],
-        "query": "select min(start_time)::text from market_orders where market_id = '$market' AND\n      simulation = '$simulation' and $__timeFilter(start_time)",
-        "refresh": 1,
+        "query": "select start_time::text from market_orders where market_id = '$market' and simulation = '$simulation' and $__timeFilter(start_time)",
+        "refresh": 2,
         "regex": "",
-        "regexApplyTo": "value",
+        "sort": 1,
         "type": "query"
       }
     ]
