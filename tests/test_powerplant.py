@@ -652,6 +652,195 @@ def test_initialising_invalid_powerplants():
         PowerPlant(**d)
 
 
+def _make_start_cost_plant(
+    periods: int = 24,
+    freq: str = "h",
+    hot_start_cost: float = 10.0,
+    warm_start_cost: float = 20.0,
+    cold_start_cost: float = 30.0,
+    downtime_hot_start: int = 2,
+    downtime_warm_start: int = 4,
+    min_down_time: int = 1,
+    min_operating_time: int = 1,
+    min_power: float = 50,
+    max_power: float = 500,
+) -> PowerPlant:
+    index = pd.date_range("2022-01-01", periods=periods, freq=freq)
+    forecaster = PowerplantForecaster(
+        index=index,
+        availability=1,
+        fuel_prices={"lignite": 10, "co2": 0},
+        market_prices={"EOM": 0},
+    )
+    return PowerPlant(
+        id="test_pp",
+        unit_operator="test_operator",
+        technology="coal",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        index=forecaster.index,
+        max_power=max_power,
+        min_power=min_power,
+        efficiency=0.5,
+        additional_cost=0,
+        fuel_type="lignite",
+        emission_factor=0,
+        ramp_down=max_power,
+        ramp_up=max_power,
+        hot_start_cost=hot_start_cost,
+        warm_start_cost=warm_start_cost,
+        cold_start_cost=cold_start_cost,
+        downtime_hot_start=downtime_hot_start,
+        downtime_warm_start=downtime_warm_start,
+        min_operating_time=min_operating_time,
+        min_down_time=min_down_time,
+        forecaster=forecaster,
+    )
+
+
+def _set_energy(pp: PowerPlant, values: list[float]) -> None:
+    for i, v in enumerate(values):
+        pp.outputs["energy"].at[pp.index[i]] = v
+
+
+def _start_costs_list(pp: PowerPlant, n: int) -> list[float]:
+    return [float(pp.outputs["energy_start_costs"].at[pp.index[i]]) for i in range(n)]
+
+
+def test_start_cost_not_booked_when_always_on():
+    pp = _make_start_cost_plant(periods=5)
+    _set_energy(pp, [200, 200, 200, 200, 200])
+
+    pp._book_start_costs(pp.index[0], pp.index[-1], "energy")
+
+    assert sum(_start_costs_list(pp, 5)) == 0
+
+
+def test_start_cost_hot_start_booked_once_at_transition():
+    pp = _make_start_cost_plant(
+        periods=5,
+        hot_start_cost=10,
+        warm_start_cost=20,
+        cold_start_cost=30,
+        downtime_hot_start=2,
+        downtime_warm_start=4,
+    )
+    # off for 1 step (within hot-start window), then on for the rest
+    _set_energy(pp, [0, 200, 200, 200, 200])
+
+    pp._book_start_costs(pp.index[0], pp.index[-1], "energy")
+
+    series = _start_costs_list(pp, 5)
+    assert series == [0, pp.hot_start_cost, 0, 0, 0]
+
+
+def test_start_cost_warm_start_booked():
+    pp = _make_start_cost_plant(
+        periods=5,
+        hot_start_cost=10,
+        warm_start_cost=20,
+        cold_start_cost=30,
+        downtime_hot_start=2,
+        downtime_warm_start=4,
+    )
+    _set_energy(pp, [0, 0, 0, 200, 200])
+
+    pp._book_start_costs(pp.index[0], pp.index[-1], "energy")
+
+    series = _start_costs_list(pp, 5)
+    assert series == [0, 0, 0, pp.warm_start_cost, 0]
+
+
+def test_start_cost_cold_start_booked():
+    pp = _make_start_cost_plant(
+        periods=6,
+        hot_start_cost=10,
+        warm_start_cost=20,
+        cold_start_cost=30,
+        downtime_hot_start=2,
+        downtime_warm_start=4,
+    )
+    _set_energy(pp, [0, 0, 0, 0, 0, 200])
+
+    pp._book_start_costs(pp.index[0], pp.index[-1], "energy")
+
+    series = _start_costs_list(pp, 6)
+    assert series == [0, 0, 0, 0, 0, pp.cold_start_cost]
+
+
+def test_start_cost_two_separate_cycles():
+    pp = _make_start_cost_plant(
+        periods=5,
+        hot_start_cost=10,
+        warm_start_cost=20,
+        cold_start_cost=30,
+        downtime_hot_start=2,
+        downtime_warm_start=4,
+        min_down_time=1,
+        min_operating_time=1,
+    )
+    # on -> off -> on -> off -> on
+    _set_energy(pp, [200, 0, 200, 0, 200])
+
+    pp._book_start_costs(pp.index[0], pp.index[-1], "energy")
+
+    series = _start_costs_list(pp, 5)
+    # step 0: already running at the boundary, no transition
+    # step 2: off->on restart in hot window
+    # step 4: off->on restart in hot window
+    assert series == [0, 0, pp.hot_start_cost, 0, pp.hot_start_cost]
+
+
+def test_start_cost_idempotent_across_multiple_dispatch_calls():
+    """
+    Simulates multi-market re-entrancy: execute_current_dispatch is called
+    once per product_type clearing within a simulation tick. Start-up and
+    generation costs must be idempotent (produce the same series every time).
+    """
+    pp = _make_start_cost_plant(
+        periods=5,
+        hot_start_cost=10,
+        warm_start_cost=20,
+        cold_start_cost=30,
+        downtime_hot_start=2,
+        downtime_warm_start=4,
+    )
+    # seed a dispatch schedule on outputs["energy"] that triggers a start
+    _set_energy(pp, [0, 200, 200, 200, 200])
+
+    end = pp.index[-1]
+    first = list(pp.execute_current_dispatch(pp.index[0], end))
+    first_start = _start_costs_list(pp, 5)
+    first_gen = [
+        float(pp.outputs["energy_generation_costs"].at[pp.index[i]]) for i in range(5)
+    ]
+
+    # Simulate three more clearings on different product types hitting the
+    # same dispatch window. The final accumulated dispatch in outputs["energy"]
+    # is still the same, so every call must produce the same cost series.
+    for _ in range(3):
+        pp.execute_current_dispatch(pp.index[0], end)
+
+    assert _start_costs_list(pp, 5) == first_start
+    assert [
+        float(pp.outputs["energy_generation_costs"].at[pp.index[i]]) for i in range(5)
+    ] == first_gen
+    assert list(pp.execute_current_dispatch(pp.index[0], end)) == first
+
+
+def test_start_cost_scaled_by_max_power():
+    pp = _make_start_cost_plant(
+        hot_start_cost=1.0,
+        warm_start_cost=2.0,
+        cold_start_cost=3.0,
+        min_power=10,
+        max_power=40,
+    )
+    # Input costs are per-MW of installed (max) capacity; absolute EUR scales with max_power
+    assert pp.hot_start_cost == 1.0 * pp.max_power
+    assert pp.warm_start_cost == 2.0 * pp.max_power
+    assert pp.cold_start_cost == 3.0 * pp.max_power
+
+
 if __name__ == "__main__":
     # run pytest and enable prints
     pytest.main(["-s", __file__])

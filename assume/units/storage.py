@@ -41,11 +41,6 @@ class Storage(SupportsMinMaxCharge):
         ramp_down_charge (float): The ramp down rate of charging the storage unit in MW/15 minutes (negative value).
         ramp_up_discharge (float): The ramp up rate of discharging the storage unit in MW/15 minutes.
         ramp_down_discharge (float): The ramp down rate of discharging the storage unit in MW/15 minutes.
-        hot_start_cost (float): The hot start cost of the storage unit in €/MW.
-        warm_start_cost (float): The warm start cost of the storage unit in €/MW.
-        cold_start_cost (float): The cold start cost of the storage unit in €/MW.
-        downtime_hot_start (float): Definition of downtime before hot start in h.
-        downtime_warm_start (float): Definition of downtime before warm start in h.
         min_operating_time (float): The minimum operating time of the storage unit in hours.
         min_down_time (float): The minimum down time of the storage unit in hours.
         is_active (bool): Defines whether or not the unit bids itself or is portfolio optimized.
@@ -77,13 +72,8 @@ class Storage(SupportsMinMaxCharge):
         ramp_down_charge: float | None = None,
         ramp_up_discharge: float | None = None,
         ramp_down_discharge: float | None = None,
-        hot_start_cost: float = 0,
-        warm_start_cost: float = 0,
-        cold_start_cost: float = 0,
         min_operating_time: float = 0,  # hours
         min_down_time: float = 0,  # hours
-        downtime_hot_start: int = 8,  # hours
-        downtime_warm_start: int = 48,  # hours
         location: tuple[float, float] = (0, 0),
         node: str = "node0",
         **kwargs,
@@ -253,26 +243,6 @@ class Storage(SupportsMinMaxCharge):
                 field="min_down_time",
             )
         self.min_down_time = min_down_time
-        # The downtime before hot start of the storage unit.
-        if downtime_hot_start < 0:
-            raise ValidationError(
-                message=f"{downtime_hot_start=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="downtime_hot_start",
-            )
-        self.downtime_hot_start = downtime_hot_start
-        # The downtime before warm start of the storage unit.
-        if downtime_warm_start < 0:
-            raise ValidationError(
-                message=f"{downtime_warm_start=} must be >= 0 for unit {self.id}",
-                id=self.id,
-                field="downtime_warm_start",
-            )
-        self.downtime_warm_start = downtime_warm_start
-
-        self.hot_start_cost = hot_start_cost * max_power_discharge
-        self.warm_start_cost = warm_start_cost * max_power_discharge
-        self.cold_start_cost = cold_start_cost * max_power_discharge
 
     def execute_current_dispatch(self, start: datetime, end: datetime) -> np.ndarray:
         """
@@ -331,18 +301,16 @@ class Storage(SupportsMinMaxCharge):
                     -current_power * time_delta * self.efficiency_charge
                 ) / self.capacity
 
-            # TODO op_time calculation for storages
-            op_time = 1
-            self.outputs["energy_generation_costs"].at[t] += self.get_starting_costs(
-                op_time
-            )
-
             # update the values of the state of charge and the energy
             next_freq = t + self.index.freq
             if next_freq in self.index:
                 self.outputs["soc"].at[next_freq] = soc + delta_soc
             self.outputs["energy"].at[t] = current_power
 
+        # Overwrite the variable generation cost series from the finalized
+        # dispatch. Storages have no start-up costs, so no start-cost booking
+        # is needed. The helper uses `=` semantics so it is safe to call
+        # repeatedly as different markets clear for the same window.
         self.calculate_generation_cost(start, end, "energy")
         return self.outputs["energy"].loc[start:end]
 
@@ -573,26 +541,6 @@ class Storage(SupportsMinMaxCharge):
             power_charge = 0
 
         return power_charge
-
-    def get_starting_costs(self, op_time: int) -> float:
-        """
-        Calculates the starting costs of the unit depending on how long it was shut down
-
-        Args:
-            op_time (float): The time the unit was shut down in hours.
-
-        Returns:
-            float: The starting costs of the unit.
-        """
-        if op_time > 0:
-            # unit is running
-            return 0
-        if -op_time < self.downtime_hot_start:
-            return self.hot_start_cost
-        elif -op_time < self.downtime_warm_start:
-            return self.warm_start_cost
-        else:
-            return self.cold_start_cost
 
     def as_dict(self) -> dict:
         """

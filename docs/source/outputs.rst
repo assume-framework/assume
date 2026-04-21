@@ -74,7 +74,7 @@ When the outputs are stored in CSV files, the data is organized in a similar str
 
    * - unit_dispatch
      - Unit-level dispatch data.
-     - simulation, unit, power, heat, soc, energy_generation_costs, energy_cashflow, total_costs
+     - simulation, unit, power, heat, soc, energy_generation_costs, energy_start_costs, energy_cashflow, total_costs
 
    * - market_orders
      - Market order details.

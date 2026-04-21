@@ -119,15 +119,18 @@ def test_calculate_bids(base_unit, mock_market_config):
     # we received more, as accepted_price is higher
     assert base_unit.outputs["energy_cashflow"][start] == 10 * 11
 
-    # we somehow sold an additional 10 MW
+    # we somehow sold an additional 10 MW on a second market for the same step
     base_unit.set_dispatch_plan(mock_market_config, orderbook)
     base_unit.calculate_generation_cost(index[0], index[1], "energy")
     base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
 
-    # the final output should be 10+10
+    # the final dispatched output should be 10+10
     assert base_unit.outputs["energy"][start] == 20
-    # the marginal cost for this volume should be twice as much too
+    # generation cost is a pure function of the aggregated dispatch, so the
+    # second call overwrites the first (idempotency under multi-market
+    # re-entry): 20 MW * 10 EUR/MWh = 200
     assert base_unit.outputs["energy_generation_costs"][start] == 200
+    # cashflow on the other hand accumulates across markets: 110 + 110 = 220
     assert base_unit.outputs["energy_cashflow"][start] == 20 * 11
 
 
@@ -172,7 +175,9 @@ def test_calculate_multi_bids(base_unit, mock_market_config):
     base_unit.calculate_generation_cost(index[0], index[1], "energy")
     base_unit.calculate_cashflow_and_reward(mock_market_config, orderbook)
 
-    # should be correctly applied for the sum, even if different hours are applied
+    # dispatch accumulates across markets, but generation cost is a pure
+    # function of the aggregated dispatch and therefore stays at 20 MW * 10
+    # EUR/MWh = 200 even after a second market has cleared on the same step.
     assert base_unit.outputs["energy"][index[0]] == 20
     assert base_unit.outputs["energy_generation_costs"][index[0]] == 200
     assert base_unit.outputs["energy_cashflow"][index[0]] == 220
