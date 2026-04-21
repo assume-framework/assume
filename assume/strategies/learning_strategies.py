@@ -1035,7 +1035,9 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         marginal_cost = unit.calculate_marginal_cost(
             start, unit.outputs[product_type].at[start]
         )
-        marginal_cost += unit.get_starting_costs(int(duration_hours))
+        # Start-up cost is already booked idempotently into
+        # outputs[f"{product_type}_start_costs"] by _book_start_costs.
+        start_cost = unit.outputs[f"{product_type}_start_costs"].at[start]
 
         accepted_volume = order.get("accepted_volume", 0)
         # ignore very small volumes due to calculations
@@ -1044,7 +1046,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
 
         # Calculate profit and cost for the order
         order_profit = accepted_price * accepted_volume * duration_hours
-        order_cost = abs(marginal_cost * accepted_volume * duration_hours)
+        order_cost = abs(marginal_cost * accepted_volume * duration_hours) + start_cost
 
         current_soc = unit.outputs["soc"].at[start]
         next_soc = unit.outputs["soc"].at[next_time]
@@ -1263,7 +1265,7 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         # Start-up cost is already booked idempotently into
         # outputs[f"{product_type}_start_costs"] by _book_start_costs in
         # execute_current_dispatch. Read from there instead of recomputing.
-        start_cost = unit.outputs[f"{product_type}_start_costs"].at[start] /2
+        start_cost = unit.outputs[f"{product_type}_start_costs"].at[start] / 2
 
         profit = income - operational_cost - start_cost
 
