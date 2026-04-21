@@ -121,7 +121,7 @@ dam_with_complex_clearing:
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
       param_dict:
-        solver: highs
+        solver_name: highs
         pricing_mechanism: pay_as_clear
       additional_fields:
         - bid_type
