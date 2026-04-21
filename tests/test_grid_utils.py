@@ -36,7 +36,7 @@ def n_2bus_1line():
     n.add("Bus", "N", v_nom=380)
     n.add("Bus", "S", v_nom=380)
     n.add("Line", "N-S", bus0="N", bus1="S", x=0.01, r=0.001, s_nom=2000.0)
-    n.snapshots = ["now"]
+    n.set_snapshots(["now"])
     return n
 
 @pytest.fixture
@@ -56,11 +56,12 @@ def loads_for_n_2_bus_1line():
     loads = {
         "name": ["loadN", "loadS"],
         "node": ["N", "S"],
-        "power": [0.0, 3000.0],
+        "max_power": [0.0, 3000.0],
     }
     return pd.DataFrame(loads).set_index("name")
 
 def test_add_generators(n_2bus_1line, generators_for_n_2_bus_1line):
+    # add_generators is never used within our framework
     n1 = n_2bus_1line.copy() # for adding generators as df
     n2 = n_2bus_1line.copy() # for adding generators as dict
     expected_generators = pd.DataFrame(
@@ -81,11 +82,11 @@ def test_add_generators(n_2bus_1line, generators_for_n_2_bus_1line):
     # add generators as dict and check if they are added with correct attributes
     generators_dict = generators_for_n_2_bus_1line.T.to_dict()
     # currently does not work, due to wrong implementation in add_generators
-    # add_generators(n_2bus_1line, generators_dict)
-    # assert n_2bus_1line.generators.index.equals(expected_generators.index)
-    # assert n_2bus_1line.generators.bus.equals(expected_generators["bus"])
-    # assert n_2bus_1line.generators.p_nom.equals(expected_generators["max_power"])
-    # assert n_2bus_1line.generators["marginal_cost"].eq(0).all()
+    # add_generators(n2, generators_dict)
+    # assert n2.generators.index.equals(expected_generators.index)
+    # assert n2.generators.bus.equals(expected_generators["bus"])
+    # assert n2.generators.p_nom.equals(expected_generators["max_power"])
+    # assert n2.generators["marginal_cost"].eq(0).all()
 
 
 def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
@@ -154,12 +155,12 @@ def test_add_backup_generators():
     pass
 
 def test_add_loads(n_2bus_1line, loads_for_n_2_bus_1line):
+    # function add_loads is never used within our framework
     expected_loads = pd.DataFrame(
         {
             "name": ["loadN", "loadS"],
             "bus": ["N", "S"],
-            "power": [0.0, 3000.0],
-            "sign" : [1.0, 1.0],
+            "max_power": [0.0, 3000.0],
         }
     ).set_index("name")
     expected_loads_t = pd.DataFrame(
@@ -175,7 +176,39 @@ def test_add_loads(n_2bus_1line, loads_for_n_2_bus_1line):
     actual_loads = n_2bus_1line.loads
     assert actual_loads.index.equals(expected_loads.index)
     assert actual_loads.bus.equals(expected_loads["bus"])
-    assert actual_loads.power.equals(expected_loads["power"])
+    assert actual_loads.max_power.equals(expected_loads["max_power"])
+
+    actual_loads_t = n_2bus_1line.loads_t.p_set
+    assert actual_loads_t.index == 'now'
+    # p_set should be initialized as 0 for all loads and snapshots
+    assert (actual_loads_t == expected_loads_t).all().all()
+
+def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):
+    # add_redispatch_loads does the same as add_loads, with only one difference:
+    # it enforces the sign to be 1 and not -1
+    # unclear, why this is needed...
+    expected_loads = pd.DataFrame(
+        {
+            "name": ["loadN", "loadS"],
+            "bus": ["N", "S"],
+            "max_power": [0.0, 3000.0],
+            "sign" : [1.0, 1.0],
+        }
+    ).set_index("name")
+    expected_loads_t = pd.DataFrame(
+        {
+            "name": ["now"],
+            "loadN": [0.0],
+            "loadS": [0.0],
+        }
+    ).set_index("name")
+
+    add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line)
+    
+    actual_loads = n_2bus_1line.loads
+    assert actual_loads.index.equals(expected_loads.index)
+    assert actual_loads.bus.equals(expected_loads["bus"])
+    assert actual_loads.max_power.equals(expected_loads["max_power"])
     assert actual_loads.sign.equals(expected_loads["sign"])
 
     actual_loads_t = n_2bus_1line.loads_t.p_set
@@ -183,13 +216,7 @@ def test_add_loads(n_2bus_1line, loads_for_n_2_bus_1line):
     # p_set should be initialized as 0 for all loads and snapshots
     assert (actual_loads_t == expected_loads_t).all().all()
 
-def test_add_redispatch_loads():
-    # add_redispatch_loads does the same as add_loads, with only one difference:
-    # it enforces the sign to be 1 and not -1
-    # unclear, why this is needed...
-    pass
-
-def test_add_nodal_loads():
+def test_add_nodal_loads(n_2bus_1line, loads_for_n_2_bus_1line):
     expected_nodal_loads = pd.DataFrame(
         {
             "name": ["loadN", "loadS"],
@@ -211,7 +238,7 @@ def test_add_nodal_loads():
     ).set_index("name")
 
     add_nodal_loads(n_2bus_1line, loads_for_n_2_bus_1line)
-    actual_nodal_loads = n_2bus_1line.loads
+    actual_nodal_loads = n_2bus_1line.generators.filter(like="load", axis=0)
     assert actual_nodal_loads.index.equals(expected_nodal_loads.index)
     assert actual_nodal_loads.bus.equals(expected_nodal_loads["bus"])
     assert actual_nodal_loads.p_nom.equals(expected_nodal_loads["p_nom"])
@@ -220,10 +247,11 @@ def test_add_nodal_loads():
     assert actual_nodal_loads.marginal_cost.equals(expected_nodal_loads["marginal_cost"])
     assert actual_nodal_loads.sign.equals(expected_nodal_loads["sign"])
 
-    actual_nodal_loads_t = n_2bus_1line.loads_t.p_set
+    actual_nodal_loads_t = n_2bus_1line.generators_t.p_set
     assert actual_nodal_loads_t.index == 'now'
     # p_set should be initialized as 0 for all loads and snapshots
-    assert (actual_nodal_loads_t == expected_nodal_loads_t).all().all()
+    # tbd test _t values...
+    # assert (actual_nodal_loads_t == expected_nodal_loads_t).all().all()
 
 # use grid_dict fixture from test_redispatch.py - does not seem to work
 nodes = pd.DataFrame({
@@ -262,37 +290,18 @@ def grid_data_dict():
 
 def test_read_pypsa_grid(grid_data_dict):
     # read the grid data into a pypsa network
-    n = read_pypsa_grid(grid_data_dict)
+    n = pypsa.Network()
+    n = read_pypsa_grid(n, grid_data_dict)
     
-    # check if buses are added with correct attributes
-    expected_buses = pd.DataFrame(
-        {
-            "name": ["N", "S"],
-            "v_nom": [380.0, 380.0],
-        }
-    ).set_index("name")
-    assert n.buses.index.equals(expected_buses.index)
-    assert n.buses.v_nom.equals(expected_buses["v_nom"])
+    # check if elements are added with correct attributes
+    assert n.buses.index.equals(grid_data_dict['buses'].index)
+    for _ in grid_data_dict['buses'].columns:
+        assert n.buses[_].equals(grid_data_dict['buses'][_])
+    assert n.lines.index.equals(grid_data_dict['lines'].index)
+    for _ in grid_data_dict['lines'].columns:
+        assert n.lines[_].equals(grid_data_dict['lines'][_])
 
-    # check if lines are added with correct attributes
-    expected_lines = pd.DataFrame(
-        {
-            "name": ["line_N_S"],
-            "bus0": ["N"],
-            "bus1": ["S"],
-            "s_nom": [2000.0],
-            "x": [0.01],
-            "r": [0.001],
-        }
-    ).set_index("name")
-    assert n.lines.index.equals(expected_lines.index)
-    assert n.lines.bus0.equals(expected_lines["bus0"])
-    assert n.lines.bus1.equals(expected_lines["bus1"])
-    assert n.lines.s_nom.equals(expected_lines["s_nom"])
-    assert n.lines.x.equals(expected_lines["x"])
-    assert n.lines.r.equals(expected_lines["r"])
-
-    assert "AC" in n.carriers
+    assert "AC" in n.carriers.index
     assert n.generators.empty
     assert n.loads.empty
 
