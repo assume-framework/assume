@@ -43,6 +43,9 @@ freq_map = {
 # Solver priority order for fallback selection.
 SUPPORTED_SOLVERS = ["highs", "gurobi", "glpk", "cbc", "cplex"]
 
+# Backend-specific aliases for solver names.
+PYOMO_SOLVER_ALIASES = {"highs": "appsi_highs"}
+
 
 def initializer(func):
     """
@@ -800,15 +803,18 @@ def get_supported_solver_pyomo(default_solver: str | None = None):
         Logs a warning if the default_solver is not available and a fallback is used.
     """
 
+    pyomo_solvers = [
+        PYOMO_SOLVER_ALIASES.get(solver, solver) for solver in SUPPORTED_SOLVERS
+    ]
+
     # Check if the solver is available
-    solvers = check_available_solvers(*SUPPORTED_SOLVERS)
+    solvers = check_available_solvers(*pyomo_solvers)
     if not solvers:
-        raise RuntimeError(f"None of {SUPPORTED_SOLVERS} are available")
+        raise RuntimeError(f"None of {pyomo_solvers} are available")
+
+    default_solver = PYOMO_SOLVER_ALIASES.get(default_solver, default_solver)
 
     solver = default_solver or solvers[0]
-
-    if solver == "highs":
-        solver = "appsi_highs"
 
     if solver not in solvers:
         logger.warning("Solver %s not available, using %s", solver, solvers[0])
