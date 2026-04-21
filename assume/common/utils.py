@@ -805,10 +805,10 @@ def get_supported_solver_pyomo(default_solver: str | None = None):
     if not solvers:
         raise RuntimeError(f"None of {SUPPORTED_SOLVERS} are available")
 
-    if default_solver == "highs":
-        default_solver = "appsi_highs"
-
     solver = default_solver or solvers[0]
+
+    if solver == "highs":
+        solver = "appsi_highs"
 
     if solver not in solvers:
         logger.warning("Solver %s not available, using %s", solver, solvers[0])
