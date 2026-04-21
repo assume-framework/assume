@@ -628,17 +628,10 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
             income += order_income
             operational_cost += order_cost
 
-        # Consideration of start-up costs, divided evenly between upward and downward regulation events.
-        if (
-            unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].at[start - unit.index.freq] == 0
-        ):
-            operational_cost += unit.hot_start_cost / 2
-        elif (
-            unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].at[start - unit.index.freq] != 0
-        ):
-            operational_cost += unit.hot_start_cost / 2
+        # Start-up cost is already booked idempotently into
+        # outputs[f"{product_type}_start_costs"] by _book_start_costs in
+        # execute_current_dispatch. Read from there instead of recomputing.
+        operational_cost += unit.outputs[f"{product_type}_start_costs"].at[start]
 
         profit = income - operational_cost
 
@@ -1267,19 +1260,12 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
             income += order_income
             operational_cost += order_cost
 
-        # Consideration of start-up costs, divided evenly between upward and downward regulation events.
-        if (
-            unit.outputs[product_type].at[start] != 0
-            and unit.outputs[product_type].at[start - unit.index.freq] == 0
-        ):
-            operational_cost += unit.hot_start_cost / 2
-        elif (
-            unit.outputs[product_type].at[start] == 0
-            and unit.outputs[product_type].at[start - unit.index.freq] != 0
-        ):
-            operational_cost += unit.hot_start_cost / 2
+        # Start-up cost is already booked idempotently into
+        # outputs[f"{product_type}_start_costs"] by _book_start_costs in
+        # execute_current_dispatch. Read from there instead of recomputing.
+        start_cost = unit.outputs[f"{product_type}_start_costs"].at[start] /2
 
-        profit = income - operational_cost
+        profit = income - operational_cost - start_cost
 
         # Stabilizing learning: Limit positive profit to 50% of its absolute value.
         # This reduces variance in rewards and prevents overfitting to extreme profit-seeking behavior.
