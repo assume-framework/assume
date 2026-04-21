@@ -9,8 +9,9 @@ import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
+    add_fix_units,
     add_redispatch_generators,
-    add_redispatch_loads,
+    add_redispatch_storage_units,
     calculate_network_meta,
     read_pypsa_grid,
 )
@@ -64,9 +65,16 @@ class RedispatchMarketRole(MarketRole):
                 "backup_marginal_cost", 10e4
             ),
         )
-        add_redispatch_loads(
+        # fixed loads (non-redispatch)
+        add_fix_units(
             network=self.network,
-            loads=self.grid_data["loads"],
+            units=self.grid_data["loads"],
+        )
+
+        # redispatchable storage units (batteries, PSPP, etc.)
+        add_redispatch_storage_units(
+            network=self.network,
+            storage_units=self.grid_data["storage_units"],
         )
 
         self.solver = marketconfig.param_dict.get("solver", "highs")

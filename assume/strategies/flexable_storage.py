@@ -465,6 +465,165 @@ class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
         return bids
 
 
+class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
+    """
+    Redispatch strategy for storage, flexABLE-style, aligned with redispatch.py:
+
+    - Uses the EOM/base schedule from unit.outputs["energy"] as the reference.
+    - Produces ONE bid per unit & timestep with:
+        * volume   = base power (MW) from EOM
+        * min_power, max_power = ramp- and SoC-feasible absolute bounds (MW)
+        * price    = symmetric redispatch price (one value for up & down)
+
+    redispatch.py then converts (volume, min_power, max_power) into
+    up/down headroom for the _up/_down generators created in grid_utils.add_redispatch_storage_units.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "24h"))
+        self.lookahead = parse_duration(kwargs.get("lookahead", "0h"))
+
+    def _avg_price(self, series, t, window):
+        """Calculate average price over foresight window."""
+        if series is None or (hasattr(series, "empty") and series.empty):
+            return 0.0
+        left = max(t - window, series.index[0])
+        right = min(t + window, series.index[-1])
+        if left > right:
+            return float(series.get(t, 0.0)) if hasattr(series, "get") else 0.0
+        return float(series.loc[left:right].mean())
+
+    # ---------- main: used ONLY in redispatch market ----------
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        bids: list[dict] = []
+
+        # Redispatch horizon
+        start0 = product_tuples[0][0]
+        end_all = product_tuples[-1][1]
+
+        # Seeds from (already run) EOM
+        previous_power = unit.get_output_before(start0)  # MW
+        try:
+            soc_theory = unit.outputs["soc"].at[start0]
+        except Exception:
+            # Fallback for storage outputs that may not include this timestamp yet
+            if len(unit.outputs["soc"]):
+                soc_theory = float(unit.outputs["soc"].iloc[0])
+            else:
+                soc_theory = 0.0
+
+        # SoC- and power-feasible envelopes (no ramp yet)
+        min_power_charge_values, max_power_charge_values = (
+            unit.calculate_min_max_charge(start0, end_all)
+        )
+        min_power_discharge_values, max_power_discharge_values = (
+            unit.calculate_min_max_discharge(start0, end_all, soc=soc_theory)
+        )
+
+        # Get price forecast (primary: market-specific, fallback: EOM)
+        try:
+            price_series = unit.forecaster[f"price_{market_config.market_id}"]
+        except (KeyError, TypeError):
+            try:
+                price_series = unit.forecaster["price_EOM"]
+            except (KeyError, TypeError):
+                price_series = None
+
+        for (
+            product,
+            max_power_discharge,
+            min_power_discharge,
+            max_power_charge,
+            min_power_charge,
+        ) in zip(
+            product_tuples,
+            max_power_discharge_values,
+            min_power_discharge_values,
+            max_power_charge_values,
+            min_power_charge_values,
+        ):
+            t0, t1 = product[0], product[1]
+            only_hours = product[2] if len(product) > 2 else None
+
+            # 1) base power from EOM / base schedule
+            base_p = float(unit.outputs["energy"].at[t0])  # +MW disch, −MW charge
+            current_power_discharge = max(base_p, 0.0)
+            current_power_charge = min(base_p, 0.0)
+
+            # 2) apply ramping to the physical envelopes
+            # Discharge side
+            max_power_discharge_ramp = unit.calculate_ramp_discharge(
+                soc_theory,
+                previous_power,
+                float(max_power_discharge),
+                current_power_discharge,
+                float(min_power_discharge),
+            )
+
+            # Charge side (negative powers)
+            max_power_charge_ramp = unit.calculate_ramp_charge(
+                soc_theory,
+                previous_power,
+                float(max_power_charge),
+                current_power_charge,
+                float(min_power_charge),
+            )
+
+            # 3) combine to a single [min_power, max_power] interval around base_p
+            # discharging bounds are ≥ 0, charging bounds ≤ 0
+            p_max_eff = max(0.0, float(max_power_discharge_ramp))
+            p_min_eff = min(0.0, float(max_power_charge_ramp))
+
+            # Ensure the base point lies in the feasible interval
+            p_max_eff = max(p_max_eff, base_p)
+            p_min_eff = min(p_min_eff, base_p)
+
+            if p_min_eff > p_max_eff:
+                # degenerate interval if something went wrong
+                p_min_eff = p_max_eff = base_p
+
+            # 4) symmetric redispatch price
+            avg_p = self._avg_price(price_series, t0, self.foresight)
+            price = float(avg_p)
+
+            # 5) one bid row per unit & timestep for redispatch.py
+            bids.append(
+                {
+                    "start_time": t0,
+                    "end_time": t1,
+                    "only_hours": only_hours,
+                    "unit_id": unit.id,
+                    "node": unit.node,
+                    "volume": float(base_p),  # base schedule (EOM result)
+                    "max_power": float(p_max_eff),  # absolute upper bound (MW)
+                    "min_power": float(p_min_eff),  # absolute lower bound (MW)
+                    "price": price,
+                }
+            )
+
+            # 6) advance theoretic SoC with base profile only (MWh)
+            dt_h = (t1 - t0) / timedelta(hours=1)
+            if base_p > 0.0:  # discharging
+                d_soc = -(base_p * dt_h) / max(unit.efficiency_discharge, 1e-9)
+            elif base_p < 0.0:  # charging
+                d_soc = -(base_p * dt_h) * unit.efficiency_charge
+            else:
+                d_soc = 0.0
+
+            soc_theory += float(d_soc)
+            previous_power = base_p
+
+        return bids
+
+
 def calculate_price_average(current_time, foresight, price_forecast):
     """
     Calculates the average price for a given foresight and returns the average price.

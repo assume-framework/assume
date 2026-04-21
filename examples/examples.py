@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 # define the path where the simulation results in form of CSV files will be stored, for example: "examples/outputs"
 # "" means no CSV files will be stored
-csv_path = ""
+csv_path = "outputs"
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -105,6 +105,7 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
+    "redisp_storage_3_nodes_small": {"scenario": "example_05b", "study_case": "base"},
 }
 
 
@@ -121,7 +122,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_with_vre_and_storage"
+    example = "redisp_storage_3_nodes_small"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
