@@ -381,6 +381,7 @@ class UnitsOperator(Role):
                 "soc",
                 "cashflow",
                 "generation_costs",
+                "start_costs",
                 "total_costs",
                 "heat",
             ]

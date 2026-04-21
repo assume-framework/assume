@@ -202,7 +202,7 @@ class BaseUnit:
             for idx, t in enumerate(self.index[start:end])
         ]
         generation_costs = np.abs(marginal_costs * product_data)
-        self.outputs[f"{product_type}_generation_costs"].loc[start:end] += (
+        self.outputs[f"{product_type}_generation_costs"].loc[start:end] = (
             generation_costs
         )
 
@@ -224,9 +224,6 @@ class BaseUnit:
         Returns:
             The volume of the unit within the given time range.
         """
-        # TODO for each time, check if start cost must be applied and calculate this
-        # self.outputs["energy"]["start"] +=
-        # cost = self.get_starting_costs(op_time)
         self.calculate_generation_cost(start, end, "energy")
         return self.outputs["energy"].loc[start:end]
 
@@ -323,7 +320,6 @@ class SupportsMinMax(BaseUnit):
     emission_factor: float
     min_operating_time: int = 1
     min_down_time: int = 1
-    cold_start_cost: float = 0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -399,9 +395,22 @@ class SupportsMinMax(BaseUnit):
             )
         return power
 
+    def get_max_lookback_optime(self):
+        max_time = max(
+            self.min_operating_time,
+            self.min_down_time,
+            1,
+        )
+        return max_time
+
     def get_operation_time(self, start: datetime) -> int:
         """
         Returns the time the unit is operating (positive) or shut down (negative).
+
+        The lookback window covers the longest of the minimum operating time
+        and the minimum down time (or the warm-start downtime threshold if the
+        subclass defines one), so the value is meaningful both for ramping
+        decisions and for tiering start-up costs (hot / warm / cold).
 
         Args:
             start (datetime.datetime): The start time.
@@ -409,8 +418,8 @@ class SupportsMinMax(BaseUnit):
         Returns:
             int: The operation time as a positive integer if operating, or negative if shut down.
         """
-        # Set the time window based on max of min operating/down time
-        max_time = max(self.min_operating_time, self.min_down_time, 1)
+        max_time = self.get_max_lookback_optime()
+
         begin = max(start - self.index.freq * max_time, self.index[0])
         end = start - self.index.freq
 
@@ -436,24 +445,6 @@ class SupportsMinMax(BaseUnit):
 
         # Return positive time if operating, negative if shut down
         return -run if is_off else run
-
-    def get_starting_costs(self, op_time: int) -> float:
-        """
-        Returns the start-up cost for the given operation time.
-        If operation time is positive, the unit is running, so no start-up costs are returned.
-        If operation time is negative, the unit is not running, so start-up costs are returned
-
-        Args:
-            op_time (float): The time the unit was shut down in hours.
-
-        Returns:
-            float: The starting costs of the unit.
-        """
-        if op_time > 0:
-            # unit is running
-            return 0
-        else:
-            return self.cold_start_cost
 
 
 class SupportsMinMaxCharge(BaseUnit):
@@ -489,7 +480,8 @@ class SupportsMinMaxCharge(BaseUnit):
     capacity: float
     efficiency_charge: float
     efficiency_discharge: float
-    cold_start_cost: float = 0
+    min_operating_time: int = 1
+    min_down_time: int = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -676,24 +668,6 @@ class SupportsMinMaxCharge(BaseUnit):
             # update the values of the state of charge and the energy
             self.outputs["soc"].at[next_t] = soc + delta_soc
             self.outputs["energy"].at[t] = current_power
-
-    def get_starting_costs(self, op_time: int) -> float:
-        """
-        Returns the start-up cost for the given operation time.
-        If operation time is positive, the unit is running, so no start-up costs are returned.
-        If operation time is negative, the unit is not running, so start-up costs are returned
-
-        Args:
-            op_time (float): The time the unit was shut down in hours.
-
-        Returns:
-            float: The starting costs of the unit.
-        """
-        if op_time > 0:
-            # unit is running
-            return 0
-        else:
-            return self.cold_start_cost
 
 
 class BaseStrategy:

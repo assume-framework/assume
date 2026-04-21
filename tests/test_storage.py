@@ -560,18 +560,6 @@ def test_initialising_invalid_storages():
         d = param_dict.copy()
         d["min_down_time"] = -10
         Storage(**d)
-    with pytest.raises(
-        ValueError, match="downtime_hot_start=-10 must be >= 0 for unit id"
-    ):
-        d = param_dict.copy()
-        d["downtime_hot_start"] = -10
-        Storage(**d)
-    with pytest.raises(
-        ValueError, match="downtime_warm_start=-10 must be >= 0 for unit id"
-    ):
-        d = param_dict.copy()
-        d["downtime_warm_start"] = -10
-        Storage(**d)
 
 
 if __name__ == "__main__":
