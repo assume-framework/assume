@@ -556,13 +556,13 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "volume gas"
+              "options": "volume combined cycle gas turbine"
             },
             "properties": [
               {
                 "id": "color",
                 "value": {
-                  "fixedColor": "orange",
+                  "fixedColor": "light-orange",
                   "mode": "fixed"
                 }
               }
@@ -642,6 +642,126 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume open cycle gas turbine"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "semi-dark-orange",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume inflex_demand"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#cfcfcf",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume exchange import"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume exchange export"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume BESS charge"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume BESS discharge"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "super-light-purple",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume PSPP charge"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#130987",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "volume PSPP discharge"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#130987",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       },
@@ -659,7 +779,9 @@
           ],
           "displayMode": "table",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": true,
+          "sortBy": "Mean",
+          "sortDesc": true
         },
         "tooltip": {
           "hideZeros": false,
@@ -694,7 +816,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select time, sum(volume) as \"volume\", tech FROM \n(\nSELECT\n  $__timeGroupAlias(start_time,$__interval),\n  avg(accepted_volume) AS \"volume\", unit_id, pm.technology as tech\nFROM market_orders mo\njoin power_plant_meta pm on pm.index=mo.unit_id and pm.simulation=mo.simulation\nWHERE\n\n  $__timeFilter(start_time) AND\n  market_id = '$market' AND\n  mo.simulation = '$simulation'\n\nGROUP BY 1, unit_id, bid_id, pm.technology\nORDER BY 1\n\n) a\ngroup by 1, tech\nORDER BY 1, tech desc",
+          "rawSql": "SELECT\n  $__timeGroupAlias(mo.start_time, $__interval),\n  SUM(mo.accepted_volume) AS \"volume\",\n  CASE\n    WHEN pm.index IS NOT NULL THEN pm.technology\n    WHEN sm.index IS NOT NULL AND mo.accepted_volume >= 0 THEN COALESCE(sm.technology, 'storage') || ' discharge'\n    WHEN sm.index IS NOT NULL AND mo.accepted_volume < 0 THEN COALESCE(sm.technology, 'storage') || ' charge'\n    WHEN dm.index IS NOT NULL THEN COALESCE(dm.technology, 'demand')\n    WHEN em.index IS NOT NULL AND mo.accepted_volume >= 0 THEN COALESCE(em.technology, 'exchange') || ' import'\n    WHEN em.index IS NOT NULL AND mo.accepted_volume < 0 THEN COALESCE(em.technology, 'exchange') || ' export'\n    ELSE 'unknown technology'\n  END AS tech\nFROM market_orders mo\nLEFT JOIN power_plant_meta pm\n  ON pm.index = mo.unit_id AND pm.simulation = mo.simulation\nLEFT JOIN storage_meta sm\n  ON sm.index = mo.unit_id AND sm.simulation = mo.simulation\nLEFT JOIN demand_meta dm\n  ON dm.index = mo.unit_id AND dm.simulation = mo.simulation\nLEFT JOIN exchange_meta em\n  ON em.index = mo.unit_id AND em.simulation = mo.simulation\nWHERE\n  $__timeFilter(mo.start_time) AND\n  mo.market_id = '$market' AND\n  mo.simulation = '$simulation'\nGROUP BY 1, 3\nORDER BY 1, 3 DESC",
           "refId": "A",
           "select": [
             [
