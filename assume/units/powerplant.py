@@ -110,9 +110,9 @@ class PowerPlant(SupportsMinMax):
                 id=self.id,
                 field="min_power",
             )
-        if not 0 <= efficiency <= 1:
+        if efficiency < 0:
             raise ValidationError(
-                message=f"{efficiency=} must be between 0 and 1 for unit {self.id}",
+                message=f"{efficiency=} must be >= 0 for unit {self.id}",
                 id=self.id,
                 field="efficiency",
             )
