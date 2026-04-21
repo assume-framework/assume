@@ -415,7 +415,7 @@ class SupportsMinMax(BaseUnit):
         end = start - self.index.freq
 
         if start <= self.index[0]:
-            # before start of index
+            # this assumes that all powerplants are running at the start of the simulation
             return max_time
 
         # Check energy output in the defined time window, reversed for most recent state
