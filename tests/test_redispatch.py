@@ -29,6 +29,97 @@ def test_clear():
 def test_process_dispatch_data():
     pass
 
+# case # min_power # max_power # availability # max_ramp_up # max_ramp_down #
+# 1    #     x     #            #              #                #      
+# 2    #           #     x      #              #                #
+# 3    #           #            #      x       #                #
+# 4    #           #            #              #        x       #
+# 5    #           #            #              #                #       x
+# 6    #     x     #            #      x       #                #
+# 7    #           #     x      #      x       #                #
+# 8    #           #            #      x       #        x       #
+# 9    #           #            #      x       #                #       x
+# 10   #           #     x      #              #        x       #
+# 11   #           #     x      #              #                #       x
+# 12   #     x     #            #              #        x       #
+# 13   #     x     #            #              #                #       x
+# 14   #     x     #     x      #              #                #
+# 15   #     x     #     x      #      x       #                #
+# 16   #     x     #     x      #      x       #        x       #       x
+
+@pytest.mark.require_network
+# 1
+def test_redispatch_with_min_power():
+    pass
+
+# 2
+def test_redispatch_with_max_power():
+    pass
+
+# 3
+def test_redispatch_with_availability():
+    pass
+
+# 4
+def test_redispatch_with_max_ramp_up():
+    pass
+
+# 5
+def test_redispatch_with_max_ramp_down():
+    pass
+
+# 6
+def test_redispatch_with_min_power_and_availability():
+    pass
+
+# 7
+def test_redispatch_with_max_power_and_availability():
+    pass
+
+# 8
+def test_redispatch_with_max_ramp_up_and_availability():
+    pass
+
+# 9
+def test_redispatch_with_max_ramp_down_and_availability():
+    pass
+
+# 10
+def test_redispatch_with_max_power_and_max_ramp_up():
+    pass
+
+# 11
+def test_redispatch_with_max_power_and_max_ramp_down():
+    pass
+
+# 12
+def test_redispatch_with_min_power_and_max_ramp_up():
+    pass
+
+# 13
+def test_redispatch_with_min_power_and_max_ramp_down():
+    pass
+
+# 14
+def test_redispatch_with_min_max_power():
+    pass
+
+# 15
+def test_redispatch_with_min_max_power_and_availability():
+    pass
+
+# 16
+def test_redispatch_with_min_max_power_and_availability_and_max_ramp():
+    pass
+
+@pytest.mark.require_network
+def test_line_loading_after_redispatch():
+    pass
+
+@pytest.mark.require_network
+def test_redispatch_with_storage():
+    pass
+
 
 simple_zonal_market_config = MarketConfig(
     market_id="simple_zonal_auction",
@@ -176,19 +267,3 @@ def test_two_nodes_redispatch(dummy_generation, dummy_demand, expected_redispatc
     # test cost
 
     # test up == -1 * down
-
-@pytest.mark.require_network
-def test_redispatch_with_availability():
-
-    pass
-
-@pytest.mark.require_network
-def test_line_loading_after_redispatch():
-
-    pass
-
-@pytest.mark.require_network
-def test_redispatch_with_storage():
-
-    pass
-
