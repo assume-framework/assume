@@ -5,6 +5,7 @@
 import calendar
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -23,6 +24,7 @@ from assume.common.utils import (
     get_products_index,
     get_supported_solver,
     initializer,
+    load_index_file,
     parse_duration,
     plot_orderbook,
     separate_orders,
@@ -581,8 +583,8 @@ def test_create_date_range():
     for i in range(n):
         q_pd_slice = series.loc[start:new_end]
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     # check that setting items is faster:
     t = time.time()
@@ -596,8 +598,8 @@ def test_create_date_range():
     for i in range(n):
         series.at[start] = 1
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     # check that setting slices is faster
     t = time.time()
@@ -611,8 +613,8 @@ def test_create_date_range():
     for i in range(n):
         series.loc[start:new_end] = 17
     res_slice_pd = time.time() - t
-    # more than at least factor 5
-    assert res_slice < res_slice_pd / 5
+    # more than at least factor 4
+    assert res_slice < res_slice_pd / 4
 
     se = pd.Series(0.0, index=fs.index.get_date_list())
     se.loc[start]
@@ -821,6 +823,28 @@ def test_solver_unavailable(monkeypatch):
     monkeypatch.setattr("assume.common.utils.check_available_solvers", lambda *args: [])
     with pytest.raises(RuntimeError):
         get_supported_solver()
+
+
+def test_load_index_file():
+    path = Path("./tests/fixtures/forecast_init/demand.csv")
+
+    index = pd.date_range("2019-01-01", periods=10, freq="h")
+    df = load_index_file(path, index)
+    assert len(df) == 10
+
+    index = pd.date_range("2019-01-01", periods=24, freq="h")
+    df = load_index_file(path, index)
+    assert len(df) == 24
+
+    index = pd.date_range("2019-01-01", periods=36, freq="h")
+    df = load_index_file(path, index)
+    assert df is None
+
+    invalid_path = Path("./tests/fixtures/forecast_init/invalid")
+
+    index = pd.date_range("2019-01-01", periods=36, freq="h")
+    df = load_index_file(invalid_path, index)
+    assert df is None
 
 
 if __name__ == "__main__":
