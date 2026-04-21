@@ -162,7 +162,7 @@ class MarketConfig:
         if "solver" in self.param_dict:
             warn(
                 "The key 'solver' in 'param_dict' is deprecated and may be removed in future versions. "
-                "Please update your configuration.",
+                "Please update your configuration and rename it to 'solver_name'.",
                 DeprecationWarning,
             )
             # Update param_dict to use 'solver_name' instead of 'solver'

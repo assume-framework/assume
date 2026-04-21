@@ -3,11 +3,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import pytest
+from pytest import importorskip
 
-try:
-    from assume.common.grid_utils import get_supported_solver_linopy
-except ImportError:
-    pass
+get_supported_solver_linopy = importorskip(
+    "assume.common.grid_utils",
+    reason="linopy/pypsa dependencies not installed",
+).get_supported_solver_linopy
 
 
 @pytest.mark.require_network
