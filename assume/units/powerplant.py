@@ -42,7 +42,6 @@ class PowerPlant(SupportsMinMax):
         min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours. Defaults to 0.
         downtime_hot_start (int, optional): The downtime required after a hot start before the power plant can be restarted, in hours. Defaults to 8.
         downtime_warm_start (int, optional): The downtime required after a warm start before the power plant can be restarted, in hours. Defaults to 48.
-        heat_extraction (bool, optional): A boolean indicating whether the power plant can extract heat for external purposes. Defaults to False.
         max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit. Defaults to 0.
         location (Tuple[float, float], optional): The geographical coordinates (latitude and longitude) of the power plant's location. Defaults to (0.0, 0.0).
         node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "node0".
@@ -72,7 +71,6 @@ class PowerPlant(SupportsMinMax):
         min_down_time: int = 1,  # hours
         downtime_hot_start: int = 0,  # hours
         downtime_warm_start: int = 0,  # hours
-        heat_extraction: bool = False,
         max_heat_extraction: float = 0,
         location: tuple[float, float] = (0.0, 0.0),
         node: str = "node0",
@@ -137,7 +135,6 @@ class PowerPlant(SupportsMinMax):
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
         self.emission_factor = emission_factor
-        self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
         self.hot_start_cost = hot_start_cost * max_power
         self.warm_start_cost = warm_start_cost * max_power
@@ -376,6 +373,11 @@ class PowerPlant(SupportsMinMax):
                 "min_power": self.min_power,
                 "emission_factor": self.emission_factor,
                 "efficiency": self.efficiency,
+                "fuel_type": self.fuel_type,
+                "max_heat_extraction": self.max_heat_extraction,
+                "hot_start_cost": self.hot_start_cost,
+                "warm_start_cost": self.warm_start_cost,
+                "cold_start_cost": self.cold_start_cost,
                 "unit_type": "power_plant",
             }
         )
