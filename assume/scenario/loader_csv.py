@@ -751,7 +751,7 @@ def load_config_and_create_forecaster(
                         if initial_market_prices
                         else unit.get("market_prices"),
                         forecast_algorithms=final_algorithms,
-                        forecast_registries=forecast_registries,
+                        forecast_registries=None,
                         fuel_prices=fuel_prices_df,
                         normalized_load_profile=normalized_profile,
                         steel_demand=steel_demand,

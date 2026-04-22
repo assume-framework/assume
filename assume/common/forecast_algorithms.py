@@ -673,7 +673,6 @@ def calculate_price_from_cleared_history(
         dict: Updated forecast with adaptive prices learned from clearing history.
     """
     unit = kwargs.get("unit")
-    current_time = kwargs.get("current_time")
 
     if unit is None or not hasattr(unit.outputs, "get"):
         # Fallback: return current forecast if unit data not available

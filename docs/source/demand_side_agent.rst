@@ -31,6 +31,89 @@ The :py:class:`assume.units.dsm_load_shift` module integrates load-shifting capa
 - Shifting loads between time steps based on operational flexibility.
 - Recalculating operations based on market offers and accepted bids.
 
+Rolling-Horizon Optimisation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+DSM units support both a full-horizon solve and a rolling-horizon solve.
+Without additional configuration, units use the full simulation horizon.
+When rolling horizon is enabled, the unit repeatedly optimises a shorter
+look-ahead window, commits only the first part of that solution, and then
+re-optimises after the next market step with updated internal states.
+
+This is useful when the optimisation should stay responsive to market
+clearing results while still accounting for storage states, ramping limits,
+and process-coupling constraints over a wider future horizon.
+
+Configuration
+~~~~~~~~~~~~~
+
+Rolling-horizon behaviour is configured through
+``dsm_optimisation_config``. In scenario-based runs this configuration is
+passed from ``config.yaml`` to the DSM units by the CSV scenario loader.
+
+The supported keys are:
+
+- ``horizon_mode``: Either ``full_horizon`` or ``rolling_horizon``.
+- ``look_ahead_horizon``: Length of the optimisation window, for example ``72h``.
+- ``commit_horizon``: Number of steps committed before the next re-optimisation, for example ``24h``.
+- ``rolling_step``: Shift applied between consecutive windows, for example ``24h``.
+
+.. note::
+
+    If ``horizon_mode`` is set to ``rolling_horizon``, the values for
+    ``look_ahead_horizon``, ``commit_horizon``, and ``rolling_step`` must all
+    be provided.
+
+Example YAML configuration:
+
+.. code-block:: yaml
+
+    industrial_dsm_optimisation:
+       horizon_mode: rolling_horizon
+       look_ahead_horizon: 4h
+       commit_horizon: 2h
+       rolling_step: 2h
+
+    residential_dsm_optimisation:
+       horizon_mode: rolling_horizon
+       look_ahead_horizon: 6h
+       commit_horizon: 2h
+       rolling_step: 2h
+
+Operational flow
+~~~~~~~~~~~~~~~~
+
+In rolling-horizon mode, the optimisation proceeds as follows:
+
+1. A look-ahead window is built from the current simulation step.
+2. The unit solves that window with the same process and flexibility constraints used in the full-horizon model.
+3. Only the first ``commit_horizon`` part of the solution is committed to the unit's schedule.
+4. End-of-window component states, such as storage state of charge or operational status, are carried into the next window.
+5. After the market advances, the unit re-optimises the next window starting from the updated state.
+
+This means DSM units can preserve inter-temporal feasibility while reacting
+to accepted bids and updated market conditions.
+
+Steel plant strategies in rolling horizon
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For :class:`~assume.units.steel_plant.SteelPlant`, rolling-horizon
+optimisation can combine the rolling window logic with different production
+guidance modes from the forecaster.
+
+- **Cost-optimized**: If no additional production guidance is provided, the steel plant minimizes cost freely across each rolling window.
+- **Profile-guided**: If ``normalized_load_profile`` is provided, the rolling-horizon solver keeps committed production close to the profile shape using soft profile-tracking constraints.
+- **Min-demand**: If per-timestep ``steel_demand`` is provided, the rolling-horizon solver enforces hourly minimum production levels in the committed part of each window.
+
+The steel plant forecaster accepts either generic forecast columns or
+unit-specific columns:
+
+- ``normalized_load_profile`` or ``<unit_id>_normalized_load_profile``
+- ``steel_demand`` or ``<unit_id>_steel_demand``
+
+These signals are copied to the unit during forecaster initialization and are
+used automatically by the rolling-horizon solver.
+
 Attributes
 ^^^^^^^^^^^
 

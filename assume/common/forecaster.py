@@ -663,7 +663,11 @@ class DsmUnitForecaster(UnitForecaster):
             *args,
             **kwargs,
         )
-        self.congestion_signal = self._dict_to_series(self.congestion_signal)
+        self.congestion_signal = (
+            self._dict_to_series(self.congestion_signal)
+            if isinstance(self.congestion_signal, dict)
+            else self._to_series(self.congestion_signal)
+        )
 
         renewable_utilisation_update_algorithm_name = self.forecast_algorithms.get(
             "update_renewable_utilisation", "renewable_utilisation_default"
@@ -677,8 +681,10 @@ class DsmUnitForecaster(UnitForecaster):
             *args,
             **kwargs,
         )
-        self.renewable_utilisation_signal = self._dict_to_series(
-            self.renewable_utilisation_signal
+        self.renewable_utilisation_signal = (
+            self._dict_to_series(self.renewable_utilisation_signal)
+            if isinstance(self.renewable_utilisation_signal, dict)
+            else self._to_series(self.renewable_utilisation_signal)
         )
 
 

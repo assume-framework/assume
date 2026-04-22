@@ -147,6 +147,9 @@ def test_congestion_management_flexibility(steel_plant_congestion):
     instance = steel_plant_congestion.switch_to_flex(instance)
 
     # Set the congestion_indicator in the instance
+    # Delete the old component if it exists to avoid Pyomo warnings
+    if hasattr(instance, "congestion_indicator"):
+        instance.del_component("congestion_indicator")
     instance.congestion_indicator = pyo.Param(
         instance.time_steps,
         initialize=congestion_indicator,
@@ -193,6 +196,12 @@ def test_peak_load_shifting(steel_plant_peak_shifting):
     instance = steel_plant_peak_shifting.switch_to_flex(instance)
 
     # Set the peak_load_cap_value and peak_indicator in the instance
+    # Delete old components if they exist to avoid Pyomo warnings
+    if hasattr(instance, "peak_load_cap_value"):
+        instance.del_component("peak_load_cap_value")
+    if hasattr(instance, "peak_indicator"):
+        instance.del_component("peak_indicator")
+
     instance.peak_load_cap_value = pyo.Param(
         initialize=peak_load_cap_value,
         within=pyo.NonNegativeReals,
@@ -255,6 +264,9 @@ def test_renewable_utilisation(steel_plant_renewable_utilisation):
     instance = steel_plant_renewable_utilisation.switch_to_flex(instance)
 
     # Set the normalized renewable signal in the instance
+    # Delete the old component if it exists to avoid Pyomo warnings
+    if hasattr(instance, "renewable_signal"):
+        instance.del_component("renewable_signal")
     instance.renewable_signal = pyo.Param(
         instance.time_steps,
         initialize=renewable_signal_dict,
@@ -358,6 +370,277 @@ def reset_objectives(create_steel):
             instance.obj_rule_flex.deactivate()
 
     return _reset
+
+
+def _make_plant(dsm_components, forecaster, plant_id="test_plant", demand=1000):
+    """Create a SteelPlant with the given forecaster (without calling setup_model)."""
+    return SteelPlant(
+        id=plant_id,
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+        node="south",
+        components=dsm_components,
+        forecaster=forecaster,
+        demand=demand,
+        technology="steel_plant",
+    )
+
+
+def test_steel_plant_reads_normalized_profile_from_forecaster(dsm_components):
+    """SteelPlant.__init__ copies normalized_load_profile from the forecaster."""
+    index = pd.date_range("2023-01-01", periods=24, freq="h")
+    profile = [i / 23.0 for i in range(24)]
+    forecaster = SteelplantForecaster(
+        index,
+        electricity_price=[50] * 24,
+        fuel_prices={"natural_gas": [30] * 24, "co2": [20] * 24},
+        normalized_load_profile=profile,
+    )
+    plant = _make_plant(dsm_components, forecaster)
+    assert plant.normalized_load_profile is not None
+    assert len(plant.normalized_load_profile) == 24
+
+
+def test_steel_plant_reads_steel_demand_from_forecaster(dsm_components):
+    """SteelPlant.__init__ copies steel_demand_per_timestep from the forecaster."""
+    index = pd.date_range("2023-01-01", periods=24, freq="h")
+    hourly_demand = [50.0] * 24
+    forecaster = SteelplantForecaster(
+        index,
+        electricity_price=[50] * 24,
+        fuel_prices={"natural_gas": [30] * 24, "co2": [20] * 24},
+        steel_demand=hourly_demand,
+    )
+    plant = _make_plant(dsm_components, forecaster)
+    assert plant.steel_demand_per_timestep is not None
+    assert len(plant.steel_demand_per_timestep) == 24
+
+
+def test_steel_plant_no_profile_no_demand_attrs_are_none(dsm_components):
+    """Without profile/demand in forecaster the corresponding plant attrs are None."""
+    index = pd.date_range("2023-01-01", periods=24, freq="h")
+    forecaster = SteelplantForecaster(
+        index,
+        electricity_price=[50] * 24,
+        fuel_prices={"natural_gas": [30] * 24, "co2": [20] * 24},
+    )
+    plant = _make_plant(dsm_components, forecaster)
+    assert plant.normalized_load_profile is None
+    assert plant.steel_demand_per_timestep is None
+
+
+def test_load_profile_deviation_stored_as_attribute(dsm_components):
+    """Custom load_profile_deviation is stored on the plant."""
+    index = pd.date_range("2023-01-01", periods=24, freq="h")
+    forecaster = SteelplantForecaster(
+        index,
+        electricity_price=[50] * 24,
+        fuel_prices={"natural_gas": [30] * 24, "co2": [20] * 24},
+        normalized_load_profile=[0.5] * 24,
+    )
+    plant = SteelPlant(
+        id="test_deviation",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+        node="south",
+        components=dsm_components,
+        forecaster=forecaster,
+        demand=1000,
+        technology="steel_plant",
+        load_profile_deviation=0.05,
+    )
+    assert plant.load_profile_deviation == 0.05
+
+
+def test_profile_guided_optimization_uses_correct_param_values(dsm_components):
+    """
+    Profile-guided strategy: the Pyomo model stores the normalized_load_profile and
+    load_profile_deviation parameters with the exact values from the forecaster, and
+    the full-horizon optimization meets the total steel demand.
+    """
+    n = 8
+    index = pd.date_range("2023-01-01", periods=n, freq="h")
+    # Linearly increasing profile: 0.0, 1/7, 2/7, … 1.0
+    profile = [round(i / (n - 1), 6) for i in range(n)]
+    forecaster = SteelplantForecaster(
+        index,
+        electricity_price=[50] * n,
+        fuel_prices={"natural_gas": [30] * n, "co2": [20] * n},
+        normalized_load_profile=profile,
+    )
+    plant = SteelPlant(
+        id="test_profile_param_values",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+        node="south",
+        components=dsm_components,
+        forecaster=forecaster,
+        demand=80,
+        technology="steel_plant",
+        load_profile_deviation=0.10,
+    )
+    plant.setup_model()
+
+    # Pyomo model must carry the profile and deviation as parameters
+    assert hasattr(plant.model, "normalized_load_profile")
+    assert hasattr(plant.model, "load_profile_deviation")
+
+    # Each Pyomo param value must match the input profile exactly
+    for t in range(n):
+        assert pyo.value(plant.model.normalized_load_profile[t]) == pytest.approx(
+            profile[t], abs=1e-6
+        ), f"Profile mismatch at timestep {t}"
+
+    assert pyo.value(plant.model.load_profile_deviation) == pytest.approx(
+        0.10, abs=1e-6
+    )
+
+    # Run the full-horizon optimization and verify total demand is met.
+    # The profile only constrains the rolling-horizon path; in the full-horizon
+    # solve the equality constraint sum(eaf.steel_output) == 80 is always active.
+    # With 3 components each consuming 1 MWh per unit of steel:
+    #   sum(total_power_input) == 3 * 80 == 240 MWh.
+    plant.determine_optimal_operation_without_flex()
+    assert plant.opt_power_requirement is not None
+    total_power = sum(plant.opt_power_requirement.data)
+    assert total_power == pytest.approx(3 * 80, rel=1e-3)
+
+
+def test_min_demand_strategy_skips_global_equality_constraint(dsm_components):
+    """
+    Min-demand strategy omits the global ``steel_output_association_constraint``
+    (sum == demand) from the Pyomo model, while the cost-optimised strategy
+    (no per-timestep minimums) keeps it.
+
+    The global equality constraint is only skipped when per-timestep minimums are
+    supplied via the forecaster's ``steel_demand`` kwarg.  Without the equality
+    constraint the solver is free to satisfy costs without producing a fixed total;
+    with it the solver must exactly meet the declared steel demand.
+
+    Two separate copies of the components dict are used because ``setup_model()``
+    converts the dict entries into component objects in-place.
+    """
+    import copy
+
+    n = 8
+    index = pd.date_range("2023-01-01", periods=n, freq="h")
+
+    # --- Min-demand plant (per-timestep minimums supplied) ---
+    forecaster_min = SteelplantForecaster(
+        index,
+        electricity_price=[50] * n,
+        fuel_prices={"natural_gas": [30] * n, "co2": [20] * n},
+        steel_demand=[50.0] * n,  # triggers min_demand strategy
+    )
+    plant_min = SteelPlant(
+        id="test_min_demand_con",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+        node="south",
+        components=copy.deepcopy(dsm_components),
+        forecaster=forecaster_min,
+        demand=200,
+        technology="steel_plant",
+    )
+    plant_min.setup_model()
+    assert not hasattr(plant_min.model, "steel_output_association_constraint"), (
+        "steel_output_association_constraint must be absent for min_demand strategy"
+    )
+    # The per-timestep demand param is present
+    assert hasattr(plant_min.model, "steel_demand_per_timestep")
+
+    # --- Cost-optimised plant (no per-timestep minimums) ---
+    forecaster_cost = SteelplantForecaster(
+        index,
+        electricity_price=[50] * n,
+        fuel_prices={"natural_gas": [30] * n, "co2": [20] * n},
+    )
+    plant_cost = SteelPlant(
+        id="test_cost_opt_con",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+        node="south",
+        components=copy.deepcopy(dsm_components),
+        forecaster=forecaster_cost,
+        demand=200,
+        technology="steel_plant",
+    )
+    plant_cost.setup_model()
+    plant_cost.determine_optimal_operation_without_flex()
+
+    # Global equality constraint is present for cost-optimised strategy
+    assert hasattr(plant_cost.model, "steel_output_association_constraint"), (
+        "steel_output_association_constraint must be present for cost_optimized strategy"
+    )
+    # The optimizer must have met the demand: total power = 3 × demand
+    total_power = sum(plant_cost.opt_power_requirement.data)
+    assert total_power == pytest.approx(3 * 200, rel=1e-3)
+
+
+def test_cost_optimized_concentrates_production_in_cheap_hours(dsm_components):
+    """
+    Cost-optimised strategy: with electricity prices much higher in the first
+    4 hours than in the last 4, the optimizer schedules all production in the
+    cheap hours.
+
+    The demand constraint forces sum(eaf.steel_output) == 100.  With max_power=100
+    per component per hour and a demand of 100 units, 4 cheap hours are more than
+    sufficient.  The optimizer should therefore leave the expensive hours idle and
+    concentrate production in hours 4-7.
+    """
+    n = 8
+    index = pd.date_range("2023-01-01", periods=n, freq="h")
+    # First 4 hours very expensive, last 4 very cheap
+    prices = [200.0] * 4 + [10.0] * 4
+    forecaster = SteelplantForecaster(
+        index,
+        electricity_price=prices,
+        fuel_prices={"natural_gas": [30] * n, "co2": [20] * n},
+    )
+    plant = SteelPlant(
+        id="test_price_shift_opt",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+        node="south",
+        components=dsm_components,
+        forecaster=forecaster,
+        demand=100,
+        technology="steel_plant",
+    )
+    plant.setup_model()
+    plant.determine_optimal_operation_without_flex()
+
+    opt_power = plant.opt_power_requirement
+    assert opt_power is not None
+
+    # Power in cheap hours (4-7) must exceed power in expensive hours (0-3)
+    cheap_power = sum(opt_power.data[4:])
+    expensive_power = sum(opt_power.data[:4])
+    assert cheap_power > expensive_power, (
+        f"Optimizer should prefer cheap hours: "
+        f"cheap={cheap_power:.2f} MWh vs expensive={expensive_power:.2f} MWh"
+    )
+
+    # Total production must satisfy the steel demand constraint:
+    # 3 components × 100 units × 1 MWh/unit = 300 MWh
+    total_power = sum(opt_power.data)
+    assert total_power == pytest.approx(3 * 100, rel=1e-3)
+
+    # The model must NOT have profile or per-timestep demand params
+    assert not hasattr(plant.model, "normalized_load_profile")
+    assert not hasattr(plant.model, "steel_demand_per_timestep")
 
 
 if __name__ == "__main__":

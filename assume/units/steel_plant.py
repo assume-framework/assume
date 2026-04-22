@@ -51,6 +51,32 @@ class SteelPlant(DSMFlex, SupportsMinMax):
     required_technologies = ["dri_plant", "eaf"]
     optional_technologies = ["electrolyser", "hydrogen_buffer_storage", "dri_storage"]
 
+    # Rolling-horizon extensibility hooks (DSMFlex)
+    _demand_attr_suffix = "steel_demand"
+    _extra_price_attrs = [
+        "electricity_price",
+        "hydrogen_price",
+        "natural_gas_price",
+        "steel_price",
+        "iron_ore_price",
+        "lime_price",
+        "co2_price",
+    ]
+    _component_schema = {
+        "eaf": ("power_in", "steel_output", "eaf_power_input", "eaf_steel_output"),
+        "dri_plant": ("power_in", "dri_output", "dri_power_input", "dri_output"),
+        "electrolyser": (
+            "power_in",
+            "hydrogen_out",
+            "electrolyser_power",
+            "hydrogen_prod",
+        ),
+    }
+
+    def _primary_output_expr(self, m, t):
+        """Steel production (tonnes) from the EAF is the tracked output."""
+        return m.dsm_blocks["eaf"].steel_output[t]
+
     def __init__(
         self,
         id: str,
