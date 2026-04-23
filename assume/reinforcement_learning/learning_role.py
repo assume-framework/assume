@@ -70,15 +70,16 @@ class Learning(Role):
         self.critics = {}
         self.target_critics = {}
 
-        self.device = th.device(
-            self.learning_config.device
-            if (
-                self.learning_config
-                and "cuda" in self.learning_config.device
-                and th.cuda.is_available()
-            )
-            else "cpu"
-        )
+        device = "cpu"
+        if self.learning_config:
+            if "cuda" in self.learning_config.device and th.cuda.is_available():
+                device = self.learning_config.device
+            elif (
+                "mps" in self.learning_config.device and th.backends.mps.is_available()
+            ):
+                device = self.learning_config.device
+        self.device = th.device(device)
+
         # future: add option to choose between float16 and float32
         # float_type = learning_config.float_type
         self.float_type = th.float
@@ -283,8 +284,20 @@ class Learning(Role):
         # Get timestamps from cache we took
         all_timestamps = sorted(current_obs.keys())
         if len(all_timestamps) > 1:
-            # Remove last timestamp that has no reward yet
-            timestamps_to_process = all_timestamps[:-1]
+            # Identify all incomplete timesteps (no reward yet)
+            incomplete_timestamps = [
+                ts for ts in all_timestamps if ts not in current_rewards
+            ]
+
+            # Process only complete timesteps
+            timestamps_to_process = [
+                ts for ts in all_timestamps if ts not in incomplete_timestamps
+            ]
+            # Carry over incomplete timesteps to new cache dicts
+            for ts in incomplete_timestamps:
+                self.all_obs[ts] = current_obs[ts]
+                self.all_actions[ts] = current_actions[ts]
+                self.all_noises[ts] = current_noises[ts]
 
             # Create filtered cache (only complete timesteps)
             cache = {
@@ -330,29 +343,33 @@ class Learning(Role):
                 return
 
         # Add data to buffer - type depends on algorithm category
+        sorted_unit_ids_global = sorted(self.rl_strats.keys())
         if is_on_policy(self.learning_config.algorithm):
             # Using RolloutBuffer for on-policy algorithms (PPO/MAPPO).
             for timestamp in sorted(cache["obs"].keys()):
-                sorted_unit_ids = sorted(cache["obs"][timestamp].keys())
+                sorted_unit_ids = sorted_unit_ids_global
                 n_rl_agents = len(sorted_unit_ids)
 
                 obs_data = transform_buffer_data(
                     {
                         timestamp: cache["obs"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
                 actions_data = transform_buffer_data(
                     {
                         timestamp: cache["actions"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
                 rewards_data = transform_buffer_data(
                     {
                         timestamp: cache["rewards"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
 
                 # Computing MAPPO value targets with the centralized critic
@@ -389,21 +406,24 @@ class Learning(Role):
                         {
                             timestamp: cache["values"][timestamp]
                         },
-                        device
+                        device,
+                        sorted_unit_ids,
                     )
                 
                 log_probs_data = transform_buffer_data(
                     {
                         timestamp: cache["log_probs"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
 
                 dones_data = transform_buffer_data(
                     {
                         timestamp: cache["dones"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
 
                 # Adding data to the rollout buffer.
@@ -419,9 +439,9 @@ class Learning(Role):
             # Using ReplayBuffer for off-policy algorithms (TD3/DDPG).
             # Rewriting the dict so obs.shape == (n_rl_units, obs_dim), sorting by keys, and storing it in the buffer.
             self.buffer.add(
-                obs = transform_buffer_data(cache["obs"], device),
-                actions = transform_buffer_data(cache["actions"], device),
-                reward = transform_buffer_data(cache["rewards"], device),
+                obs = transform_buffer_data(cache["obs"], device, sorted_unit_ids_global),
+                actions = transform_buffer_data(cache["actions"], device, sorted_unit_ids_global),
+                reward = transform_buffer_data(cache["rewards"], device, sorted_unit_ids_global),
             )
 
         # Only update policy after initial experience for off-policy algorithms

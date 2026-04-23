@@ -16,8 +16,8 @@ base:
     trained_policies_load_path: null
     max_bid_price: 100
     algorithm: matd3
-    learning_rate: 0.001
-    training_episodes: 400
+    learning_rate: 0.01
+    training_episodes: 300
     train_freq: 100h
     batch_size: 128
     gamma: 0.99

@@ -119,7 +119,7 @@ class HydrogenPlant(DSMFlex, SupportsMinMax):
                 )
 
         # Initialize the model
-        self.setup_model()
+        # self.setup_model()  # NOTE: called in forecaster initialization again!!!
 
     def define_parameters(self):
         self.model.electricity_price = pyo.Param(

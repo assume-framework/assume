@@ -144,6 +144,15 @@ class MarketConfig:
     param_dict: dict = field(default_factory=dict)
     addr: AgentAddress | None = None
 
+    def __hash__(self):
+        return hash(
+            tuple(
+                i
+                for i in self.__dict__.values()
+                if type(i) not in [list, dict] and not callable(i)
+            )
+        )
+
 
 class OpeningMessage(TypedDict):
     """
@@ -282,22 +291,27 @@ contract_type = Callable[[Agent, Agent], None]
 market_contract_type = Callable[[Agent, Agent, list], None]
 
 
-def only_renewables(unit):
+def is_renewable(string, pattern=r"\b(?:wind|solar|bio)\b") -> bool:
+    """
+    Returns whether a string contains any of the renewable technology keywords (wind, solar, bio).
+    """
+    return re.search(pattern, string, flags=re.IGNORECASE) is not None
+
+
+def only_renewables(unit) -> bool:
     """
     check that technology is renewable.
     This allows all names containing wind, solar, bio or demand
     """
-    return re.search(
-        r"\b(?:wind|solar|bio|demand)\b", unit["technology"], flags=re.IGNORECASE
-    )
+    return is_renewable(unit["technology"], r"\b(?:wind|solar|bio|demand)\b")
 
 
-def only_co2emissionless(unit):
+def only_co2emissionless(unit) -> bool:
     """same as only_renewables plus nuclear"""
     return only_renewables(unit) or unit["technology"] == "nuclear"
 
 
-def power_plant_not_negative(unit):
+def power_plant_not_negative(unit) -> bool:
     return unit.get("unit_type") != "power_plant" or abs(unit["max_power"]) >= 0
 
 

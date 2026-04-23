@@ -47,9 +47,8 @@ class TorchLearningStrategy(LearningStrategy):
         # tells us whether we are training the agents or just executing per-learning strategies
         self.learning_mode = self.learning_config.learning_mode
         self.evaluation_mode = self.learning_config.evaluation_mode
-
-        # based on learning config
         self.algorithm = self.learning_config.algorithm
+
         self.actor_architecture = self.learning_config.actor_architecture
 
         # check if actor architecture is available
@@ -1255,7 +1254,7 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
         scaled_available_power = available_power[0] / unit.max_power
 
         individual_observations = np.array(
-            [scaled_total_dispatch, scaled_marginal_cost, scaled_available_power]
+            [scaled_total_dispatch, scaled_available_power, scaled_marginal_cost]
         )
 
         return individual_observations

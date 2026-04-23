@@ -45,19 +45,7 @@ class DSMFlex:
         super().__init__(**kwargs)
 
         self.components = components
-
-        self.initialize_solver()
-
-    def initialize_solver(self, solver=None):
-        # Define a solver
-        solver = get_supported_solver(solver)
-        if solver == "gurobi":
-            self.solver_options = {"LogToConsole": 0, "OutputFlag": 0}
-        elif solver == "appsi_highs":
-            self.solver_options = {"output_flag": False, "log_to_console": False}
-        else:
-            self.solver_options = {}
-        self.solver = SolverFactory(solver)
+        self.solver = SolverFactory(get_supported_solver())
 
     def initialize_components(self):
         """
@@ -656,7 +644,7 @@ class DSMFlex:
         if switch_flex_off:
             instance = self.switch_to_opt(instance)
         # solve the instance
-        results = self.solver.solve(instance, options=self.solver_options)
+        results = self.solver.solve(instance, options={})
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
@@ -703,7 +691,7 @@ class DSMFlex:
         # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
         instance = self.switch_to_flex(instance)
         # solve the instance
-        results = self.solver.solve(instance, options=self.solver_options)
+        results = self.solver.solve(instance)
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
