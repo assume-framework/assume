@@ -9,7 +9,7 @@ import pytest
 from assume.units.dst_components import Boiler
 
 # Define the solver to use
-use_solver = "appsi_highs"  # Replace with the appropriate solver
+solver_name = "appsi_highs"  # Replace with the appropriate solver
 
 
 # Fixture for creating an electricity price profile, including negative prices
@@ -96,7 +96,7 @@ def electric_boiler_model(electric_boiler_config, price_profile):
     )
 
     # Solve the model
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=False)
 
     return model, results
@@ -132,7 +132,7 @@ def gas_boiler_model(gas_boiler_config, price_profile):
     )
 
     # Solve the model
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=False)
 
     return model, results
@@ -163,7 +163,7 @@ def hydrogen_boiler_model(hydrogen_boiler_config, price_profile):
         sense=pyo.minimize,
     )
 
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=False)
     return model, results
 

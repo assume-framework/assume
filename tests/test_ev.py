@@ -8,7 +8,7 @@ import pytest
 
 from assume.units.dst_components import ElectricVehicle
 
-use_solver = "appsi_highs"
+solver_name = "appsi_highs"
 
 
 # Fixture for EV configuration (without profiles)
@@ -55,7 +55,7 @@ def ev_model_with_availability(ev_config):
     )
 
     # Solve the model
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=True)
 
     return model, results
@@ -90,7 +90,7 @@ def ev_model_with_charging_profile(ev_config):
     )
 
     # Solve the model
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=True)
 
     return model, results
