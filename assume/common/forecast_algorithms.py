@@ -299,7 +299,7 @@ def calculate_naive_price_elastic(
         orderbook = []
         orderbook.extend(supply_offers.to_dict("records"))
         orderbook.extend(demand_bids.to_dict("records"))
-        if demand_t > 0:
+        if demand_t > 0 and len(inelastic_demand_units) > 0:
             inelastic_price_bid = max(
                 [unit.price[t] for unit in inelastic_demand_units]
             )
@@ -381,7 +381,10 @@ def calculate_naive_residual_load(
     config: MarketConfig,
     preprocess_information=None,
 ) -> dict[str, ForecastSeries]:
-    """Compute residual load as total demand minus renewable generation for each timestep."""
+    """Compute residual load as total demand minus renewable generation for each timestep.
+
+    NOTE: Elastic demands are not supported currently
+    """
     powerplants_units, demand_units, exchange_units, _, _ = sort_units(
         units, config.market_id
     )
@@ -431,6 +434,9 @@ def calculate_naive_congestion_signal(
 ) -> dict[str, ForecastSeries]:
     """
     Compute per-node congestion severity signals from net load and line capacities.
+    Node congestion forecast resembles:
+        max(line congestion of connected lines)
+            with line congestion = (demand - supply) / line capacity
 
     Steps:
         1. **Net load per node** — for each demand node, subtract local generation from
@@ -441,6 +447,7 @@ def calculate_naive_congestion_signal(
             across all connected lines as the node's congestion signal.
 
     Returns an empty dict if grid data (buses/lines) is unavailable.
+    NOTE: Elastic demands are not supported currently
     """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
@@ -459,6 +466,10 @@ def calculate_naive_congestion_signal(
             "Node-specific congestion signals forecast could not be calculated. "
             "Not all unit nodes are available in buses."
         )
+        return {}
+
+    # TODO: Add support for elastic demand (currently error of only elastic demands)
+    if all([unit.elasticity_model != 0 for unit in demand_units]):
         return {}
 
     # Step 1: Calculate load for each powerplant based on availability factor and max power

@@ -22,6 +22,7 @@ from assume.common.forecaster import (
     BuildingForecaster,
     CustomUnitForecaster,
     DemandForecaster,
+    DsmUnitForecaster,
     ExchangeForecaster,
     HydrogenForecaster,
     PowerplantForecaster,
@@ -454,6 +455,67 @@ def read_units(
             )
         )
     return units_dict
+
+
+def save_unique_forecasts(units, save_path: Path) -> None:
+    """Collect unique forecasts computed by unit forecasters and write them to CSV.
+
+    Since there is one forecaster per unit but forecasts are shared across units
+    (via ``@lru_cache`` on the underlying algorithms), forecasts are deduplicated
+    by column name. Column names mirror the ``forecasts_df.csv`` convention so the
+    resulting file can be consumed as a drop-in input in a later run.
+    """
+    unique_forecasts = {
+        "price": {},
+        "residual_load": {},
+        "congestion_signal": {},
+        "renewable_utilisation": {},
+    }
+    default_values = {
+        "price": "price_naive_forecast",
+        "residual_load": "residual_load_naive_forecast",
+        "congestion_signal": "congestion_signal_naive_forecast",
+        "renewable_utilisation": "renewable_utilisation_naive_forecast",
+    }
+    for unit in units:
+        algs = unit.forecaster.forecast_algorithms
+        if isinstance(unit.forecaster, DsmUnitForecaster):
+            for key in unique_forecasts:
+                forecast_name = algs.get(key, default_values[key])
+                unique_forecasts[key][forecast_name] = unit
+        else:
+            for key in ["price", "residual_load"]:
+                forecast_name = algs.get(key, default_values[key])
+                unique_forecasts[key][forecast_name] = unit
+
+    forecast_dict = {}
+    for f_type in unique_forecasts:  # price, residual_load, ...
+        for f_name in unique_forecasts[f_type]:  #
+            unit = unique_forecasts[f_type][f_name]
+            attr_name = (
+                "renewable_utilisation_signal"
+                if f_type == "renewable_utilisation"
+                else f_type
+            )
+            forecast = getattr(unit.forecaster, attr_name)
+            if isinstance(forecast, dict):
+                for f_key in forecast:
+                    forecast_dict[f"{f_name}_{f_key}"] = forecast[f_key].as_pd_series(
+                        name=f"{f_name}_{f_key}"
+                    )
+            else:
+                forecast_dict[f"{f_name}"] = forecast.as_pd_series(name=f"{f_name}")
+
+    if not forecast_dict:
+        logger.info("No unique forecasts to save.")
+        return
+
+    df = pd.concat(forecast_dict.values(), axis=1, names=forecast_dict.keys())
+    df.index.name = "datetime"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(save_path)
+
+    logger.info(f"Saved {len(df.columns)} unique forecasts to {save_path}")
 
 
 def load_config_and_create_forecaster(
@@ -927,7 +989,17 @@ def setup_world(
             for unit in op_units:
                 world.add_unit(**unit)
 
-    world.init_forecasts(forecasts_df)
+    # When use_forecasts_df is False, the loaded forecasts_df does not
+    # supersede algorithmic forecast calculation.
+    use_forecasts_df = config.get("use_forecasts_df", True)
+    world.init_forecasts(forecasts_df if use_forecasts_df else None)
+
+    if config.get("save_forecasts", False):
+        forecast_save_file = Path(scenario_data["path"]) / config.get(
+            "forecast_save_file",
+            "saved_forecasts.csv",
+        )
+        save_unique_forecasts(world.units.values(), forecast_save_file)
 
     if (
         world.learning_mode
