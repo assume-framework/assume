@@ -826,17 +826,17 @@ def test_solver_unavailable(monkeypatch):
 
 
 def test_load_index_file():
-    path = Path("./tests/fixtures/forecast_init/demand.csv")
+    path = Path("./tests/fixtures/forecast_init/demand_df.csv")
 
-    index = pd.date_range("2019-01-01", periods=10, freq="h")
+    index = pd.date_range("2019-01-01 8:00", periods=3, freq="h")
     df = load_index_file(path, index)
-    assert len(df) == 10
+    assert len(df) == 3
 
-    index = pd.date_range("2019-01-01", periods=24, freq="h")
+    index = pd.date_range("2019-01-01 8:00", periods=7, freq="h")
     df = load_index_file(path, index)
-    assert len(df) == 24
+    assert len(df) == 7
 
-    index = pd.date_range("2019-01-01", periods=36, freq="h")
+    index = pd.date_range("2019-01-01 8:00", periods=12, freq="h")
     df = load_index_file(path, index)
     assert df is None
 
