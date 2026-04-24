@@ -224,6 +224,7 @@ class BaseUnit:
         Returns:
             The volume of the unit within the given time range.
         """
+        self.calculate_generation_cost(start, end, "energy")
         return self.outputs["energy"].loc[start:end]
 
     def get_output_before(self, dt: datetime, product_type: str = "energy") -> float:
@@ -292,13 +293,15 @@ class BaseUnit:
 
     def get_starting_costs(self, op_time: int) -> float:
         """
-        Returns the costs if start-up is planned.
+        Returns the start-up cost for the given operation time.
+        If operation time is positive, the unit is running, so no start-up costs are returned.
+        If operation time is negative, the unit is not running, so start-up costs are returned
 
         Args:
-            op_time: Operation time in hours running from get_operation_time.
+            op_time (float): The time the unit was shut down in hours.
 
         Returns:
-            Start-up costs.
+            float: The starting costs of the unit.
         """
         return 0
 
@@ -315,8 +318,8 @@ class SupportsMinMax(BaseUnit):
     ramp_up: float = None
     efficiency: float
     emission_factor: float
-    min_operating_time: int = 0
-    min_down_time: int = 0
+    min_operating_time: int = 1
+    min_down_time: int = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -392,9 +395,22 @@ class SupportsMinMax(BaseUnit):
             )
         return power
 
+    def get_max_lookback_optime(self):
+        max_time = max(
+            self.min_operating_time,
+            self.min_down_time,
+            1,
+        )
+        return max_time
+
     def get_operation_time(self, start: datetime) -> int:
         """
         Returns the time the unit is operating (positive) or shut down (negative).
+
+        The lookback window covers the longest of the minimum operating time
+        and the minimum down time (or the warm-start downtime threshold if the
+        subclass defines one), so the value is meaningful both for ramping
+        decisions and for tiering start-up costs (hot / warm / cold).
 
         Args:
             start (datetime.datetime): The start time.
@@ -402,13 +418,13 @@ class SupportsMinMax(BaseUnit):
         Returns:
             int: The operation time as a positive integer if operating, or negative if shut down.
         """
-        # Set the time window based on max of min operating/down time
-        max_time = max(self.min_operating_time, self.min_down_time, 1)
+        max_time = self.get_max_lookback_optime()
+
         begin = max(start - self.index.freq * max_time, self.index[0])
         end = start - self.index.freq
 
         if start <= self.index[0]:
-            # before start of index
+            # this assumes that all powerplants are running at the start of the simulation
             return max_time
 
         # Check energy output in the defined time window, reversed for most recent state
@@ -429,35 +445,6 @@ class SupportsMinMax(BaseUnit):
 
         # Return positive time if operating, negative if shut down
         return -run if is_off else run
-
-    def get_starting_costs(self, op_time: int) -> float:
-        """
-        Returns the start-up cost for the given operation time.
-        If operation time is positive, the unit is running, so no start-up costs are returned.
-        If operation time is negative, the unit is not running, so start-up costs are returned
-        according to the start-up costs of the unit and the hot/warm/cold start times.
-
-        Args:
-            op_time (int): The operation time.
-
-        Returns:
-            float: The start-up costs depending on the down time.
-        """
-        if op_time > 0:
-            # The unit is running, no start-up cost is needed
-            return 0
-
-        downtime = abs(op_time)
-
-        # Check and return the appropriate start-up cost
-        if downtime <= self.downtime_hot_start:
-            return self.hot_start_cost
-
-        if downtime <= self.downtime_warm_start:
-            return self.warm_start_cost
-
-        # If it exceeds warm start threshold, return cold start cost
-        return self.cold_start_cost
 
 
 class SupportsMinMaxCharge(BaseUnit):
@@ -493,6 +480,8 @@ class SupportsMinMaxCharge(BaseUnit):
     capacity: float
     efficiency_charge: float
     efficiency_discharge: float
+    min_operating_time: int = 1
+    min_down_time: int = 1
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
