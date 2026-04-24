@@ -200,11 +200,12 @@ def copy_layer_data(dst, src):
             dst[k].data.copy_(src[k].data)
 
 
-def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
-    """Transform nested dict into torch tensor.
-    
-    Transforms nested dict {datetime -> {unit_id -> [values]}} into torch tensor 
-    of shape (timesteps, powerplants, values). Compatible with buffer storage.
+def transform_buffer_data(
+    nested_dict: dict, device: th.device, keys_unit_order: list | None = None
+) -> np.ndarray:
+    """
+    Transform nested dict {datetime -> {unit_id -> [values]}} into
+    torch tensor of shape (timesteps, powerplants, values). Compatible with buffer storage.
     Get tensors from GPU to CPU.
 
     Args:
@@ -214,11 +215,16 @@ def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
     Returns:
         Shape (n_timesteps, n_powerplants, feature_dim).
     """
+    if not nested_dict:
+        return np.zeros((0, 0, 1), dtype=np.float32)
+
     # Get sorted lists of units and timestamps (for consistent ordering)
     all_times = sorted(nested_dict.keys())
-    unit_ids = sorted(
-        set(dt for unit_data in nested_dict.values() for dt in unit_data.keys())
-    )
+    if keys_unit_order is None:
+        unit_ids = set()
+        for unit_data in nested_dict.values():
+            unit_ids.update(unit_data.keys())
+        keys_unit_order = sorted(unit_ids)
 
     # Get feature dimension from first non-empty value
     feature_dim = None
@@ -233,17 +239,19 @@ def transform_buffer_data(nested_dict: dict, device: th.device) -> np.ndarray:
         if feature_dim is not None:
             break
 
+    # Some on-policy fields (e.g. log_probs/values) can be empty for some timesteps.
+    # Keep zeros in that case instead of failing the entire training loop.
     if feature_dim is None:
-        raise ValueError(
-            "Error, while transforming RL data for buffer: No data found to determine feature dimension"
-        )
+        feature_dim = 1
 
     # Pre-allocate tensor (keep on same device as input data)
-    result = th.zeros((len(all_times), len(unit_ids), feature_dim), device=device)
+    result = th.zeros(
+        (len(all_times), len(keys_unit_order), feature_dim), device=device
+    )
 
     # Fill tensor with values (stays on same device as input so if on GPU it stays there during filling)
     for t, timestamp in enumerate(all_times):
-        for u, unit_id in enumerate(unit_ids):
+        for u, unit_id in enumerate(keys_unit_order):
             values = nested_dict[timestamp].get(unit_id, [])
             if values:  # if we have values for this timestamp
                 result[t, u] = values[0]
@@ -351,3 +359,32 @@ def transfer_weights(
             )
 
     return new_state_copy
+
+
+def encode_time_features(start: datetime) -> list:
+    """
+    Encode time features for a given datetime object.
+    This function extracts various time-related features from the datetime object
+    and encodes them using sine and cosine transformations to capture periodicity.
+
+    Args:
+        start (datetime): The datetime object to encode.
+
+    Returns:
+        list: A list containing the encoded time features.
+    """
+
+    start_hour = start.hour / 24.0
+    start_hour_cos = np.cos(2 * np.pi * start_hour)
+    start_hour_sin = np.sin(2 * np.pi * start_hour)
+
+    start_month = start.month / 12.0
+    start_month_cos = np.cos(2 * np.pi * start_month)
+    start_month_sin = np.sin(2 * np.pi * start_month)
+
+    return (
+        start_hour_cos,
+        start_hour_sin,
+        start_month_cos,
+        start_month_sin,
+    )

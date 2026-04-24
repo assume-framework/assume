@@ -17,7 +17,7 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
-from assume.common.forecast_initialisation import ForecastInitialisation
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecaster import (
     BuildingForecaster,
     CustomUnitForecaster,
@@ -34,6 +34,7 @@ from assume.common.utils import (
     adjust_unit_operator_for_learning,
     confirm_learning_save_path,
     convert_to_rrule_freq,
+    load_index_file,
     normalize_availability,
     set_random_seed,
 )
@@ -49,6 +50,29 @@ def bidding_strategies_from_param_dict(param_dict: dict):
         for ident, strategy in param_dict.items()
         if ident.startswith("bidding_")
     }
+
+
+def forecast_algorithm_from_param_dict(param_dict: dict) -> dict[str, str]:
+    return {
+        ident.split("forecast_")[1]: forecast_algorithm
+        for ident, forecast_algorithm in param_dict.items()
+        if ident.startswith("forecast_")
+    }
+
+
+def get_unit_forecast_algorithms(
+    forecast_algorithms: dict[str, str], plant: dict
+) -> dict[str, str]:
+    unit_forecast_algorithms = forecast_algorithm_from_param_dict(
+        plant
+    )  # get forecast specific parts
+
+    # overwrite None in plant csv with values from config if it exists!
+    for key, forecast_alg in unit_forecast_algorithms.items():
+        if forecast_alg is None or pd.isna(forecast_alg):
+            unit_forecast_algorithms[key] = forecast_algorithms.get(key)
+
+    return forecast_algorithms | unit_forecast_algorithms  # merge dicts together
 
 
 def load_file(
@@ -82,73 +106,40 @@ def load_file(
     if file_name in config:
         if config[file_name] is None:
             return None
-        file_path = f"{path}/{config[file_name]}"
+        file_path = Path(path) / config[file_name]
     else:
-        file_path = f"{path}/{file_name}.csv"
+        file_path = Path(path) / f"{file_name}.csv"
 
     try:
-        df = pd.read_csv(
-            file_path,
-            index_col=0,
-            encoding="utf-8",
-            na_values=["n.a.", "None", "-", "none", "nan"],
-            parse_dates=index is not None,
-        )
-
-        for col in df:
-            # check if the column is of dtype int
-            if df[col].dtype == "int":
-                # convert the column to float
-                df[col] = df[col].astype(float)
-
         if index is not None:
-            if len(df.index) == 1:
-                return df
+            df = load_index_file(file_path, index)
+        else:
+            df = pd.read_csv(
+                file_path,
+                index_col=0,
+                encoding="utf-8",
+                na_values=["n.a.", "None", "-", "none", "nan"],
+                parse_dates=index is not None,
+            )
+            for col in df:
+                # check if the column is of dtype int
+                if df[col].dtype == "int":
+                    # convert the column to float
+                    df[col] = df[col].astype(float)
 
-            if len(df.index) != len(index) and not isinstance(
-                df.index, pd.DatetimeIndex
-            ):
-                logger.warning(
-                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
-                )
-                return None
+            if check_duplicates:
+                # Check if duplicate unit names exist and raise an error
+                duplicates = df.index[df.index.duplicated()].unique()
 
-            df.index.freq = df.index.inferred_freq
-
-            if len(df.index) < len(index) and df.index.freq == index.freq:
-                logger.warning(
-                    f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
-                )
-                return None
-
-            if df.index.freq < index.freq:
-                logger.warning(
-                    f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
-                    "Resampling using mean(). Make sure this is what you want."
-                )
-                df = df.resample(index.freq).mean()
-                logger.info(f"Downsampling {file_name} successful.")
-
-            elif df.index.freq > index.freq or len(df.index) < len(index):
-                logger.warning("Upsampling not implemented yet. Returning None.")
-                return None
-
-            df = df.loc[index]
-
-        elif check_duplicates:
-            # Check if duplicate unit names exist and raise an error
-            duplicates = df.index[df.index.duplicated()].unique()
-
-            if len(duplicates) > 0:
-                duplicate_names = ", ".join(map(str, duplicates))
-                raise ValueError(
-                    f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
-                )
-
+                if len(duplicates) > 0:
+                    duplicate_names = ", ".join(map(str, duplicates))
+                    raise ValueError(
+                        f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
+                    )
         return df
 
     except FileNotFoundError:
-        logger.info(f"{file_name} not found. Returning None")
+        logger.info(f"{file_path} not found. Returning None")
         return None
 
 
@@ -345,7 +336,7 @@ def make_market_config(
     return market_config
 
 
-def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
+def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame | None]:
     network_path = Path(network_path)
     buses = None
     lines = None
@@ -551,10 +542,19 @@ def load_config_and_create_forecaster(
     )
     demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
     if demand_df is None:
+        # no demand timeseries exist, all demand is elastic. Fill missing demand timeseries with zeros and raise a warning.
         logger.warning(
             "!! No demand_df timeseries provided !! Filling demand_df with zeros. Make sure this is what you actually want."
         )
         demand_df = pd.DataFrame(index=index, columns=demand_units.index, data=0.0)
+    elif not demand_df.columns.equals(demand_units.index):
+        # there exist demand timeseries, but not for all demand units. Some demand is elastic, some is not. Fill missing demand timeseries with zeros and raise a warning.
+        logger.warning(
+            "!! Incomplete demand_df timeseries provided !! Filling demand_df for some units with zeros. Make sure this is what you actually want."
+        )
+        missing_columns = demand_units.index.difference(demand_df.columns)
+        for col in missing_columns:
+            demand_df[col] = 0.0
 
     exchanges_df = load_file(
         path=path, config=config, file_name="exchanges_df", index=index
@@ -573,79 +573,80 @@ def load_config_and_create_forecaster(
         )
         availability = normalize_availability(powerplant_units, availability)
 
+    if availability is None:
+        availability = pd.DataFrame(index=index)
+
     fuel_prices_df = load_file(
         path=path, config=config, file_name="fuel_prices_df", index=index
     )
+    if fuel_prices_df is None:
+        fuel_prices_df = pd.DataFrame(index=index)
 
-    buses = load_file(path=path, config=config, file_name="buses")
-    lines = load_file(path=path, config=config, file_name="lines")
+    if len(fuel_prices_df) <= 1:  # single value provided, extend to full index
+        fuel_prices_df.index = index[:1]
+        fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
 
-    initializer = ForecastInitialisation(
-        index=index,
-        demand_units=demand_units,
-        exchange_units=exchange_units,
-        powerplants_units=powerplant_units,
-        buses=buses,
-        lines=lines,
-        fuel_prices=fuel_prices_df,
-        market_configs=config["markets_config"],
-        forecasts=forecasts_df,
-        demand=demand_df,
-        availability=availability,
-        exchanges=exchanges_df,
+    forecast_algorithms = config.get("forecast_algorithms", {})
+
+    # create shared unit index for caching!
+    shared_unit_index = FastIndex(
+        start=index[0], end=index[-1], freq=pd.infer_freq(index)
     )
-
     unit_forecasts: dict[str, UnitForecaster] = {}
-    market_prices, residual_loads = initializer.calculate_market_forecasts()
-    congestion_signal, renewable_utilization = initializer.calc_node_forecasts()
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
-                index=index,
-                availability=initializer.availability(id),
-                fuel_prices=initializer.fuel_prices,
-                market_prices=market_prices,
-                residual_load=residual_loads,
+                index=shared_unit_index,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                fuel_prices=fuel_prices_df,
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, plant
+                ),
             )
     if demand_units is not None:
         for id, demand in demand_units.iterrows():
             unit_forecasts[id] = DemandForecaster(
-                index=index,
-                availability=initializer.availability(id),
+                index=shared_unit_index,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 demand=-demand_df[id].abs(),
-                market_prices=market_prices,
-                residual_load=residual_loads,
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, demand
+                ),
             )
     if storage_units is not None:
         for id, storage in storage_units.iterrows():
             unit_forecasts[id] = UnitForecaster(
-                index=index,
-                availability=initializer.availability(id),
-                market_prices=market_prices,
-                residual_load=residual_loads,
+                index=shared_unit_index,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, storage
+                ),
             )
     if exchange_units is not None:
         for id, exchange in exchange_units.iterrows():
             unit_forecasts[id] = ExchangeForecaster(
-                index=index,
-                availability=initializer.availability(id),
-                market_prices=market_prices,
+                index=shared_unit_index,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, exchange
+                ),
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
-                residual_load=residual_loads,
             )
     if dsm_units is not None:
         for type, dsm in dsm_units.items():
             for id, unit in dsm.iterrows():
+                unit_forecast_algorithms = get_unit_forecast_algorithms(
+                    forecast_algorithms, unit
+                )
                 if type == "building":
                     unit_forecasts[id] = BuildingForecaster(
-                        index=index,
-                        availability=initializer.availability(id),
-                        market_prices=market_prices,
-                        fuel_prices=initializer.fuel_prices,
-                        residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        forecast_algorithms=unit_forecast_algorithms,
+                        fuel_prices=fuel_prices_df,
                         load_profile=0,  # TODO
                         ev_load_profile=0,  # TODO
                         heat_demand=0,  # TODO
@@ -654,39 +655,32 @@ def load_config_and_create_forecaster(
                     )
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
-                        index=index,
-                        availability=initializer.availability(id),
-                        market_prices=market_prices,
-                        fuel_prices=initializer.fuel_prices,
-                        residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
-                        congestion_signal=congestion_signal,
-                        renewable_utilisation_signal=renewable_utilization,
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        forecast_algorithms=unit_forecast_algorithms,
+                        fuel_prices=fuel_prices_df,
                     )
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
-                        index=index,
-                        availability=initializer.availability(id),
-                        market_prices=market_prices,
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        forecast_algorithms=unit_forecast_algorithms,
                         hydrogen_demand=unit["demand"],
-                        residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
                         seasonal_storage_schedule=0,  # TODO
                     )
                 if type == "steam_plant":
                     unit_forecasts[id] = SteamgenerationForecaster(
-                        index=index,
-                        availability=initializer.availability(id),
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        forecast_algorithms=unit_forecast_algorithms,
                         demand=unit["demand"],
-                        market_prices=market_prices,
-                        fuel_prices=initializer.fuel_prices,
-                        residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
-                        congestion_signal=congestion_signal,
-                        renewable_utilisation_signal=renewable_utilization,
+                        fuel_prices=fuel_prices_df,
                         electricity_price_flex=0,  # TODO
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
@@ -705,6 +699,7 @@ def load_config_and_create_forecaster(
         "dsm_units": dsm_units,
         "unit_forecasts": unit_forecasts,
         "index": index,
+        "forecasts_df": forecasts_df,
     }
 
 
@@ -745,6 +740,7 @@ def setup_world(
     exchange_units = scenario_data["exchange_units"]
     dsm_units = scenario_data["dsm_units"]
     unit_forecasts = scenario_data["unit_forecasts"]
+    forecasts_df = scenario_data["forecasts_df"]
 
     # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -931,6 +927,8 @@ def setup_world(
             for unit in op_units:
                 world.add_unit(**unit)
 
+    world.init_forecasts(forecasts_df)
+
     if (
         world.learning_mode
         and world.learning_role is not None
@@ -1058,13 +1056,14 @@ def run_learning(
         verbose (bool, optional): A flag indicating whether to enable verbose logging. Defaults to False.
 
     Note:
-        - The function uses a ReplayBuffer to store experiences for training the DRL agents.
+        - The function uses a ReplayBuffer for off-policy algorithms and a RolloutBuffer for on-policy algorithms.
         - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
         - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
         - Upon completion of training, the function performs an evaluation run using the last policy learned during training.
         - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
-    from assume.reinforcement_learning.buffer import ReplayBuffer
+    from assume.common.base import is_off_policy
+    from assume.reinforcement_learning.buffer import ReplayBuffer, RolloutBuffer
 
     if not verbose:
         logger.setLevel(logging.WARNING)
@@ -1086,17 +1085,48 @@ def run_learning(
     if os.path.exists(tensorboard_path):
         shutil.rmtree(tensorboard_path, ignore_errors=True)
 
-    # -----------------------------------------
-    # Information that needs to be stored across episodes, aka one simulation run
-    inter_episodic_data = {
-        "buffer": ReplayBuffer(
-            buffer_size=world.learning_role.learning_config.replay_buffer_size,
+    learning_config = world.learning_role.learning_config
+    validation_interval = world.learning_role.determine_validation_interval()
+
+    # sync train frequency with simulation horizon once at the beginning of training and overwrite scenario data
+    world.scenario_data["config"]["learning_config"]["train_freq"] = (
+        world.learning_role.sync_train_freq_with_simulation_horizon()
+    )
+
+    # Build the appropriate buffer for the selected algorithm category.
+    if is_off_policy(learning_config.algorithm):
+        buffer = ReplayBuffer(
+            buffer_size=learning_config.off_policy.replay_buffer_size,
             obs_dim=world.learning_role.rl_algorithm.obs_dim,
             act_dim=world.learning_role.rl_algorithm.act_dim,
             n_rl_units=len(world.learning_role.rl_strats),
             device=world.learning_role.device,
             float_type=world.learning_role.float_type,
-        ),
+        )
+        min_episode_for_eval = (
+            learning_config.off_policy.episodes_collecting_initial_experience
+            + validation_interval
+        )
+    else:
+        train_freq = pd.Timedelta(str(learning_config.train_freq))
+        time_step = pd.Timedelta(str(world.scenario_data["config"]["time_step"]))
+        rollout_buffer_size = max(2, int(train_freq / time_step))
+        buffer = RolloutBuffer(
+            buffer_size=rollout_buffer_size,
+            obs_dim=world.learning_role.rl_algorithm.obs_dim,
+            act_dim=world.learning_role.rl_algorithm.act_dim,
+            n_rl_units=len(world.learning_role.rl_strats),
+            device=world.learning_role.device,
+            float_type=world.learning_role.float_type,
+            gamma=learning_config.gamma,
+            gae_lambda=learning_config.on_policy.gae_lambda,
+        )
+        min_episode_for_eval = validation_interval
+
+    # -----------------------------------------
+    # Information that needs to be stored across episodes, aka one simulation run
+    inter_episodic_data = {
+        "buffer": buffer,
         "actors_and_critics": None,
         "max_eval": defaultdict(lambda: -1e9),
         "all_eval": defaultdict(list),
@@ -1106,13 +1136,6 @@ def run_learning(
     }
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
-
-    validation_interval = world.learning_role.determine_validation_interval()
-
-    # sync train frequency with simulation horizon once at the beginning of training and overwrite scenario data
-    world.scenario_data["config"]["learning_config"]["train_freq"] = (
-        world.learning_role.sync_train_freq_with_simulation_horizon()
-    )
 
     eval_episode = 1
 
@@ -1142,8 +1165,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            >= world.learning_role.learning_config.off_policy.episodes_collecting_initial_experience
-            + validation_interval
+            >= min_episode_for_eval
         ):
             world.reset()
 
@@ -1190,8 +1212,7 @@ def run_learning(
         # save the policies after each episode in case the simulation is stopped or crashes
         if (
             episode
-            >= world.learning_role.learning_config.off_policy.episodes_collecting_initial_experience
-            + validation_interval
+            >= min_episode_for_eval
         ):
             world.learning_role.rl_algorithm.save_params(
                 directory=f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"

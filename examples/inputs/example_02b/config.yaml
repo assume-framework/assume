@@ -4,7 +4,7 @@
 
 base:
   start_date: 2019-03-01 00:00
-  end_date: 2019-04-01 00:00
+  end_date: 2019-03-07 00:00
   time_step: 1h
   save_frequency_hours: null
   seed: null
@@ -17,7 +17,7 @@ base:
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001
-    training_episodes: 100
+    training_episodes: 30
     train_freq: 100h
     batch_size: 128
     gamma: 0.99
@@ -61,7 +61,7 @@ base:
 
 base_lstm:
   start_date: 2019-03-01 00:00
-  end_date: 2019-04-01 00:00
+  end_date: 2019-03-07 00:00
   time_step: 1h
   save_frequency_hours: null
   seed: null
@@ -74,7 +74,7 @@ base_lstm:
     algorithm: matd3
     actor_architecture: lstm
     learning_rate: 0.001
-    training_episodes: 100
+    training_episodes: 30
     train_freq: 24h
     batch_size: 256
     gamma: 0.99

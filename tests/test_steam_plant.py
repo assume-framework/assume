@@ -77,7 +77,7 @@ def steam_plant_with_hp(steam_plant_components_with_hp) -> SteamPlant:
     }
 
     # Initialize the HydrogenPlant with the specified components, forecast, and strategy
-    return SteamPlant(
+    plant = SteamPlant(
         id="A360",
         unit_operator="test_operator",
         objective="min_variable_cost",
@@ -87,6 +87,9 @@ def steam_plant_with_hp(steam_plant_components_with_hp) -> SteamPlant:
         components=steam_plant_components_with_hp,
         forecaster=forecast,
     )
+
+    plant.setup_model()
+    return plant
 
 
 def test_optimal_operation_without_flex_initialization_hp(steam_plant_with_hp):
@@ -193,7 +196,7 @@ def steam_plant_with_hp_b(steam_plant_components_with_hp_b) -> SteamPlant:
     }
 
     # Initialize the HydrogenPlant with the specified components, forecast, and strategy
-    return SteamPlant(
+    plant = SteamPlant(
         id="A360",
         unit_operator="test_operator",
         objective="min_variable_cost",
@@ -203,6 +206,10 @@ def steam_plant_with_hp_b(steam_plant_components_with_hp_b) -> SteamPlant:
         components=steam_plant_components_with_hp_b,
         forecaster=forecast,
     )
+
+    plant.setup_model()
+
+    return plant
 
 
 def test_optimal_operation_without_flex_initialization_hp_b(steam_plant_with_hp_b):
@@ -324,7 +331,7 @@ def steam_plant_with_hp_b_ts(steam_plant_components_with_hp_b_ts) -> SteamPlant:
     }
 
     # Initialize the HydrogenPlant with the specified components, forecast, and strategy
-    return SteamPlant(
+    plant = SteamPlant(
         id="A360",
         unit_operator="test_operator",
         objective="min_variable_cost",
@@ -334,6 +341,9 @@ def steam_plant_with_hp_b_ts(steam_plant_components_with_hp_b_ts) -> SteamPlant:
         components=steam_plant_components_with_hp_b_ts,
         forecaster=forecast,
     )
+
+    plant.setup_model()
+    return plant
 
 
 def test_optimal_operation_without_flex_initialization_hp_b_ts(
@@ -488,7 +498,7 @@ def steam_plant_with_hp_b_longterm_ts(
         market_prices={"EOM": 0},
     )
     bidding_strategy = {"EOM": DsmEnergyOptimizationStrategy()}
-    return SteamPlant(
+    plant = SteamPlant(
         id="A360",
         unit_operator="test_operator",
         objective="min_variable_cost",
@@ -498,6 +508,9 @@ def steam_plant_with_hp_b_longterm_ts(
         components=steam_plant_components_with_hp_b_longterm_ts,
         forecaster=forecast,
     )
+
+    plant.setup_model()
+    return plant
 
 
 def test_optimal_operation_with_longterm_storage(steam_plant_with_hp_b_longterm_ts):
@@ -586,7 +599,7 @@ def steam_plant_with_crm_flex(steam_plant_components_with_hp_b):
         "CRM_pos": DsmCapacityHeuristicBalancingPosStrategy(),
         "CRM_neg": DsmCapacityHeuristicBalancingNegStrategy(),
     }
-    return SteamPlant(
+    plant = SteamPlant(
         id="A360",
         unit_operator="test_operator",
         objective="min_variable_cost",
@@ -596,6 +609,8 @@ def steam_plant_with_crm_flex(steam_plant_components_with_hp_b):
         components=steam_plant_components_with_hp_b,
         forecaster=forecast,
     )
+    plant.setup_model()
+    return plant
 
 
 def test_crm_block_flexibility_and_bidding(steam_plant_with_crm_flex):
@@ -663,6 +678,7 @@ def steam_plant_with_price_signal_flex(steam_plant_components_with_hp_b):
         forecaster=forecast,
     )
     plant.electricity_price_flex = price_flex
+    plant.setup_model()
     return plant
 
 

@@ -120,6 +120,7 @@ class WriteOutput(Role):
                 "value": "avg(power/max_power)",
                 "from_table": 'market_dispatch ud join power_plant_meta um on ud.unit_id = um."index" and ud.simulation=um.simulation',
                 "group_bys": ["market_id", "variable"],
+                "simulation_col": "ud.simulation",
             },
         }
         self.kpi_defs.update(additional_kpis)
@@ -262,16 +263,13 @@ class WriteOutput(Role):
         Args:
             rl_params (dict): The RL parameters.
         """
+        # check for tensors and convert them to floats
+        rl_params = convert_tensors(rl_params)
 
         df = pd.DataFrame.from_records(rl_params, index="datetime")
         df["simulation"] = self.simulation_id
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
-
-        # check for tensors and convert them to floats
-        # apply per column to ensure correct restructering after conversion
-        for col in df.columns:
-            df[col] = df[col].apply(convert_tensors)
 
         return df
 
@@ -282,14 +280,13 @@ class WriteOutput(Role):
         Args:
             rl_grad_params (dict): The RL parameters per gradient step.
         """
+        # check for tensors and convert them to floats
+        rl_grad_params = convert_tensors(rl_grad_params)
 
         df = pd.DataFrame.from_records(rl_grad_params, index="step")
         df["simulation"] = self.simulation_id
         df["evaluation_mode"] = self.evaluation_mode
         df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
-
-        # check for tensors and convert them to floats
-        df = df.apply(convert_tensors)
 
         return df
 
@@ -461,6 +458,7 @@ class WriteOutput(Role):
         for table, data_list in self.write_buffers.items():
             if len(data_list) == 0:
                 continue
+
             df = None
             with self.locks[table]:
                 if table == "grid_topology":
@@ -526,7 +524,12 @@ class WriteOutput(Role):
                 try:
                     with self.db.begin() as db:
                         df.to_sql(table, db, if_exists="append")
-                except (ProgrammingError, OperationalError, DataError):
+                except (
+                    ProgrammingError,
+                    OperationalError,
+                    DataError,
+                    pd.errors.DatabaseError,
+                ):
                     self.check_columns(table, df)
                     # now try again
                     with self.db.begin() as db:
@@ -584,7 +587,7 @@ class WriteOutput(Role):
 
         for table, df in grid.items():
             geo_table = f"{table}_geo"
-            if df.empty:
+            if df is None or df.empty:
                 continue
             df["simulation"] = self.simulation_id
             df.reset_index()
@@ -593,7 +596,13 @@ class WriteOutput(Role):
             try:
                 with self.db.begin() as db:
                     df.to_sql(geo_table, db, if_exists="append")
-            except (ProgrammingError, OperationalError, DataError, UndefinedColumn):
+            except (
+                ProgrammingError,
+                OperationalError,
+                DataError,
+                UndefinedColumn,
+                pd.errors.DatabaseError,
+            ):
                 # if a column is missing, check and try again
                 self.check_columns(geo_table, df)
                 # now try again
@@ -652,28 +661,25 @@ class WriteOutput(Role):
         if self.db is None:
             return
 
-        queries = []
-        for variable, kpi_def in self.kpi_defs.items():
-            group_bys = ",".join(kpi_def.get("group_bys", ["market_id"]))
-            queries.append(
-                f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where simulation = '{self.simulation_id}' group by {group_bys}"
-            )
-
-        if self.episode:
-            queries.extend(
-                [
-                    f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                    f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                    f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                ]
-            )
+        if self.learning_mode or self.evaluation_mode:
+            queries = [
+                f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+            ]
+        else:
+            queries = []
+            for variable, kpi_def in self.kpi_defs.items():
+                group_bys = ",".join(kpi_def.get("group_bys", ["market_id"]))
+                simulation_col = kpi_def.get("simulation_col", "simulation")
+                queries.append(
+                    f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where {simulation_col} = '{self.simulation_id}' group by {group_bys}"
+                )
 
         dfs = []
         for query in queries:
             try:
                 df = pd.read_sql(query, self.db)
-            except (ProgrammingError, OperationalError, DataError):
-                continue
             except Exception as e:
                 logger.error("could not read query: %s", e)
                 continue

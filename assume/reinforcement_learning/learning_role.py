@@ -5,7 +5,6 @@
 import logging
 from collections import defaultdict
 from datetime import datetime
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -70,15 +69,16 @@ class Learning(Role):
         self.critics = {}
         self.target_critics = {}
 
-        self.device = th.device(
-            self.learning_config.device
-            if (
-                self.learning_config
-                and "cuda" in self.learning_config.device
-                and th.cuda.is_available()
-            )
-            else "cpu"
-        )
+        device = "cpu"
+        if self.learning_config:
+            if "cuda" in self.learning_config.device and th.cuda.is_available():
+                device = self.learning_config.device
+            elif (
+                "mps" in self.learning_config.device and th.backends.mps.is_available()
+            ):
+                device = self.learning_config.device
+        self.device = th.device(device)
+
         # future: add option to choose between float16 and float32
         # float_type = learning_config.float_type
         self.float_type = th.float
@@ -283,8 +283,20 @@ class Learning(Role):
         # Get timestamps from cache we took
         all_timestamps = sorted(current_obs.keys())
         if len(all_timestamps) > 1:
-            # Remove last timestamp that has no reward yet
-            timestamps_to_process = all_timestamps[:-1]
+            # Identify all incomplete timesteps (no reward yet)
+            incomplete_timestamps = [
+                ts for ts in all_timestamps if ts not in current_rewards
+            ]
+
+            # Process only complete timesteps
+            timestamps_to_process = [
+                ts for ts in all_timestamps if ts not in incomplete_timestamps
+            ]
+            # Carry over incomplete timesteps to new cache dicts
+            for ts in incomplete_timestamps:
+                self.all_obs[ts] = current_obs[ts]
+                self.all_actions[ts] = current_actions[ts]
+                self.all_noises[ts] = current_noises[ts]
 
             # Create filtered cache (only complete timesteps)
             cache = {
@@ -332,6 +344,7 @@ class Learning(Role):
         # Add data to buffer - type depends on algorithm category
         if is_on_policy(self.learning_config.algorithm):
             # Using RolloutBuffer for on-policy algorithms (PPO/MAPPO).
+            added_timestamps = 0
             for timestamp in sorted(cache["obs"].keys()):
                 sorted_unit_ids = sorted(cache["obs"][timestamp].keys())
                 n_rl_agents = len(sorted_unit_ids)
@@ -340,19 +353,22 @@ class Learning(Role):
                     {
                         timestamp: cache["obs"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
                 actions_data = transform_buffer_data(
                     {
                         timestamp: cache["actions"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
                 rewards_data = transform_buffer_data(
                     {
                         timestamp: cache["rewards"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
 
                 # Computing MAPPO value targets with the centralized critic
@@ -389,21 +405,24 @@ class Learning(Role):
                         {
                             timestamp: cache["values"][timestamp]
                         },
-                        device
+                        device,
+                        sorted_unit_ids,
                     )
                 
                 log_probs_data = transform_buffer_data(
                     {
                         timestamp: cache["log_probs"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
 
                 dones_data = transform_buffer_data(
                     {
                         timestamp: cache["dones"][timestamp]
                     },
-                    device
+                    device,
+                    sorted_unit_ids,
                 )
 
                 # Adding data to the rollout buffer.
@@ -415,13 +434,16 @@ class Learning(Role):
                     value = values_data,
                     log_prob = log_probs_data
                 )
+                added_timestamps += 1
+
         else:
             # Using ReplayBuffer for off-policy algorithms (TD3/DDPG).
             # Rewriting the dict so obs.shape == (n_rl_units, obs_dim), sorting by keys, and storing it in the buffer.
+            sorted_unit_ids = sorted(self.rl_strats.keys())
             self.buffer.add(
-                obs = transform_buffer_data(cache["obs"], device),
-                actions = transform_buffer_data(cache["actions"], device),
-                reward = transform_buffer_data(cache["rewards"], device),
+                obs = transform_buffer_data(cache["obs"], device, sorted_unit_ids),
+                actions = transform_buffer_data(cache["actions"], device, sorted_unit_ids),
+                reward = transform_buffer_data(cache["rewards"], device, sorted_unit_ids),
             )
 
         # Only update policy after initial experience for off-policy algorithms
@@ -466,6 +488,34 @@ class Learning(Role):
 
         self.all_actions[start][unit_id].append(action)
         self.all_noises[start][unit_id].append(noise)
+
+        # For on-policy algorithms (MAPPO), cache PPO metadata at action time so
+        # rollout entries stay aligned across strategies and timesteps.
+        if is_on_policy(self.learning_config.algorithm):
+            strategy = self.rl_strats.get(unit_id)
+            if strategy is None or not hasattr(strategy, "_last_log_prob"):
+                return
+
+            # Avoid duplicate appends if add_actions_to_cache is called multiple
+            # times for the same unit/timestamp during one market step.
+            if self.all_log_probs[start][unit_id]:
+                return
+
+            value = getattr(strategy, "_last_value", 0.0)
+            log_prob = strategy._last_log_prob
+
+            if hasattr(value, "item"):
+                value = value.item()
+            if hasattr(log_prob, "item"):
+                log_prob = log_prob.item()
+
+            self.add_ppo_data_to_cache(
+                unit_id=unit_id,
+                start=start,
+                value=value,
+                log_prob=log_prob,
+                done=False,
+            )
 
     def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
         """Add the reward to the cache dict, per unit_id.
