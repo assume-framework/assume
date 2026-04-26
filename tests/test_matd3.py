@@ -9,7 +9,7 @@ from datetime import datetime
 
 import pytest
 
-from assume.common.base import LearningConfig
+from assume.common.base import LearningConfig, OffPolicyConfig
 
 try:
     import torch as th
@@ -46,19 +46,21 @@ def base_learning_config() -> dict:
             learning_mode=True,
             evaluation_mode=False,
             training_episodes=1,
-            episodes_collecting_initial_experience=0,
             continue_learning=False,
             trained_policies_save_path=None,
             early_stopping_steps=10,
             early_stopping_threshold=0.05,
             learning_rate=1e-4,
             batch_size=100,
-            tau=0.005,
             gamma=0.99,
-            gradient_steps=1,
-            policy_delay=2,
-            target_policy_noise=0.2,
-            target_noise_clip=0.5,
+            off_policy=OffPolicyConfig(
+                episodes_collecting_initial_experience=0,
+                gradient_steps=1,
+                tau=0.005,
+                policy_delay=2,
+                target_policy_noise=0.2,
+                target_noise_clip=0.5,
+            ),
         ),
     }
 
