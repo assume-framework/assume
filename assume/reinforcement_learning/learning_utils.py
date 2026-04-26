@@ -194,6 +194,11 @@ def get_hidden_sizes(state_dict: dict, prefix: str) -> list[int]:
     return sizes[:-1]  # exclude the final output layer if needed
 
 
+def _get_q_prefixes(state_dict: dict) -> list[str]:
+    known = ("q_layers", "q1_layers", "q2_layers")
+    return [p for p in known if f"{p}.0.weight" in state_dict]
+
+
 def copy_layer_data(dst, src):
     for k in dst:
         if k in src and dst[k].shape == src[k].shape:
@@ -289,8 +294,18 @@ def transfer_weights(
 
     # 1) Architecture check
     new_state = model.state_dict()
-    loaded_hidden = get_hidden_sizes(loaded_state, prefix="q1_layers")
-    new_hidden = get_hidden_sizes(new_state, prefix="q1_layers")
+    prefixes = _get_q_prefixes(loaded_state)
+    if not prefixes:
+        logger.warning(
+            "Cannot transfer weights: no recognised Q-network prefix "
+            "(q_layers / q1_layers / q2_layers) found in loaded state dict."
+        )
+        return None
+
+    # Using the first detected prefix for architecture check.
+    check_prefix = prefixes[0]
+    loaded_hidden = get_hidden_sizes(loaded_state, prefix=check_prefix)
+    new_hidden = get_hidden_sizes(new_state, prefix=check_prefix)
     if loaded_hidden != new_hidden:
         logger.warning(
             f"Cannot transfer weights: neural network architecture mismatch.\n"
@@ -307,8 +322,7 @@ def transfer_weights(
     # 3) Clone new state
     new_state_copy = {k: v.clone() for k, v in new_state.items()}
 
-    # 4) Transfer per-prefix
-    for prefix in ("q1_layers", "q2_layers"):
+    for prefix in prefixes:
         w_loaded = loaded_state[f"{prefix}.0.weight"]
         b_loaded = loaded_state[f"{prefix}.0.bias"]
         w_new = new_state_copy[f"{prefix}.0.weight"]
@@ -348,7 +362,7 @@ def transfer_weights(
             # actions untouched
 
         # d) bias and deeper layers
-        # copy all other wigths and biases (besides input layer) from loaded to new model
+        # copy all other weights and biases (besides input layer) from loaded to new model
         b_new.copy_(b_loaded)
         for i in range(1, len(new_hidden) + 1):
             new_state_copy[f"{prefix}.{i}.weight"].copy_(
