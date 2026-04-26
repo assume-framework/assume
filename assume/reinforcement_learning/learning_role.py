@@ -343,11 +343,11 @@ class Learning(Role):
                 return
 
         # Add data to buffer - type depends on algorithm category
-        sorted_unit_ids_global = sorted(self.rl_strats.keys())
         if is_on_policy(self.learning_config.algorithm):
             # Using RolloutBuffer for on-policy algorithms (PPO/MAPPO).
+            added_timestamps = 0
             for timestamp in sorted(cache["obs"].keys()):
-                sorted_unit_ids = sorted_unit_ids_global
+                sorted_unit_ids = sorted(cache["obs"][timestamp].keys())
                 n_rl_agents = len(sorted_unit_ids)
 
                 obs_data = transform_buffer_data(
@@ -435,13 +435,16 @@ class Learning(Role):
                     value = values_data,
                     log_prob = log_probs_data
                 )
+                added_timestamps += 1
+
         else:
             # Using ReplayBuffer for off-policy algorithms (TD3/DDPG).
             # Rewriting the dict so obs.shape == (n_rl_units, obs_dim), sorting by keys, and storing it in the buffer.
+            sorted_unit_ids = sorted(self.rl_strats.keys())
             self.buffer.add(
-                obs = transform_buffer_data(cache["obs"], device, sorted_unit_ids_global),
-                actions = transform_buffer_data(cache["actions"], device, sorted_unit_ids_global),
-                reward = transform_buffer_data(cache["rewards"], device, sorted_unit_ids_global),
+                obs = transform_buffer_data(cache["obs"], device, sorted_unit_ids),
+                actions = transform_buffer_data(cache["actions"], device, sorted_unit_ids),
+                reward = transform_buffer_data(cache["rewards"], device, sorted_unit_ids),
             )
 
         # Only update policy after initial experience for off-policy algorithms
@@ -486,6 +489,34 @@ class Learning(Role):
 
         self.all_actions[start][unit_id].append(action)
         self.all_noises[start][unit_id].append(noise)
+
+        # For on-policy algorithms (MAPPO), cache PPO metadata at action time so
+        # rollout entries stay aligned across strategies and timesteps.
+        if is_on_policy(self.learning_config.algorithm):
+            strategy = self.rl_strats.get(unit_id)
+            if strategy is None or not hasattr(strategy, "_last_log_prob"):
+                return
+
+            # Avoid duplicate appends if add_actions_to_cache is called multiple
+            # times for the same unit/timestamp during one market step.
+            if self.all_log_probs[start][unit_id]:
+                return
+
+            value = getattr(strategy, "_last_value", 0.0)
+            log_prob = strategy._last_log_prob
+
+            if hasattr(value, "item"):
+                value = value.item()
+            if hasattr(log_prob, "item"):
+                log_prob = log_prob.item()
+
+            self.add_ppo_data_to_cache(
+                unit_id=unit_id,
+                start=start,
+                value=value,
+                log_prob=log_prob,
+                done=False,
+            )
 
     def add_reward_to_cache(self, unit_id, start, reward, regret, profit) -> None:
         """Add the reward to the cache dict, per unit_id.

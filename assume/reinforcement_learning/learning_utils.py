@@ -194,6 +194,11 @@ def get_hidden_sizes(state_dict: dict, prefix: str) -> list[int]:
     return sizes[:-1]  # exclude the final output layer if needed
 
 
+def _get_q_prefixes(state_dict: dict) -> list[str]:
+    known = ("q_layers", "q1_layers", "q2_layers")
+    return [p for p in known if f"{p}.0.weight" in state_dict]
+
+
 def copy_layer_data(dst, src):
     for k in dst:
         if k in src and dst[k].shape == src[k].shape:
@@ -201,34 +206,30 @@ def copy_layer_data(dst, src):
 
 
 def transform_buffer_data(
-    nested_dict: dict,
-    device: th.device,
-    keys_unit_order: list | None = None,
+    nested_dict: dict, device: th.device, keys_unit_order: list | None = None
 ) -> np.ndarray:
-    """Transform nested dict into tensor data for replay/rollout buffers.
-
-    Transforms nested dict {datetime -> {unit_id -> [values]}} into tensor data
-    of shape (timesteps, powerplants, values). Compatible with buffer storage.
+    """
+    Transform nested dict {datetime -> {unit_id -> [values]}} into
+    torch tensor of shape (timesteps, powerplants, values). Compatible with buffer storage.
     Get tensors from GPU to CPU.
 
     Args:
         nested_dict: Dict with structure {datetime -> {unit_id -> list[tensor]}}.
         device: PyTorch device config.
-        keys_unit_order: Optional explicit unit_id order. If omitted, the order
-            is derived from all unit_ids present in nested_dict (sorted by str).
 
     Returns:
         Shape (n_timesteps, n_powerplants, feature_dim).
     """
-    all_times = sorted(nested_dict.keys())
+    if not nested_dict:
+        return np.zeros((0, 0, 1), dtype=np.float32)
 
+    # Get sorted lists of units and timestamps (for consistent ordering)
+    all_times = sorted(nested_dict.keys())
     if keys_unit_order is None:
         unit_ids = set()
         for unit_data in nested_dict.values():
             unit_ids.update(unit_data.keys())
-        keys_unit_order = sorted(unit_ids, key=str)
-    else:
-        keys_unit_order = list(keys_unit_order)
+        keys_unit_order = sorted(unit_ids)
 
     # Get feature dimension from first non-empty value
     feature_dim = None
@@ -243,10 +244,10 @@ def transform_buffer_data(
         if feature_dim is not None:
             break
 
+    # Some on-policy fields (e.g. log_probs/values) can be empty for some timesteps.
+    # Keep zeros in that case instead of failing the entire training loop.
     if feature_dim is None:
-        raise ValueError(
-            "Error, while transforming RL data for buffer: No data found to determine feature dimension"
-        )
+        feature_dim = 1
 
     # Pre-allocate tensor (keep on same device as input data)
     result = th.zeros(
@@ -293,8 +294,18 @@ def transfer_weights(
 
     # 1) Architecture check
     new_state = model.state_dict()
-    loaded_hidden = get_hidden_sizes(loaded_state, prefix="q1_layers")
-    new_hidden = get_hidden_sizes(new_state, prefix="q1_layers")
+    prefixes = _get_q_prefixes(loaded_state)
+    if not prefixes:
+        logger.warning(
+            "Cannot transfer weights: no recognised Q-network prefix "
+            "(q_layers / q1_layers / q2_layers) found in loaded state dict."
+        )
+        return None
+
+    # Using the first detected prefix for architecture check.
+    check_prefix = prefixes[0]
+    loaded_hidden = get_hidden_sizes(loaded_state, prefix=check_prefix)
+    new_hidden = get_hidden_sizes(new_state, prefix=check_prefix)
     if loaded_hidden != new_hidden:
         logger.warning(
             f"Cannot transfer weights: neural network architecture mismatch.\n"
@@ -311,8 +322,7 @@ def transfer_weights(
     # 3) Clone new state
     new_state_copy = {k: v.clone() for k, v in new_state.items()}
 
-    # 4) Transfer per-prefix
-    for prefix in ("q1_layers", "q2_layers"):
+    for prefix in prefixes:
         w_loaded = loaded_state[f"{prefix}.0.weight"]
         b_loaded = loaded_state[f"{prefix}.0.bias"]
         w_new = new_state_copy[f"{prefix}.0.weight"]
@@ -352,7 +362,7 @@ def transfer_weights(
             # actions untouched
 
         # d) bias and deeper layers
-        # copy all other wigths and biases (besides input layer) from loaded to new model
+        # copy all other weights and biases (besides input layer) from loaded to new model
         b_new.copy_(b_loaded)
         for i in range(1, len(new_hidden) + 1):
             new_state_copy[f"{prefix}.{i}.weight"].copy_(

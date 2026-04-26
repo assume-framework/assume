@@ -73,10 +73,12 @@ class TorchLearningStrategy(LearningStrategy):
 
         if self.learning_mode or self.evaluation_mode:
             # Keeping initial random exploration only for off-policy methods.
-            self.collect_initial_experience_mode = is_off_policy(self.algorithm)
+            self.collect_initial_experience_mode = is_off_policy(
+                self.learning_config.algorithm
+            )
 
             
-            if is_off_policy(self.algorithm):
+            if is_off_policy(self.learning_config.algorithm):
                 self.action_noise = NormalActionNoise(
                     mu=0.0,
                     sigma=self.learning_config.off_policy.noise_sigma,
@@ -271,12 +273,14 @@ class TorchLearningStrategy(LearningStrategy):
         For PPO, we also store log_prob and value estimates for later use.
         """
 
+        current_algorithm = self.learning_config.algorithm
+
         # distinction whether we are in learning mode or not to handle exploration realised with noise
         if self.learning_mode and not self.evaluation_mode:
             # if we are in learning mode the first x episodes we want to explore the entire action space
             # to get a good initial experience, in the area around the costs of the agent
             # Only use initial experience collection for off-policy algorithms (not PPO)
-            if self.collect_initial_experience_mode and self.algorithm != "mappo":
+            if self.collect_initial_experience_mode and is_off_policy(current_algorithm):
                 # define current action as solely noise
                 noise = th.normal(
                     mean=0.0,
@@ -294,7 +298,7 @@ class TorchLearningStrategy(LearningStrategy):
                 
             else:
                 # Using the policy forMAPPO (no initial random exploration).
-                if self.algorithm == "mappo":
+                if current_algorithm == "mappo":
                     # Using get_action_and_log_prob for proper PPO stochastic sampling.
                     curr_action, log_prob = self.actor.get_action_and_log_prob(next_observation.unsqueeze(0))
                     curr_action = curr_action.squeeze(0).detach()
@@ -319,7 +323,7 @@ class TorchLearningStrategy(LearningStrategy):
                 )
         else:
             # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-            if self.algorithm == "mappo":
+            if current_algorithm == "mappo":
                 # For PPO evaluation, use deterministic action (mean)
                 curr_action = self.actor(next_observation, deterministic=True).detach()
             else:
@@ -517,15 +521,6 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
 
         if self.learning_mode:
             self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
-            # For PPO, also cache value estimates and log probabilities
-            if self.algorithm == "mappo" and hasattr(self, '_last_log_prob'):
-                self.learning_role.add_ppo_data_to_cache(
-                    self.unit_id, 
-                    start, 
-                    getattr(self, '_last_value', 0.0),
-                    self._last_log_prob.item() if hasattr(self._last_log_prob, 'item') else self._last_log_prob,
-                    done=False
-                )
 
         return bids
 
@@ -552,7 +547,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         curr_action, noise = super().get_actions(next_observation)
 
         if self.learning_mode and not self.evaluation_mode:
-            if self.collect_initial_experience_mode:
+            if self.collect_initial_experience_mode and is_off_policy(
+                self.learning_config.algorithm
+            ):
                 # Assumes last dimension of the observation corresponds to marginal cost
                 marginal_cost = next_observation[
                     -1
@@ -828,15 +825,6 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
 
         if self.learning_mode:
             self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
-            # For PPO, also cache value estimates and log probabilities
-            if self.algorithm == "mappo" and hasattr(self, '_last_log_prob'):
-                self.learning_role.add_ppo_data_to_cache(
-                    self.unit_id, 
-                    start, 
-                    getattr(self, '_last_value', 0.0),
-                    self._last_log_prob.item() if hasattr(self._last_log_prob, 'item') else self._last_log_prob,
-                    done=False
-                )
 
         return bids
 

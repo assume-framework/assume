@@ -551,11 +551,6 @@ class LSTMActorPPO(ActorPPO):
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
 
         self.activation = "softsign"
-        if self.activation not in activation_function_limit:
-            raise ValueError(
-                f"Activation '{self.activation}' not supported! Supported: {list(activation_function_limit.keys())}"
-            )
-
         self.min_output = activation_function_limit[self.activation]["min"]
         self.max_output = activation_function_limit[self.activation]["max"]
         self.activation_function = activation_function_limit[self.activation]["func"]
@@ -603,8 +598,8 @@ class LSTMActorPPO(ActorPPO):
         nn.init.orthogonal_(self.mean_layer.weight, gain=0.01)
         nn.init.zeros_(self.mean_layer.bias)
 
-    def _extract_features(self, obs: th.Tensor) -> tuple[th.Tensor, bool]:
-        """Build latent features from timeseries and stationary observations."""
+    def _compute_mean(self, obs: th.Tensor) -> th.Tensor:
+        """Compute policy mean action from LSTM features."""
         if obs.dim() not in (1, 2):
             raise ValueError(
                 f"LSTMCell: Expected input to be 1D or 2D, got {obs.dim()}D instead"
@@ -639,21 +634,30 @@ class LSTMActorPPO(ActorPPO):
             h_t2, c_t2 = self.LSTM2(h_t, (h_t2, c_t2))
             outputs.append(h_t2)
 
-        # Concatenate LSTM outputs with stationary observations
+        # Concatenate LSTM outputs
         outputs = th.cat(outputs, dim=1)
+        
+        # Concatenate with stationary observations
         x = th.cat((outputs, x2), dim=1)
+        
+        # FC Layers
         x = F.relu(self.FC1(x))
+        mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
 
-        return x, is_batched
+        if not is_batched:
+            mean = mean.squeeze(0)
+
+        return mean
 
     def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
         """Forward pass"""
-        mean, log_std = self.get_distribution(obs)
+        mean = self._compute_mean(obs)
 
         if deterministic:
             return mean
-        
+
         # Sample from Gaussian during training
+        log_std = self.log_std.expand_as(mean)
         std = log_std.exp()  # Ensure positive
         # Add small epsilon for numerical stability
         std = std + 1e-6
@@ -664,14 +668,39 @@ class LSTMActorPPO(ActorPPO):
         return th.clamp(action, -1.0, 1.0)
 
     def get_distribution(self, obs: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
-        """Get Gaussian policy parameters from LSTM features."""
-        x, is_batched = self._extract_features(obs)
-
-        mean = th.tanh(self.mean_layer(x))
+        """Get policy distribution parameters from LSTM path."""
+        mean = self._compute_mean(obs)
         log_std = self.log_std.expand_as(mean)
-
-        if not is_batched:
-            mean = mean.squeeze(0)
-            log_std = log_std.squeeze(0)
-
         return mean, log_std
+
+    def get_action_and_log_prob(
+        self,
+        obs: th.Tensor,
+        deterministic: bool = False,
+    ) -> tuple[th.Tensor, th.Tensor]:
+        """Sample action and compute log probability for LSTM PPO."""
+        mean, log_std = self.get_distribution(obs)
+        std = log_std.exp() + 1e-6
+
+        if deterministic:
+            action = mean
+        else:
+            noise = th.randn_like(mean)
+            action = mean + std * noise
+
+        action = th.clamp(action, -1.0, 1.0)
+        log_prob = self._compute_log_prob(action, mean, std)
+
+        return action, log_prob
+
+    def evaluate_actions(
+        self,
+        obs: th.Tensor,
+        actions: th.Tensor,
+    ) -> tuple[th.Tensor, th.Tensor]:
+        """Evaluate log prob and entropy for provided actions."""
+        mean, log_std = self.get_distribution(obs)
+        std = log_std.exp() + 1e-6
+        log_prob = self._compute_log_prob(actions, mean, std)
+        entropy = 0.5 * (1.0 + th.log(2 * th.pi * std.pow(2))).sum(dim=-1)
+        return log_prob, entropy

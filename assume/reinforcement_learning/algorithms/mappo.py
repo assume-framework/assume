@@ -2,9 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-import json
 import logging
-import os
 
 import numpy as np
 import torch as th
@@ -233,13 +231,11 @@ class PPO(A2CAlgorithm):
             logger.debug("Rollout buffer is empty, skipping policy update")
             return
 
-        # Accumulate data if we don't have enough for a full batch
-        # This decouples train_freq from the required rollout length
-        if rollout_buffer.pos < self.learning_role.learning_config.batch_size:
+        # Require at least two transitions because we reserve the final one
+        # for bootstrapping V(s_{t+1}) and train on the remaining rollout.
+        if rollout_buffer.pos < 2:
             logger.debug(
-                f"Rollout buffer has {rollout_buffer.pos} samples, "
-                f"waiting for {self.learning_role.learning_config.batch_size} (batch_size). "
-                "Skipping update to accumulate more on-policy data."
+                "Rollout buffer has fewer than 2 samples, skipping policy update."
             )
             return
 
@@ -324,8 +320,13 @@ class PPO(A2CAlgorithm):
                 for u_id in self.learning_role.rl_strats.keys()
             }
 
+        effective_batch_size = min(
+            self.learning_config.batch_size,
+            rollout_buffer.pos if not rollout_buffer.full else rollout_buffer.buffer_size,
+        )
+
         for epoch in range(self.n_epochs):
-            for batch in rollout_buffer.get(self.learning_config.batch_size):
+            for batch in rollout_buffer.get(effective_batch_size):
                 current_batch_size = batch.observations.shape[0]
 
                 # Precompute unique observation parts for centralized critic

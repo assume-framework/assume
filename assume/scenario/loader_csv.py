@@ -1056,13 +1056,14 @@ def run_learning(
         verbose (bool, optional): A flag indicating whether to enable verbose logging. Defaults to False.
 
     Note:
-        - The function uses a ReplayBuffer to store experiences for training the DRL agents.
+        - The function uses a ReplayBuffer for off-policy algorithms and a RolloutBuffer for on-policy algorithms.
         - It iterates through training episodes, updating the agents and evaluating their performance at regular intervals.
         - Initial exploration is active at the beginning and is disabled after a certain number of episodes to improve the performance of DRL algorithms.
         - Upon completion of training, the function performs an evaluation run using the last policy learned during training.
         - The best policies are chosen based on the average reward obtained during the evaluation runs, and they are saved for future use.
     """
-    from assume.reinforcement_learning.buffer import ReplayBuffer
+    from assume.common.base import is_off_policy
+    from assume.reinforcement_learning.buffer import ReplayBuffer, RolloutBuffer
 
     if not verbose:
         logger.setLevel(logging.WARNING)
@@ -1084,17 +1085,48 @@ def run_learning(
     if os.path.exists(tensorboard_path):
         shutil.rmtree(tensorboard_path, ignore_errors=True)
 
-    # -----------------------------------------
-    # Information that needs to be stored across episodes, aka one simulation run
-    inter_episodic_data = {
-        "buffer": ReplayBuffer(
-            buffer_size=world.learning_role.learning_config.replay_buffer_size,
+    learning_config = world.learning_role.learning_config
+    validation_interval = world.learning_role.determine_validation_interval()
+
+    # sync train frequency with simulation horizon once at the beginning of training and overwrite scenario data
+    world.scenario_data["config"]["learning_config"]["train_freq"] = (
+        world.learning_role.sync_train_freq_with_simulation_horizon()
+    )
+
+    # Build the appropriate buffer for the selected algorithm category.
+    if is_off_policy(learning_config.algorithm):
+        buffer = ReplayBuffer(
+            buffer_size=learning_config.off_policy.replay_buffer_size,
             obs_dim=world.learning_role.rl_algorithm.obs_dim,
             act_dim=world.learning_role.rl_algorithm.act_dim,
             n_rl_units=len(world.learning_role.rl_strats),
             device=world.learning_role.device,
             float_type=world.learning_role.float_type,
-        ),
+        )
+        min_episode_for_eval = (
+            learning_config.off_policy.episodes_collecting_initial_experience
+            + validation_interval
+        )
+    else:
+        train_freq = pd.Timedelta(str(learning_config.train_freq))
+        time_step = pd.Timedelta(str(world.scenario_data["config"]["time_step"]))
+        rollout_buffer_size = max(2, int(train_freq / time_step))
+        buffer = RolloutBuffer(
+            buffer_size=rollout_buffer_size,
+            obs_dim=world.learning_role.rl_algorithm.obs_dim,
+            act_dim=world.learning_role.rl_algorithm.act_dim,
+            n_rl_units=len(world.learning_role.rl_strats),
+            device=world.learning_role.device,
+            float_type=world.learning_role.float_type,
+            gamma=learning_config.gamma,
+            gae_lambda=learning_config.on_policy.gae_lambda,
+        )
+        min_episode_for_eval = validation_interval
+
+    # -----------------------------------------
+    # Information that needs to be stored across episodes, aka one simulation run
+    inter_episodic_data = {
+        "buffer": buffer,
         "actors_and_critics": None,
         "max_eval": defaultdict(lambda: -1e9),
         "all_eval": defaultdict(list),
@@ -1104,13 +1136,6 @@ def run_learning(
     }
 
     world.learning_role.load_inter_episodic_data(inter_episodic_data)
-
-    validation_interval = world.learning_role.determine_validation_interval()
-
-    # sync train frequency with simulation horizon once at the beginning of training and overwrite scenario data
-    world.scenario_data["config"]["learning_config"]["train_freq"] = (
-        world.learning_role.sync_train_freq_with_simulation_horizon()
-    )
 
     eval_episode = 1
 
@@ -1140,8 +1165,7 @@ def run_learning(
         if (
             episode % validation_interval == 0
             and episode
-            >= world.learning_role.learning_config.off_policy.episodes_collecting_initial_experience
-            + validation_interval
+            >= min_episode_for_eval
         ):
             world.reset()
 
@@ -1188,8 +1212,7 @@ def run_learning(
         # save the policies after each episode in case the simulation is stopped or crashes
         if (
             episode
-            >= world.learning_role.learning_config.off_policy.episodes_collecting_initial_experience
-            + validation_interval
+            >= min_episode_for_eval
         ):
             world.learning_role.rl_algorithm.save_params(
                 directory=f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"

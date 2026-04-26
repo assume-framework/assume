@@ -1005,6 +1005,7 @@ class LearningStrategy(BaseStrategy):
         # access to the learning_role that orchestrates learning
         self.learning_role = learning_role
         self.learning_config = learning_role.learning_config
+        self.algorithm = self.learning_config.algorithm
 
         self.foresight = foresight
         self.act_dim = act_dim
