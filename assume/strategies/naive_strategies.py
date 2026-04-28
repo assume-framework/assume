@@ -267,8 +267,8 @@ class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
         :rtype: Orderbook
         """
         start = product_tuples[0][0]
-        # end_all = product_tuples[-1][1]
         previous_power = unit.get_output_before(start)
+        p_nom = unit.max_power
 
         bids = []
         for product in product_tuples:
@@ -277,13 +277,15 @@ class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
             marginal_cost = unit.calculate_marginal_cost(
                 start, previous_power
             )  # calculation of the marginal costs
-
-            available_power = unit.forecaster.availability.loc[start]
-            max_power = available_power * unit.max_power
-            min_power = min(
-                unit.min_power, max_power
-            )  # TODO: choice relates to discussion in github.com/assume-framework/assume/pull/737
-            p_nom = unit.max_power
+            available_power = unit.forecaster.availability.at[start] * unit.max_power
+            # if additional max_power is below the technical minimum, the unit cannot run
+            # set to current power to avoid supplying redispatch potential (although current power should generally be 0 in that case)
+            if available_power < unit.min_power:
+                min_power = current_power
+                max_power = current_power
+            else:
+                min_power = unit.min_power
+                max_power = available_power
 
             bids.append(
                 {
@@ -298,6 +300,9 @@ class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
                     "node": unit.node,
                 }
             )
+
+            # update previous power for the next iteration
+            previous_power = current_power
 
         return bids
 
