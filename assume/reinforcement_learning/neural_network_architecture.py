@@ -9,7 +9,11 @@ from torch.nn import functional as F
 
 from typing import List, Tuple, Type, Optional, Union
 
-from assume.reinforcement_learning.learning_utils import activation_function_limit
+from assume.reinforcement_learning.learning_utils import (
+    activation_function_limit,
+    xavier_init_weights,
+    orthogonal_init_weights,
+)
 
 
 class Critic(nn.Module):
@@ -69,14 +73,8 @@ class Critic(nn.Module):
         return layers
 
     def _init_weights(self):
-        """Apply Xavier initialization to all layers."""
-
-        def init_layer(m):
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                nn.init.zeros_(m.bias)
-
-        self.apply(init_layer)
+        """Apply Xavier uniform initialisation to all Linear layers."""
+        self.apply(xavier_init_weights)
 
 
 class CriticTD3(Critic):
@@ -218,16 +216,11 @@ class CriticPPO(Critic):
         self._init_weights()
 
     def _init_weights(self) -> None:
-        """Apply Orthogonal initialization with appropriate gains."""
-        def init_layer(m):
-            if isinstance(m, nn.Linear):
-                if m.out_features == 1:  # Output layer
-                    nn.init.orthogonal_(m.weight, gain=0.01)
-                else:  # Hidden layers
-                    nn.init.orthogonal_(m.weight, gain=np.sqrt(2))
-                nn.init.zeros_(m.bias)
-        
-        self.apply(init_layer)
+        """Apply orthogonal initialisation: sqrt(2) gain for hidden layers, 1.0 for the value head."""
+        for layer in self.v_layers:
+            if isinstance(layer, nn.Linear):
+                gain = 0.01 if layer.out_features == 1 else np.sqrt(2)
+                orthogonal_init_weights(layer, gain=gain)
 
     def forward(self, obs: th.Tensor) -> th.Tensor:
         """Returns V value."""
@@ -269,14 +262,8 @@ class MLPActor(Actor):
         self._init_weights()
 
     def _init_weights(self):
-        """Apply Xavier initialization to all layers."""
-
-        def init_layer(m):
-            if isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight)
-                nn.init.zeros_(m.bias)
-
-        self.apply(init_layer)
+        """Apply Xavier uniform initialisation to all Linear layers."""
+        self.apply(xavier_init_weights)
 
     def forward(self, obs):
         """Forward pass for action prediction."""
@@ -389,7 +376,7 @@ class ActorPPO(nn.Module):
         self.act_dim = act_dim
         self.float_type = float_type
 
-        self.activation = "softsign"  # or "tanh", "sigmoid", "relu"
+        self.activation = "tanh"  # or "softsign", "sigmoid", "relu"
 
         if self.activation not in activation_function_limit:
             raise ValueError(
@@ -412,24 +399,10 @@ class ActorPPO(nn.Module):
         self._init_weights()
 
     def _init_weights(self) -> None:
-        """Apply orthogonal initialization with appropriate gains."""
-        def init_layer(m):
-            if isinstance(m, nn.Linear):
-                if m.out_features == self.act_dim:  # Output layer (mean)
-                    nn.init.orthogonal_(m.weight, gain=0.01)
-                else:  # Hidden layers
-                    nn.init.orthogonal_(m.weight, gain=np.sqrt(2))
-                nn.init.zeros_(m.bias)
-        
-        # Initialize hidden layers with larger gain
-        nn.init.orthogonal_(self.FC1.weight, gain=np.sqrt(2))
-        nn.init.orthogonal_(self.FC2.weight, gain=np.sqrt(2))
-        nn.init.zeros_(self.FC1.bias)
-        nn.init.zeros_(self.FC2.bias)
-        
-        # Initialize output layer with small gain
-        nn.init.orthogonal_(self.mean_layer.weight, gain=0.01)
-        nn.init.zeros_(self.mean_layer.bias)
+        """Apply orthogonal initialisation with appropriate gains."""
+        orthogonal_init_weights(self.FC1, gain=np.sqrt(2))
+        orthogonal_init_weights(self.FC2, gain=np.sqrt(2))
+        orthogonal_init_weights(self.mean_layer, gain=0.01)
 
     def forward(self, obs: th.Tensor, deterministic: bool = False) -> th.Tensor:
         """Forward pass"""
@@ -550,7 +523,7 @@ class LSTMActorPPO(ActorPPO):
         self.unique_obs_dim = unique_obs_dim
         self.num_timeseries_obs_dim = num_timeseries_obs_dim
 
-        self.activation = "softsign"
+        self.activation = "tanh"
         self.min_output = activation_function_limit[self.activation]["min"]
         self.max_output = activation_function_limit[self.activation]["max"]
         self.activation_function = activation_function_limit[self.activation]["func"]
@@ -581,22 +554,15 @@ class LSTMActorPPO(ActorPPO):
         self._init_weights()
 
     def _init_weights(self) -> None:
-        """Apply orthogonal initialization."""
-        def init_layer(m):
-            if isinstance(m, nn.Linear):
-                nn.init.orthogonal_(m.weight, gain=1.0)
-                nn.init.zeros_(m.bias)
-            elif isinstance(m, nn.LSTMCell):
+        """Apply orthogonal initialisation."""
+        for m in self.modules():
+            if isinstance(m, nn.LSTMCell):
                 nn.init.orthogonal_(m.weight_ih, gain=1.0)
                 nn.init.orthogonal_(m.weight_hh, gain=1.0)
                 nn.init.zeros_(m.bias_ih)
                 nn.init.zeros_(m.bias_hh)
-        
-        self.apply(init_layer)
-        
-        # Initialize output layer with small gain
-        nn.init.orthogonal_(self.mean_layer.weight, gain=0.01)
-        nn.init.zeros_(self.mean_layer.bias)
+        orthogonal_init_weights(self.FC1, gain=np.sqrt(2))
+        orthogonal_init_weights(self.mean_layer, gain=0.01)
 
     def _compute_mean(self, obs: th.Tensor) -> th.Tensor:
         """Compute policy mean action from LSTM features."""

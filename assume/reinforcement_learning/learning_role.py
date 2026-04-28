@@ -136,10 +136,12 @@ class Learning(Role):
             self.all_rewards = defaultdict(lambda: defaultdict(list))
             self.all_regrets = defaultdict(lambda: defaultdict(list))
             self.all_profits = defaultdict(lambda: defaultdict(list))
-            # PPO algorithm specific caches for on-policy learning
-            self.all_values = defaultdict(lambda: defaultdict(list))
-            self.all_log_probs = defaultdict(lambda: defaultdict(list))
-            self.all_dones = defaultdict(lambda: defaultdict(list))
+            # On-policy (PPO/MAPPO) only: value estimates, log-probs, and done
+            # flags collected per time-step for GAE computation.
+            if is_on_policy(self.learning_config.algorithm):
+                self.all_values = defaultdict(lambda: defaultdict(list))
+                self.all_log_probs = defaultdict(lambda: defaultdict(list))
+                self.all_dones = defaultdict(lambda: defaultdict(list))
 
     def on_ready(self):
         """Set up the learning role for reinforcement learning training.
@@ -264,10 +266,15 @@ class Learning(Role):
         current_noises = self.all_noises
         current_regrets = self.all_regrets
         current_profits = self.all_profits
-        # PPO specific caches
-        current_values = self.all_values
-        current_log_probs = self.all_log_probs
-        current_dones = self.all_dones
+        # On-policy (PPO/MAPPO) only caches
+        if is_on_policy(self.learning_config.algorithm):
+            current_values = self.all_values
+            current_log_probs = self.all_log_probs
+            current_dones = self.all_dones
+        else:
+            current_values = defaultdict(lambda: defaultdict(list))
+            current_log_probs = defaultdict(lambda: defaultdict(list))
+            current_dones = defaultdict(lambda: defaultdict(list))
 
         # Reset cache dicts immediately with new defaultdicts
         self.all_obs = defaultdict(lambda: defaultdict(list))
@@ -276,10 +283,10 @@ class Learning(Role):
         self.all_noises = defaultdict(lambda: defaultdict(list))
         self.all_regrets = defaultdict(lambda: defaultdict(list))
         self.all_profits = defaultdict(lambda: defaultdict(list))
-        # PPO specific resets
-        self.all_values = defaultdict(lambda: defaultdict(list))
-        self.all_log_probs = defaultdict(lambda: defaultdict(list))
-        self.all_dones = defaultdict(lambda: defaultdict(list))
+        if is_on_policy(self.learning_config.algorithm):
+            self.all_values = defaultdict(lambda: defaultdict(list))
+            self.all_log_probs = defaultdict(lambda: defaultdict(list))
+            self.all_dones = defaultdict(lambda: defaultdict(list))
 
         # Get timestamps from cache we took
         all_timestamps = sorted(current_obs.keys())

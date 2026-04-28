@@ -103,7 +103,31 @@ class PPO(A2CAlgorithm):
     # Note: save_params, save_critic_params, save_actor_params, load_params,
     # load_critic_params, load_actor_params, initialize_policy are inherited from A2CAlgorithm
 
+    def get_action(
+        self, strategy, obs: th.Tensor
+    ) -> tuple[th.Tensor, th.Tensor]:
+        """Sample a stochastic action.
 
+        In learning mode the actor's Gaussian policy is sampled and the
+        log-probability is cached on the strategy for later use in
+        _store_to_buffer_and_update_sync.  In evaluation mode the
+        deterministic mean action is returned instead.
+
+        PPO does *not* have an initial-exploration phase — the stochastic
+        policy provides sufficient exploration from the very first episode.
+        """
+        if strategy.learning_mode and not strategy.evaluation_mode:
+            action, log_prob = strategy.actor.get_action_and_log_prob(obs.unsqueeze(0))
+            action = action.squeeze(0).detach()
+            # Cache log-prob for rollout buffer; value is recomputed centrally
+            strategy._last_log_prob = log_prob.squeeze(0).detach()
+            noise = th.zeros_like(action, dtype=strategy.float_type)
+            return action, noise
+
+        # Evaluation
+        action = strategy.actor(obs, deterministic=True).detach()
+        noise = th.zeros_like(action, dtype=strategy.float_type)
+        return action, noise
 
     def create_actors(self) -> None:
         """Create stochastic actor networks for all agents.

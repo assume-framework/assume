@@ -13,6 +13,8 @@ from assume.reinforcement_learning.learning_utils import (
     transfer_weights,
 )
 
+from assume.common.base import LearningStrategy
+
 logger = logging.getLogger(__name__)
 
 
@@ -94,6 +96,25 @@ class RLAlgorithm:
         for optimizer in optimizers:
             for param_group in optimizer.param_groups:
                 param_group["lr"] = learning_rate
+
+    def get_action(
+        self, strategy: "LearningStrategy", obs: th.Tensor
+    ) -> tuple[th.Tensor, th.Tensor]:
+        """Sample an action for strategy given observation *obs*.
+
+        Each concrete algorithm overrides this method with its own sampling
+        logic.
+
+        Args:
+            strategy: The TorchLearningStrategy instance requesting an action.
+            obs: Flat observation tensor for a single time-step.
+
+        Returns:
+            A (action, noise) tuple, both tensors on the same device as strategy.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement get_action()"
+        )
 
     def update_policy(self) -> None:
         """Update the policy parameters.
@@ -184,6 +205,47 @@ class A2CAlgorithm(RLAlgorithm):
             learning_role: Learning role object containing configuration and strategies.
         """
         super().__init__(learning_role)
+
+    def get_action(
+        self, strategy: "LearningStrategy", obs: th.Tensor
+    ) -> tuple[th.Tensor, th.Tensor]:
+        """Sample an action using the off-policy strategy.
+
+        During learning mode the agent either performs pure-noise initial
+        exploration (first N episodes) or uses its deterministic actor plus
+        Gaussian action noise.  During evaluation mode the actor is used
+        without any noise.
+
+        This default implementation is shared by TD3 and DDPG.  PPO overrides
+        it with its own stochastic Gaussian sampling.
+        """
+        if strategy.learning_mode and not strategy.evaluation_mode:
+            if strategy.collect_initial_experience_mode:
+                # Pure Gaussian noise for initial random exploration
+                noise = th.normal(
+                    mean=0.0,
+                    std=strategy.exploration_noise_std,
+                    size=(strategy.act_dim,),
+                    dtype=strategy.float_type,
+                    device=strategy.device,
+                )
+                return noise, noise
+
+            action = strategy.actor(obs).detach()
+            noise = strategy.action_noise.noise(
+                device=strategy.device, dtype=strategy.float_type
+            )
+            action = th.clamp(
+                action + noise,
+                strategy.actor.min_output,
+                strategy.actor.max_output,
+            )
+            return action, noise
+
+        # Evaluation
+        action = strategy.actor(obs).detach()
+        noise = th.zeros(strategy.act_dim, dtype=strategy.float_type, device=strategy.device)
+        return action, noise
 
     def save_params(self, directory: str) -> None:
         """Save actor and critic network parameters.

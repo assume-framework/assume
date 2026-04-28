@@ -375,6 +375,38 @@ def transfer_weights(
     return new_state_copy
 
 
+def xavier_init_weights(module: th.nn.Module) -> None:
+    """Apply Xavier uniform initialisation to all Linear layers in *module*.
+
+    Xavier initialisation keeps activation variance roughly constant across
+    layers, which works well for tanh / softsign activations (TD3/DDPG actors
+    and all Q-network critics).
+
+    Args:
+        module: Any ``nn.Module`` whose ``Linear`` sub-layers should be initialised.
+    """
+    if isinstance(module, th.nn.Linear):
+        th.nn.init.xavier_uniform_(module.weight)
+        th.nn.init.zeros_(module.bias)
+
+
+def orthogonal_init_weights(module: th.nn.Module, gain: float = 1.0) -> None:
+    """Apply orthogonal initialisation to a single Linear layer.
+
+    Orthogonal initialisation is the standard choice for PPO because it
+    preserves gradient norms better than Xavier when combined with ReLU
+    activations and a Gaussian policy head.
+
+    Args:
+        module: An ``nn.Linear`` layer to initialise.
+        gain: Scaling factor for the weight matrix.  Common choices:
+            ``sqrt(2)`` for hidden layers, ``0.01`` for the output / policy head.
+    """
+    if isinstance(module, th.nn.Linear):
+        th.nn.init.orthogonal_(module.weight, gain=gain)
+        th.nn.init.zeros_(module.bias)
+
+
 def encode_time_features(start: datetime) -> list:
     """
     Encode time features for a given datetime object.

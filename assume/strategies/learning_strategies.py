@@ -22,10 +22,7 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
-from assume.common.base import (
-    is_off_policy,
-    is_on_policy,
-)
+from assume.common.base import is_off_policy
 
 logger = logging.getLogger(__name__)
 
@@ -251,8 +248,10 @@ class TorchLearningStrategy(LearningStrategy):
         return np.array([])
 
     def get_actions(self, next_observation):
-        """
-        Determines actions based on the current observation, applying noise for exploration if in learning mode.
+        """Determine action and exploration noise for the current observation.
+
+        All algorithm-specific sampling logic lives in the
+        algorithm class via get_action. 
 
         Args
         ----
@@ -272,64 +271,7 @@ class TorchLearningStrategy(LearningStrategy):
         solely on noise to cover the action space broadly.
         For PPO, we also store log_prob and value estimates for later use.
         """
-
-        current_algorithm = self.learning_config.algorithm
-
-        # distinction whether we are in learning mode or not to handle exploration realised with noise
-        if self.learning_mode and not self.evaluation_mode:
-            # if we are in learning mode the first x episodes we want to explore the entire action space
-            # to get a good initial experience, in the area around the costs of the agent
-            # Only use initial experience collection for off-policy algorithms (not PPO)
-            if self.collect_initial_experience_mode and is_off_policy(current_algorithm):
-                # define current action as solely noise
-                noise = th.normal(
-                    mean=0.0,
-                    std=self.exploration_noise_std,
-                    size=(self.act_dim,),
-                    dtype=self.float_type,
-                    device=self.device,
-                )
-
-                # =============================================================================
-                # 2.1 Get Actions and handle exploration
-                # =============================================================================
-                # Using only noise as the action to enforce exploration.
-                curr_action = noise
-                
-            else:
-                # Using the policy forMAPPO (no initial random exploration).
-                if current_algorithm == "mappo":
-                    # Using get_action_and_log_prob for proper PPO stochastic sampling.
-                    curr_action, log_prob = self.actor.get_action_and_log_prob(next_observation.unsqueeze(0))
-                    curr_action = curr_action.squeeze(0).detach()
-                    self._last_log_prob = log_prob.squeeze(0).detach()
-
-                    # Using stochastic PPO policy with no external noise.
-                    noise = th.zeros_like(curr_action, dtype=self.float_type)
-                else:
-                    # TD3/DDPG: if we are not in the initial exploration phase we chose the action with the actor neural net
-                    # and add noise to the action
-                    curr_action = self.actor(next_observation).detach()
-                    noise = self.action_noise.noise(
-                        device=self.device, dtype=self.float_type
-                    )
-                    curr_action += noise
-
-                # make sure that noise adding does not exceed the actual output of the NN as it pushes results in a direction that actor can't even reach
-                curr_action = th.clamp(
-                    curr_action, self.actor.min_output, self.actor.max_output
-                )
-        else:
-            # if we are not in learning mode we just use the actor neural net to get the action without adding noise
-            if current_algorithm == "mappo":
-                # For PPO evaluation, use deterministic action (mean)
-                curr_action = self.actor(next_observation, deterministic=True).detach()
-            else:
-                curr_action = self.actor(next_observation).detach()
-            # noise is an tensor with zeros, because we are not in learning mode
-            noise = th.zeros_like(curr_action, dtype=self.float_type)
-
-        return curr_action, noise
+        return self.learning_role.rl_algorithm.get_action(self, next_observation)
 
 
 class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
