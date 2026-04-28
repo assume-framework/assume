@@ -12,6 +12,7 @@ from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
     calculate_network_meta,
+    get_supported_solver_linopy,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
@@ -35,7 +36,7 @@ class RedispatchMarketRole(MarketRole):
         marketconfig (MarketConfig): The market configuration.
 
     Note:
-        Users can also configure the path to the network data, the solver to be used,
+        Users can also configure the path to the network data, the name of the solver to be used,
         and the backup marginal cost in the param_dict of the market configuration.
 
     """
@@ -69,7 +70,9 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.solver = marketconfig.param_dict.get("solver", "highs")
+        self.solver_name = get_supported_solver_linopy(
+            marketconfig.param_dict.get("solver_name", "highs")
+        )
 
         # set the market clearing principle
         # as pay as bid or pay as clear
@@ -185,11 +188,13 @@ class RedispatchMarketRole(MarketRole):
             logger.debug("Congestion detected")
 
             status, termination_condition = redispatch_network.optimize(
-                solver_name=self.solver,
+                solver_name=self.solver_name,
                 log_to_console=False,
                 # do not show tqdm progress bars for large grids
                 # https://github.com/PyPSA/linopy/pull/375
                 progress=False,
+                # Constant objective terms do not affect dispatch or nodal prices; omit for speed/stability.
+                include_objective_constant=False,
             )
 
             if status != "ok":
