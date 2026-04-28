@@ -303,9 +303,7 @@ class TorchLearningStrategy(LearningStrategy):
                     curr_action, log_prob = self.actor.get_action_and_log_prob(next_observation.unsqueeze(0))
                     curr_action = curr_action.squeeze(0).detach()
                     self._last_log_prob = log_prob.squeeze(0).detach()
-                    # Computing the value later from centralized observations in learning_role.
-                    self._last_value = th.tensor(0.0, device=self.device)
-                    
+
                     # Using stochastic PPO policy with no external noise.
                     noise = th.zeros_like(curr_action, dtype=self.float_type)
                 else:
