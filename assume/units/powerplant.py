@@ -328,6 +328,12 @@ class PowerPlant(SupportsMinMax):
 
         # subtract positive reserve commitment and already-dispatched base_load from available power
         max_power = available_power - capacity_pos - base_load
+
+        # warn if previous dispatch exceeded available power
+        if (max_power < 0).any():
+            logger.warning(
+                f"Unit {self.id}: previous dispatch exceeded available power between {start} and {end}. Limiting additional power to 0."
+            )
         # additional power can never be negative
         max_power = max_power.clip(min=0)
 
