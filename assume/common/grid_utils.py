@@ -2,13 +2,18 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from datetime import timedelta
 
 import numpy as np
 import pandas as pd
 import pypsa
+from linopy import available_solvers
 
 from assume.common.market_objects import MarketProduct
+from assume.common.utils import SUPPORTED_SOLVERS
+
+logger = logging.getLogger(__name__)
 
 
 def add_generators(
@@ -333,3 +338,39 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
         )
 
     return meta
+
+
+def get_supported_solver_linopy(default_solver: str | None = None):
+    """
+    Get an available solver for linopy optimization.
+
+    Filters the list of supported solvers to find which ones are installed,
+    then returns the default solver if available, otherwise falls back to the first available solver.
+
+    Args:
+        default_solver (str | None, optional): Preferred solver name. If not available,
+            falls back to the first available solver. Defaults to None.
+
+    Returns:
+        str: Name of the selected solver.
+
+    Raises:
+        RuntimeError: If none of the supported solvers (highs, gurobi, glpk, cbc, cplex) are available.
+
+    Warning:
+        Logs a warning if the default_solver is not available and a fallback is used.
+    """
+    solvers_priority = SUPPORTED_SOLVERS
+
+    # Filter available solvers while preserving the shared fallback priority.
+    solvers = [solver for solver in solvers_priority if solver in available_solvers]
+    if not solvers:
+        raise RuntimeError(f"None of {solvers_priority} are available")
+
+    solver = default_solver or solvers[0]
+
+    if solver not in solvers:
+        logger.warning("Solver %s not available, using %s", solver, solvers[0])
+        solver = solvers[0]
+
+    return solver
