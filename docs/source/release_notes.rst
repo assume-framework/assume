@@ -20,9 +20,13 @@ Upcoming Release
   - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.
   - **Added a check for available solvers in redispatch & nodal_clearing**, similar to the check in complex clearing.
   - **Consistently distinguish 'solver' and 'solver_name'**: Users should now use 'solver_name' to specify the solver in the market configs param_dict, as 'solver' now refers to the actual solver instance.
+  - **Extended ``min_max_scale`` to support arbitrary output ranges**: Added optional ``out_min`` and ``out_max`` parameters, enabling both forward scaling and inverse rescaling with a single function instead of two separate ones.
+  - **Add test for portfolio learning strategy and ``min_max_scale`` function**: Added a test for the portfolio learning strategy and ``min_max_rescale`` function to ensure its functionality and stability.
+  - **More flexible action to bid transformation for EnergyLearningStrategy and EnergyLearningSingleBidStrategy**: They now transform bids linearly to the specified bid range, which can be configured in the learning config.
 **Bug Fixes:**
   - **dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
   - **fixed a bug in forecasts**, that occurred when using complex clearing
+  - **Fix errors in portfolio learning strategies**: The ``min_max_rescale`` function was missing from ``utils.py``, causing an ``ImportError`` in ``portfolio_learning_strategies.py``. Resolved by extending ``min_max_scale`` to cover the rescaling use case. And fix minor construction bug for observation space.
 
 0.6.0 - (18th March 2026)
 =========================

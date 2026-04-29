@@ -750,19 +750,36 @@ def calculate_content_size(content: list | dict) -> int:
     return sys.getsizeof(content)
 
 
-def min_max_scale(x, min_val: float, max_val: float):
+def min_max_scale(
+    val,
+    min_val: float,
+    max_val: float,
+    out_min: float = 0.0,
+    out_max: float = 1.0,
+):
     """
-    Min-Max scaling of a value x to the range [0, 1]
+    Linearly scale value from [min_val, max_val] to [out_min, out_max] (default: [0.0, 1.0]).
 
     Args:
-        x: value(s) to scale
-        min_val: minimum value of the parameter
-        max_val: maximum value of the parameter
+        val: value to scale
+        min_val: minimum value of the input range
+        max_val: maximum value of the input range
+        out_min: minimum value of the output range
+        out_max: maximum value of the output range
     """
+    # Catch values outside the input range
+    below, above = val < min_val, val > max_val
+    if (below.any() if hasattr(below, "any") else below) or (
+        above.any() if hasattr(above, "any") else above
+    ):
+        raise ValueError(
+            f"Value {val} is outside the input range [{min_val}, {max_val}]."
+        )
     # Avoid division by zero
     if min_val == max_val:
-        return x
-    return (x - min_val) / (max_val - min_val)
+        return val
+    else:
+        return out_min + (val - min_val) / (max_val - min_val) * (out_max - out_min)
 
 
 def str_to_bool(val):

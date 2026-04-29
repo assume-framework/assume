@@ -450,7 +450,9 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         # =============================================================================
         # actions are in the range [-1,1], we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
-        bid_prices = actions * self.max_bid_price
+        bid_prices = min_max_scale(
+            actions, -1, 1, self.min_bid_price, self.max_bid_price
+        )
 
         # 3.1 formulate the bids for Pmin
         # Pmin, the minimum run capacity is the inflexible part of the bid, which should always be accepted
@@ -770,7 +772,9 @@ class EnergyLearningSingleBidStrategy(EnergyLearningStrategy, MinMaxStrategy):
         # =============================================================================
         # actions are in the range [-1,1] + noise, we need to transform them into actual bids
         # we can use our domain knowledge to guide the bid formulation
-        bid_price = actions[0] * self.max_bid_price
+        bid_price = min_max_scale(
+            actions[0], -1, 1, self.min_bid_price, self.max_bid_price
+        )
 
         # actually formulate bids in orderbook format
         bids = [
