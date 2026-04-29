@@ -768,13 +768,16 @@ def min_max_scale(
         out_max: maximum value of the output range
     """
     # Catch values outside the input range
-    if np.any(val < min_val) or np.any(val > max_val):
+    below, above = val < min_val, val > max_val
+    if (below.any() if hasattr(below, "any") else below) or (
+        above.any() if hasattr(above, "any") else above
+    ):
         raise ValueError(
             f"Value {val} is outside the input range [{min_val}, {max_val}]."
         )
     # Avoid division by zero
     if min_val == max_val:
-        return val  # TODO: is that really intended behavior?
+        return val
     else:
         return out_min + (val - min_val) / (max_val - min_val) * (out_max - out_min)
 
