@@ -193,7 +193,6 @@ class PowerPlant(SupportsMinMax):
             current_power = self.outputs["energy"].at[t]
             previous_power = self.get_output_before(t)
             op_time = self.get_operation_time(t)
-
             current_power = self.calculate_ramp(op_time, previous_power, current_power)
 
             if current_power > 0:
@@ -202,7 +201,75 @@ class PowerPlant(SupportsMinMax):
 
             self.outputs["energy"].at[t] = current_power
 
+        # Book start-up and variable generation costs from the finalized
+        # dispatch. Both helpers overwrite their output series, which keeps
+        # the computation idempotent when execute_current_dispatch is called
+        # multiple times per simulation tick (once per cleared market).
+        self._book_start_costs(start, end, "energy")
+        self.calculate_generation_cost(start, end, "energy")
         return self.outputs["energy"].loc[start:end]
+
+    def get_starting_costs(self, op_time: int) -> float:
+        """
+        Returns the start-up cost for the given operation time.
+
+        If ``op_time`` is positive, the unit is running and no start-up cost is
+        returned. Otherwise the cost is selected from the hot / warm / cold
+        tiers based on how many index steps the unit has been shut down.
+
+        Args:
+            op_time: The operation time, in index steps. Positive if running,
+                negative (as produced by :meth:`get_operation_time`) if it was
+                shut down.
+
+        Returns:
+            The start-up cost applicable to the given operation time.
+        """
+        if op_time > 0:
+            return 0
+
+        downtime = abs(op_time)
+        if downtime <= self.downtime_hot_start:
+            return self.hot_start_cost
+        if downtime <= self.downtime_warm_start:
+            return self.warm_start_cost
+        return self.cold_start_cost
+
+    def _book_start_costs(
+        self, start: datetime, end: datetime, product_type: str = "energy"
+    ) -> None:
+        """
+        Recomputes and overwrites ``{product_type}_start_costs`` for the window.
+
+        A start-up cost is booked at step ``t`` iff the unit transitions from
+        non-operating to operating between ``t - freq`` and ``t`` in the final,
+        multi-market-aggregated ``outputs[product_type]`` series. The amount is
+        taken from :meth:`get_starting_costs` using the operation time observed
+        just before ``t``.
+
+        Idempotent: calling it repeatedly with the same
+        ``outputs[product_type]`` history produces the same series. Must be
+        called after :meth:`calculate_ramp` has finalized the dispatch, so
+        starts that are suppressed by ``min_down_time`` are not charged.
+        """
+        if start not in self.index:
+            start = self.index[0]
+
+        energy = self.outputs[product_type]
+        start_cost_key = f"{product_type}_start_costs"
+
+        for t in self.index[start:end]:
+            self.outputs[start_cost_key].at[t] = 0.0
+
+            if energy.at[t] <= 0:
+                continue
+
+            prev_energy = self.get_output_before(t, product_type)
+            if prev_energy > 0:
+                continue
+
+            op_time = self.get_operation_time(t)
+            self.outputs[start_cost_key].at[t] = self.get_starting_costs(op_time)
 
     def calc_simple_marginal_cost(
         self,
@@ -401,3 +468,15 @@ class PowerPlant(SupportsMinMax):
         )
 
         return unit_dict
+
+    def get_max_lookback_optime(self):
+        # Add 1 to the warm/hot-start threshold so the window is big enough to
+        # distinguish warm/hot from cold starts (downtime > downtime_warm_start).
+        max_time = max(
+            self.min_operating_time,
+            self.min_down_time,
+            self.downtime_hot_start + 1,
+            self.downtime_warm_start + 1,
+            1,
+        )
+        return max_time
