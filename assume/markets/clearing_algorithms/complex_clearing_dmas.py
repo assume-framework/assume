@@ -23,7 +23,7 @@ from pyomo.environ import value as get_real_number
 from pyomo.opt import SolverFactory
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order, Orderbook
-from assume.common.utils import get_supported_solver
+from assume.common.utils import get_supported_solver_pyomo
 from assume.markets.base_market import MarketRole
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ class ComplexDmasClearingRole(MarketRole):
         start_block = []
         model = ConcreteModel("dmas_market")
         # Create a solver
-        opt = SolverFactory(get_supported_solver())
+        opt = SolverFactory(get_supported_solver_pyomo())
 
         bid_ids = {}
         agent_addrs = {}

@@ -42,7 +42,6 @@ class PowerPlant(SupportsMinMax):
         min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours. Defaults to 0.
         downtime_hot_start (int, optional): The downtime required after a hot start before the power plant can be restarted, in hours. Defaults to 8.
         downtime_warm_start (int, optional): The downtime required after a warm start before the power plant can be restarted, in hours. Defaults to 48.
-        heat_extraction (bool, optional): A boolean indicating whether the power plant can extract heat for external purposes. Defaults to False.
         max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit. Defaults to 0.
         location (Tuple[float, float], optional): The geographical coordinates (latitude and longitude) of the power plant's location. Defaults to (0.0, 0.0).
         node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "node0".
@@ -72,7 +71,6 @@ class PowerPlant(SupportsMinMax):
         min_down_time: int = 1,  # hours
         downtime_hot_start: int = 0,  # hours
         downtime_warm_start: int = 0,  # hours
-        heat_extraction: bool = False,
         max_heat_extraction: float = 0,
         location: tuple[float, float] = (0.0, 0.0),
         node: str = "node0",
@@ -112,9 +110,9 @@ class PowerPlant(SupportsMinMax):
                 id=self.id,
                 field="min_power",
             )
-        if not 0 <= efficiency <= 1:
+        if efficiency < 0:
             raise ValidationError(
-                message=f"{efficiency=} must be between 0 and 1 for unit {self.id}",
+                message=f"{efficiency=} must be >= 0 for unit {self.id}",
                 id=self.id,
                 field="efficiency",
             )
@@ -137,7 +135,6 @@ class PowerPlant(SupportsMinMax):
         self.partial_load_eff = partial_load_eff
         self.fuel_type = fuel_type
         self.emission_factor = emission_factor
-        self.heat_extraction = heat_extraction
         self.max_heat_extraction = max_heat_extraction
         self.hot_start_cost = hot_start_cost * max_power
         self.warm_start_cost = warm_start_cost * max_power
@@ -292,47 +289,65 @@ class PowerPlant(SupportsMinMax):
         self, start: datetime, end: datetime, product_type="energy"
     ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Calculates the minimum and maximum power output of the unit and returns it,
-        while considering heat demand and positive capacity reserve power.
+        Calculates the additional minimum and maximum power output.
+
+        "Additional" means relative to the already-committed power, e.g. at other markets.
+        Considers heat demand, positive capacity reserve (capacity_pos reduces headroom),
+        and negative capacity reserve (capacity_neg raises the minimum obligation).
+
         Args:
-            start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
-            product_type (str, optional): The product type of the unit. Defaults to "energy".
+            start (datetime): The start time of the dispatch.
+            end (datetime): The end time of the dispatch (exclusive).
+            product_type (str, optional): The product type. Defaults to "energy".
 
         Returns:
-            tuple[pandas.Series, pandas.Series]: The minimum and maximum power output of the unit.
+            tuple[np.ndarray, np.ndarray]: The additional minimum and maximum power output of the unit.
 
         Note:
             The calculation does not include ramping constraints and can be used for arbitrary start times in the future.
+            Ramping constraints can be applied afterwards via calculate_ramp().
         """
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
 
         base_load = self.outputs["energy"].loc[start:end_excl]
         heat_demand = self.outputs["heat"].loc[start:end_excl]
+        capacity_pos = self.outputs["capacity_pos"].loc[start:end_excl]
         capacity_neg = self.outputs["capacity_neg"].loc[start:end_excl]
 
-        # needed minimum + capacity_neg - what is already sold is actual minimum
-        min_power = self.min_power + capacity_neg - base_load
-        # min_power should be at least the heat demand at that time
-        min_power = min_power.clip(min=heat_demand)
+        availability = self.forecaster.availability.loc[start:end_excl]
+        available_power = availability * self.max_power
 
-        available_power = self.forecaster.availability.loc[start:end_excl]
-        max_power = available_power * self.max_power
         # check if available power is larger than max_power and raise an error if so
-        if (max_power > self.max_power).any():
+        if (available_power > self.max_power).any():
             raise ValidationError(
                 message=f"Available power is larger than max_power for unit {self.id} at time {start}.",
                 id=self.id,
                 field="availability",
             )
 
-        # provide reserve for capacity_pos
-        max_power = max_power - self.outputs["capacity_pos"].loc[start:end_excl]
-        # remove what has already been bid
-        max_power = max_power - base_load
-        # make sure that max_power is > 0 for all timesteps
+        # subtract positive reserve commitment and already-dispatched base_load from available power
+        max_power = available_power - capacity_pos - base_load
+
+        # warn if previous dispatch exceeded available power
+        if (max_power < 0).any():
+            logger.warning(
+                f"Unit {self.id}: previous dispatch exceeded available power between {start} and {end}. Limiting additional power to 0."
+            )
+        # additional power can never be negative
         max_power = max_power.clip(min=0)
+
+        # actual minimum is technical minimum + negative reserve obligation - already dispatched base_load
+        min_power = self.min_power + capacity_neg - base_load
+        # must also cover any heat demand not yet met by base_load
+        # clip to 0: negative values mean base_load already covers heat demand fully
+        heat_demand_still_needed = (heat_demand - base_load).clip(min=0)
+        min_power = min_power.clip(min=heat_demand_still_needed)
+
+        # if additional max_power is below the technical minimum, the unit cannot run at all
+        infeasible = max_power < min_power
+        min_power[infeasible] = 0
+        max_power[infeasible] = 0
 
         return min_power, max_power
 
@@ -376,6 +391,11 @@ class PowerPlant(SupportsMinMax):
                 "min_power": self.min_power,
                 "emission_factor": self.emission_factor,
                 "efficiency": self.efficiency,
+                "fuel_type": self.fuel_type,
+                "max_heat_extraction": self.max_heat_extraction,
+                "hot_start_cost": self.hot_start_cost,
+                "warm_start_cost": self.warm_start_cost,
+                "cold_start_cost": self.cold_start_cost,
                 "unit_type": "power_plant",
             }
         )

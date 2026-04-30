@@ -14,7 +14,7 @@ from pyomo.opt import (
 )
 
 from assume.common.fast_pandas import FastSeries
-from assume.common.utils import get_supported_solver
+from assume.common.utils import get_supported_solver_pyomo
 from assume.units.dst_components import demand_side_technologies
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class DSMFlex:
         super().__init__(**kwargs)
 
         self.components = components
-        self.solver = SolverFactory(get_supported_solver())
+        self.solver = SolverFactory(get_supported_solver_pyomo())
 
     def initialize_components(self):
         """
