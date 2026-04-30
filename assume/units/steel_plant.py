@@ -444,24 +444,25 @@ class SteelPlant(DSMFlex, SupportsMinMax):
                 )
                 return total_output == m.steel_demand
 
-        # NOTE: Per-timestep minimum steel output constraint is NOT added here.
-        # It is added dynamically during rolling-horizon optimization when values are properly
-        # initialized for each window. Adding it here during setup could cause infeasibility
-        # with the full-horizon initial solve.
-        # if self.steel_demand_per_timestep is not None:
-        #     @self.model.Constraint(self.model.time_steps)
-        #     def steel_demand_per_timestep_constraint(m, t):
-        #         """
-        #         Per-timestep constraint: Ensures minimum steel output each hour.
-        #         If per-timestep demand is provided (from forecasts_df), enforce that the EAF produces
-        #         at least the specified amount each hour.
-        #         """
-        #         return m.dsm_blocks["eaf"].steel_output[t] >= m.steel_demand_per_timestep[t]
+        # Per-timestep minimum steel output constraint.
+        # In rolling-horizon mode this is applied per window in _add_window_demand_constraints;
+        # in full-horizon mode we add it here directly.
+        if (
+            self.steel_demand_per_timestep is not None
+            and self.horizon_mode != "rolling_horizon"
+        ):
+
+            @self.model.Constraint(self.model.time_steps)
+            def steel_demand_per_timestep_constraint(m, t):
+                return (
+                    m.dsm_blocks["eaf"].steel_output[t]
+                    >= m.steel_demand_per_timestep[t]
+                )
 
         # Constraint for total power input
         @self.model.Constraint(self.model.time_steps)
         def total_power_input_constraint(m, t):
-            """steel_demand given
+            """
             Ensures the total power input is the sum of power inputs of all components.
             """
             power_input = (

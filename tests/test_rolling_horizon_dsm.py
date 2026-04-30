@@ -138,13 +138,13 @@ def test_rolling_horizon_default_mode_is_full_horizon(dsm_components):
         demand=100,
         technology="steel_plant",
     )
-    assert plant._horizon_mode == "full_horizon"
+    assert plant.horizon_mode == "full_horizon"
 
 
 def test_rolling_horizon_mode_stored_from_config(dsm_components, rh_config):
     """dsm_optimisation_config is correctly parsed into rolling-horizon settings."""
     plant = _make_rh_plant(dsm_components, rh_config)
-    assert plant._horizon_mode == "rolling_horizon"
+    assert plant.horizon_mode == "rolling_horizon"
     assert plant._rh_look_ahead == "4h"
     assert plant._rh_commit == "2h"
     assert plant._rh_step == "2h"

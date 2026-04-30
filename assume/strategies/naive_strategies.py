@@ -172,18 +172,15 @@ class DsmEnergyOptimizationStrategy(MinMaxStrategy):
             Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
         """
 
-        # For rolling-horizon units: check if we need to re-optimize for the next window
-        if hasattr(unit, "_horizon_mode") and unit._horizon_mode == "rolling_horizon":
-            current_market_time = product_tuples[0][0]  # Start time of first product
+        if unit.horizon_mode == "rolling_horizon":
+            current_market_time = product_tuples[0][0]
             did_reoptimize = unit._check_and_reoptimize_rolling_window(
                 current_market_time
             )
             if not did_reoptimize and unit.optimisation_counter == 0:
-                # First call and no rolling-horizon re-optimization needed: run full initial optimization
                 unit.determine_optimal_operation_with_flex()
                 unit.optimisation_counter = 1
         else:
-            # Non-rolling-horizon units: optimize once and reuse
             if unit.optimisation_counter == 0:
                 unit.determine_optimal_operation_with_flex()
                 unit.optimisation_counter = 1
@@ -226,9 +223,8 @@ class DsmEnergyNaiveRedispatchStrategy(MinMaxStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        # For rolling-horizon units: check if we need to re-optimize for the next window
-        if hasattr(unit, "_horizon_mode") and unit._horizon_mode == "rolling_horizon":
-            current_market_time = product_tuples[0][0]  # Start time of first product
+        if unit.horizon_mode == "rolling_horizon":
+            current_market_time = product_tuples[0][0]
             unit._check_and_reoptimize_rolling_window(current_market_time)
 
         # calculate the optimal operation of the unit according to the objective function

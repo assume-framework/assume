@@ -66,7 +66,7 @@ class DSMFlex:
         self.solver = SolverFactory(get_supported_solver_pyomo())
 
         # Rolling-horizon settings (populated from config; default is full horizon)
-        self._horizon_mode = dsm_opt.get("horizon_mode", "full_horizon")
+        self.horizon_mode = dsm_opt.get("horizon_mode", "full_horizon")
         self._rh_look_ahead = dsm_opt.get("look_ahead_horizon")  # e.g. "72h"
         self._rh_commit = dsm_opt.get("commit_horizon")  # e.g. "24h"
         self._rh_step = dsm_opt.get("rolling_step")  # e.g. "24h"
@@ -80,29 +80,7 @@ class DSMFlex:
             0  # How far we've optimized (in full horizon steps)
         )
 
-        if self._horizon_mode == "rolling_horizon":
-            if not all([self._rh_look_ahead, self._rh_commit, self._rh_step]):
-                raise ValueError(
-                    "Rolling horizon mode requires look_ahead_horizon, "
-                    "commit_horizon, and rolling_step to be specified."
-                )
-
-        # Rolling-horizon settings (populated from config; default is full horizon)
-        self._horizon_mode = dsm_opt.get("horizon_mode", "full_horizon")
-        self._rh_look_ahead = dsm_opt.get("look_ahead_horizon")  # e.g. "72h"
-        self._rh_commit = dsm_opt.get("commit_horizon")  # e.g. "24h"
-        self._rh_step = dsm_opt.get("rolling_step")  # e.g. "24h"
-
-        # Rolling-horizon state tracking (for per-market-round re-optimization)
-        self._rh_window_start_idx = 0  # Current window start index in full horizon
-        self._rh_last_market_request_step = (
-            None  # Track which step the last market request was for
-        )
-        self._rh_optimized_until_step = (
-            0  # How far we've optimized (in full horizon steps)
-        )
-
-        if self._horizon_mode == "rolling_horizon":
+        if self.horizon_mode == "rolling_horizon":
             if not all([self._rh_look_ahead, self._rh_commit, self._rh_step]):
                 raise ValueError(
                     "Rolling horizon mode requires look_ahead_horizon, "
@@ -1359,7 +1337,7 @@ class DSMFlex:
         Called by the bidding strategy each time it generates bids.
         Returns ``True`` if re-optimisation was performed.
         """
-        if self._horizon_mode != "rolling_horizon":
+        if self.horizon_mode != "rolling_horizon":
             return False
 
         try:
@@ -1570,7 +1548,7 @@ class DSMFlex:
         # Rolling horizon will be used later during market time re-optimization
         if not switch_flex_off:
             pass
-        elif self._horizon_mode == "rolling_horizon":
+        elif self.horizon_mode == "rolling_horizon":
             logger.info(
                 "[ROLLING-HORIZON] %s: Starting rolling-horizon optimization "
                 "(look_ahead=%s, commit=%s, step=%s)",
@@ -1637,7 +1615,7 @@ class DSMFlex:
 
         # CRITICAL: If rolling horizon is enabled, populate the full-horizon accumulator
         # This ensures the first market call has correct production history
-        if self._horizon_mode == "rolling_horizon":
+        if self.horizon_mode == "rolling_horizon":
             if not hasattr(self, "_rh_full_horizon_production"):
                 self._rh_full_horizon_production = [0.0] * len(self.index)
 

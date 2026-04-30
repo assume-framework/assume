@@ -146,9 +146,12 @@ def test_congestion_management_flexibility(steel_plant_congestion):
     instance = steel_plant_congestion.model.create_instance()
     instance = steel_plant_congestion.switch_to_flex(instance)
 
-    # Set the congestion_indicator in the instance
-    # Delete the old component if it exists to avoid Pyomo warnings
-    if hasattr(instance, "congestion_indicator"):
+    # Overwrite the congestion_indicator set during model build with the one
+    # computed here (which uses the actual threshold comparison).
+    if (
+        steel_plant_congestion.flexibility_measure
+        == "congestion_management_flexibility"
+    ):
         instance.del_component("congestion_indicator")
     instance.congestion_indicator = pyo.Param(
         instance.time_steps,
@@ -195,11 +198,9 @@ def test_peak_load_shifting(steel_plant_peak_shifting):
     instance = steel_plant_peak_shifting.model.create_instance()
     instance = steel_plant_peak_shifting.switch_to_flex(instance)
 
-    # Set the peak_load_cap_value and peak_indicator in the instance
-    # Delete old components if they exist to avoid Pyomo warnings
-    if hasattr(instance, "peak_load_cap_value"):
+    # Overwrite the peak_load_cap_value and peak_indicator set during model build.
+    if steel_plant_peak_shifting.flexibility_measure == "peak_load_shifting":
         instance.del_component("peak_load_cap_value")
-    if hasattr(instance, "peak_indicator"):
         instance.del_component("peak_indicator")
 
     instance.peak_load_cap_value = pyo.Param(
@@ -263,9 +264,8 @@ def test_renewable_utilisation(steel_plant_renewable_utilisation):
     instance = steel_plant_renewable_utilisation.model.create_instance()
     instance = steel_plant_renewable_utilisation.switch_to_flex(instance)
 
-    # Set the normalized renewable signal in the instance
-    # Delete the old component if it exists to avoid Pyomo warnings
-    if hasattr(instance, "renewable_signal"):
+    # Overwrite the renewable_signal set during model build.
+    if steel_plant_renewable_utilisation.flexibility_measure == "renewable_utilisation":
         instance.del_component("renewable_signal")
     instance.renewable_signal = pyo.Param(
         instance.time_steps,
@@ -641,6 +641,79 @@ def test_cost_optimized_concentrates_production_in_cheap_hours(dsm_components):
     # The model must NOT have profile or per-timestep demand params
     assert not hasattr(plant.model, "normalized_load_profile")
     assert not hasattr(plant.model, "steel_demand_per_timestep")
+
+
+def test_full_horizon_per_timestep_demand_constraint_is_enforced(dsm_components):
+    """
+    Full-horizon mode with steel_demand_per_timestep supplied via the forecaster must
+    add steel_demand_per_timestep_constraint to the model and the optimizer must
+    produce at least the declared minimum each hour.
+
+    Setup:
+      - 4 hours, varying electricity price (expensive in hours 0-1, cheap in hours 2-3).
+      - Per-timestep minimum: [10, 20, 30, 5] tonnes / hour.
+      - Without the constraint the optimizer would idle in expensive hours; with it
+        the optimizer MUST produce at least the declared minimum in every hour.
+
+    The fixture uses specific_electricity_consumption=1 for each of the 3 components,
+    so total_power_input[t] == 3 * steel_output[t].  The per-hour minimum in power
+    terms is therefore 3 * per_hour_min[t].
+    """
+    import copy
+
+    n = 4
+    index = pd.date_range("2023-01-01", periods=n, freq="h")
+    per_hour_min = [10.0, 20.0, 30.0, 5.0]
+    # High prices in first two hours — without the constraint the optimizer would
+    # concentrate all production in the cheaper last two hours.
+    prices = [500.0, 500.0, 10.0, 10.0]
+
+    forecaster = SteelplantForecaster(
+        index,
+        electricity_price=prices,
+        fuel_prices={"natural_gas": [30.0] * n, "co2": [20.0] * n},
+        steel_demand=per_hour_min,
+    )
+    plant = SteelPlant(
+        id="test_full_horizon_per_ts",
+        unit_operator="test_operator",
+        objective="min_variable_cost",
+        flexibility_measure="cost_based_load_shift",
+        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
+        node="south",
+        components=copy.deepcopy(dsm_components),
+        forecaster=forecaster,
+        demand=0,  # no global demand; per-timestep minimums drive production
+        technology="steel_plant",
+    )
+    plant.setup_model()
+
+    # Constraint and parameter must both be present on the abstract model
+    assert hasattr(plant.model, "steel_demand_per_timestep"), (
+        "Pyomo parameter steel_demand_per_timestep must exist in full-horizon mode"
+    )
+    assert hasattr(plant.model, "steel_demand_per_timestep_constraint"), (
+        "Constraint steel_demand_per_timestep_constraint must be added in full-horizon mode"
+    )
+
+    # Run optimization
+    plant.determine_optimal_operation_without_flex()
+    assert plant.opt_power_requirement is not None
+
+    # With specific_electricity_consumption=1 for all 3 components, total_power_input[t]
+    # == 3 * eaf.steel_output[t].  So the per-hour minimum in power terms is 3 * min.
+    energy_per_tonne = 3.0
+    opt_power = plant.opt_power_requirement
+    for t, min_steel in enumerate(per_hour_min):
+        ts = index[t]
+        power_at_t = opt_power.at[ts]
+        assert power_at_t >= energy_per_tonne * min_steel - 1e-4, (
+            f"Hour {t}: power={power_at_t:.4f} < min_steel*factor={energy_per_tonne * min_steel:.4f}"
+        )
+
+    # Total power >= 3 * sum(per_hour_min)
+    total_power = sum(opt_power.data)
+    assert total_power >= energy_per_tonne * sum(per_hour_min) - 1e-4
 
 
 if __name__ == "__main__":
