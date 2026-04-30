@@ -26,12 +26,26 @@ observation_dict = dict[list[datetime], ObsActRew]
 Schedule = Callable[[float], float]
 
 
+class ActivationLimits(TypedDict):
+    """Output limits for activation functions."""
+
+    min: float
+    max: float
+    func: Callable[[th.Tensor], th.Tensor]
+
+
+activation_function_limit: dict[str, ActivationLimits] = {
+    "tanh": {"min": -1, "max": 1, "func": th.tanh},
+    "sigmoid": {"min": 0, "max": 1, "func": th.sigmoid},
+    "relu": {"min": 0, "max": float("inf"), "func": th.nn.functional.relu},
+    "softsign": {"min": -1, "max": 1, "func": th.nn.functional.softsign},
+}
+
+
 # Ornstein-Uhlenbeck Noise
 # from https://github.com/songrotek/DDPG/blob/master/ou_noise.py
 class OUNoise:
-    """
-    A class that implements Ornstein-Uhlenbeck noise.
-    """
+    """A class that implements Ornstein-Uhlenbeck noise."""
 
     def __init__(self, action_dimension, mu=0, sigma=0.5, theta=0.15, dt=1e-2):
         self.action_dimension = action_dimension
@@ -60,9 +74,7 @@ class OUNoise:
 
 
 class NormalActionNoise:
-    """
-    A Gaussian action noise that supports direct tensor creation on a given device.
-    """
+    """A Gaussian action noise that supports direct tensor creation on a given device."""
 
     def __init__(self, action_dimension, mu=0.0, sigma=0.1, scale=1.0, dt=0.9998):
         self.act_dimension = action_dimension
@@ -72,15 +84,14 @@ class NormalActionNoise:
         self.dt = dt
 
     def noise(self, device=None, dtype=th.float):
-        """
-        Generates noise using torch.normal(), ensuring efficient execution on GPU if needed.
+        """Generate noise using torch.normal() ensuring efficient execution on GPU if needed.
 
         Args:
-        - device (torch.device, optional): Target device (e.g., 'cuda' or 'cpu').
-        - dtype (torch.dtype, optional): Data type of the tensor (default: torch.float32).
+            device: Target device (e.g., 'cuda' or 'cpu').
+            dtype: Data type of the tensor (default: torch.float32).
 
         Returns:
-        - torch.Tensor: Noise tensor on the specified device.
+            Noise tensor on the specified device.
         """
         return (
             self.dt
@@ -99,9 +110,9 @@ class NormalActionNoise:
 
 
 def polyak_update(params, target_params, tau: float):
-    """
-    Perform a Polyak average update on ``target_params`` using ``params``:
-    target parameters are slowly updated towards the main parameters.
+    """Perform a Polyak average update on ``target_params`` using ``params``.
+    
+    Target parameters are slowly updated towards the main parameters.
     ``tau``, the soft update coefficient controls the interpolation:
     ``tau=1`` corresponds to copying the parameters to the target ones whereas nothing happens when ``tau=0``.
     The Polyak update is done in place, with ``no_grad``, and therefore does not create intermediate tensors,
@@ -111,9 +122,9 @@ def polyak_update(params, target_params, tau: float):
     See https://github.com/DLR-RM/stable-baselines3/issues/93
 
     Args:
-        params: parameters to use to update the target params
-        target_params: parameters to update
-        tau: the soft update coefficient ("Polyak update", between 0 and 1)
+        params: Parameters to use to update the target params.
+        target_params: Parameters to update.
+        tau: The soft update coefficient ("Polyak update", between 0 and 1).
     """
     with th.no_grad():
         for param, target_param in zip(params, target_params):
@@ -123,9 +134,10 @@ def polyak_update(params, target_params, tau: float):
 def linear_schedule_func(
     start: float, end: float = 0, end_fraction: float = 1
 ) -> Schedule:
-    """
-    Create a function that interpolates linearly between start and end
-    between ``progress_remaining`` = 1 and ``progress_remaining`` = 1 - ``end_fraction``.
+    """Create a function that interpolates linearly between start and end.
+    
+    Interpolates linearly between start and end between ``progress_remaining`` = 1 
+    and ``progress_remaining`` = 1 - ``end_fraction``.
 
     Args:
         start: value to start with if ``progress_remaining`` = 1
@@ -135,11 +147,10 @@ def linear_schedule_func(
             of the complete training process.
 
     Returns:
-        Linear schedule function.
+        The linear schedule function.
 
     Note:
         Adapted from SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L100
-
     """
 
     def func(progress_remaining: float) -> float:
@@ -152,17 +163,18 @@ def linear_schedule_func(
 
 
 def constant_schedule(val: float) -> Schedule:
-    """
-    Create a function that returns a constant. It is useful for learning rate schedule (to avoid code duplication)
+    """Create a function that returns a constant. 
+    
+    It is useful for learning rate schedule (to avoid code duplication).
 
     Args:
-        val: constant value
+        val: Constant value.
+        
     Returns:
         Constant schedule function.
 
     Note:
         From SB3: https://github.com/DLR-RM/stable-baselines3/blob/512eea923afad6f6da4bb53d72b6ea4c6d856e59/stable_baselines3/common/utils.py#L124
-
     """
 
     def func(_):
@@ -182,6 +194,11 @@ def get_hidden_sizes(state_dict: dict, prefix: str) -> list[int]:
     return sizes[:-1]  # exclude the final output layer if needed
 
 
+def _get_q_prefixes(state_dict: dict) -> list[str]:
+    known = ("q_layers", "q1_layers", "q2_layers")
+    return [p for p in known if f"{p}.0.weight" in state_dict]
+
+
 def copy_layer_data(dst, src):
     for k in dst:
         if k in src and dst[k].shape == src[k].shape:
@@ -189,7 +206,7 @@ def copy_layer_data(dst, src):
 
 
 def transform_buffer_data(
-    nested_dict: dict, device: th.device, keys_unit_order: list
+    nested_dict: dict, device: th.device, keys_unit_order: list | None = None
 ) -> np.ndarray:
     """
     Transform nested dict {datetime -> {unit_id -> [values]}} into
@@ -197,13 +214,22 @@ def transform_buffer_data(
     Get tensors from GPU to CPU.
 
     Args:
-        nested_dict: Dict with structure {datetime -> {unit_id -> list[tensor]}}
+        nested_dict: Dict with structure {datetime -> {unit_id -> list[tensor]}}.
+        device: PyTorch device config.
 
     Returns:
-        th.Tensor: Shape (n_timesteps, n_powerplants, feature_dim)
+        Shape (n_timesteps, n_powerplants, feature_dim).
     """
+    if not nested_dict:
+        return np.zeros((0, 0, 1), dtype=np.float32)
+
     # Get sorted lists of units and timestamps (for consistent ordering)
     all_times = sorted(nested_dict.keys())
+    if keys_unit_order is None:
+        unit_ids = set()
+        for unit_data in nested_dict.values():
+            unit_ids.update(unit_data.keys())
+        keys_unit_order = sorted(unit_ids)
 
     # Get feature dimension from first non-empty value
     feature_dim = None
@@ -218,10 +244,10 @@ def transform_buffer_data(
         if feature_dim is not None:
             break
 
+    # Some on-policy fields (e.g. log_probs/values) can be empty for some timesteps.
+    # Keep zeros in that case instead of failing the entire training loop.
     if feature_dim is None:
-        raise ValueError(
-            "Error, while transforming RL data for buffer: No data found to determine feature dimension"
-        )
+        feature_dim = 1
 
     # Pre-allocate tensor (keep on same device as input data)
     result = th.zeros(
@@ -247,9 +273,11 @@ def transfer_weights(
     act_dim: int,
     unique_obs: int,
 ) -> dict | None:
-    """
-    Transfer weights from loaded model to new model. Copy only those obs- and action-slices for matching IDs.
-    New IDs keep their original (random) weights. Function only works if the neural network architeczture remained stable besides the input layer, namely with the same hidden layers.
+    """Transfer weights from loaded model to new model.
+    
+    Copy only those obs- and action-slices for matching IDs. New IDs keep their 
+    original (random) weights. Function only works if the neural network architecture 
+    remained stable besides the input layer, namely with the same hidden layers.
 
     Args:
         model (th.nn.Module): The model to transfer weights to.
@@ -260,14 +288,24 @@ def transfer_weights(
         act_dim (int): The action dimension size.
         unique_obs (int): The unique observation size per agent, smaller than obs_base as these include also shared observation values.
 
-    returns:
+    Returns:
         dict | None: The updated state dictionary with transferred weights, or None if architecture mismatch.
     """
 
     # 1) Architecture check
     new_state = model.state_dict()
-    loaded_hidden = get_hidden_sizes(loaded_state, prefix="q1_layers")
-    new_hidden = get_hidden_sizes(new_state, prefix="q1_layers")
+    prefixes = _get_q_prefixes(loaded_state)
+    if not prefixes:
+        logger.warning(
+            "Cannot transfer weights: no recognised Q-network prefix "
+            "(q_layers / q1_layers / q2_layers) found in loaded state dict."
+        )
+        return None
+
+    # Using the first detected prefix for architecture check.
+    check_prefix = prefixes[0]
+    loaded_hidden = get_hidden_sizes(loaded_state, prefix=check_prefix)
+    new_hidden = get_hidden_sizes(new_state, prefix=check_prefix)
     if loaded_hidden != new_hidden:
         logger.warning(
             f"Cannot transfer weights: neural network architecture mismatch.\n"
@@ -284,8 +322,7 @@ def transfer_weights(
     # 3) Clone new state
     new_state_copy = {k: v.clone() for k, v in new_state.items()}
 
-    # 4) Transfer per-prefix
-    for prefix in ("q1_layers", "q2_layers"):
+    for prefix in prefixes:
         w_loaded = loaded_state[f"{prefix}.0.weight"]
         b_loaded = loaded_state[f"{prefix}.0.bias"]
         w_new = new_state_copy[f"{prefix}.0.weight"]
@@ -325,7 +362,7 @@ def transfer_weights(
             # actions untouched
 
         # d) bias and deeper layers
-        # copy all other wigths and biases (besides input layer) from loaded to new model
+        # copy all other weights and biases (besides input layer) from loaded to new model
         b_new.copy_(b_loaded)
         for i in range(1, len(new_hidden) + 1):
             new_state_copy[f"{prefix}.{i}.weight"].copy_(
@@ -336,6 +373,38 @@ def transfer_weights(
             )
 
     return new_state_copy
+
+
+def xavier_init_weights(module: th.nn.Module) -> None:
+    """Apply Xavier uniform initialisation to all Linear layers in *module*.
+
+    Xavier initialisation keeps activation variance roughly constant across
+    layers, which works well for tanh / softsign activations (TD3/DDPG actors
+    and all Q-network critics).
+
+    Args:
+        module: Any ``nn.Module`` whose ``Linear`` sub-layers should be initialised.
+    """
+    if isinstance(module, th.nn.Linear):
+        th.nn.init.xavier_uniform_(module.weight)
+        th.nn.init.zeros_(module.bias)
+
+
+def orthogonal_init_weights(module: th.nn.Module, gain: float = 1.0) -> None:
+    """Apply orthogonal initialisation to a single Linear layer.
+
+    Orthogonal initialisation is the standard choice for PPO because it
+    preserves gradient norms better than Xavier when combined with ReLU
+    activations and a Gaussian policy head.
+
+    Args:
+        module: An ``nn.Linear`` layer to initialise.
+        gain: Scaling factor for the weight matrix.  Common choices:
+            ``sqrt(2)`` for hidden layers, ``0.01`` for the output / policy head.
+    """
+    if isinstance(module, th.nn.Linear):
+        th.nn.init.orthogonal_(module.weight, gain=gain)
+        th.nn.init.zeros_(module.bias)
 
 
 def encode_time_features(start: datetime) -> list:
