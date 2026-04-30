@@ -51,37 +51,55 @@ class DSMFlex:
         """
         Initializes the DSM components by creating and adding blocks to the model.
 
-        This method iterates over the provided components, instantiates their corresponding classes,
-        and adds the respective blocks to the Pyomo model.
-
-        Args:
-            components (dict[str, dict]): A dictionary where each key is a technology name and
-                                        the value is a dictionary of parameters for the respective technology.
-                                        Each technology is mapped to a corresponding class in `demand_side_technologies`.
-
-        The method:
-        - Looks up the corresponding class for each technology in `demand_side_technologies`.
-        - Instantiates the class by passing the required parameters.
-        - Adds the resulting block to the model under the `dsm_blocks` attribute.
+        Supports component names with suffixes, e.g.
+        - electric_vehicle_1
+        - charging_station_2
+        by resolving the base technology from the prefix.
         """
         components = self.components.copy()
         self.model.dsm_blocks = pyo.Block(list(components.keys()))
 
         for technology, component_data in components.items():
-            if technology in demand_side_technologies:
-                # Get the class from the dictionary mapping (adjust `demand_side_technologies` to hold classes)
-                component_class = demand_side_technologies[technology]
+            base_technology = next(
+                (
+                    tech
+                    for tech in demand_side_technologies
+                    if technology.startswith(tech)
+                ),
+                None,
+            )
 
-                # Instantiate the component with the required parameters (unpack the component_data dictionary)
-                component_instance = component_class(
-                    time_steps=self.model.time_steps, **component_data
+            if base_technology is None:
+                raise ValueError(f"Unknown DSM component technology: {technology}")
+
+            component_class = demand_side_technologies[base_technology]
+
+            component_instance = component_class(
+                time_steps=self.model.time_steps,
+                **component_data,
+            )
+
+            # store instantiated component back
+            self.components[technology] = component_instance
+
+            # EVs may need external trip distance or trip energy consumption input
+            if technology.startswith("electric_vehicle"):
+                external_trip_distance = getattr(
+                    self.model, f"{technology}_trip_distance", None
                 )
-                # Add the component to the components dictionary
-                self.components[technology] = component_instance
-
-                # Add the component's block to the model
+                external_trip_energy_consumption = getattr(
+                    self.model, f"{technology}_trip_energy_consumption", None
+                )
                 component_instance.add_to_model(
-                    self.model, self.model.dsm_blocks[technology]
+                    self.model,
+                    self.model.dsm_blocks[technology],
+                    external_trip_distance=external_trip_distance,
+                    external_trip_energy_consumption=external_trip_energy_consumption,
+                )
+            else:
+                component_instance.add_to_model(
+                    self.model,
+                    self.model.dsm_blocks[technology],
                 )
 
     def setup_model(self, presolve=True):
@@ -148,11 +166,12 @@ class DSMFlex:
     def electricity_price_signal(self, model):
         """
         Determine the optimal operation using a new electricity price signal.
+        Allows power flexibility within cost tolerance limits.
         """
-        # Delete the existing electricity_price component
-        model.del_component(model.electricity_price)
+        # Replace electricity price parameter
+        if hasattr(model, "electricity_price"):
+            model.del_component(model.electricity_price)
 
-        # Add the updated electricity_price component explicitly
         model.add_component(
             "electricity_price",
             pyo.Param(
@@ -164,15 +183,31 @@ class DSMFlex:
             ),
         )
 
-        @self.model.Objective(sense=pyo.minimize)
-        def obj_rule_flex(m):
-            """
-            Maximizes the load shift over all time steps.
-            """
-            total_variable_cost = pyo.quicksum(
-                self.model.variable_cost[t] for t in self.model.time_steps
-            )
+        # Add cost tolerance parameter
+        model.cost_tolerance = pyo.Param(initialize=self.cost_tolerance)
+        model.total_cost = pyo.Param(initialize=0.0, mutable=True)
 
+        # Delete old cost constraints that may conflict
+        if hasattr(model, "variable_cost_constraint"):
+            model.del_component(model.variable_cost_constraint)
+        if hasattr(model, "cost_per_time_step"):
+            model.del_component(model.cost_per_time_step)
+
+        # Define new variable cost constraint based on electricity price
+        @model.Constraint(model.time_steps)
+        def variable_cost_constraint(m, t):
+            return m.variable_cost[t] == m.total_power_input[t] * m.electricity_price[t]
+
+        # Add cost tolerance constraint
+        @model.Constraint()
+        def total_cost_upper_limit(m):
+            return pyo.quicksum(
+                m.variable_cost[t] for t in m.time_steps
+            ) <= m.total_cost * (1 + (m.cost_tolerance / 100))
+
+        @model.Objective(sense=pyo.minimize)
+        def obj_rule_flex(m):
+            total_variable_cost = pyo.quicksum(m.variable_cost[t] for t in m.time_steps)
             return total_variable_cost
 
     def cost_based_flexibility(self, model):
@@ -233,22 +268,44 @@ class DSMFlex:
 
             elif self.technology == "building":
                 total_power_input = m.inflex_demand[t]
-                if self.has_heatpump:
-                    total_power_input += self.model.dsm_blocks["heat_pump"].power_in[t]
-                if self.has_boiler:
-                    total_power_input += self.model.dsm_blocks["boiler"].power_in[t]
-                if self.has_ev:
-                    total_power_input += (
-                        self.model.dsm_blocks["electric_vehicle"].charge[t]
-                        - self.model.dsm_blocks["electric_vehicle"].discharge[t]
-                    )
-                if self.has_battery_storage:
-                    total_power_input += (
-                        self.model.dsm_blocks["generic_storage"].charge[t]
-                        - self.model.dsm_blocks["generic_storage"].discharge[t]
-                    )
-                if self.has_pv:
-                    total_power_input -= self.model.dsm_blocks["pv_plant"].power[t]
+
+                # heat pumps
+                if hasattr(self, "heat_pumps"):
+                    for hp in self.heat_pumps:
+                        total_power_input += m.dsm_blocks[hp].power_in[t]
+
+                # boilers
+                if hasattr(self, "boilers"):
+                    for boiler in self.boilers:
+                        if hasattr(m.dsm_blocks[boiler], "power_in"):
+                            total_power_input += m.dsm_blocks[boiler].power_in[t]
+
+                # EV topology
+                if getattr(self, "has_ev", False) and getattr(
+                    self, "has_charging_station", False
+                ):
+                    # charging stations connect to grid/building
+                    for cs in self.charging_stations:
+                        total_power_input += m.dsm_blocks[cs].charge[t]
+                        if hasattr(m.dsm_blocks[cs], "discharge"):
+                            total_power_input -= m.dsm_blocks[cs].discharge[t]
+
+                elif getattr(self, "has_ev", False):
+                    # no charging station: EVs directly connect to grid
+                    for ev in self.evs:
+                        total_power_input += m.dsm_blocks[ev].charge[t]
+                        total_power_input -= m.dsm_blocks[ev].discharge[t]
+
+                # stationary batteries
+                if hasattr(self, "battery_storages"):
+                    for bat in self.battery_storages:
+                        total_power_input += m.dsm_blocks[bat].charge[t]
+                        total_power_input -= m.dsm_blocks[bat].discharge[t]
+
+                # PV
+                if hasattr(self, "pv_plants"):
+                    for pv in self.pv_plants:
+                        total_power_input -= m.dsm_blocks[pv].power[t]
 
                 return (
                     m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
@@ -763,27 +820,23 @@ class DSMFlex:
         )
 
     def switch_to_opt(self, instance):
-        """
-        Switches the instance to solve a cost based optimisation problem by deactivating the flexibility constraints and objective.
+        if hasattr(instance, "obj_rule_flex"):
+            instance.obj_rule_flex.deactivate()
 
-        Args:
-            instance (pyomo.ConcreteModel): The instance of the Pyomo model.
-
-        Returns:
-            pyomo.ConcreteModel: The modified instance with flexibility constraints and objective deactivated.
-        """
-
-        instance.obj_rule_flex.deactivate()
-
-        # Deactivate flexibility constraints if they exist
         if hasattr(instance, "total_cost_upper_limit"):
             instance.total_cost_upper_limit.deactivate()
 
         if hasattr(instance, "peak_load_shift_constraint"):
             instance.peak_load_shift_constraint.deactivate()
 
-        # if hasattr(instance, "total_power_input_constraint_with_flex"):
-        instance.total_power_input_constraint_with_flex.deactivate()
+        if hasattr(instance, "total_power_input_constraint_with_flex"):
+            instance.total_power_input_constraint_with_flex.deactivate()
+
+        if hasattr(instance, "total_power_input_constraint_with_peak_shift"):
+            instance.total_power_input_constraint_with_peak_shift.deactivate()
+
+        if hasattr(instance, "total_power_input_constraint_flex"):
+            instance.total_power_input_constraint_flex.deactivate()
 
         return instance
 
@@ -799,12 +852,18 @@ class DSMFlex:
         """
         # deactivate the optimal constraints and objective
         instance.obj_rule_opt.deactivate()
-        instance.total_power_input_constraint.deactivate()
 
-        # fix values of model.total_power_input
-        for t in instance.time_steps:
-            instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
-        instance.total_cost = self.total_cost
+        # For electricity_price_signal, don't fix power input - let it vary within cost tolerance
+        if self.flexibility_measure != "electricity_price_signal":
+            instance.total_power_input_constraint.deactivate()
+
+            # fix values of model.total_power_input
+            for t in instance.time_steps:
+                instance.total_power_input[t].fix(self.opt_power_requirement.iloc[t])
+            instance.total_cost = self.total_cost
+        else:
+            # For electricity_price_signal, set the cost upper limit that was computed
+            instance.total_cost = self.total_cost
 
         return instance
 
