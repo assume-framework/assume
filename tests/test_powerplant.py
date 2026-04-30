@@ -337,9 +337,9 @@ def test_powerplant_availability(power_plant_1):
         start, end, product_type="energy"
     )
     op_time = power_plant_1.get_operation_time(start)
-    # run min_power if 0 < power <= min_power is needed
+    # do not run if 0 < power <= min_power is needed
     max_ramp = power_plant_1.calculate_ramp(op_time, 0, max_power[0])
-    assert max_ramp == power_plant_1.min_power
+    assert max_ramp == 0.0
 
     ### HOUR 2
     start += timedelta(hours=1)

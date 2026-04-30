@@ -754,5 +754,6 @@ def test_steelplant_forecaster_update_syncs_electricity_price_to_unit(dsm_compon
         f"with 100 EUR/MWh cleared prices; got max={max(updated):.2f}"
     )
 
+
 if __name__ == "__main__":
     pytest.main(["-s", __file__])

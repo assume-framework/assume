@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from numbers import Number
 from typing import NamedTuple, TypedDict
+from warnings import warn
 
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
@@ -152,6 +153,20 @@ class MarketConfig:
                 if type(i) not in [list, dict] and not callable(i)
             )
         )
+
+    def __post_init__(self):
+        """
+        Post-initialization checks for deprecated key "solver" in param_dict.
+        """
+
+        if "solver" in self.param_dict:
+            warn(
+                "The key 'solver' in 'param_dict' is deprecated and may be removed in future versions. "
+                "Please update your configuration and rename it to 'solver_name'.",
+                DeprecationWarning,
+            )
+            # Update param_dict to use 'solver_name' instead of 'solver'
+            self.param_dict["solver_name"] = self.param_dict.pop("solver")
 
 
 class OpeningMessage(TypedDict):

@@ -16,7 +16,7 @@ from pyomo.opt import (
 )
 
 from assume.common.fast_pandas import FastIndex, FastSeries
-from assume.common.utils import get_supported_solver
+from assume.common.utils import get_supported_solver_pyomo
 from assume.units.dst_components import demand_side_technologies
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,29 @@ class DSMFlex:
         super().__init__(**kwargs)
 
         self.components = components
-        self.solver = SolverFactory(get_supported_solver())
+        self.solver = SolverFactory(get_supported_solver_pyomo())
+
+        # Rolling-horizon settings (populated from config; default is full horizon)
+        self._horizon_mode = dsm_opt.get("horizon_mode", "full_horizon")
+        self._rh_look_ahead = dsm_opt.get("look_ahead_horizon")  # e.g. "72h"
+        self._rh_commit = dsm_opt.get("commit_horizon")  # e.g. "24h"
+        self._rh_step = dsm_opt.get("rolling_step")  # e.g. "24h"
+
+        # Rolling-horizon state tracking (for per-market-round re-optimization)
+        self._rh_window_start_idx = 0  # Current window start index in full horizon
+        self._rh_last_market_request_step = (
+            None  # Track which step the last market request was for
+        )
+        self._rh_optimized_until_step = (
+            0  # How far we've optimized (in full horizon steps)
+        )
+
+        if self._horizon_mode == "rolling_horizon":
+            if not all([self._rh_look_ahead, self._rh_commit, self._rh_step]):
+                raise ValueError(
+                    "Rolling horizon mode requires look_ahead_horizon, "
+                    "commit_horizon, and rolling_step to be specified."
+                )
 
         # Rolling-horizon settings (populated from config; default is full horizon)
         self._horizon_mode = dsm_opt.get("horizon_mode", "full_horizon")
