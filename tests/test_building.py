@@ -719,6 +719,9 @@ def test_building_ev_profile_keyerror_triggers_fallback(
         ev_load_profile=_series(
             [1, 1, 1, 1, 1, 1, 1, 1], time_index
         ),  # fallback profile
+        A360_electric_vehicle_1_trip_distance=_series(
+            [0, 0, 0, 0, 0, 0, 0, 0], time_index
+        ),  # required: at least one trip config
     )
 
     components = {
@@ -746,10 +749,10 @@ def test_building_ev_profile_keyerror_triggers_fallback(
 def test_building_ev_trip_distance_keyerror_is_optional(
     time_index,
 ):
-    """Test that missing EV trip distance profile (KeyError) doesn't raise error (it's optional)."""
+    """Test that missing EV trip distance profile is optional when trip_energy_consumption is provided."""
     market_prices = {"EOM": _series([50, 40, 30, 20, 20, 30, 40, 50], time_index)}
 
-    # Create forecaster WITHOUT the specific EV trip distance profile
+    # Create forecaster WITHOUT trip_distance, but WITH trip_energy_consumption (alternative mode)
     forecaster = BuildingForecaster(
         index=time_index,
         fuel_prices={"natural_gas": _series([20] * 8, time_index)},
@@ -760,9 +763,12 @@ def test_building_ev_trip_distance_keyerror_is_optional(
         pv_profile=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
         battery_load_profile=_series([0] * 8, time_index),
         ev_load_profile=_series([1, 1, 1, 1, 1, 1, 1, 1], time_index),
-        # No A360_electric_vehicle_1_trip_distance key - it's optional, so trip_distance should be None
+        # No trip_distance, but providing trip_energy_consumption as alternative
         A360_electric_vehicle_1_availability_profile=_series(
             [1, 1, 0, 0, 1, 1, 1, 1], time_index
+        ),
+        A360_electric_vehicle_1_trip_energy_consumption=_series(
+            [0, 0, 5, 5, 0, 0, 0, 0], time_index
         ),
     )
 
@@ -783,10 +789,13 @@ def test_building_ev_trip_distance_keyerror_is_optional(
         }
     }
 
-    # Should succeed with trip_distance = None (optional behavior)
+    # Should succeed with trip_distance = None when trip_energy_consumption is provided
     building = _make_building(forecaster, components)
     assert building.has_ev is True
     assert building.components["electric_vehicle_1"]["trip_distance"] is None
+    assert (
+        building.components["electric_vehicle_1"]["trip_energy_consumption"] is not None
+    )
 
 
 def test_building_classifies_components_by_prefix(
@@ -1056,6 +1065,9 @@ def test_ev_bidirectional_v2g_charges_cheap_discharges_expensive(time_index):
         battery_load_profile=_series([0] * 8, time_index),
         ev_load_profile=_series([0] * 8, time_index),
         A360_electric_vehicle_1_availability_profile=_series([1] * 8, time_index),
+        A360_electric_vehicle_1_trip_distance=_series(
+            [0] * 8, time_index
+        ),  # required: at least one trip config
     )
 
     components = {
@@ -1072,6 +1084,7 @@ def test_ev_bidirectional_v2g_charges_cheap_discharges_expensive(time_index):
             "ramp_down": 5.0,
             "storage_loss_rate": 0.0,
             "power_flow_directionality": "bidirectional",
+            "mileage": 1.0,  # required when trip_distance is provided
         }
     }
 
@@ -1316,6 +1329,248 @@ def test_ev_availability_profile(ev_model_with_availability):
         else:
             assert charge <= pyo.value(model.ev.max_power_charge) + 1e-5
             assert discharge <= pyo.value(model.ev.max_power_discharge) + 1e-5
+
+
+# EV input validation
+# -----------------------------------------------------------------
+def test_ev_conflicting_availability_trip_distance_warning(time_index, caplog):
+    """Soft validation: warn if EV has availability=1 and trip_distance>0 in same timestep."""
+    import logging
+
+    market_prices = {"EOM": _series([50, 40, 30, 20, 20, 30, 40, 50], time_index)}
+
+    # Create forecaster with conflicting profiles
+    forecaster = BuildingForecaster(
+        index=time_index,
+        fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+        market_prices=market_prices,
+        electricity_price_flex=_series([45, 35, 25, 15, 15, 25, 35, 45], time_index),
+        load_profile=_series([5, 5, 5, 5, 5, 5, 5, 5], time_index),
+        heat_demand=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        pv_profile=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        battery_load_profile=_series([0] * 8, time_index),
+        # Conflicting: availability=1 but trip_distance>0 at timesteps 2, 3, 6
+        A360_electric_vehicle_1_availability_profile=_series(
+            [1, 1, 1, 1, 0, 0, 1, 1], time_index
+        ),
+        A360_electric_vehicle_1_trip_distance=_series(
+            [0, 0, 100, 80, 0, 0, 50, 0], time_index
+        ),
+    )
+
+    components = {
+        "electric_vehicle_1": {
+            "capacity": 50.0,
+            "min_soc": 0.1,
+            "max_soc": 1.0,
+            "max_power_charge": 10.0,
+            "max_power_discharge": 10.0,
+            "initial_soc": 0.5,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "power_flow_directionality": "bidirectional",
+        }
+    }
+
+    # Capture log output at WARNING level
+    with caplog.at_level(logging.WARNING, logger="assume.units.building"):
+        building = _make_building(forecaster, components)
+
+    # Verify warning was logged
+    assert building.has_ev is True
+    warning_messages = [
+        r.message for r in caplog.records if "conflicting profiles" in r.message
+    ]
+    assert len(warning_messages) > 0, "Expected warning about conflicting EV profiles"
+
+    # Verify warning mentions conflicting timesteps and conflict details
+    warning_text = warning_messages[0]
+    assert "availability=1 and trip_distance>0" in warning_text
+    assert "prioritize trip fulfillment" in warning_text
+
+
+# EV energy consumption modes
+# -----------------------------------------------------------------
+def test_ev_direct_trip_energy_consumption_mode(solved_building_with_cs):
+    """Mode 1: EV uses direct trip_energy_consumption (energy per trip, not distance-based)."""
+    _, instance, _ = solved_building_with_cs
+    ts = list(instance.time_steps)
+
+    # electric_vehicle_1 uses trip_energy_consumption mode
+    # (provided in forecaster as A360_electric_vehicle_1_trip_energy_consumption)
+    ev = instance.dsm_blocks["electric_vehicle_1"]
+    availability = getattr(instance, "electric_vehicle_1_availability")
+    trip_energy = getattr(instance, "electric_vehicle_1_trip_energy_consumption", None)
+
+    # If trip_energy_consumption is available, verify usage follows: usage = (1 - availability) * trip_energy
+    if trip_energy is not None:
+        for t in ts:
+            avail = _val(availability[t])
+            expected_usage = (1 - avail) * _val(trip_energy[t])
+            actual_usage = _val(ev.usage[t])
+            assert abs(actual_usage - expected_usage) <= 1e-5
+
+
+# EV validation
+# -----------------------------------------------------------------
+def test_building_raises_error_if_ev_lacks_trip_data(time_index):
+    """Verify that Building raises ValueError when EV has neither trip_distance nor trip_energy_consumption."""
+    market_prices = {"EOM": _series([50, 40, 30, 20, 20, 30, 40, 50], time_index)}
+
+    # Forecaster WITHOUT trip_distance or trip_energy_consumption for the EV
+    forecaster = BuildingForecaster(
+        index=time_index,
+        fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+        market_prices=market_prices,
+        electricity_price_flex=_series([45, 35, 25, 15, 15, 25, 35, 45], time_index),
+        load_profile=_series([5, 5, 5, 5, 5, 5, 5, 5], time_index),
+        heat_demand=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        pv_profile=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        battery_load_profile=_series([0] * 8, time_index),
+        ev_load_profile=_series([0] * 8, time_index),
+        A360_electric_vehicle_1_availability_profile=_series(
+            [1, 1, 0, 0, 1, 1, 1, 1], time_index
+        ),
+        # NOTE: Missing trip_distance and trip_energy_consumption!
+    )
+
+    components = {
+        "electric_vehicle_1": {
+            "capacity": 50.0,
+            "min_soc": 0.1,
+            "max_soc": 1.0,
+            "max_power_charge": 10.0,
+            "max_power_discharge": 10.0,
+            "initial_soc": 0.5,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "ramp_up": 10.0,
+            "ramp_down": 10.0,
+            "mileage": 1.0,
+            "power_flow_directionality": "bidirectional",
+        },
+    }
+
+    # Should raise ValueError because EV lacks both trip configurations
+    with pytest.raises(
+        ValueError,
+        match="must have either 'trip_distance' or 'trip_energy_consumption'",
+    ):
+        _make_building(forecaster, components)
+
+
+def test_ev_distance_based_energy_consumption_mode(time_index):
+    """Mode 2: EV uses trip_distance + mileage (existing behavior)."""
+    market_prices = {"EOM": _series([50, 40, 30, 20, 20, 30, 40, 50], time_index)}
+
+    forecaster = BuildingForecaster(
+        index=time_index,
+        fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+        market_prices=market_prices,
+        electricity_price_flex=_series([45, 35, 25, 15, 15, 25, 35, 45], time_index),
+        load_profile=_series([5, 5, 5, 5, 5, 5, 5, 5], time_index),
+        heat_demand=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        pv_profile=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        battery_load_profile=_series([0] * 8, time_index),
+        # Provide trip_distance and availability but NOT trip_energy_consumption
+        A360_electric_vehicle_1_availability_profile=_series(
+            [1, 1, 0, 0, 1, 1, 1, 1], time_index
+        ),
+        A360_electric_vehicle_1_trip_distance=_series(
+            [0, 0, 50, 100, 0, 0, 25, 0], time_index
+        ),
+    )
+
+    components = {
+        "electric_vehicle_1": {
+            "capacity": 50.0,
+            "min_soc": 0.1,
+            "max_soc": 1.0,
+            "max_power_charge": 10.0,
+            "max_power_discharge": 10.0,
+            "initial_soc": 0.5,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "mileage": 0.2,  # kWh per km
+            "power_flow_directionality": "bidirectional",
+        }
+    }
+
+    building = _make_building(forecaster, components)
+    _, instance, _ = _solve_building_opt(building)
+    ts = list(instance.time_steps)
+
+    # Verify usage follows distance-based formula: usage = (1 - availability) * trip_distance * mileage
+    ev = instance.dsm_blocks["electric_vehicle_1"]
+    availability = getattr(instance, "electric_vehicle_1_availability")
+    trip_distance = getattr(instance, "electric_vehicle_1_trip_distance", None)
+
+    if trip_distance is not None:
+        mileage = _val(ev.mileage)
+        for t in ts:
+            avail = _val(availability[t])
+            dist = _val(trip_distance[t])
+            expected_usage = (1 - avail) * dist * mileage
+            actual_usage = _val(ev.usage[t])
+            assert abs(actual_usage - expected_usage) <= 1e-5
+
+
+def test_ev_trip_energy_takes_priority_over_distance(time_index):
+    """When both trip_energy_consumption and trip_distance provided, energy-based takes priority."""
+    market_prices = {"EOM": _series([50, 40, 30, 20, 20, 30, 40, 50], time_index)}
+
+    forecaster = BuildingForecaster(
+        index=time_index,
+        fuel_prices={"natural_gas": _series([20] * 8, time_index)},
+        market_prices=market_prices,
+        electricity_price_flex=_series([45, 35, 25, 15, 15, 25, 35, 45], time_index),
+        load_profile=_series([5, 5, 5, 5, 5, 5, 5, 5], time_index),
+        heat_demand=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        pv_profile=_series([0, 0, 0, 0, 0, 0, 0, 0], time_index),
+        battery_load_profile=_series([0] * 8, time_index),
+        A360_electric_vehicle_1_availability_profile=_series(
+            [1, 1, 0, 0, 1, 1, 1, 1], time_index
+        ),
+        # Both provided - energy-based should take priority
+        A360_electric_vehicle_1_trip_distance=_series(
+            [0, 0, 100, 200, 0, 0, 50, 0], time_index
+        ),
+        A360_electric_vehicle_1_trip_energy_consumption=_series(
+            [0, 0, 10, 15, 0, 0, 5, 0], time_index
+        ),
+    )
+
+    components = {
+        "electric_vehicle_1": {
+            "capacity": 50.0,
+            "min_soc": 0.1,
+            "max_soc": 1.0,
+            "max_power_charge": 10.0,
+            "max_power_discharge": 10.0,
+            "initial_soc": 0.5,
+            "efficiency_charge": 1.0,
+            "efficiency_discharge": 1.0,
+            "mileage": 0.2,
+            "power_flow_directionality": "bidirectional",
+        }
+    }
+
+    building = _make_building(forecaster, components)
+    _, instance, _ = _solve_building_opt(building)
+
+    # Verify usage uses trip_energy_consumption, not distance-based
+    ev = instance.dsm_blocks["electric_vehicle_1"]
+    availability = getattr(instance, "electric_vehicle_1_availability")
+    trip_energy = getattr(instance, "electric_vehicle_1_trip_energy_consumption", None)
+
+    if trip_energy is not None:
+        ts = list(instance.time_steps)
+        for t in ts:
+            avail = _val(availability[t])
+            # Should use energy-based formula, not distance-based
+            expected_usage = (1 - avail) * _val(trip_energy[t])
+            actual_usage = _val(ev.usage[t])
+            assert abs(actual_usage - expected_usage) <= 1e-5
 
 
 if __name__ == "__main__":

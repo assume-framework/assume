@@ -82,15 +82,19 @@ class DSMFlex:
             # store instantiated component back
             self.components[technology] = component_instance
 
-            # EVs may need external trip distance input
+            # EVs may need external trip distance or trip energy consumption input
             if technology.startswith("electric_vehicle"):
                 external_trip_distance = getattr(
                     self.model, f"{technology}_trip_distance", None
+                )
+                external_trip_energy_consumption = getattr(
+                    self.model, f"{technology}_trip_energy_consumption", None
                 )
                 component_instance.add_to_model(
                     self.model,
                     self.model.dsm_blocks[technology],
                     external_trip_distance=external_trip_distance,
+                    external_trip_energy_consumption=external_trip_energy_consumption,
                 )
             else:
                 component_instance.add_to_model(

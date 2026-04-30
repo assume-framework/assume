@@ -1493,6 +1493,7 @@ class ElectricVehicle(GenericStorage):
         model: pyo.ConcreteModel,
         model_block: pyo.Block,
         external_trip_distance: pyo.Param | None = None,
+        external_trip_energy_consumption: pyo.Param | None = None,
     ) -> pyo.Block:
         """
         Add EV to Pyomo model.
@@ -1502,9 +1503,13 @@ class ElectricVehicle(GenericStorage):
         model : pyo.ConcreteModel
         model_block : pyo.Block
         external_trip_distance : pyo.Param | None
-            Exogenous trip distance per time step.
-            Required if mobility-related usage should be modelled.
-            usage[t] = (1 - availability[t]) * external_trip_distance[t] * mileage
+            Exogenous trip distance per time step (Mode 1: distance-based).
+            Used to calculate usage as: usage[t] = (1 - availability[t]) * external_trip_distance[t] * mileage
+            Requires `mileage` to be provided.
+        external_trip_energy_consumption : pyo.Param | None
+            Exogenous trip energy consumption per time step (Mode 2: direct energy).
+            Used to calculate usage as: usage[t] = (1 - availability[t]) * external_trip_energy_consumption[t]
+            If both trip_distance and trip_energy_consumption are provided, trip_energy_consumption takes priority.
         """
         # Start from generic storage structure
         model_block = super().add_to_model(model, model_block)
@@ -1583,7 +1588,19 @@ class ElectricVehicle(GenericStorage):
                 return b.discharge[t] == 0
 
             # Driving usage only when unavailable
-            if external_trip_distance is not None:
+            # Priority: trip_energy_consumption (Mode 2) > trip_distance (Mode 1)
+            if external_trip_energy_consumption is not None:
+                # Mode 2: Direct energy consumption for trip
+                @model_block.Constraint(self.time_steps)
+                def usage_constraint(b, t):
+                    availability = self.availability_profile.iat[t]
+                    return (
+                        b.usage[t]
+                        == (1 - availability) * external_trip_energy_consumption[t]
+                    )
+
+            elif external_trip_distance is not None:
+                # Mode 1: Energy consumption from distance * mileage
                 if self.mileage is None:
                     raise ValueError(
                         "`mileage` must be provided when `external_trip_distance` is used."

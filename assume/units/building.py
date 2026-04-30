@@ -197,6 +197,90 @@ class Building(DSMFlex, SupportsMinMax):
                 # optional: if no trip distance is provided, EV will behave like stationary EV
                 ev_config["trip_distance"] = None
 
+            # Alternative mode: direct trip energy consumption (instead of trip_distance * mileage)
+            trip_energy_key = f"{self.id}_{ev_key}_trip_energy_consumption"
+            try:
+                ev_config["trip_energy_consumption"] = self.forecaster[trip_energy_key]
+            except KeyError:
+                # optional: if no trip energy consumption is provided, use trip_distance mode
+                ev_config["trip_energy_consumption"] = None
+
+        # Soft validation: warn if EV has conflicting availability and trip distance/energy
+        for ev_key in self.evs:
+            ev_config = self.components[ev_key]
+            availability = ev_config.get("availability_profile")
+            trip_distance = ev_config.get("trip_distance")
+            trip_energy = ev_config.get("trip_energy_consumption")
+
+            # Validate that user doesn't provide both trip_distance and trip_energy_consumption
+            if trip_distance is not None and trip_energy is not None:
+                logger.warning(
+                    f"EV '{ev_key}' has both trip_distance and trip_energy_consumption provided. "
+                    f"trip_energy_consumption will take priority; trip_distance will be ignored."
+                )
+
+            if availability is not None and trip_distance is not None:
+                # Check for physical inconsistencies: availability=1 and trip>0 in same timestep
+                conflicts = []
+                for t in range(min(len(availability), len(trip_distance))):
+                    avail = (
+                        availability.iloc[t]
+                        if hasattr(availability, "iloc")
+                        else availability[t]
+                    )
+                    trip = (
+                        trip_distance.iloc[t]
+                        if hasattr(trip_distance, "iloc")
+                        else trip_distance[t]
+                    )
+                    if avail > 0 and trip > 0:
+                        conflicts.append(t)
+
+                if conflicts:
+                    logger.warning(
+                        f"EV '{ev_key}' has conflicting profiles: availability=1 and trip_distance>0 "
+                        f"at timesteps {conflicts[:5]}{'...' if len(conflicts) > 5 else ''}. "
+                        f"The hard constraint will prioritize trip fulfillment over charging availability."
+                    )
+
+            if availability is not None and trip_energy is not None:
+                # Check for physical inconsistencies: availability=1 and trip_energy>0 in same timestep
+                conflicts = []
+                for t in range(min(len(availability), len(trip_energy))):
+                    avail = (
+                        availability.iloc[t]
+                        if hasattr(availability, "iloc")
+                        else availability[t]
+                    )
+                    energy = (
+                        trip_energy.iloc[t]
+                        if hasattr(trip_energy, "iloc")
+                        else trip_energy[t]
+                    )
+                    if avail > 0 and energy > 0:
+                        conflicts.append(t)
+
+                if conflicts:
+                    logger.warning(
+                        f"EV '{ev_key}' has conflicting profiles: availability=1 and trip_energy_consumption>0 "
+                        f"at timesteps {conflicts[:5]}{'...' if len(conflicts) > 5 else ''}. "
+                        f"The hard constraint will prioritize trip fulfillment over charging availability."
+                    )
+
+        # Validate that each EV has at least one trip configuration (trip_distance or trip_energy_consumption)
+        for ev_key in self.evs:
+            ev_config = self.components[ev_key]
+            trip_distance = ev_config.get("trip_distance")
+            trip_energy = ev_config.get("trip_energy_consumption")
+
+            if trip_distance is None and trip_energy is None:
+                raise ValueError(
+                    f"EV '{ev_key}' must have either 'trip_distance' or 'trip_energy_consumption' "
+                    f"provided in the BuildingForecaster. Please add one of these profiles using kwargs. "
+                    f"Example: BuildingForecaster(..., {self.id}_{ev_key}_trip_distance=profile_series) "
+                    f"or {self.id}_{ev_key}_trip_energy_consumption=profile_series)"
+                )
+
         for cs_key in self.charging_stations:
             cs_config = self.components[cs_key]
             cs_config.pop("availability_profile", None)
@@ -265,6 +349,39 @@ class Building(DSMFlex, SupportsMinMax):
                     self.model.time_steps,
                     initialize=trip_distance_init,
                     doc=f"Trip distance profile for {ev_key} (in km or user-defined units)",
+                ),
+            )
+
+        # EV trip energy consumption parameters (alternative to trip_distance * mileage)
+        # Trip energy consumption is optional and only used if provided instead of trip_distance.
+        # If provided, it represents the energy consumed per trip (e.g., for mobile usage) in each time step.
+        # Priority: trip_energy_consumption > trip_distance (if both provided, trip_energy_consumption is used)
+        for ev_key in self.evs:
+            ev_trip_energy = self.components[ev_key].get(
+                "trip_energy_consumption", None
+            )
+            if ev_trip_energy is None:
+                continue
+
+            # Normalize trip energy data to a dictionary keyed by time step
+            # Handle both pandas Series (with .iloc) and array-like objects (list, numpy array)
+            if hasattr(ev_trip_energy, "iloc"):
+                trip_energy_init = {
+                    t: ev_trip_energy.iloc[t] if t < len(ev_trip_energy) else 0
+                    for t in self.model.time_steps
+                }
+            else:
+                trip_energy_init = {
+                    t: ev_trip_energy[t] if t < len(ev_trip_energy) else 0
+                    for t in self.model.time_steps
+                }
+
+            self.model.add_component(
+                f"{ev_key}_trip_energy_consumption",
+                pyo.Param(
+                    self.model.time_steps,
+                    initialize=trip_energy_init,
+                    doc=f"Trip energy consumption profile for {ev_key} (in kWh or energy units)",
                 ),
             )
 
