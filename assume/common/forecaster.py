@@ -607,7 +607,7 @@ class DsmUnitForecaster(UnitForecaster):
         self.electricity_price = self.price.get("EOM")
 
         # Store the initializing unit's node so update() can extract the right signal
-        if initializing_unit is not None and hasattr(initializing_unit, "node"):
+        if initializing_unit is not None:
             self._unit_node = initializing_unit.node
 
         # 5. Get congestion signal forecast
