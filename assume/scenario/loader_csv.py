@@ -143,6 +143,19 @@ def load_file(
         return None
 
 
+def _get_dsm_profile(
+    forecasts_df: pd.DataFrame | None, unit_id: str, profile_name: str
+) -> pd.Series | int:
+    """Return a named profile column from forecasts_df for a DSM unit, or 0 if absent.
+
+    Looks for a column named ``{unit_id}_{profile_name}`` in *forecasts_df*.
+    """
+    if forecasts_df is None:
+        return 0
+    col = f"{unit_id}_{profile_name}"
+    return forecasts_df[col] if col in forecasts_df.columns else 0
+
+
 def load_dsm_units(
     path: str,
     config: dict,
@@ -647,11 +660,15 @@ def load_config_and_create_forecaster(
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
                         fuel_prices=fuel_prices_df,
-                        load_profile=0,  # TODO
-                        ev_load_profile=0,  # TODO
-                        heat_demand=0,  # TODO
-                        battery_load_profile=0,  # TODO
-                        pv_profile=0,  # TODO
+                        load_profile=_get_dsm_profile(forecasts_df, id, "load_profile"),
+                        ev_load_profile=_get_dsm_profile(
+                            forecasts_df, id, "ev_load_profile"
+                        ),
+                        heat_demand=_get_dsm_profile(forecasts_df, id, "heat_demand"),
+                        battery_load_profile=_get_dsm_profile(
+                            forecasts_df, id, "battery_load_profile"
+                        ),
+                        pv_profile=_get_dsm_profile(forecasts_df, id, "pv_profile"),
                     )
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
@@ -670,7 +687,9 @@ def load_config_and_create_forecaster(
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
                         hydrogen_demand=unit["demand"],
-                        seasonal_storage_schedule=0,  # TODO
+                        seasonal_storage_schedule=_get_dsm_profile(
+                            forecasts_df, id, "seasonal_storage_schedule"
+                        ),
                     )
                 if type == "steam_plant":
                     unit_forecasts[id] = SteamgenerationForecaster(
@@ -681,9 +700,15 @@ def load_config_and_create_forecaster(
                         forecast_algorithms=unit_forecast_algorithms,
                         demand=unit["demand"],
                         fuel_prices=fuel_prices_df,
-                        electricity_price_flex=0,  # TODO
-                        thermal_storage_schedule=0,  # TODO
-                        thermal_demand=0,  # TODO
+                        electricity_price_flex=_get_dsm_profile(
+                            forecasts_df, id, "electricity_price_flex"
+                        ),
+                        thermal_storage_schedule=_get_dsm_profile(
+                            forecasts_df, id, "thermal_storage_schedule"
+                        ),
+                        thermal_demand=_get_dsm_profile(
+                            forecasts_df, id, "thermal_demand"
+                        ),
                     )
     return {
         "config": config,
