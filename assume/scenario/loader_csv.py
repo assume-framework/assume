@@ -145,6 +145,19 @@ def load_file(
         return None
 
 
+def _get_dsm_profile(
+    forecasts_df: pd.DataFrame | None, unit_id: str, profile_name: str
+) -> pd.Series | int:
+    """Return a named profile column from forecasts_df for a DSM unit, or 0 if absent.
+
+    Looks for a column named ``{unit_id}_{profile_name}`` in *forecasts_df*.
+    """
+    if forecasts_df is None:
+        return 0
+    col = f"{unit_id}_{profile_name}"
+    return forecasts_df[col] if col in forecasts_df.columns else 0
+
+
 def load_dsm_units(
     path: str,
     config: dict,
@@ -767,7 +780,9 @@ def load_config_and_create_forecaster(
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
                         hydrogen_demand=unit["demand"],
-                        seasonal_storage_schedule=0,  # TODO
+                        seasonal_storage_schedule=_get_dsm_profile(
+                            forecasts_df, id, "seasonal_storage_schedule"
+                        ),
                     )
                 if type == "steam_plant":
                     unit_forecasts[id] = SteamgenerationForecaster(
@@ -778,9 +793,15 @@ def load_config_and_create_forecaster(
                         forecast_algorithms=unit_forecast_algorithms,
                         demand=unit["demand"],
                         fuel_prices=fuel_prices_df,
-                        electricity_price_flex=0,  # TODO
-                        thermal_storage_schedule=0,  # TODO
-                        thermal_demand=0,  # TODO
+                        electricity_price_flex=_get_dsm_profile(
+                            forecasts_df, id, "electricity_price_flex"
+                        ),
+                        thermal_storage_schedule=_get_dsm_profile(
+                            forecasts_df, id, "thermal_storage_schedule"
+                        ),
+                        thermal_demand=_get_dsm_profile(
+                            forecasts_df, id, "thermal_demand"
+                        ),
                     )
     # shared inputs used to build one UnitsOperatorForecaster per operator in
     # setup_world. An operator has no availability of its own (that is a
