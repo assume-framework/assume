@@ -492,8 +492,8 @@ class MarketRole(MarketMechanism, Role):
         Raises:
             KeyError: If required keys ('orderbook', 'sender_addr', 'sender_id') are missing in the message.
             ValueError: If the order book fails validation.
-            Exception: If an unexpected error occurs during processing.
         """
+        agent_addr = ""
         try:
             # Safely retrieve required keys from 'content' and 'meta'
             orderbook: Orderbook = content.get("orderbook")
@@ -508,7 +508,7 @@ class MarketRole(MarketMechanism, Role):
             for order in orderbook:
                 self.all_orders.append(order)
 
-        except Exception as e:
+        except (KeyError, ValueError, TypeError, AttributeError) as e:
             # Log the error with agent details for better traceability
             logger.error(
                 f"Error handling orderbook message from agent '{agent_addr}': {e}"

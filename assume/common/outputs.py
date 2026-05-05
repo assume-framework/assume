@@ -17,7 +17,7 @@ from mango import Role
 from pandas.api.types import is_bool_dtype, is_numeric_dtype
 from psycopg2.errors import UndefinedColumn
 from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.exc import DataError, OperationalError, ProgrammingError
+from sqlalchemy.exc import DataError, IntegrityError, OperationalError, ProgrammingError
 
 from assume.common.market_objects import MetaDict
 from assume.common.utils import (
@@ -635,8 +635,9 @@ class WriteOutput(Role):
                     query = f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"
                     with self.db.begin() as db:
                         db.execute(text(query))
-                except Exception:
-                    logger.exception("Error converting column")
+                except (ProgrammingError, OperationalError, DataError) as e:
+                    logger.error("Failed to add column %s to %s: %s", column, table, e)
+                    raise
 
         if index and df.index.name:
             df.index.name = df.index.name.lower()
@@ -824,10 +825,11 @@ class DatabaseMaintenance:
                     )
                     result = conn.execute(delete_query, {"simulations": simulation_ids})
                     logger.debug("Deleted %s rows from %s", result.rowcount, table)
-            except Exception as e:
+            except (ProgrammingError, OperationalError, IntegrityError) as e:
                 logger.error(
                     "Could not delete simulation(s) from table %s: %s", table, e
                 )
+                raise
 
     def delete_all_simulations(self, exclude: list[str] = None) -> None:
         """
@@ -861,5 +863,6 @@ class DatabaseMaintenance:
                         delete_query = text(f'DELETE FROM "{table}"')
                     result = conn.execute(delete_query)
                     logger.debug("Deleted %s rows from %s", result.rowcount, table)
-            except Exception as e:
+            except (ProgrammingError, OperationalError, IntegrityError) as e:
                 logger.error("Could not delete simulations from table %s: %s", table, e)
+                raise
