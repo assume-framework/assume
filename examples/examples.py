@@ -20,6 +20,10 @@ os.makedirs("./examples/local_db", exist_ok=True)
 available_examples = {
     # small examples for easier understanding of different features and configurations
     "small": {"scenario": "example_01a", "study_case": "base"},
+    "example_forecast_update": {
+        "scenario": "example_forecast_update",
+        "study_case": "base",
+    },
     "small_with_exchanges": {
         "scenario": "example_01a",
         "study_case": "base_with_exchanges",
@@ -118,10 +122,10 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_with_vre_and_storage"
+    example = "example_forecast_update"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

@@ -62,6 +62,15 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
         # =============================================================================
         # save a theoretic SOC to calculate the ramping
         start = product_tuples[0][0]
+
+        # Past market clearing prices are stored in the unit outputs by
+        # `BaseUnit.set_dispatch_plan` after each clearing (entries before `start`
+        # are populated; later entries are 0 from the FastSeries default).
+        previous_prices = unit.outputs[
+            f"{market_config.product_type}_accepted_price"
+        ].loc[: start - unit.index.freq]
+        self.update_forecasts_if_needed(unit, previous_prices=previous_prices)
+
         theoretic_SOC = unit.outputs["soc"].at[start]
         previous_power = unit.get_output_before(start)
 

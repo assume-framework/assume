@@ -1,0 +1,3 @@
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,unit_operator
+Baseload,nuclear,powerplant_energy_naive,uranium,0.0,1000.0,0.0,0.3,10.3,Operator 1
+Solar,solar,powerplant_energy_naive,renewable,0.0,2000.0,0.0,1.0,0.0,Operator 2

@@ -661,12 +661,26 @@ def set_preloaded_forecast_by_name(
     return preprocess_information[new_forecast_name]
 
 
+def price_example_update(
+    current_forecast, preprocess_information, previous_prices=None, *args, **kwargs
+):
+    """Stub price-forecast update — to be implemented.
+
+    Receives ``previous_prices`` (past accepted clearing prices from
+    ``unit.outputs[f"{product_type}_accepted_price"]``) so future implementations
+    can revise the price forecast based on observed market outcomes.
+    """
+    # TODO: add new logic here and return new forecast
+    return current_forecast
+
+
 forecast_update_algorithms = {
     "price_default": default_update,
     "residual_load_default": default_update,
     "residual_load_set_preloaded": set_preloaded_forecast_by_name,
     "congestion_signal_default": default_update,
     "renewable_utilisation_default": default_update,
+    "price_example_update": price_example_update,
 }
 
 
