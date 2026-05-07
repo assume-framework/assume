@@ -280,10 +280,15 @@ def read_pypsa_grid(
     def add_lines(network: pypsa.Network, lines: pd.DataFrame) -> None:
         network.add("Line", lines.index, **lines)
 
+    def add_links(network: pypsa.Network, links: pd.DataFrame) -> None:
+        network.add("Link", links.index, **links)
+
     # setup the network
     add_buses(network, grid_dict["buses"])
     add_lines(network, grid_dict["lines"])
+    add_links(network, grid_dict["links"])
     network.add("Carrier", "AC")
+    network.add("Carrier", "DC")
     return network
 
 

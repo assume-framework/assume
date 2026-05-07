@@ -285,3 +285,73 @@ class RedispatchMarketRole(MarketRole):
                     nodal_marginal_prices[unit_node],
                     0,
                 )
+        # TODO: check if still works
+        # pass to orderbook so that set points can be analyzed in dashboard etc.
+        # # add (optimal) HVDC link set points to orderbook
+        # for link_id in network.links.index:
+        #     if self.payment_mechanism == "pay_as_bid":
+        #         accepted_price_bus0 = accepted_price_bus1 = (
+        #             0
+        #             if network.links_t.p0[link_id][0] == 0
+        #             else network.links.loc[link_id, "marginal_cost"]
+        #         )
+        #     elif self.payment_mechanism == "pay_as_clear":
+        #         accepted_price_bus0 = (
+        #             0
+        #             if network.links_t.p0[link_id][0] == 0
+        #             else -network.buses_t.marginal_price[
+        #                 network.links.loc[link_id, "bus0"]
+        #             ][0]
+        #         )
+        #         accepted_price_bus1 = (
+        #             0
+        #             if network.links_t.p0[link_id][0] == 0
+        #             else -network.buses_t.marginal_price[
+        #                 network.links.loc[link_id, "bus1"]
+        #             ][0]
+        #         )
+
+        #     # "Active power at bus0 (positive if branch is withdrawing power from bus0)." - https://pypsa.readthedocs.io/en/stable/user-guide/components.html
+        #     # That means: positive == demand / downward redispatch, negative == generator / upward redispatch
+        #     # However, downward redispatch needs to be negative, upward redispatch needs to be positive (see above)
+        #     # Sign needs to be changed for volumes
+        #     bus0 = {
+        #         "start_time": orderbook_df.loc[0, "start_time"],
+        #         "end_time": orderbook_df.loc[0, "end_time"],
+        #         "only_hours": orderbook_df.loc[0, "only_hours"],
+        #         "price": network.links.loc[link_id, "marginal_cost"],
+        #         "volume": -network.links_t.p0[link_id][0],
+        #         "max_power": network.links.loc[link_id, "p_max_pu"]
+        #         * network.links.loc[link_id, "p_nom"],
+        #         "min_power": network.links.loc[link_id, "p_min_pu"]
+        #         * network.links.loc[link_id, "p_nom"],
+        #         "node": network.links.loc[link_id, "bus0"],
+        #         "bid_type": None,
+        #         "agent_addr": None,
+        #         "bid_id": None,
+        #         "unit_id": link_id,
+        #         "accepted_volume": -network.links_t.p0[link_id][0],
+        #         "accepted_price": accepted_price_bus0,
+        #     }
+        #     # "Active power at bus1 (positive if branch is withdrawing power from bus1)." - https://pypsa.readthedocs.io/en/stable/user-guide/components.html
+        #     bus1 = {
+        #         "start_time": orderbook_df.loc[0, "start_time"],
+        #         "end_time": orderbook_df.loc[0, "end_time"],
+        #         "only_hours": orderbook_df.loc[0, "only_hours"],
+        #         "price": network.links.loc[link_id, "marginal_cost"],
+        #         "volume": -network.links_t.p1[link_id][0],
+        #         "max_power": network.links.loc[link_id, "p_max_pu"]
+        #         * network.links.loc[link_id, "p_nom"],
+        #         "min_power": network.links.loc[link_id, "p_min_pu"]
+        #         * network.links.loc[link_id, "p_nom"],
+        #         "node": network.links.loc[link_id, "bus1"],
+        #         "bid_type": None,
+        #         "agent_addr": None,
+        #         "bid_id": None,
+        #         "unit_id": link_id,
+        #         "accepted_volume": -network.links_t.p1[link_id][0],
+        #         "accepted_price": accepted_price_bus1,
+        #     }
+
+        #     orderbook_df.loc[len(orderbook_df)] = bus0
+        #     orderbook_df.loc[len(orderbook_df)] = bus1

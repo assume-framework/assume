@@ -340,6 +340,7 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame | None]:
     network_path = Path(network_path)
     buses = None
     lines = None
+    links = None
     generators = None
     loads = None
     storage_units = None
@@ -348,6 +349,8 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame | None]:
         buses = pd.read_csv(network_path / "buses.csv", index_col=0)
     if (network_path / "lines.csv").exists():
         lines = pd.read_csv(network_path / "lines.csv", index_col=0)
+    if (network_path / "links.csv").exists():
+        links = pd.read_csv(network_path / "links.csv", index_col=0)
     if (network_path / "powerplant_units.csv").exists():
         generators = pd.read_csv(network_path / "powerplant_units.csv", index_col=0)
     if (network_path / "demand_units.csv").exists():
@@ -358,6 +361,7 @@ def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame | None]:
     return {
         "buses": buses,
         "lines": lines,
+        "links": links,
         "generators": generators,
         "loads": loads,
         "storage_units": storage_units,

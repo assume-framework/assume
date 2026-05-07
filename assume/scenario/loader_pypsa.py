@@ -68,8 +68,10 @@ def load_pypsa(
     grid_data = {
         "buses": network.buses,
         "lines": network.lines,
+        "links": network.links,
         "generators": network.generators,
         "loads": network.loads,
+        "storage_units": network.storage_units,
     }
 
     for market_config in marketdesign:
