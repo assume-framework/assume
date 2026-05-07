@@ -510,6 +510,7 @@ def adjust_unit_operator_for_learning(
     return unit_operator_id
 
 
+# TODO: does including links lead to changes here?
 def create_incidence_matrix(lines, buses, zones_id=None):
     # Determine nodes based on whether we're working with zones or individual buses
     if zones_id:

@@ -31,7 +31,7 @@ def market_clearing_opt_constraints(
     mode: str,
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame,
-    lines: pd.DataFrame,
+    lines: pd.DataFrame,  # TODO: what about links?
 ):
     """
     Adds the constraints to the model.
@@ -219,7 +219,7 @@ def market_clearing_opt(
     mode: str,
     with_linked_bids: bool,
     incidence_matrix: pd.DataFrame = None,
-    lines: pd.DataFrame = None,
+    lines: pd.DataFrame = None,  # TODO: what about links?
     solver: OptSolver = None,
     solver_options: dict = {},
     func_constraints=market_clearing_opt_constraints,
@@ -357,6 +357,7 @@ class ComplexClearingRole(MarketRole):
         self.zones_id = None
         self.incidence_matrix = None
         self.lines = None
+        # TODO: what about links?
 
         if self.grid_data:
             self.lines = self.grid_data["lines"]

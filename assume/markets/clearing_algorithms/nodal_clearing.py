@@ -70,7 +70,7 @@ class NodalClearingRole(MarketRole):
         # Define grid data
         self.nodes = ["node0"]
         self.incidence_matrix = None
-
+        # TODO: what about links?
         self.lines = self.grid_data["lines"]
         buses = self.grid_data["buses"]
 
@@ -430,5 +430,6 @@ def extract_results(
     if log_flows:
         # extract flows
         flows = network.lines_t.p0.stack(future_stack=True).to_dict()
+        # TODO: also for set points of links?
 
     return accepted_orders, rejected_orders, meta, flows

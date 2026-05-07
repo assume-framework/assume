@@ -416,6 +416,7 @@ def extract_buses_and_lines(market_configs: list[MarketConfig]):
 
         buses = grid_data.get("buses")
         lines = grid_data.get("lines")
+        # TODO: check: links = grid_data.get("links")
         if buses is not None and lines is not None:
             break
 
@@ -444,7 +445,7 @@ def calculate_naive_congestion_signal(
     """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
-
+    # TODO: should links be incorporated in the congestion signal calculation?
     # Lines and buses should be everywhere the same
     buses, lines = extract_buses_and_lines(market_configs)
 
@@ -551,10 +552,10 @@ def calculate_naive_renewable_utilisation(
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
 
-    # Lines and buses should be everywhere the same
-    buses, lines = extract_buses_and_lines(market_configs)
+    # Buses should be everywhere the same
+    buses, _ = extract_buses_and_lines(market_configs)
 
-    if buses is None or lines is None:
+    if buses is None:
         return {}
 
     powerplants_units, demand_units, _, _, _ = sort_units(units)

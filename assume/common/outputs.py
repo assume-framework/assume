@@ -567,6 +567,8 @@ class WriteOutput(Role):
             def create_line(row):
                 return f"SRID=4326;LINESTRING ({translate_dict[row['bus0']]}, {translate_dict[row['bus1']]})"
 
+            # TODO: do we need this for links as well?
+
             # Apply the function to each row
             grid["lines"]["wkt_srid_4326"] = grid["lines"].apply(create_line, axis=1)
 
