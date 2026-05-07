@@ -23,6 +23,7 @@ Upcoming Release
 **Bug Fixes:**
   - **dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
   - **fixed a bug in forecasts**, that occurred when using complex clearing
+  - **Fix upward redispatch potential**, so that availabilities are now correctly considered instead of the nominal power output of the unit
 
 0.6.0 - (18th March 2026)
 =========================
