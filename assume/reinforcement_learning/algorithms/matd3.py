@@ -7,6 +7,7 @@ import logging
 import torch as th
 from torch.nn import functional as F
 
+from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import A2CAlgorithm
 from assume.reinforcement_learning.learning_utils import (
     polyak_update,
@@ -25,12 +26,12 @@ class TD3(A2CAlgorithm):
 
     Open AI Spinning guide: https://spinningup.openai.com/en/latest/algorithms/td3.html
     Original paper: https://arxiv.org/pdf/1802.09477.pdf
-    
+
     Attributes:
         n_updates: Counter for gradient updates performed.
         grad_clip_norm: Maximum gradient norm for clipping.
         critic_architecture_class: Critic network architecture class (CriticTD3).
-        
+
     Example:
         >>> td3 = TD3(learning_role)
         >>> td3.update_policy()
@@ -38,10 +39,10 @@ class TD3(A2CAlgorithm):
 
     def __init__(self, learning_role):
         """Initialize the TD3 algorithm.
-        
+
         Sets up the algorithm with gradient counters, clipping parameters,
         and critic architecture.
-        
+
         Args:
             learning_role: Learning role object managing agents and replay buffer.
                 Must have off-policy configuration.
@@ -54,12 +55,55 @@ class TD3(A2CAlgorithm):
         # Define the critic architecture class for TD3
         self.critic_architecture_class = CriticTD3
 
+    def get_action(
+        self, strategy: "LearningStrategy", obs: th.Tensor
+    ) -> tuple[th.Tensor, th.Tensor]:
+        """Sample an action using the off-policy strategy.
+
+        During learning mode the agent either performs pure-noise initial
+        exploration (first N episodes) or uses its deterministic actor plus
+        Gaussian action noise.  During evaluation mode the actor is used
+        without any noise.
+
+        This default implementation is shared by TD3 and DDPG.  PPO overrides
+        it with its own stochastic Gaussian sampling.
+        """
+        if strategy.learning_mode and not strategy.evaluation_mode:
+            if strategy.collect_initial_experience_mode:
+                # Pure Gaussian noise for initial random exploration
+                noise = th.normal(
+                    mean=0.0,
+                    std=strategy.exploration_noise_std,
+                    size=(strategy.act_dim,),
+                    dtype=strategy.float_type,
+                    device=strategy.device,
+                )
+                return noise, noise
+
+            action = strategy.actor(obs).detach()
+            noise = strategy.action_noise.noise(
+                device=strategy.device, dtype=strategy.float_type
+            )
+            action = th.clamp(
+                action + noise,
+                strategy.actor.min_output,
+                strategy.actor.max_output,
+            )
+            return action, noise
+
+        # Evaluation
+        action = strategy.actor(obs).detach()
+        noise = th.zeros(
+            strategy.act_dim, dtype=strategy.float_type, device=strategy.device
+        )
+        return action, noise
+
     def update_policy(self):
         """Update the policy using the Twin Delayed Deep Deterministic Policy Gradients (TD3).
 
-        This method performs the policy update step, which involves updating the actor 
-        (policy) and critic (Q-function) networks using the TD3 algorithm. It iterates 
-        over the specified number of gradient steps and performs the following for each 
+        This method performs the policy update step, which involves updating the actor
+        (policy) and critic (Q-function) networks using the TD3 algorithm. It iterates
+        over the specified number of gradient steps and performs the following for each
         learning strategy:
 
         1. Sample a batch of transitions from the replay buffer.
@@ -127,7 +171,8 @@ class TD3(A2CAlgorithm):
             with th.no_grad():
                 # Select action according to policy and add clipped noise
                 noise = (
-                    th.randn_like(actions) * self.learning_config.off_policy.target_policy_noise
+                    th.randn_like(actions)
+                    * self.learning_config.off_policy.target_policy_noise
                 )
                 noise = noise.clamp(
                     -self.learning_config.off_policy.target_noise_clip,
@@ -359,7 +404,9 @@ class TD3(A2CAlgorithm):
                     self.learning_config.off_policy.tau,
                 )
                 polyak_update(
-                    all_actor_params, all_target_actor_params, self.learning_config.off_policy.tau
+                    all_actor_params,
+                    all_target_actor_params,
+                    self.learning_config.off_policy.tau,
                 )
 
         self.learning_role.write_rl_grad_params_to_output(learning_rate, unit_params)

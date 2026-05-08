@@ -7,6 +7,7 @@ import logging
 import torch as th
 from torch.nn import functional as F
 
+from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import A2CAlgorithm
 from assume.reinforcement_learning.learning_utils import (
     polyak_update,
@@ -18,21 +19,21 @@ logger = logging.getLogger(__name__)
 
 class DDPG(A2CAlgorithm):
     """Deep Deterministic Policy Gradient (DDPG) Algorithm.
-    
+
     An off-policy actor-critic algorithm that uses deterministic policy gradients
     for continuous action spaces. DDPG combines Q-learning with policy gradients,
     using:
-    
+
     - A single critic network to estimate Q-values
     - Deterministic actor networks that map states to actions
     - Target networks updated via Polyak averaging for stability
     - Replay buffer for sample efficiency and decorrelation
-    
+
     Attributes:
         n_updates: Counter for gradient updates performed.
         grad_clip_norm: Maximum gradient norm for clipping.
         critic_architecture_class: Critic network architecture (CriticDDPG).
-    
+
     Example:
         >>> ddpg = DDPG(learning_role)
         >>> ddpg.update_policy()  # Performs one training iteration
@@ -40,34 +41,77 @@ class DDPG(A2CAlgorithm):
 
     def __init__(self, learning_role) -> None:
         """Initialize the DDPG algorithm.
-        
+
         Sets up the algorithm with gradient counters, clipping parameters,
         and critic architecture.
-        
+
         Args:
             learning_role: Learning role object managing agents and replay buffer.
                 Must have off-policy configuration.
         """
         super().__init__(learning_role)
-        
+
         # Gradient step counter
         self.n_updates = 0
-        
+
         # Gradient clipping threshold
         self.grad_clip_norm = 1.0
 
         # Define the critic architecture class for DDPG (single critic)
         self.critic_architecture_class = CriticDDPG
 
+    def get_action(
+        self, strategy: "LearningStrategy", obs: th.Tensor
+    ) -> tuple[th.Tensor, th.Tensor]:
+        """Sample an action using the off-policy strategy.
+
+        During learning mode the agent either performs pure-noise initial
+        exploration (first N episodes) or uses its deterministic actor plus
+        Gaussian action noise.  During evaluation mode the actor is used
+        without any noise.
+
+        This default implementation is shared by TD3 and DDPG.  PPO overrides
+        it with its own stochastic Gaussian sampling.
+        """
+        if strategy.learning_mode and not strategy.evaluation_mode:
+            if strategy.collect_initial_experience_mode:
+                # Pure Gaussian noise for initial random exploration
+                noise = th.normal(
+                    mean=0.0,
+                    std=strategy.exploration_noise_std,
+                    size=(strategy.act_dim,),
+                    dtype=strategy.float_type,
+                    device=strategy.device,
+                )
+                return noise, noise
+
+            action = strategy.actor(obs).detach()
+            noise = strategy.action_noise.noise(
+                device=strategy.device, dtype=strategy.float_type
+            )
+            action = th.clamp(
+                action + noise,
+                strategy.actor.min_output,
+                strategy.actor.max_output,
+            )
+            return action, noise
+
+        # Evaluation
+        action = strategy.actor(obs).detach()
+        noise = th.zeros(
+            strategy.act_dim, dtype=strategy.float_type, device=strategy.device
+        )
+        return action, noise
+
     def update_policy(self) -> None:
         """Update actor and critic networks using DDPG algorithm.
-        
+
         Performs one complete training iteration consisting of:
         1. Sampling batches from replay buffer
         2. Updating critic networks using MSE loss
         3. Updating actor networks using policy gradient
         4. Updating target networks via Polyak averaging
-        
+
         """
         logger.debug("Updating Policy (MADDPG/DDPG)")
 
@@ -92,7 +136,9 @@ class DDPG(A2CAlgorithm):
 
         # Update noise decay and learning rate based on training progress
         progress_remaining = self.learning_role.get_progress_remaining()
-        updated_noise_decay = self.learning_role.calc_noise_from_progress(progress_remaining)
+        updated_noise_decay = self.learning_role.calc_noise_from_progress(
+            progress_remaining
+        )
         learning_rate = self.learning_role.calc_lr_from_progress(progress_remaining)
 
         # Update learning rates and noise schedules for all strategies
@@ -111,7 +157,7 @@ class DDPG(A2CAlgorithm):
             transitions = self.learning_role.buffer.sample(
                 self.learning_config.batch_size
             )
-            
+
             states, actions, next_states, rewards = (
                 transitions.observations,
                 transitions.actions,
@@ -121,10 +167,12 @@ class DDPG(A2CAlgorithm):
 
             # Compute target actions using target actors
             with th.no_grad():
-                next_actions = th.stack([
-                    strategy.actor_target(next_states[:, i, :]).clamp(-1, 1)
-                    for i, strategy in enumerate(strategies)
-                ])
+                next_actions = th.stack(
+                    [
+                        strategy.actor_target(next_states[:, i, :]).clamp(-1, 1)
+                        for i, strategy in enumerate(strategies)
+                    ]
+                )
                 next_actions = next_actions.transpose(0, 1).contiguous()
                 next_actions = next_actions.view(-1, n_rl_agents * self.act_dim)
 
@@ -134,7 +182,7 @@ class DDPG(A2CAlgorithm):
             unique_obs_from_others = states[
                 :, :, self.obs_dim - self.unique_obs_dim :
             ].reshape(self.learning_config.batch_size, n_rl_agents, -1)
-            
+
             next_unique_obs_from_others = next_states[
                 :, :, self.obs_dim - self.unique_obs_dim :
             ].reshape(self.learning_config.batch_size, n_rl_agents, -1)
@@ -157,7 +205,10 @@ class DDPG(A2CAlgorithm):
                     dim=1,
                 )
                 other_next_unique_obs = th.cat(
-                    (next_unique_obs_from_others[:, :i], next_unique_obs_from_others[:, i + 1 :]),
+                    (
+                        next_unique_obs_from_others[:, :i],
+                        next_unique_obs_from_others[:, i + 1 :],
+                    ),
                     dim=1,
                 )
 
@@ -170,8 +221,12 @@ class DDPG(A2CAlgorithm):
                 )
                 all_next_states = th.cat(
                     (
-                        next_states[:, i, :].reshape(self.learning_config.batch_size, -1),
-                        other_next_unique_obs.reshape(self.learning_config.batch_size, -1),
+                        next_states[:, i, :].reshape(
+                            self.learning_config.batch_size, -1
+                        ),
+                        other_next_unique_obs.reshape(
+                            self.learning_config.batch_size, -1
+                        ),
                     ),
                     dim=1,
                 )
@@ -204,8 +259,12 @@ class DDPG(A2CAlgorithm):
                 )
                 strategy.critics.optimizer.step()
 
-                unit_params[step][strategy.unit_id]["critic_total_grad_norm"] = total_norm
-                unit_params[step][strategy.unit_id]["critic_max_grad_norm"] = max_grad_norm
+                unit_params[step][strategy.unit_id]["critic_total_grad_norm"] = (
+                    total_norm
+                )
+                unit_params[step][strategy.unit_id]["critic_max_grad_norm"] = (
+                    max_grad_norm
+                )
 
             # ------------------------------------------------------------
             # ACTOR UPDATE PHASE (updated every step)
@@ -257,8 +316,12 @@ class DDPG(A2CAlgorithm):
                 )
                 strategy.actor.optimizer.step()
 
-                unit_params[step][strategy.unit_id]["actor_total_grad_norm"] = total_norm
-                unit_params[step][strategy.unit_id]["actor_max_grad_norm"] = max_grad_norm
+                unit_params[step][strategy.unit_id]["actor_total_grad_norm"] = (
+                    total_norm
+                )
+                unit_params[step][strategy.unit_id]["actor_max_grad_norm"] = (
+                    max_grad_norm
+                )
 
             # ------------------------------------------------------------
             # TARGET NETWORK UPDATE PHASE (Polyak averaging)
