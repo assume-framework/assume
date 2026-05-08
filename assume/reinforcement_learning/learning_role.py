@@ -27,6 +27,7 @@ from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
 from assume.reinforcement_learning.algorithms.maddpg import DDPG
 from assume.reinforcement_learning.algorithms.mappo import PPO
 from assume.reinforcement_learning.algorithms.matd3 import TD3
+from assume.reinforcement_learning.buffer import ReplayBuffer, RolloutBuffer
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
     transform_buffer_data,
@@ -170,6 +171,43 @@ class Learning(Role):
             recurrency_task,
             src="no_wait",
         )
+
+    def intialize_buffer(self, time_step, validation_interval):
+        """Initialize the replay buffer for reinforcement learning training.
+
+        Args:
+            buffer: The replay buffer to be initialized.
+        """
+        if is_off_policy(self.learning_config.algorithm):
+            buffer = ReplayBuffer(
+                buffer_size=self.learning_config.off_policy.replay_buffer_size,
+                obs_dim=self.rl_algorithm.obs_dim,
+                act_dim=self.rl_algorithm.act_dim,
+                n_rl_units=len(self.rl_strats),
+                device=self.device,
+                float_type=self.float_type,
+            )
+            min_episode_for_eval = (
+                self.learning_config.off_policy.episodes_collecting_initial_experience
+                + validation_interval
+            )
+        else:
+            train_freq = pd.Timedelta(str(self.learning_config.train_freq))
+            time_step = pd.Timedelta(time_step)
+            rollout_buffer_size = max(2, int(train_freq / time_step))
+            buffer = RolloutBuffer(
+                buffer_size=rollout_buffer_size,
+                obs_dim=self.rl_algorithm.obs_dim,
+                act_dim=self.rl_algorithm.act_dim,
+                n_rl_units=len(self.rl_strats),
+                device=self.device,
+                float_type=self.float_type,
+                gamma=self.learning_config.gamma,
+                gae_lambda=self.learning_config.on_policy.gae_lambda,
+            )
+            min_episode_for_eval = validation_interval
+
+        return buffer, min_episode_for_eval
 
     def sync_train_freq_with_simulation_horizon(self) -> str | None:
         """Ensure self.train_freq evenly divides the simulation length.
