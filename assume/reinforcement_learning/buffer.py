@@ -3,10 +3,13 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import warnings
-from typing import NamedTuple, Generator
+from collections.abc import Generator
+from typing import NamedTuple
 
 import numpy as np
 import torch as th
+
+from assume.common.utils import convert_to_tensors
 
 try:
     # Check memory used by replay buffer when possible
@@ -16,6 +19,16 @@ except ImportError:
 
 
 class ReplayBufferSamples(NamedTuple):
+    """Container for replay buffer samples.
+
+
+    Attributes:
+        observations: States/observations the agent saw.
+        actions: Actions the agent took.
+        next_observations: States/observations the agent saw after taking the action.
+        rewards: Rewards the agent received for taking the action.
+    """
+
     observations: th.Tensor
     actions: th.Tensor
     next_observations: th.Tensor
@@ -33,17 +46,20 @@ class ReplayBuffer:
         float_type,
     ):
         """Initialize the replay buffer.
-        
+
         A class that represents a replay buffer for storing observations, actions, and rewards.
         The replay buffer is implemented as a circular buffer, where the oldest experiences are discarded when the buffer is full.
-        
+
         Args:
-            buffer_size: The maximum size of the buffer.
-            obs_dim: The dimension of the observation space.
-            act_dim: The dimension of the action space.
-            n_rl_units: The number of reinforcement learning units.
-            device: The device to use for storing the data (e.g., 'cpu' or 'cuda').
-            float_type: The data type to use for the stored data.
+            buffer_size (int): The maximum size of the buffer.
+            obs_dim (int): The dimension of the observation space.
+            act_dim (int): The dimension of the action space.
+            n_rl_units (int): The number of reinforcement learning units.
+            device (str): The device to use for storing the data (e.g., 'cpu' or 'cuda').
+            float_type (torch.dtype): The data type to use for the stored data.
+            observations (numpy.ndarray): The stored observations.
+            actions (numpy.ndarray): The stored actions.
+            rewards (numpy.ndarray): The stored rewards.
         """
 
         self.buffer_size = buffer_size
@@ -90,31 +106,12 @@ class ReplayBuffer:
 
     def size(self):
         """Return the current size of the buffer.
-        
+
         Returns:
-            The current size of the buffer (i.e. number of transitions stored).
+            buffer_size(int): The current size of the buffer
+
         """
         return self.buffer_size if self.full else self.pos
-
-    def to_torch(self, array: np.array, copy=True):
-        """Convert a numpy array to a PyTorch tensor.
-        
-        Note:
-            It copies the data by default.
-            
-        Args:
-            array: The numpy array to convert.
-            copy: Whether to copy the data or not (may be useful to avoid changing 
-                things by reference). Defaults to True.
-                
-        Returns:
-            The converted PyTorch tensor.
-        """
-
-        if copy:
-            return th.tensor(array, dtype=self.th_float_type, device=self.device)
-
-        return th.as_tensor(array, dtype=self.th_float_type, device=self.device)
 
     def add(
         self,
@@ -123,11 +120,11 @@ class ReplayBuffer:
         reward: np.ndarray,
     ):
         """Add an observation, action, and reward of all agents to the replay buffer.
-        
+
         Args:
-            obs: The observation to add.
-            actions: The actions to add.
-            reward: The reward to add.
+            obs (numpy.ndarray): The observation to add.
+            actions (numpy.ndarray): The actions to add.
+            reward (numpy.ndarray): The reward to add.
         """
         # copying all to avoid modification
         len_obs = obs.shape[0]
@@ -144,13 +141,13 @@ class ReplayBuffer:
 
     def sample(self, batch_size: int) -> ReplayBufferSamples:
         """Sample a random batch of experiences from the replay buffer.
-        
+
         Args:
-            batch_size: The number of experiences to sample.
-            
+            batch_size (int): The number of experiences to sample.
+
         Returns:
-            A named tuple containing the sampled observations, actions, and rewards.
-            
+            ReplayBufferSamples: A named tuple containing the sampled observations, actions, and rewards.
+
         Raises:
             Exception: If there are less than two entries in the buffer.
         """
@@ -167,13 +164,16 @@ class ReplayBuffer:
             self.rewards[batch_inds],
         )
 
-        return ReplayBufferSamples(*tuple(map(self.to_torch, data)))
+        return ReplayBufferSamples(
+            *tuple(convert_to_tensors(x, self.device, self.th_float_type) for x in data)
+        )
+
 
 class RolloutBufferSamples(NamedTuple):
     """Container for rollout buffer samples.
-    
+
     It holds one batch of training samples from PPO's rollout buffer.
-    
+
     Attributes:
         observations: States/observations the agent saw.
         actions: Actions the agent took.
@@ -182,22 +182,24 @@ class RolloutBufferSamples(NamedTuple):
         advantages: Generalized advantage estimates.
         returns: Expected returns.
     """
-    observations: th.Tensor     # states/observations the agent saw
-    actions: th.Tensor          # actions the agent took
-    old_values: th.Tensor       # critic's value estimates
-    old_log_probs: th.Tensor    # log_probability of taking each action
-    advantages: th.Tensor       # generalized advantage estimates
-    returns: th.Tensor          # expected returns
+
+    observations: th.Tensor  # states/observations the agent saw
+    actions: th.Tensor  # actions the agent took
+    old_values: th.Tensor  # critic's value estimates
+    old_log_probs: th.Tensor  # log_probability of taking each action
+    advantages: th.Tensor  # generalized advantage estimates
+    returns: th.Tensor  # expected returns
+
 
 class RolloutBuffer:
     """Rollout buffer used in on-policy algorithms like PPO.
-    
+
     It corresponds to the transitions collected using the current policy.
     This experience is discarded after the policy is updated.
     In order to use PPO, the current observations are needed to be stored.
     The observations include actions, rewards, values, log probabilities and done for each action.
     """
-    
+
     def __init__(
         self,
         buffer_size: int,
@@ -207,10 +209,10 @@ class RolloutBuffer:
         device: str | th.device,
         float_type: th.dtype,
         gamma: float = 0.99,
-        gae_lambda: float = 0.98
+        gae_lambda: float = 0.98,
     ):
         """Initialize the rollout buffer.
-        
+
         Args:
             buffer_size: Max number of elements allowed in the buffer.
             obs_dim: Dimension of the observation space.
@@ -240,69 +242,25 @@ class RolloutBuffer:
 
     def reset(self) -> None:
         """Reset the rollout buffer.
-        
+
         Clearing the buffer and allocating new storage.
         """
         self.observations = np.zeros(
-            (
-                self.buffer_size, 
-                self.n_rl_units, 
-                self.obs_dim
-            ),
-            dtype = np.float32
+            (self.buffer_size, self.n_rl_units, self.obs_dim), dtype=np.float32
         )
         self.actions = np.zeros(
-            (
-                self.buffer_size,
-                self.n_rl_units,
-                self.act_dim
-            ),
-            dtype = np.float32
+            (self.buffer_size, self.n_rl_units, self.act_dim), dtype=np.float32
         )
-        self.rewards = np.zeros(
-            (
-                self.buffer_size,
-                self.n_rl_units
-            ),
-            dtype = np.float32
-        )
-        self.values = np.zeros(
-            (
-                self.buffer_size,
-                self.n_rl_units
-            ),
-            dtype = np.float32
-        )
-        self.log_probs = np.zeros(
-            (
-                self.buffer_size,
-                self.n_rl_units
-            ),
-            dtype = np.float32
-        )
-        self.dones = np.zeros(
-            (
-                self.buffer_size,
-                self.n_rl_units
-            ),
-            dtype = np.float32
-        )
+        self.rewards = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+        self.values = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+        self.log_probs = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+        self.dones = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
 
         # Computed after rollout
         self.advantages = np.zeros(
-            (
-                self.buffer_size,
-                self.n_rl_units
-            ),
-            dtype = np.float32
+            (self.buffer_size, self.n_rl_units), dtype=np.float32
         )
-        self.returns = np.zeros(
-            (
-                self.buffer_size,
-                self.n_rl_units
-            ),
-            dtype = np.float32
-        )
+        self.returns = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
 
         self.pos = 0
         self.full = False
@@ -315,10 +273,10 @@ class RolloutBuffer:
         reward: np.ndarray,
         done: np.ndarray,
         value: np.ndarray,
-        log_prob: np.ndarray
+        log_prob: np.ndarray,
     ) -> None:
         """Add a transition to the buffer.
-        
+
         Args:
             obs: Observation of the agents.
             action: Action taken by the agents.
@@ -330,7 +288,7 @@ class RolloutBuffer:
         if self.pos >= self.buffer_size:
             self.full = True
             return
-        
+
         self.observations[self.pos] = np.array(obs).copy()
         self.actions[self.pos] = np.array(action).copy()
         self.rewards[self.pos] = np.array(reward).flatten().copy()
@@ -342,14 +300,12 @@ class RolloutBuffer:
         self.pos += 1
 
     def compute_returns_and_advantages(
-        self,
-        last_values: np.ndarray,
-        dones: np.ndarray
+        self, last_values: np.ndarray, dones: np.ndarray
     ) -> None:
         """Use Generalized Advantage Estimation to compute the advantage.
-        
+
         To obtain the lambda-return, the advantage is added to the value estimate.
-        
+
         Args:
             last_values: Value estimation for the last step.
             dones: Whether the last step was terminal.
@@ -384,8 +340,7 @@ class RolloutBuffer:
 
             # GAE advantage
             last_gae_lam = (
-                delta
-                + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
+                delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
             )
             self.advantages[step] = last_gae_lam
 
@@ -394,14 +349,13 @@ class RolloutBuffer:
         self.generator_ready = True
 
     def get(
-        self,
-        batch_size: int | None = None
+        self, batch_size: int | None = None
     ) -> Generator[RolloutBufferSamples, None, None]:
         """Generate batches of transition samples for training.
-        
+
         Args:
             batch_size: Number of samples to be accessed per batch.
-            
+
         Yields:
             A generator yielding RolloutBufferSamples.
         """
@@ -409,7 +363,7 @@ class RolloutBuffer:
             raise ValueError(
                 "Must call compute_returns_and_advantages before sampling."
             )
-        
+
         buffer_size = self.pos if not self.full else self.buffer_size
         indices = np.random.permutation(buffer_size)
 
@@ -419,56 +373,36 @@ class RolloutBuffer:
         start_idx = 0
         while start_idx < buffer_size:
             batch_indices = indices[start_idx : start_idx + batch_size]
-            yield self._get_samples(batch_indices)
+            yield self.sample(batch_indices)
             start_idx += batch_size
 
-    def _get_samples(self, indices: np.ndarray) -> RolloutBufferSamples:
+    def sample(self, indices: np.ndarray) -> RolloutBufferSamples:
         """Sample data from the buffer for given indices.
-        
+
         Converts numpy arrays to torch tensors for given indices.
-        
+
         Args:
             indices: Indices of the samples to retrieve.
-            
+
         Returns:
             The batch of samples converted to PyTorch tensors.
         """
-        return RolloutBufferSamples(
-            observations = th.as_tensor(
-                self.observations[indices],
-                device = self.device,
-                dtype = self.float_type
-            ),
-            actions = th.as_tensor(
-                self.actions[indices],
-                device = self.device,
-                dtype = self.float_type
-            ),
-            old_values = th.as_tensor(
-                self.values[indices],
-                device = self.device,
-                dtype = self.float_type
-            ),
-            old_log_probs = th.as_tensor(
-                self.log_probs[indices],
-                device = self.device,
-                dtype = self.float_type
-            ),
-            advantages = th.as_tensor(
-                self.advantages[indices],
-                device = self.device,
-                dtype = self.float_type
-            ),
-            returns = th.as_tensor(
-                self.returns[indices],
-                device = self.device,
-                dtype = self.float_type
-            )
+        data = (
+            self.observations[indices],
+            self.actions[indices],
+            self.values[indices],
+            self.log_probs[indices],
+            self.advantages[indices],
+            self.returns[indices],
         )
-    
+
+        return RolloutBufferSamples(
+            *(convert_to_tensors(x, self.device, self.float_type) for x in data)
+        )
+
     def size(self) -> int:
         """Return the current number of stored transitions.
-        
+
         Returns:
             The size of the buffer.
         """
