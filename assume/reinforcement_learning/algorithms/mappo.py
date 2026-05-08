@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 class PPO(A2CAlgorithm):
     """
     Proximal Policy Optimization (PPO) Algorithm.
-    
-    A policy gradient method that alternates between sampling data through 
-    interaction with the environment, and optimizing a surrogate objective 
+
+    A policy gradient method that alternates between sampling data through
+    interaction with the environment, and optimizing a surrogate objective
     function using stochastic gradient ascent. It is an on-policy algorithm.
-    
+
     Attributes:
         clip_range: The epsilon parameter for PPO clipping.
         clip_range_vf: The epsilon parameter for value function clipping.
@@ -37,7 +37,7 @@ class PPO(A2CAlgorithm):
         n_updates: Counter for gradient updates performed.
         actor_architecture_class: Actor network architecture class.
         critic_architecture_class: Critic network architecture class.
-    
+
     Example:
         >>> ppo = PPO(learning_role)
         >>> ppo.update_policy()
@@ -54,7 +54,7 @@ class PPO(A2CAlgorithm):
         max_grad_norm=None,
     ):
         """Initialize PPO algorithm with specific hyperparameters.
-        
+
         Args:
             learning_role: The primary learning role object.
             clip_range: The epsilon parameter for PPO policy clipping.
@@ -80,9 +80,7 @@ class PPO(A2CAlgorithm):
         self.clip_range_vf = clip_range_vf
         self.n_epochs = n_epochs if n_epochs is not None else on_policy_config.n_epochs
         self.entropy_coef = (
-            entropy_coef
-            if entropy_coef is not None
-            else on_policy_config.entropy_coef
+            entropy_coef if entropy_coef is not None else on_policy_config.entropy_coef
         )
         self.vf_coef = vf_coef if vf_coef is not None else on_policy_config.vf_coef
         self.max_grad_norm = (
@@ -103,9 +101,7 @@ class PPO(A2CAlgorithm):
     # Note: save_params, save_critic_params, save_actor_params, load_params,
     # load_critic_params, load_actor_params, initialize_policy are inherited from A2CAlgorithm
 
-    def get_action(
-        self, strategy, obs: th.Tensor
-    ) -> tuple[th.Tensor, th.Tensor]:
+    def get_action(self, strategy, obs: th.Tensor) -> tuple[th.Tensor, th.Tensor]:
         """Sample a stochastic action.
 
         In learning mode the actor's Gaussian policy is sampled and the
@@ -131,10 +127,10 @@ class PPO(A2CAlgorithm):
 
     def create_actors(self) -> None:
         """Create stochastic actor networks for all agents.
-        
+
         Initializes the ActorPPO or LSTMActorPPO network based on the configuration,
         as well as its optimizer for each agent strategy.
-        
+
         Example:
             >>> ppo.create_actors()
             >>> # Creates actor network and optimizer for each strategy
@@ -168,10 +164,10 @@ class PPO(A2CAlgorithm):
 
     def create_critics(self) -> None:
         """Create value networks for all agents.
-        
-        Initializes the CriticPPO network (Centralized Critic) and its optimizer 
+
+        Initializes the CriticPPO network (Centralized Critic) and its optimizer
         for each registered agent strategy.
-        
+
         Example:
             >>> ppo.create_critics()
             >>> # Creates critic networks and optimizers for each strategy
@@ -195,16 +191,16 @@ class PPO(A2CAlgorithm):
 
     def extract_policy(self) -> dict:
         """Extract all actor and critic networks into a dictionary.
-        
+
         Collects actor and critic networks from all learning strategies into
         a structured dictionary.
-        
+
         Returns:
             Dictionary containing all network components organized by type:
                 - 'actors': Primary actor networks
                 - 'critics': Primary critic networks
                 - Dimension information for reconstruction
-        
+
         Example:
             >>> policy_dict = ppo.extract_policy()
             >>> # Contains all networks ready for saving or transfer
@@ -230,7 +226,7 @@ class PPO(A2CAlgorithm):
 
     def update_policy(self) -> None:
         """Update actor and critic networks using Proximal Policy Optimization (PPO).
-        
+
         Performs one complete training iteration consisting of:
         1. Checking if enough data is collected in the rollout buffer.
         2. Computing Generalized Advantage Estimation (GAE) and Returns using the last value estimate.
@@ -240,11 +236,10 @@ class PPO(A2CAlgorithm):
         6. Logging metrics and gradients.
         7. Clearing the on-policy buffer after the update.
         """
-        logger.debug("Updating Policy")
+        logger.debug("Updating Policy (PPO)")
 
         # Keeping strategy order aligned with rollout-buffer column order.
-        sorted_unit_ids = sorted(self.learning_role.rl_strats.keys())
-        strategies = [self.learning_role.rl_strats[u_id] for u_id in sorted_unit_ids]
+        strategies = [self.learning_role.rl_strats]
         n_rl_agents = len(strategies)
 
         # Getting the buffer, this will be a RolloutBuffer for on-policy algorithms.
@@ -278,7 +273,11 @@ class PPO(A2CAlgorithm):
         dones = np.zeros(n_rl_agents)
 
         # Get the buffer size to index into the last stored state
-        buffer_size = rollout_buffer.pos if not rollout_buffer.full else rollout_buffer.buffer_size
+        buffer_size = (
+            rollout_buffer.pos
+            if not rollout_buffer.full
+            else rollout_buffer.buffer_size
+        )
 
         if buffer_size > 0:
             # Use the LAST observation as the bootstrap for the REST of the buffer.
@@ -314,7 +313,9 @@ class PPO(A2CAlgorithm):
                         dtype=self.float_type,
                     )
                     # Get value estimate from critic
-                    last_values[i] = strategy.critics(obs_tensor).cpu().numpy().flatten()[0]
+                    last_values[i] = (
+                        strategy.critics(obs_tensor).cpu().numpy().flatten()[0]
+                    )
                     dones[i] = last_dones[i]
 
         # Compute advantages and returns
@@ -346,7 +347,9 @@ class PPO(A2CAlgorithm):
 
         effective_batch_size = min(
             self.learning_config.batch_size,
-            rollout_buffer.pos if not rollout_buffer.full else rollout_buffer.buffer_size,
+            rollout_buffer.pos
+            if not rollout_buffer.full
+            else rollout_buffer.buffer_size,
         )
 
         for epoch in range(self.n_epochs):
@@ -366,7 +369,10 @@ class PPO(A2CAlgorithm):
 
                     # Construct centralized state
                     other_unique_obs = th.cat(
-                        (unique_obs_from_others[:, :i], unique_obs_from_others[:, i + 1 :]),
+                        (
+                            unique_obs_from_others[:, :i],
+                            unique_obs_from_others[:, i + 1 :],
+                        ),
                         dim=1,
                     )
                     all_states = th.cat(
@@ -431,11 +437,19 @@ class PPO(A2CAlgorithm):
                     critic_params = list(critic.parameters())
 
                     actor_max_grad_norm = max(
-                        (p.grad.norm().item() for p in actor_params if p.grad is not None),
+                        (
+                            p.grad.norm().item()
+                            for p in actor_params
+                            if p.grad is not None
+                        ),
                         default=0.0,
                     )
                     critic_max_grad_norm = max(
-                        (p.grad.norm().item() for p in critic_params if p.grad is not None),
+                        (
+                            p.grad.norm().item()
+                            for p in critic_params
+                            if p.grad is not None
+                        ),
                         default=0.0,
                     )
 
@@ -460,20 +474,32 @@ class PPO(A2CAlgorithm):
                         unit_params.append(create_step_entry())
 
                     # Store per-unit gradient params for this step
-                    unit_params[step_count][strategy.unit_id]["actor_loss"] = policy_loss.item()
-                    unit_params[step_count][strategy.unit_id]["critic_loss"] = value_loss.item()
-                    unit_params[step_count][strategy.unit_id]["actor_total_grad_norm"] = (
+                    unit_params[step_count][strategy.unit_id]["actor_loss"] = (
+                        policy_loss.item()
+                    )
+                    unit_params[step_count][strategy.unit_id]["critic_loss"] = (
+                        value_loss.item()
+                    )
+                    unit_params[step_count][strategy.unit_id][
+                        "actor_total_grad_norm"
+                    ] = (
                         actor_total_grad_norm.item()
                         if isinstance(actor_total_grad_norm, th.Tensor)
                         else actor_total_grad_norm
                     )
-                    unit_params[step_count][strategy.unit_id]["actor_max_grad_norm"] = actor_max_grad_norm
-                    unit_params[step_count][strategy.unit_id]["critic_total_grad_norm"] = (
+                    unit_params[step_count][strategy.unit_id]["actor_max_grad_norm"] = (
+                        actor_max_grad_norm
+                    )
+                    unit_params[step_count][strategy.unit_id][
+                        "critic_total_grad_norm"
+                    ] = (
                         critic_total_grad_norm.item()
                         if isinstance(critic_total_grad_norm, th.Tensor)
                         else critic_total_grad_norm
                     )
-                    unit_params[step_count][strategy.unit_id]["critic_max_grad_norm"] = critic_max_grad_norm
+                    unit_params[step_count][strategy.unit_id][
+                        "critic_max_grad_norm"
+                    ] = critic_max_grad_norm
 
                 step_count += 1
 

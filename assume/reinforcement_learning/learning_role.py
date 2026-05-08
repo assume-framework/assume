@@ -24,13 +24,9 @@ from assume.common.utils import (
     timestamp2datetime,
 )
 from assume.reinforcement_learning.algorithms.base_algorithm import RLAlgorithm
-from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.algorithms.maddpg import DDPG
 from assume.reinforcement_learning.algorithms.mappo import PPO
-from assume.reinforcement_learning.buffer import (
-    ReplayBuffer, 
-    RolloutBuffer
-)
+from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
     transform_buffer_data,
@@ -42,9 +38,9 @@ logger = logging.getLogger(__name__)
 
 class Learning(Role):
     """Manages the learning process of reinforcement learning agents.
-    
+
     This class handles the initialization of key components such as neural networks,
-    replay buffer, and learning hyperparameters. It handles both training and evaluation 
+    replay buffer, and learning hyperparameters. It handles both training and evaluation
     modes based on the provided learning configuration.
 
     Args:
@@ -110,7 +106,9 @@ class Learning(Role):
                         self.learning_config.off_policy.noise_dt
                     )
                 else:
-                    self.calc_noise_from_progress = lambda x: self.learning_config.off_policy.noise_dt
+                    self.calc_noise_from_progress = (
+                        lambda x: self.learning_config.off_policy.noise_dt
+                    )
             # For on-policy algorithms, no noise schedule needed
 
             self.eval_episodes_done = 0
@@ -148,11 +146,11 @@ class Learning(Role):
 
         Note:
             This method prepares the learning role for the reinforcement learning training process.
-            It subscribes to relevant messages for handling the training process and schedules 
+            It subscribes to relevant messages for handling the training process and schedules
             recurrent tasks for policy updates based on the specified training frequency.
-            This cannot happen in the init since the context (compare mango agents) is not 
-            yet available there. To avoid inconsistent replay buffer states (e.g. observation 
-            and action has been stored but not the reward), this slightly shifts the timing 
+            This cannot happen in the init since the context (compare mango agents) is not
+            yet available there. To avoid inconsistent replay buffer states (e.g. observation
+            and action has been stored but not the reward), this slightly shifts the timing
             of the buffer updates.
         """
         super().on_ready()
@@ -175,7 +173,7 @@ class Learning(Role):
 
     def sync_train_freq_with_simulation_horizon(self) -> str | None:
         """Ensure self.train_freq evenly divides the simulation length.
-        
+
         If not, adjust self.train_freq (in-place) and return the new string, otherwise return None.
         Uses self.start_datetime/self.end_datetime when available, otherwise falls back to timestamp fields.
         """
@@ -232,7 +230,7 @@ class Learning(Role):
                 self.learning_config.off_policy.episodes_collecting_initial_experience
                 + validation_interval
             )
-            
+
             if self.learning_config.training_episodes < min_required_episodes:
                 raise ValueError(
                     f"Training episodes ({training_episodes}) must be greater than the sum of initial experience episodes ({self.learning_config.off_policy.episodes_collecting_initial_experience}) and evaluation interval ({validation_interval})."
@@ -240,7 +238,7 @@ class Learning(Role):
         else:
             # For on-policy algorithms, no initial experience collection needed
             min_required_episodes = validation_interval
-            
+
             if self.learning_config.training_episodes < min_required_episodes:
                 raise ValueError(
                     f"Training episodes ({training_episodes}) must be greater than evaluation interval ({validation_interval})."
@@ -316,7 +314,7 @@ class Learning(Role):
                 "profit": {t: current_profits[t] for t in timestamps_to_process},
                 "values": {t: current_values[t] for t in timestamps_to_process},
                 "log_probs": {t: current_log_probs[t] for t in timestamps_to_process},
-                "dones": {t: current_dones[t] for t in timestamps_to_process}
+                "dones": {t: current_dones[t] for t in timestamps_to_process},
             }
 
             # write data to output agent
@@ -331,8 +329,8 @@ class Learning(Role):
 
     async def _store_to_buffer_and_update_sync(self, cache, device) -> None:
         """Process strategy data into the buffer and trigger policy update.
-        
-        This function takes all the information that the strategies wrote into the 
+
+        This function takes all the information that the strategies wrote into the
         learning_role cache dicts and post-processes them to fit into the buffer.
         """
         first_start = next(iter(cache["obs"]))
@@ -358,34 +356,29 @@ class Learning(Role):
                 n_rl_agents = len(sorted_unit_ids)
 
                 obs_data = transform_buffer_data(
-                    {
-                        timestamp: cache["obs"][timestamp]
-                    },
+                    {timestamp: cache["obs"][timestamp]},
                     device,
                     sorted_unit_ids,
                 )
                 actions_data = transform_buffer_data(
-                    {
-                        timestamp: cache["actions"][timestamp]
-                    },
+                    {timestamp: cache["actions"][timestamp]},
                     device,
                     sorted_unit_ids,
                 )
                 rewards_data = transform_buffer_data(
-                    {
-                        timestamp: cache["rewards"][timestamp]
-                    },
+                    {timestamp: cache["rewards"][timestamp]},
                     device,
                     sorted_unit_ids,
                 )
 
                 # Computing MAPPO value targets with the centralized critic
-                #using the joint observation available at this timestamp.
+                # using the joint observation available at this timestamp.
                 if self.learning_config.algorithm == "mappo":
                     values_data = np.zeros((1, n_rl_agents, 1), dtype=np.float32)
                     obs_step = obs_data[0]
                     unique_obs_all = obs_step[
-                        :, self.rl_algorithm.obs_dim - self.rl_algorithm.unique_obs_dim :
+                        :,
+                        self.rl_algorithm.obs_dim - self.rl_algorithm.unique_obs_dim :,
                     ]
 
                     with th.no_grad():
@@ -406,52 +399,52 @@ class Learning(Role):
                                 dtype=self.float_type,
                             )
                             values_data[0, i, 0] = (
-                                strategy.critics(obs_tensor).cpu().numpy().reshape(-1)[0]
+                                strategy.critics(obs_tensor)
+                                .cpu()
+                                .numpy()
+                                .reshape(-1)[0]
                             )
                 else:
                     values_data = transform_buffer_data(
-                        {
-                            timestamp: cache["values"][timestamp]
-                        },
+                        {timestamp: cache["values"][timestamp]},
                         device,
                         sorted_unit_ids,
                     )
-                
+
                 log_probs_data = transform_buffer_data(
-                    {
-                        timestamp: cache["log_probs"][timestamp]
-                    },
+                    {timestamp: cache["log_probs"][timestamp]},
                     device,
                     sorted_unit_ids,
                 )
 
                 dones_data = transform_buffer_data(
-                    {
-                        timestamp: cache["dones"][timestamp]
-                    },
+                    {timestamp: cache["dones"][timestamp]},
                     device,
                     sorted_unit_ids,
                 )
 
                 # Adding data to the rollout buffer.
                 self.buffer.add(
-                    obs = obs_data,
-                    action = actions_data,
-                    reward = rewards_data,
-                    done = dones_data,
-                    value = values_data,
-                    log_prob = log_probs_data
+                    obs=obs_data,
+                    action=actions_data,
+                    reward=rewards_data,
+                    done=dones_data,
+                    value=values_data,
+                    log_prob=log_probs_data,
                 )
                 added_timestamps += 1
 
         else:
             # Using ReplayBuffer for off-policy algorithms (TD3/DDPG).
-            # Rewriting the dict so obs.shape == (n_rl_units, obs_dim), sorting by keys, and storing it in the buffer.
-            sorted_unit_ids = sorted(self.rl_strats.keys())
+            # Rewriting the dict so obs.shape == (n_rl_units, obs_dim), used by keys in learning role.
             self.buffer.add(
-                obs = transform_buffer_data(cache["obs"], device, sorted_unit_ids),
-                actions = transform_buffer_data(cache["actions"], device, sorted_unit_ids),
-                reward = transform_buffer_data(cache["rewards"], device, sorted_unit_ids),
+                obs=transform_buffer_data(cache["obs"], device, self.rl_strats.keys()),
+                actions=transform_buffer_data(
+                    cache["actions"], device, self.rl_strats.keys()
+                ),
+                reward=transform_buffer_data(
+                    cache["rewards"], device, self.rl_strats.keys()
+                ),
             )
 
         # Only update policy after initial experience for off-policy algorithms
@@ -540,12 +533,7 @@ class Learning(Role):
         self.all_profits[start][unit_id].append(profit)
 
     def add_ppo_data_to_cache(
-        self,
-        unit_id,
-        start,
-        value,
-        log_prob,
-        done=False
+        self, unit_id, start, value, log_prob, done=False
     ) -> None:
         """Add PPO specific data to the cache dict, per unit_id.
 
@@ -624,7 +612,7 @@ class Learning(Role):
 
     def get_progress_remaining(self) -> float:
         """Get the remaining learning progress from the simulation run.
-        
+
         Returns:
             The remaining progress as a float between 0 and 1.
         """
@@ -633,25 +621,20 @@ class Learning(Role):
 
         # Only calculate progress for off-policy algorithms
         if is_off_policy(self.learning_config.algorithm):
-            initial_experience_episodes = self.learning_config.off_policy.episodes_collecting_initial_experience
+            initial_experience_episodes = (
+                self.learning_config.off_policy.episodes_collecting_initial_experience
+            )
             learning_episodes = (
-                self.learning_config.training_episodes
-                - initial_experience_episodes
+                self.learning_config.training_episodes - initial_experience_episodes
             )
 
-            if (
-                self.episodes_done
-                < initial_experience_episodes
-            ):
+            if self.episodes_done < initial_experience_episodes:
                 progress_remaining = 1
             else:
                 progress_remaining = (
                     1
                     - (
-                        (
-                            self.episodes_done
-                            - initial_experience_episodes
-                        )
+                        (self.episodes_done - initial_experience_episodes)
                         / learning_episodes
                     )
                     - ((1 / learning_episodes) * (elapsed_duration / total_duration))
@@ -659,15 +642,19 @@ class Learning(Role):
         else:
             # For on-policy algorithms, simpler progress calculation
             total_episodes = self.learning_config.training_episodes
-            progress_remaining = 1 - (self.episodes_done / total_episodes) - (elapsed_duration / total_duration)
+            progress_remaining = (
+                1
+                - (self.episodes_done / total_episodes)
+                - (elapsed_duration / total_duration)
+            )
 
         return progress_remaining
 
     def create_learning_algorithm(self, algorithm: RLAlgorithm):
         """Create and initialize the reinforcement learning algorithm.
 
-        This method creates and initializes the reinforcement learning algorithm based on 
-        the specified algorithm name. The algorithm is associated with the learning role 
+        This method creates and initializes the reinforcement learning algorithm based on
+        the specified algorithm name. The algorithm is associated with the learning role
         and configured with relevant hyperparameters.
 
         Args:
@@ -686,11 +673,11 @@ class Learning(Role):
         """
         Initialize the policy of the reinforcement learning agent considering the respective algorithm.
 
-        This method initializes the policy (actor) of the reinforcement learning agent. It 
-        tests if we want to continue the learning process with stored policies from a former 
-        training process. If so, it loads the policies from the specified directory. 
+        This method initializes the policy (actor) of the reinforcement learning agent. It
+        tests if we want to continue the learning process with stored policies from a former
+        training process. If so, it loads the policies from the specified directory.
         Otherwise, it initializes the respective new policies.
-        
+
         Args:
             actors_and_critics: The pre-initialized actor and critic policies.
         """
@@ -713,19 +700,19 @@ class Learning(Role):
     def compare_and_save_policies(self, metrics: dict) -> bool:
         """Compare evaluation metrics and save best performing policies.
 
-        This method compares the evaluation metrics, such as reward, profit, and regret, 
-        and saves the policies if they achieve the best performance in their respective 
+        This method compares the evaluation metrics, such as reward, profit, and regret,
+        and saves the policies if they achieve the best performance in their respective
         categories. It iterates through the specified modes, compares the current evaluation
-        value with the previous best, and updates the best value if necessary. If an improvement 
+        value with the previous best, and updates the best value if necessary. If an improvement
         is detected, it saves the policy and associated parameters.
 
-        Metrics contain a metric key like "reward" and the current value. This function 
-        stores the policies with the highest metric. If minimize is required, one should 
+        Metrics contain a metric key like "reward" and the current value. This function
+        stores the policies with the highest metric. If minimize is required, one should
         add for example "minus_regret" which is then maximized.
 
         Args:
             metrics: Dictionary of metrics evaluated.
-            
+
         Returns:
             True if early stopping criteria is triggered, False otherwise.
 
@@ -820,12 +807,12 @@ class Learning(Role):
         It also initializes the parameters required for sending data to the output role.
 
         Args:
-            simulation_id: The unique identifier for the simulation.
-            episode: The current training episode number.
-            eval_episode: The current evaluation episode number.
-            db_uri: URI for connecting to the database.
-            output_agent_addr: The address of the output agent.
-            train_start: The start time of simulation.
+            simulation_id (str): The unique identifier for the simulation.
+            episode (int): The current training episode number.
+            eval_episode (int): The current evaluation episode number.
+            db_uri (str): URI for connecting to the database.
+            output_agent_addr (str): The address of the output agent.
+            train_start (str): The start time of simulation.
         """
 
         self.tensor_board_logger = TensorBoardLogger(
@@ -903,7 +890,7 @@ class Learning(Role):
 
         Args:
             learning_rate: The current learning rate used in training.
-            unit_params_list: A list of dictionaries containing critic losses for each 
+            unit_params_list: A list of dictionaries containing critic losses for each
                 time step (mapping critic names to their losses in dict).
         """
         # gradient steps performed in previous training episodes
@@ -922,9 +909,8 @@ class Learning(Role):
             )
             current_gradient_steps = self.learning_config.off_policy.gradient_steps
         else:
-            # For on-policy, no gradient steps concept - use 1 for calculation purposes
+            # For on-policy, no gradient steps concept - use 0 for calculation purposes
             gradient_steps_done = 0
-            current_gradient_steps = 1
 
         # Handle different parameter structures for on-policy vs off-policy
         if self.learning_config.algorithm == "mappo":
@@ -937,7 +923,7 @@ class Learning(Role):
             # For off-policy: use configured gradient_steps
             actual_gradient_steps = self.learning_config.off_policy.gradient_steps
             gradient_step_range = range(actual_gradient_steps)
-            
+
             # gradient steps performed in previous training episodes
             gradient_steps_done = (
                 max(
