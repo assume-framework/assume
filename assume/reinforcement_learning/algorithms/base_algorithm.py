@@ -286,10 +286,11 @@ class A2CAlgorithm(RLAlgorithm):
             th.save(obj, path)
 
     def load_params(self, directory: str) -> None:
-        """Load actor and critic network parameters.
+        """
+        Load the parameters of both actor and critic networks.
 
-        Loads both actor and critic parameters from the specified directory.
-        Calls load_critic_params() and load_actor_params() sequentially.
+        This method loads the parameters of both the actor and critic networks associated with the learning role from the specified
+        directory. It uses the `load_critic_params` and `load_actor_params` methods to load the respective parameters.
 
         Args:
             directory: Base directory containing 'actors/' and 'critics/' subdirectories.
@@ -387,6 +388,12 @@ class A2CAlgorithm(RLAlgorithm):
                         unique_obs=strategy.unique_obs_dim,
                     )
 
+                    if critic_weights is None:
+                        logger.warning(
+                            f"Critic weights transfer failed for {u_id}; skipping."
+                        )
+                        continue
+
                     strategy.critics.load_state_dict(critic_weights)
 
                     # Only transfer target critic weights if this algorithm uses target networks
@@ -400,10 +407,14 @@ class A2CAlgorithm(RLAlgorithm):
                             act_dim=strategy.act_dim,
                             unique_obs=strategy.unique_obs_dim,
                         )
-                        if target_critic_weights is not None:
-                            strategy.target_critics.load_state_dict(
-                                target_critic_weights
+
+                        if target_critic_weights is None:
+                            logger.warning(
+                                f"Target critic weights transfer failed for {u_id}; skipping."
                             )
+                            continue
+
+                        strategy.target_critics.load_state_dict(target_critic_weights)
 
                     logger.debug(f"Critic weights transferred for {u_id}.")
 
@@ -581,16 +592,17 @@ class A2CAlgorithm(RLAlgorithm):
                 num_timeseries_obs_dim=self.num_timeseries_obs_dim,
             ).to(self.device)
 
-            strategy.actor_target = self.actor_architecture_class(
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
-                float_type=self.float_type,
-                unique_obs_dim=self.unique_obs_dim,
-                num_timeseries_obs_dim=self.num_timeseries_obs_dim,
-            ).to(self.device)
+            if self.uses_target_networks:
+                strategy.actor_target = self.actor_architecture_class(
+                    obs_dim=self.obs_dim,
+                    act_dim=self.act_dim,
+                    float_type=self.float_type,
+                    unique_obs_dim=self.unique_obs_dim,
+                    num_timeseries_obs_dim=self.num_timeseries_obs_dim,
+                ).to(self.device)
 
-            strategy.actor_target.load_state_dict(strategy.actor.state_dict())
-            strategy.actor_target.train(mode=False)
+                strategy.actor_target.load_state_dict(strategy.actor.state_dict())
+                strategy.actor_target.train(mode=False)
 
             strategy.actor.optimizer = AdamW(
                 strategy.actor.parameters(),
@@ -627,16 +639,17 @@ class A2CAlgorithm(RLAlgorithm):
                 float_type=self.float_type,
             ).to(self.device)
 
-            strategy.target_critics = self.critic_architecture_class(
-                n_agents=n_agents,
-                obs_dim=self.obs_dim,
-                act_dim=self.act_dim,
-                unique_obs_dim=self.unique_obs_dim,
-                float_type=self.float_type,
-            ).to(self.device)
+            if self.uses_target_networks:
+                strategy.target_critics = self.critic_architecture_class(
+                    n_agents=n_agents,
+                    obs_dim=self.obs_dim,
+                    act_dim=self.act_dim,
+                    unique_obs_dim=self.unique_obs_dim,
+                    float_type=self.float_type,
+                ).to(self.device)
 
-            strategy.target_critics.load_state_dict(strategy.critics.state_dict())
-            strategy.target_critics.train(mode=False)
+                strategy.target_critics.load_state_dict(strategy.critics.state_dict())
+                strategy.target_critics.train(mode=False)
 
             strategy.critics.optimizer = AdamW(
                 strategy.critics.parameters(),
@@ -664,26 +677,28 @@ class A2CAlgorithm(RLAlgorithm):
             >>> # Contains all networks ready for saving or transfer
         """
         actors = {}
-        actor_targets = {}
-
         critics = {}
-        target_critics = {}
+        if self.uses_target_networks:
+            actor_targets = {}
+            target_critics = {}
 
         for u_id, strategy in self.learning_role.rl_strats.items():
             actors[u_id] = strategy.actor
-            actor_targets[u_id] = strategy.actor_target
-
             critics[u_id] = strategy.critics
-            target_critics[u_id] = strategy.target_critics
+            if self.uses_target_networks:
+                actor_targets[u_id] = strategy.actor_target
+                target_critics[u_id] = strategy.target_critics
 
         actors_and_critics = {
             "actors": actors,
-            "actor_targets": actor_targets,
             "critics": critics,
-            "target_critics": target_critics,
             "obs_dim": self.obs_dim,
             "act_dim": self.act_dim,
             "unique_obs_dim": self.unique_obs_dim,
         }
+
+        if self.uses_target_networks:
+            actors_and_critics["actor_targets"] = actor_targets
+            actors_and_critics["target_critics"] = target_critics
 
         return actors_and_critics
