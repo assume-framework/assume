@@ -16,13 +16,13 @@ from assume.common.base import (
     MinMaxStrategy,
     SupportsMinMax,
     SupportsMinMaxCharge,
+    is_off_policy,
 )
 from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
-from assume.common.base import is_off_policy
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,6 @@ class TorchLearningStrategy(LearningStrategy):
                 self.learning_config.algorithm
             )
 
-            
             if is_off_policy(self.learning_config.algorithm):
                 self.action_noise = NormalActionNoise(
                     mu=0.0,
@@ -251,7 +250,7 @@ class TorchLearningStrategy(LearningStrategy):
         """Determine action and exploration noise for the current observation.
 
         All algorithm-specific sampling logic lives in the
-        algorithm class via get_action. 
+        algorithm class via get_action.
 
         Args
         ----

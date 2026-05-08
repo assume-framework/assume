@@ -17,7 +17,6 @@ try:
     from assume.common.base import LearningStrategy
     from assume.reinforcement_learning.algorithms.maddpg import DDPG
     from assume.reinforcement_learning.learning_role import Learning
-    from assume.reinforcement_learning.neural_network_architecture import CriticDDPG
 
 except ImportError:
     pass
@@ -25,6 +24,7 @@ except ImportError:
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
+
 
 @pytest.fixture
 def base_learning_config() -> dict:
@@ -55,7 +55,7 @@ def base_learning_config() -> dict:
                 episodes_collecting_initial_experience=0,
                 gradient_steps=1,
                 tau=0.005,
-                policy_delay=2, 
+                policy_delay=2,
                 target_policy_noise=0.2,
                 target_noise_clip=0.5,
             ),
@@ -225,7 +225,9 @@ def make_state_dicts(
     baseline_new[f"{prefix}.0.weight"] = th.randn(hidden_dims[0], new_input_dim)
     baseline_new[f"{prefix}.0.bias"] = th.randn(hidden_dims[0])
     for i in range(1, len(hidden_dims)):
-        baseline_new[f"{prefix}.{i}.weight"] = th.randn(hidden_dims[i], hidden_dims[i - 1])
+        baseline_new[f"{prefix}.{i}.weight"] = th.randn(
+            hidden_dims[i], hidden_dims[i - 1]
+        )
         baseline_new[f"{prefix}.{i}.bias"] = th.randn(hidden_dims[i])
 
     # Build old_state with matching dims
@@ -264,10 +266,12 @@ def test_ddpg_load_transfer_n_plus_m(
     learning_role_n_plus_m.rl_algorithm.load_params(directory=save_dir)
 
     post_state = learning_role_n_plus_m.rl_strats["agent_0"].critics.state_dict()
-    post_target = learning_role_n_plus_m.rl_strats["agent_0"].target_critics.state_dict()
-    post_opt_state = (
-        learning_role_n_plus_m.rl_strats["agent_0"].critics.optimizer.state_dict()
-    )
+    post_target = learning_role_n_plus_m.rl_strats[
+        "agent_0"
+    ].target_critics.state_dict()
+    post_opt_state = learning_role_n_plus_m.rl_strats[
+        "agent_0"
+    ].critics.optimizer.state_dict()
 
     assert not compare_state_dicts(pre_state, post_state)
 

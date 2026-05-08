@@ -2,17 +2,16 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+
 import numpy as np
 import torch as th
 from torch import nn
 from torch.nn import functional as F
 
-from typing import List, Tuple, Type, Optional, Union
-
 from assume.reinforcement_learning.learning_utils import (
     activation_function_limit,
-    xavier_init_weights,
     orthogonal_init_weights,
+    xavier_init_weights,
 )
 
 
@@ -26,6 +25,7 @@ class Critic(nn.Module):
         float_type: Data type for parameters
         unique_obs_dim: Dimension of agent-specific observations
     """
+
     def __init__(
         self,
         n_agents: int,
@@ -45,9 +45,7 @@ class Critic(nn.Module):
         # Dynamic Architecture Definition
         self.hidden_sizes = self._get_architecture(n_agents)
 
-    def _get_architecture(
-        self, n_agents: int
-    ) -> List[int]:
+    def _get_architecture(self, n_agents: int) -> list[int]:
         """Returns hidden layer sizes based on the number of agents."""
         if n_agents <= 20:
             hidden_sizes = [256, 128]  # Shallow network for small `n_agents`
@@ -62,13 +60,13 @@ class Critic(nn.Module):
         layers = nn.ModuleList()
         input_dim = (
             self.obs_dim + self.act_dim
-        ) # Input includes all observations and actions
+        )  # Input includes all observations and actions
 
         for h in self.hidden_sizes:
             layers.append(nn.Linear(input_dim, h, dtype=self.float_type))
             layers.append(nn.ReLU())
             input_dim = h
-        layers.append(nn.Linear(input_dim, 1, dtype=self.float_type)) # Output Q-value
+        layers.append(nn.Linear(input_dim, 1, dtype=self.float_type))  # Output Q-value
 
         return layers
 
@@ -87,21 +85,11 @@ class CriticTD3(Critic):
         float_type: Data type for parameters.
         unique_obs_dim: Dimension of agent-specific observations.
     """
+
     def __init__(
-        self,
-        n_agents: int,
-        obs_dim: int,
-        act_dim: int,
-        float_type,
-        unique_obs_dim: int
+        self, n_agents: int, obs_dim: int, act_dim: int, float_type, unique_obs_dim: int
     ):
-        super().__init__(
-            n_agents, 
-            obs_dim, 
-            act_dim, 
-            float_type, 
-            unique_obs_dim
-        )
+        super().__init__(n_agents, obs_dim, act_dim, float_type, unique_obs_dim)
 
         # First Q-network (Q1)
         self.q1_layers = self._build_q_network()
@@ -110,30 +98,33 @@ class CriticTD3(Critic):
         self.q2_layers = self._build_q_network()
 
     def forward(
-        self,
-        obs: th.Tensor,
-        actions: th.Tensor
-    ) -> Tuple[th.Tensor, th.Tensor]:
+        self, obs: th.Tensor, actions: th.Tensor
+    ) -> tuple[th.Tensor, th.Tensor]:
         """Forward pass through both Q-networks."""
-        xu = th.cat([obs, actions], dim=1) # Concatenate obs & actions
+        xu = th.cat([obs, actions], dim=1)  # Concatenate obs & actions
 
         # Compute Q1
-        x1 = nn.Sequential(*self.q1_layers)(xu)
+        x1 = xu
+        for layer in self.q1_layers[:-1]:  # All hidden layers
+            x1 = F.relu(layer(x1))
+        x1 = self.q1_layers[-1](x1)  # Output layer (no activation)
 
         # Compute Q2
-        x2 = nn.Sequential(*self.q2_layers)(xu)
+        x2 = xu
+        for layer in self.q2_layers[:-1]:  # All hidden layers
+            x2 = F.relu(layer(x2))
+        x2 = self.q2_layers[-1](x2)  # Output layer (no activation)
 
         return x1, x2
 
-    def q1_forward(
-        self,
-        obs: th.Tensor,
-        actions: th.Tensor
-    ) -> th.Tensor:
+    def q1_forward(self, obs: th.Tensor, actions: th.Tensor) -> th.Tensor:
         """Compute only Q1 (used during actor updates)."""
         x = th.cat([obs, actions], dim=1)
 
-        x = nn.Sequential(*self.q1_layers)(x)
+        for layer in self.q1_layers[:-1]:  # All hidden layers
+            x = F.relu(layer(x))
+
+        x = self.q1_layers[-1](x)  # Output layer (no activation)
 
         return x
 
@@ -148,6 +139,7 @@ class CriticDDPG(Critic):
         float_type: Data type for parameters
         unique_obs_dim: Dimension of agent-specific observations
     """
+
     def __init__(
         self,
         n_agents: int,
@@ -156,30 +148,23 @@ class CriticDDPG(Critic):
         float_type: th.dtype,
         unique_obs_dim: int,
     ):
-        super().__init__(
-            n_agents, 
-            obs_dim, 
-            act_dim, 
-            float_type, 
-            unique_obs_dim
-        )
+        super().__init__(n_agents, obs_dim, act_dim, float_type, unique_obs_dim)
 
         # Q-network
         self.q_layers = self._build_q_network()
-        
+
         # Initialize weights properly
         self._init_weights()
 
-    def forward(
-        self,
-        obs: th.Tensor,
-        actions: th.Tensor
-    ) -> th.Tensor:
+    def forward(self, obs: th.Tensor, actions: th.Tensor) -> th.Tensor:
         """Returns Q value."""
-        xu = th.cat([obs, actions], dim=1) # Concatenate obs & actions
+        xu = th.cat([obs, actions], dim=1)  # Concatenate obs & actions
 
         # Compute Q
-        x = nn.Sequential(*self.q_layers)(xu)
+        for layer in self.q_layers[:-1]:  # All hidden layers
+            xu = F.relu(layer(xu))
+
+        x = self.q_layers[-1](xu)
 
         return x
 
@@ -194,19 +179,13 @@ class CriticPPO(Critic):
         unique_obs_dim: Dimension of agent-specific observations.
     """
 
-    def __init__(
-        self,
-        n_agents: int,
-        obs_dim: int,
-        float_type,
-        unique_obs_dim: int
-    ):
+    def __init__(self, n_agents: int, obs_dim: int, float_type, unique_obs_dim: int):
         super().__init__(
             n_agents=n_agents,
             obs_dim=obs_dim,
             act_dim=0,
             float_type=float_type,
-            unique_obs_dim=unique_obs_dim
+            unique_obs_dim=unique_obs_dim,
         )
 
         # V-network
@@ -253,7 +232,7 @@ class MLPActor(Actor):
 
     def __init__(self, obs_dim: int, act_dim: int, float_type, *args, **kwargs):
         super().__init__()
-        
+
         self.FC1 = nn.Linear(obs_dim, 256, dtype=float_type)
         self.FC2 = nn.Linear(256, 128, dtype=float_type)
         self.FC3 = nn.Linear(128, act_dim, dtype=float_type)
@@ -280,8 +259,8 @@ class LSTMActor(Actor):
     Based on "Multi-Period and Multi-Spatial Equilibrium Analysis in Imperfect Electricity Markets"
     by Ye at al. (2019)
 
-    Note: 
-        The original source code was not available, therefore this implementation was derived from the published paper. 
+    Note:
+        The original source code was not available, therefore this implementation was derived from the published paper.
         Adjustments to resemble final layers from MLPActor:
         - dense layer 2 was omitted
         - single output layer with softsign activation function to output actions directly instead of two output layers for mean and stddev
@@ -295,7 +274,7 @@ class LSTMActor(Actor):
         unique_obs_dim: int,
         num_timeseries_obs_dim: int,
         *args,
-        **kwargs
+        **kwargs,
     ):
         super().__init__()
         self.float_type = float_type
@@ -349,7 +328,7 @@ class LSTMActor(Actor):
 
         outputs = th.cat(outputs, dim=1)
         x = th.cat((outputs, x2), dim=1)
-        
+
         x = F.relu(self.FC1(x))
         x = self.activation_function(self.FC2(x))
 
@@ -392,9 +371,7 @@ class ActorPPO(nn.Module):
         self.mean_layer = nn.Linear(128, act_dim, dtype=float_type)
 
         # Learnable log standard deviation
-        self.log_std = nn.Parameter(
-            th.ones(act_dim, dtype=float_type) * log_std_init
-        )
+        self.log_std = nn.Parameter(th.ones(act_dim, dtype=float_type) * log_std_init)
 
         self._init_weights()
 
@@ -409,16 +386,16 @@ class ActorPPO(nn.Module):
         x = F.relu(self.FC1(obs))
         x = F.relu(self.FC2(x))
         mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
-        
+
         if deterministic:
             return mean
-        
+
         # Sample from Gaussian during training
         log_std = self.log_std.expand_as(mean)
         std = log_std.exp()
         noise = th.randn_like(mean)
         action = mean + std * noise
-        
+
         # Clamp to valid range
         return th.clamp(action, -1.0, 1.0)
 
@@ -428,7 +405,7 @@ class ActorPPO(nn.Module):
         x = F.relu(self.FC2(x))
         mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
         log_std = self.log_std.expand_as(mean)
-        
+
         return mean, log_std
 
     def get_action_and_log_prob(
@@ -437,11 +414,11 @@ class ActorPPO(nn.Module):
         deterministic: bool = False,
     ) -> tuple[th.Tensor, th.Tensor]:
         """Sample action and compute log probability.
-        
+
         Args:
             obs: Observations.
             deterministic: If True, return mean action.
-            
+
         Returns:
             Tuple of (action, log_prob).
         """
@@ -469,13 +446,13 @@ class ActorPPO(nn.Module):
         actions: th.Tensor,
     ) -> tuple[th.Tensor, th.Tensor, th.Tensor]:
         """Evaluate log probability and entropy for given actions.
-        
+
         Used during PPO update to compute importance ratio.
-        
+
         Args:
             obs: Observations.
             actions: Actions to evaluate.
-            
+
         Returns:
             Tuple of (log_prob, entropy, values).
         """
@@ -543,13 +520,13 @@ class LSTMActorPPO(ActorPPO):
         self.LSTM2 = nn.LSTMCell(8, 16, dtype=float_type)
 
         # Fully Connected Layers
-        self.FC1 = nn.Linear(self.timeseries_len * 16 + unique_obs_dim, 128, dtype=float_type)
+        self.FC1 = nn.Linear(
+            self.timeseries_len * 16 + unique_obs_dim, 128, dtype=float_type
+        )
         self.mean_layer = nn.Linear(128, act_dim, dtype=float_type)
 
         # Learnable log standard deviation
-        self.log_std = nn.Parameter(
-            th.ones(act_dim, dtype=float_type) * log_std_init
-        )
+        self.log_std = nn.Parameter(th.ones(act_dim, dtype=float_type) * log_std_init)
 
         self._init_weights()
 
@@ -602,10 +579,10 @@ class LSTMActorPPO(ActorPPO):
 
         # Concatenate LSTM outputs
         outputs = th.cat(outputs, dim=1)
-        
+
         # Concatenate with stationary observations
         x = th.cat((outputs, x2), dim=1)
-        
+
         # FC Layers
         x = F.relu(self.FC1(x))
         mean = th.tanh(self.mean_layer(x))  # Bounded to [-1, 1]
@@ -629,7 +606,7 @@ class LSTMActorPPO(ActorPPO):
         std = std + 1e-6
         noise = th.randn_like(mean)
         action = mean + std * noise
-        
+
         # Clamp to valid range
         return th.clamp(action, -1.0, 1.0)
 

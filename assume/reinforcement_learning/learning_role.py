@@ -945,7 +945,6 @@ class Learning(Role):
                 )
                 * self.learning_config.off_policy.gradient_steps
             )
-            current_gradient_steps = self.learning_config.off_policy.gradient_steps
         else:
             # For on-policy, no gradient steps concept - use 0 for calculation purposes
             gradient_steps_done = 0

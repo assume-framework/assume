@@ -12,14 +12,6 @@ Import layers which are covered are as follows:
 
 import pytest
 
-try:
-    import torch as th
-
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
-
-
 # ---------------------------------------------------------------------------
 # Layer 1 – assume.reinforcement_learning.algorithms
 # ---------------------------------------------------------------------------
@@ -73,16 +65,20 @@ class TestAlgorithmsPackageExports:
     def test_algorithm_hierarchy(self):
         """TD3, DDPG, PPO must all be subclasses of A2CAlgorithm → RLAlgorithm."""
         from assume.reinforcement_learning.algorithms import (
-            A2CAlgorithm,
             DDPG,
             PPO,
-            RLAlgorithm,
             TD3,
+            A2CAlgorithm,
+            RLAlgorithm,
         )
 
         for cls in (TD3, DDPG, PPO):
-            assert issubclass(cls, A2CAlgorithm), f"{cls.__name__} not subclass of A2CAlgorithm"
-            assert issubclass(cls, RLAlgorithm), f"{cls.__name__} not subclass of RLAlgorithm"
+            assert issubclass(cls, A2CAlgorithm), (
+                f"{cls.__name__} not subclass of A2CAlgorithm"
+            )
+            assert issubclass(cls, RLAlgorithm), (
+                f"{cls.__name__} not subclass of RLAlgorithm"
+            )
 
     def test_actor_aliases_map_to_nn_modules(self):
         from torch import nn
@@ -90,7 +86,9 @@ class TestAlgorithmsPackageExports:
         from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 
         for name, cls in actor_architecture_aliases.items():
-            assert issubclass(cls, nn.Module), f"alias '{name}' does not map to an nn.Module"
+            assert issubclass(cls, nn.Module), (
+                f"alias '{name}' does not map to an nn.Module"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +178,10 @@ class TestRLPackageExports:
         assert ReplayBuffer is not RolloutBuffer
 
     def test_buffer_samples_are_distinct(self):
-        from assume.reinforcement_learning import ReplayBufferSamples, RolloutBufferSamples
+        from assume.reinforcement_learning import (
+            ReplayBufferSamples,
+            RolloutBufferSamples,
+        )
 
         assert ReplayBufferSamples is not RolloutBufferSamples
 
@@ -273,8 +274,12 @@ class TestTopLevelPackageRLExports:
         from assume.reinforcement_learning.algorithms import DDPG, PPO, TD3
 
         for name, algo_cls in [("TD3", TD3), ("DDPG", DDPG), ("PPO", PPO)]:
-            assert getattr(rl, name) is algo_cls, f"rl.{name} is not the same object as algorithms.{name}"
-            assert getattr(assume, name) is algo_cls, f"assume.{name} is not the same object as algorithms.{name}"
+            assert getattr(rl, name) is algo_cls, (
+                f"rl.{name} is not the same object as algorithms.{name}"
+            )
+            assert getattr(assume, name) is algo_cls, (
+                f"assume.{name} is not the same object as algorithms.{name}"
+            )
 
     def test_version_still_present(self):
         import assume
@@ -286,5 +291,13 @@ class TestTopLevelPackageRLExports:
         """Core non-RL exports (World, MarketConfig, etc.) must still be present."""
         import assume
 
-        for name in ("World", "MarketConfig", "MarketProduct", "load_scenario_folder", "run_learning"):
-            assert hasattr(assume, name), f"Pre-existing export '{name}' missing after __init__ update"
+        for name in (
+            "World",
+            "MarketConfig",
+            "MarketProduct",
+            "load_scenario_folder",
+            "run_learning",
+        ):
+            assert hasattr(assume, name), (
+                f"Pre-existing export '{name}' missing after __init__ update"
+            )

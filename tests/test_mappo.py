@@ -19,10 +19,7 @@ try:
     from assume.reinforcement_learning.algorithms.mappo import PPO
     from assume.reinforcement_learning.buffer import RolloutBuffer
     from assume.reinforcement_learning.learning_role import Learning
-    from assume.reinforcement_learning.neural_network_architecture import (
-        ActorPPO,
-        CriticPPO,
-    )
+
 
 except ImportError:
     pass
@@ -74,16 +71,15 @@ def learning_role_n(base_learning_config):
     config = copy(base_learning_config)
     learn = Learning(config["learning_config"], start, end)
     for agent_id in ("agent_0", "agent_1"):
-        strat = LearningStrategy(**config, learning_role=learn)
-        strat.unit_id = agent_id
-        learn.rl_strats[agent_id] = strat
+        strategy = LearningStrategy(**config, learning_role=learn)
+        strategy.unit_id = agent_id
+        learn.rl_strats[agent_id] = strategy
     return learn
 
 
 @pytest.fixture(scope="function")
 def saved_n_agent_model(learning_role_n, tmp_path) -> tuple[str, dict]:
-    """Save a 2-agent PPO model; return (save_dir, state_dict_snapshot).
-    """
+    """Save a 2-agent PPO model; return (save_dir, state_dict_snapshot)."""
     learning_role_n.initialize_policy()
     save_dir = tmp_path / "saved_model_n"
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -146,8 +142,7 @@ def _make_rollout_buffer(
 
 
 def _setup_for_update(learning_role) -> None:
-    """Setting minimal attributes needed.
-    """
+    """Setting minimal attributes needed."""
     learning_role.update_steps = 0
     learning_role.db_addr = None  # disables the context.schedule_instant_message path
 
@@ -211,135 +206,6 @@ def test_mappo_load_matching_n(base_learning_config, saved_n_agent_model):
         deepcopy(original_states["optimizer_actor"]),
         deepcopy(agent.actor.optimizer.state_dict()),
     )
-
-
-# @pytest.mark.require_learning
-# def test_mappo_update_policy_skips_none_buffer(learning_role_n, monkeypatch):
-#     learning_role_n.initialize_policy()
-#     _setup_for_update(learning_role_n)
-#     monkeypatch.setattr(learning_role_n, "get_progress_remaining", lambda: 1.0)
-
-#     learning_role_n.buffer = None
-#     learning_role_n.rl_algorithm.update_policy()
-#     assert learning_role_n.rl_algorithm.n_updates == 0
-
-
-# @pytest.mark.require_learning
-# def test_mappo_update_policy_skips_empty_buffer(learning_role_n, monkeypatch):
-#     learning_role_n.initialize_policy()
-#     _setup_for_update(learning_role_n)
-#     monkeypatch.setattr(learning_role_n, "get_progress_remaining", lambda: 1.0)
-
-#     s = learning_role_n.rl_strats["agent_0"]
-#     learning_role_n.buffer = RolloutBuffer(
-#         buffer_size=50,
-#         obs_dim=s.obs_dim,
-#         act_dim=s.act_dim,
-#         n_rl_units=2,
-#         device="cpu",
-#         float_type=th.float32,
-#     )
-#     learning_role_n.rl_algorithm.update_policy()
-#     assert learning_role_n.rl_algorithm.n_updates == 0
-
-
-# @pytest.mark.require_learning
-# def test_mappo_update_policy_skips_insufficient_data(learning_role_n, monkeypatch):
-#     learning_role_n.initialize_policy()
-#     _setup_for_update(learning_role_n)
-#     monkeypatch.setattr(learning_role_n, "get_progress_remaining", lambda: 1.0)
-
-#     s = learning_role_n.rl_strats["agent_0"]
-#     learning_role_n.buffer = _make_rollout_buffer(
-#         obs_dim=s.obs_dim, act_dim=s.act_dim, n_agents=2, n_steps=1
-#     )
-#     learning_role_n.rl_algorithm.update_policy()
-#     assert learning_role_n.rl_algorithm.n_updates == 0
-
-
-# @pytest.mark.require_learning
-# def test_mappo_update_policy_increments_n_updates(learning_role_n, monkeypatch):
-#     learning_role_n.initialize_policy()
-#     _setup_for_update(learning_role_n)
-#     monkeypatch.setattr(learning_role_n, "get_progress_remaining", lambda: 1.0)
-
-#     s = learning_role_n.rl_strats["agent_0"]
-#     learning_role_n.buffer = _make_rollout_buffer(
-#         obs_dim=s.obs_dim, act_dim=s.act_dim, n_agents=2, n_steps=20
-#     )
-#     learning_role_n.rl_algorithm.update_policy()
-#     assert learning_role_n.rl_algorithm.n_updates == 1
-
-
-# @pytest.mark.require_learning
-# def test_mappo_update_policy_resets_buffer(learning_role_n, monkeypatch):
-#     learning_role_n.initialize_policy()
-#     _setup_for_update(learning_role_n)
-#     monkeypatch.setattr(learning_role_n, "get_progress_remaining", lambda: 1.0)
-
-#     s = learning_role_n.rl_strats["agent_0"]
-#     learning_role_n.buffer = _make_rollout_buffer(
-#         obs_dim=s.obs_dim, act_dim=s.act_dim, n_agents=2, n_steps=20
-#     )
-#     assert learning_role_n.buffer.pos > 0
-
-#     learning_role_n.rl_algorithm.update_policy()
-#     assert learning_role_n.buffer.pos == 0, (
-#         "RolloutBuffer.reset() must be called at the end of every PPO update"
-#     )
-
-
-# @pytest.mark.require_learning
-# def test_mappo_update_policy_multiple_epochs(base_learning_config, monkeypatch):
-#     config = copy(base_learning_config)
-#     config["learning_config"].on_policy.n_epochs = 3
-
-#     learn = Learning(config["learning_config"], start, end)
-#     for agent_id in ("agent_0", "agent_1"):
-#         strat = LearningStrategy(**config, learning_role=learn)
-#         strat.unit_id = agent_id
-#         learn.rl_strats[agent_id] = strat
-#     learn.initialize_policy()
-#     _setup_for_update(learn)
-#     monkeypatch.setattr(learn, "get_progress_remaining", lambda: 1.0)
-
-#     s = learn.rl_strats["agent_0"]
-#     learn.buffer = _make_rollout_buffer(
-#         obs_dim=s.obs_dim, act_dim=s.act_dim, n_agents=2, n_steps=30
-#     )
-
-#     algo = learn.rl_algorithm
-#     assert algo.n_epochs == 3
-#     algo.update_policy()
-#     assert algo.n_updates == 1
-
-
-# @pytest.mark.require_learning
-# def test_mappo_update_policy_actor_weights_change(learning_role_n, monkeypatch):
-#     learning_role_n.initialize_policy()
-#     _setup_for_update(learning_role_n)
-#     monkeypatch.setattr(learning_role_n, "get_progress_remaining", lambda: 1.0)
-
-#     s = learning_role_n.rl_strats["agent_0"]
-#     pre_actor = deepcopy(s.actor.state_dict())
-#     pre_critic = deepcopy(s.critics.state_dict())
-
-#     learning_role_n.buffer = _make_rollout_buffer(
-#         obs_dim=s.obs_dim, act_dim=s.act_dim, n_agents=2, n_steps=20
-#     )
-#     learning_role_n.rl_algorithm.update_policy()
-
-#     post_actor = s.actor.state_dict()
-#     post_critic = s.critics.state_dict()
-
-#     actor_changed = any(
-#         not th.equal(pre_actor[k], post_actor[k]) for k in pre_actor
-#     )
-#     critic_changed = any(
-#         not th.equal(pre_critic[k], post_critic[k]) for k in pre_critic
-#     )
-#     assert actor_changed, "Actor weights must change after a PPO update"
-#     assert critic_changed, "Critic weights must change after a PPO update"
 
 
 @pytest.mark.require_learning

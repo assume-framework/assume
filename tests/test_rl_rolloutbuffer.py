@@ -15,6 +15,7 @@ try:
 except ImportError:
     pass
 
+
 def make_rollout_buffer(
     buffer_size=8,
     obs_dim=3,
@@ -148,8 +149,12 @@ def test_gae_single_step_non_terminal():
     """For 1 step, 1 agent, non-terminal: advantage = TD error."""
     gamma, gae_lambda = 0.99, 0.95
     buf = make_rollout_buffer(
-        buffer_size=1, obs_dim=1, act_dim=1, n_rl_units=1,
-        gamma=gamma, gae_lambda=gae_lambda,
+        buffer_size=1,
+        obs_dim=1,
+        act_dim=1,
+        n_rl_units=1,
+        gamma=gamma,
+        gae_lambda=gae_lambda,
     )
     r, v, v_next = 1.0, 0.5, 0.8
     buf.add(
@@ -178,8 +183,12 @@ def test_gae_single_step_terminal():
     """For a terminal episode end, bootstrap value must not propagate."""
     gamma, gae_lambda = 0.99, 0.95
     buf = make_rollout_buffer(
-        buffer_size=1, obs_dim=1, act_dim=1, n_rl_units=1,
-        gamma=gamma, gae_lambda=gae_lambda,
+        buffer_size=1,
+        obs_dim=1,
+        act_dim=1,
+        n_rl_units=1,
+        gamma=gamma,
+        gae_lambda=gae_lambda,
     )
     r, v = 2.0, 1.0
     buf.add(
@@ -209,8 +218,12 @@ def test_gae_multi_step_manual():
     """Manually verify 2-step GAE for a single agent."""
     gamma, gae_lambda = 0.99, 0.95
     buf = make_rollout_buffer(
-        buffer_size=2, obs_dim=1, act_dim=1, n_rl_units=1,
-        gamma=gamma, gae_lambda=gae_lambda,
+        buffer_size=2,
+        obs_dim=1,
+        act_dim=1,
+        n_rl_units=1,
+        gamma=gamma,
+        gae_lambda=gae_lambda,
     )
     r0, v0 = 1.0, 0.4
     r1, v1 = 0.5, 0.6
@@ -248,8 +261,12 @@ def test_gae_lambda_zero_equals_td_error():
     """gae_lambda=0 reduces GAE to a 1-step TD advantage per step."""
     gamma, gae_lambda = 0.99, 0.0
     buf = make_rollout_buffer(
-        buffer_size=3, obs_dim=1, act_dim=1, n_rl_units=1,
-        gamma=gamma, gae_lambda=gae_lambda,
+        buffer_size=3,
+        obs_dim=1,
+        act_dim=1,
+        n_rl_units=1,
+        gamma=gamma,
+        gae_lambda=gae_lambda,
     )
     rewards = [1.0, 0.5, 2.0]
     values = [0.4, 0.6, 0.3]
@@ -282,8 +299,12 @@ def test_gae_lambda_one_gamma_one_monte_carlo():
     gamma, gae_lambda = 1.0, 1.0
     T = 4
     buf = make_rollout_buffer(
-        buffer_size=T, obs_dim=1, act_dim=1, n_rl_units=1,
-        gamma=gamma, gae_lambda=gae_lambda,
+        buffer_size=T,
+        obs_dim=1,
+        act_dim=1,
+        n_rl_units=1,
+        gamma=gamma,
+        gae_lambda=gae_lambda,
     )
     rewards = [1.0, 1.0, 1.0, 1.0]
     values = [0.1] * T
@@ -312,8 +333,12 @@ def test_gae_multi_agent_independence():
     """One agent's rewards must not cause issue with another agent's advantages."""
     gamma, gae_lambda = 0.99, 0.95
     buf = make_rollout_buffer(
-        buffer_size=3, obs_dim=1, act_dim=1, n_rl_units=2,
-        gamma=gamma, gae_lambda=gae_lambda,
+        buffer_size=3,
+        obs_dim=1,
+        act_dim=1,
+        n_rl_units=2,
+        gamma=gamma,
+        gae_lambda=gae_lambda,
     )
 
     for _ in range(3):
@@ -410,7 +435,7 @@ def test_rollout_buffer_get_mini_batches_cover_all_steps():
 def test_rollout_buffer_get_partial_fill():
     """A partially-filled buffer must only yield the filled steps."""
     buf = make_rollout_buffer(buffer_size=10, obs_dim=2, act_dim=1, n_rl_units=1)
-    fill_buffer(buf, n_steps=4) 
+    fill_buffer(buf, n_steps=4)
     buf.compute_returns_and_advantages(
         last_values=np.zeros(1, dtype=np.float32),
         dones=np.zeros(1, dtype=np.float32),
@@ -425,8 +450,12 @@ def test_full_episode_rollout():
     """fill -> GAE -> mini-batch epochs -> reset"""
     T, obs_dim, act_dim, n_agents = 16, 5, 3, 2
     buf = make_rollout_buffer(
-        buffer_size=T, obs_dim=obs_dim, act_dim=act_dim, n_rl_units=n_agents,
-        gamma=0.99, gae_lambda=0.95,
+        buffer_size=T,
+        obs_dim=obs_dim,
+        act_dim=act_dim,
+        n_rl_units=n_agents,
+        gamma=0.99,
+        gae_lambda=0.95,
     )
 
     rng = np.random.default_rng(42)
