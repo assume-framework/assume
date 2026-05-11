@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # %%
 import logging
 import os
@@ -15,7 +19,17 @@ os.makedirs("./examples/local_db", exist_ok=True)
 
 scenario = {
     "simple": {"scenario": "simple", "study_case": "base_case"},
+    "simple_10demand-steps_complex": {"scenario":"simple_10demand-steps", "study_case":"complex_clearing"},
+    "simple_100demand-steps_complex": {"scenario":"simple_100demand-steps", "study_case":"complex_clearing"},
+    "simple_1000demand-steps_complex": {"scenario":"simple_1000demand-steps", "study_case":"complex_clearing"},
     "simple_complex": {"scenario":"simple", "study_case":"complex_clearing"},
+
+    "simple_with_storage_10demand-steps_complex": {"scenario":"simple_with_storage_10demand-steps", "study_case":"complex_clearing"},
+    "simple_with_storage_10demand-steps_cc_24h": {"scenario":"simple_with_storage_10demand-steps", "study_case":"cc_24h_foresight"},
+    "simple_with_storage_100demand-steps_complex": {"scenario":"simple_with_storage_100demand-steps", "study_case":"complex_clearing"},
+    "simple_with_storage_1000demand-steps_complex": {"scenario":"simple_with_storage_1000demand-steps", "study_case":"complex_clearing"},
+    "simple_with_storage_1000demand-steps_cc_24h": {"scenario":"simple_with_storage_1000demand-steps", "study_case":"cc_24h_foresight"},
+
     "simple_with_storage": {"scenario":"simple_with_storage", "study_case":"base_case"},
     "simple_with_storage_complex": {"scenario":"simple_with_storage", "study_case":"complex_clearing"},
     "simple_with_storage_24h": {"scenario":"simple_with_storage", "study_case":"cc_24h_foresight"},
@@ -28,6 +42,12 @@ scenario = {
     "simple_with_storage_cc_price_48h" : {"scenario":"simple_with_storage_forecast", "study_case":"cc_price_48h_foresight"},
     "simple_with_storage_cc_price_336h" : {"scenario":"simple_with_storage_forecast", "study_case":"cc_price_336h_foresight"},
     "simple_with_storage_cc_price_8760h" : {"scenario":"simple_with_storage_forecast", "study_case":"cc_price_8760h_foresight"},
+
+    "simple_with_storage_100demand-steps_24h" : {"scenario":"simple_with_storage_100demand-steps", "study_case":"24h_foresight"}, # simple clearing
+    "simple_with_storage_100demand-steps_cc_24h" : {"scenario":"simple_with_storage_100demand-steps", "study_case":"cc_24h_foresight"},
+    "simple_with_storage_100demand-steps_cc_price_24h" : {"scenario":"simple_with_storage_100demand-steps_forecast", "study_case":"cc_price_24h_foresight"},
+    "simple_with_storage_100demand-steps_opt_cc_price_24h" : {"scenario":"simple_with_storage_100demand-steps_opt", "study_case":"cc_price_24h_foresight"},
+    "simple_with_storage_100demand-steps_learning_cc_price_12h" : {"scenario":"simple_with_storage_100demand-steps_learning", "study_case":"cc_price_12h_foresight"},
     
     "simple_with_storage_opt_price" : {"scenario":"simple_with_storage_opt", "study_case":"price"},
     "simple_with_storage_opt_cc_price" : {"scenario":"simple_with_storage_opt", "study_case":"cc_price"},
@@ -63,7 +83,7 @@ if __name__ == "__main__":
 
     data_format = "timescale"  # "local_db" or "timescale"
 
-    example = "simple_with_storage_learning_cc_price_12h"  # "simple", "simple_complex", "simple_with_storage", "simple_with_storage_complex", "stylized"
+    example = "simple_with_storage_10demand-steps_cc_24h"  # "simple", "simple_complex", "simple_with_storage", "simple_with_storage_complex", "stylized"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
@@ -77,6 +97,9 @@ if __name__ == "__main__":
     current_dir = os.path.dirname(os.path.abspath(__file__))  # folder containing this file
     inputs_path = os.path.join(os.path.dirname(os.path.dirname(current_dir)), "assume-examples", "inputs", "inconsistencies")  # one level up + "directory"
     print(f"Loading inputs from: {inputs_path}")
+
+    print("Scenario:", scenario[example]["scenario"])
+    print("Study Case:", scenario[example]["study_case"])
 
     load_scenario_folder(
         world,
