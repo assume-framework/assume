@@ -29,10 +29,12 @@ from assume.common.utils import (
 logger = logging.getLogger(__name__)
 
 
-class OutputDef(TypedDict):
+class OutputDef(TypedDict, total=False):
     name: str
     value: str
     from_table: str
+    group_bys: list[str]
+    simulation_col: str
 
 
 class WriteOutput(Role):
@@ -120,6 +122,7 @@ class WriteOutput(Role):
                 "value": "avg(power/max_power)",
                 "from_table": 'market_dispatch ud join power_plant_meta um on ud.unit_id = um."index" and ud.simulation=um.simulation',
                 "group_bys": ["market_id", "variable"],
+                "simulation_col": "ud.simulation",
             },
         }
         self.kpi_defs.update(additional_kpis)
@@ -655,8 +658,9 @@ class WriteOutput(Role):
         queries = []
         for variable, kpi_def in self.kpi_defs.items():
             group_bys = ",".join(kpi_def.get("group_bys", ["market_id"]))
+            sim_col = kpi_def.get("simulation_col", "simulation")
             queries.append(
-                f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where simulation = '{self.simulation_id}' group by {group_bys}"
+                f"select '{variable}' as variable, market_id as ident, {kpi_def['value']} as value from {kpi_def['from_table']} where {sim_col} = '{self.simulation_id}' group by {group_bys}"
             )
 
         if self.episode:
