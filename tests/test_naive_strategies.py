@@ -2,18 +2,23 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
+import pandas as pd
 import pytest
 from dateutil.relativedelta import relativedelta as rd
+from dateutil import rrule as rr
 
-from assume.common.market_objects import MarketProduct
+from assume.common.forecaster import UnitForecaster
+from assume.common.market_objects import MarketConfig, MarketProduct, Order
 from assume.common.utils import get_available_products
 from assume.strategies import (
     EnergyHeuristicElasticStrategy,
     EnergyNaiveProfileStrategy,
     EnergyNaiveStrategy,
 )
+from assume.strategies.naive_strategies import EnergyNaiveRedispatchStrategy
+from tests.conftest import MockMinMaxUnit
 
 start = datetime(2023, 7, 1)
 end = datetime(2023, 7, 2)
@@ -135,7 +140,62 @@ def test_demand_energy_heuristic_elastic_strategy_raises_when_volume_exceeds_max
     with pytest.raises(ValueError, match="exceeds max power"):
         strategy.calculate_bids(unit, mock_market_config, product_tuples)
 
+redispatch_start = datetime(2005, 6, 1, 0)
+redispatch_end = datetime(2005, 6, 1, 3)
+simple_redispatch_market_config = MarketConfig(
+    market_id="simple_redispatch",
+    market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+    additional_fields=["node", "min_power", "max_power"],
+    opening_hours=rr.rrule(
+        rr.HOURLY,
+        dtstart=redispatch_start,
+        until=redispatch_end,
+        cache=True,
+    ),
+    opening_duration=timedelta(hours=1),
+    volume_unit="MW",
+    volume_tick=0.1,
+    maximum_bid_volume=None,
+    price_unit="€/MW",
+    market_mechanism="redispatch",
+)
 
+index = pd.date_range(start=redispatch_start, end=redispatch_end, freq="1h")
+forecaster = UnitForecaster(index=index)
+unit_for_redispatch_with_availability = MockMinMaxUnit(forecaster=forecaster)
+unit_for_redispatch_with_availability.max_power = 1000
+unit_for_redispatch_with_availability.min_power = 100
+
+@pytest.mark.parametrize("dummy_availability, dummy_current_power, expected_bids_volume, expected_bids_max_power, expected_min_power",
+                         [
+                            (pd.Series(0, index=index), pd.Series([0, 0, 0, 0], index=index), pd.Series([0, 0, 0, 0], index=index), pd.Series(0, index=index), pd.Series(0, index=index)), # no availability, not running on EOM -> no volume to offer
+                            (pd.Series(0.0, index=index), pd.Series([0, 0, 0, 0], index=index), pd.Series([0, 0, 0, 0], index=index), pd.Series(0, index=index), pd.Series(0, index=index)), # same as above, but with float availability
+                            (pd.Series(0.5, index=index), pd.Series([0, 100, 200, 500], index=index), pd.Series([0, 100, 200, 500], index=index), pd.Series(500, index=index), pd.Series(100, index=index)), # 0.5 availability
+                            (pd.Series(1.0, index=index), pd.Series([0, 100, 200, 1000], index=index), pd.Series([0, 100, 200, 1000], index=index), pd.Series(1000, index=index), pd.Series(100, index=index)), # full availability
+                         ])
+
+def test_naive_redispatch_strategy(dummy_availability, dummy_current_power, expected_bids_volume, expected_bids_max_power, expected_min_power):
+    # test with simple redispatch market
+    strategy = EnergyNaiveRedispatchStrategy()
+    mc = simple_redispatch_market_config
+    unit = unit_for_redispatch_with_availability
+
+    mc.market_products = [MarketProduct(rd(hours=+1), 4, rd(hours=0))] # 4 products with 1h duration, starting at redispatch_start
+    next_opening = redispatch_start
+    products = get_available_products(mc.market_products, next_opening)
+    assert len(products) == 4
+
+    unit.forecaster.availability = dummy_availability
+    unit.outputs['energy'] = dummy_current_power
+    bids = strategy.calculate_bids(unit, mc, product_tuples=products)
+    
+    assert [bids[i]['volume'] for i in range(0, len(bids))] == pytest.approx(expected_bids_volume)
+    assert [bids[i]['max_power'] for i in range(0, len(bids))] == pytest.approx(expected_bids_max_power)
+    assert [bids[i]['min_power'] for i in range(0, len(bids))] == pytest.approx(expected_min_power)
+    assert [bids[i]['p_nom'] for i in range(0, len(bids))] == pytest.approx([unit.max_power] * len(bids))
+    assert [bids[i]['node'] for i in range(0, len(bids))] == pytest.approx([unit.node] * len(bids))
+    assert [bids[i]['price'] for i in range(0, len(bids))] == pytest.approx([3] * len(bids)) # should bid at marginal cost, which are set to 3 in MockMinMaxUnit
+    
 if __name__ == "__main__":
     # run pytest and enable prints
     import pytest
