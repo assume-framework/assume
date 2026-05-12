@@ -69,7 +69,7 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.solver = marketconfig.param_dict.get("solver", "highs")
+        self.solver_name = marketconfig.param_dict.get("solver_name", "highs")
 
         # set the market clearing principle
         # as pay as bid or pay as clear
@@ -189,7 +189,7 @@ class RedispatchMarketRole(MarketRole):
             logger.debug("Congestion detected")
 
             status, termination_condition = redispatch_network.optimize(
-                solver_name=self.solver,
+                solver_name=self.solver_name,
                 log_to_console=False,
                 # do not show tqdm progress bars for large grids
                 # https://github.com/PyPSA/linopy/pull/375
