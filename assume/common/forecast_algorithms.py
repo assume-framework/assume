@@ -29,6 +29,26 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+def is_elastic_demand(unit, market_config=None) -> bool:
+    """
+    Checks whether a unit as an elastic demand.
+    NOTE: There is currently not a clear flag whether some demand is elastic.
+          Until then, it is defined via its bidding strategy on a given market.
+          If no market given we use the same criterion the Demand class uses itself:
+            unit.elasticity_model != 0
+    """
+    if market_config is not None:
+        return isinstance(
+            unit.bidding_strategies[market_config.market_id],
+            EnergyHeuristicElasticStrategy,
+        )
+
+    if isinstance(unit, Demand):
+        return unit.elasticity_model != 0
+
+    return False
+
+
 def calculate_max_power(units, index=None):
     """
     Returns: max available power: shape (num_units, forecast_len)
@@ -76,9 +96,17 @@ def calculate_sum_demand(
     Returns summed demand at every timestep (incl. imports and exports)
     Shape: (num_timesteps,)
     """
-    sum_demand = abs(np.array([unit.forecaster.demand for unit in demand_units])).sum(
-        axis=0
-    )
+    sum_demand = np.zeros(len(demand_units[0].forecaster.index))
+
+    sum_demand += abs(
+        np.array(
+            [
+                unit.forecaster.demand
+                for unit in demand_units
+                if not is_elastic_demand(unit)
+            ]
+        )
+    ).sum(axis=0)
 
     return sum_demand + calculate_exchange_volume(exchange_units)
 
@@ -359,11 +387,7 @@ def calculate_naive_price(
     _, demand_units, _, _, _ = sort_units(units, config.market_id)
 
     elastic_demand_units = {
-        unit.id: unit
-        for unit in demand_units
-        if isinstance(
-            unit.bidding_strategies[config.market_id], EnergyHeuristicElasticStrategy
-        )
+        unit.id: unit for unit in demand_units if is_elastic_demand(unit, config)
     }
 
     if len(elastic_demand_units) > 0:
@@ -383,7 +407,8 @@ def calculate_naive_residual_load(
 ) -> dict[str, ForecastSeries]:
     """Compute residual load as total demand minus renewable generation for each timestep.
 
-    NOTE: Elastic demands are not supported currently
+    NOTE: Elastic demands are ignored in this forecast.
+          This will underestimate the residual load if there are elastic demands present.
     """
     powerplants_units, demand_units, exchange_units, _, _ = sort_units(
         units, config.market_id
@@ -447,7 +472,7 @@ def calculate_naive_congestion_signal(
             across all connected lines as the node's congestion signal.
 
     Returns an empty dict if grid data (buses/lines) is unavailable.
-    NOTE: Elastic demands are not supported currently
+    NOTE: Elastic demands are ignored currently.
     """
     if isinstance(index, FastIndex):
         index = index.as_datetimeindex()
@@ -468,8 +493,8 @@ def calculate_naive_congestion_signal(
         )
         return {}
 
-    # TODO: Add support for elastic demand (currently error of only elastic demands)
-    if all([unit.elasticity_model != 0 for unit in demand_units]):
+    # Go on if only elastic demand (as they are ignored)
+    if all([is_elastic_demand(unit) for unit in demand_units]):
         return {}
 
     # Step 1: Calculate load for each powerplant based on availability factor and max power
