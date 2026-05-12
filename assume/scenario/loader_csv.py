@@ -640,6 +640,34 @@ def load_config_and_create_forecaster(
                     forecast_algorithms, unit
                 )
                 if type == "building":
+
+                    def get_building_profile(column_name: str) -> pd.Series:
+                        default_profile = pd.Series(0.0, index=index, name=column_name)
+                        if forecasts_df is None:
+                            return default_profile
+                        return forecasts_df.get(column_name, default_profile)
+
+                    # Base aggregate building profiles
+                    building_load_profile = get_building_profile(f"{id}_load_profile")
+                    building_heat_demand = get_building_profile(f"{id}_heat_demand")
+                    building_pv_profile = get_building_profile(f"{id}_pv_profile")
+                    building_battery_profile = get_building_profile(
+                        f"{id}_battery_load_profile"
+                    )
+                    building_ev_profile = get_building_profile(f"{id}_ev_load_profile")
+                    building_electricity_price_flex = get_building_profile(
+                        f"{id}_electricity_price_flex"
+                    )
+
+                    # collect arbitrary component-level forecasts for this building
+                    extra_building_profiles = {}
+
+                    if forecasts_df is not None:
+                        building_prefix = f"{id}_"
+                        for col in forecasts_df.columns:
+                            if col.startswith(building_prefix):
+                                extra_building_profiles[col] = forecasts_df[col]
+
                     unit_forecasts[id] = BuildingForecaster(
                         index=shared_unit_index,
                         availability=availability.get(
@@ -647,11 +675,13 @@ def load_config_and_create_forecaster(
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
                         fuel_prices=fuel_prices_df,
-                        load_profile=0,  # TODO
-                        ev_load_profile=0,  # TODO
-                        heat_demand=0,  # TODO
-                        battery_load_profile=0,  # TODO
-                        pv_profile=0,  # TODO
+                        load_profile=building_load_profile,
+                        ev_load_profile=building_ev_profile,
+                        heat_demand=building_heat_demand,
+                        battery_load_profile=building_battery_profile,
+                        pv_profile=building_pv_profile,
+                        electricity_price_flex=building_electricity_price_flex,
+                        **extra_building_profiles,
                     )
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
