@@ -2,14 +2,11 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+from pathlib import Path
+
+import pandas as pd
 import pytest
 
-from assume.common.forecast_algorithms import (
-    calculate_naive_congestion_signal,
-    calculate_naive_price,
-    calculate_naive_renewable_utilisation,
-    calculate_naive_residual_load,
-)
 from assume.scenario.loader_csv import (
     get_unit_forecast_algorithms,
     load_config_and_create_forecaster,
@@ -40,8 +37,9 @@ def test_csv_loader_forecaster_algorithms():
         setting via config
         setting via csv (overwrites config if not None)
     for forecast, preprocess and update algorithms.
-    Includes:
-        test in config and csv with forecasts that are not present in the other.
+
+    Special cases:
+        setting specific forecasts for config and csv that are not present in the other one
     """
     scenario_data = load_config_and_create_forecaster(
         inputs_path="tests/fixtures", scenario="different_forecasts", study_case="base"
@@ -132,6 +130,12 @@ def test_csv_loader_forecaster_algorithms():
 
 
 def test_get_unit_forecast_algorithms():
+    """
+    Test the function: get_unit_forecast_algorithms
+        This function gets correct forecast_names from config and csvs.
+        csv will overwrite config values (except if csv has None types)
+        Further, this checks, that only forecast_names with prefix "forecast_" are used from csv
+    """
     powerplant_dict = {
         "forecast_test": "value1",
         "forecast_test2": "value2",
@@ -148,10 +152,10 @@ def test_get_unit_forecast_algorithms():
     config_dict_copy = config_dict.copy()
 
     expected_output = {
-        "test": "value1",
-        "test2": "value2",
-        "test4": "other2",
-        "test5": "other3",
+        "test": "value1",  # from powerplant_dict
+        "test2": "value2",  # from powerplant_dict
+        "test4": "other2",  # from config_dict
+        "test5": "other3",  # from config_dict (powerplant_dict has None)
     }
 
     output = get_unit_forecast_algorithms(config_dict, powerplant_dict)
@@ -169,21 +173,24 @@ def test_get_unit_forecast_algorithms():
         assert expected_output[key] == output[key]
 
 
-def test_cache_unit_forecast_algorithms_cache_hits():
-    calculate_naive_price.cache_clear()
-    calculate_naive_residual_load.cache_clear()
-    calculate_naive_congestion_signal.cache_clear()
-    calculate_naive_renewable_utilisation.cache_clear()
-
+def test_forecast_interface__save_forecasts():
+    """
+    Tests that forecasts are saved correctly
+    """
+    path = Path("./tests/fixtures/forecast_save")
+    expected_price = pd.read_csv(path / "results/price.csv")
+    expected_load = pd.read_csv(path / "results/load_forecast.csv")
     world = World()
     world.scenario_data = load_config_and_create_forecaster(
-        inputs_path="tests/fixtures", scenario="forecast_init", study_case="base"
+        inputs_path="tests/fixtures", scenario="forecast_save", study_case="base"
     )
-
     setup_world(world=world)
 
-    assert calculate_naive_price.cache_info().hits == len(world.units) - 1
-    assert calculate_naive_price.cache_info().misses == 1
-
-    assert calculate_naive_residual_load.cache_info().hits == len(world.units) - 1
-    assert calculate_naive_residual_load.cache_info().misses == 1
+    saved_forecasts = pd.read_csv(path / "outputs/saved_forecasts.csv")
+    assert (
+        saved_forecasts["price_naive_forecast_EOM"] == expected_price["price"]
+    ).all()
+    assert (
+        saved_forecasts["residual_load_naive_forecast_EOM"]
+        == expected_load["load_forecast"]
+    ).all()
