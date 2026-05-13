@@ -12,7 +12,7 @@ import torch as th
 from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
-from assume.reinforcement_learning.learning_utils import encode_time_features
+from assume.reinforcement_learning.learning_utils import encode_hourly_features
 from assume.strategies.learning_strategies import TorchLearningStrategy
 from assume.strategies.portfolio_strategies import UnitOperatorStrategy
 
@@ -352,7 +352,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         )
 
         # --- 2. Cyclical encoding for hour of the day ---
-        hour_cos, hour_sin, _, _ = encode_time_features(start)
+        hour_features = encode_hourly_features(start)
 
         # --- 3. Individual observations ---
 
@@ -363,7 +363,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         # concat all observations into one array
         observation = np.concatenate(
             [
-                [hour_cos, hour_sin],
+                hour_features,
                 scaled_res_load_forecast,
                 scaled_price_forecast,
                 scaled_gen_forecast,
