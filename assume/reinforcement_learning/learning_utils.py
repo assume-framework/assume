@@ -360,6 +360,7 @@ def encode_hourly_features(date: datetime) -> list:
         hour_sin,
     ]
 
+
 def encode_monthly_features(start: datetime) -> list:
     """
     Encode time features for a given datetime object.

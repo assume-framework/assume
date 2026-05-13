@@ -836,7 +836,7 @@ def test_min_max_scale():
     assert min_max_scale(5.0, min_val=0, max_val=10, out_min=1, out_max=3) == 2.0
 
     # Edge case: min_val == max_val → returns x unchanged
-    assert min_max_scale(5.0, min_val=5, max_val=5) == 5.0
+    assert min_max_scale(5.0, min_val=5, max_val=5) == 0.5
 
     # Edge case: val is outside the input range → raises ValueError
     with pytest.raises(ValueError):

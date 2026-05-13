@@ -751,12 +751,12 @@ def calculate_content_size(content: list | dict) -> int:
 
 
 def min_max_scale(
-    val,
+    val: np.ndarray | float,  # or th.Tensor
     min_val: float,
     max_val: float,
     out_min: float = 0.0,
     out_max: float = 1.0,
-):
+) -> np.ndarray | float:  # or th.Tensor
     """
     Linearly scale value from [min_val, max_val] to [out_min, out_max] (default: [0.0, 1.0]).
 
@@ -768,16 +768,13 @@ def min_max_scale(
         out_max: maximum value of the output range
     """
     # Catch values outside the input range
-    below, above = val < min_val, val > max_val
-    if (below.any() if hasattr(below, "any") else below) or (
-        above.any() if hasattr(above, "any") else above
-    ):
+    if np.any(val < min_val) or np.any(val > max_val):
         raise ValueError(
             f"Value {val} is outside the input range [{min_val}, {max_val}]."
         )
     # Avoid division by zero
     if min_val == max_val:
-        return val
+        return np.ones_like(val) * (out_min + out_max) / 2
     else:
         return out_min + (val - min_val) / (max_val - min_val) * (out_max - out_min)
 

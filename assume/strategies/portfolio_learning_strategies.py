@@ -92,6 +92,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         # Hyperparameters for action and reward
         self.min_markup = kwargs.pop("min_markup", 1)  # min markup on marginal cost
         self.max_markup = kwargs.pop("max_markup", 3)  # max markup on marginal cost
+        self.is_prepared = False
 
         super().__init__(
             foresight=foresight,
@@ -304,6 +305,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
 
         # Inframarginal generation forecast
         self.scaled_gen_obs = gen_obs / residual_load
+        self.is_prepared = True
 
     def create_observation(self, units_operator, market_id, start, end):
         """
@@ -334,9 +336,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         """
 
         # ensure scaled observations are prepared
-        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
-            self, "scaled_prices_obs"
-        ):
+        if not self.is_prepared:
             self.prepare_observations(units_operator, market_id)
 
         # --- 1. Forecasted residual load, price and inframarginal capacity (forward-looking) ---
