@@ -2661,7 +2661,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs + energy_start_costs AS \"Production costs\",\r\n  energy_start_costs AS \"Start-up costs\",\r\n  energy_cashflow - energy_generation_costs - energy_start_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs, energy_start_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -2829,7 +2829,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs + energy_start_costs AS \"Production costs\",\r\n  energy_start_costs AS \"Start-up costs\",\r\n  energy_cashflow - energy_generation_costs - energy_start_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Gen_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs, energy_start_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -5067,7 +5067,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs + energy_start_costs AS \"Production costs\",\r\n  energy_start_costs AS \"Start-up costs\",\r\n  energy_cashflow - energy_generation_costs - energy_start_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs, energy_start_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
@@ -5235,7 +5235,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs AS \"Production costs\",\r\n  energy_cashflow - energy_generation_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs\r\nORDER BY 1",
+          "rawSql": "SELECT\r\n  $__timeGroupAlias(time,$__interval),\r\n  energy_cashflow AS \"Cashflow\",\r\n  energy_generation_costs + energy_start_costs AS \"Production costs\",\r\n  energy_start_costs AS \"Start-up costs\",\r\n  energy_cashflow - energy_generation_costs - energy_start_costs AS \"Profit\",\r\n  unit\r\nFROM unit_dispatch\r\nWHERE\r\n  $__timeFilter(time) AND\r\n  simulation = '$simulation' AND\r\n  unit in ($Storage_Units)\r\nGROUP BY 1, unit, energy_cashflow, energy_generation_costs, energy_start_costs\r\nORDER BY 1",
           "refId": "A",
           "select": [
             [
