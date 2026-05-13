@@ -142,6 +142,352 @@
     },
     {
       "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p25"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "p10"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p75"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "median"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p90"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "p75"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "median"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "p25"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "median"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "id": 61,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n    episode,\r\n    percentile_cont(0.10) WITHIN GROUP (ORDER BY total_reward) AS p10,\r\n    percentile_cont(0.25) WITHIN GROUP (ORDER BY total_reward) AS p25,\r\n    percentile_cont(0.50) WITHIN GROUP (ORDER BY total_reward) AS median,\r\n    percentile_cont(0.75) WITHIN GROUP (ORDER BY total_reward) AS p75,\r\n    percentile_cont(0.90) WITHIN GROUP (ORDER BY total_reward) AS p90\r\nFROM (\r\n    SELECT\r\n        episode,\r\n        unit,\r\n        SUM(reward) AS total_reward\r\n    FROM rl_params\r\n    WHERE simulation = '${simulation}'\r\n        AND evaluation_mode = FALSE\r\n        AND unit IN (${rl_unit})\r\n    GROUP BY episode, unit\r\n) sub\r\nGROUP BY episode\r\nORDER BY episode",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Distribution of Reward over Training Episodes",
+      "type": "trend"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "P7B13B9DF907EC40C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 1,
+            "pointSize": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p25"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "p10"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p75"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "median"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "p90"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "p75"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "median"
+            },
+            "properties": [
+              {
+                "id": "custom.fillBelowTo",
+                "value": "p25"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "median"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "id": 65,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.1",
+      "targets": [
+        {
+          "dataset": "assume",
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n    episode,\r\n    percentile_cont(0.10) WITHIN GROUP (ORDER BY total_reward) AS p10,\r\n    percentile_cont(0.25) WITHIN GROUP (ORDER BY total_reward) AS p25,\r\n    percentile_cont(0.50) WITHIN GROUP (ORDER BY total_reward) AS median,\r\n    percentile_cont(0.75) WITHIN GROUP (ORDER BY total_reward) AS p75,\r\n    percentile_cont(0.90) WITHIN GROUP (ORDER BY total_reward) AS p90\r\nFROM (\r\n    SELECT\r\n        episode,\r\n        unit,\r\n        SUM(reward) AS total_reward\r\n    FROM rl_params\r\n    WHERE simulation = '${simulation}'\r\n        AND evaluation_mode = TRUE\r\n        AND unit IN (${rl_unit})\r\n    GROUP BY episode, unit\r\n) sub\r\nGROUP BY episode\r\nORDER BY episode",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Distribution of Reward over Evaluation Episodes",
+      "type": "trend"
+    },
+    {
+      "datasource": {
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
@@ -202,7 +548,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 23
       },
       "id": 50,
       "options": {
@@ -401,7 +747,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 15
+        "y": 23
       },
       "id": 51,
       "options": {
@@ -544,7 +890,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 23
+        "y": 31
       },
       "id": 40,
       "panels": [],
@@ -613,7 +959,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 24
+        "y": 32
       },
       "id": 31,
       "options": {
@@ -812,7 +1158,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 24
+        "y": 32
       },
       "id": 37,
       "options": {
@@ -1011,7 +1357,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 32
+        "y": 40
       },
       "id": 38,
       "options": {
@@ -1210,7 +1556,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 32
+        "y": 40
       },
       "id": 39,
       "options": {
@@ -1353,14 +1699,14 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 48
       },
       "id": 42,
       "panels": [],
       "title": "Per episode per unit",
       "type": "row"
     },
-        {
+    {
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
@@ -1393,7 +1739,7 @@
         "h": 3,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 49
       },
       "id": 53,
       "options": {
@@ -1452,7 +1798,7 @@
       "title": "Training Episode",
       "type": "volkovlabs-variable-panel"
     },
-        {
+    {
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
@@ -1485,7 +1831,7 @@
         "h": 3,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 49
       },
       "id": 54,
       "options": {
@@ -1618,7 +1964,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 41
+        "y": 52
       },
       "id": 41,
       "options": {
@@ -1815,7 +2161,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 41
+        "y": 52
       },
       "id": 43,
       "options": {
@@ -1985,7 +2331,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 49
+        "y": 60
       },
       "id": 55,
       "options": {
@@ -2079,7 +2425,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 49
+        "y": 60
       },
       "id": 56,
       "options": {
@@ -2200,7 +2546,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 57
+        "y": 68
       },
       "id": 44,
       "options": {
@@ -2397,7 +2743,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 57
+        "y": 68
       },
       "id": 45,
       "options": {
@@ -2583,7 +2929,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 65
+        "y": 76
       },
       "id": 46,
       "options": {
@@ -2793,7 +3139,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 65
+        "y": 76
       },
       "id": 60,
       "options": {
@@ -2983,9 +3329,9 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 73
+        "y": 84
       },
-      "id": 53,
+      "id": 57,
       "options": {
         "legend": {
           "calcs": [],
@@ -3112,9 +3458,9 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 73
+        "y": 84
       },
-      "id": 54,
+      "id": 58,
       "options": {
         "legend": {
           "calcs": [],
@@ -3303,5 +3649,5 @@
   "timezone": "",
   "title": "ASSUME: Training progress",
   "uid": "JKQzx0q4k",
-  "version": 13
+  "version": 14
 }
