@@ -25,6 +25,7 @@ from pyomo.opt import check_available_solvers
 
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.common.exceptions import AssumeException
+from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
@@ -772,9 +773,13 @@ def min_max_scale(
         raise ValueError(
             f"Value {val} is outside the input range [{min_val}, {max_val}]."
         )
+    out_mean = (out_min + out_max) / 2
     # Avoid division by zero
     if min_val == max_val:
-        return np.ones_like(val) * (out_min + out_max) / 2
+        if isinstance(val, FastSeries):
+            return val.ones_like() * out_mean
+        else:
+            return np.ones_like(val) * out_mean
     else:
         return out_min + (val - min_val) / (max_val - min_val) * (out_max - out_min)
 
