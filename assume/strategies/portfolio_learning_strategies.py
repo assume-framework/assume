@@ -162,16 +162,16 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
 
         costs = min_max_scale(
             scaled_costs.cpu().numpy(),
-            min_val=0,
-            max_val=1,
+            in_min=0,
+            in_max=1,
             out_min=0,
             out_max=self.max_price,
         )
 
         markups = min_max_scale(
             actions.cpu().numpy(),
-            min_val=-1,
-            max_val=1,
+            in_min=-1,
+            in_max=1,
             out_min=self.min_markup,
             out_max=self.max_markup,
         )
@@ -432,7 +432,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         cost_bins = np.quantile(flex_cost, q=bins)
 
         # Creates bins of marginal costs
-        scaled_costs = min_max_scale(cost_bins, min_val=0, max_val=self.max_price)
+        scaled_costs = min_max_scale(cost_bins, in_min=0, in_max=self.max_price)
 
         # Calculates the total capacity of units in those bins
         index = np.searchsorted(cost_bins, flex_cost, side="right")

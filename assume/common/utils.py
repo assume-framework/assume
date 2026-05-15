@@ -753,35 +753,35 @@ def calculate_content_size(content: list | dict) -> int:
 
 def min_max_scale(
     val: np.ndarray | float,  # or th.Tensor
-    min_val: float,
-    max_val: float,
+    in_min: float,
+    in_max: float,
     out_min: float = 0.0,
     out_max: float = 1.0,
 ) -> np.ndarray | float:  # or th.Tensor
     """
-    Linearly scale value from [min_val, max_val] to [out_min, out_max] (default: [0.0, 1.0]).
+    Linearly scale value from [in_min, in_max] to [out_min, out_max] (default: [0.0, 1.0]).
 
     Args:
-        val: value to scale
-        min_val: minimum value of the input range
-        max_val: maximum value of the input range
+        val: value(s) to scale
+        in_min: minimum value of the input range
+        in_max: maximum value of the input range
         out_min: minimum value of the output range
         out_max: maximum value of the output range
     """
     # Catch values outside the input range
-    if np.any(val < min_val) or np.any(val > max_val):
+    if np.any(val < in_min) or np.any(val > in_max):
         raise ValueError(
-            f"Value {val} is outside the input range [{min_val}, {max_val}]."
+            f"Value {val} is outside the input range [{in_min}, {in_max}]."
         )
     out_mean = (out_min + out_max) / 2
     # Avoid division by zero
-    if min_val == max_val:
+    if in_min == in_max:
         if isinstance(val, FastSeries):
             return val.ones_like() * out_mean
         else:
             return np.ones_like(val) * out_mean
     else:
-        return out_min + (val - min_val) / (max_val - min_val) * (out_max - out_min)
+        return out_min + (val - in_min) / (in_max - in_min) * (out_max - out_min)
 
 
 def str_to_bool(val):

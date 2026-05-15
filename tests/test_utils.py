@@ -828,19 +828,19 @@ def test_solver_unavailable(monkeypatch):
 
 def test_min_max_scale():
     # Default out_min/out_max: scales to [0, 1]
-    assert min_max_scale(5.0, min_val=0, max_val=10) == 0.5
-    assert min_max_scale(0.0, min_val=0, max_val=10) == 0.0
-    assert min_max_scale(10.0, min_val=0, max_val=10) == 1.0
+    assert min_max_scale(5.0, in_min=0, in_max=10) == 0.5
+    assert min_max_scale(0.0, in_min=0, in_max=10) == 0.0
+    assert min_max_scale(10.0, in_min=0, in_max=10) == 1.0
 
     # Custom output range: scale [0, 10] → [1, 3], x=5 → 2.0
-    assert min_max_scale(5.0, min_val=0, max_val=10, out_min=1, out_max=3) == 2.0
+    assert min_max_scale(5.0, in_min=0, in_max=10, out_min=1, out_max=3) == 2.0
 
-    # Edge case: min_val == max_val → returns x unchanged
-    assert min_max_scale(5.0, min_val=5, max_val=5) == 0.5
+    # Edge case: in_min == in_max → returns midpoint of output range
+    assert min_max_scale(5.0, in_min=5, in_max=5) == 0.5
 
     # Edge case: val is outside the input range → raises ValueError
     with pytest.raises(ValueError):
-        min_max_scale(15.0, min_val=0, max_val=10)
+        min_max_scale(15.0, in_min=0, in_max=10)
 
 
 def test_load_index_file():
