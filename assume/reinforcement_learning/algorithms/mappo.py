@@ -239,7 +239,7 @@ class PPO(A2CAlgorithm):
         logger.debug("Updating Policy (PPO)")
 
         # Keeping strategy order aligned with rollout-buffer column order.
-        strategies = [self.learning_role.rl_strats]
+        strategies = [strategy for strategy in self.learning_role.rl_strats.values()]
         n_rl_agents = len(strategies)
 
         # Getting the buffer, this will be a RolloutBuffer for on-policy algorithms.

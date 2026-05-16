@@ -599,7 +599,7 @@ def rename_study_case(path: str, old_key: str, new_key: str):
         yaml.safe_dump(data, file, sort_keys=False)
 
 
-def convert_to_tensors(self, array: np.array, copy=True, dtype=None, device=None):
+def convert_to_tensors(array: np.array, copy=True, dtype=None, device=None):
     """Convert a numpy array to a PyTorch tensor.
 
     Note:

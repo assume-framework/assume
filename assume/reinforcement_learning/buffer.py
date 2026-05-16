@@ -165,7 +165,7 @@ class ReplayBuffer:
         )
 
         return ReplayBufferSamples(
-            *tuple(convert_to_tensors(x, self.device, self.th_float_type) for x in data)
+            *tuple(convert_to_tensors(array=x, dtype=self.th_float_type, device=self.device) for x in data)
         )
 
 
@@ -397,7 +397,7 @@ class RolloutBuffer:
         )
 
         return RolloutBufferSamples(
-            *(convert_to_tensors(x, self.device, self.float_type) for x in data)
+            *(convert_to_tensors(array=x, dtype=self.float_type, device=self.device) for x in data)
         )
 
     def size(self) -> int:

@@ -8,6 +8,12 @@ from assume.reinforcement_learning.neural_network_architecture import (
     LSTMActor,
     MLPActor,
 )
+
+actor_architecture_aliases: dict[str, type[nn.Module]] = {
+    "mlp": MLPActor,
+    "lstm": LSTMActor,
+}
+
 from assume.reinforcement_learning.algorithms.base_algorithm import (
     A2CAlgorithm,
     RLAlgorithm,
@@ -15,11 +21,6 @@ from assume.reinforcement_learning.algorithms.base_algorithm import (
 from assume.reinforcement_learning.algorithms.maddpg import DDPG
 from assume.reinforcement_learning.algorithms.mappo import PPO
 from assume.reinforcement_learning.algorithms.matd3 import TD3
-
-actor_architecture_aliases: dict[str, type[nn.Module]] = {
-    "mlp": MLPActor,
-    "lstm": LSTMActor,
-}
 
 
 __all__ = [
