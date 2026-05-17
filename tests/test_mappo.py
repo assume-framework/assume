@@ -240,3 +240,134 @@ def test_mappo_initialize_policy_all_dimensions_match(base_learning_config):
         learn.rl_algorithm.initialize_policy()
     except Exception as e:
         pytest.fail(f"initialize_policy raised an unexpected error: {e}")
+
+
+@pytest.mark.require_learning
+def test_mappo_buffer_storage_uses_rl_strats_order(base_learning_config):
+    """Regression test for the agent-ordering bug.
+
+    The on-policy buffer-storage path used to call
+    ``sorted(cache["obs"][timestamp].keys())`` to order agents, while
+    ``mappo.PPO.update_policy`` iterates ``self.rl_strats.values()``.  When
+    the unit ids do not happen to be alphabetically sorted (e.g.
+    ``pp_6, pp_7, pp_8, pp_9, pp_10``) the two orders diverge and every
+    agent is trained on a different agent's observations / actions / values,
+    silently degrading MAPPO to noise.
+
+    This test pins ``learning_role`` to use the ``rl_strats`` insertion order
+    when filling the rollout buffer, exactly like the off-policy algorithms
+    already do.
+    """
+    import asyncio
+    from collections import defaultdict
+
+    config = copy(base_learning_config)
+
+    learn = Learning(config["learning_config"], start, end)
+    insertion_order = ("pp_6", "pp_7", "pp_8", "pp_9", "pp_10")
+    assert sorted(insertion_order) != list(insertion_order), (
+        "test scenario must use unit ids whose sort order differs from "
+        "insertion order; otherwise this regression test is trivially passing"
+    )
+
+    for agent_id in insertion_order:
+        strat = LearningStrategy(**config, learning_role=learn)
+        strat.unit_id = agent_id
+        learn.rl_strats[agent_id] = strat
+
+    learn.initialize_policy()
+
+    n_agents = len(insertion_order)
+    # ``LearningStrategy`` computes ``self.obs_dim`` from
+    # ``num_timeseries_obs_dim * foresight + unique_obs_dim``, so we must
+    # match that here for the fake centralized-critic input to align.
+    obs_dim = (
+        config["num_timeseries_obs_dim"] * config["foresight"]
+        + config["unique_obs_dim"]
+    )
+    act_dim = config["act_dim"]
+
+    # Build a fake rollout buffer large enough to hold one fake timestep.
+    learn.buffer = RolloutBuffer(
+        buffer_size=4,
+        obs_dim=obs_dim,
+        act_dim=act_dim,
+        n_rl_units=n_agents,
+        device="cpu",
+        float_type=th.float32,
+        gamma=0.99,
+        gae_lambda=0.95,
+    )
+
+    # Craft a cache where each unit's observation/action/reward is a unique
+    # constant equal to (1+i)*10, so we can assert that the row for agent i in
+    # the buffer matches the i-th *insertion-order* unit, not the i-th
+    # *sorted-order* unit.
+    timestamp = "2023-07-01 00:00:00"
+    cache = {
+        "obs": {timestamp: {}},
+        "actions": {timestamp: {}},
+        "rewards": {timestamp: {}},
+        "noises": {timestamp: {}},
+        "regret": {timestamp: {}},
+        "profit": {timestamp: {}},
+        "values": {timestamp: defaultdict(list)},
+        "log_probs": {timestamp: {}},
+        "dones": {timestamp: {}},
+    }
+    for i, unit_id in enumerate(insertion_order):
+        marker = float(i + 1)
+        cache["obs"][timestamp][unit_id] = [
+            th.full((obs_dim,), marker, dtype=th.float32)
+        ]
+        cache["actions"][timestamp][unit_id] = [
+            th.full((act_dim,), marker, dtype=th.float32)
+        ]
+        cache["rewards"][timestamp][unit_id] = [marker]
+        cache["noises"][timestamp][unit_id] = [
+            th.zeros(act_dim, dtype=th.float32)
+        ]
+        cache["regret"][timestamp][unit_id] = [0.0]
+        cache["profit"][timestamp][unit_id] = [0.0]
+        cache["log_probs"][timestamp][unit_id] = [-marker]
+        cache["dones"][timestamp][unit_id] = [0.0]
+        # leave cache["values"][timestamp] empty - mappo recomputes values
+
+    # Stash db_addr/update_steps so the logging path inside the algorithm is
+    # safe to call.  We do NOT need an actual policy update for this test, so
+    # we monkey-patch update_policy to a no-op.
+    learn.db_addr = None
+    learn.update_steps = 0
+    learn.rl_algorithm.update_policy = lambda: None
+
+    asyncio.run(
+        learn._store_to_buffer_and_update_sync(cache, learn.device)
+    )
+
+    buf = learn.buffer
+    # One timestamp -> one row in the buffer.
+    assert buf.pos == 1, f"expected 1 transition, got {buf.pos}"
+
+    stored_obs = buf.observations[0]
+    stored_actions = buf.actions[0]
+    stored_rewards = buf.rewards[0]
+    stored_log_probs = buf.log_probs[0]
+
+    for i in range(n_agents):
+        expected = float(i + 1)
+        assert np.allclose(stored_obs[i], expected), (
+            f"row {i} of buffer.observations should match insertion-order "
+            f"agent {insertion_order[i]} (value {expected}); got {stored_obs[i]}"
+        )
+        assert np.allclose(stored_actions[i], expected), (
+            f"row {i} of buffer.actions should match insertion-order "
+            f"agent {insertion_order[i]} (value {expected}); got {stored_actions[i]}"
+        )
+        assert np.allclose(stored_rewards[i], expected), (
+            f"row {i} of buffer.rewards should match insertion-order "
+            f"agent {insertion_order[i]} (value {expected}); got {stored_rewards[i]}"
+        )
+        assert np.allclose(stored_log_probs[i], -expected), (
+            f"row {i} of buffer.log_probs should match insertion-order "
+            f"agent {insertion_order[i]} (value {-expected}); got {stored_log_probs[i]}"
+        )

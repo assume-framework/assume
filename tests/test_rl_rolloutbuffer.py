@@ -125,6 +125,13 @@ def test_rollout_buffer_add_stores_correct_values():
 
 @pytest.mark.require_learning
 def test_rollout_buffer_add_beyond_capacity_sets_full():
+    """The buffer becomes ``full`` after the last in-bounds add and refuses
+    to silently drop further transitions.
+
+    Silent drops mask configuration errors (e.g. an over-sized rollout window)
+    and were one of the bugs that hid the MAPPO ordering issue.  The buffer
+    must instead raise ``OverflowError`` so the caller has a chance to react.
+    """
     buf = make_rollout_buffer(buffer_size=3)
     obs = np.zeros((buf.n_rl_units, buf.obs_dim), dtype=np.float32)
     act = np.zeros((buf.n_rl_units, buf.act_dim), dtype=np.float32)
@@ -138,8 +145,10 @@ def test_rollout_buffer_add_beyond_capacity_sets_full():
 
     assert buf.pos == 3
     assert buf.size() == 3
+    assert buf.full is True
 
-    buf.add(obs, act, rew, done, val, lp)
+    with pytest.raises(OverflowError):
+        buf.add(obs, act, rew, done, val, lp)
     assert buf.full is True
     assert buf.size() == 3
 

@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 import warnings
 from collections.abc import Generator
 from typing import NamedTuple
@@ -16,6 +17,9 @@ try:
     import psutil
 except ImportError:
     psutil = None
+
+
+logger = logging.getLogger(__name__)
 
 
 class ReplayBufferSamples(NamedTuple):
@@ -284,10 +288,23 @@ class RolloutBuffer:
             done: Whether the episode ended.
             value: Value estimate from the critic.
             log_prob: Log probability of the action.
+
+        Raises:
+            OverflowError: If the buffer is already full.  The buffer must be either
+                resized or cleared before adding another transition.
         """
         if self.pos >= self.buffer_size:
             self.full = True
-            return
+            logger.error(
+                "RolloutBuffer is full (size=%d). Refusing to silently drop a "
+                "transition. Increase buffer_size or call reset() before adding "
+                "more data.",
+                self.buffer_size,
+            )
+            raise OverflowError(
+                f"RolloutBuffer of size {self.buffer_size} is full; cannot add "
+                "another transition without losing data."
+            )
 
         self.observations[self.pos] = np.array(obs).copy()
         self.actions[self.pos] = np.array(action).copy()
@@ -298,6 +315,8 @@ class RolloutBuffer:
         # flattening the rewards, dones, values, log_probs array to (n_units,) size
 
         self.pos += 1
+        if self.pos >= self.buffer_size:
+            self.full = True
 
     def compute_returns_and_advantages(
         self, last_values: np.ndarray, dones: np.ndarray

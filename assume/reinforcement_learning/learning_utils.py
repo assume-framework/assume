@@ -206,7 +206,7 @@ def copy_layer_data(dst, src):
 
 
 def transform_buffer_data(
-    nested_dict: dict, device: th.device, keys_unit_order: list | None = None
+    nested_dict: dict, device: th.device, keys_unit_order: list
 ) -> np.ndarray:
     """
     Transform nested dict {datetime -> {unit_id -> [values]}} into
@@ -216,22 +216,14 @@ def transform_buffer_data(
     Args:
         nested_dict: Dict with structure {datetime -> {unit_id -> list[tensor]}}.
         device: PyTorch device config.
+        keys_unit_order: Ordered iterable of unit ids defining the agent
+            axis of the returned tensor.
 
     Returns:
-        Shape (n_timesteps, n_powerplants, feature_dim).
+        np.ndarray: Shape (n_timesteps, n_powerplants, feature_dim).
     """
-    if not nested_dict:
-        return np.zeros((0, 0, 1), dtype=np.float32)
-
-    # Get sorted lists of units and timestamps (for consistent ordering)
     all_times = sorted(nested_dict.keys())
-    if keys_unit_order is None:
-        unit_ids = set()
-        for unit_data in nested_dict.values():
-            unit_ids.update(unit_data.keys())
-        keys_unit_order = sorted(unit_ids)
 
-    # Get feature dimension from first non-empty value
     feature_dim = None
     for unit_data in nested_dict.values():
         for values in unit_data.values():
@@ -244,21 +236,22 @@ def transform_buffer_data(
         if feature_dim is not None:
             break
 
-    # Some on-policy fields (e.g. log_probs/values) can be empty for some timesteps.
-    # Keep zeros in that case instead of failing the entire training loop.
     if feature_dim is None:
-        feature_dim = 1
+        raise ValueError(
+            "Error, while transforming RL data for buffer: No data found "
+            "to determine feature dimension. Callers must filter out empty "
+            "timesteps before calling transform_buffer_data (see "
+            "learning_role._store_to_buffer_and_update_sync)."
+        )
 
-    # Pre-allocate tensor (keep on same device as input data)
     result = th.zeros(
         (len(all_times), len(keys_unit_order), feature_dim), device=device
     )
 
-    # Fill tensor with values (stays on same device as input so if on GPU it stays there during filling)
     for t, timestamp in enumerate(all_times):
         for u, unit_id in enumerate(keys_unit_order):
             values = nested_dict[timestamp].get(unit_id, [])
-            if values:  # if we have values for this timestamp
+            if values:
                 result[t, u] = values[0]
 
     return result.cpu().numpy()

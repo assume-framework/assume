@@ -336,11 +336,20 @@ class Learning(Role):
             timestamps_to_process = [
                 ts for ts in all_timestamps if ts not in incomplete_timestamps
             ]
-            # Carry over incomplete timesteps to new cache dicts
+            # Carry over incomplete timesteps to new cache dicts so they are
+            # not lost when the cache is reset below.
+            on_policy_active = is_on_policy(self.learning_config.algorithm)
             for ts in incomplete_timestamps:
                 self.all_obs[ts] = current_obs[ts]
                 self.all_actions[ts] = current_actions[ts]
                 self.all_noises[ts] = current_noises[ts]
+                if on_policy_active:
+                    if ts in current_values:
+                        self.all_values[ts] = current_values[ts]
+                    if ts in current_log_probs:
+                        self.all_log_probs[ts] = current_log_probs[ts]
+                    if ts in current_dones:
+                        self.all_dones[ts] = current_dones[ts]
 
             # Create filtered cache (only complete timesteps)
             cache = {
@@ -388,25 +397,45 @@ class Learning(Role):
         # Add data to buffer - type depends on algorithm category
         if is_on_policy(self.learning_config.algorithm):
             # Using RolloutBuffer for on-policy algorithms (PPO/MAPPO).
+            unit_id_order = list(self.rl_strats.keys())
+            n_rl_agents = len(unit_id_order)
             added_timestamps = 0
+
             for timestamp in sorted(cache["obs"].keys()):
-                sorted_unit_ids = sorted(cache["obs"][timestamp].keys())
-                n_rl_agents = len(sorted_unit_ids)
+                missing_units = [
+                    u
+                    for u in unit_id_order
+                    if u not in cache["obs"][timestamp]
+                    or u not in cache["actions"][timestamp]
+                    or u not in cache["rewards"][timestamp]
+                    or u not in cache["log_probs"][timestamp]
+                    or u not in cache["dones"][timestamp]
+                ]
+                if missing_units:
+                    logger.warning(
+                        "Skipping on-policy rollout step at %s: missing data for units %s. "
+                        "This usually means a learning unit failed to report an "
+                        "observation/action/reward/log_prob/done for this timestep, "
+                        "and we refuse to fill the buffer with zeros.",
+                        timestamp,
+                        missing_units,
+                    )
+                    continue
 
                 obs_data = transform_buffer_data(
                     {timestamp: cache["obs"][timestamp]},
                     device,
-                    sorted_unit_ids,
+                    unit_id_order,
                 )
                 actions_data = transform_buffer_data(
                     {timestamp: cache["actions"][timestamp]},
                     device,
-                    sorted_unit_ids,
+                    unit_id_order,
                 )
                 rewards_data = transform_buffer_data(
                     {timestamp: cache["rewards"][timestamp]},
                     device,
-                    sorted_unit_ids,
+                    unit_id_order,
                 )
 
                 # Computing MAPPO value targets with the centralized critic
@@ -420,7 +449,7 @@ class Learning(Role):
                     ]
 
                     with th.no_grad():
-                        for i, unit_id in enumerate(sorted_unit_ids):
+                        for i, unit_id in enumerate(unit_id_order):
                             strategy = self.rl_strats[unit_id]
                             obs_i = obs_step[i : i + 1]
                             other_unique = np.concatenate(
@@ -446,19 +475,19 @@ class Learning(Role):
                     values_data = transform_buffer_data(
                         {timestamp: cache["values"][timestamp]},
                         device,
-                        sorted_unit_ids,
+                        unit_id_order,
                     )
 
                 log_probs_data = transform_buffer_data(
                     {timestamp: cache["log_probs"][timestamp]},
                     device,
-                    sorted_unit_ids,
+                    unit_id_order,
                 )
 
                 dones_data = transform_buffer_data(
                     {timestamp: cache["dones"][timestamp]},
                     device,
-                    sorted_unit_ids,
+                    unit_id_order,
                 )
 
                 # Adding data to the rollout buffer.
@@ -475,13 +504,14 @@ class Learning(Role):
         else:
             # Using ReplayBuffer for off-policy algorithms (TD3/DDPG).
             # Rewriting the dict so obs.shape == (n_rl_units, obs_dim), used by keys in learning role.
+            unit_id_order = list(self.rl_strats.keys())
             self.buffer.add(
-                obs=transform_buffer_data(cache["obs"], device, self.rl_strats.keys()),
+                obs=transform_buffer_data(cache["obs"], device, unit_id_order),
                 actions=transform_buffer_data(
-                    cache["actions"], device, self.rl_strats.keys()
+                    cache["actions"], device, unit_id_order
                 ),
                 reward=transform_buffer_data(
-                    cache["rewards"], device, self.rl_strats.keys()
+                    cache["rewards"], device, unit_id_order
                 ),
             )
 

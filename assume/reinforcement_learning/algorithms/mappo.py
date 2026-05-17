@@ -282,11 +282,15 @@ class PPO(A2CAlgorithm):
         if buffer_size > 0:
             # Use the LAST observation as the bootstrap for the REST of the buffer.
             # We sacrifice the last step (pos-1) to serve as s_{t+1} for the step before it.
-            # This ensures V(s_{t+1}) is calculating using the REAL next state, not self-referential.
-
+            # This ensures V(s_{t+1}) is calculated using the REAL next state, not a self-
+            # referential V(s_{t}).
             last_idx = buffer_size - 1
             last_obs = rollout_buffer.observations[last_idx]
-            last_dones = rollout_buffer.dones[last_idx]
+
+            if last_idx > 0:
+                last_dones = rollout_buffer.dones[last_idx - 1]
+            else:
+                last_dones = rollout_buffer.dones[last_idx]
 
             # Reduce buffer size by 1 so as to not train on the bootstrap step
             rollout_buffer.pos -= 1
