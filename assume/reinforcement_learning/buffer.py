@@ -2,11 +2,15 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 import warnings
+from collections.abc import Generator
 from typing import NamedTuple
 
 import numpy as np
 import torch as th
+
+from assume.common.utils import convert_to_tensors
 
 try:
     # Check memory used by replay buffer when possible
@@ -15,7 +19,20 @@ except ImportError:
     psutil = None
 
 
+logger = logging.getLogger(__name__)
+
+
 class ReplayBufferSamples(NamedTuple):
+    """Container for replay buffer samples.
+
+
+    Attributes:
+        observations: States/observations the agent saw.
+        actions: Actions the agent took.
+        next_observations: States/observations the agent saw after taking the action.
+        rewards: Rewards the agent received for taking the action.
+    """
+
     observations: th.Tensor
     actions: th.Tensor
     next_observations: th.Tensor
@@ -32,7 +49,8 @@ class ReplayBuffer:
         device: str,
         float_type,
     ):
-        """
+        """Initialize the replay buffer.
+
         A class that represents a replay buffer for storing observations, actions, and rewards.
         The replay buffer is implemented as a circular buffer, where the oldest experiences are discarded when the buffer is full.
 
@@ -91,10 +109,7 @@ class ReplayBuffer:
                 )
 
     def size(self):
-        # write docstring for this function
-        """
-        Return the current size of the buffer (i.e. number of transitions
-        stored in the buffer).
+        """Return the current size of the buffer.
 
         Returns:
             buffer_size(int): The current size of the buffer
@@ -102,32 +117,13 @@ class ReplayBuffer:
         """
         return self.buffer_size if self.full else self.pos
 
-    def to_torch(self, array: np.array, copy=True):
-        """
-        Converts a numpy array to a PyTorch tensor. Note: It copies the data by default.
-
-        Args:
-            array (numpy.ndarray): The numpy array to convert.
-            copy (bool, optional): Whether to copy the data or not
-                (may be useful to avoid changing things by reference). Defaults to True.
-
-        Returns:
-            torch.Tensor: The converted PyTorch tensor.
-        """
-
-        if copy:
-            return th.tensor(array, dtype=self.th_float_type, device=self.device)
-
-        return th.as_tensor(array, dtype=self.th_float_type, device=self.device)
-
     def add(
         self,
         obs: np.ndarray,
         actions: np.ndarray,
         reward: np.ndarray,
     ):
-        """
-        Adds an observation, action, and reward of all agents to the replay buffer.
+        """Add an observation, action, and reward of all agents to the replay buffer.
 
         Args:
             obs (numpy.ndarray): The observation to add.
@@ -148,8 +144,7 @@ class ReplayBuffer:
             self.pos = 0
 
     def sample(self, batch_size: int) -> ReplayBufferSamples:
-        """
-        Samples a random batch of experiences from the replay buffer.
+        """Sample a random batch of experiences from the replay buffer.
 
         Args:
             batch_size (int): The number of experiences to sample.
@@ -173,4 +168,261 @@ class ReplayBuffer:
             self.rewards[batch_inds],
         )
 
-        return ReplayBufferSamples(*tuple(map(self.to_torch, data)))
+        return ReplayBufferSamples(
+            *tuple(convert_to_tensors(array=x, dtype=self.th_float_type, device=self.device) for x in data)
+        )
+
+
+class RolloutBufferSamples(NamedTuple):
+    """Container for rollout buffer samples.
+
+    It holds one batch of training samples from PPO's rollout buffer.
+
+    Attributes:
+        observations: States/observations the agent saw.
+        actions: Actions the agent took.
+        old_values: Critic's value estimates.
+        old_log_probs: Log_probability of taking each action.
+        advantages: Generalized advantage estimates.
+        returns: Expected returns.
+    """
+
+    observations: th.Tensor  # states/observations the agent saw
+    actions: th.Tensor  # actions the agent took
+    old_values: th.Tensor  # critic's value estimates
+    old_log_probs: th.Tensor  # log_probability of taking each action
+    advantages: th.Tensor  # generalized advantage estimates
+    returns: th.Tensor  # expected returns
+
+
+class RolloutBuffer:
+    """Rollout buffer used in on-policy algorithms like PPO.
+
+    It corresponds to the transitions collected using the current policy.
+    This experience is discarded after the policy is updated.
+    In order to use PPO, the current observations are needed to be stored.
+    The observations include actions, rewards, values, log probabilities and done for each action.
+    """
+
+    def __init__(
+        self,
+        buffer_size: int,
+        obs_dim: int,
+        act_dim: int,
+        n_rl_units: int,
+        device: str | th.device,
+        float_type: th.dtype,
+        gamma: float = 0.99,
+        gae_lambda: float = 0.98,
+    ):
+        """Initialize the rollout buffer.
+
+        Args:
+            buffer_size: Max number of elements allowed in the buffer.
+            obs_dim: Dimension of the observation space.
+            act_dim: Dimension of the action space.
+            n_rl_units: Number of RL agents.
+            device: PyTorch device config.
+            float_type: Data type for floating point numbers.
+            gamma: Discount factor.
+            gae_lambda: bias-variance trade-off factor for Generalized Advantage Estimator.
+        """
+        self.buffer_size = buffer_size
+        self.obs_dim = obs_dim
+        self.act_dim = act_dim
+        self.n_rl_units = n_rl_units
+        self.device = device
+        self.float_type = float_type
+        self.gamma = gamma
+        self.gae_lambda = gae_lambda
+
+        # Current position and full flag
+        self.pos = 0
+        self.full = False
+        self.generator_ready = False
+
+        # Allocate buffers
+        self.reset()
+
+    def reset(self) -> None:
+        """Reset the rollout buffer.
+
+        Clearing the buffer and allocating new storage.
+        """
+        self.observations = np.zeros(
+            (self.buffer_size, self.n_rl_units, self.obs_dim), dtype=np.float32
+        )
+        self.actions = np.zeros(
+            (self.buffer_size, self.n_rl_units, self.act_dim), dtype=np.float32
+        )
+        self.rewards = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+        self.values = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+        self.log_probs = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+        self.dones = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+
+        # Computed after rollout
+        self.advantages = np.zeros(
+            (self.buffer_size, self.n_rl_units), dtype=np.float32
+        )
+        self.returns = np.zeros((self.buffer_size, self.n_rl_units), dtype=np.float32)
+
+        self.pos = 0
+        self.full = False
+        self.generator_ready = False
+
+    def add(
+        self,
+        obs: np.ndarray,
+        action: np.ndarray,
+        reward: np.ndarray,
+        done: np.ndarray,
+        value: np.ndarray,
+        log_prob: np.ndarray,
+    ) -> None:
+        """Add a transition to the buffer.
+
+        Args:
+            obs: Observation of the agents.
+            action: Action taken by the agents.
+            reward: Reward obtained.
+            done: Whether the episode ended.
+            value: Value estimate from the critic.
+            log_prob: Log probability of the action.
+
+        Raises:
+            OverflowError: If the buffer is already full.  The buffer must be either
+                resized or cleared before adding another transition.
+        """
+        if self.pos >= self.buffer_size:
+            self.full = True
+            logger.error(
+                "RolloutBuffer is full (size=%d). Refusing to silently drop a "
+                "transition. Increase buffer_size or call reset() before adding "
+                "more data.",
+                self.buffer_size,
+            )
+            raise OverflowError(
+                f"RolloutBuffer of size {self.buffer_size} is full; cannot add "
+                "another transition without losing data."
+            )
+
+        self.observations[self.pos] = np.array(obs).copy()
+        self.actions[self.pos] = np.array(action).copy()
+        self.rewards[self.pos] = np.array(reward).flatten().copy()
+        self.dones[self.pos] = np.array(done).flatten().copy()
+        self.values[self.pos] = np.array(value).flatten().copy()
+        self.log_probs[self.pos] = np.array(log_prob).flatten().copy()
+        # flattening the rewards, dones, values, log_probs array to (n_units,) size
+
+        self.pos += 1
+        if self.pos >= self.buffer_size:
+            self.full = True
+
+    def compute_returns_and_advantages(
+        self, last_values: np.ndarray, dones: np.ndarray
+    ) -> None:
+        """Use Generalized Advantage Estimation to compute the advantage.
+
+        To obtain the lambda-return, the advantage is added to the value estimate.
+
+        Args:
+            last_values: Value estimation for the last step.
+            dones: Whether the last step was terminal.
+        """
+        # taking the final value estimates and episode-end flags,
+        # and making them flat arrays providing one number per agent.
+        last_values = np.array(last_values).flatten()
+        dones = np.array(dones).flatten()
+
+        # GAE computation
+        # starting with running total of zero for each agent.
+        last_gae_lam = np.zeros(self.n_rl_units, dtype=np.float32)
+        buffer_size = self.pos if not self.full else self.buffer_size
+
+        # backward loop
+        for step in reversed(range(buffer_size)):
+            if step == buffer_size - 1:
+                # if at the last step, use the last_vlaues given as input
+                next_non_terminal = 1.0 - dones
+                next_values = last_values
+            else:
+                # for all the other steps, get the next value and next episode flag.
+                next_non_terminal = 1.0 - self.dones[step + 1]
+                next_values = self.values[step + 1]
+
+            # TD error
+            delta = (
+                self.rewards[step]
+                + self.gamma * next_values * next_non_terminal
+                - self.values[step]
+            )
+
+            # GAE advantage
+            last_gae_lam = (
+                delta + self.gamma * self.gae_lambda * next_non_terminal * last_gae_lam
+            )
+            self.advantages[step] = last_gae_lam
+
+        # Returns = advantages + values
+        self.returns = self.advantages + self.values
+        self.generator_ready = True
+
+    def get(
+        self, batch_size: int | None = None
+    ) -> Generator[RolloutBufferSamples, None, None]:
+        """Generate batches of transition samples for training.
+
+        Args:
+            batch_size: Number of samples to be accessed per batch.
+
+        Yields:
+            A generator yielding RolloutBufferSamples.
+        """
+        if not self.generator_ready:
+            raise ValueError(
+                "Must call compute_returns_and_advantages before sampling."
+            )
+
+        buffer_size = self.pos if not self.full else self.buffer_size
+        indices = np.random.permutation(buffer_size)
+
+        if batch_size is None:
+            batch_size = buffer_size
+
+        start_idx = 0
+        while start_idx < buffer_size:
+            batch_indices = indices[start_idx : start_idx + batch_size]
+            yield self.sample(batch_indices)
+            start_idx += batch_size
+
+    def sample(self, indices: np.ndarray) -> RolloutBufferSamples:
+        """Sample data from the buffer for given indices.
+
+        Converts numpy arrays to torch tensors for given indices.
+
+        Args:
+            indices: Indices of the samples to retrieve.
+
+        Returns:
+            The batch of samples converted to PyTorch tensors.
+        """
+        data = (
+            self.observations[indices],
+            self.actions[indices],
+            self.values[indices],
+            self.log_probs[indices],
+            self.advantages[indices],
+            self.returns[indices],
+        )
+
+        return RolloutBufferSamples(
+            *(convert_to_tensors(array=x, dtype=self.float_type, device=self.device) for x in data)
+        )
+
+    def size(self) -> int:
+        """Return the current number of stored transitions.
+
+        Returns:
+            The size of the buffer.
+        """
+        return self.buffer_size if self.full else self.pos
