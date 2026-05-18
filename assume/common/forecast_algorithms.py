@@ -661,8 +661,130 @@ def set_preloaded_forecast_by_name(
     return preprocess_information[new_forecast_name]
 
 
+def calculate_price_from_cleared_history(
+    current_forecast, preprocess_information, *args, **kwargs
+):
+    """Learn electricity price from actual market clearing history.
+
+    Extracts last 24 hours of cleared prices from unit outputs, calculates average,
+    trend, and hourly seasonality factors, then forecasts next 48 hours.
+
+    Args:
+        current_forecast (dict): Map of market_id to forecasted price series.
+        preprocess_information (dict): Contains 'unit' and timing information.
+        *args, **kwargs: Additional arguments (unit, current_time, etc.).
+
+    Returns:
+        dict: Updated forecast with adaptive prices learned from clearing history.
+    """
+    unit = kwargs.get("unit")
+
+    if unit is None or not hasattr(unit.outputs, "get"):
+        # Fallback: return current forecast if unit data not available
+        return current_forecast
+
+    try:
+        # Extract cleared prices from last 24 hours
+        cleared_prices = unit.outputs.get("energy_accepted_price", {})
+        if isinstance(cleared_prices, dict):
+            cleared_prices = pd.Series(cleared_prices)
+        elif not isinstance(cleared_prices, pd.Series):
+            cleared_prices = pd.Series(cleared_prices)
+
+        # Filter non-zero prices (actual cleared prices)
+        actual_cleared_prices = cleared_prices[cleared_prices > 0.0]
+
+        if len(actual_cleared_prices) < 2:
+            # Not enough data yet, return current forecast
+            return current_forecast
+
+        # Calculate statistics from recent prices
+        recent_prices = actual_cleared_prices.tail(24)  # Last 24 hours
+        avg_price = recent_prices.mean()
+
+        # Calculate trend: compare recent half vs older half
+        mid_point = len(recent_prices) // 2
+        if mid_point > 0:
+            recent_half = recent_prices.iloc[mid_point:].mean()
+            older_half = recent_prices.iloc[:mid_point].mean()
+            trend = (recent_half - older_half) / max(
+                older_half, 1.0
+            )  # Avoid division by zero
+        else:
+            trend = 0.0
+
+        # Hourly seasonality factors (typical EOM market pattern)
+        hourly_factors = {
+            0: 0.70,  # Night: low price
+            1: 0.70,
+            2: 0.70,
+            3: 0.70,
+            4: 0.70,
+            5: 0.75,
+            6: 0.90,
+            7: 0.95,
+            8: 1.10,  # Morning ramp
+            9: 1.20,  # Peak demand starts
+            10: 1.25,  # Peak
+            11: 1.25,
+            12: 1.20,
+            13: 1.15,
+            14: 1.10,
+            15: 1.15,
+            16: 1.25,  # Afternoon peak
+            17: 1.30,
+            18: 1.25,
+            19: 1.15,
+            20: 1.05,
+            21: 0.95,
+            22: 0.80,
+            23: 0.70,
+        }
+
+        # Generate 48-hour forecast
+        forecast_hours = 48
+        forecasted_prices = []
+        current_hour_index = 0
+
+        for i in range(forecast_hours):
+            hour_of_day = (current_hour_index + i) % 24
+
+            # Decay trend over forecast horizon (gradual convergence to average)
+            decay_factor = 1.0 - (i / forecast_hours) * 0.5
+            hourly_component = avg_price * hourly_factors[hour_of_day]
+            trend_component = trend * avg_price * decay_factor
+
+            forecasted_price = hourly_component + trend_component
+            forecasted_price = max(5.0, forecasted_price)  # Floor at €5/MWh
+
+            forecasted_prices.append(forecasted_price)
+
+        # Update forecast for EOM market (main electricity market)
+        if "EOM" in current_forecast:
+            if isinstance(current_forecast["EOM"], FastSeries):
+                # Update values in the FastSeries
+                updated_forecast = current_forecast["EOM"].copy()
+                updated_forecast[:forecast_hours] = forecasted_prices
+                current_forecast["EOM"] = updated_forecast
+            else:
+                # Handle regular pandas Series
+                updated_forecast = current_forecast["EOM"].copy()
+                updated_forecast.iloc[:forecast_hours] = forecasted_prices
+                current_forecast["EOM"] = updated_forecast
+
+        return current_forecast
+
+    except Exception as e:
+        # If anything goes wrong, return current forecast
+        logging.getLogger(__name__).warning(
+            f"Error in calculate_price_from_cleared_history: {e}. Using fallback."
+        )
+        return current_forecast
+
+
 forecast_update_algorithms = {
     "price_default": default_update,
+    "price_from_cleared_history": calculate_price_from_cleared_history,
     "residual_load_default": default_update,
     "residual_load_set_preloaded": set_preloaded_forecast_by_name,
     "congestion_signal_default": default_update,

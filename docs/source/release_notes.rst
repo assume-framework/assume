@@ -50,6 +50,17 @@ Upcoming Release
     - If charging stations are included, charging stations connect to the building/grid and EVs connect to the charging stations through assignment variables.
   - **Building-specific flexible electricity-price support**: Added support for ``electricity_price_flex`` in ``BuildingForecaster`` for use with the ``electricity_price_signal`` flexibility measure.
 
+0.6.1 - (30th April 2026)
+=========================
+
+**New Features:**
+
+- **Rolling-Horizon Optimisation for DSM Units**: DSM units now support rolling-horizon optimization, allowing re-optimization of shorter look-ahead windows after each market round while carrying component states (e.g., storage SoC) between windows. This enables more reactive bidding strategies while maintaining inter-temporal feasibility. Configure via ``dsm_optimisation_config`` with keys ``horizon_mode`` (``"rolling_horizon"`` or ``"full_horizon"``), ``look_ahead_horizon``, ``commit_horizon``, and ``rolling_step`` (all as duration strings, e.g., ``"24h"``). Steel plants offer three operational strategies: cost-optimized (default), profile-guided (with soft constraints to track a normalized load profile), and min-demand (enforces hourly minimum production). The rolling-horizon implementation is extensible—new DSM unit types can enable it by setting class attributes ``_demand_attr_suffix``, ``_component_schema``, and ``_extra_price_attrs``, and optionally overriding ``_primary_output_expr()`` for domain-specific outputs.
+
+**Improvements:**
+
+- **Generalized rolling-horizon optimization in DSMFlex**: Refactored rolling-horizon logic to remove hardcoded technology-specific constraints (previously coupled to steel plants). Extracted eight helper methods, replaced 15 technology guards with generic extension points, and reduced code by approximately 60%. The optimization engine now works for all DSM unit types via reusable class-level hooks, improving maintainability and extensibility.
+
 0.6.0 - (18th March 2026)
 =========================
 

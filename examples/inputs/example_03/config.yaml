@@ -122,9 +122,14 @@ eom_crm_case_2019:
 
 base_case_2019_with_DSM:
   start_date: 2019-01-01 00:00
-  end_date: 2019-02-01 00:00
+  end_date: 2019-01-03 00:00
   time_step: 1h
   industrial_dsm_units: industrial_dsm_units.csv
+  industrial_dsm_optimisation:
+    horizon_mode: rolling_horizon
+    look_ahead_horizon: 72h
+    commit_horizon: 24h
+    rolling_step: 24h
   save_frequency_hours: 720
 
   markets_config:
