@@ -845,13 +845,10 @@ class DSMFlex:
             else:
                 window_comps[tech_name] = comp_data
 
-        # Patch remaining_demand for units that track cumulative production
+        # Store remaining_demand as an instance attribute (not in components dict)
+        # so rolling-horizon constraints can access it without polluting the components
         if remaining_demand is not None and self._has_demand_tracking:
-            # Find the first dict-type component block to carry the value in
-            for _blk, _blk_data in window_comps.items():
-                if isinstance(_blk_data, dict):
-                    window_comps["_remaining_demand"] = remaining_demand
-                    break
+            self._rh_window_remaining_demand = remaining_demand
 
         return window_comps
 
