@@ -230,7 +230,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
 
         # Use remaining_demand if available (rolling-horizon mode), otherwise use global steel_demand
         demand_value = self.steel_demand
-        if hasattr(self, "_rh_window_remaining_demand"):
+        if self._rh_window_remaining_demand is not None:
             demand_value = self._rh_window_remaining_demand
             logger.info(f"Using rolling-horizon remaining_demand: {demand_value}")
 

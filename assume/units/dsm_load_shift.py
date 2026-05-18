@@ -79,6 +79,9 @@ class DSMFlex:
         self._rh_optimized_until_step = (
             0  # How far we've optimized (in full horizon steps)
         )
+        self._rh_window_remaining_demand = (
+            None  # Remaining demand in current rolling-horizon window
+        )
 
         if self.horizon_mode == "rolling_horizon":
             if not all([self._rh_look_ahead, self._rh_commit, self._rh_step]):
