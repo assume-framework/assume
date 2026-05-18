@@ -642,8 +642,23 @@ def prepare_unit_specific_residual_load_forecasts(
     return preprocess_information
 
 
+def prepare_full_system_info(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    market_configs: list[MarketConfig],
+    forecast_df: ForecastSeries = None,
+    initializing_unit: BaseUnit = None,
+):
+    """
+    Saves information about all units and markets in the simulation for later use in forecast update functions.
+    Further, information about the initializing unit is saved.
+    """
+    return units, market_configs, initializing_unit
+
+
 forecast_preprocess_algorithms = {
     "price_default": default_preprocess,
+    "price_full_system_info": prepare_full_system_info,
     "residual_load_default": default_preprocess,
     "residual_load_prepare_multiple": prepare_unit_specific_residual_load_forecasts,
     "congestion_signal_default": default_preprocess,
