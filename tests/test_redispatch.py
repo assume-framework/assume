@@ -83,7 +83,7 @@ demand = pd.DataFrame({
 
 # add this as a fixture and use in test_grid_utils as well
 @pytest.fixture
-def grid_data_dict():
+def grid_data_dict_2_nodes():
     return {
         "buses": nodes,
         "lines": lines,
@@ -91,13 +91,13 @@ def grid_data_dict():
         "loads": demand,
 }
 
-def test_initialization(simple_redispatch_market_config, grid_data_dict):
+def test_initialization(simple_redispatch_market_config, grid_data_dict_2_nodes):
     """
     Test the successful initialization of RedispatchMarketRole.
     It should correctly set up a PyPSA network when given valid grid data.
     """
     mc = simple_redispatch_market_config
-    mc.param_dict["grid_data"] = grid_data_dict
+    mc.param_dict["grid_data"] = grid_data_dict_2_nodes
     rmr = RedispatchMarketRole(mc)
     
     assert rmr.network is not None
@@ -120,12 +120,12 @@ def test_initialization_missing_grid_data(simple_redispatch_market_config):
     with pytest.raises(ValueError, match="grid_data is missing"):
         RedispatchMarketRole(mc)
 
-def test_initialization_invalid_payment_mechanism(simple_redispatch_market_config, grid_data_dict):
+def test_initialization_invalid_payment_mechanism(simple_redispatch_market_config, grid_data_dict_2_nodes):
     """
     Test that ValueError is raised when an invalid payment mechanism is configured.
     """
     mc = simple_redispatch_market_config
-    mc.param_dict["grid_data"] = grid_data_dict
+    mc.param_dict["grid_data"] = grid_data_dict_2_nodes
     mc.param_dict["payment_mechanism"] = "invalid_mechanism"
     
     with pytest.raises(ValueError, match="Invalid payment mechanism."):
@@ -221,27 +221,33 @@ def test_redispatch_with_min_max_power_and_availability_and_max_ramp():
     pass
 
 @pytest.mark.require_network
-def test_line_loading_after_redispatch():
-    pass
-
-@pytest.mark.require_network
 def test_redispatch_with_storage():
     pass
 
 # generators index: ["coal_N", "coal_S", "gas_S"]
 # demand index: ["dem_S"]
 units_index = ["coal_N", "coal_S", "gas_S", "dem_S"]
-@pytest.mark.parametrize("dummy_generation, dummy_demand, expected_supply_volume, expected_demand_volume, expected_accepted_orders_volume, expected_accepted_orders_price, expected_flow",
+@pytest.mark.parametrize("dummy_generation, dummy_demand, expected_up_volume, expected_down_volume, expected_accepted_orders_volume, expected_accepted_orders_price, expected_volume_change, expected_flows",
                          [
-                             (pd.Series([0, 1000, 0], index=generators.index), -1000, [0, 0], [0, 0], [], [], []), # all demand covered by coal_S
-                            (pd.Series([1000, 0, 0], index=generators.index), -1000, [500, 0], [0, 500], [-500, 500, 0, 0], [10, 50, 0, 0], [500]), # downwards redispatch of wind_N, upward redispatch of coal_S
-                            #(pd.Series([0, 0, 0], index=generators.index), -1000, [?, ?], [?, ?], [500, 500, 0, 0], [10, 50, 0, 0], 500), # zonal market does not cover demand -> find cheapest solution
+                             (pd.Series([0, 1000, 0], index=generators.index), -1000, [0, 0], [0, 0], [], [], 0, []), # all demand covered by coal_S
+                            (pd.Series([1000, 0, 0], index=generators.index), -1000, [0, 500], [500, 0], [-500, 500], [10, 50], 0, [500]), # downwards redispatch of wind_N, upward redispatch of coal_S
+                            (pd.Series([0, 0, 0], index=generators.index), -1000, [500, 500], [0, 0], [500, 500], [10, 50], 1000, [500]), # bids do not cover demand -> find cheapest solution
                          ])
 
 @pytest.mark.require_network
-def test_two_nodes_redispatch(simple_redispatch_market_config, grid_data_dict, dummy_generation, dummy_demand, expected_supply_volume, expected_demand_volume,expected_accepted_orders_volume, expected_accepted_orders_price, expected_flow):
+def test_two_nodes_redispatch(simple_redispatch_market_config,
+                              grid_data_dict_2_nodes,
+                              dummy_generation,
+                              dummy_demand,
+                              expected_up_volume,
+                              expected_down_volume,
+                              expected_accepted_orders_volume,
+                              expected_accepted_orders_price,
+                              expected_volume_change,
+                              expected_flows,
+                              ):
     market_config = simple_redispatch_market_config
-    market_config.param_dict["grid_data"] = grid_data_dict
+    market_config.param_dict["grid_data"] = grid_data_dict_2_nodes
     market_config.param_dict["log_flows"] = True
     
     next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
@@ -294,10 +300,173 @@ def test_two_nodes_redispatch(simple_redispatch_market_config, grid_data_dict, d
     assert "supply_volume" in meta[1]
     assert "demand_volume" in meta[0]
     assert "demand_volume" in meta[1]
-    assert [meta[i]["supply_volume"] for i in range(len(nodes))] == pytest.approx(expected_supply_volume)
-    assert [meta[i]["demand_volume"] for i in range(len(nodes))] == pytest.approx(expected_demand_volume)
-    assert [o["volume"] for o in accepted_orders] == pytest.approx(expected_accepted_orders_volume)
-    assert [o["price"] for o in accepted_orders] == pytest.approx(expected_accepted_orders_price)
-    #assert flows["line_N_S"].iloc[0] == pytest.approx(expected_flow)
+    print('Meta: ' + str(meta))
+    assert [meta[i]["supply_volume"] for i in range(len(nodes))] == pytest.approx(expected_up_volume)
+    assert [meta[i]["demand_volume"] for i in range(len(nodes))] == pytest.approx(expected_down_volume)
+    print('Accepted: ' + str(accepted_orders))
+    assert [o["accepted_volume"] for o in accepted_orders] == pytest.approx(expected_accepted_orders_volume)
+    assert [o["accepted_price"] for o in accepted_orders] == pytest.approx(expected_accepted_orders_price)
+    assert sum([o["accepted_volume"] for o in accepted_orders]) == pytest.approx(expected_volume_change)
+    # todo: check flows
 
-    # test up == -1 * down
+nodes_3 = pd.DataFrame({
+        "name": ["node1", "node2", "node3"],
+        "v_nom": [380.0, 380.0, 380.0],
+    }).set_index("name")
+lines_3 = pd.DataFrame({
+        "name": ["line_1_2", "line_1_3", "line_2_3"],
+        "bus0": ["node1", "node1", "node2"],
+        "bus1": ["node2", "node3", "node3"],
+        "s_nom": [5000.0, 5000.0, 5000.0],
+        "x": [0.01, 0.01, 0.01],
+        "r": [0.001, 0.001, 0.001],
+    }).set_index("name")
+generators_3 = pd.DataFrame({
+        "name": [f"gen{p}" for p in range(5, 35)],
+        "node": ["node1"] * 10 + ["node2"] * 10 + ["node3"] * 10,
+        "marginal_cost": list(range(5, 15)) + list(range(15, 25)) + list(range(25, 35)),
+        "max_power": [1000.0] * 30,
+    }).set_index("name")
+    
+demand_3 = pd.DataFrame({
+    "name": ["dem1", "dem2", "dem3"],
+        "node": ["node1", "node2", "node3"],
+        "marginal_cost": [3000.0, 3000.0, 3000.0],
+        "max_power": [4400.0, 4400.0, 17400.0],
+}).set_index("name")
+
+@pytest.fixture
+def grid_data_dict_3_nodes():
+    return {
+        "buses": nodes_3,
+        "lines": lines_3,
+        "generators": generators_3,
+        "loads": demand_3,
+}
+
+# node1: marginal cost from 5 to 14
+# node2: marginal cost from 15 to 24
+# node3: marginal cost from 25 to 34
+@pytest.mark.parametrize("dummy_generation_3, dummy_demand_3, expected_up_volume_3, expected_down_volume_3, expected_accepted_orders_volume_3, expected_accepted_nodal_price_3, expected_volume_change_3, expected_flows_3",
+    [
+    (
+        # nodal clearing market outcome hour 0, no redispatch needed
+        pd.Series([1000]*7 + [600] + [0]*2 + [1000]*7 + [0]*3 + [1000]*7 + [600] + [0]*2, index=generators_3.index),
+        pd.Series([-2400, -2400, -17400], index=demand_3.index),
+        [0, 0, 0], # no up volume
+        [0, 0, 0], # no down volume
+        [], # no accepted orders
+        [0, 0, 0], # no prices
+        0, # no volume change
+        [200, 5000, 4800] # flows on lines
+    ),
+    (
+        # copper plate market outcome hour 1
+        pd.Series([1000]*10 + [1000]*10 + [1000]*2 + [200] + [0]*7, index=generators_3.index),
+        pd.Series([-2400, -2400, -17400], index=demand_3.index),
+        [0, 0, 5200], # up at node 3
+        [2600, 2600, 0], # down at nodes 1 and 2
+        [-600, -1000, -1000, -600, -1000, -1000, 800, 1000, 1000, 1000, 1000, 400],
+        [12, 22, 32], # nodal prices emerge similar to nodal clearing solution
+        0, # no volume change
+        [200, 5000, 4800]), # flows
+    (
+        # copper plate market outcome hour 2
+        pd.Series([1000]*23 + [200] + [0]*6, index=generators_3.index),
+        pd.Series([-4400, -4400, -14400], index=demand_3.index),
+        [0, 0, 1800], # up at node 3
+        [0, 1800, 0], # down at node 2
+        [-800, -1000, 800, 1000],
+        [17, 23, 29], # nodal prices similar to nodal clearing solution
+        0, # no volume change
+        [600, 5000, 5000]), # flows
+     (
+        # EOM did not provide enough energy to cover demand, redispatch to find cheapest solution (equal to nodal clearing)
+        pd.Series([1000] + [0]*9 + [200] + [0]*9 + [0]*10, index=generators_3.index), # generation of 1200 MW
+        pd.Series([-4400, -4400, -14400], index=demand_3.index), # demand of 23200 MW
+        [9000, 8000, 5000], # up at node 3
+        [0, 0, 0], # down at node 2
+        #[1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 800, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 200, 1000, 1000, 1000, 1000, 1000],
+        [1000]*9 + [800] + [1000]*7 + [200] + [1000]*5,
+        [17, 23, 29], # nodal prices similar to nodal clearing solution
+        22000, # + 22000 MW to match demand of 23200 MW
+        [600, 5000, 5000]), # flows
+    ])
+
+def test_three_nodes_redispatch(grid_data_dict_3_nodes,
+                                simple_redispatch_market_config,
+                                dummy_generation_3,
+                                dummy_demand_3,
+                                expected_up_volume_3,
+                                expected_down_volume_3,
+                                expected_accepted_orders_volume_3,
+                                expected_accepted_nodal_price_3,
+                                expected_volume_change_3,
+                                expected_flows_3,
+                                ):
+    market_config = simple_redispatch_market_config
+    market_config.param_dict["grid_data"] = grid_data_dict_3_nodes
+    market_config.param_dict["log_flows"] = True
+    h = 1
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), h, timedelta(hours=1))
+    ]
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+    order: Order = {
+        "start_time": products[0][0],
+        "end_time": products[0][1],
+        "unit_id": "x",
+        "bid_id": "y",
+        "volume": 0,
+        "min_power": 0,
+        "max_power": 0,
+        "price": 0,
+        "only_hours": None,
+        "node": 0,
+    }
+
+    assert len(products) == h
+    orderbook = []
+
+    for _ in generators_3.index:
+        supply_bid = order.copy()
+        supply_bid["unit_id"] = _
+        supply_bid["volume"] = dummy_generation_3[_]
+        supply_bid["min_power"] = 0
+        supply_bid["max_power"] = generators_3.max_power[_]
+        supply_bid["p_nom"] = generators_3.max_power[_]
+        supply_bid["price"] = generators_3.marginal_cost[_]
+        supply_bid["node"] = generators_3.node[_]
+        supply_bid["bid_id"] = _ + "_bid"
+        orderbook.append(supply_bid)
+    
+    for _ in demand_3.index:
+        demand_bid = order.copy()
+        demand_bid["unit_id"] = _
+        demand_bid["volume"] = dummy_demand_3[_]
+        demand_bid["min_power"] = 0
+        demand_bid["max_power"] = demand_3.max_power[_]
+        demand_bid["price"] = 1000.0
+        demand_bid["p_nom"] = demand_3.max_power[_]
+        demand_bid["node"] = demand_3.node[_]
+        demand_bid["bid_id"] = _ + "_bid"
+        orderbook.append(demand_bid)
+    
+    assert len(orderbook) == (len(generators_3) + len(demand_3)) * h
+
+    rmr = RedispatchMarketRole(market_config)
+    accepted_orders, rejected_orders, meta, flows = rmr.clear(orderbook, products)
+
+    assert meta[0]["node"] == "node1"
+    assert meta[1]["node"] == "node2"
+    assert meta[2]["node"] == "node3"
+    print('Meta: ' + str(meta))
+    assert [meta[i]["supply_volume"] for i in range(len(nodes_3))] == pytest.approx(expected_up_volume_3)
+    assert [meta[i]["demand_volume"] for i in range(len(nodes_3))] == pytest.approx(expected_down_volume_3)
+    assert [meta[i]["price"] for i in range(len(nodes_3))] == pytest.approx(expected_accepted_nodal_price_3)
+    print('Accepted: ' + str(accepted_orders))
+    assert [o["accepted_volume"] for o in accepted_orders] == pytest.approx(expected_accepted_orders_volume_3)
+    #assert [o["accepted_price"] for o in accepted_orders] == pytest.approx(expected_accepted_orders_price_3)
+    assert sum([o["accepted_volume"] for o in accepted_orders]) == pytest.approx(expected_volume_change_3)
+    # todo: flows
