@@ -105,6 +105,10 @@ available_examples = {
         "scenario": "example_03c",
         "study_case": "base_case_2019_with_storage",
     },
+    "case_2030": {
+        "scenario": "example_2030",
+        "study_case": "base_case_2030",
+    },
 }
 
 

@@ -165,7 +165,10 @@ class PowerPlant(SupportsMinMax):
             self.index.freq / timedelta(hours=1)
         )
 
-        self.marginal_cost = self.calc_simple_marginal_cost()
+        if not self.partial_load_eff:
+            self.marginal_cost = self.calc_simple_marginal_cost()
+        else:
+            self.marginal_cost = None
 
     def execute_current_dispatch(
         self,
@@ -244,7 +247,7 @@ class PowerPlant(SupportsMinMax):
 
         capacity_ratio = power_output / self.max_power
 
-        if self.fuel_type in ["lignite", "hard coal"]:
+        if self.fuel_type in ["lignite", "hard coal", "biomass", "waste"]:
             eta_loss = (
                 0.095859 * (capacity_ratio**4)
                 - 0.356010 * (capacity_ratio**3)
@@ -253,7 +256,11 @@ class PowerPlant(SupportsMinMax):
                 + 0.174262
             )
 
-        elif self.fuel_type == "combined cycle gas turbine":
+        elif self.technology in [
+            "combined cycle gas turbine",
+            "gas power plant",
+            "urban central H2 CHP",
+        ]:
             eta_loss = (
                 0.178749 * (capacity_ratio**4)
                 - 0.653192 * (capacity_ratio**3)
@@ -262,7 +269,7 @@ class PowerPlant(SupportsMinMax):
                 + 0.315584
             )
 
-        elif self.fuel_type == "open cycle gas turbine":
+        elif self.technology == "open cycle gas turbine" or self.fuel_type == "oil":
             eta_loss = (
                 0.485049 * (capacity_ratio**4)
                 - 1.540723 * (capacity_ratio**3)

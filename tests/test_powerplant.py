@@ -110,7 +110,9 @@ def test_init_function(power_plant_1, power_plant_2, power_plant_3):
     ).all()
 
     assert (power_plant_2.marginal_cost == pd.Series(40, index)).all()
-    assert (power_plant_3.marginal_cost == pd.Series(40, index)).all()
+    assert (
+        power_plant_3.marginal_cost is None
+    )  # partial_load_eff=True defers cost to calc_marginal_cost_with_partial_eff
 
 
 def test_reset_function(power_plant_1):
