@@ -6,11 +6,12 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import pytest
+from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 from dateutil import rrule as rr
 
 from assume.common.forecaster import UnitForecaster
-from assume.common.market_objects import MarketConfig, MarketProduct, Order
+from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
 from assume.strategies import (
     EnergyHeuristicElasticStrategy,
@@ -166,36 +167,83 @@ unit_for_redispatch_with_availability = MockMinMaxUnit(forecaster=forecaster)
 unit_for_redispatch_with_availability.max_power = 1000
 unit_for_redispatch_with_availability.min_power = 100
 
-@pytest.mark.parametrize("dummy_availability, dummy_current_power, expected_bids_volume, expected_bids_max_power, expected_min_power",
-                         [
-                            (pd.Series(0, index=index), pd.Series([0, 0, 0, 0], index=index), pd.Series([0, 0, 0, 0], index=index), pd.Series(0, index=index), pd.Series(0, index=index)), # no availability, not running on EOM -> no volume to offer
-                            (pd.Series(0.0, index=index), pd.Series([0, 0, 0, 0], index=index), pd.Series([0, 0, 0, 0], index=index), pd.Series(0, index=index), pd.Series(0, index=index)), # same as above, but with float availability
-                            (pd.Series(0.5, index=index), pd.Series([0, 100, 200, 500], index=index), pd.Series([0, 100, 200, 500], index=index), pd.Series(500, index=index), pd.Series(100, index=index)), # 0.5 availability
-                            (pd.Series(1.0, index=index), pd.Series([0, 100, 200, 1000], index=index), pd.Series([0, 100, 200, 1000], index=index), pd.Series(1000, index=index), pd.Series(100, index=index)), # full availability
-                         ])
 
-def test_naive_redispatch_strategy(dummy_availability, dummy_current_power, expected_bids_volume, expected_bids_max_power, expected_min_power):
+@pytest.mark.parametrize(
+    "dummy_availability, dummy_current_power, expected_bids_volume, expected_bids_max_power, expected_min_power",
+    [
+        (
+            pd.Series(0, index=index),
+            pd.Series([0, 0, 0, 0], index=index),
+            pd.Series([0, 0, 0, 0], index=index),
+            pd.Series(0, index=index),
+            pd.Series(0, index=index),
+        ),  # no availability, not running on EOM -> no volume to offer
+        (
+            pd.Series(0.0, index=index),
+            pd.Series([0, 0, 0, 0], index=index),
+            pd.Series([0, 0, 0, 0], index=index),
+            pd.Series(0, index=index),
+            pd.Series(0, index=index),
+        ),  # same as above, but with float availability
+        (
+            pd.Series(0.5, index=index),
+            pd.Series([0, 100, 200, 500], index=index),
+            pd.Series([0, 100, 200, 500], index=index),
+            pd.Series(500, index=index),
+            pd.Series(100, index=index),
+        ),  # 0.5 availability
+        (
+            pd.Series(1.0, index=index),
+            pd.Series([0, 100, 200, 1000], index=index),
+            pd.Series([0, 100, 200, 1000], index=index),
+            pd.Series(1000, index=index),
+            pd.Series(100, index=index),
+        ),  # full availability
+    ],
+)
+def test_naive_redispatch_strategy(
+    dummy_availability,
+    dummy_current_power,
+    expected_bids_volume,
+    expected_bids_max_power,
+    expected_min_power,
+):
     # test with simple redispatch market
     strategy = EnergyNaiveRedispatchStrategy()
     mc = simple_redispatch_market_config
     unit = unit_for_redispatch_with_availability
 
-    mc.market_products = [MarketProduct(rd(hours=+1), 4, rd(hours=0))] # 4 products with 1h duration, starting at redispatch_start
+    mc.market_products = [
+        MarketProduct(rd(hours=+1), 4, rd(hours=0))
+    ]  # 4 products with 1h duration, starting at redispatch_start
     next_opening = redispatch_start
     products = get_available_products(mc.market_products, next_opening)
     assert len(products) == 4
 
     unit.forecaster.availability = dummy_availability
-    unit.outputs['energy'] = dummy_current_power
+    unit.outputs["energy"] = dummy_current_power
     bids = strategy.calculate_bids(unit, mc, product_tuples=products)
-    
-    assert [bids[i]['volume'] for i in range(0, len(bids))] == pytest.approx(expected_bids_volume)
-    assert [bids[i]['max_power'] for i in range(0, len(bids))] == pytest.approx(expected_bids_max_power)
-    assert [bids[i]['min_power'] for i in range(0, len(bids))] == pytest.approx(expected_min_power)
-    assert [bids[i]['p_nom'] for i in range(0, len(bids))] == pytest.approx([unit.max_power] * len(bids))
-    assert [bids[i]['node'] for i in range(0, len(bids))] == pytest.approx([unit.node] * len(bids))
-    assert [bids[i]['price'] for i in range(0, len(bids))] == pytest.approx([3] * len(bids)) # should bid at marginal cost, which are set to 3 in MockMinMaxUnit
-    
+
+    assert [bids[i]["volume"] for i in range(len(bids))] == pytest.approx(
+        expected_bids_volume
+    )
+    assert [bids[i]["max_power"] for i in range(len(bids))] == pytest.approx(
+        expected_bids_max_power
+    )
+    assert [bids[i]["min_power"] for i in range(len(bids))] == pytest.approx(
+        expected_min_power
+    )
+    assert [bids[i]["p_nom"] for i in range(len(bids))] == pytest.approx(
+        [unit.max_power] * len(bids)
+    )
+    assert [bids[i]["node"] for i in range(len(bids))] == pytest.approx(
+        [unit.node] * len(bids)
+    )
+    assert [bids[i]["price"] for i in range(len(bids))] == pytest.approx(
+        [3] * len(bids)
+    )  # should bid at marginal cost, which are set to 3 in MockMinMaxUnit
+
+
 if __name__ == "__main__":
     # run pytest and enable prints
     import pytest

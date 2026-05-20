@@ -29,6 +29,19 @@ try:
 except ImportError:
     pass
 
+from pytest import importorskip
+
+get_supported_solver_linopy = importorskip(
+    "assume.common.grid_utils",
+    reason="linopy/pypsa dependencies not installed",
+).get_supported_solver_linopy
+
+
+@pytest.mark.require_network
+def test_solver_available():
+    assert get_supported_solver_linopy() == "highs"
+    assert get_supported_solver_linopy("unknown_solver") == "highs"
+
 @pytest.fixture
 def n_2bus_1line():
     # set up empty network with 2 buses N and S and a line connecting them
