@@ -19,22 +19,6 @@ try:
 except ImportError:
     pass
 
-simple_zonal_market_config = MarketConfig(
-    market_id="simple_zonal_auction",
-    market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
-    additional_fields=["node"],
-    opening_hours=rr.rrule(
-        rr.HOURLY,
-        dtstart=datetime(2005, 6, 1),
-        until=datetime(2005, 6, 2),
-        cache=True,
-    ),
-    opening_duration=timedelta(hours=1),
-    volume_unit="MW",
-    volume_tick=0.1,
-    price_unit="€/MW",
-    market_mechanism="complex_clearing",
-)
 @pytest.fixture
 def simple_redispatch_market_config():
     return MarketConfig(
@@ -220,10 +204,10 @@ def test_redispatch_with_min_max_power_and_availability():
 def test_redispatch_with_min_max_power_and_availability_and_max_ramp():
     pass
 
-@pytest.mark.require_network
 def test_redispatch_with_storage():
     pass
 
+# Tests with 2 nodes and 3 generators (coal_N, coal_S, gas_S) and 1 demand (dem_S)
 # generators index: ["coal_N", "coal_S", "gas_S"]
 # demand index: ["dem_S"]
 units_index = ["coal_N", "coal_S", "gas_S", "dem_S"]
@@ -309,6 +293,7 @@ def test_two_nodes_redispatch(simple_redispatch_market_config,
     assert sum([o["accepted_volume"] for o in accepted_orders]) == pytest.approx(expected_volume_change)
     # todo: check flows
 
+# Tests with 3 nodes and 30 generators (gen5 to gen34) and 3 demand (dem1 to dem3)
 nodes_3 = pd.DataFrame({
         "name": ["node1", "node2", "node3"],
         "v_nom": [380.0, 380.0, 380.0],
@@ -386,7 +371,6 @@ def grid_data_dict_3_nodes():
         pd.Series([-4400, -4400, -14400], index=demand_3.index), # demand of 23200 MW
         [9000, 8000, 5000], # up at node 3
         [0, 0, 0], # down at node 2
-        #[1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 800, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 200, 1000, 1000, 1000, 1000, 1000],
         [1000]*9 + [800] + [1000]*7 + [200] + [1000]*5,
         [17, 23, 29], # nodal prices similar to nodal clearing solution
         22000, # + 22000 MW to match demand of 23200 MW
@@ -467,6 +451,5 @@ def test_three_nodes_redispatch(grid_data_dict_3_nodes,
     assert [meta[i]["price"] for i in range(len(nodes_3))] == pytest.approx(expected_accepted_nodal_price_3)
     print('Accepted: ' + str(accepted_orders))
     assert [o["accepted_volume"] for o in accepted_orders] == pytest.approx(expected_accepted_orders_volume_3)
-    #assert [o["accepted_price"] for o in accepted_orders] == pytest.approx(expected_accepted_orders_price_3)
     assert sum([o["accepted_volume"] for o in accepted_orders]) == pytest.approx(expected_volume_change_3)
     # todo: flows
