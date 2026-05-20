@@ -7,6 +7,9 @@ base:
   end_date: 2019-01-08 00:00
   time_step: 1h
   save_frequency_hours: 168
+  use_forecasts_df: true
+  forecast_save_file: "outputs/saved_forecasts.csv"
+  save_forecasts: true
 
   markets_config:
     EOM:
