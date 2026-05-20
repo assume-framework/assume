@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
-from dateutil import rrule as rr
 
 from assume.common.forecaster import UnitForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
@@ -140,6 +139,7 @@ def test_demand_energy_heuristic_elastic_strategy_raises_when_volume_exceeds_max
 
     with pytest.raises(ValueError, match="exceeds max power"):
         strategy.calculate_bids(unit, mock_market_config, product_tuples)
+
 
 redispatch_start = datetime(2005, 6, 1, 0)
 redispatch_end = datetime(2005, 6, 1, 3)
