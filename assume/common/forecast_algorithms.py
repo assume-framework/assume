@@ -420,6 +420,8 @@ def calculate_locational_marginal_price(
         # does not make sense for zonal redispatch markets
         zones_id = config.param_dict.get('zones_identifier')
         node_to_zone = None
+        if config.param_dict.get('grid_data') is None:
+            raise ValueError("Grid data (buses and lines) must be provided in market config for LMP calculation.")
         lines = config.param_dict.get('grid_data')['lines']
         buses = config.param_dict.get('grid_data')['buses']
         
@@ -445,14 +447,14 @@ def calculate_locational_marginal_price(
     
     # step 1: sort units by type and filter for units with bidding strategy for the given market_id
     # disregard dsm_units for now
-    powerplant_units, demand_units, exchange_units, storage_units, _ = sort_units(
+    powerplants_units, demand_units, exchange_units, storage_units, _ = sort_units(
         units, config.market_id
     )
     
     # step 2: calculate marginal costs and power for each unit and time step.
     #TODO: do really calculate this for each timestep! not only take mc from units df. unclear how.
-    marginal_costs = pd.DataFrame(index=snapshots, columns=[pp.id for pp in powerplant_units])
-    power = pd.DataFrame(index=snapshots, columns=[pp.id for pp in powerplant_units])
+    marginal_costs = pd.DataFrame(index=snapshots, columns=[pp.id for pp in powerplants_units])
+    power = pd.DataFrame(index=snapshots, columns=[pp.id for pp in powerplants_units])
     for col in range(0, len(marginal_costs.columns)):
         #TODO check mc calculation
         marginal_costs.loc[:, col] = powerplants_units[col].marginal_cost
@@ -505,10 +507,10 @@ def calculate_locational_marginal_price(
     if exchange_units is not None:
         # get sum of imports as name of exchange_unit_import
         import_units = [f"{unit}_import" for unit in exchange_units.index]
-        sum_imports = exchanges[import_units].sum(axis=1)
+        sum_imports = exchange_units[import_units].sum(axis=1)
         # get sum of exports as name of exchange_unit_export
         export_units = [f"{unit}_export" for unit in exchange_units.index]
-        sum_exports = exchanges[export_units].sum(axis=1)
+        sum_exports = exchange_units[export_units].sum(axis=1)
         # add imports and exports to the sum_demand
         sum_demand += sum_imports - sum_exports
 
@@ -531,10 +533,10 @@ def calculate_locational_marginal_price(
             # TODO add p as timeseries?
         )
 
-    solver = config.param_dict.get("solver", "highs")
-    if solver == "gurobi":
+    solver_name = config.param_dict.get("solver_name", "highs")
+    if solver_name == "gurobi":
         solver_options = {"LogToConsole": 0, "OutputFlag": 0}
-    elif solver == "highs":
+    elif solver_name == "highs":
         solver_options = {"output_flag": False, "log_to_console": False}
     else:
         solver_options = {}
@@ -542,13 +544,13 @@ def calculate_locational_marginal_price(
     # step 4: run linear optimal powerflow
     network.optimize.fix_optimal_capacities()
     status, termination_condition = network.optimize(
-        solver=solver,
+        solver_name=solver_name,
         solver_options=solver_options,
         progress=False,
     )
 
     if status != "ok":
-        _logger.error(f"Solver exited with {termination_condition}")
+        log.error(f"Solver exited with {termination_condition}")
         raise Exception("Solver in nodal clearing forecast did not converge")
     
     # step 5: extract lmps
