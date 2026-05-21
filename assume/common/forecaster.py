@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, TypeAlias
 
 import pandas as pd
 
+from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.market_objects import MarketConfig
 
@@ -184,9 +185,11 @@ class UnitForecaster:
 
         self.index: FastIndex = index
         self.availability: FastSeries = self._to_series(availability)
+        if any(self.availability < 0) or any(self.availability > 1):
+            raise ValidationError(
+                message="Availability must be between 0 and 1", field="availability"
+            )
         self.forecast_algorithms = forecast_algorithms
-        if forecast_registries is None:
-            forecast_registries = {"init": {}, "preprocess": {}, "update": {}}
         self._registries = forecast_registries
         if market_prices is None:
             market_prices = {"EOM": 50}  # default value for tests
@@ -414,7 +417,7 @@ class DemandForecaster(UnitForecaster):
         )
         self.demand = self._to_series(demand)
         if any(self.demand > 0):
-            raise ValueError(f"{demand=} must be negative")
+            raise ValidationError(message="demand must be negative", field="demand")
 
 
 class PowerplantForecaster(UnitForecaster):
@@ -821,29 +824,22 @@ class SteamgenerationForecaster(DsmUnitForecaster):
 
 
 class BuildingForecaster(DsmUnitForecaster):
-    """Forecaster for building units.
+    """
+    Forecaster for building units.
 
-    Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus fuel prices and
-    building-specific load/generation profiles. After initialization, electricity price
-    is copied to the unit and ``setup_model(presolve=True)`` is called.
-
-    Attributes:
-        fuel_prices (dict[str, ForecastSeries]): Map of fuel type to forecasted fuel prices.
-        heat_demand (ForecastSeries): Forecasted heat demand.
-        ev_load_profile (ForecastSeries): Forecasted electric vehicle load profile.
-        battery_load_profile (ForecastSeries): Forecasted battery load profile.
-        pv_profile (ForecastSeries): Forecasted photovoltaic generation profile.
-        load_profile (ForecastSeries): Forecasted overall load profile.
+    Provides all DSM forecasts plus building-specific profiles.
+    Supports both aggregate building profiles and arbitrary component-level
+    profiles passed through **kwargs.
     """
 
     def __init__(
         self,
         index: ForecastIndex,
         fuel_prices: dict[str, ForecastSeries],
-        heat_demand: ForecastSeries,
-        ev_load_profile: ForecastSeries,
-        battery_load_profile: ForecastSeries,
-        pv_profile: ForecastSeries,
+        heat_demand: ForecastSeries = 0,
+        ev_load_profile: ForecastSeries = 0,
+        battery_load_profile: ForecastSeries = 0,
+        pv_profile: ForecastSeries = 0,
         forecast_algorithms: dict[str, str] = {},
         forecast_registries: dict[str, dict] = None,
         market_prices: dict[str, ForecastSeries] = None,
@@ -851,8 +847,10 @@ class BuildingForecaster(DsmUnitForecaster):
         congestion_signal: ForecastSeries = 0.0,
         renewable_utilisation_signal: ForecastSeries = 0.0,
         electricity_price: ForecastSeries = 0.0,
+        electricity_price_flex: ForecastSeries = 0.0,
         availability: ForecastSeries = 1,
         load_profile: ForecastSeries = 0,
+        **kwargs,
     ):
         super().__init__(
             index=index,
@@ -871,6 +869,24 @@ class BuildingForecaster(DsmUnitForecaster):
         self.battery_load_profile = self._to_series(battery_load_profile)
         self.pv_profile = self._to_series(pv_profile)
         self.load_profile = self._to_series(load_profile)
+        self.electricity_price_flex = self._to_series(electricity_price_flex)
+
+        # store arbitrary building-specific additional profiles
+        for key, value in kwargs.items():
+            if isinstance(value, pd.Series):
+                value = self._to_series(value)
+            self.__setattr__(key, value)
+
+    def __getitem__(self, key: str):
+        """
+        Allow dictionary-style access for arbitrary component-level forecasts,
+        e.g.:
+            forecaster["building_1_electric_vehicle_1_availability_profile"]
+            forecaster["building_1_electric_vehicle_1_range"]
+        """
+        if hasattr(self, key):
+            return getattr(self, key)
+        raise KeyError(f"Forecast '{key}' not found in BuildingForecaster.")
 
     def get_price(self, fuel: str) -> FastSeries:
         if fuel not in self.fuel_prices:
@@ -892,9 +908,6 @@ class BuildingForecaster(DsmUnitForecaster):
         )
 
         initializing_unit.electricity_price = self.electricity_price
-        # initializing_unit.congestion_signal = self.congestion_signal
-        # initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
-
         initializing_unit.setup_model(presolve=True)
 
 

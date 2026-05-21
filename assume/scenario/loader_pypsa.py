@@ -141,7 +141,8 @@ def load_pypsa(
                 "price": 1e3,
             },
             DemandForecaster(
-                index, demand=-abs(load_t), forecast_registries=_forecast_registries
+                index,
+                demand=-abs(load_t),
             ),
         )
 

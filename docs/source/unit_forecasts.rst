@@ -274,6 +274,14 @@ Besides configuring algorithms, there are two additional ways to supply forecast
    corresponding algorithm to ``{forecast_metric}_keep_given`` to prevent the initialize step
    from overwriting your data.
 
+.. note::
+
+   When using direct instantiation you are responsible for driving the forecast lifecycle.
+   If you do not call :meth:`~assume.common.forecaster.UnitForecaster.initialize` (or
+   :func:`~assume.world.World.init_forecasts`), DSM units will not have their internal
+   optimisation model built and you must call ``unit.setup_model()`` explicitly before
+   running optimisation or dispatching the unit.
+
 ***********************************
 Adding Custom Algorithms
 ***********************************

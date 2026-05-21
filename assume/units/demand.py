@@ -139,10 +139,11 @@ class Demand(SupportsMinMax):
 
         Args:
             start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch (exclusive).
+            product_type (str, optional): The product type. Defaults to "energy".
 
         Returns:
-            tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
+            tuple[np.ndarray, np.ndarray]: The bid volume as both the minimum and maximum power output of the unit.
         """
 
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once

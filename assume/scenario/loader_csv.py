@@ -18,7 +18,6 @@ from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
 from assume.common.fast_pandas import FastIndex
-from assume.common.forecast_algorithms import get_forecast_registries
 from assume.common.forecaster import (
     BuildingForecaster,
     CustomUnitForecaster,
@@ -35,6 +34,7 @@ from assume.common.utils import (
     adjust_unit_operator_for_learning,
     confirm_learning_save_path,
     convert_to_rrule_freq,
+    load_index_file,
     normalize_availability,
     set_random_seed,
 )
@@ -106,72 +106,40 @@ def load_file(
     if file_name in config:
         if config[file_name] is None:
             return None
-        file_path = f"{path}/{config[file_name]}"
+        file_path = Path(path) / config[file_name]
     else:
-        file_path = f"{path}/{file_name}.csv"
+        file_path = Path(path) / f"{file_name}.csv"
 
     try:
-        df = pd.read_csv(
-            file_path,
-            index_col=0,
-            encoding="utf-8",
-            na_values=["n.a.", "None", "-", "none", "nan"],
-            parse_dates=index is not None,
-        )
-        for col in df:
-            # check if the column is of dtype int
-            if df[col].dtype == "int":
-                # convert the column to float
-                df[col] = df[col].astype(float)
-
         if index is not None:
-            if len(df.index) == 1:
-                return df
+            df = load_index_file(file_path, index)
+        else:
+            df = pd.read_csv(
+                file_path,
+                index_col=0,
+                encoding="utf-8",
+                na_values=["n.a.", "None", "-", "none", "nan"],
+                parse_dates=index is not None,
+            )
+            for col in df:
+                # check if the column is of dtype int
+                if df[col].dtype == "int":
+                    # convert the column to float
+                    df[col] = df[col].astype(float)
 
-            if len(df.index) != len(index) and not isinstance(
-                df.index, pd.DatetimeIndex
-            ):
-                logger.warning(
-                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
-                )
-                return None
+            if check_duplicates:
+                # Check if duplicate unit names exist and raise an error
+                duplicates = df.index[df.index.duplicated()].unique()
 
-            df.index.freq = df.index.inferred_freq
-
-            if len(df.index) < len(index) and df.index.freq == index.freq:
-                logger.warning(
-                    f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
-                )
-                return None
-
-            if df.index.freq < index.freq:
-                logger.warning(
-                    f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
-                    "Resampling using mean(). Make sure this is what you want."
-                )
-                df = df.resample(index.freq).mean()
-                logger.info(f"Downsampling {file_name} successful.")
-
-            elif df.index.freq > index.freq or len(df.index) < len(index):
-                logger.warning("Upsampling not implemented yet. Returning None.")
-                return None
-
-            df = df.loc[index]
-
-        elif check_duplicates:
-            # Check if duplicate unit names exist and raise an error
-            duplicates = df.index[df.index.duplicated()].unique()
-
-            if len(duplicates) > 0:
-                duplicate_names = ", ".join(map(str, duplicates))
-                raise ValueError(
-                    f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
-                )
-
+                if len(duplicates) > 0:
+                    duplicate_names = ", ".join(map(str, duplicates))
+                    raise ValueError(
+                        f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
+                    )
         return df
 
     except FileNotFoundError:
-        logger.info(f"{file_name} not found. Returning None")
+        logger.info(f"{file_path} not found. Returning None")
         return None
 
 
@@ -619,7 +587,6 @@ def load_config_and_create_forecaster(
         fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
 
     forecast_algorithms = config.get("forecast_algorithms", {})
-    forecast_registries = get_forecast_registries()
 
     # create shared unit index for caching!
     shared_unit_index = FastIndex(
@@ -635,7 +602,6 @@ def load_config_and_create_forecaster(
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, plant
                 ),
-                forecast_registries=forecast_registries,
             )
     if demand_units is not None:
         for id, demand in demand_units.iterrows():
@@ -646,7 +612,6 @@ def load_config_and_create_forecaster(
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, demand
                 ),
-                forecast_registries=forecast_registries,
             )
     if storage_units is not None:
         for id, storage in storage_units.iterrows():
@@ -656,7 +621,6 @@ def load_config_and_create_forecaster(
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, storage
                 ),
-                forecast_registries=forecast_registries,
             )
     if exchange_units is not None:
         for id, exchange in exchange_units.iterrows():
@@ -666,7 +630,6 @@ def load_config_and_create_forecaster(
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, exchange
                 ),
-                forecast_registries=forecast_registries,
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
             )
@@ -677,19 +640,48 @@ def load_config_and_create_forecaster(
                     forecast_algorithms, unit
                 )
                 if type == "building":
+
+                    def get_building_profile(column_name: str) -> pd.Series:
+                        default_profile = pd.Series(0.0, index=index, name=column_name)
+                        if forecasts_df is None:
+                            return default_profile
+                        return forecasts_df.get(column_name, default_profile)
+
+                    # Base aggregate building profiles
+                    building_load_profile = get_building_profile(f"{id}_load_profile")
+                    building_heat_demand = get_building_profile(f"{id}_heat_demand")
+                    building_pv_profile = get_building_profile(f"{id}_pv_profile")
+                    building_battery_profile = get_building_profile(
+                        f"{id}_battery_load_profile"
+                    )
+                    building_ev_profile = get_building_profile(f"{id}_ev_load_profile")
+                    building_electricity_price_flex = get_building_profile(
+                        f"{id}_electricity_price_flex"
+                    )
+
+                    # collect arbitrary component-level forecasts for this building
+                    extra_building_profiles = {}
+
+                    if forecasts_df is not None:
+                        building_prefix = f"{id}_"
+                        for col in forecasts_df.columns:
+                            if col.startswith(building_prefix):
+                                extra_building_profiles[col] = forecasts_df[col]
+
                     unit_forecasts[id] = BuildingForecaster(
                         index=shared_unit_index,
                         availability=availability.get(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        forecast_registries=forecast_registries,
                         fuel_prices=fuel_prices_df,
-                        load_profile=0,  # TODO
-                        ev_load_profile=0,  # TODO
-                        heat_demand=0,  # TODO
-                        battery_load_profile=0,  # TODO
-                        pv_profile=0,  # TODO
+                        load_profile=building_load_profile,
+                        ev_load_profile=building_ev_profile,
+                        heat_demand=building_heat_demand,
+                        battery_load_profile=building_battery_profile,
+                        pv_profile=building_pv_profile,
+                        electricity_price_flex=building_electricity_price_flex,
+                        **extra_building_profiles,
                     )
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
@@ -698,7 +690,6 @@ def load_config_and_create_forecaster(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        forecast_registries=forecast_registries,
                         fuel_prices=fuel_prices_df,
                     )
                 if type == "hydrogen_plant":
@@ -708,7 +699,6 @@ def load_config_and_create_forecaster(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        forecast_registries=forecast_registries,
                         hydrogen_demand=unit["demand"],
                         seasonal_storage_schedule=0,  # TODO
                     )
@@ -719,7 +709,6 @@ def load_config_and_create_forecaster(
                             id, pd.Series(1.0, index, name=id)
                         ),
                         forecast_algorithms=unit_forecast_algorithms,
-                        forecast_registries=forecast_registries,
                         demand=unit["demand"],
                         fuel_prices=fuel_prices_df,
                         electricity_price_flex=0,  # TODO

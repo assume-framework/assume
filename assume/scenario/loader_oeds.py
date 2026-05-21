@@ -205,7 +205,8 @@ def load_oeds(
                 "price": 1e3,
             },
             DemandForecaster(
-                index, demand=-abs(demand), forecast_registries=_forecast_registries
+                index,
+                demand=-abs(demand),
             ),
         )
 
@@ -248,7 +249,6 @@ def load_oeds(
                     index,
                     availability=wind / wind.max(),
                     fuel_prices={"others": 0.2},
-                    forecast_registries=_forecast_registries,
                 ),
             )
 
@@ -302,7 +302,6 @@ def load_oeds(
                 index,
                 availability=1,
                 fuel_prices={"others": 0.2},
-                forecast_registries=_forecast_registries,
             ),
         )
 

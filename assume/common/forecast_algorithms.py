@@ -169,7 +169,7 @@ def calculate_naive_price_inelastic(
         matching_units = cumsum_power[cumsum_power >= demand_t]
         if matching_units.empty:
             # If available capacity is insufficient, set the price to max willingnes to pay.
-            price = max([unit.price for unit in demand_units])
+            price = max([unit.price[t] for unit in demand_units])
         else:
             # The marginal cost of the first unit that meets demand becomes the price.
             price = sorted_mc.loc[matching_units.index[0]]
@@ -208,7 +208,9 @@ def calculate_naive_price_elastic(
     elastic_demand_bids = []
     # 1. Sort units by type and filter for units with bidding strategy for the given market_id
     powerplants_units, demand_units, exchange_units, _, _ = sort_units(units, market_id)
-    inelastic_demand_units = [unit for unit in demand_units if unit not in elastic_demand_units]
+    inelastic_demand_units = [
+        unit for unit in demand_units if unit not in elastic_demand_units
+    ]
 
     start = config.opening_hours[0]
     end = start + config.market_products[0].duration
@@ -256,56 +258,52 @@ def calculate_naive_price_elastic(
 
     # clear the market forecast including elastic demand bids using the PayAsClearRole
     for t in index:
-        # get the supply offers
+        # get the supply offers (marginal cost and available power) for time t
         mc_t = marginal_costs.loc[t]
         power_t = power.loc[t]
         start = t
         end = start + pd.Timedelta(config.market_products[0].duration)
-        # Compute the cumulative sum of available power in the sorted order.
-        # cumsum_power = sorted_power.cumsum()
-        supply_offers = (
-            pd.DataFrame(
-                {
-                    "start_time": start,
-                    "end_time": end,
-                    "only_hours": None,
-                    "node": "node0",
-                    "price": mc_t,
-                    "volume": power_t,
-                    "bid_type": "SB",
-                    #"bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
-                }
-            )
-            .reset_index()
-            .rename(columns={"index": "bid_id"})
+
+        supply_offers = pd.DataFrame(
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "node": "node0",
+                "price": mc_t,
+                "volume": power_t,
+                "bid_type": "SB",
+                "bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
+            }
         )
 
         # shape of sum_demand: (time_steps, 1)
         demand_t = sum_demand.loc[t][0]
 
         # get the demand bids
-        demand_bids = (
-            pd.DataFrame(
-                {
-                    "start_time": start,
-                    "end_time": end,
-                    "only_hours": None,
-                    "node": "node0",
-                    "price": elastic_demand_prices,
-                    "volume": elastic_demand_volumes,
-                    "bid_type": "SB",
-                    #"bid_id": [f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))],
-                }
-            )
-            .reset_index()
-            .rename(columns={"index": "bid_id"})
+        demand_bids = pd.DataFrame(
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "node": "node0",
+                "price": elastic_demand_prices,
+                "volume": elastic_demand_volumes,
+                "bid_type": "SB",
+                "bid_id": [
+                    f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))
+                ],
+            }
         )
+
         # create an orderbook containing all supply offers and demand bids
         orderbook = []
         orderbook.extend(supply_offers.to_dict("records"))
         orderbook.extend(demand_bids.to_dict("records"))
-        inelastic_price_bid = max([unit.price[t] for unit in inelastic_demand_units])
         if demand_t > 0:
+            inelastic_price_bid = max(
+                [unit.price[t] for unit in inelastic_demand_units]
+            )
             orderbook.append(
                 {
                     "start_time": start,
@@ -319,10 +317,19 @@ def calculate_naive_price_elastic(
                 }
             )
 
+        cleaned_orderbook = []
+        for bid in orderbook:
+            if isinstance(bid["volume"], dict):
+                if all(volume == 0 for volume in bid["volume"].values()):
+                    continue
+            elif bid["volume"] == 0:
+                continue
+            cleaned_orderbook.append(bid)
+
         mps = get_available_products(
             config.market_products, pd.Timestamp(start) - pd.Timedelta("1h")
         )
-        
+
         if config.market_mechanism == "pay_as_bid":
             # the forecast price is the volume-weighted average price of matched orders of each timestep
             mechanism = PayAsBidRole(config)
@@ -335,7 +342,7 @@ def calculate_naive_price_elastic(
                 f"Invalid market mechanism {config.param_dict.get('market_mechanism')}."
             )
 
-        accepted, rejected, meta, flows = mechanism.clear(orderbook, mps)
+        _, _, meta, _ = mechanism.clear(cleaned_orderbook, mps)
         price_forecast.loc[t] = meta[0]["price"]
 
     return price_forecast
@@ -731,6 +738,10 @@ def calculate_naive_renewable_utilisation(
     renewable_units = [
         unit for unit in powerplants_units if is_renewable(unit.technology)
     ]
+
+    if len(renewable_units) == 0:
+        return {}
+
     power = calculate_max_power(
         renewable_units, index=[pp.id for pp in renewable_units]
     ).T

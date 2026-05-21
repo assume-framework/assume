@@ -24,7 +24,6 @@ from assume.world import World
 
 logger = logging.getLogger(__name__)
 
-_forecast_registries = get_forecast_registries()
 
 translate_clearing = {
     "SAME_SHARES": "pay_as_clear",
@@ -188,7 +187,8 @@ def add_agent_to_world(
                         "price": value,
                     },
                     DemandForecaster(
-                        index, demand=-100000, forecast_registries=_forecast_registries
+                        index,
+                        demand=-100000,
                     ),
                 )
         case "EnergyExchange" | "DayAheadMarketSingleZone":
@@ -271,7 +271,6 @@ def add_agent_to_world(
                     DemandForecaster(
                         index,
                         demand=demand_series[: len(index)],
-                        forecast_registries=_forecast_registries,
                     ),
                 )
 

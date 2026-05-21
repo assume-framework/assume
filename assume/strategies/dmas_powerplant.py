@@ -27,7 +27,7 @@ from pyomo.opt import (
 
 from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import get_supported_solver
+from assume.common.utils import get_supported_solver_pyomo
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
         """
         super().__init__(*args, **kwargs)
         self.model = ConcreteModel("powerplant")
-        self.opt = SolverFactory(get_supported_solver())
+        self.opt = SolverFactory(get_supported_solver_pyomo())
         self.steps = steps
         self.T = 24
         self.opt_results = {
