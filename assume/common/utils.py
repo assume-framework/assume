@@ -599,6 +599,34 @@ def rename_study_case(path: str, old_key: str, new_key: str):
         yaml.safe_dump(data, file, sort_keys=False)
 
 
+def convert_to_tensors(array: np.array, copy=True, dtype=None, device=None):
+    """Convert a numpy array to a PyTorch tensor.
+
+    Note:
+        It copies the data by default.
+
+    Args:
+        array (numpy.ndarray): The numpy array to convert.
+        copy (bool, optional): Whether to copy the data or not
+            (may be useful to avoid changing things by reference). Defaults to True.
+
+    Returns:
+        torch.Tensor: The converted PyTorch tensor.
+    """
+
+    try:
+        import torch as th
+
+        if copy:
+            return th.tensor(array, dtype=dtype, device=device)
+
+        return th.as_tensor(array, dtype=dtype, device=device)
+
+    except ImportError:
+        # If torch is not installed, return the array unchanged
+        return array
+
+
 def convert_tensors(data):
     """
     Recursively checks if the data contains PyTorch tensors and converts them to

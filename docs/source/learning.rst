@@ -36,8 +36,8 @@ After taking action :math:`a_i \in A_i` in state :math:`s_i \in S` according to 
 Each agent receives a reward :math:`r_i` according to the individual reward function :math:`R_i` and a private observation correlated with the state :math:`o_i: S \rightarrow O_i`.
 Like in a Markov Decision Process, each agent :math:`i` learns an optimal policy :math:`\pi_i^*(s)` that maximizes its expected reward.
 
-To enable multi-agent learning some adjustments are needed within the learning algorithm to get from the TD3 to an MATD3 algorithm.
-Other authors used similar tweaks to improve the MADDPG algorithm and derive the MA-TD3 algorithm.
+To enable multi-agent learning, ASSUME supports three RL algorithms out of the box: **MATD3** (Multi-Agent Twin Delayed DDPG, off-policy), **MADDPG** (Multi-Agent DDPG, off-policy), and **MAPPO** (Multi-Agent PPO, on-policy).
+The algorithm to use is selected via the ``algorithm`` config item.
 We'll start explaining the learning by focusing on a single agent and then extend it to multi-agent learning.
 
 Single-Agent Learning
@@ -96,17 +96,22 @@ Multi-Agent Learning
 In a single-agent setup, the state transition and respective reward depend only on the actions of a single agent. However, in a
 multi-agent setup, the state transitions and rewards depend on the actions of all learning agents. This makes the environment
 non-stationary for a single agent, violating the Markov property. The convergence guarantees of single-agent RL algorithms are no longer
-valid. To address this, we utilize the framework of centralized training and decentralized execution and expand upon the MADDPG algorithm.
+valid. To address this, we utilize the framework of centralized training and decentralized execution, which is supported in ASSUME (MATD3, MADDPG, MAPPO).
 The main idea is to use a centralized critic during the training phase, which has access to the entire state :math:`S`, and all actions :math:`a_1, \ldots, a_N`, thus resolving the issue of non-stationarity.
 Changes in state transitions and rewards can be explained by the actions of other agents.
 Meanwhile, during both training and execution, the actor has access only to its local observations :math:`o_i` derived from the entire state :math:`S`.
 
-For each agent :math:`i`, we train not one but two centralized critics :math:`Q_{i,\theta_1,2}(S, a_1, \ldots, a_N)` together with two target critic networks.
-Similar to TD3, the smaller value of the two critics and target action noise :math:`a_i,k \sim` is used to calculate the target :math:`y_i,k`. This is done to to address the issue of overestimation bias.
+For each agent :math:`i`, MATD3 and MADDPG train centralized critics together with target critic networks.
+In MATD3 and MADDPG, the critics are used to calculate the target :math:`y_i,k`. In MATD3, two critics per agent are maintained and the minimum value is used (twin-critic trick) to address overestimation bias.
+In MADDPG, a single critic per agent is used. In MAPPO, a single centralized value network is used across all agents, updated via GAE-based advantage estimates rather than Bellman targets.
+
+For MATD3, the target uses the twin-critic minimum:
 
 .. math::
 
     y_i,k = r_i,k + γ * min_j=1,2 Q_i,θ′_j(S′_k, a_1,k, ..., a_N,k, π′(o_i,k))
+
+For MADDPG, the same formulation is used with a single critic.
 
 where :math:`r_i,k` is the reward obtained by agent :math:`i` at time step :math:`k`, :math:`\gamma` is the discount factor, :math:`S'_k` is the next state of the
 environment, and :math:`\pi'(o_i,k)` is the target policy of agent :math:`i`.
@@ -123,8 +128,12 @@ The actor policy of each agent is updated using the deterministic policy gradien
 
     ∇_a Q_i,θ_j(S_k, a_1,k, ..., a_N,k, π(o_i,k))|a_i,k=π(o_i,k) * ∇_θ π(o_i,k)
 
-The actor is updated similarly using only one critic network :math:`Q_{θ1}`. These changes to the original DDPG algorithm allow increased stability and convergence of the TD3 algorithm. This is especially relevant when approaching a multi-agent RL setup, as discussed in the foregoing section.
-Please note that the actor and critics are updated by sampling experience from the buffer where all interactions of the agents are stored, namely the observations, actions and rewards. There are more complex buffers possible, like those that use importance sampling, but the default buffer is a simple replay buffer. You can find a documentation of the latter in :ref:`replay-buffer`.
+In MATD3, the actor update is delayed relative to the critic (every ``policy_delay`` gradient steps) to improve stability.
+In MADDPG, the actor is updated at every gradient step.
+In MAPPO, the actor is updated using the PPO clipped surrogate objective rather than the deterministic policy gradient.
+Please note that for off-policy algorithms (MATD3, MADDPG), the actor and critics are updated by sampling experience from the replay buffer where all interactions of the agents are stored.
+For the on-policy algorithm (MAPPO), a rollout buffer is used instead, and experiences are discarded after each policy update.
+You can find documentation of both buffer types in :ref:`replay-buffer` and :ref:`rollout-buffer`.
 
 .. _learning_implementation:
 
