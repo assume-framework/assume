@@ -26,17 +26,3 @@ base:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
-
-  # Rolling horizon DSM optimization config for industrial units
-  industrial_dsm_optimisation:
-    horizon_mode: rolling_horizon
-    look_ahead_horizon: 4h
-    commit_horizon: 2h
-    rolling_step: 2h
-
-  # Rolling horizon DSM optimization config for residential units
-  residential_dsm_optimisation:
-    horizon_mode: rolling_horizon
-    look_ahead_horizon: 6h
-    commit_horizon: 2h
-    rolling_step: 2h

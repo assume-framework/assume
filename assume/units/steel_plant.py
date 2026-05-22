@@ -424,9 +424,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # Skip the global equality constraint entirely — it will conflict since the
         # optimizer is free to produce more than the per-hour minimums.
         _min_demand_strategy = (
-            hasattr(self, "normalized_load_profile")
-            and self.normalized_load_profile is None
-            and hasattr(self, "steel_demand_per_timestep")
+            self.normalized_load_profile is None
             and self.steel_demand_per_timestep is not None
         )
         if not _min_demand_strategy:

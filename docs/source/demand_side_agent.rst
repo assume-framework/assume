@@ -47,11 +47,13 @@ and process-coupling constraints over a wider future horizon.
 Configuration
 ~~~~~~~~~~~~~
 
-Rolling-horizon behaviour is configured through
-``dsm_optimisation_config``. In scenario-based runs this configuration is
-passed from ``config.yaml`` to the DSM units by the CSV scenario loader.
+Rolling-horizon behaviour is configured **per plant** via optional columns in
+the DSM units CSV (``industrial_dsm_units.csv`` or
+``residential_dsm_units.csv``). The CSV scenario loader collects these
+columns from the first technology row of each plant and assembles them into
+the ``dsm_optimisation_config`` dict passed to the unit constructor.
 
-The supported keys are:
+The supported columns are:
 
 - ``horizon_mode``: Either ``full_horizon`` or ``rolling_horizon``.
 - ``look_ahead_horizon``: Length of the optimisation window, for example ``72h``.
@@ -62,23 +64,36 @@ The supported keys are:
 
     If ``horizon_mode`` is set to ``rolling_horizon``, the values for
     ``look_ahead_horizon``, ``commit_horizon``, and ``rolling_step`` must all
-    be provided.
+    be provided on that plant row.
 
-Example YAML configuration:
+Example CSV row (only the relevant columns shown, plant ``A360`` with three
+technology rows; the horizon values are filled once on the first row):
 
-.. code-block:: yaml
+.. code-block:: text
 
-    industrial_dsm_optimisation:
-       horizon_mode: rolling_horizon
-       look_ahead_horizon: 4h
-       commit_horizon: 2h
-       rolling_step: 2h
+    name,technology,...,horizon_mode,look_ahead_horizon,commit_horizon,rolling_step
+    A360,electrolyser,...,rolling_horizon,72h,24h,24h
+    A360,dri_plant,...,,,,
+    A360,eaf,...,,,,
 
-    residential_dsm_optimisation:
-       horizon_mode: rolling_horizon
-       look_ahead_horizon: 6h
-       commit_horizon: 2h
-       rolling_step: 2h
+Because the columns are read per plant, different plants in the same
+scenario can run with different rolling-horizon settings.
+
+Using full horizon
+~~~~~~~~~~~~~~~~~~
+
+To run a plant with the full simulation horizon (the default behaviour), you
+have three equivalent options:
+
+1. **Omit the four columns entirely from the CSV.** This is the right choice
+   for scenarios that never use rolling horizon — no migration needed.
+2. **Include the columns but leave the cells blank** for that plant. This is
+   useful in mixed scenarios where some plants use rolling horizon and
+   others run full horizon.
+3. **Explicitly set** ``horizon_mode: full_horizon`` on the plant row for
+   readability. The three rolling-horizon columns can stay blank because
+   the all-or-none validation only applies when ``horizon_mode`` is
+   ``rolling_horizon``.
 
 Operational flow
 ~~~~~~~~~~~~~~~~

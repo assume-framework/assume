@@ -689,7 +689,7 @@ def test_rolling_window_second_window_triggered_at_commit_boundary(
 def test_steelplant_forecaster_update_syncs_electricity_price_to_unit(dsm_components):
     """After update() the unit's electricity_price reflects the cleared-price history.
 
-    The forecaster is configured with ``update_price='price_from_cleared_history'``.
+    The forecaster is configured with ``update_price='adaptive'``.
     The unit carries cleared prices of 100 EUR/MWh in its outputs.  After calling
     forecaster.update(unit=plant, …) the plant's electricity_price must be higher
     than the initial flat forecast of 40 EUR/MWh.
@@ -710,7 +710,7 @@ def test_steelplant_forecaster_update_syncs_electricity_price_to_unit(dsm_compon
         index=FastIndex(start=index[0], end=index[-1], freq="h"),
         electricity_price=[40.0] * n,
         fuel_prices={"natural_gas": [30] * n, "co2": [20] * n},
-        forecast_algorithms={"update_price": "price_from_cleared_history"},
+        forecast_algorithms={"update_price": "adaptive"},
         forecast_registries=get_forecast_registries(),
     )
     # Provide the preprocess_information that the parent update() calls require

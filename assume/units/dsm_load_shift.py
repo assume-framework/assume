@@ -825,28 +825,23 @@ class DSMFlex:
         """
         window_comps: dict = {}
         for tech_name, comp_data in self._orig_components_dict.items():
-            if isinstance(comp_data, dict):
-                sliced = self._deep_slice_component_data(
-                    comp_data, window_start, window_end, full_len
-                )
-                # Patch carried-over state variables for this technology
-                if tech_name in init_states and isinstance(
-                    init_states[tech_name], dict
-                ):
-                    state_dict = init_states[tech_name]
-                    # Patch SoC if present (storage components)
-                    if "soc" in state_dict:
-                        sliced["initial_soc"] = state_dict["soc"]
-                    # Patch operational status if present (generation/load units)
-                    if "operational_status" in state_dict:
-                        sliced["initial_operational_status"] = state_dict[
-                            "operational_status"
-                        ]
-                    # Note: start_up and shut_down are derived from operational_status transitions,
-                    # so they don't need to be explicitly patched
-                window_comps[tech_name] = sliced
-            else:
-                window_comps[tech_name] = comp_data
+            sliced = self._deep_slice_component_data(
+                comp_data, window_start, window_end, full_len
+            )
+            # Patch carried-over state variables for this technology
+            if tech_name in init_states:
+                state_dict = init_states[tech_name]
+                # Patch SoC if present (storage components)
+                if "soc" in state_dict:
+                    sliced["initial_soc"] = state_dict["soc"]
+                # Patch operational status if present (generation/load units)
+                if "operational_status" in state_dict:
+                    sliced["initial_operational_status"] = state_dict[
+                        "operational_status"
+                    ]
+                # Note: start_up and shut_down are derived from operational_status transitions,
+                # so they don't need to be explicitly patched
+            window_comps[tech_name] = sliced
 
         # Store remaining_demand as an instance attribute (not in components dict)
         # so rolling-horizon constraints can access it without polluting the components
@@ -877,14 +872,13 @@ class DSMFlex:
         """Collect initial states (SoC, operational_status) from the original component dicts."""
         init_states: dict = {}
         for tech, data in self._orig_components_dict.items():
-            if isinstance(data, dict):
-                state: dict = {}
-                if "initial_soc" in data:
-                    state["soc"] = data["initial_soc"]
-                if "initial_operational_status" in data:
-                    state["operational_status"] = data["initial_operational_status"]
-                if state:
-                    init_states[tech] = state
+            state: dict = {}
+            if "initial_soc" in data:
+                state["soc"] = data["initial_soc"]
+            if "initial_operational_status" in data:
+                state["operational_status"] = data["initial_operational_status"]
+            if state:
+                init_states[tech] = state
         return init_states
 
     def _update_init_states(

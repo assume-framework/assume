@@ -814,7 +814,7 @@ class SteelplantForecaster(DsmUnitForecaster):
         )
 
         if price_update_algorithm is not None:
-            # Call the price update algorithm (may be price_default or price_from_cleared_history)
+            # Call the price update algorithm (may be price_default or adaptive)
             self.price = price_update_algorithm(
                 self.price,
                 self.preprocess_information.get("price", {}),

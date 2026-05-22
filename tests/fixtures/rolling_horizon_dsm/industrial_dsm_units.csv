@@ -1,2 +1,2 @@
-name,technology,bidding_EOM,bidding_redispatch,bidding_nodal,bidding_DAM,max_power,min_power,unit_operator,node,flexibility_measure,demand,unit_type
-test_steel_plant_rh,steel_plant,naive_eom,naive_redispatch,naive_eom,naive_eom,100,0,steel_op,north,cost_based_load_shift,100,steel_plant
+name,technology,bidding_EOM,bidding_redispatch,bidding_nodal,bidding_DAM,max_power,min_power,unit_operator,node,flexibility_measure,demand,unit_type,horizon_mode,look_ahead_horizon,commit_horizon,rolling_step
+test_steel_plant_rh,steel_plant,naive_eom,naive_redispatch,naive_eom,naive_eom,100,0,steel_op,north,cost_based_load_shift,100,steel_plant,rolling_horizon,4h,2h,2h

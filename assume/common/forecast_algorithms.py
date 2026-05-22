@@ -812,7 +812,7 @@ def calculate_price_from_cleared_history(
 
     except Exception as e:
         # If anything goes wrong, return current forecast
-        logging.getLogger(__name__).warning(
+        log.warning(
             f"Error in calculate_price_from_cleared_history: {e}. Using fallback."
         )
         return current_forecast
@@ -820,7 +820,7 @@ def calculate_price_from_cleared_history(
 
 forecast_update_algorithms = {
     "price_default": default_update,
-    "price_from_cleared_history": calculate_price_from_cleared_history,
+    "adaptive": calculate_price_from_cleared_history,
     "residual_load_default": default_update,
     "residual_load_set_preloaded": set_preloaded_forecast_by_name,
     "congestion_signal_default": default_update,

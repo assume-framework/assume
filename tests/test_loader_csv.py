@@ -10,7 +10,6 @@ import pytest
 from assume.scenario.loader_csv import (
     get_unit_forecast_algorithms,
     load_config_and_create_forecaster,
-    resolve_forecast_source,
     setup_world,
 )
 from assume.world import World
@@ -195,3 +194,7 @@ def test_forecast_interface__save_forecasts():
         saved_forecasts["residual_load_naive_forecast_EOM"]
         == expected_load["load_forecast"]
     ).all()
+
+
+if __name__ == "__main__":
+    pytest.main(["-s", __file__])
