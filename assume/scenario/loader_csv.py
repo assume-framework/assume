@@ -76,35 +76,6 @@ def get_unit_forecast_algorithms(
     return forecast_algorithms | unit_forecast_algorithms  # merge dicts together
 
 
-def resolve_forecast_source(value: str, forecasts_df: pd.DataFrame | None = None):
-    """Resolve forecast source: algorithm name OR direct column from forecasts_df.
-
-    Args:
-        value (str): Either algorithm name (e.g., "adaptive", "price_default")
-                    or direct column name from forecasts_df (e.g., "A360_electricity_price")
-        forecasts_df (pd.DataFrame, optional): Forecasts dataframe to check for columns.
-
-    Returns:
-        str (algorithm name) or pd.Series (actual data) or None
-
-    Examples:
-        "adaptive" → "adaptive" (algorithm)
-        "A360_electricity_price" → pd.Series from forecasts_df (direct data)
-        "price_naive_forecast" → "price_naive_forecast" (algorithm)
-    """
-    if value is None or pd.isna(value):
-        return None
-
-    value = str(value).strip()
-
-    # Check if it exists as a column in forecasts_df (direct data reference)
-    if forecasts_df is not None and value in forecasts_df.columns:
-        return forecasts_df[value]  # Return actual data series
-
-    # Otherwise treat as algorithm name and return as-is
-    return value
-
-
 def load_file(
     path: str,
     config: dict,
@@ -807,55 +778,45 @@ def load_config_and_create_forecaster(
                     # Strategy 1: Normalized load profile (profile-guided operation)
                     normalized_profile = None
                     profile_col = f"{id}_normalized_load_profile"
-                    if forecasts_df is not None and profile_col in forecasts_df.columns:
-                        normalized_profile = forecasts_df[profile_col]
-                    elif (
-                        forecasts_df is not None
-                        and "normalized_load_profile" in forecasts_df.columns
-                    ):
-                        # Fallback: use generic column if ID-specific not found
-                        normalized_profile = forecasts_df["normalized_load_profile"]
 
-                    # Strategy 2: Hourly minimum steel demand (min-demand operation)
                     steel_demand = None
                     demand_col = f"{id}_steel_demand"
-                    if forecasts_df is not None and demand_col in forecasts_df.columns:
-                        steel_demand = forecasts_df[demand_col]
-                    elif (
-                        forecasts_df is not None
-                        and "steel_demand" in forecasts_df.columns
-                    ):
-                        # Fallback: use generic column if ID-specific not found
-                        steel_demand = forecasts_df["steel_demand"]
+                    if forecasts_df is not None:
+                        if profile_col in forecasts_df.columns:
+                            normalized_profile = forecasts_df[profile_col]
+                        elif "normalized_load_profile" in forecasts_df.columns:
+                            # Fallback: use generic column if ID-specific not found
+                            normalized_profile = forecasts_df["normalized_load_profile"]
+
+                        # Strategy 2: Hourly minimum steel demand (min-demand operation)
+                        if demand_col in forecasts_df.columns:
+                            steel_demand = forecasts_df[demand_col]
+                        elif "steel_demand" in forecasts_df.columns:
+                            # Fallback: use generic column if ID-specific not found
+                            steel_demand = forecasts_df["steel_demand"]
 
                     # Resolve electricity price source: either algorithm or direct column
                     price_update_source = unit.get(
                         "forecast_electricity_price_update", None
                     )
-                    price_update_resolved = resolve_forecast_source(
-                        price_update_source, forecasts_df
-                    )
 
-                    # Setup forecast algorithms and initial market prices
-                    final_algorithms = unit_forecast_algorithms.copy()
-                    initial_market_prices = {}
-
-                    if isinstance(price_update_resolved, pd.Series):
-                        # Direct column: use as initial market prices
-                        initial_market_prices["EOM"] = price_update_resolved
-                        # Don't set update_price - will use default update
-                    elif isinstance(price_update_resolved, str):
-                        # Algorithm name: use for price updates
-                        final_algorithms["update_price"] = price_update_resolved
+                    if price_update_source is not None:
+                        price_forecast = forecasts_df.get(price_update_source, None)
+                        initial_market_prices = {}
+                        if price_forecast is not None:
+                            initial_market_prices["EOM"] = price_forecast
+                        else:
+                            unit_forecast_algorithms["update_price"] = (
+                                price_update_source
+                            )
 
                     unit_forecasts[id] = SteelplantForecaster(
                         index=shared_unit_index,
                         availability=availability.get(
                             id, pd.Series(1.0, index, name=id)
                         ),
-                        market_prices=initial_market_prices
-                        or unit.get("market_prices"),
-                        forecast_algorithms=final_algorithms,
+                        market_prices=initial_market_prices,
+                        forecast_algorithms=unit_forecast_algorithms,
                         forecast_registries=None,
                         fuel_prices=fuel_prices_df,
                         normalized_load_profile=normalized_profile,
