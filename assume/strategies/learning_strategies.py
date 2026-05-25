@@ -1331,3 +1331,254 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
             self.learning_role.add_reward_to_cache(
                 unit.id, start, reward, regret, profit
             )
+
+
+class RenewableEnergyLearningCompatibleStrategy(EnergyLearningSingleBidStrategy):
+    """
+    Reinforcement Learning Strategy for renewable units that is dimension-compatible
+    with storage and generator learning strategies.
+
+    This strategy inherits from ``EnergyLearningSingleBidStrategy`` and sets
+    ``unique_obs_dim=2`` so that the resulting observation dimension (``obs_dim=74``)
+    matches the storage and generator strategies exactly.  This allows all three
+    unit types to share a single centralised MATD3 critic.
+
+    Compared to ``RenewableEnergyLearningSingleBidStrategy`` (which uses
+    ``unique_obs_dim=3``), this variant drops marginal cost from the individual
+    observations.  Marginal cost is near-zero and essentially constant for
+    renewables, so it provides no useful learning signal.  The availability
+    observation — which tells the agent how much generation capacity is actually
+    available — is retained.
+
+    Individual observations returned:
+        - ``scaled_total_dispatch``  – current output / max_power
+        - ``scaled_available_power`` – available power / max_power
+
+    The ``calculate_reward`` method uses renewable-specific opportunity-cost logic
+    (based on available generation rather than installed capacity), identical to
+    ``RenewableEnergyLearningSingleBidStrategy``.
+
+    Attributes
+    ----------
+    foresight : int
+        Number of forecast look-ahead time steps.  Default 24.
+    act_dim : int
+        Action dimension (single bid price).  Default 1.
+    unique_obs_dim : int
+        Unit-specific observation dimension.  Fixed at 2 for critic compatibility.
+    """
+
+    def __init__(self, *args, **kwargs):
+        foresight = kwargs.pop("foresight", 24)
+        act_dim = kwargs.pop("act_dim", 1)
+        # Force unique_obs_dim=2 so obs_dim matches storage/generator strategies
+        kwargs.pop("unique_obs_dim", None)
+        super().__init__(
+            foresight=foresight,
+            act_dim=act_dim,
+            unique_obs_dim=2,
+            *args,
+            **kwargs,
+        )
+
+    def get_individual_observations(
+        self, unit: SupportsMinMaxCharge, start: datetime, end: datetime
+    ):
+        """
+        Return unit-specific observations for renewable units (compatible variant).
+
+        Only two observations are returned so that ``unique_obs_dim`` equals 2,
+        matching the storage and generator learning strategies.
+
+        Parameters
+        ----------
+        unit : SupportsMinMaxCharge
+            The renewable unit.
+        start : datetime.datetime
+            Start of the observation period.
+        end : datetime.datetime
+            End of the observation period.
+
+        Returns
+        -------
+        np.ndarray
+            ``[scaled_total_dispatch, scaled_available_power]``
+        """
+        current_volume = unit.get_output_before(start)
+        _, available_power = unit.calculate_min_max_power(start, end)
+
+        scaled_total_dispatch = current_volume / unit.max_power
+        scaled_available_power = available_power[0] / unit.max_power
+
+        return np.array([scaled_total_dispatch, scaled_available_power])
+
+    def get_actions(self, next_observation):
+        """
+        Determines actions based on the current observation.
+
+        Overrides EnergyLearningStrategy.get_actions to remove the marginal cost
+        exploration bias, which is inappropriate for renewables where marginal cost
+        has been removed from the observation space. Falls back to pure noise-driven
+        exploration during initial experience collection.
+        """
+        curr_action, noise = TorchLearningStrategy.get_actions(self, next_observation)
+        return curr_action, noise
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Generates a single price bid for the full available capacity (max_power).
+
+        Overrides the parent to remap the action space from [-1, 1] to [0, max_bid_price]
+        instead of [-max_bid_price, +max_bid_price]. This prevents negative bids, which
+        are not meaningful for renewable units with near-zero marginal cost.
+
+        Returns
+        -------
+        Orderbook
+            A list containing one bid with start/end time, full volume, and calculated price.
+        """
+
+        start = product_tuples[0][0]
+        end = product_tuples[0][1]
+        # get technical bounds for the unit output from the unit
+        _, max_power = unit.calculate_min_max_power(start, end)
+        max_power = max_power[0]
+
+        # =============================================================================
+        # 1. Get the Observations, which are the basis of the action decision
+        # =============================================================================
+        next_observation = self.create_observation(
+            unit=unit,
+            market_id=market_config.market_id,
+            start=start,
+            end=end,
+        )
+
+        # =============================================================================
+        # 2. Get the Actions, based on the observations
+        # =============================================================================
+        actions, noise = self.get_actions(next_observation)
+
+        # =============================================================================
+        # 3. Transform Actions into bids
+        # =============================================================================
+        # Remap from [-1, 1] to [0, max_bid_price] for renewables.
+        # A linear remap (instead of clamping) preserves full gradient resolution
+        # across the valid bid range.
+        bid_price = ((actions[0] + 1) / 2) * self.max_bid_price
+
+        # actually formulate bids in orderbook format
+        bids = [
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "price": bid_price,
+                "volume": max_power,
+                "node": unit.node,
+            },
+        ]
+
+        if self.learning_mode:
+            self.learning_role.add_actions_to_cache(self.unit_id, start, actions, noise)
+
+        return bids
+
+    def calculate_reward(
+        self,
+        unit: SupportsMinMaxCharge,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+    ):
+        """
+        Calculate the reward for the renewable unit.
+
+        Uses renewable-specific opportunity-cost logic identical to
+        ``RenewableEnergyLearningSingleBidStrategy``: opportunity cost is
+        computed against the *available* generation (from the offered volume)
+        rather than the full installed capacity.
+
+        Parameters
+        ----------
+        unit : SupportsMinMaxCharge
+            The renewable unit.
+        marketconfig : MarketConfig
+            Market configuration.
+        orderbook : Orderbook
+            Executed orders from market clearing.
+        """
+        product_type = marketconfig.product_type
+
+        start = orderbook[0]["start_time"]
+        end = orderbook[0]["end_time"]
+        end_excl = end - unit.index.freq
+
+        marginal_cost = unit.calculate_marginal_cost(
+            start, unit.outputs[product_type].at[start]
+        )
+        market_clearing_price = orderbook[0]["accepted_price"]
+
+        duration = (end - start) / timedelta(hours=1)
+
+        income = 0.0
+        operational_cost = 0.0
+
+        accepted_volume_total = 0
+        offered_volume_total = 0
+
+        for order in orderbook:
+            accepted_volume = order.get("accepted_volume", 0)
+            accepted_volume_total += accepted_volume
+
+            offered_volume_total += order["volume"]
+
+            order_income = market_clearing_price * accepted_volume * duration
+            order_cost = marginal_cost * accepted_volume * duration
+
+            income += order_income
+            operational_cost += order_cost
+
+        if (
+            unit.outputs[product_type].at[start] != 0
+            and unit.outputs[product_type].at[start - unit.index.freq] == 0
+        ):
+            operational_cost += unit.hot_start_cost / 2
+        elif (
+            unit.outputs[product_type].at[start] == 0
+            and unit.outputs[product_type].at[start - unit.index.freq] != 0
+        ):
+            operational_cost += unit.hot_start_cost / 2
+
+        profit = income - operational_cost
+
+        profit_scale = 1
+        profit = min(profit, profit_scale * abs(profit))
+
+        available_power = offered_volume_total
+
+        if available_power == 0:
+            scaling = 0
+        else:
+            scaling = 1 / (self.max_bid_price * available_power)
+
+        # Regret term removed for renewables: near-zero marginal cost causes the regret
+        # mechanism to create a one-directional incentive to bid at the price floor,
+        # regardless of market conditions. Profit-only reward provides sufficient signal:
+        # positive reward when dispatched at positive prices, negative reward at negative
+        # prices, zero when not dispatched.
+        regret = 0
+        reward = scaling * (profit - regret)
+
+        unit.outputs["profit"].loc[start:end_excl] += profit
+        unit.outputs["total_costs"].loc[start:end_excl] += operational_cost
+
+        if self.learning_mode:
+            self.learning_role.add_reward_to_cache(
+                unit.id, start, reward, regret, profit
+            )
