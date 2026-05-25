@@ -1,0 +1,3 @@
+name,technology,bidding_EOM,bidding_aFRR_cap_pos,bidding_aFRR_cap_neg,bidding_aFRR_en_pos,bidding_aFRR_en_neg,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,ramp_up,ramp_down,hot_start_cost,warm_start_cost,cold_start_cost,min_operating_time,min_down_time,unit_operator
+Gas_CCGT,combined cycle gas turbine,powerplant_energy_heuristic_flexable,powerplant_afrr_cap_block,powerplant_afrr_cap_block,powerplant_afrr_energy,powerplant_afrr_energy,natural gas,0.2,1000,200,0.5,5,500,500,30,15,5,1,1,GasOp
+Coal_PP,hard coal,powerplant_energy_heuristic_flexable,powerplant_afrr_cap_block,powerplant_afrr_cap_block,powerplant_afrr_energy,powerplant_afrr_energy,hard coal,0.3,800,300,0.4,2,200,200,40,20,8,2,2,CoalOp

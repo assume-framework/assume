@@ -1,0 +1,6 @@
+name,technology,bidding_EOM,bidding_aFRR_cap_pos,bidding_aFRR_cap_neg,bidding_aFRR_en_pos,bidding_aFRR_en_neg,max_power,min_power,unit_operator
+demand_EOM,inflex_demand,demand_energy_naive,,,,,1000000,0,eom_demand
+demand_aFRR_cap_pos,reserve_capacity,,demand_energy_naive,,,,1000,0,afrr_demand
+demand_aFRR_cap_neg,reserve_capacity,,,demand_energy_naive,,,1000,0,afrr_demand
+demand_aFRR_en_pos,reserve_energy,,,,demand_energy_naive,,1000,0,afrr_demand
+demand_aFRR_en_neg,reserve_energy,,,,,demand_energy_naive,1000,0,afrr_demand

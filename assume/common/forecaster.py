@@ -61,16 +61,20 @@ def calculate_base_forecasts(
 
     for config in market_configs:
         market_id = config.market_id
+
+        # Honor an explicit override from forecast_df regardless of product_type.
+        # For non-energy markets (capacity_pos/neg, energy_pos/neg used by aFRR/CRM),
+        # there is no merit-order forecast algorithm, so the override is the only
+        # way to provide a price series.
+        override = forecast_df.get(f"{prefix}_{market_id}")
+        if override is not None:
+            forecast[market_id] = override
+            continue
+
         if config.product_type != "energy":
             log.warning(
                 f"Forecast could not be calculated for {market_id}. It can only be calculated for energy-only markets for now."
             )
-            continue
-
-        # NOTE: if given forecast_df will currently always prevent other forecast calculations
-        forecast[market_id] = forecast_df.get(f"{prefix}_{market_id}")
-        if forecast[market_id] is not None:
-            # go next if forecast existing
             continue
 
         forecast[market_id] = forecast_algorithm(

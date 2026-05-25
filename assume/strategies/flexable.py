@@ -548,16 +548,30 @@ def calculate_EOM_price_if_on(
     if bid_quantity_inflex == 0:
         return 0
 
-    # check the starting cost if the unit were turned off for min_down_time
-    starting_cost = unit.get_starting_costs(-unit.min_down_time)
+    # If the unit has any aFRR/CRM commitment at this hour (capacity_pos or
+    # capacity_neg > 0), it is contractually required to stay online regardless
+    # of the EOM clearing outcome. The "lower the bid to avoid a costly
+    # shutdown" rationale does not apply in that case, so we skip the
+    # price reduction. Without this guard, an aFRR-committed unit would
+    # over-incentivize cheap EOM bids in low-price hours.
+    has_capacity_commitment = (
+        float(unit.outputs["capacity_pos"].at[start]) > 0
+        or float(unit.outputs["capacity_neg"].at[start]) > 0
+    )
 
-    # disregard unit.min_down_time of 0 to avoid division by zero
-    if unit.min_down_time == 0:
-        price_reduction_restart = starting_cost / bid_quantity_inflex
+    if has_capacity_commitment:
+        price_reduction_restart = 0.0
     else:
-        price_reduction_restart = (
-            starting_cost / unit.min_down_time / bid_quantity_inflex
-        )
+        # check the starting cost if the unit were turned off for min_down_time
+        starting_cost = unit.get_starting_costs(-unit.min_down_time)
+
+        # disregard unit.min_down_time of 0 to avoid division by zero
+        if unit.min_down_time == 0:
+            price_reduction_restart = starting_cost / bid_quantity_inflex
+        else:
+            price_reduction_restart = (
+                starting_cost / unit.min_down_time / bid_quantity_inflex
+            )
 
     if unit.outputs["heat"].at[start] > 0:
         heat_gen_cost = (
