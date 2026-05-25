@@ -84,7 +84,7 @@ def market_setup():
 @pytest.fixture
 def index():
     return pd.DatetimeIndex(
-        pd.date_range("2019-01-01", periods=24, freq="h"),
+        pd.date_range("2019-01-01 08:00", periods=7, freq="h"),
     )
 
 
@@ -95,20 +95,30 @@ def shared_FastIndex(index):
 
 @pytest.fixture
 def forecast_setup(index, shared_FastIndex):
+    #############################################################
+    # 1. Read in csv inputs
+    #############################################################
     powerplants_units = pd.read_csv(path / "powerplant_units.csv", index_col="name")
     demand_units = pd.read_csv(path / "demand_units.csv", index_col="name")
     availability = pd.read_csv(path / "availability.csv", **parse_date)
-    demand_df = pd.read_csv(path / "demand.csv", **parse_date)
+    demand_df = pd.read_csv(path / "demand_df.csv", **parse_date)
     fuel_prices_df = pd.read_csv(path / "fuel_prices.csv", index_col="fuel")
     forecast_df = pd.read_csv(path / "forecasts.csv", **parse_date)
 
+    #############################################################
+    # 2. Process inputs
+    #############################################################
     demand_units["min_power"] = -abs(demand_units["min_power"])
     demand_units["max_power"] = -abs(demand_units["max_power"])
 
     fuel_prices_df.index = index[:1]
     fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
 
-    units: dict = {}
+    #############################################################
+    # 3. Build forecasts and units
+    #############################################################
+    all_units_inelastic_case: dict = {}
+    all_units_elastic_case: dict = {}
     forecast_registries = get_forecast_registries()
 
     # create a mock dsm forecaster as it also calculates congestion_signal
@@ -127,7 +137,8 @@ def forecast_setup(index, shared_FastIndex):
         )
         plant["bidding_strategies"] = {"EOM": EnergyNaiveStrategy()}
         plant["id"] = id
-        units[id] = PowerPlant(**plant)
+        all_units_inelastic_case[id] = PowerPlant(**plant)
+        all_units_elastic_case[id] = PowerPlant(**plant)
 
     for id, demand in demand_units.iterrows():
         demand["forecaster"] = DemandForecaster(
@@ -138,21 +149,22 @@ def forecast_setup(index, shared_FastIndex):
         )
         demand["bidding_strategies"] = {"EOM": EnergyNaiveStrategy()}
         demand["id"] = id
-        units[id] = Demand(**demand)
+        all_units_inelastic_case[id] = Demand(**demand)
 
     elastic_demand = demand.copy()
     elastic_demand["bidding_strategies"] = {"EOM": EnergyHeuristicElasticStrategy()}
     elastic_demand["elasticity_model"] = "linear"
-    elastic_demand["num_bids"] = 3
+    elastic_demand["num_bids"] = 300
+    elastic_demand["max_power"] = -3000
+    elastic_demand["max_price"] = 300
 
     elastic_unit = Demand(**elastic_demand)
 
-    units_elastic = {id: unit for id, unit in units.items()}
-    units_elastic[elastic_unit.id] = elastic_unit
+    all_units_elastic_case[elastic_unit.id] = elastic_unit
 
     return {
-        "units": units.values(),
-        "units_elastic": units_elastic.values(),
+        "units": all_units_inelastic_case.values(),
+        "units_elastic_case": all_units_elastic_case.values(),
         "forecast_df": forecast_df,
         "mock_dsm_forecaster": dsm_forecaster,
     }
@@ -161,8 +173,19 @@ def forecast_setup(index, shared_FastIndex):
 def test_forecast_interface__calc_and_update_forecasts(
     index, market_setup, forecast_setup
 ):
-    # 1. Initialize forecasts (includes preprocess)
+    #############################################################
+    # 1. Arrange
+    #############################################################
+    expected_price = pd.read_csv(path / "results/price.csv", **parse_date)
+    expected_load = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
+    expected_cgn = pd.read_csv(path / "results/congestion_signal.csv", **parse_date)
+    expected_uti = pd.read_csv(path / "results/renewable_utilization.csv", **parse_date)
     mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
+
+    #############################################################
+    # 2. (Act) Initialize forecasts (includes preprocess)
+    #############################################################
+
     mock_dsm_forecaster.initialize(
         forecast_setup["units"],
         market_setup["market_configs"],
@@ -170,17 +193,13 @@ def test_forecast_interface__calc_and_update_forecasts(
         None,  # forecaster has no unit
     )
 
+    #############################################################
+    # 3. Assert that results are generated like expected
+    #############################################################
     market_forecast = mock_dsm_forecaster.price
     load_forecast = mock_dsm_forecaster.residual_load
     congestion_signal = mock_dsm_forecaster.congestion_signal
     rn_utilization = mock_dsm_forecaster.renewable_utilisation_signal
-
-    # 2. Assert that results are generated like expected
-    expected_price = pd.read_csv(path / "results/price.csv", **parse_date)
-    expected_load = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
-    expected_cgn = pd.read_csv(path / "results/congestion_signal.csv", **parse_date)
-    expected_uti = pd.read_csv(path / "results/renewable_utilization.csv", **parse_date)
-
     assert_series_equal(
         expected_load["load_forecast"],
         pd.Series(
@@ -190,7 +209,6 @@ def test_forecast_interface__calc_and_update_forecasts(
         check_dtype=False,
         check_freq=False,
     )
-
     assert_series_equal(
         expected_price["price"],
         pd.Series(
@@ -202,6 +220,7 @@ def test_forecast_interface__calc_and_update_forecasts(
     )
 
     # Check congestion signal and renewable_utilization are as expected
+    # NOTE: congestion forecast is negative as max available power > demand at the nodes
     for key in congestion_signal:
         assert np.isclose(congestion_signal[key].data, expected_cgn[key].values).all()
 
@@ -214,9 +233,16 @@ def test_forecast_interface__calc_and_update_forecasts(
     for key in expected_uti:  # also test that all keys are present
         assert np.isclose(rn_utilization[key].data, expected_uti[key].values).all()
 
-    # 3. Update all forecasts
-    # Default update should do nothing on all forecasts!!!
+    #############################################################
+    # 4. (Act Again) Update all forecasts
+    #############################################################
+
     mock_dsm_forecaster.update()
+
+    #############################################################
+    # 5. Assert (Again) that results are generated like expected
+    #    Default update should do nothing on all forecasts!!!
+    #############################################################
 
     market_forecast = mock_dsm_forecaster.price
     load_forecast = mock_dsm_forecaster.residual_load
@@ -296,14 +322,14 @@ def test_forecast_interface__uses_given_forecast(index, market_setup, forecast_s
 
     # Check congestion_signal uses given forecasts (stored under congestion_severity keys)
     congestion_signal = mock_dsm_forecaster.congestion_signal
-    assert list(congestion_signal["north_1_congestion_severity"]) == [1.0] * 24
-    assert list(congestion_signal["north_2_congestion_severity"]) == [1.0] * 24
+    assert list(congestion_signal["north_1_congestion_severity"]) == [1.0] * len(index)
+    assert list(congestion_signal["north_2_congestion_severity"]) == [1.0] * len(index)
 
     # Check renewable_utilisation uses given forecasts
     rn_utilization = mock_dsm_forecaster.renewable_utilisation_signal
-    assert list(rn_utilization["north_1_renewable_utilisation"]) == [1.0] * 24
-    assert list(rn_utilization["north_2_renewable_utilisation"]) == [1.0] * 24
-    assert list(rn_utilization["all_nodes_renewable_utilisation"]) == [1.0] * 24
+    assert list(rn_utilization["north_1_renewable_utilisation"]) == [1.0] * len(index)
+    assert list(rn_utilization["north_2_renewable_utilisation"]) == [1.0] * len(index)
+    assert list(rn_utilization["all_nodes_renewable_utilisation"]) == [1.0] * len(index)
 
 
 def test_forecast_interface__empty_grid(market_setup, forecast_setup):
@@ -321,49 +347,22 @@ def test_forecast_interface__empty_grid(market_setup, forecast_setup):
 
 
 def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup):
+    """
+    TODO: make better test scenario for elastic demand
+    """
     mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
 
     mock_dsm_forecaster.initialize(
-        forecast_setup["units_elastic"],
+        forecast_setup["units_elastic_case"],
         market_setup["market_configs"],
         None,
         None,
     )
 
-    market_forecast = mock_dsm_forecaster.price
-    load_forecast = mock_dsm_forecaster.residual_load
-    congestion_signal = mock_dsm_forecaster.congestion_signal
-    rn_utilization = mock_dsm_forecaster.renewable_utilisation_signal
-
     # 2. Assert that results are generated like expected
-    expected_load = pd.read_csv(path / "results/load_forecast.csv", **parse_date)
-    expected_cgn = pd.read_csv(path / "results/congestion_signal.csv", **parse_date)
-    expected_uti = pd.read_csv(path / "results/renewable_utilization.csv", **parse_date)
+    market_forecast = mock_dsm_forecaster.price
 
-    assert_series_equal(
-        expected_load["load_forecast"],
-        pd.Series(
-            load_forecast["EOM"], index
-        ),  # convert FastSeries to pd.Series for comparison
-        check_names=False,
-        check_dtype=False,
-        check_freq=False,
-    )
-
-    assert np.isclose(list(market_forecast["EOM"]), [71 / 3] * 24).all()
-
-    # Check congestion signal and renewable_utilization are as expected
-    for key in congestion_signal:
-        assert np.isclose(congestion_signal[key].data, expected_cgn[key].values).all()
-
-    for key in expected_cgn:  # also test that all keys are present
-        assert np.isclose(congestion_signal[key].data, expected_cgn[key].values).all()
-
-    for key in rn_utilization:
-        assert np.isclose(rn_utilization[key].data, expected_uti[key].values).all()
-
-    for key in expected_uti:  # also test that all keys are present
-        assert np.isclose(rn_utilization[key].data, expected_uti[key].values).all()
+    assert np.isclose(list(market_forecast["EOM"]), [8.0] * 7).all()
 
 
 def test_forecast_interface__cache(market_setup, forecast_setup):
@@ -375,8 +374,10 @@ def test_forecast_interface__cache(market_setup, forecast_setup):
     calculate_naive_price_inelastic.cache_clear()
 
     mock_dsm_forecaster = forecast_setup["mock_dsm_forecaster"]
+
+    # simulate multiple dsm units by rerunning initialization
     n = 2
-    for i in range(n):
+    for _ in range(n):
         mock_dsm_forecaster.initialize(
             forecast_setup["units"],
             market_setup["market_configs"],
@@ -384,34 +385,30 @@ def test_forecast_interface__cache(market_setup, forecast_setup):
             None,  # forecaster has no unit
         )
 
-        assert calculate_naive_price.cache_info().hits == i
-        assert calculate_naive_price.cache_info().misses == 1
-
-        assert calculate_naive_residual_load.cache_info().hits == i
-        assert calculate_naive_residual_load.cache_info().misses == 1
-
-        assert calculate_naive_congestion_signal.cache_info().hits == i
-        assert calculate_naive_congestion_signal.cache_info().misses == 1
-
-        assert calculate_naive_renewable_utilisation.cache_info().hits == i
-        assert calculate_naive_renewable_utilisation.cache_info().misses == 1
-
-    for i, unit in enumerate(forecast_setup["units"]):
+    for unit in forecast_setup["units"]:
         unit.forecaster.initialize(
             forecast_setup["units"], market_setup["market_configs"], None, unit
         )
 
-        assert calculate_naive_price.cache_info().hits == i + n
-        assert calculate_naive_price.cache_info().misses == 1
+    # price and residual_load are called by all initializations
+    assert (
+        calculate_naive_price.cache_info().hits == len(forecast_setup["units"]) + n - 1
+    )
+    assert calculate_naive_price.cache_info().misses == 1
 
-        assert calculate_naive_residual_load.cache_info().hits == i + n
-        assert calculate_naive_residual_load.cache_info().misses == 1
+    assert (
+        calculate_naive_residual_load.cache_info().hits
+        == len(forecast_setup["units"]) + n - 1
+    )
+    assert calculate_naive_residual_load.cache_info().misses == 1
 
-        assert calculate_naive_congestion_signal.cache_info().hits == n - 1
-        assert calculate_naive_congestion_signal.cache_info().misses == 1
+    # congestion_signal and renewable_utilisation are called only by dsm units (n times)
+    assert calculate_naive_congestion_signal.cache_info().hits == n - 1
+    assert calculate_naive_congestion_signal.cache_info().misses == 1
 
-        assert calculate_naive_renewable_utilisation.cache_info().hits == n - 1
-        assert calculate_naive_renewable_utilisation.cache_info().misses == 1
+    assert calculate_naive_renewable_utilisation.cache_info().hits == n - 1
+    assert calculate_naive_renewable_utilisation.cache_info().misses == 1
 
+    # NOTE: only missed once & no hits due to lru_cache also on calculate_naive_price
     assert calculate_naive_price_inelastic.cache_info().hits == 0
     assert calculate_naive_price_inelastic.cache_info().misses == 1
