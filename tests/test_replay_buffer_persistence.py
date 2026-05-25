@@ -7,13 +7,19 @@ import tempfile
 
 import numpy as np
 import pytest
-import torch as th
 
-from assume.reinforcement_learning.buffer import ReplayBuffer
+try:
+    import torch as th
+
+    from assume.reinforcement_learning.buffer import ReplayBuffer
+except ImportError:
+    pass
 
 
 @pytest.mark.require_learning
 def test_replay_buffer_save_load_preserves_shapes_and_metadata():
+    th = pytest.importorskip("torch")
+    
     # create a small buffer
     buffer_size = 10
     n_rl_units = 2
