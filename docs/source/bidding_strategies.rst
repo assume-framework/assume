@@ -209,6 +209,9 @@ powerplant_energy_learning_single_bid EOM                Reinforcement Learning 
                                                          effectively treating the full capacity as inflexible from a bidding perspective.
 renewable_energy_learning_single_bid  EOM                Reinforcement Learning Strategy for a renewable unit that enables the agent to learn
                                                          optimal bidding strategies on an Energy-Only Market.
+renewable_energy_learning_compatible  EOM                Renewable single-bid learning strategy with observation dimensions aligned to the
+                                                         generator and storage learning strategies so mixed-agent MATD3 setups can share a
+                                                         centralised critic while avoiding negative-price floor-seeking behaviour.
 ===================================== ================== =============================================================
 
 Learning method API references:
@@ -217,6 +220,7 @@ Learning method API references:
 - :py:meth:`assume.strategies.learning_strategies.EnergyLearningSingleBidStrategy`
 - :py:meth:`assume.strategies.learning_strategies.StorageEnergyLearningStrategy`
 - :py:meth:`assume.strategies.learning_strategies.RenewableEnergyLearningSingleBidStrategy`
+- :py:meth:`assume.strategies.learning_strategies.RenewableEnergyLearningCompatibleStrategy`
 
 Other
 -----

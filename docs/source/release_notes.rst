@@ -15,6 +15,7 @@ Upcoming Release
 
 **New Features:**
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+  - **Renewable-compatible RL strategy**: Added a renewable single-bid learning strategy with observation dimensions that match the generator and storage learning strategies, enabling shared MATD3 critics in mixed-agent training setups.
 
 **Improvements:**
   - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.
@@ -25,6 +26,7 @@ Upcoming Release
   - **Fix bug in forecasts**, that occurred when using complex clearing
   - **Fix infeasible power output in PowerPlant**: ``calculate_min_max_power`` now correctly accounts for base load, positive/negative capacity reserves, and heat demand when computing additional power. If reduced availability makes the unit infeasible to run, both min and max power are set to 0. A warning is issued if previous dispatch exceeded available power.
   - **Fix upward redispatch potential**, so that availabilities are now correctly considered instead of the nominal power output of the unit
+  - **Improve renewable RL bidding behaviour**: Renewable-compatible learning now remaps its action space to a non-negative bid range and removes a regret signal that otherwise pushed agents toward pathological floor-bidding.
 
 0.6.1 - (25th March 2026)
 =========================
