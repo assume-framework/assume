@@ -234,7 +234,9 @@ class UnitsOperator(Role):
             order["market_id"] = content["market_id"]
 
         marketconfig = self.registered_markets[content["market_id"]]
-        self.valid_orders[marketconfig.product_type].extend(orderbook)
+        # Only keep accepted orders for dispatch tracking —
+        # rejected orders are not needed and cause unbounded growth.
+        self.valid_orders[marketconfig.product_type].extend(accepted_orders)
         self.set_unit_dispatch(orderbook, marketconfig)
         self.write_actual_dispatch(marketconfig.product_type)
 

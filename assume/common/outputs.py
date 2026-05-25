@@ -658,6 +658,13 @@ class WriteOutput(Role):
         # insert left records into db
         await self.store_dfs()
 
+        # Dispose the SQLAlchemy engine to release pooled connections
+        if self.db is not None:
+            try:
+                self.db.dispose()
+            except Exception:
+                pass
+
         if self.db is None:
             return
 

@@ -737,16 +737,52 @@ def parse_duration(duration_str):
 
 def calculate_content_size(content: list | dict) -> int:
     """
-    Calculate the size of a content in bytes.
+    Calculate the deep memory size of content in bytes.
+
+    Uses recursive traversal to account for nested structures,
+    DataFrames, numpy arrays, and torch tensors — unlike sys.getsizeof
+    which only measures the shallow container size.
     """
-    if isinstance(content, dict):  # For dictionaries
+    try:
+        import pandas as pd
+
+        if isinstance(content, pd.DataFrame):
+            return int(content.memory_usage(deep=True).sum())
+        if isinstance(content, pd.Series):
+            return int(content.memory_usage(deep=True))
+    except Exception:
+        pass
+
+    try:
+        import numpy as np
+
+        if isinstance(content, np.ndarray):
+            return content.nbytes
+    except Exception:
+        pass
+
+    try:
+        import torch
+
+        if isinstance(content, torch.Tensor):
+            return content.nelement() * content.element_size()
+    except Exception:
+        pass
+
+    if isinstance(content, dict):
         return sys.getsizeof(content) + sum(
-            sys.getsizeof(value) for value in content.values()
+            calculate_content_size(k) + calculate_content_size(v)
+            for k, v in content.items()
         )
-    elif isinstance(content, list):  # For lists, including lists of dicts
+    elif isinstance(content, (list, tuple)):
         return sys.getsizeof(content) + sum(
             calculate_content_size(item) for item in content
         )
+    elif isinstance(content, str):
+        return sys.getsizeof(content)
+    elif isinstance(content, (int, float, bool, type(None))):
+        return sys.getsizeof(content)
+    # Fallback for unknown types
     return sys.getsizeof(content)
 
 
