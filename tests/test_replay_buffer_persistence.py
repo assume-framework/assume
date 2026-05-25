@@ -6,11 +6,13 @@ import os
 import tempfile
 
 import numpy as np
+import pytest
 import torch as th
 
 from assume.reinforcement_learning.buffer import ReplayBuffer
 
 
+@pytest.mark.require_learning
 def test_replay_buffer_save_load_preserves_shapes_and_metadata():
     # create a small buffer
     buffer_size = 10
