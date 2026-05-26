@@ -28,6 +28,8 @@ def _clear_with_inserted(sp_r, sv_r, dp, dv, idx, new_price, new_volume):
     last_ok_price = 0.0  # last valid clearing price
     cleared = 0.0  # cleared volume
     cum_before_k = 0.0  # last supply volume before current volume addition
+    vol_at_price = 0.0
+
 
     # go through redisual supply bids + virtually inserted new bid
     for i in range(n_r + 1):
@@ -39,87 +41,108 @@ def _clear_with_inserted(sp_r, sv_r, dp, dv, idx, new_price, new_volume):
         else:  # normal supply bids (with adjusted index i)
             sp_i = sp_r[i - 1]; sv_i = sv_r[i - 1]
 
-        # Accumulate demands volume dv as long as its price dp is above supply price sp_i (dp descending)
-        while j < n_d and dp[j] >= sp_i:
-            dem_avail += dv[j]
+        # Reduce available demand by bids that cant be used anymore (dp ascending)
+        while j < n_d and dp[j] < sp_i:
+            dem_avail -= dv[j]
             j += 1
 
         # if available demand > supply from last round we can still add some supply
         # at this market price
         if cum_s < dem_avail:
             last_ok = i
+            if sp_i != last_ok_price:
+                vol_at_price = 0.0
             last_ok_price = sp_i
             cum_before_k = cum_s
             s_total = cum_s + sv_i
             cleared = dem_avail if s_total > dem_avail else s_total
-        # FIXME: if last round supply is greater than demand that I can use now -->
-        #           cannot add anything (and next round I can use less (descending dp))
-        # else: break
+            vol_at_price += cleared - cum_before_k  # add what got added to cleared
+        else:  # if last round cannot satisfy demand, this round is worse (sp ascending)
+            break
         cum_s += sv_i
-        # FIXME: Shouldn't j get reset to 0 
-        # --> as dp descending to small sp_i, in next iteration this will not be valid anymore!!!!?
-        
 
-    return last_ok_price, last_ok, cleared, cum_before_k
+
+    return last_ok_price, last_ok, cleared, cum_before_k, vol_at_price
 
 
 @njit(cache=True)
 def _probe_classify(sp_r, sv_r, dp, dv, new_price, new_volume):
     """Returns (clear_price, accepted_volume, state).
-    state: -1 fully inframarginal, 0 marginal, +1 fully extramarginal."""
+    state: -1 fully inframarginal, 0 marginal, +1 fully extramarginal.
+    
+    Splitting rule: give credit to current unit first 
+    """
     n = sp_r.shape[0]
     idx = 0
     # find index before new price
     while idx < n and sp_r[idx] < new_price:
         idx += 1
 
-    cp, k, cleared, cum_before = _clear_with_inserted(
+    # cp: clearing price, k: index of last dispatched unit (marginal unit)
+    # cleared: total cleared volume, cum_before: last fully cleared volume
+    # vol_at_price: dispatched volume at this price
+    cp, k, cleared, cum_before, vol_at_price = _clear_with_inserted(
         sp_r, sv_r, dp, dv, idx, new_price, new_volume
     )
 
-    if k < 0 or idx > k:
-        return cp, 0.0, 1
-    if idx < k:
+    # cp < new_price: unit not accepted --> extramarginal, k < 0: nothing got accepted
+    if cp < new_price or k < 0:
+        return cp, 0.0, 1  # extramarginal
+    
+    # cp > new_price: unit got fully accepted --> inframarginal
+    if cp > new_price:
         return cp, new_volume, -1
-    # idx == k → unit is marginal
-    accepted = cleared - cum_before
-    if accepted >= new_volume - 1e-9:
-        return cp, accepted, -1
-    if accepted <= 1e-9:
-        return cp, accepted, 1
+
+    #cp == new_price: --> unit is marginal (at correct price)
+
+    # accepted = cleared - cum_before  # deterministic based on sort
+    
+    # assume that current unit got all volume at this price
+    accepted = new_volume if vol_at_price >= new_volume else vol_at_price
     return cp, accepted, 0
+
+    #if k < 0 or idx > k:
+    #    return cp, 0.0, 1
+    
+    # idx < k: unit got fully accepted 
+    #if idx < k:
+    #    return cp, new_volume, -1
+    # idx == k → unit is marginal
+    #accepted = cleared - cum_before
+    #if accepted >= new_volume - 1e-9:
+    #    return cp, accepted, -1
+    #if accepted <= 1e-9:
+    #    return cp, accepted, 1
+    #return cp, accepted, 0
 
 
 @njit(cache=True)
 def _walk_outward(sp_r, sv_r, dp, dv, unit_price, unit_volume,
                   out_probe_prices, out_clear_prices, out_accepted_vols):
     """
-    sp_r: residual supply prices (excluding unit price)
-    sv_r: residual supply volumes (excluding unit volume)
-    dp: demand prices
-    dv: demand volumes
+    sp_r: residual supply prices (excluding unit price, ascending)
+    sv_r: residual supply volumes (excluding unit volume, ascending)
+    dp: demand prices  (ascending)
+    dv: demand volumes  (ascending)
     out_...: buffers for results
 
     Walk outward from unit_price. Fills the three output buffers in ascending
     price order. Returns the number of probes written."""
-
-    # get starting position: start from unit price????????!!!!!!
-    # FIXME: ---> maybe go to market price instead
-    #             put start after: "probe at units own price" --> get cp from that
-    #                   --> do while until: sp_r[start] < cp:
     n_r = sp_r.shape[0]
-    start = 0
-    while start < n_r and sp_r[start] < unit_price:
-        start += 1
     n_cand = n_r + 1
 
     # Scratch buffers indexed by candidate position
-    pr_buf = np.empty(n_cand)
-    cp_buf = np.empty(n_cand)
-    av_buf = np.empty(n_cand)
+    pr_buf = np.empty(n_cand)  # probing price
+    cp_buf = np.empty(n_cand)  # clearing price
+    av_buf = np.empty(n_cand)  # accepted volume
 
     # Probe at start (the unit's own price)
     cp, av, st = _probe_classify(sp_r, sv_r, dp, dv, unit_price, unit_volume)
+
+    # start at current clearing price
+    start = 0
+    while start < n_r and sp_r[start] < cp:
+        start += 1
     pr_buf[start] = unit_price
     cp_buf[start] = cp
     av_buf[start] = av
@@ -158,7 +181,7 @@ def _walk_outward(sp_r, sv_r, dp, dv, unit_price, unit_volume,
 
 def _process_timestep(timestep, ts_data):
     """Module-level, pickles cleanly across workers."""
-    sp, sv, su, dp, dv, cum_dv = ts_data
+    sp, sv, su, dp, dv, cum_dv, cp, av = ts_data
     # cum_dv unused here — the JIT version computes demand on the fly
     out = {}
     max_probes = sp.size + 1
@@ -203,17 +226,21 @@ class FastClearing:
             p = g["price"].to_numpy(dtype=np.float64)
             v = g["volume"].to_numpy(dtype=np.float64)
             u = g["unit_id"].to_numpy()
+            # get accepted volume and clearing price ("accepted_price") of initial bid
+            cp = g["accepted_price"].to_numpy(dtype=np.float64)
+            av = g["accepted_volume"].to_numpy(dtype=np.float64)
 
             # separate supply and demand
             s = v > 0; d = v < 0
             sp, sv, su = p[s], v[s], u[s]
             dp, dv = p[d], -v[d]
 
-            # sort units based on prices (neg for demand to get highest bidding)
+            # sort units based on prices in **ascending** order
             i = np.argsort(sp, kind="stable")
-            j = np.argsort(-dp, kind="stable")
+            j = np.argsort(dp, kind="stable")
             self.ts[t] = (sp[i], sv[i], su[i],
-                          dp[j], dv[j], np.cumsum(dv[j]))
+                          dp[j], dv[j], np.cumsum(dv[j]),
+                          cp[i], av[i])
 
     def run_all_probes(self):
         """Serial version — walk-outward, single core."""
@@ -222,18 +249,91 @@ class FastClearing:
             merged.update(_process_timestep(t, data))
         return merged
 
+    def calculate_exploitability(self, units, results):
+        """Per-(timestep, unit) exploitability.
+
+        marginal_costs: iterable of (unit_id, marginal_cost) pairs, or dict.
+        results: output of run_all_probes().
+
+        For each unit, exploitability = best_response_profit - original_profit,
+        where profit = (accepted_price - marginal_cost) * accepted_volume,
+        best_response is taken over all probed bid prices, and "original"
+        refers to the probe at the unit's actual orderbook bid price.
+        """
+        #mc = dict(marginal_costs)
+        per_unit = {}
+        for (t, unit_id), probes in results.items():
+            if unit_id not in units:
+                continue
+            c = units[unit_id].marginal_cost[t] if len(units[unit_id].marginal_cost) > 1 else units[unit_id].marginal_cost
+            su, cp, av = self.ts[t][2], self.ts[t][6], self.ts[t][7]
+            original_accepted_price = float(cp[su == unit_id][0])
+            original_accepted_volume = float(av[su == unit_id][0])
+
+            original_profit = (original_accepted_price - c) * original_accepted_volume
+            best_profit = -np.inf
+            for p in probes:
+                profit = (p["accepted_price"] - c) * p["accepted_volume"]
+                if profit > best_profit:
+                    best_profit = profit
+            per_unit[(t, unit_id)] = best_profit - original_profit
+        return per_unit
+
+    def aggregate_per_timestep(self, per_unit):
+        """Sum per-unit exploitability across units for each timestep."""
+        num_units = int(len(per_unit) / len(self.ts))
+        agg = {}
+        for (t, _), e in per_unit.items():
+            agg[t] = agg.get(t, 0.0) + e / num_units
+        return agg
+
+    @staticmethod
+    def aggregate_total(per_unit):
+        """Single value: mean across all timesteps and units."""
+        return float(sum(per_unit.values())/len(per_unit.values())) 
+
+    @staticmethod
+    def plot_exploitability(per_unit, path=None):
+        """Time-series plot of total exploitability with a per-unit breakdown."""
+        import matplotlib.pyplot as plt
+
+        df = pd.DataFrame(
+            [(t, u, e) for (t, u), e in per_unit.items()],
+            columns=["time", "unit", "exploitability"],
+        )
+        per_t = df.groupby("time")["exploitability"].sum().sort_index()
+        per_u = df.groupby("unit")["exploitability"].sum().sort_values(ascending=False)
+        total = float(per_t.sum())
+
+        fig, (ax1, ax2) = plt.subplots(
+            2, 1, figsize=(12, 7), gridspec_kw={"height_ratios": [2, 1]}
+        )
+        per_t.plot(ax=ax1, marker=".")
+        ax1.set_xlabel("time")
+        ax1.set_ylabel("exploitability (sum over units)")
+        ax1.set_title(f"Exploitability over time — total: {total:.2f}")
+        ax1.grid(True, alpha=0.3)
+
+        per_u.plot(kind="bar", ax=ax2)
+        ax2.set_ylabel("exploitability (sum over time)")
+        ax2.set_title("Per-unit exploitability")
+        ax2.grid(True, axis="y", alpha=0.3)
+
+        fig.tight_layout()
+        if path:
+            fig.savefig(path)
+        return fig
+
 
 db_uri = "postgresql://assume:assume@localhost:5432/assume"
 db = create_engine(db_uri)
 
-input_path = "examples/inputs/"
-#scenario, study_case = "example_03", "base_case_2019"  # "example_03_naive"  # "example_01a"
+input_path = "examples/inputs"
+scenario, study_case = "example_03", "base_case_2019"  # "example_03_naive"  # "example_01a"
 #scenario, study_case = "example_03_naive", "base_case_2019"
-scenario, study_case = "example_01a", "base"
+#scenario, study_case = "example_01a", "base"
 
 query = f"SELECT * FROM market_orders where simulation = '{scenario}_{study_case}'"
-
-
 
 def init_database(db, query):
     # 1. Load real data once
@@ -257,7 +357,6 @@ def init_database(db, query):
     build_time = time.perf_counter() - t0
     print(f"Setup fast clearing: {build_time*1000:.1f} ms  "
         f"({len(fc.ts)} timesteps)")
-    print(fc.ts)
 
     ts0, data0 = next(iter(fc.ts.items()))
     t0 = time.perf_counter()
@@ -271,7 +370,7 @@ def init_database(db, query):
     # 3. Time the full probe sweep. Run a few times — first call may pay
     #    one-off costs (numpy import warmup, allocator settling).
     ts = next(iter(fc.ts))
-    sp, sv, su, dp, dv, cum_dv = fc.ts[ts]
+    sp, sv, su, dp, dv, cum_dv, cp, av = fc.ts[ts]
     mask = su == "Unit 3"
     sp_r, sv_r = sp[~mask], sv[~mask]
 
@@ -285,23 +384,37 @@ def init_database(db, query):
 
 df, fc = init_database(db, query)
 
-for ts in fc.ts:
-    sp, sv, su, dp, dv, cum_dv = fc.ts[ts]
-    print("supply price", sp)
-    print("supply vol", sv)
-    print("supply unit", su)
-    print("demand price", dp)
-    print("demand vol", dv)
-    break
 
-    
+results = fc.run_all_probes()
+bench = True
+calc_exploitability = False
+
+if calc_exploitability:
+    world = World(database_uri=db_uri, export_csv_path="")
+
+    # load scenario
+    load_scenario_folder(
+        world,
+        inputs_path=input_path,
+        scenario=scenario,
+        study_case=study_case,
+    )
+
+    units = world.units
+
+    per_unit = fc.calculate_exploitability(units, results)
+    per_t = fc.aggregate_per_timestep(per_unit)
+    total = fc.aggregate_total(per_unit)
+    print(f"Exploitability — total: {total:.2f}  "
+        f"(mean per timestep: {total / max(len(per_t), 1):.2f})")
+
+    fig = fc.plot_exploitability(per_unit, path="exploitability.png")
+    print("Saved plot to exploitability.png")
 
 
 
 
 
-
-bench = False
 
 if bench:
     import cProfile
