@@ -86,7 +86,7 @@ available_examples = {
     "small_learning_with_renewables": {"scenario": "example_02d", "study_case": "base"},
     #
     # full year examples to show real-world scenarios
-    "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
+    "large_2019_eom": {"scenario": "example_03_naive", "study_case": "base_case_2019"},
     "large_2019_eom_crm": {
         "scenario": "example_03",
         "study_case": "eom_crm_case_2019",
@@ -118,10 +118,10 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small"
+    example = "large_2019_eom"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
