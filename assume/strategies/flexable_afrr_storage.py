@@ -20,8 +20,6 @@ Storage-specific subtleties:
       reason about; a future version can walk a forecasted EOM dispatch.
 """
 
-from datetime import datetime
-
 import numpy as np
 
 from assume.common.base import MinMaxChargeStrategy, SupportsMinMaxCharge
@@ -63,9 +61,7 @@ class StorageAfrrCapBlockStrategy(MinMaxChargeStrategy):
         self.eom_foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
         self.activation_probability = float(kwargs.get("activation_probability", 0.05))
         self.capacity_price_floor = float(kwargs.get("capacity_price_floor", 0.0))
-        self.delivery_duration_hours = float(
-            kwargs.get("delivery_duration_hours", 1.0)
-        )
+        self.delivery_duration_hours = float(kwargs.get("delivery_duration_hours", 1.0))
         self.eom_market_id = kwargs.get("eom_market_id", "EOM")
         self.afrr_energy_market_id_pos = kwargs.get(
             "afrr_energy_market_id_pos", "aFRR_en_pos"
@@ -366,9 +362,7 @@ class StorageAfrrEnergyStrategy(MinMaxChargeStrategy):
         super().__init__(*args, **kwargs)
         self.voluntary_markup = float(kwargs.get("voluntary_markup", 0.0))
         self.voluntary_discount = float(kwargs.get("voluntary_discount", 0.0))
-        self.delivery_duration_hours = float(
-            kwargs.get("delivery_duration_hours", 1.0)
-        )
+        self.delivery_duration_hours = float(kwargs.get("delivery_duration_hours", 1.0))
 
     def calculate_bids(
         self,
@@ -492,7 +486,9 @@ class StorageAfrrEnergyStrategy(MinMaxChargeStrategy):
         """
         if direction == "pos":
             power_room = unit.max_power_discharge - max(0.0, base_load) - must_volume
-            soc_supply = (soc - unit.min_soc) * unit.capacity * unit.efficiency_discharge / d
+            soc_supply = (
+                (soc - unit.min_soc) * unit.capacity * unit.efficiency_discharge / d
+            )
             soc_room = soc_supply - max(0.0, base_load) - must_volume
         else:
             eff_ch = unit.efficiency_charge if unit.efficiency_charge > 0 else 1.0

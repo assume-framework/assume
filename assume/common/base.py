@@ -346,6 +346,7 @@ class SupportsMinMax(BaseUnit):
         previous_power: float,
         power: float,
         current_power: float = 0,
+        start: datetime = None,
     ) -> float:
         """
         Corrects the possible power to offer according to ramping restrictions.
@@ -355,6 +356,12 @@ class SupportsMinMax(BaseUnit):
             previous_power (float): The previous power output of the unit.
             power (float): The planned power offer of the unit.
             current_power (float): The current power output of the unit.
+            start (datetime, optional): The timestep being evaluated. When provided
+                and the unit holds an aFRR/CRM capacity commitment at that timestep
+                (``outputs["capacity_pos"|"capacity_neg"] > 0``), the
+                min_down_time / min_operating_time restrictions are bypassed --
+                the unit is contractually required to be online and cannot be
+                blocked from starting up or forced to stay at min_power.
 
         Returns:
             float: The corrected possible power to offer according to ramping restrictions.
@@ -362,12 +369,23 @@ class SupportsMinMax(BaseUnit):
         if self.ramp_down is None and self.ramp_up is None:
             return power
 
-        # was off before, but should be on now and min_down_time is not reached
-        if power > 0 and op_time < 0 and op_time > -self.min_down_time:
-            power = 0
-        # was on before, but should be off now and min_operating_time is not reached
-        elif power == 0 and op_time > 0 and op_time < self.min_operating_time:
-            power = self.min_power
+        # Capacity-commitment override: a unit holding aFRR/CRM cap at this
+        # timestep must be online regardless of how recently it was shut down,
+        # and cannot be forced to stay at min_power once committed elsewhere.
+        has_capacity_commitment = False
+        if start is not None:
+            has_capacity_commitment = (
+                float(self.outputs["capacity_pos"].at[start]) > 0
+                or float(self.outputs["capacity_neg"].at[start]) > 0
+            )
+
+        if not has_capacity_commitment:
+            # was off before, but should be on now and min_down_time is not reached
+            if power > 0 and op_time < 0 and op_time > -self.min_down_time:
+                power = 0
+            # was on before, but should be off now and min_operating_time is not reached
+            elif power == 0 and op_time > 0 and op_time < self.min_operating_time:
+                power = self.min_power
 
         if power == 0:
             # if less than min_power is required, we run min_power

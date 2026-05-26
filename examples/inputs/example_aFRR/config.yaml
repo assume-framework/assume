@@ -49,14 +49,18 @@ aFRR_demo:
       price_unit: EUR/MW
       market_mechanism: pay_as_clear
 
+    # aFRR_cap_neg opens 1h AFTER aFRR_cap_pos so neg strategies see the pos
+    # commitment when they bid. Without staggering, both markets open at the
+    # same sim time, the units bid independently, and the same headroom gets
+    # double-committed -- leaving the unit infeasible in EOM.
     aFRR_cap_neg:
       operator: aFRR_operator
       product_type: capacity_neg
-      start_date: 2019-01-01 00:00
+      start_date: 2019-01-01 01:00
       products:
         - duration: 4h
           count: 1
-          first_delivery: 4h
+          first_delivery: 3h
       opening_frequency: 4h
       opening_duration: 1h
       volume_unit: MW

@@ -113,10 +113,10 @@ def test_pos_cap_volume_power_limited():
     Flat DA price -> opp_cost=0 -> price clipped to floor (0).
     """
     s = _make_storage()
-    strat = StorageAfrrCapBlockStrategy(
+    strategy = StorageAfrrCapBlockStrategy(
         activation_probability=0.0, delivery_duration_hours=1.0
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -130,10 +130,10 @@ def test_pos_cap_volume_soc_limited():
     => volume = 20 MW
     """
     s = _make_storage()
-    strat = StorageAfrrCapBlockStrategy(
+    strategy = StorageAfrrCapBlockStrategy(
         activation_probability=0.0, delivery_duration_hours=10.0
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -143,8 +143,8 @@ def test_pos_cap_volume_soc_limited():
 def test_pos_cap_zero_when_soc_empty():
     """SOC=0 -> no SOC to discharge -> no bid."""
     s = _make_storage(initial_soc=0.0)
-    strat = StorageAfrrCapBlockStrategy(activation_probability=0.0)
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrCapBlockStrategy(activation_probability=0.0)
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert bids == []
@@ -161,12 +161,12 @@ def test_pos_cap_price_reflects_da_spread():
     p_activation=0 -> net = 3200 -> block_price = 32 EUR/MW
     """
     s = _make_storage(da_price=[100.0] * 4 + [60.0] * 20)
-    strat = StorageAfrrCapBlockStrategy(
+    strategy = StorageAfrrCapBlockStrategy(
         eom_foresight="4h",
         activation_probability=0.0,
         delivery_duration_hours=1.0,
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -186,12 +186,12 @@ def test_pos_cap_activation_reduces_price():
         da_price=[100.0] * 4 + [60.0] * 20,
         afrr_en_pos=10.0,
     )
-    strat = StorageAfrrCapBlockStrategy(
+    strategy = StorageAfrrCapBlockStrategy(
         eom_foresight="4h",
         activation_probability=0.5,
         delivery_duration_hours=1.0,
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -209,10 +209,10 @@ def test_neg_cap_volume_power_limited():
     Power-limited at |max_power_charge| = 100 MW.
     """
     s = _make_storage()
-    strat = StorageAfrrCapBlockStrategy(
+    strategy = StorageAfrrCapBlockStrategy(
         activation_probability=0.0, delivery_duration_hours=1.0
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -223,8 +223,8 @@ def test_neg_cap_volume_power_limited():
 def test_neg_cap_zero_when_soc_full():
     """SOC=1 -> no headroom to absorb -> no bid."""
     s = _make_storage(initial_soc=1.0)
-    strat = StorageAfrrCapBlockStrategy(activation_probability=0.0)
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrCapBlockStrategy(activation_probability=0.0)
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert bids == []
@@ -239,12 +239,12 @@ def test_neg_cap_price_reflects_da_average_minus_da():
     p_activation=0 -> price = 32 EUR/MW
     """
     s = _make_storage(da_price=[40.0] * 4 + [80.0] * 20)
-    strat = StorageAfrrCapBlockStrategy(
+    strategy = StorageAfrrCapBlockStrategy(
         eom_foresight="4h",
         activation_probability=0.0,
         delivery_duration_hours=1.0,
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -256,10 +256,10 @@ def test_neg_cap_volume_soc_limited():
     delivery_duration=10h, SOC=0.5: headroom limit = 200/10 = 20 MW < 100 MW.
     """
     s = _make_storage()
-    strat = StorageAfrrCapBlockStrategy(
+    strategy = StorageAfrrCapBlockStrategy(
         activation_probability=0.0, delivery_duration_hours=10.0
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -279,8 +279,8 @@ def test_pos_cap_subtracts_existing_capacity_pos():
     s = _make_storage()
     s.outputs["capacity_pos"][BLOCK_START] = 30.0
 
-    strat = StorageAfrrCapBlockStrategy(activation_probability=0.0)
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrCapBlockStrategy(activation_probability=0.0)
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -290,8 +290,8 @@ def test_pos_cap_subtracts_existing_capacity_pos():
 def test_emits_one_bid_per_block():
     """Two consecutive 4h blocks -> two bids."""
     s = _make_storage()
-    strat = StorageAfrrCapBlockStrategy(activation_probability=0.0)
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrCapBlockStrategy(activation_probability=0.0)
+    bids = strategy.calculate_bids(
         s,
         _cap_market_config("capacity_pos"),
         [(BLOCK_START, BLOCK_END, None), (BLOCK_END, SECOND_BLOCK_END, None)],
@@ -303,11 +303,11 @@ def test_emits_one_bid_per_block():
 
 def test_unsupported_product_type_raises():
     s = _make_storage()
-    strat = StorageAfrrCapBlockStrategy()
+    strategy = StorageAfrrCapBlockStrategy()
     bad_cfg = _cap_market_config("capacity_pos")
     bad_cfg.product_type = "energy"
     with pytest.raises(ValueError, match="capacity_pos/capacity_neg"):
-        strat.calculate_bids(s, bad_cfg, [(BLOCK_START, BLOCK_END, None)])
+        strategy.calculate_bids(s, bad_cfg, [(BLOCK_START, BLOCK_END, None)])
 
 
 # ===========================================================================
@@ -320,8 +320,8 @@ def test_en_pos_must_offer_only_when_no_headroom():
     s = _make_storage()
     s.outputs["capacity_pos"][HOUR_START] = 100.0
 
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -334,8 +334,8 @@ def test_en_pos_must_plus_voluntary():
     s = _make_storage()
     s.outputs["capacity_pos"][HOUR_START] = 30.0
 
-    strat = StorageAfrrEnergyStrategy(voluntary_markup=2.0)
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy(voluntary_markup=2.0)
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 2
@@ -349,8 +349,8 @@ def test_en_pos_must_plus_voluntary():
 def test_en_pos_voluntary_only_when_no_cap():
     """No cap reserved => single voluntary bid at MC."""
     s = _make_storage()
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -363,8 +363,8 @@ def test_en_pos_soc_limited_voluntary():
     SOC=0.1 => soc_room = 0.1*400*1/1 = 40 MW < power_room=100. Voluntary=40.
     """
     s = _make_storage(initial_soc=0.1)
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -374,8 +374,8 @@ def test_en_pos_soc_limited_voluntary():
 def test_en_pos_no_bid_when_soc_empty():
     """SOC=0 => no discharge possible."""
     s = _make_storage(initial_soc=0.0)
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert bids == []
@@ -388,8 +388,8 @@ def test_en_pos_accounts_for_base_load_discharge():
     """
     s = _make_storage()
     s.outputs["energy"][HOUR_START] = 30.0
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -401,8 +401,8 @@ def test_en_neg_must_offer_only_when_no_headroom():
     s = _make_storage()
     s.outputs["capacity_neg"][HOUR_START] = 100.0
 
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -415,8 +415,8 @@ def test_en_neg_must_plus_voluntary():
     s = _make_storage()
     s.outputs["capacity_neg"][HOUR_START] = 30.0
 
-    strat = StorageAfrrEnergyStrategy(voluntary_discount=1.0)
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy(voluntary_discount=1.0)
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 2
@@ -430,8 +430,8 @@ def test_en_neg_must_plus_voluntary():
 def test_en_neg_voluntary_only_when_no_cap():
     """No cap reserved => single voluntary bid."""
     s = _make_storage()
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -444,8 +444,8 @@ def test_en_neg_soc_limited_voluntary():
     SOC=0.9 => soc_headroom = 0.1*400/1/1 = 40 MWh -> 40 MW voluntary cap.
     """
     s = _make_storage(initial_soc=0.9)
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -455,8 +455,8 @@ def test_en_neg_soc_limited_voluntary():
 def test_en_neg_no_bid_when_soc_full():
     """SOC=1.0 => no charge headroom."""
     s = _make_storage(initial_soc=1.0)
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert bids == []
@@ -469,8 +469,8 @@ def test_en_neg_accounts_for_base_load_charge():
     """
     s = _make_storage()
     s.outputs["energy"][HOUR_START] = -50.0
-    strat = StorageAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         s, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -482,8 +482,8 @@ def test_en_multiple_products_emit_per_hour_pairs():
     s = _make_storage()
     for h in range(2):
         s.outputs["capacity_pos"][HOUR_START + pd.Timedelta(hours=h)] = 30.0
-    strat = StorageAfrrEnergyStrategy(voluntary_markup=2.0)
-    bids = strat.calculate_bids(
+    strategy = StorageAfrrEnergyStrategy(voluntary_markup=2.0)
+    bids = strategy.calculate_bids(
         s,
         _energy_market_config("energy_pos"),
         [(HOUR_START, HOUR_END, None), (HOUR_END, NEXT_HOUR_END, None)],
@@ -496,11 +496,11 @@ def test_en_multiple_products_emit_per_hour_pairs():
 
 def test_en_strategy_rejects_capacity_product_type():
     s = _make_storage()
-    strat = StorageAfrrEnergyStrategy()
+    strategy = StorageAfrrEnergyStrategy()
     bad_cfg = _energy_market_config("energy_pos")
     bad_cfg.product_type = "capacity_pos"
     with pytest.raises(ValueError, match="energy_pos/energy_neg"):
-        strat.calculate_bids(s, bad_cfg, [(HOUR_START, HOUR_END, None)])
+        strategy.calculate_bids(s, bad_cfg, [(HOUR_START, HOUR_END, None)])
 
 
 # ===========================================================================
@@ -511,10 +511,10 @@ def test_en_strategy_rejects_capacity_product_type():
 def test_walk_off_default_matches_flat_behavior():
     """forecasted_soc_walk defaults to False -> same result as before."""
     s = _make_storage(da_price=[100.0] * 4 + [60.0] * 20)
-    strat = StorageAfrrCapBlockStrategy(
+    strategy = StorageAfrrCapBlockStrategy(
         eom_foresight="4h", activation_probability=0.0, delivery_duration_hours=1.0
     )  # walk omitted -> defaults to False
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -532,18 +532,18 @@ def test_walk_no_da_forecast_falls_back_to_flat():
     s = _make_storage()
     s.forecaster.price.pop("EOM", None)
 
-    strat_flat = StorageAfrrCapBlockStrategy(
+    strategy_flat = StorageAfrrCapBlockStrategy(
         activation_probability=0.0, delivery_duration_hours=1.0
     )
-    strat_walk = StorageAfrrCapBlockStrategy(
+    strategy_walk = StorageAfrrCapBlockStrategy(
         activation_probability=0.0,
         delivery_duration_hours=1.0,
         forecasted_soc_walk=True,
     )
-    bids_flat = strat_flat.calculate_bids(
+    bids_flat = strategy_flat.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
-    bids_walk = strat_walk.calculate_bids(
+    bids_walk = strategy_walk.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids_flat) == len(bids_walk) == 1
@@ -564,19 +564,19 @@ def test_walk_pos_depleted_soc_blocks_bid():
     Walk bid:    per-hour V = [100, 100, 0, 0] -> min = 0 -> no bid.
     """
     s = _make_storage(da_price=[100.0, 100.0, 60.0, 60.0] + [40.0] * 20)
-    strat_flat = StorageAfrrCapBlockStrategy(
+    strategy_flat = StorageAfrrCapBlockStrategy(
         eom_foresight="4h", activation_probability=0.0, delivery_duration_hours=1.0
     )
-    strat_walk = StorageAfrrCapBlockStrategy(
+    strategy_walk = StorageAfrrCapBlockStrategy(
         eom_foresight="4h",
         activation_probability=0.0,
         delivery_duration_hours=1.0,
         forecasted_soc_walk=True,
     )
-    bids_flat = strat_flat.calculate_bids(
+    bids_flat = strategy_flat.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
-    bids_walk = strat_walk.calculate_bids(
+    bids_walk = strategy_walk.calculate_bids(
         s, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids_flat) == 1
@@ -596,19 +596,19 @@ def test_walk_neg_filled_soc_blocks_bid():
     Flat-SOC bid: V = 100. Walk: min per-hour = 0 -> no bid.
     """
     s = _make_storage(da_price=[20.0] * 4 + [60.0] * 20)
-    strat_flat = StorageAfrrCapBlockStrategy(
+    strategy_flat = StorageAfrrCapBlockStrategy(
         eom_foresight="4h", activation_probability=0.0, delivery_duration_hours=1.0
     )
-    strat_walk = StorageAfrrCapBlockStrategy(
+    strategy_walk = StorageAfrrCapBlockStrategy(
         eom_foresight="4h",
         activation_probability=0.0,
         delivery_duration_hours=1.0,
         forecasted_soc_walk=True,
     )
-    bids_flat = strat_flat.calculate_bids(
+    bids_flat = strategy_flat.calculate_bids(
         s, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
-    bids_walk = strat_walk.calculate_bids(
+    bids_walk = strategy_walk.calculate_bids(
         s, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids_flat) == 1

@@ -81,13 +81,14 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
 
             current_power = unit.outputs["energy"].at[start]
 
-            # adjust max_power for ramp speed
+            # adjust max_power for ramp speed (pass start so calculate_ramp can
+            # honor any aFRR/CRM capacity commitment at this timestep)
             max_power = unit.calculate_ramp(
-                op_time, previous_power, max_power, current_power
+                op_time, previous_power, max_power, current_power, start=start
             )
             # adjust min_power for ramp speed
             min_power = unit.calculate_ramp(
-                op_time, previous_power, min_power, current_power
+                op_time, previous_power, min_power, current_power, start=start
             )
 
             bid_quantity_inflex = min_power
@@ -300,7 +301,7 @@ class CapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
             current_power = unit.outputs["energy"].at[start]
             # max_power + current_power < previous_power + unit.ramp_up
             bid_quantity = unit.calculate_ramp(
-                op_time, previous_power, max_power, current_power
+                op_time, previous_power, max_power, current_power, start=start
             )
 
             if bid_quantity == 0:
@@ -410,7 +411,7 @@ class CapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
 
             # min_power + current_power > previous_power - unit.ramp_down
             min_power = unit.calculate_ramp(
-                op_time, previous_power, min_power, current_power
+                op_time, previous_power, min_power, current_power, start=start
             )
             bid_quantity = previous_power - min_power
             if bid_quantity <= 0:

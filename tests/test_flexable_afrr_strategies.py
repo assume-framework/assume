@@ -93,18 +93,20 @@ NEXT_HOUR_END = datetime(2023, 7, 1, 2)
 
 def test_pos_cap_basic_block_no_activation():
     """
-    DA = 60, MC = 40 -> per-hour opp cost = 20*1000 = 20_000 EUR
-    over 4h block: opp_cost_total = 80_000 EUR
+    DA = 60, MC = 40 -> per-hour opp cost = 20*V EUR
+    Cross-direction guard caps V at (MAX_P - MIN_P) = 800 (the unit can sit at
+    min_power=200 and ramp up to max_power=1000, so max swing is 800).
+    opp_cost_total = 20*800*4 = 64_000 EUR
     activation_probability = 0 -> no energy revenue offset
-    expected block_price = 80_000 / 1000 = 80 EUR/MW, volume = 1000 MW
+    expected block_price = 64_000 / 800 = 80 EUR/MW, volume = 800 MW
     """
     pp = _make_powerplant(da_price=60.0)
-    strat = PowerPlantAfrrCapBlockStrategy(activation_probability=0.0)
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrCapBlockStrategy(activation_probability=0.0)
+    bids = strategy.calculate_bids(
         pp, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
-    assert bids[0]["volume"] == pytest.approx(MAX_P)
+    assert bids[0]["volume"] == pytest.approx(MAX_P - MIN_P)
     assert bids[0]["price"] == pytest.approx(80.0)
     assert bids[0]["start_time"] == BLOCK_START
     assert bids[0]["end_time"] == BLOCK_END
@@ -119,29 +121,97 @@ def test_pos_cap_activation_reduces_price():
     block_price  = 60_000 / 1000 = 60 EUR/MW
     """
     pp = _make_powerplant(da_price=60.0, afrr_en_pos=50.0)
-    strat = PowerPlantAfrrCapBlockStrategy(activation_probability=0.5)
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrCapBlockStrategy(activation_probability=0.5)
+    bids = strategy.calculate_bids(
         pp, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
     assert bids[0]["price"] == pytest.approx(60.0)
 
 
-def test_pos_cap_da_below_mc_yields_floor():
+def test_pos_cap_no_bid_when_da_below_mc_implies_offline():
     """
-    DA = 20 < MC = 40 -> no EOM opportunity cost.
-    aFRR_en activation revenue is positive but only enters via -p_act*revenue,
-    so net_value is non-positive. Result clipped to capacity_price_floor.
+    Online-state guard: DA = 20 < MC = 40 -> EOM dispatch proxy says the unit
+    will be offline -> unit cannot physically activate aFRR pos -> no bid
+    in any block hour -> empty orderbook.
+
+    (Previously the strategy would have bid at the floor price; that was
+    unrealistic because an offline thermal unit can't activate within the
+    aFRR response window.)
     """
     pp = _make_powerplant(da_price=20.0, afrr_en_pos=50.0)
-    strat = PowerPlantAfrrCapBlockStrategy(
+    strategy = PowerPlantAfrrCapBlockStrategy(
         activation_probability=0.5, capacity_price_floor=0.0
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
+        pp, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
+    )
+    assert bids == []
+
+
+def test_pos_cap_activation_outweighs_opp_cost_clips_to_floor():
+    """
+    Demonstrates floor clipping without triggering the offline guard:
+    DA = MC = 40 -> proxy says unit IS forecasted online -> bid is emitted.
+    Volume = MAX_P - MIN_P = 800 (cross-direction guard).
+    opp_cost = max(0, 40-40)*V*4 = 0
+    en_revenue = (50-40)*V*4 = signed positive
+    net_value = 0 - 0.5 * en_revenue < 0 -> price = max(net/V, 0) = 0 (floor)
+    """
+    pp = _make_powerplant(da_price=40.0, afrr_en_pos=50.0)
+    strategy = PowerPlantAfrrCapBlockStrategy(
+        activation_probability=0.5, capacity_price_floor=0.0
+    )
+    bids = strategy.calculate_bids(
         pp, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
+    assert bids[0]["volume"] == pytest.approx(MAX_P - MIN_P)
     assert bids[0]["price"] == pytest.approx(0.0)
+
+
+def test_pos_cap_respects_existing_cap_neg_commitment():
+    """
+    Cross-direction guard: if cap_neg=200 is already committed, the pos bid
+    must not exceed (max - min) - cap_neg = 800 - 200 = 600 MW.
+    Otherwise the unit would be infeasible in EOM (min > max).
+    """
+    pp = _make_powerplant(da_price=60.0)
+    # simulate that the neg cap market already cleared 200 MW
+    for h in range(4):
+        pp.outputs["capacity_neg"][BLOCK_START + pd.Timedelta(hours=h)] = 200.0
+
+    strategy = PowerPlantAfrrCapBlockStrategy(activation_probability=0.0)
+    bids = strategy.calculate_bids(
+        pp, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
+    )
+    assert len(bids) == 1
+    assert bids[0]["volume"] == pytest.approx(MAX_P - MIN_P - 200.0)
+
+
+def test_pos_cap_bids_when_real_dispatch_present_even_without_proxy():
+    """
+    If the unit actually has committed EOM dispatch (base_load > 0), the guard
+    does not trigger and the strategy bids normally even with forecast proxy
+    disabled.
+    """
+    pp = _make_powerplant(da_price=60.0)
+    # simulate that EOM already cleared with 300 MW dispatch
+    pp.outputs["energy"][BLOCK_START] = 300.0
+
+    strategy = PowerPlantAfrrCapBlockStrategy(
+        activation_probability=0.0, forecast_eom_dispatch=False
+    )
+    bids = strategy.calculate_bids(
+        pp, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
+    )
+    # block volume bound by smallest hourly headroom -- hours 1-3 have base=0
+    # but proxy is off, so feas = max_p_h = 1000 (since calculate_min_max_power
+    # only subtracts the actual committed base_load at each hour).
+    # Hour 0: base=300, max_p_h = 1000-300 = 700.
+    # min over block = 700.
+    assert len(bids) == 1
+    assert bids[0]["volume"] == pytest.approx(700.0)
 
 
 def test_pos_cap_volume_takes_min_across_block():
@@ -153,8 +223,8 @@ def test_pos_cap_volume_takes_min_across_block():
     # availability series is full at 1.0, drop hour 2 (third hour of block)
     pp.forecaster.availability[BLOCK_START + pd.Timedelta(hours=2)] = 0.5
 
-    strat = PowerPlantAfrrCapBlockStrategy(activation_probability=0.0)
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrCapBlockStrategy(activation_probability=0.0)
+    bids = strategy.calculate_bids(
         pp, _cap_market_config("capacity_pos"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -167,12 +237,12 @@ def test_pos_cap_volume_takes_min_across_block():
 def test_pos_cap_emits_one_bid_per_block():
     """Two consecutive 4h blocks should produce two bids."""
     pp = _make_powerplant(da_price=60.0)
-    strat = PowerPlantAfrrCapBlockStrategy(activation_probability=0.0)
+    strategy = PowerPlantAfrrCapBlockStrategy(activation_probability=0.0)
     products = [
         (BLOCK_START, BLOCK_END, None),
         (BLOCK_END, SECOND_BLOCK_END, None),
     ]
-    bids = strat.calculate_bids(pp, _cap_market_config("capacity_pos"), products)
+    bids = strategy.calculate_bids(pp, _cap_market_config("capacity_pos"), products)
     assert len(bids) == 2
     assert bids[0]["start_time"] == BLOCK_START
     assert bids[0]["end_time"] == BLOCK_END
@@ -189,10 +259,10 @@ def test_pos_cap_price_clipped_to_market_max():
     market's maximum_bid_price. Verify clipping.
     """
     pp = _make_powerplant(da_price=20_000.0)
-    strat = PowerPlantAfrrCapBlockStrategy(activation_probability=0.0)
+    strategy = PowerPlantAfrrCapBlockStrategy(activation_probability=0.0)
     cfg = _cap_market_config("capacity_pos")
     cfg.maximum_bid_price = 500.0
-    bids = strat.calculate_bids(pp, cfg, [(BLOCK_START, BLOCK_END, None)])
+    bids = strategy.calculate_bids(pp, cfg, [(BLOCK_START, BLOCK_END, None)])
     assert len(bids) == 1
     assert bids[0]["price"] == pytest.approx(500.0)
 
@@ -214,12 +284,12 @@ def test_neg_cap_with_proxy_yields_bid():
     price clipped to floor = 0.
     """
     pp = _make_powerplant(da_price=60.0, afrr_en_neg=30.0)
-    strat = PowerPlantAfrrCapBlockStrategy(
+    strategy = PowerPlantAfrrCapBlockStrategy(
         activation_probability=0.5,
         capacity_price_floor=0.0,
         forecast_eom_dispatch=True,
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         pp, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -234,10 +304,10 @@ def test_neg_cap_must_run_cost_when_da_below_mc():
     Verify no bid emitted.
     """
     pp = _make_powerplant(da_price=30.0)
-    strat = PowerPlantAfrrCapBlockStrategy(
+    strategy = PowerPlantAfrrCapBlockStrategy(
         activation_probability=0.0, forecast_eom_dispatch=True
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         pp, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert bids == []
@@ -249,10 +319,10 @@ def test_neg_cap_without_proxy_yields_no_bid():
     DA > MC. Demonstrates the pre-clearing limitation when the proxy is off.
     """
     pp = _make_powerplant(da_price=60.0)
-    strat = PowerPlantAfrrCapBlockStrategy(
+    strategy = PowerPlantAfrrCapBlockStrategy(
         activation_probability=0.0, forecast_eom_dispatch=False
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         pp, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert bids == []
@@ -269,10 +339,10 @@ def test_neg_cap_uses_committed_dispatch_when_present():
     for h in range(4):
         pp.outputs["energy"][BLOCK_START + pd.Timedelta(hours=h)] = 800.0
 
-    strat = PowerPlantAfrrCapBlockStrategy(
+    strategy = PowerPlantAfrrCapBlockStrategy(
         activation_probability=0.0, forecast_eom_dispatch=False
     )
-    bids = strat.calculate_bids(
+    bids = strategy.calculate_bids(
         pp, _cap_market_config("capacity_neg"), [(BLOCK_START, BLOCK_END, None)]
     )
     assert len(bids) == 1
@@ -289,11 +359,11 @@ def test_neg_cap_uses_committed_dispatch_when_present():
 
 def test_unsupported_product_type_raises():
     pp = _make_powerplant()
-    strat = PowerPlantAfrrCapBlockStrategy()
+    strategy = PowerPlantAfrrCapBlockStrategy()
     bad_cfg = _cap_market_config("capacity_pos")
     bad_cfg.product_type = "energy"  # not a capacity product
     with pytest.raises(ValueError, match="capacity_pos/capacity_neg"):
-        strat.calculate_bids(pp, bad_cfg, [(BLOCK_START, BLOCK_END, None)])
+        strategy.calculate_bids(pp, bad_cfg, [(BLOCK_START, BLOCK_END, None)])
 
 
 # ===========================================================================
@@ -310,8 +380,8 @@ def test_en_pos_must_offer_only_when_no_headroom():
     pp.outputs["energy"][HOUR_START] = 700.0
     pp.outputs["capacity_pos"][HOUR_START] = 300.0
 
-    strat = PowerPlantAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         pp, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -329,8 +399,8 @@ def test_en_pos_must_plus_voluntary():
     pp.outputs["energy"][HOUR_START] = 500.0
     pp.outputs["capacity_pos"][HOUR_START] = 200.0
 
-    strat = PowerPlantAfrrEnergyStrategy(voluntary_markup=5.0)
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrEnergyStrategy(voluntary_markup=5.0)
+    bids = strategy.calculate_bids(
         pp, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 2
@@ -343,15 +413,54 @@ def test_en_pos_must_plus_voluntary():
 
 def test_en_pos_voluntary_only_when_no_cap_reserved():
     """
-    base=0, cap_pos=0, max=1000 => no must-offer; voluntary covers full max.
+    Unit is online in EOM (base_power=300>0) and has no aFRR-cap commitment.
+    => no must-offer; voluntary covers (max_p - base) = 700 MW.
     """
     pp = _make_powerplant()
-    strat = PowerPlantAfrrEnergyStrategy(voluntary_markup=0.0)
-    bids = strat.calculate_bids(
+    pp.outputs["energy"][HOUR_START] = 300.0  # online in EOM
+    strategy = PowerPlantAfrrEnergyStrategy(voluntary_markup=0.0)
+    bids = strategy.calculate_bids(
         pp, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
-    assert bids[0]["volume"] == pytest.approx(MAX_P)
+    assert bids[0]["volume"] == pytest.approx(MAX_P - 300.0)
+    assert bids[0]["price"] == pytest.approx(MC)
+
+
+def test_en_pos_voluntary_skipped_when_unit_offline():
+    """
+    Realism guard: a thermal unit offline in EOM (base_power=0) cannot
+    physically activate aFRR pos within the response window, so the voluntary
+    leg should be skipped even if calculate_min_max_power would otherwise
+    report headroom.
+
+    With no aFRR-cap commitment AND base=0 -> no bids at all.
+    """
+    pp = _make_powerplant()
+    # outputs["energy"] defaults to 0 (offline)
+    strategy = PowerPlantAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
+        pp, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
+    )
+    assert bids == []
+
+
+def test_en_pos_must_offer_emitted_even_when_offline():
+    """
+    Even if base_power=0 at this hour, a must-offer leg from a prior
+    aFRR-cap win is still emitted (the cap commitment is binding; the cap
+    strategy is responsible for not committing infeasible volume in the
+    first place).
+    """
+    pp = _make_powerplant()
+    pp.outputs["capacity_pos"][HOUR_START] = 100.0  # cap won, but unit offline
+
+    strategy = PowerPlantAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
+        pp, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
+    )
+    assert len(bids) == 1  # must-offer only; no voluntary
+    assert bids[0]["volume"] == pytest.approx(100.0)
     assert bids[0]["price"] == pytest.approx(MC)
 
 
@@ -360,8 +469,8 @@ def test_en_pos_no_bids_when_unit_fully_committed():
     pp = _make_powerplant()
     pp.outputs["energy"][HOUR_START] = MAX_P
 
-    strat = PowerPlantAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         pp, _energy_market_config("energy_pos"), [(HOUR_START, HOUR_END, None)]
     )
     assert bids == []
@@ -376,8 +485,8 @@ def test_en_neg_must_offer_only_when_at_floor_plus_cap():
     pp.outputs["energy"][HOUR_START] = 300.0
     pp.outputs["capacity_neg"][HOUR_START] = 100.0
 
-    strat = PowerPlantAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         pp, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -395,8 +504,8 @@ def test_en_neg_must_plus_voluntary():
     pp.outputs["energy"][HOUR_START] = 800.0
     pp.outputs["capacity_neg"][HOUR_START] = 100.0
 
-    strat = PowerPlantAfrrEnergyStrategy(voluntary_discount=5.0)
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrEnergyStrategy(voluntary_discount=5.0)
+    bids = strategy.calculate_bids(
         pp, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 2
@@ -412,8 +521,8 @@ def test_en_neg_voluntary_only_when_no_cap():
     pp = _make_powerplant()
     pp.outputs["energy"][HOUR_START] = 800.0
 
-    strat = PowerPlantAfrrEnergyStrategy(voluntary_discount=0.0)
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrEnergyStrategy(voluntary_discount=0.0)
+    bids = strategy.calculate_bids(
         pp, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert len(bids) == 1
@@ -426,8 +535,8 @@ def test_en_neg_no_bids_when_at_min_power():
     pp = _make_powerplant()
     pp.outputs["energy"][HOUR_START] = MIN_P
 
-    strat = PowerPlantAfrrEnergyStrategy()
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrEnergyStrategy()
+    bids = strategy.calculate_bids(
         pp, _energy_market_config("energy_neg"), [(HOUR_START, HOUR_END, None)]
     )
     assert bids == []
@@ -441,8 +550,8 @@ def test_en_pos_emits_two_bids_per_hourly_product():
         pp.outputs["energy"][t] = 500.0
         pp.outputs["capacity_pos"][t] = 200.0
 
-    strat = PowerPlantAfrrEnergyStrategy(voluntary_markup=5.0)
-    bids = strat.calculate_bids(
+    strategy = PowerPlantAfrrEnergyStrategy(voluntary_markup=5.0)
+    bids = strategy.calculate_bids(
         pp,
         _energy_market_config("energy_pos"),
         [(HOUR_START, HOUR_END, None), (HOUR_END, NEXT_HOUR_END, None)],
@@ -455,11 +564,11 @@ def test_en_pos_emits_two_bids_per_hourly_product():
 
 def test_en_strategy_rejects_capacity_product_type():
     pp = _make_powerplant()
-    strat = PowerPlantAfrrEnergyStrategy()
+    strategy = PowerPlantAfrrEnergyStrategy()
     bad_cfg = _energy_market_config("energy_pos")
     bad_cfg.product_type = "capacity_pos"
     with pytest.raises(ValueError, match="energy_pos/energy_neg"):
-        strat.calculate_bids(pp, bad_cfg, [(HOUR_START, HOUR_END, None)])
+        strategy.calculate_bids(pp, bad_cfg, [(HOUR_START, HOUR_END, None)])
 
 
 # ===========================================================================
@@ -575,3 +684,137 @@ def test_eom_strategy_skips_price_reduction_when_capacity_pos_committed():
     bids = strategy.calculate_bids(pp, cfg, product_tuples=[(start, end, None)])
     assert len(bids) == 2
     assert bids[0]["price"] == pytest.approx(MC)
+
+
+# ===========================================================================
+# calculate_ramp capacity-commitment bypass
+# ===========================================================================
+
+
+def test_calculate_ramp_blocks_startup_without_commitment():
+    """
+    Baseline: no aFRR/CRM commitment.
+        op_time=-1 (just shut), min_down_time=2 (so -op_time(1) < min_down_time(2))
+        Calling calculate_ramp(power=300) with active ramps should zero the
+        power (the min_down_time start-up block).
+    """
+    index = pd.date_range("2023-07-01", periods=24, freq="h")
+    forecaster = PowerplantForecaster(index, fuel_prices={"lignite": 10, "co2": 10})
+    pp = PowerPlant(
+        id="ramp_pp",
+        unit_operator="op",
+        technology="hard coal",
+        index=index,
+        max_power=MAX_P,
+        min_power=MIN_P,
+        efficiency=0.5,
+        additional_cost=10,
+        bidding_strategies={},
+        fuel_type="lignite",
+        emission_factor=0.5,
+        forecaster=forecaster,
+        ramp_up=200,
+        ramp_down=200,
+        min_operating_time=1,
+        min_down_time=2,
+    )
+    # baseline: no commitment, no start arg -> startup blocked
+    result = pp.calculate_ramp(op_time=-1, previous_power=0, power=300, current_power=0)
+    assert result == 0
+
+
+def test_calculate_ramp_allows_startup_with_capacity_pos_commitment():
+    """With cap_pos > 0 at `start`, min_down_time block is bypassed."""
+    index = pd.date_range("2023-07-01", periods=24, freq="h")
+    forecaster = PowerplantForecaster(index, fuel_prices={"lignite": 10, "co2": 10})
+    pp = PowerPlant(
+        id="ramp_pp",
+        unit_operator="op",
+        technology="hard coal",
+        index=index,
+        max_power=MAX_P,
+        min_power=MIN_P,
+        efficiency=0.5,
+        additional_cost=10,
+        bidding_strategies={},
+        fuel_type="lignite",
+        emission_factor=0.5,
+        forecaster=forecaster,
+        ramp_up=200,
+        ramp_down=200,
+        min_operating_time=1,
+        min_down_time=2,
+    )
+    t = index[0]
+    pp.outputs["capacity_pos"][t] = 100.0  # aFRR commitment
+
+    # with start arg: startup allowed, then ramp constraint applies
+    # ramp-bounded: min(300, 0 + 200 - 0, 1000 - 0) = 200
+    result = pp.calculate_ramp(
+        op_time=-1, previous_power=0, power=300, current_power=0, start=t
+    )
+    assert result == 200.0
+
+
+def test_calculate_ramp_allows_startup_with_capacity_neg_commitment():
+    """Same bypass should hold for capacity_neg commitment."""
+    index = pd.date_range("2023-07-01", periods=24, freq="h")
+    forecaster = PowerplantForecaster(index, fuel_prices={"lignite": 10, "co2": 10})
+    pp = PowerPlant(
+        id="ramp_pp",
+        unit_operator="op",
+        technology="hard coal",
+        index=index,
+        max_power=MAX_P,
+        min_power=MIN_P,
+        efficiency=0.5,
+        additional_cost=10,
+        bidding_strategies={},
+        fuel_type="lignite",
+        emission_factor=0.5,
+        forecaster=forecaster,
+        ramp_up=200,
+        ramp_down=200,
+        min_operating_time=1,
+        min_down_time=2,
+    )
+    t = index[0]
+    pp.outputs["capacity_neg"][t] = 50.0  # aFRR neg commitment
+
+    result = pp.calculate_ramp(
+        op_time=-1, previous_power=0, power=300, current_power=0, start=t
+    )
+    assert result == 200.0
+
+
+def test_calculate_ramp_no_commitment_with_start_arg_unchanged():
+    """
+    Passing start without any commitment must not change baseline behavior:
+    min_down_time start-up block still fires.
+    """
+    index = pd.date_range("2023-07-01", periods=24, freq="h")
+    forecaster = PowerplantForecaster(index, fuel_prices={"lignite": 10, "co2": 10})
+    pp = PowerPlant(
+        id="ramp_pp",
+        unit_operator="op",
+        technology="hard coal",
+        index=index,
+        max_power=MAX_P,
+        min_power=MIN_P,
+        efficiency=0.5,
+        additional_cost=10,
+        bidding_strategies={},
+        fuel_type="lignite",
+        emission_factor=0.5,
+        forecaster=forecaster,
+        ramp_up=200,
+        ramp_down=200,
+        min_operating_time=1,
+        min_down_time=2,
+    )
+    t = index[0]
+    # no commitment set
+    result = pp.calculate_ramp(
+        op_time=-1, previous_power=0, power=300, current_power=0, start=t
+    )
+    assert result == 0

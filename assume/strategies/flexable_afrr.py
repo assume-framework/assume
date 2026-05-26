@@ -20,10 +20,6 @@ Interdependence is realized via three mechanisms:
       to value opportunity cost across the three markets.
 """
 
-from datetime import datetime
-
-import numpy as np
-
 from assume.common.base import MinMaxStrategy, SupportsMinMax
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import parse_duration
@@ -98,7 +94,7 @@ class PowerPlantAfrrCapBlockStrategy(MinMaxStrategy):
 
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
-        min_p_full, max_p_full = unit.calculate_min_max_power(start, end)
+        _, max_p_full = unit.calculate_min_max_power(start, end)
 
         previous_power = unit.get_output_before(start)
         idx_offset = 0
@@ -111,14 +107,12 @@ class PowerPlantAfrrCapBlockStrategy(MinMaxStrategy):
             if n == 0:
                 continue
 
-            block_min_p = min_p_full[idx_offset : idx_offset + n]
             block_max_p = max_p_full[idx_offset : idx_offset + n]
             idx_offset += n
 
             block_volume, previous_power = self._block_feasible_volume(
                 unit=unit,
                 block_steps=block_steps,
-                block_min_p=block_min_p,
                 block_max_p=block_max_p,
                 direction=direction,
                 previous_power=previous_power,
@@ -203,7 +197,6 @@ class PowerPlantAfrrCapBlockStrategy(MinMaxStrategy):
         self,
         unit,
         block_steps,
-        block_min_p,
         block_max_p,
         direction: str,
         previous_power: float,
@@ -214,10 +207,14 @@ class PowerPlantAfrrCapBlockStrategy(MinMaxStrategy):
         clear in every hour). Returns (block_volume, previous_power_after_block).
 
         - pos: ramp- and availability-feasible upward headroom relative to the
-          unit's currently planned dispatch at each hour.
+          unit's currently planned dispatch at each hour. When the EOM dispatch
+          is not yet known (aFRR cap clears first), an EOM dispatch proxy is used
+          to check whether the unit will be online; if forecasted offline, the
+          unit cannot deliver aFRR pos within the activation window and the
+          hourly volume is zero.
         - neg: ramp-feasible downward room from the unit's assumed operating point
           at each hour, down to the technical minimum. When the EOM dispatch is not
-          yet known (aFRR cap clears first), an EOM dispatch proxy is used.
+          yet known, the same EOM dispatch proxy is used.
         """
         hourly_volumes: list[float] = []
         local_prev = float(previous_power)
@@ -225,12 +222,22 @@ class PowerPlantAfrrCapBlockStrategy(MinMaxStrategy):
         for i, t in enumerate(block_steps):
             op_time = unit.get_operation_time(t)
             max_p_h = float(block_max_p[i])
-            min_p_h = float(block_min_p[i])
 
             if direction == "pos":
                 current_power = float(unit.outputs["energy"].at[t])
+                # Online-state guard: when EOM has not cleared yet and the unit
+                # appears offline (current_power=0), consult the EOM dispatch
+                # proxy. If the proxy forecasts the unit will remain offline,
+                # it cannot physically deliver aFRR pos (no fast start-up), so
+                # the hourly volume is zero.
+                if current_power <= 0 and self.forecast_eom_dispatch:
+                    forecasted = self._eom_dispatch_proxy(unit, t, da_price)
+                    if forecasted <= 0:
+                        hourly_volumes.append(0.0)
+                        local_prev = current_power
+                        continue
                 feas = unit.calculate_ramp(
-                    op_time, local_prev, max_p_h, current_power
+                    op_time, local_prev, max_p_h, current_power, start=t
                 )
                 # capacity reservation does not change actual dispatch
                 next_prev = current_power
@@ -247,10 +254,23 @@ class PowerPlantAfrrCapBlockStrategy(MinMaxStrategy):
                     float(unit.outputs["heat"].at[t]),
                 )
                 min_ramped = unit.calculate_ramp(
-                    op_time, local_prev, absolute_min, current_power
+                    op_time, local_prev, absolute_min, current_power, start=t
                 )
                 feas = current_power - min_ramped
                 next_prev = current_power
+
+            # Cross-direction guard: the unit's combined aFRR reservation cannot
+            # exceed (max_power - min_power) regardless of operating point. If
+            # the OTHER direction already cleared with some volume, the new bid
+            # must respect that. This prevents over-commitment that would render
+            # the unit infeasible in EOM (max_p < min_p).
+            cap_pos_existing = float(unit.outputs["capacity_pos"].at[t])
+            cap_neg_existing = float(unit.outputs["capacity_neg"].at[t])
+            cross_dir_room = max(
+                0.0,
+                (unit.max_power - unit.min_power) - cap_pos_existing - cap_neg_existing,
+            )
+            feas = min(float(feas), cross_dir_room)
 
             hourly_volumes.append(max(0.0, float(feas)))
             local_prev = next_prev
@@ -504,23 +524,38 @@ class PowerPlantAfrrEnergyStrategy(MinMaxStrategy):
         """
         Ramp-feasible voluntary headroom *beyond* the must-offer.
 
-        - pos: max_p_h from calculate_min_max_power already subtracts capacity_pos
-          and base_load, so it directly represents the additional voluntary
-          headroom above the must-offer. We just apply the ramp constraint.
-        - neg: total ramp-down room = base_power - absolute_floor, where
-          absolute_floor = max(unit.min_power, heat_demand). Voluntary part is
-          that minus the must-offer volume.
+        Online-state guard (pos): aFRR activation must happen within ~5 minutes.
+        A thermal unit that is not synchronized to the grid at the bidding hour
+        (``base_power <= 0`` in the EOM-cleared dispatch) cannot start up fast
+        enough to physically deliver, so we skip the pos voluntary leg.
+        The must-offer leg is still emitted upstream when ``capacity_pos`` is
+        committed -- that obligation was taken on at aFRR-cap time and the
+        physical-feasibility of that commitment is the cap strategy's concern.
+
+        For neg the guard is implicit: if ``base_power == 0`` the
+        ``base_power - ramp_floor`` term is already 0.
+
+        Volume formulas:
+          - pos: max_p_h from calculate_min_max_power already nets out
+            capacity_pos and base_load, so it directly represents additional
+            voluntary headroom above the must-offer. Apply the ramp constraint.
+          - neg: total ramp-down room = base_power - absolute_floor, where
+            absolute_floor = max(unit.min_power, heat_demand). Voluntary part
+            is that minus the must-offer volume.
         """
         if direction == "pos":
-            ramp_feas = unit.calculate_ramp(op_time, previous_power, max_p_h, base_power)
+            if base_power <= 0:
+                # offline at this hour -> cannot deliver aFRR pos voluntary
+                return 0.0
+            ramp_feas = unit.calculate_ramp(
+                op_time, previous_power, max_p_h, base_power, start=t
+            )
             return max(0.0, float(ramp_feas))
 
         # neg
-        absolute_floor = max(
-            unit.min_power, float(unit.outputs["heat"].at[t])
-        )
+        absolute_floor = max(unit.min_power, float(unit.outputs["heat"].at[t]))
         ramp_floor = unit.calculate_ramp(
-            op_time, previous_power, absolute_floor, base_power
+            op_time, previous_power, absolute_floor, base_power, start=t
         )
         total_room = max(0.0, float(base_power) - float(ramp_floor))
         return max(0.0, total_room - must_volume)
