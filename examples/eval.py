@@ -1,11 +1,13 @@
 # packages needed: seaborn, plotly, kaleido
 
 import os
+import time
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 from assume import World
 from assume.scenario.loader_csv import load_scenario_folder
+from timeit import Timer
 
 # assume module imports
 #import examples.examples as examples
@@ -17,37 +19,46 @@ from numba import njit
 def _clear_with_inserted(sp_r, sv_r, dp, dv, idx, new_price, new_volume):
     """Clear with one bid virtually inserted at position idx in (sp_r, sv_r).
     Two-pointer sweep, no allocations, no merged arrays."""
-    n_r = sp_r.shape[0]
-    n_d = dp.shape[0]
-    j = 0
-    dem_avail = 0.0
-    cum_s = 0.0
-    last_ok = -1
-    last_ok_price = 0.0
-    cleared = 0.0
-    cum_before_k = 0.0
+    n_r = sp_r.shape[0]  # num residual supplies
+    n_d = dp.shape[0]  # num demands
+    j = 0  # pointer on demand position
+    dem_avail = 0.0  # available demand volume at current price
+    cum_s = 0.0  # supply that gets cumulated
+    last_ok = -1  #  last valid supply id
+    last_ok_price = 0.0  # last valid clearing price
+    cleared = 0.0  # cleared volume
+    cum_before_k = 0.0  # last supply volume before current volume addition
 
+    # go through redisual supply bids + virtually inserted new bid
     for i in range(n_r + 1):
         # Virtual supply at position i: either inserted bid or original residual
-        if i < idx:
+        if i < idx:  # normal supply bids
             sp_i = sp_r[i]; sv_i = sv_r[i]
-        elif i == idx:
+        elif i == idx:  # virtually insert new bid
             sp_i = new_price; sv_i = new_volume
-        else:
+        else:  # normal supply bids (with adjusted index i)
             sp_i = sp_r[i - 1]; sv_i = sv_r[i - 1]
 
-        # Pull in demand bids clearing against sp_i (dp descending)
+        # Accumulate demands volume dv as long as its price dp is above supply price sp_i (dp descending)
         while j < n_d and dp[j] >= sp_i:
             dem_avail += dv[j]
             j += 1
 
+        # if available demand > supply from last round we can still add some supply
+        # at this market price
         if cum_s < dem_avail:
             last_ok = i
             last_ok_price = sp_i
             cum_before_k = cum_s
             s_total = cum_s + sv_i
             cleared = dem_avail if s_total > dem_avail else s_total
+        # FIXME: if last round supply is greater than demand that I can use now -->
+        #           cannot add anything (and next round I can use less (descending dp))
+        # else: break
         cum_s += sv_i
+        # FIXME: Shouldn't j get reset to 0 
+        # --> as dp descending to small sp_i, in next iteration this will not be valid anymore!!!!?
+        
 
     return last_ok_price, last_ok, cleared, cum_before_k
 
@@ -58,6 +69,7 @@ def _probe_classify(sp_r, sv_r, dp, dv, new_price, new_volume):
     state: -1 fully inframarginal, 0 marginal, +1 fully extramarginal."""
     n = sp_r.shape[0]
     idx = 0
+    # find index before new price
     while idx < n and sp_r[idx] < new_price:
         idx += 1
 
@@ -81,8 +93,20 @@ def _probe_classify(sp_r, sv_r, dp, dv, new_price, new_volume):
 @njit(cache=True)
 def _walk_outward(sp_r, sv_r, dp, dv, unit_price, unit_volume,
                   out_probe_prices, out_clear_prices, out_accepted_vols):
-    """Walk outward from unit_price. Fills the three output buffers in ascending
+    """
+    sp_r: residual supply prices (excluding unit price)
+    sv_r: residual supply volumes (excluding unit volume)
+    dp: demand prices
+    dv: demand volumes
+    out_...: buffers for results
+
+    Walk outward from unit_price. Fills the three output buffers in ascending
     price order. Returns the number of probes written."""
+
+    # get starting position: start from unit price????????!!!!!!
+    # FIXME: ---> maybe go to market price instead
+    #             put start after: "probe at units own price" --> get cp from that
+    #                   --> do while until: sp_r[start] < cp:
     n_r = sp_r.shape[0]
     start = 0
     while start < n_r and sp_r[start] < unit_price:
@@ -141,11 +165,18 @@ def _process_timestep(timestep, ts_data):
     pr_buf = np.empty(max_probes)
     cp_buf = np.empty(max_probes)
     av_buf = np.empty(max_probes)
-    # print(timestep, end="__")
+
+    # for every unit
     for unit_id in np.unique(su):
+        # get mask for unit specific elements
         mask = su == unit_id
+
+        # do stuff with unit specific elements
+        # --> in this simple version just 1 bid per unit with price and volume
         unit_volume = float(sv[mask][0])
         unit_price  = float(sp[mask][0])
+
+        # Get residual prices and volumes
         sp_r = np.ascontiguousarray(sp[~mask])
         sv_r = np.ascontiguousarray(sv[~mask])
 
@@ -162,22 +193,23 @@ def _process_timestep(timestep, ts_data):
         ]
     return out
 
-def _process_chunk(items_chunk):
-    out = {}
-    for t, data in items_chunk:
-        out.update(_process_timestep(t, data))
-    return out
-
 class FastClearing:
     def __init__(self, orders_df):
         self.ts = {}
+
+        # sort data by timestep
         for t, g in orders_df.groupby("start_time", sort=False):
+            # get bids of units (keys: "price" and "volume")
             p = g["price"].to_numpy(dtype=np.float64)
             v = g["volume"].to_numpy(dtype=np.float64)
             u = g["unit_id"].to_numpy()
+
+            # separate supply and demand
             s = v > 0; d = v < 0
             sp, sv, su = p[s], v[s], u[s]
             dp, dv = p[d], -v[d]
+
+            # sort units based on prices (neg for demand to get highest bidding)
             i = np.argsort(sp, kind="stable")
             j = np.argsort(-dp, kind="stable")
             self.ts[t] = (sp[i], sv[i], su[i],
@@ -195,113 +227,94 @@ db_uri = "postgresql://assume:assume@localhost:5432/assume"
 db = create_engine(db_uri)
 
 input_path = "examples/inputs/"
-scenario = "example_03"  # "example_03_naive"  # "example_01a"
-#scenario = "example_03_naive"
-study_case = "base_case_2019"  # "base"
+#scenario, study_case = "example_03", "base_case_2019"  # "example_03_naive"  # "example_01a"
+#scenario, study_case = "example_03_naive", "base_case_2019"
+scenario, study_case = "example_01a", "base"
 
 query = f"SELECT * FROM market_orders where simulation = '{scenario}_{study_case}'"
-# market_orders_df = pd.read_sql(query, db)
-#print("orders", market_orders_df.columns)
-
-if False:
-    orders = market_orders_df[["start_time", "unit_id", "accepted_price", "accepted_volume", "price", "volume"]]
-    print(len(orders))
-    orders = orders[:100]
-    print("cropped", len(orders))
-    #orders = orders.groupby(["start_time"])
-
-
-    fc = FastClearing(market_orders_df)
-    results = fc.run_all_probes(dedupe_consecutive=False)
-
-    # Inspect a single (timestep, unit):
-    ts = next(iter(fc.ts))
-    #print(pd.DataFrame(results[(ts, "Unit 3")]))
-
-    # Flatten everything into one DataFrame if you'd rather work that way:
-    rows = [
-        {"start_time": t, "unit_id": u, **r}
-        for (t, u), probes in results.items()
-        for r in probes
-    ]
-    df = pd.DataFrame(rows)
-    #print(df)
-
-
-import time
-import cProfile
-import pstats
-from pstats import SortKey
-
-# 1. Load real data once
-print("Read database")
-t0 = time.perf_counter()
-market_orders_df = pd.read_sql(query, db)
-market_orders_df = market_orders_df[["start_time", "unit_id", "accepted_price", "accepted_volume", "price", "volume"]]
-read_time = time.perf_counter() - t0
-print(f"Setup: {read_time*1000:.1f} ms  "
-      f"({len(market_orders_df)} entries)")
-n = len(market_orders_df)  #10**5
-print("Reduce size to", n)
-market_orders_df = market_orders_df[:n]
-print("starting")
-
-
-# 2. Build the precomputed structure (this cost is one-time, measure separately)
-t0 = time.perf_counter()
-fc = FastClearing(market_orders_df)
-build_time = time.perf_counter() - t0
-print(f"Setup: {build_time*1000:.1f} ms  "
-      f"({len(fc.ts)} timesteps)")
-
-print("compiling")
-n_jobs = 1
-
-ts0, data0 = next(iter(fc.ts.items()))
-t0 = time.perf_counter()
-_process_timestep(ts0, data0)
-elapsed = time.perf_counter() - t0
-print("compile time:", elapsed)
-
-
-# 3. Time the full probe sweep. Run a few times — first call may pay
-#    one-off costs (numpy import warmup, allocator settling).
-from timeit import Timer
-ts = next(iter(fc.ts))
-sp, sv, su, dp, dv, cum_dv = fc.ts[ts]
-mask = su == "Unit 3"
-sp_r, sv_r = sp[~mask], sv[~mask]
-
-t = Timer(
-    lambda: _probe_classify(sp_r, sv_r, dp, dv, 50.0, 1000.0)
-)
-n, total = t.autorange()
-print(f"_probe_in_residual: {total/n*1e6:.2f} µs per call")
 
 
 
-
-profiler = cProfile.Profile()
-profiler.enable()
-results = fc.run_all_probes()
-#results = fc.run_all_probes()
-profiler.disable()
-stats = pstats.Stats(profiler).sort_stats(SortKey.CUMULATIVE)
-stats.print_stats(20)   # top 20 by cumulative time
-
-
-for run in range(1):
+def init_database(db, query):
+    # 1. Load real data once
+    print("Read database")
     t0 = time.perf_counter()
+    market_orders_df = pd.read_sql(query, db)
+    market_orders_df = market_orders_df[["start_time", "unit_id", "accepted_price", "accepted_volume", "price", "volume"]]
+    read_time = time.perf_counter() - t0
+    print(f"Read db: {read_time*1000:.1f} ms  "
+        f"({len(market_orders_df)} entries)")
+
+    # n = len(market_orders_df)  #10**5
+    #print("Reduce size to", n)
+    #market_orders_df = market_orders_df[:n]
+    #print("starting")
+
+
+    # 2. Build the precomputed structure (this cost is one-time, measure separately)
+    t0 = time.perf_counter()
+    fc = FastClearing(market_orders_df)
+    build_time = time.perf_counter() - t0
+    print(f"Setup fast clearing: {build_time*1000:.1f} ms  "
+        f"({len(fc.ts)} timesteps)")
+    print(fc.ts)
+
+    ts0, data0 = next(iter(fc.ts.items()))
+    t0 = time.perf_counter()
+    _process_timestep(ts0, data0)
+    compile_time = time.perf_counter() - t0
+    print(f"JIT compile: {compile_time*1000:.1f} ms  ")
+
+
+
+
+    # 3. Time the full probe sweep. Run a few times — first call may pay
+    #    one-off costs (numpy import warmup, allocator settling).
+    ts = next(iter(fc.ts))
+    sp, sv, su, dp, dv, cum_dv = fc.ts[ts]
+    mask = su == "Unit 3"
+    sp_r, sv_r = sp[~mask], sv[~mask]
+
+    t = Timer(
+        lambda: _probe_classify(sp_r, sv_r, dp, dv, 50.0, 1000.0)
+    )
+    n, total = t.autorange()
+    print(f"_probe_in_residual: {total/n*1e6:.2f} µs per call")
+    return market_orders_df, fc
+
+
+df, fc = init_database(db, query)
+
+for ts in fc.ts:
+    sp, sv, su, dp, dv, cum_dv = fc.ts[ts]
+    print("supply price", sp)
+    print("supply vol", sv)
+    print("supply unit", su)
+    print("demand price", dp)
+    print("demand vol", dv)
+    break
+
+    
+
+
+
+
+
+
+bench = False
+
+if bench:
+    import cProfile
+    import pstats
+    from pstats import SortKey
+
+    profiler = cProfile.Profile()
+    profiler.enable()
     results = fc.run_all_probes()
     #results = fc.run_all_probes()
-    elapsed = time.perf_counter() - t0
-
-    n_probes = sum(len(v) for v in results.values())
-    n_pairs  = len(results)
-    print(f"Run {run+1}: {elapsed:.3f} s  "
-          f"{n_pairs} (timestep, unit) pairs, "
-          f"{n_probes} probes total, "
-          f"{n_probes/elapsed:,.0f} probes/sec")
+    profiler.disable()
+    stats = pstats.Stats(profiler).sort_stats(SortKey.CUMULATIVE)
+    stats.print_stats(20)   # top 20 by cumulative time
 
 
 if False:
