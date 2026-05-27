@@ -244,7 +244,7 @@ def test_market_coupling_directional_capacities():
     assert accepted_orders[3]["agent_addr"] == "gen7"
     assert math.isclose(accepted_orders[3]["accepted_volume"], 500, abs_tol=eps)
     assert math.isclose(accepted_orders[3]["accepted_price"], 50, abs_tol=eps)
-    
+
     # Check that recorded flows reflect the directional capacities (flow is node1 -> node2 so it's negative)
     # The flow limit from node2 to node1 is -300
     assert math.isclose(flows[(products[0][0], 0)], -300, abs_tol=eps)
