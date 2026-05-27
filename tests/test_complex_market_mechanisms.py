@@ -157,6 +157,101 @@ def test_market_coupling():
     market_config.param_dict = {}
 
 
+def test_market_coupling_directional_capacities():
+    market_config = simple_dayahead_auction_config
+    h = 2
+    market_config.market_products = [
+        MarketProduct(timedelta(hours=1), h, timedelta(hours=1))
+    ]
+    market_config.additional_fields = [
+        "bid_type",
+        "node_id",
+    ]
+    # Create a dictionary with the data
+    nodes = {
+        "name": ["node1", "node2"],
+        "v_nom": [380.0, 380.0],
+    }
+
+    # Convert the dictionary to a Pandas DataFrame with 'name' as the index
+    nodes = pd.DataFrame(nodes).set_index("name")
+
+    # Create a dictionary with lines having explicit directional capacities
+    # Flow from node2 to node1 will be limited to 300 (s_nom_reverse)
+    # Flow from node1 to node2 is allowed up to 1000 (s_nom_forward)
+    lines = {
+        "name": ["line_1"],
+        "bus0": ["node1"],
+        "bus1": ["node2"],
+        "s_nom": [500.0],
+        "s_nom_forward": [1000.0],
+        "s_nom_reverse": [300.0],
+    }
+
+    # Convert the dictionary to a Pandas DataFrame
+    lines = pd.DataFrame(lines)
+
+    grid_data = {"buses": nodes, "lines": lines}
+    market_config.param_dict["grid_data"] = grid_data
+    market_config.param_dict["log_flows"] = True
+
+    next_opening = market_config.opening_hours.after(datetime(2005, 6, 1))
+    products = get_available_products(market_config.market_products, next_opening)
+    assert len(products) == h
+
+    """
+    Create Orderbook with constant order volumes and prices:
+        - dem1: volume = -1000, price = 3000, node1
+        - dem2: volume = -200, price = 3000, node2
+        - gen1: volume = 1000, price = 100, node1
+        - gen2: volume = 1000, price = 50, node2
+    """
+    orderbook = []
+    orderbook = extend_orderbook(
+        products, volume=-1000, price=3000, orderbook=orderbook, node="node1"
+    )
+    orderbook = extend_orderbook(
+        products, volume=-200, price=3000, orderbook=orderbook, node="node2"
+    )
+    orderbook = extend_orderbook(products, 1000, 100, orderbook, node="node1")
+    orderbook = extend_orderbook(products, 1000, 50, orderbook, node="node2")
+
+    mr = ComplexClearingRole(market_config)
+    accepted_orders, rejected_orders, meta, flows = mr.clear(orderbook, products)
+
+    assert meta[0]["node"] == "node1"
+    # Local supply at node1 is 700 because it imports max 300 from node2
+    assert math.isclose(meta[0]["supply_volume"], 700, abs_tol=eps)
+    assert math.isclose(meta[0]["demand_volume"], 1000, abs_tol=eps)
+    assert math.isclose(meta[0]["price"], 100, abs_tol=eps)
+
+    assert meta[2]["node"] == "node2"
+    # Local supply at node2 is 500 (200 local demand + 300 export)
+    assert math.isclose(meta[2]["supply_volume"], 500, abs_tol=eps)
+    assert math.isclose(meta[2]["demand_volume"], 200, abs_tol=eps)
+    assert math.isclose(meta[2]["price"], 50, abs_tol=eps)
+
+    assert rejected_orders == []
+    assert accepted_orders[0]["agent_addr"] == "dem1"
+    assert math.isclose(accepted_orders[0]["accepted_volume"], -1000, abs_tol=eps)
+    assert accepted_orders[1]["agent_addr"] == "dem3"
+    assert math.isclose(accepted_orders[1]["accepted_volume"], -200, abs_tol=eps)
+
+    assert accepted_orders[2]["agent_addr"] == "gen5"
+    assert math.isclose(accepted_orders[2]["accepted_volume"], 700, abs_tol=eps)
+    assert math.isclose(accepted_orders[2]["accepted_price"], 100, abs_tol=eps)
+
+    assert accepted_orders[3]["agent_addr"] == "gen7"
+    assert math.isclose(accepted_orders[3]["accepted_volume"], 500, abs_tol=eps)
+    assert math.isclose(accepted_orders[3]["accepted_price"], 50, abs_tol=eps)
+    
+    # Check that recorded flows reflect the directional capacities (flow is node1 -> node2 so it's negative)
+    # The flow limit from node2 to node1 is -300
+    assert math.isclose(flows[(products[0][0], 0)], -300, abs_tol=eps)
+
+    market_config.param_dict = {}
+
+
 def test_market_coupling_with_island():
     market_config = simple_dayahead_auction_config
     h = 2
