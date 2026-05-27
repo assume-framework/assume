@@ -848,7 +848,7 @@ def test_load_index_file():
     assert df is None
 
 
-def test_aggregate_line_capacities_direct_match():
+def test_aggregate_line_capacities_with_s_max_pu():
     lines = pd.DataFrame(
         {
             "bus0": ["B1", "B2"],
@@ -872,11 +872,11 @@ def test_aggregate_line_capacities_direct_match():
     assert result.at["L1", "cap_forward"] == 100.0
     assert result.at["L1", "cap_reverse"] == 100.0
     
-    assert result.at["L2", "cap_forward"] == 180.0
-    assert result.at["L2", "cap_reverse"] == 190.0
+    assert result.at["L2", "cap_forward"] == 180.0*0.8
+    assert result.at["L2", "cap_reverse"] == 190.0*0.8
 
 
-def test_aggregate_line_capacities_aggregation():
+def test_aggregate_line_capacities_zonal_aggregation():
     lines = pd.DataFrame(
         {
             "bus0": ["B1", "B2", "B3"],
@@ -924,6 +924,6 @@ if __name__ == "__main__":
     test_initializer()
     test_sep_block_orders()
     test_aggregate_step_amount()
-    test_aggregate_line_capacities_direct_match()
-    test_aggregate_line_capacities_aggregation()
+    test_aggregate_line_capacities_with_s_max_pu()
+    test_aggregate_line_capacities_zonal_aggregation()
     test_aggregate_line_capacities_fallback_and_reverse()
