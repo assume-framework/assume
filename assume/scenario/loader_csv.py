@@ -957,6 +957,9 @@ def setup_world(
             for unit in op_units:
                 world.add_unit(**unit)
 
+    # publish unit refs to output role to enable exploitability calculation
+    world.output_role.units = world.units
+
     world.init_forecasts(forecasts_df)
 
     if (
