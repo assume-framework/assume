@@ -119,9 +119,10 @@ if __name__ == "__main__":
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
     data_format = "timescale"  # "local_db" or "timescale"
-
+    
+    available_examples["exploit"] = {"scenario": "exploit_example", "study_case": "base"}
     # select the example to run from the available examples above
-    example = "large_2019_eom"
+    example = "exploit"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

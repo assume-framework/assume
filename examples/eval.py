@@ -305,8 +305,8 @@ class FastClearing:
             [(t, u, e) for (t, u), e in per_unit.items()],
             columns=["time", "unit", "exploitability"],
         )
-        per_t = df.groupby("time")["exploitability"].sum().sort_index()
-        per_u = df.groupby("unit")["exploitability"].sum().sort_values(ascending=False)
+        per_t = df.groupby("time")["exploitability"].mean().sort_index()
+        per_u = df.groupby("unit")["exploitability"].mean().sort_values(ascending=False)
         total = float(per_t.sum())
 
         fig, (ax1, ax2) = plt.subplots(
@@ -314,12 +314,12 @@ class FastClearing:
         )
         per_t.plot(ax=ax1, marker=".")
         ax1.set_xlabel("time")
-        ax1.set_ylabel("exploitability (sum over units)")
+        ax1.set_ylabel("exploitability (mean over units)")
         ax1.set_title(f"Exploitability over time — total: {total:.2f}")
         ax1.grid(True, alpha=0.3)
 
         per_u.plot(kind="bar", ax=ax2)
-        ax2.set_ylabel("exploitability (sum over time)")
+        ax2.set_ylabel("exploitability (mean over time)")
         ax2.set_title("Per-unit exploitability")
         ax2.grid(True, axis="y", alpha=0.3)
 
@@ -824,8 +824,9 @@ def _main():
         print(f"Exploitability — total: {total:.2f}  "
             f"(mean per timestep: {total / max(len(per_t), 1):.2f})")
 
-        fig = fc.plot_exploitability(per_unit, path="exploitability.png")
-        print("Saved plot to exploitability.png")
+        path = f"exploitability_{scenario}_{study_case}.png"
+        fig = fc.plot_exploitability(per_unit, path=path)
+        print(f"Saved plot to {path}")
 
     if bench:
         import cProfile
