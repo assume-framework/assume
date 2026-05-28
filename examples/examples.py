@@ -120,9 +120,11 @@ if __name__ == "__main__":
     # when using timescale, you need to have docker installed and can access the grafana dashboard
     data_format = "timescale"  # "local_db" or "timescale"
     
-    available_examples["exploit"] = {"scenario": "exploit_example", "study_case": "base"}
+    available_examples["exploit_single"] = {"scenario": "exploit_example", "study_case": "single"}
+    available_examples["exploit_multi"] = {"scenario": "exploit_example", "study_case": "multi"}
+    available_examples["exploit_multi_sched"] = {"scenario": "exploit_example", "study_case": "multi_sched"}
     # select the example to run from the available examples above
-    example = "exploit"
+    example = "exploit_multi_sched"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

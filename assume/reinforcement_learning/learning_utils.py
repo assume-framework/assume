@@ -151,6 +151,34 @@ def linear_schedule_func(
     return func
 
 
+def cosine_annealing_func(start:float, end:float=0, end_fraction:float=1):
+    """
+    Creates a function that interpolates between start and end with cosine annealing.
+
+    Args:
+        start: value to start with if ``progress_remaining`` = 1
+        end: value to end with if ``progress_remaining`` = 0
+        end_fraction: fraction of ``progress_remaining``
+            where end is reached e.g 0.1 then end is reached after 10%
+            of the complete training process.
+
+    Returns:
+        Cosine Annealing schedule function.
+
+    Note:
+        Adapted from SGDR: Stochastic Gradient Descent with Warm Restarts: https://arxiv.org/abs/1608.03983
+        See also: https://docs.pytorch.org/docs/stable/generated/torch.optim.lr_scheduler.CosineAnnealingLR.html
+    """
+    
+    def func(progress_remaining: float) -> float:
+        if (1 - progress_remaining) > end_fraction:
+            return end
+        else:
+            return end + 1/2*(start - end) * (1 + np.cos(np.pi*(1-progress_remaining)/end_fraction).item())
+
+    return func
+
+
 def constant_schedule(val: float) -> Schedule:
     """
     Create a function that returns a constant. It is useful for learning rate schedule (to avoid code duplication)

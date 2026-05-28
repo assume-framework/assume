@@ -22,6 +22,7 @@ from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
+    cosine_annealing_func,
     transform_buffer_data,
 )
 from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
@@ -85,7 +86,13 @@ class Learning(Role):
             # configure additional learning parameters if we are in learning or evaluation mode
             if self.learning_config.learning_rate_schedule == "linear":
                 self.calc_lr_from_progress = linear_schedule_func(
-                    self.learning_config.learning_rate
+                    self.learning_config.learning_rate,
+                    self.learning_config.min_learning_rate
+                )
+            elif self.learning_config.learning_rate_schedule == "cosine":
+                self.calc_lr_from_progress = cosine_annealing_func(
+                    self.learning_config.learning_rate,
+                    self.learning_config.min_learning_rate
                 )
             else:
                 self.calc_lr_from_progress = (

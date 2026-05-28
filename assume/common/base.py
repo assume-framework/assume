@@ -851,6 +851,7 @@ class LearningConfig:
     batch_size: int = 128
     gradient_steps: int = 100
     learning_rate: float = 0.001
+    min_learning_rate: float = 0.0
     learning_rate_schedule: str | None = None
     early_stopping_steps: int | None = None
     early_stopping_threshold: float = 0.05

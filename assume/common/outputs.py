@@ -263,7 +263,7 @@ class WriteOutput(Role):
             # so it cannot hold a multi-episode time series.
             if content_type == "market_orders" and self.evaluation_mode:
                 self.write_buffers["rl_market_orders"].append(
-                    (content_data, market_id)
+                    (content_data, market_id, self.evaluation_mode, self.eval_episode)
                 )
 
         # keep track of the memory usage of the data
@@ -514,12 +514,12 @@ class WriteOutput(Role):
                         # episode/evaluation_mode so multi-episode runs are
                         # distinguishable in the database
                         dfs = []
-                        for market_data, market_id in data_list:
+                        for market_data, market_id, mode, episode in data_list:
                             sub = self.convert_market_orders(market_data, market_id)
                             if sub is None:
                                 continue
-                            sub["evaluation_mode"] = self.evaluation_mode
-                            sub["episode"] = self.eval_episode
+                            sub["evaluation_mode"] = mode
+                            sub["episode"] = episode
                             dfs.append(sub)
                         df = pd.concat(dfs, axis=0, join="outer") if dfs else None
                     case _:
@@ -779,6 +779,7 @@ class WriteOutput(Role):
             return
 
         if orders_df.empty:
+            logger.warning("No orders found to calculcate exploitability")
             return
 
         try:

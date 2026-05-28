@@ -627,7 +627,8 @@ class World:
         market_operator_agent.markets = []
 
         # after creation of an agent - we set additional context params
-        if not self.learning_mode and not self.evaluation_mode:
+        #if not self.learning_mode and not self.evaluation_mode:
+        if not self.learning_mode or self.evaluation_mode:
             market_operator_agent._role_context.data.update(
                 {"output_agent_addr": self.output_agent_addr}
             )
