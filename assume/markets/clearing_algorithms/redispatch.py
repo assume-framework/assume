@@ -165,7 +165,7 @@ class RedispatchMarketRole(MarketRole):
 
         # Update the network parameters
         redispatch_network = self.network.copy()
-        redispatch_network.loads_t.p_set = p_set
+        redispatch_network.generators_t.p_set = p_set
 
         # Update p_max_pu for generators with _up and _down suffixes
         redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))

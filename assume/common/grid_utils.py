@@ -94,13 +94,13 @@ def add_redispatch_generators(
         columns=generators.index,
     )
 
-    # add generators and their sold capacities as load with reversed sign to have fixed feed in
+    # add generators and their sold capacities as Generator to have fixed feed in
     network.add(
-        "Load",
+        "Generator",
         name=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
+        p_nom=generators["max_power"],
         p_set=p_set,
-        sign=1,
     )
 
     # add upward redispatch generators
