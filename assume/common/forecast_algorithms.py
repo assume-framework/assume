@@ -778,7 +778,7 @@ def calculate_price_from_cleared_history(
         }
 
         # Generate 48-hour forecast
-        forecast_hours = 48
+        forecast_hours = kwargs.get("forecast_lookahead", 48)
         forecasted_prices = []
         current_hour_index = 0
 
@@ -797,16 +797,9 @@ def calculate_price_from_cleared_history(
 
         # Update forecast for EOM market (main electricity market)
         if "EOM" in current_forecast:
-            if isinstance(current_forecast["EOM"], FastSeries):
-                # Update values in the FastSeries
-                updated_forecast = current_forecast["EOM"].copy()
-                updated_forecast[:forecast_hours] = forecasted_prices
-                current_forecast["EOM"] = updated_forecast
-            else:
-                # Handle regular pandas Series
-                updated_forecast = current_forecast["EOM"].copy()
-                updated_forecast.iloc[:forecast_hours] = forecasted_prices
-                current_forecast["EOM"] = updated_forecast
+            updated_forecast = current_forecast["EOM"].copy()
+            updated_forecast.iloc[:forecast_hours] = forecasted_prices
+            current_forecast["EOM"] = updated_forecast
 
         return current_forecast
 

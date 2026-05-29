@@ -174,16 +174,16 @@ class DsmEnergyOptimizationStrategy(MinMaxStrategy):
 
         if unit.horizon_mode == "rolling_horizon":
             current_market_time = product_tuples[0][0]
+            self.update_forecasts_if_needed(unit=unit)
             did_reoptimize = unit._check_and_reoptimize_rolling_window(
                 current_market_time
             )
             if not did_reoptimize and unit.optimisation_counter == 0:
                 unit.determine_optimal_operation_with_flex()
                 unit.optimisation_counter = 1
-        else:
-            if unit.optimisation_counter == 0:
-                unit.determine_optimal_operation_with_flex()
-                unit.optimisation_counter = 1
+        elif unit.optimisation_counter == 0:
+            unit.determine_optimal_operation_with_flex()
+            unit.optimisation_counter = 1
 
         bids = []
         for product in product_tuples:
@@ -226,6 +226,7 @@ class DsmEnergyNaiveRedispatchStrategy(MinMaxStrategy):
         if unit.horizon_mode == "rolling_horizon":
             current_market_time = product_tuples[0][0]
             unit._check_and_reoptimize_rolling_window(current_market_time)
+            self.update_forecasts_if_needed(unit=unit)
 
         # calculate the optimal operation of the unit according to the objective function
         unit.determine_optimal_operation_with_flex()
