@@ -116,9 +116,7 @@ class EntsoeInterface:
             cached = self._read_cache(cache_path)
             if cached is not None:
                 return self._slice_to_period(
-                    self._ensure_unique_index(
-                        self._to_naive_index(cached)
-                    ),
+                    self._ensure_unique_index(self._to_naive_index(cached)),
                     start,
                     end,
                 )
@@ -148,9 +146,7 @@ class EntsoeInterface:
             cached = self._read_cache(cache_path)
             if cached is not None:
                 return self._slice_to_period(
-                    self._ensure_unique_index(
-                        self._to_naive_index(cached)
-                    ),
+                    self._ensure_unique_index(self._to_naive_index(cached)),
                     start,
                     end,
                 )

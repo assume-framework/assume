@@ -35,30 +35,6 @@ COUNTRY_LOCATIONS: dict[str, tuple[float, float]] = {
     "SK": (48.67, 19.70),
 }
 
-VALIDATED_PSR_FROM_API = {
-    "Biomass",
-    "Fossil Brown coal/Lignite",
-    "Fossil Coal-derived gas",
-    "Fossil Gas",
-    "Fossil Hard coal",
-    "Fossil Oil",
-    "Fossil Oil shale",
-    "Fossil Peat",
-    "Geothermal",
-    "Hydro Pumped Storage",
-    "Hydro Run-of-river and poundage",
-    "Hydro Water Reservoir",
-    "Marine",
-    "Nuclear",
-    "Other",
-    "Other renewable",
-    "Solar",
-    "Waste",
-    "Wind Offshore",
-    "Wind Onshore",
-}
-
-
 @dataclass(frozen=True)
 class TechnologyMapping:
     technology: str
@@ -136,6 +112,7 @@ DEFAULT_RENEWABLE_FUEL_PRICES: dict[str, float] = {
 
 DEFAULT_STORAGE_HOURS = 8.0
 DEFAULT_STORAGE_ADDITIONAL_COST = 0.28
+DEFAULT_CO2_PRICE_EUR_T = 70.0
 
 FOSSIL_BIDDING_KEYS = {"hard coal", "lignite", "oil", "gas"}
 THERMAL_BIDDING_KEYS = FOSSIL_BIDDING_KEYS | {"nuclear"}

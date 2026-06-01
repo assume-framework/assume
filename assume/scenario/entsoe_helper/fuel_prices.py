@@ -15,9 +15,7 @@ logger = logging.getLogger(__name__)
 EU_ETS_URL = "https://energy-api.instrat.pl/api/prices/co2"
 COAL_URL = "https://energy-api.instrat.pl/api/coal/pscmi_1"
 GAS_URL = "https://energy-api.instrat.pl/api/prices/gas_price_rdn_daily"
-USER_AGENT = (
-    "Mozilla/5.0 (compatible; ASSUME/1.0; +https://assume-project.de/)"
-)
+USER_AGENT = "Mozilla/5.0 (compatible; ASSUME/1.0; +https://assume-project.de/)"
 
 GJ_TO_KWH = 1e6 / 3600
 
@@ -103,9 +101,7 @@ class InstratFuelPrices:
 
         start = index[0].strftime("%Y-%m-%d")
         end = index[-1].strftime("%Y-%m-%d")
-        pln_eur = yf.download("PLNEUR=X", start=start, end=end, progress=False)[
-            "Close"
-        ]
+        pln_eur = yf.download("PLNEUR=X", start=start, end=end, progress=False)["Close"]
         if isinstance(pln_eur.columns, pd.MultiIndex):
             pln_eur = pln_eur["PLNEUR=X"]
         else:
@@ -173,7 +169,9 @@ class InstratFuelPrices:
 
         gas_data = self._download(GAS_URL, start, end)
         pln_eur = self._pln_to_eur(gas_data.index)
-        series = _sanitize_daily_prices(gas_data["price"] * pln_eur, "gas", fallback=30.0)
+        series = _sanitize_daily_prices(
+            gas_data["price"] * pln_eur, "gas", fallback=30.0
+        )
         series = series.resample("D").ffill().bfill()
         if use_cache:
             self._write_cache(cache_path, series)

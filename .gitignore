@@ -151,5 +151,4 @@ examples/notebooks/outputs
 *.jar
 *.nbconvert.ipynb
 fameSetup.yaml
-config.yml
 .claude

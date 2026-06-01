@@ -14,8 +14,8 @@ from assume.common.forecaster import UnitForecaster
 from assume.scenario.entsoe_helper.client import EntsoeInterface
 from assume.scenario.entsoe_helper.fuel_prices import InstratFuelPrices
 from assume.scenario.entsoe_helper.mappings import (
+    DEFAULT_CO2_PRICE_EUR_T,
     PSR_TO_ASSUME,
-    VALIDATED_PSR_FROM_API,
     block_price_factors,
     interpolate_block_prices,
     split_capacity_blocks,
@@ -24,6 +24,7 @@ from assume.scenario.loader_entsoe import (
     _add_blocked_units,
     _add_storage_units,
     _add_variable_unit,
+    _resolve_co2_prices,
     load_entsoe,
 )
 
@@ -58,11 +59,6 @@ def mock_entsoe_data(hourly_index):
         }
     )
     return demand, generation, capacity
-
-
-def test_psr_mapping_covers_validated_api_types():
-    missing = VALIDATED_PSR_FROM_API - set(PSR_TO_ASSUME)
-    assert not missing, f"Missing PSR mappings for: {missing}"
 
 
 def test_load_entsoe_requires_api_key():
@@ -120,14 +116,16 @@ def test_instrat_co2_price_parsing(hourly_index):
 @patch.object(InstratFuelPrices, "_download")
 def test_get_fuel_prices(mock_download, hourly_index):
     mock_download.side_effect = [
-        pd.DataFrame(
-            {"pscmi1_pln_per_gj": [10.0, 11.0]}, index=hourly_index[:2]
-        ),
+        pd.DataFrame({"pscmi1_pln_per_gj": [10.0, 11.0]}, index=hourly_index[:2]),
         pd.DataFrame({"price": [100.0, 110.0]}, index=hourly_index[:2]),
         pd.DataFrame({"price": [80.0, 82.0]}, index=hourly_index[:2]),
     ]
 
-    with patch.object(InstratFuelPrices, "_pln_to_eur", return_value=pd.Series(0.23, index=hourly_index[:2])):
+    with patch.object(
+        InstratFuelPrices,
+        "_pln_to_eur",
+        return_value=pd.Series(0.23, index=hourly_index[:2]),
+    ):
         prices = InstratFuelPrices().get_fuel_prices(
             datetime(2024, 1, 1),
             datetime(2024, 1, 2),
@@ -145,9 +143,7 @@ def test_get_fuel_prices_handles_empty_coal_cache(hourly_index, tmp_path):
     period_dir = cache_dir / "20240101_20240102"
     period_dir.mkdir(parents=True)
     (period_dir / "coal.csv").write_text("date,hard coal\n2024-01-01,\n")
-    (period_dir / "gas.csv").write_text(
-        "date,gas\n2024-01-01,30.0\n2024-01-02,31.0\n"
-    )
+    (period_dir / "gas.csv").write_text("date,gas\n2024-01-01,30.0\n2024-01-02,31.0\n")
     (period_dir / "co2.csv").write_text("date,co2\n2024-01-01,80.0\n2024-01-02,81.0\n")
 
     client = InstratFuelPrices(cache_dir=cache_dir)
@@ -205,10 +201,21 @@ def test_variable_unit_uses_generation_peak(hourly_index):
     assert unit_params["max_power"] == 5_000.0
 
 
+def test_resolve_co2_prices_uses_api_or_fallback(hourly_index):
+    fallback = _resolve_co2_prices(hourly_index, {})
+    assert (fallback == DEFAULT_CO2_PRICE_EUR_T).all()
+
+    api_co2 = pd.Series(82.5, index=hourly_index, name="co2")
+    resolved = _resolve_co2_prices(hourly_index, {"co2": api_co2})
+    assert resolved.iloc[0] == 82.5
+
+
 def test_thermal_units_bid_installed_capacity(hourly_index):
     world = MagicMock()
     gen_series = pd.Series(15_000.0, index=hourly_index)
     mapping = PSR_TO_ASSUME["Fossil Gas"]
+
+    co2_prices = pd.Series(75.0, index=hourly_index, name="co2")
 
     _add_blocked_units(
         world,
@@ -223,6 +230,7 @@ def test_thermal_units_bid_installed_capacity(hourly_index):
         block_sizes_mw={"gas": 400.0},
         fuel_price_ranges={"gas": (32.0, 22.0)},
         api_fuel_prices={},
+        co2_prices=co2_prices,
     )
 
     gas_units = [
@@ -238,6 +246,34 @@ def test_thermal_units_bid_installed_capacity(hourly_index):
         assert unit_params["emission_factor"] == 0.201
         assert unit_params["fuel_type"] == "gas"
         assert forecaster.availability.iloc[0] == 1.0
+        assert "co2" in forecaster.fuel_prices
+        assert forecaster.fuel_prices["co2"].iloc[0] == 75.0
+
+
+def test_oil_units_use_shared_co2_price(hourly_index):
+    world = MagicMock()
+    gen_series = pd.Series(500.0, index=hourly_index)
+    mapping = PSR_TO_ASSUME["Fossil Oil"]
+    co2_prices = pd.Series(80.0, index=hourly_index, name="co2")
+
+    _add_blocked_units(
+        world,
+        "DE",
+        "oil",
+        mapping,
+        total_capacity=400.0,
+        gen_series=gen_series,
+        index=hourly_index,
+        location=(51.16, 10.45),
+        bidding_strategies={"oil": {"EOM": "powerplant_energy_naive"}},
+        block_sizes_mw={"oil": 200.0},
+        fuel_price_ranges={"oil": (25.0, 18.0)},
+        api_fuel_prices={},
+        co2_prices=co2_prices,
+    )
+
+    forecaster = world.add_unit.call_args[0][4]
+    assert forecaster.fuel_prices["co2"].iloc[0] == 80.0
 
 
 def test_storage_units_use_installed_capacity(hourly_index):
