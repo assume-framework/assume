@@ -11,13 +11,18 @@ from dateutil import rrule as rr
 
 from assume import World
 from assume.common.exceptions import AssumeException
-from assume.common.forecaster import DemandForecaster, PowerplantForecaster, UnitForecaster
+from assume.common.forecaster import (
+    DemandForecaster,
+    PowerplantForecaster,
+    UnitForecaster,
+)
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.scenario.entsoe_helper.client import EntsoeInterface
 from assume.scenario.entsoe_helper.fuel_prices import InstratFuelPrices
 from assume.scenario.entsoe_helper.mappings import (
     COUNTRY_LOCATIONS,
     DEFAULT_BLOCK_SIZES_MW,
+    DEFAULT_CO2_PRICE_EUR_T,
     DEFAULT_EMISSION_FACTORS,
     DEFAULT_FUEL_PRICE_RANGES,
     DEFAULT_RENEWABLE_FUEL_PRICES,
@@ -94,6 +99,7 @@ def load_entsoe(
         api_fuel_prices = InstratFuelPrices().get_fuel_prices(
             start, end, index, use_cache=use_cache
         )
+    co2_prices = _resolve_co2_prices(index, api_fuel_prices)
 
     world.setup(
         start=start,
@@ -183,6 +189,7 @@ def load_entsoe(
                     block_sizes_mw,
                     fuel_price_ranges,
                     api_fuel_prices,
+                    co2_prices,
                 )
 
     world.init_forecasts()
@@ -206,22 +213,40 @@ def _emission_factor(bidding_key: str) -> float:
     return DEFAULT_EMISSION_FACTORS.get(bidding_key, 0.0)
 
 
+def _resolve_co2_prices(
+    index: pd.DatetimeIndex,
+    api_fuel_prices: dict[str, pd.Series],
+) -> pd.Series:
+    """Return a shared CO2 price series for all fossil units (€/tCO2)."""
+    if "co2" in api_fuel_prices:
+        return api_fuel_prices["co2"]
+    return pd.Series(DEFAULT_CO2_PRICE_EUR_T, index=index, name="co2")
+
+
 def _powerplant_fuel_type(bidding_key: str) -> str:
     if bidding_key in FOSSIL_BIDDING_KEYS:
         return bidding_key
     return "others"
 
 
+def _build_fossil_fuel_prices(
+    bidding_key: str,
+    fuel_value: pd.Series | float,
+    co2_prices: pd.Series,
+) -> dict[str, pd.Series | float]:
+    fuel_type = _powerplant_fuel_type(bidding_key)
+    fuel_prices: dict[str, pd.Series | float] = {fuel_type: fuel_value}
+    if bidding_key in FOSSIL_BIDDING_KEYS:
+        fuel_prices["co2"] = co2_prices
+    return fuel_prices
+
+
 def _build_api_fuel_prices(
     bidding_key: str,
     fuel_series: pd.Series,
-    api_fuel_prices: dict[str, pd.Series],
+    co2_prices: pd.Series,
 ) -> dict[str, pd.Series]:
-    fuel_type = _powerplant_fuel_type(bidding_key)
-    fuel_prices = {fuel_type: fuel_series}
-    if bidding_key in FOSSIL_BIDDING_KEYS:
-        fuel_prices["co2"] = api_fuel_prices["co2"]
-    return fuel_prices
+    return _build_fossil_fuel_prices(bidding_key, fuel_series, co2_prices)
 
 
 def _add_variable_unit(
@@ -273,6 +298,7 @@ def _add_blocked_units(
     block_sizes_mw,
     fuel_price_ranges,
     api_fuel_prices,
+    co2_prices,
 ):
     peak = gen_series.max()
     if peak <= 0:
@@ -296,13 +322,15 @@ def _add_blocked_units(
             block_max = block_capacity if bid_full_capacity else block_capacity * scale
             share = block_capacity / total_capacity
             block_gen = gen_series * share
-            availability = 1 if bid_full_capacity else _generation_availability(
-                block_gen, block_max
+            availability = (
+                1
+                if bid_full_capacity
+                else _generation_availability(block_gen, block_max)
             )
             fuel_prices = _build_api_fuel_prices(
                 mapping.bidding_key,
                 api_fuel_prices[mapping.bidding_key] * block_factor,
-                api_fuel_prices,
+                co2_prices,
             )
             world.add_unit(
                 f"generation_{country}_{tech}_{block_idx}",
@@ -333,13 +361,12 @@ def _add_blocked_units(
         block_max = block_capacity if bid_full_capacity else block_capacity * scale
         share = block_capacity / total_capacity
         block_gen = gen_series * share
-        availability = 1 if bid_full_capacity else _generation_availability(
-            block_gen, block_max
+        availability = (
+            1 if bid_full_capacity else _generation_availability(block_gen, block_max)
         )
-        fuel_type = _powerplant_fuel_type(mapping.bidding_key)
-        fuel_prices = {fuel_type: block_price}
-        if mapping.bidding_key in FOSSIL_BIDDING_KEYS:
-            fuel_prices["co2"] = price_high
+        fuel_prices = _build_fossil_fuel_prices(
+            mapping.bidding_key, block_price, co2_prices
+        )
 
         world.add_unit(
             f"generation_{country}_{tech}_{block_idx}",
@@ -350,7 +377,7 @@ def _add_blocked_units(
                 "max_power": block_max,
                 "bidding_strategies": bidding_strategies[mapping.bidding_key],
                 "technology": tech,
-                "fuel_type": fuel_type,
+                "fuel_type": _powerplant_fuel_type(mapping.bidding_key),
                 "emission_factor": _emission_factor(mapping.bidding_key),
                 "location": location,
                 "node": country,
