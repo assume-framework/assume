@@ -462,7 +462,7 @@ def grid_data_dict_3_nodes():
             [-600, -1000, -1000, -600, -1000, -1000, 800, 1000, 1000, 1000, 1000, 400],
             [12, 22, 32],  # nodal prices emerge similar to nodal clearing solution
             0,  # no volume change, as up and down volumes are equal
-            [0, 5000, 5000], # flows same as in nodal clearing solution
+            [0, 5000, 5000],  # flows same as in nodal clearing solution
             # [200, 5000, 4800], # alternative flows with alternative up and down volumes
         ),
         (
@@ -585,4 +585,3 @@ def test_three_nodes_redispatch(
     assert flows_df.loc[0, "line_1_2"] == pytest.approx(expected_flows_3[0], abs=eps)
     assert flows_df.loc[0, "line_1_3"] == pytest.approx(expected_flows_3[1], abs=eps)
     assert flows_df.loc[0, "line_2_3"] == pytest.approx(expected_flows_3[2], abs=eps)
-
