@@ -260,7 +260,7 @@ units_index = ["coal_N", "coal_S", "gas_S", "dem_S"]
             [],
             [],
             0,
-            [],
+            [0],
         ),  # all demand covered by coal_S
         (
             pd.Series([1000, 0, 0], index=generators.index),
@@ -351,14 +351,14 @@ def test_two_nodes_redispatch(
     assert "supply_volume" in meta[1]
     assert "demand_volume" in meta[0]
     assert "demand_volume" in meta[1]
-    print("Meta: " + str(meta))
+    # print("Meta: " + str(meta))
     assert [meta[i]["supply_volume"] for i in range(len(nodes))] == pytest.approx(
         expected_up_volume
     )
     assert [meta[i]["demand_volume"] for i in range(len(nodes))] == pytest.approx(
         expected_down_volume
     )
-    print("Accepted: " + str(accepted_orders))
+    # print("Accepted: " + str(accepted_orders))
     assert [o["accepted_volume"] for o in accepted_orders] == pytest.approx(
         expected_accepted_orders_volume
     )
@@ -368,7 +368,10 @@ def test_two_nodes_redispatch(
     assert sum([o["accepted_volume"] for o in accepted_orders]) == pytest.approx(
         expected_volume_change
     )
-    # todo: check flows
+    # check flows
+    flows_df = pd.Series(flows).unstack()
+    print("Flows: " + str(flows_df))
+    assert flows_df.loc[0, "line_N_S"] == pytest.approx(expected_flows[0], abs=eps)
 
 
 # Tests with 3 nodes and 30 generators (gen5 to gen34) and 3 demand (dem1 to dem3)
@@ -446,18 +449,22 @@ def grid_data_dict_3_nodes():
         ),
         (
             # copper plate market outcome hour 1
+            # there are 2 equally expensive solutions to the problem
             pd.Series(
                 [1000] * 10 + [1000] * 10 + [1000] * 2 + [200] + [0] * 7,
                 index=generators_3.index,
             ),
             pd.Series([-2400, -2400, -17400], index=demand_3.index),
             [0, 0, 5200],  # up at node 3
+            # [0, 0, 5400], # alternative up
             [2600, 2600, 0],  # down at nodes 1 and 2
+            # [2400, 3000, 0], # alternative down
             [-600, -1000, -1000, -600, -1000, -1000, 800, 1000, 1000, 1000, 1000, 400],
             [12, 22, 32],  # nodal prices emerge similar to nodal clearing solution
-            0,  # no volume change
-            [200, 5000, 4800],
-        ),  # flows
+            0,  # no volume change, as up and down volumes are equal
+            [0, 5000, 5000], # flows same as in nodal clearing solution
+            # [200, 5000, 4800], # alternative flows with alternative up and down volumes
+        ),
         (
             # copper plate market outcome hour 2
             pd.Series([1000] * 23 + [200] + [0] * 6, index=generators_3.index),
@@ -467,8 +474,8 @@ def grid_data_dict_3_nodes():
             [-800, -1000, 800, 1000],
             [17, 23, 29],  # nodal prices similar to nodal clearing solution
             0,  # no volume change
-            [600, 5000, 5000],
-        ),  # flows
+            [600, 5000, 4400],
+        ),
         (
             # EOM did not provide enough energy to cover demand, redispatch to find cheapest solution (equal to nodal clearing)
             pd.Series(
@@ -477,12 +484,12 @@ def grid_data_dict_3_nodes():
             pd.Series(
                 [-4400, -4400, -14400], index=demand_3.index
             ),  # demand of 23200 MW
-            [9000, 8000, 5000],  # up at node 3
-            [0, 0, 0],  # down at node 2
+            [9000, 8000, 5000],  # up at all nodes
+            [0, 0, 0],  # down at no nodes
             [1000] * 9 + [800] + [1000] * 7 + [200] + [1000] * 5,
             [17, 23, 29],  # nodal prices similar to nodal clearing solution
             22000,  # + 22000 MW to match demand of 23200 MW
-            [600, 5000, 5000],
+            [600, 5000, 4400],
         ),  # flows
     ],
 )
@@ -555,7 +562,7 @@ def test_three_nodes_redispatch(
     assert meta[0]["node"] == "node1"
     assert meta[1]["node"] == "node2"
     assert meta[2]["node"] == "node3"
-    print("Meta: " + str(meta))
+    # print("Meta: " + str(meta))
     assert [meta[i]["supply_volume"] for i in range(len(nodes_3))] == pytest.approx(
         expected_up_volume_3
     )
@@ -565,11 +572,17 @@ def test_three_nodes_redispatch(
     assert [meta[i]["price"] for i in range(len(nodes_3))] == pytest.approx(
         expected_accepted_nodal_price_3
     )
-    print("Accepted: " + str(accepted_orders))
+    # print("Accepted: " + str(accepted_orders))
     assert [o["accepted_volume"] for o in accepted_orders] == pytest.approx(
         expected_accepted_orders_volume_3
     )
     assert sum([o["accepted_volume"] for o in accepted_orders]) == pytest.approx(
         expected_volume_change_3
     )
-    # todo: flows
+    # check flows
+    flows_df = pd.Series(flows).unstack()
+    print("Flows: " + str(flows_df))
+    assert flows_df.loc[0, "line_1_2"] == pytest.approx(expected_flows_3[0], abs=eps)
+    assert flows_df.loc[0, "line_1_3"] == pytest.approx(expected_flows_3[1], abs=eps)
+    assert flows_df.loc[0, "line_2_3"] == pytest.approx(expected_flows_3[2], abs=eps)
+
