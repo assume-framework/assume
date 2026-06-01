@@ -72,10 +72,6 @@ class DSMFlex:
         self._rh_step = dsm_opt.get("rolling_step")  # e.g. "24h"
 
         # Rolling-horizon state tracking (for per-market-round re-optimization)
-        self._rh_window_start_idx = 0  # Current window start index in full horizon
-        self._rh_last_market_request_step = (
-            None  # Track which step the last market request was for
-        )
         self._rh_optimized_until_step = (
             0  # How far we've optimized (in full horizon steps)
         )
@@ -1246,138 +1242,6 @@ class DSMFlex:
                 )
             self._component_operations.append(row)
 
-    def _solve_rolling_horizon_opt(self) -> None:
-        """Perform the cost-optimal solve in rolling-horizon fashion.
-
-        The full horizon is split into overlapping look-ahead windows.  For each
-        window a fresh Pyomo model is built and solved; the first *commit_horizon*
-        steps are written to the full-horizon result arrays and the component
-        states at the end of that period are carried forward to the next window.
-        For steel plants, cumulative remaining demand is decremented each window.
-
-        After all windows the full-horizon ``opt_power_requirement``,
-        ``variable_cost_series``, and ``total_cost`` are populated.
-        """
-        N = len(self.index)
-        freq = self.index.freq
-
-        look_ahead_steps = self._parse_duration_to_steps(self._rh_look_ahead)
-        commit_steps = self._parse_duration_to_steps(self._rh_commit)
-        rolling_steps = self._parse_duration_to_steps(self._rh_step)
-
-        logger.info(
-            "[RH-ENGINE] Horizon=%d steps, look-ahead=%d, commit=%d, roll=%d",
-            N,
-            look_ahead_steps,
-            commit_steps,
-            rolling_steps,
-        )
-
-        opt_power: list = [0.0] * N
-        var_cost: list = [0.0] * N
-        self._rh_full_horizon_production = [0.0] * N
-
-        saved_index = self.index
-        saved_model = self.model
-        saved_components = self.components
-
-        init_states = self._collect_init_states()
-
-        remaining_demand = None
-        if self._has_demand_tracking:
-            remaining_demand = getattr(self, self._demand_attr_suffix)
-            logger.info("[RH-DEMAND] Initial remaining_demand=%.2f", remaining_demand)
-
-        window_start = 0
-        window_num = 0
-        while window_start < N:
-            window_end = min(window_start + look_ahead_steps, N)
-            commit_end = min(window_start + commit_steps, N)
-
-            logger.debug(
-                "RH window %d: [%d:%d], commit [%d:%d]",
-                window_num,
-                window_start,
-                window_end,
-                window_start,
-                commit_end,
-            )
-
-            self.index = FastIndex(
-                start=saved_index[window_start],
-                end=saved_index[window_end - 1],
-                freq=freq,
-            )
-            saved_attrs = self._collect_series_attrs_for_window(
-                window_start, window_end, N
-            )
-            self.components = self._prepare_window_components(
-                window_start, window_end, N, init_states, remaining_demand
-            )
-
-            self.model = pyo.ConcreteModel()
-            self.define_sets()
-            self.define_parameters()
-            self.define_variables()
-            self.initialize_components()
-            self.initialize_process_sequence()
-            self.define_constraints()
-
-            if remaining_demand is not None and self._has_demand_tracking:
-                self.model.demand_limit = pyo.Param(
-                    initialize=remaining_demand, mutable=True
-                )
-                self.model.demand_upper_bound = pyo.Constraint(
-                    rule=lambda m: sum(
-                        self._primary_output_expr(m, t) for t in m.time_steps
-                    )
-                    <= m.demand_limit
-                )
-
-            self.define_objective_opt()
-            instance = self.model.create_instance()
-            results = self.solver.solve(instance, options={})
-            self._log_solver_status(results, window_start, window_end)
-
-            n_commit = commit_end - window_start
-            window_production = 0.0
-            for local_t in range(n_commit):
-                global_t = window_start + local_t
-                power_val = pyo.value(instance.total_power_input[local_t])
-                opt_power[global_t] = power_val
-                var_cost[global_t] = pyo.value(instance.variable_cost[local_t])
-                window_production += power_val
-                self._rh_full_horizon_production[global_t] = power_val
-
-            self._update_init_states(instance, n_commit - 1, init_states)
-
-            if remaining_demand is not None and self._has_demand_tracking:
-                remaining_demand -= window_production
-                logger.debug(
-                    "[RH-DEMAND] Committed=%.2f, remaining=%.2f",
-                    window_production,
-                    remaining_demand,
-                )
-
-            self._restore_series_attrs(saved_attrs)
-            window_start += rolling_steps
-            window_num += 1
-
-        self.index = saved_index
-        self.model = saved_model
-        self.components = saved_components
-
-        self.opt_power_requirement = FastSeries(index=self.index, value=opt_power)
-        self.total_cost = sum(var_cost)
-        self.variable_cost_series = FastSeries(index=self.index, value=var_cost)
-
-        logger.info(
-            "[RH-COMPLETE] %d windows | total_cost=%.2f | total_production=%.2f",
-            window_num,
-            self.total_cost,
-            sum(opt_power),
-        )
-
     # ------------------------------------------------------------------
     # /Rolling-horizon helpers
     # ------------------------------------------------------------------
@@ -1576,7 +1440,6 @@ class DSMFlex:
                     "Could not update opt_power_requirement[%d]: %s", global_t, e
                 )
 
-        self._rh_window_start_idx = window_start
         self._rh_optimized_until_step = commit_end
         logger.info(
             "[RH-WINDOW-COMPLETE] production=%.2f MWh | opt_until=%d | states=%s",
@@ -1591,38 +1454,11 @@ class DSMFlex:
         """
         Determines the optimal operation of the steel plant without considering flexibility.
 
-        Note: Rolling horizon optimization is disabled during forecaster initialization
-        (switch_flex_off=False) as it can cause infeasibility during model setup.
-        Rolling horizon will be used for market time re-optimization later.
+        This performs a single full-horizon solve. For rolling-horizon units it is
+        the setup-time presolve that seeds ``_rh_full_horizon_production``; the
+        per-window re-optimisation at market time is handled separately by
+        ``_check_and_reoptimize_rolling_window``.
         """
-        # During forecaster initialization, always use full-horizon method
-        # Rolling horizon will be used later during market time re-optimization
-        if not switch_flex_off:
-            pass
-        elif self.horizon_mode == "rolling_horizon":
-            logger.info(
-                "[ROLLING-HORIZON] %s: Starting rolling-horizon optimization "
-                "(look_ahead=%s, commit=%s, step=%s)",
-                self.id,
-                self._rh_look_ahead,
-                self._rh_commit,
-                self._rh_step,
-            )
-            try:
-                self._solve_rolling_horizon_opt()
-                logger.info(
-                    "[ROLLING-HORIZON] %s: Rolling-horizon optimization complete",
-                    self.id,
-                )
-                return
-            except Exception as rh_error:
-                logger.warning(
-                    "[ROLLING-HORIZON] Rolling horizon optimization failed: %s. "
-                    "Falling back to full-horizon optimization.",
-                    type(rh_error).__name__,
-                )
-                # Fall through to full-horizon solve below
-
         # create an instance of the model
         instance = self.model.create_instance()
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective

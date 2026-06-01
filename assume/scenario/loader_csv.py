@@ -800,9 +800,13 @@ def load_config_and_create_forecaster(
                         "forecast_electricity_price_update", None
                     )
 
+                    initial_market_prices = {}
                     if price_update_source is not None:
-                        price_forecast = forecasts_df.get(price_update_source, None)
-                        initial_market_prices = {}
+                        price_forecast = (
+                            forecasts_df.get(price_update_source, None)
+                            if forecasts_df is not None
+                            else None
+                        )
                         if price_forecast is not None:
                             initial_market_prices["EOM"] = price_forecast
                         else:
@@ -815,7 +819,8 @@ def load_config_and_create_forecaster(
                         availability=availability.get(
                             id, pd.Series(1.0, index, name=id)
                         ),
-                        market_prices=initial_market_prices,
+                        market_prices=initial_market_prices
+                        or unit.get("market_prices"),
                         forecast_algorithms=unit_forecast_algorithms,
                         forecast_registries=None,
                         fuel_prices=fuel_prices_df,

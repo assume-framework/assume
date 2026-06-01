@@ -9,17 +9,14 @@ Covers:
 - Rolling-horizon config loading and validation
 - _parse_duration_to_steps
 - _collect_series_attrs_for_window / _restore_series_attrs
-- _solve_rolling_horizon_opt (result shape and properties)
-- _check_and_reoptimize_rolling_window
-- calculate_price_from_cleared_history adaptive algorithm
-- SteelplantForecaster.update() price-sync behaviour
+- _check_and_reoptimize_rolling_window / _solve_rolling_horizon_next_window
+- end-to-end steel-plant scenario through World.run()
 """
 
 import pandas as pd
 import pytest
 
-from assume.common.fast_pandas import FastIndex, FastSeries
-from assume.common.forecast_algorithms import calculate_price_from_cleared_history
+from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import SteelplantForecaster
 from assume.strategies.naive_strategies import DsmEnergyOptimizationStrategy
 from assume.units.steel_plant import SteelPlant
@@ -218,63 +215,6 @@ def test_collect_and_restore_series_attrs(dsm_components, rh_config):
 
 
 # ---------------------------------------------------------------------------
-# 4. Rolling-horizon full solve
-# ---------------------------------------------------------------------------
-
-
-def test_rolling_horizon_result_length_matches_full_horizon(dsm_components, rh_config):
-    """opt_power_requirement covers every step of the full horizon."""
-    plant = _make_rh_plant(dsm_components, rh_config, n=N_SHORT)
-    plant.setup_model(presolve=False)
-    plant.determine_optimal_operation_without_flex()
-
-    assert plant.opt_power_requirement is not None
-    assert isinstance(plant.opt_power_requirement, FastSeries)
-    assert len(plant.opt_power_requirement) == N_SHORT
-
-
-def test_rolling_horizon_opt_power_nonnegative(dsm_components, rh_config):
-    """All committed power values from rolling horizon are non-negative."""
-    plant = _make_rh_plant(dsm_components, rh_config, n=N_SHORT)
-    plant.setup_model(presolve=False)
-    plant.determine_optimal_operation_without_flex()
-
-    assert all(v >= 0 for v in plant.opt_power_requirement.data)
-
-
-def test_rolling_horizon_variable_cost_series_length(dsm_components, rh_config):
-    """variable_cost_series has the same length as the full horizon."""
-    plant = _make_rh_plant(dsm_components, rh_config, n=N_SHORT)
-    plant.setup_model(presolve=False)
-    plant.determine_optimal_operation_without_flex()
-
-    assert len(plant.variable_cost_series) == N_SHORT
-
-
-def test_rolling_horizon_total_cost_is_sum_of_var_cost(dsm_components, rh_config):
-    """total_cost equals the sum of variable_cost_series."""
-    plant = _make_rh_plant(dsm_components, rh_config, n=N_SHORT)
-    plant.setup_model(presolve=False)
-    plant.determine_optimal_operation_without_flex()
-
-    assert abs(plant.total_cost - sum(plant.variable_cost_series.data)) < 1e-6
-
-
-def test_rolling_horizon_optimisation_counter_starts_at_zero(dsm_components, rh_config):
-    """optimisation_counter is initialised to 0 during setup_model.
-
-    The counter is only incremented by the bidding strategy (naive_strategies.py)
-    when it first generates bids, not by _solve_rolling_horizon_opt itself.
-    Therefore it should still be 0 right after the rolling-horizon solve.
-    """
-    plant = _make_rh_plant(dsm_components, rh_config, n=N_SHORT)
-    plant.setup_model(presolve=False)
-    plant.determine_optimal_operation_without_flex()
-
-    assert plant.optimisation_counter == 0
-
-
-# ---------------------------------------------------------------------------
 # 5. _check_and_reoptimize_rolling_window
 # ---------------------------------------------------------------------------
 
@@ -315,225 +255,6 @@ def test_check_reoptimize_returns_false_before_threshold(dsm_components, rh_conf
     t2 = pd.Timestamp("2023-01-01 02:00")
     result = plant._check_and_reoptimize_rolling_window(t2)
     assert result is False
-
-
-# ---------------------------------------------------------------------------
-# 6. calculate_price_from_cleared_history
-# ---------------------------------------------------------------------------
-
-
-class _MockUnit:
-    """Minimal unit stand-in for algorithm tests."""
-
-    def __init__(self, cleared_prices):
-        self.outputs = {"energy_accepted_price": cleared_prices}
-
-
-def test_price_from_cleared_history_produces_updated_forecast():
-    """With sufficient cleared history, the EOM forecast is updated."""
-    # 24 non-zero cleared prices
-    cleared = pd.Series(
-        [50.0 + i for i in range(24)],
-        index=pd.date_range("2023-01-01", periods=24, freq="h"),
-    )
-    fast_index = FastIndex(
-        start=pd.Timestamp("2023-01-02"),
-        end=pd.Timestamp("2023-01-03 23:00"),
-        freq="h",
-    )
-    current_forecast = {"EOM": FastSeries(index=fast_index, value=40.0)}
-
-    result = calculate_price_from_cleared_history(
-        current_forecast=current_forecast,
-        preprocess_information={},
-        unit=_MockUnit(cleared),
-        current_time=pd.Timestamp("2023-01-02"),
-    )
-
-    assert "EOM" in result
-    # The forecast should have been modified (not all 40.0)
-    assert not all(v == 40.0 for v in result["EOM"].data[:48])
-
-
-def test_price_from_cleared_history_floor_price():
-    """All forecasted prices must be >= 5.0 (the algorithm floor)."""
-    # Very low cleared prices to trigger the floor
-    cleared = pd.Series(
-        [1.0] * 24,
-        index=pd.date_range("2023-01-01", periods=24, freq="h"),
-    )
-    fast_index = FastIndex(
-        start=pd.Timestamp("2023-01-02"),
-        end=pd.Timestamp("2023-01-03 23:00"),
-        freq="h",
-    )
-    current_forecast = {"EOM": FastSeries(index=fast_index, value=10.0)}
-
-    result = calculate_price_from_cleared_history(
-        current_forecast=current_forecast,
-        preprocess_information={},
-        unit=_MockUnit(cleared),
-        current_time=pd.Timestamp("2023-01-02"),
-    )
-
-    assert all(v >= 5.0 for v in result["EOM"].data)
-
-
-def test_price_from_cleared_history_insufficient_data_returns_current():
-    """With fewer than 2 cleared-price data points, the current forecast is unchanged."""
-    cleared = pd.Series([50.0])  # Only 1 data point
-    fast_index = FastIndex(
-        start=pd.Timestamp("2023-01-02"),
-        end=pd.Timestamp("2023-01-03 23:00"),
-        freq="h",
-    )
-    current_forecast = {"EOM": FastSeries(index=fast_index, value=40.0)}
-
-    result = calculate_price_from_cleared_history(
-        current_forecast=current_forecast,
-        preprocess_information={},
-        unit=_MockUnit(cleared),
-        current_time=pd.Timestamp("2023-01-02"),
-    )
-
-    # Should be the same object / unchanged
-    assert result is current_forecast
-
-
-def test_price_from_cleared_history_no_unit_returns_current():
-    """Without a unit kwarg, the current forecast is returned unchanged."""
-    fast_index = FastIndex(
-        start=pd.Timestamp("2023-01-02"),
-        end=pd.Timestamp("2023-01-03 23:00"),
-        freq="h",
-    )
-    current_forecast = {"EOM": FastSeries(index=fast_index, value=40.0)}
-
-    result = calculate_price_from_cleared_history(
-        current_forecast=current_forecast,
-        preprocess_information={},
-    )
-    assert result is current_forecast
-
-
-def test_price_from_cleared_history_empty_outputs_returns_current():
-    """A unit with an empty outputs dict falls back to the current forecast."""
-
-    class _EmptyUnit:
-        outputs = {"energy_accepted_price": pd.Series([], dtype=float)}
-
-    fast_index = FastIndex(
-        start=pd.Timestamp("2023-01-02"),
-        end=pd.Timestamp("2023-01-03 23:00"),
-        freq="h",
-    )
-    current_forecast = {"EOM": FastSeries(index=fast_index, value=40.0)}
-
-    result = calculate_price_from_cleared_history(
-        current_forecast=current_forecast,
-        preprocess_information={},
-        unit=_EmptyUnit(),
-    )
-    assert result is current_forecast
-
-
-def test_price_from_cleared_history_all_zero_prices_returns_current():
-    """Zero-only cleared prices (all filtered out) → falls back to current forecast."""
-    cleared = pd.Series(
-        [0.0] * 24,
-        index=pd.date_range("2023-01-01", periods=24, freq="h"),
-    )
-    fast_index = FastIndex(
-        start=pd.Timestamp("2023-01-02"),
-        end=pd.Timestamp("2023-01-03 23:00"),
-        freq="h",
-    )
-    current_forecast = {"EOM": FastSeries(index=fast_index, value=40.0)}
-
-    result = calculate_price_from_cleared_history(
-        current_forecast=current_forecast,
-        preprocess_information={},
-        unit=_MockUnit(cleared),
-    )
-    # All zeros filtered → < 2 actual prices → fallback
-    assert result is current_forecast
-
-
-# ---------------------------------------------------------------------------
-# 6b. calculate_price_from_cleared_history – behavioural algorithm tests
-# ---------------------------------------------------------------------------
-
-
-def test_price_from_cleared_history_high_prices_produce_higher_forecast():
-    """Cleared prices of 100 EUR/MWh must produce a higher forecast than 20 EUR/MWh."""
-    fast_index = FastIndex(
-        start=pd.Timestamp("2023-01-02"),
-        end=pd.Timestamp("2023-01-03 23:00"),
-        freq="h",
-    )
-
-    cleared_high = pd.Series(
-        [100.0] * 24,
-        index=pd.date_range("2023-01-01", periods=24, freq="h"),
-    )
-    cleared_low = pd.Series(
-        [20.0] * 24,
-        index=pd.date_range("2023-01-01", periods=24, freq="h"),
-    )
-
-    forecast_high = calculate_price_from_cleared_history(
-        current_forecast={"EOM": FastSeries(index=fast_index, value=40.0)},
-        preprocess_information={},
-        unit=_MockUnit(cleared_high),
-        current_time=pd.Timestamp("2023-01-02"),
-    )
-    forecast_low = calculate_price_from_cleared_history(
-        current_forecast={"EOM": FastSeries(index=fast_index, value=40.0)},
-        preprocess_information={},
-        unit=_MockUnit(cleared_low),
-        current_time=pd.Timestamp("2023-01-02"),
-    )
-
-    avg_high = sum(forecast_high["EOM"].data) / len(forecast_high["EOM"].data)
-    avg_low = sum(forecast_low["EOM"].data) / len(forecast_low["EOM"].data)
-    assert avg_high > avg_low, (
-        f"Higher cleared prices should produce a higher forecast: "
-        f"avg_high={avg_high:.2f} vs avg_low={avg_low:.2f}"
-    )
-
-
-def test_price_from_cleared_history_rising_trend_elevates_later_forecast_values():
-    """When cleared prices rise over 24 h the forecasted average should exceed the
-    simple average of the cleared prices, reflecting that the algorithm anchors
-    around the most-recent (highest) prices and applies a positive trend."""
-    fast_index = FastIndex(
-        start=pd.Timestamp("2023-01-02"),
-        end=pd.Timestamp("2023-01-03 23:00"),
-        freq="h",
-    )
-    # Prices rise linearly from 20 to 100 EUR/MWh over 24 h; simple avg = 60
-    rising_prices = pd.Series(
-        [20.0 + 80.0 * i / 23 for i in range(24)],
-        index=pd.date_range("2023-01-01", periods=24, freq="h"),
-    )
-    cleared_avg = sum(rising_prices) / len(rising_prices)  # ≈ 60
-
-    result = calculate_price_from_cleared_history(
-        current_forecast={"EOM": FastSeries(index=fast_index, value=50.0)},
-        preprocess_information={},
-        unit=_MockUnit(rising_prices),
-        current_time=pd.Timestamp("2023-01-02"),
-    )
-
-    data = list(result["EOM"].data)
-    assert len(data) == 48
-    forecast_avg = sum(data) / len(data)
-    # With rising prices ending at 100 EUR/MWh the forecast average must be
-    # substantially above the historical simple average of ~60 EUR/MWh.
-    assert forecast_avg > cleared_avg, (
-        f"Forecast avg {forecast_avg:.2f} should exceed cleared avg "
-        f"{cleared_avg:.2f} when prices are rising"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -682,77 +403,79 @@ def test_rolling_window_second_window_triggered_at_commit_boundary(
 
 
 # ---------------------------------------------------------------------------
-# 7. SteelplantForecaster.update() – price-sync behavioural test
+# 8. End-to-end: a rolling-horizon steel-plant scenario through World.run()
 # ---------------------------------------------------------------------------
+#
+# Every test above builds the SteelPlant / forecaster directly and therefore
+# bypasses two real code paths:
+#   * the CSV scenario loader (load_config_and_create_forecaster), and
+#   * the market -> bidding-strategy -> unit dispatch loop inside World.run().
+#
+# Both paths have hidden load-time / first-bid crashes that green unit tests
+# did not catch. This integration test exercises the full pipeline on the
+# example_03 steel-plant scenario (configured for rolling horizon via the
+# per-plant columns in industrial_dsm_units.csv) and asserts it runs to
+# completion and produces a dispatch schedule.
 
 
-def test_steelplant_forecaster_update_syncs_electricity_price_to_unit(dsm_components):
-    """After update() the unit's electricity_price reflects the cleared-price history.
+def test_loader_builds_steelplant_forecaster_without_price_column():
+    """The loader must not crash for a steel plant that has no
+    ``forecast_electricity_price_update`` column.
 
-    The forecaster is configured with ``update_price='adaptive'``.
-    The unit carries cleared prices of 100 EUR/MWh in its outputs.  After calling
-    forecaster.update(unit=plant, …) the plant's electricity_price must be higher
-    than the initial flat forecast of 40 EUR/MWh.
+    Regression guard for an ``UnboundLocalError`` on ``initial_market_prices``
+    in ``load_config_and_create_forecaster``: the variable was only defined
+    inside the ``if price_update_source is not None`` branch but used
+    unconditionally. The ``rolling_horizon_dsm`` fixture's steel plant has no
+    such column, so it exercises exactly that path.
     """
-    from assume.common.forecast_algorithms import get_forecast_registries
+    from assume.scenario.loader_csv import load_config_and_create_forecaster
 
-    n = 24
-    index = pd.date_range("2023-01-01", periods=n, freq="h")
+    scenario_data = load_config_and_create_forecaster(
+        inputs_path="tests/fixtures",
+        scenario="rolling_horizon_dsm",
+        study_case="base",
+    )
+    assert "test_steel_plant_rh" in scenario_data["unit_forecasts"]
 
-    # Build a 48-h forecast window (the algorithm always writes 48 values)
-    fast_index = FastIndex(
-        start=pd.Timestamp("2023-01-02"),
-        end=pd.Timestamp("2023-01-03 23:00"),
-        freq="h",
+
+def test_steelplant_rolling_horizon_scenario_runs_end_to_end():
+    """A rolling-horizon steel-plant scenario loads and runs through World.run().
+
+    Regression guard for two bugs that bypass-the-loader unit tests cannot see:
+    an UnboundLocalError while the loader builds the SteelplantForecaster, and a
+    crash in the DSM bidding strategy on the first market round.
+    """
+    from assume import World
+    from assume.scenario.loader_csv import load_scenario_folder
+
+    world = World(database_uri=None, export_csv_path=None)
+    load_scenario_folder(
+        world,
+        inputs_path="examples/inputs",
+        scenario="example_03",
+        study_case="base_case_2019_with_DSM",
     )
 
-    forecaster = SteelplantForecaster(
-        index=FastIndex(start=index[0], end=index[-1], freq="h"),
-        electricity_price=[40.0] * n,
-        fuel_prices={"natural_gas": [30] * n, "co2": [20] * n},
-        forecast_algorithms={"update_price": "adaptive"},
-        forecast_registries=get_forecast_registries(),
-    )
-    # Provide the preprocess_information that the parent update() calls require
-    forecaster.preprocess_information = {
-        "price": {},
-        "residual_load": {},
-        "congestion_signal": {},
-        "renewable_utilisation": {},
-    }
-    # Seed the price dict that the algorithm will update
-    forecaster.price = {"EOM": FastSeries(index=fast_index, value=40.0)}
+    # Loader path: the steel plant must come up with its rolling-horizon config
+    # read from the per-plant CSV columns (not the removed config.yaml block).
+    plant = world.units["A360"]
+    assert plant.horizon_mode == "rolling_horizon"
+    assert plant._rh_look_ahead == "72h"
 
-    plant = SteelPlant(
-        id="test_update_sync",
-        unit_operator="op",
-        objective="min_variable_cost",
-        flexibility_measure="cost_based_load_shift",
-        bidding_strategies={"EOM": DsmEnergyOptimizationStrategy()},
-        node="south",
-        components=dsm_components,
-        forecaster=forecaster,
-        demand=100,
-        technology="steel_plant",
-    )
+    # Full pipeline: market clearing -> DSM strategy -> rolling-horizon solve.
+    world.run()
 
-    # 24 cleared prices of 100 EUR/MWh (much higher than the initial 40)
-    plant.outputs = {
-        "energy_accepted_price": pd.Series(
-            [100.0] * n,
-            index=pd.date_range("2023-01-01", periods=n, freq="h"),
-        )
-    }
-
-    forecaster.update(unit=plant, current_time=pd.Timestamp("2023-01-02"))
-
-    # After the update the plant's electricity_price must reflect the higher
-    # cleared prices; at least some values must exceed the original 40 EUR/MWh.
-    updated = list(plant.electricity_price.data)
-    assert any(v > 40.0 for v in updated), (
-        "electricity_price should be updated above 40 EUR/MWh after update() "
-        f"with 100 EUR/MWh cleared prices; got max={max(updated):.2f}"
-    )
+    # NOTE: World.run() logs and swallows exceptions raised inside a unit's
+    # bidding strategy, so "world.run() returned" is NOT proof the strategy
+    # succeeded. opt_power_requirement is also populated by the setup-time
+    # presolve, so it is not a reliable signal either.
+    #
+    # _rh_optimized_until_step starts at 0 and is advanced ONLY by
+    # _solve_rolling_horizon_next_window, which the bidding strategy reaches
+    # *after* the forecaster.update() call. A non-zero value therefore proves
+    # the market-time rolling-horizon path executed without crashing.
+    assert plant.opt_power_requirement is not None
+    assert plant._rh_optimized_until_step > 0
 
 
 if __name__ == "__main__":

@@ -752,7 +752,7 @@ class BaseStrategy:
         return cleaned_bids
 
     def update_forecasts_if_needed(unit: BaseUnit, *args, **kwargs):
-        unit.forecaster.update(unit, *args, **kwargs)
+        unit.forecaster.update(*args, **kwargs)
 
 
 @dataclass

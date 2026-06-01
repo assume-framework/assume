@@ -174,7 +174,10 @@ class DsmEnergyOptimizationStrategy(MinMaxStrategy):
 
         if unit.horizon_mode == "rolling_horizon":
             current_market_time = product_tuples[0][0]
-            self.update_forecasts_if_needed(unit=unit)
+            # Hook to refresh runtime forecasts before re-optimising the next window.
+            # Currently the configured update algorithms default to no-ops; the hook is
+            # kept so price/forecast learning can be plugged in without touching strategies.
+            unit.forecaster.update(unit=unit)
             did_reoptimize = unit._check_and_reoptimize_rolling_window(
                 current_market_time
             )
@@ -225,8 +228,11 @@ class DsmEnergyNaiveRedispatchStrategy(MinMaxStrategy):
     ) -> Orderbook:
         if unit.horizon_mode == "rolling_horizon":
             current_market_time = product_tuples[0][0]
+            # Hook to refresh runtime forecasts before re-optimising the next window.
+            # Currently the configured update algorithms default to no-ops; the hook is
+            # kept so price/forecast learning can be plugged in without touching strategies.
+            unit.forecaster.update(unit=unit)
             unit._check_and_reoptimize_rolling_window(current_market_time)
-            self.update_forecasts_if_needed(unit=unit)
 
         # calculate the optimal operation of the unit according to the objective function
         unit.determine_optimal_operation_with_flex()
