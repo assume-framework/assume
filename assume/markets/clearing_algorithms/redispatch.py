@@ -74,6 +74,8 @@ class RedispatchMarketRole(MarketRole):
             marketconfig.param_dict.get("solver_name", "highs")
         )
 
+        self.log_flows = self.marketconfig.param_dict.get("log_flows", False)
+
         # set the market clearing principle
         # as pay as bid or pay as clear
         self.payment_mechanism = marketconfig.param_dict.get(
@@ -230,8 +232,10 @@ class RedispatchMarketRole(MarketRole):
                 calculate_network_meta(network=redispatch_network, product=product, i=i)
             )
 
-        # TODO write network flows here
-        flows = []
+        flows = {}
+        if self.log_flows:
+            # extract flows
+            flows = redispatch_network.lines_t.p0.stack(future_stack=True).to_dict()
 
         return accepted_orders, rejected_orders, meta, flows
 
