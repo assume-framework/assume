@@ -8,6 +8,7 @@ import pytest
 from pytest import importorskip
 
 pytest.importorskip("pypsa")
+import pypsa
 
 from assume.common.grid_utils import (
     add_nodal_loads,
