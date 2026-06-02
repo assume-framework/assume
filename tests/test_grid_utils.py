@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 from pytest import importorskip
 
-pypsa = pytest.importorskip("pypsa")
+pytest.importorskip("pypsa")
 
 from assume.common.grid_utils import (
     add_nodal_loads,
