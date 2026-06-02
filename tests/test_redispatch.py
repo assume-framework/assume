@@ -10,7 +10,7 @@ from dateutil import rrule as rr
 from assume.common.market_objects import MarketConfig, MarketProduct, Order
 from assume.common.utils import get_available_products
 
-pypsa = pytest.importorskip("pypsa")
+pytest.importorskip("pypsa")
 
 from assume.markets.clearing_algorithms import RedispatchMarketRole
 
