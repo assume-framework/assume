@@ -7,14 +7,14 @@ import pandas as pd
 import pytest
 from pytest import importorskip
 
+pypsa = pytest.importorskip("pypsa")
+
 from assume.common.grid_utils import (
     add_nodal_loads,
     add_redispatch_generators,
     add_redispatch_loads,
     read_pypsa_grid,
 )
-
-pypsa = pytest.importorskip("pypsa")
 
 get_supported_solver_linopy = importorskip(
     "assume.common.grid_utils",
