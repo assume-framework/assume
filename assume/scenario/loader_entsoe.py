@@ -29,7 +29,6 @@ from assume.scenario.entsoe_helper.mappings import (
     DEFAULT_STORAGE_ADDITIONAL_COST,
     DEFAULT_STORAGE_HOURS,
     FOSSIL_BIDDING_KEYS,
-    THERMAL_BIDDING_KEYS,
     block_price_factors,
     interpolate_block_prices,
     split_capacity_blocks,
@@ -170,6 +169,7 @@ def load_entsoe(
                     country,
                     tech,
                     mapping,
+                    total_capacity,
                     gen_series,
                     index,
                     location,
@@ -254,13 +254,13 @@ def _add_variable_unit(
     country,
     tech,
     mapping,
+    total_capacity,
     gen_series,
     index,
     location,
     bidding_strategies,
 ):
-    peak = gen_series.max()
-    if peak <= 0:
+    if total_capacity <= 0:
         return
 
     fuel_price = DEFAULT_RENEWABLE_FUEL_PRICES.get(tech, 0.2)
@@ -270,7 +270,7 @@ def _add_variable_unit(
         f"generation_{country}",
         {
             "min_power": 0,
-            "max_power": peak,
+            "max_power": total_capacity,
             "bidding_strategies": bidding_strategies[mapping.bidding_key],
             "technology": tech,
             "emission_factor": _emission_factor(mapping.bidding_key),
@@ -279,7 +279,7 @@ def _add_variable_unit(
         },
         PowerplantForecaster(
             index,
-            availability=_generation_availability(gen_series, peak),
+            availability=_generation_availability(gen_series, total_capacity),
             fuel_prices={"others": fuel_price},
         ),
     )
@@ -300,16 +300,13 @@ def _add_blocked_units(
     api_fuel_prices,
     co2_prices,
 ):
-    peak = gen_series.max()
-    if peak <= 0:
+    if total_capacity <= 0:
         return
 
     block_size = block_sizes_mw.get(
         tech, block_sizes_mw.get(mapping.bidding_key, 500.0)
     )
     blocks = split_capacity_blocks(total_capacity, block_size)
-    scale = peak / total_capacity
-    bid_full_capacity = mapping.bidding_key in THERMAL_BIDDING_KEYS
     price_high, price_low = _resolve_price_range(
         tech, mapping.bidding_key, fuel_price_ranges
     )
@@ -319,14 +316,7 @@ def _add_blocked_units(
         for block_idx, (block_capacity, block_factor) in enumerate(
             zip(blocks, factors), start=1
         ):
-            block_max = block_capacity if bid_full_capacity else block_capacity * scale
-            share = block_capacity / total_capacity
-            block_gen = gen_series * share
-            availability = (
-                1
-                if bid_full_capacity
-                else _generation_availability(block_gen, block_max)
-            )
+            block_max = block_capacity
             fuel_prices = _build_api_fuel_prices(
                 mapping.bidding_key,
                 api_fuel_prices[mapping.bidding_key] * block_factor,
@@ -348,7 +338,7 @@ def _add_blocked_units(
                 },
                 PowerplantForecaster(
                     index,
-                    availability=availability,
+                    availability=1,
                     fuel_prices=fuel_prices,
                 ),
             )
@@ -358,12 +348,7 @@ def _add_blocked_units(
     for block_idx, (block_capacity, block_price) in enumerate(
         zip(blocks, block_prices), start=1
     ):
-        block_max = block_capacity if bid_full_capacity else block_capacity * scale
-        share = block_capacity / total_capacity
-        block_gen = gen_series * share
-        availability = (
-            1 if bid_full_capacity else _generation_availability(block_gen, block_max)
-        )
+        block_max = block_capacity
         fuel_prices = _build_fossil_fuel_prices(
             mapping.bidding_key, block_price, co2_prices
         )
@@ -384,7 +369,7 @@ def _add_blocked_units(
             },
             PowerplantForecaster(
                 index,
-                availability=availability,
+                availability=1,
                 fuel_prices=fuel_prices,
             ),
         )

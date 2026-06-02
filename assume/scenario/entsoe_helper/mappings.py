@@ -35,6 +35,7 @@ COUNTRY_LOCATIONS: dict[str, tuple[float, float]] = {
     "SK": (48.67, 19.70),
 }
 
+
 @dataclass(frozen=True)
 class TechnologyMapping:
     technology: str
