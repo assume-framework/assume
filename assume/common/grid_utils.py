@@ -123,39 +123,6 @@ def add_redispatch_loads(
         )
 
 
-def add_nodal_loads(
-    network: pypsa.Network,
-    loads: pd.DataFrame,
-) -> None:
-    """
-    This adds loads to the nodal PyPSA network with respective bus data to which they are connected.
-    The loads are added as generators with negative sign so their dispatch can be also curtailed,
-    since regular load in PyPSA represents only an inelastic demand.
-    """
-    zeros = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(loads.index))),
-        index=network.snapshots,
-        columns=loads.index,
-    )
-    loads_c = loads.copy()
-
-    if "sign" in loads_c.columns:
-        del loads_c["sign"]
-
-    # add loads as negative generators
-    network.add(
-        "Generator",
-        name=loads.index,
-        bus=loads["node"],  # bus to which the generator is connected to
-        p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=zeros,
-        p_max_pu=zeros + 1,
-        marginal_cost=zeros,
-        sign=-1,
-        **loads_c,
-    )
-
-
 def read_pypsa_grid(
     network: pypsa.Network,
     grid_dict: dict[str, pd.DataFrame],
