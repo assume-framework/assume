@@ -61,6 +61,7 @@ def loads_for_n_2_bus_1line():
     }
     return pd.DataFrame(loads).set_index("name")
 
+
 def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
     expected_backup_marginal_cost = 5000
     add_redispatch_generators(
