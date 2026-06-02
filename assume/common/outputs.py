@@ -796,8 +796,8 @@ class WriteOutput(Role):
         # mirror the rl_params storage layout: datetime as index, always-set
         # simulation / evaluation_mode / episode columns
         df = pd.DataFrame.from_records(
-            [{"datetime": t, "unit_id": u, "exploitability": e}
-             for (t, u), e in per_unit.items()],
+            [{"datetime": t, "unit_id": u, "exploitability": e, "best_profit": b, "original_profit": o}
+             for (t, u), (e, b, o) in per_unit.items()],
             index="datetime",
         )
         df["simulation"] = self.simulation_id
