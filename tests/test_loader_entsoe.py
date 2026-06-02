@@ -181,7 +181,7 @@ def test_aggregate_uses_generation_peak_when_capacity_missing(hourly_index):
     assert aggregated["other"]["capacity_mw"] == 100.0
 
 
-def test_variable_unit_uses_generation_peak(hourly_index):
+def test_variable_unit_uses_installed_capacity_and_availability(hourly_index):
     world = MagicMock()
     gen_series = pd.Series(5_000.0, index=hourly_index)
     mapping = PSR_TO_ASSUME["Solar"]
@@ -191,14 +191,17 @@ def test_variable_unit_uses_generation_peak(hourly_index):
         "DE",
         "solar",
         mapping,
-        gen_series,
-        hourly_index,
-        (51.16, 10.45),
-        {"solar": {"EOM": "powerplant_energy_naive"}},
+        total_capacity=80_000.0,
+        gen_series=gen_series,
+        index=hourly_index,
+        location=(51.16, 10.45),
+        bidding_strategies={"solar": {"EOM": "powerplant_energy_naive"}},
     )
 
     unit_params = world.add_unit.call_args[0][3]
-    assert unit_params["max_power"] == 5_000.0
+    forecaster = world.add_unit.call_args[0][4]
+    assert unit_params["max_power"] == 80_000.0
+    assert forecaster.availability.iloc[0] == pytest.approx(5_000.0 / 80_000.0)
 
 
 def test_resolve_co2_prices_uses_api_or_fallback(hourly_index):
@@ -208,6 +211,35 @@ def test_resolve_co2_prices_uses_api_or_fallback(hourly_index):
     api_co2 = pd.Series(82.5, index=hourly_index, name="co2")
     resolved = _resolve_co2_prices(hourly_index, {"co2": api_co2})
     assert resolved.iloc[0] == 82.5
+
+
+def test_blocked_units_use_installed_capacity_not_generation_peak(hourly_index):
+    world = MagicMock()
+    gen_series = pd.Series(3_000.0, index=hourly_index)
+    mapping = PSR_TO_ASSUME["Hydro Water Reservoir"]
+
+    _add_blocked_units(
+        world,
+        "DE",
+        "hydro",
+        mapping,
+        total_capacity=10_000.0,
+        gen_series=gen_series,
+        index=hourly_index,
+        location=(51.16, 10.45),
+        bidding_strategies={"hydro": {"EOM": "powerplant_energy_naive"}},
+        block_sizes_mw={"hydro": 300.0},
+        fuel_price_ranges={"hydro": (0.4, 0.1)},
+        api_fuel_prices={},
+        co2_prices=pd.Series(70.0, index=hourly_index, name="co2"),
+    )
+
+    max_powers = [call[0][3]["max_power"] for call in world.add_unit.call_args_list]
+    assert sum(max_powers) == pytest.approx(10_000.0)
+    assert max(max_powers) == 300.0
+    assert all(
+        call[0][4].availability.iloc[0] == 1.0 for call in world.add_unit.call_args_list
+    )
 
 
 def test_thermal_units_bid_installed_capacity(hourly_index):
