@@ -20,6 +20,7 @@ Upcoming Release
   - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.
   - **Added a check for available solvers in redispatch & nodal_clearing**, similar to the check in complex clearing.
   - **Consistently distinguish 'solver' and 'solver_name'**: Users should now use 'solver_name' to specify the solver in the market configs param_dict, as 'solver' now refers to the actual solver instance.
+  - **Added tests for network related functionalities**: grid_utils.py and redispatch.py
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
   - **Fix bug in forecasts**, that occurred when using complex clearing
