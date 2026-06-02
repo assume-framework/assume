@@ -113,8 +113,7 @@ This will launch a container for TimescaleDB and Grafana with preconfigured dash
 You can access the Grafana dashboards at `http://localhost:3000`.
 
 ### Using TensorBoard to display Learning Metrics
-TensorBoard is used to visualize and monitor the learning progress 
-during reinforcement learning training. 
+TensorBoard is used to visualize and monitor the learning progress during reinforcement learning training.
 
 When running an example with learning capabilities, you can start TensorBoard to observe the learning process.
 Use the following shell command to start TensorBoard:
@@ -128,16 +127,15 @@ Please note that TensorBoard should ideally be shut down via `Ctrl + C` every ti
 
 ## Trying out ASSUME and the provided Examples
 
-To ease your way into ASSUME we provided some tutorials and preconfiguered networks.
-The former are helpful if you would like to get an impression of how ASSUME works and the latter introduce you into the development of ASSUME.
+To ease your way into ASSUME we provided under the folder exempels some tutorial notebooks and preconfigured example simualtions.
+The former are helpful if you would like to get an impression of how ASSUME works as they present different functionalities of Assume condensed in specific notebooks and the latter provides various example simualtions ranging from 8 power plant examples to the representations of entire GErmany for one year.
 
-### The Tutorials
+### The Tutorial Notebooks
 
-You can run the totorials locally using the notebooks [here](tutorials/notebooks) or use [google colab](https://assume.readthedocs.io/en/latest/examples_basic.html)
-They provide code snippets and tasks that show how you can work with the software package on your own.
-The tutorials begin with the basics of ASSUME, e.g. introducing a new unit, while the later tutorials cover more advanced use cases. 
+You can run the tutorials locally using the notebooks [here](examples/notebooks) or use [google colab](https://assume.readthedocs.io/en/latest/examples_basic.html)
+The tutorials begin with the basics of ASSUME, e.g. introducing a new unit, while the later tutorials cover more advanced use cases.
 
-We particularly recommend these tutorials:
+We particularly recommend these tutorials, more can be found under the given Link:
 
 
 How to configure a new unit in ASSUME?
@@ -155,9 +153,9 @@ How to use reinforcement learning for new market participants in ASSUME?
 - Storage unit: [![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04c_reinforcement_learning_storage_example.ipynb)
 
 
-### Preconfiguered Networks
+### Preconfigured Exampels
 
-To explore the provided Networks, follow these steps:
+To explore the provided example simualtions [here](examples/inputs), follow these steps:
 
 1. Clone the repository and navigate to its directory:
 
