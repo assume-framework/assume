@@ -10,6 +10,8 @@ Each unit in ASSUME has an associated **forecaster** that provides it with stati
 availability, fuel prices, or market price predictions. Forecast data is typically provided as time
 series, either loaded from a CSV file or calculated internally from simulation data.
 
+Forecasters can generally be safed via config parameter ``save_forecasts`` to the specified file given by: ``forecast_save_file`` (default: SCENARIO_PATH/saved_forecasts.csv)
+
 ***********************
 Forecaster Types
 ***********************
@@ -268,6 +270,7 @@ Besides configuring algorithms, there are two additional ways to supply forecast
 1. **Via forecast_df.csv** — create a CSV file with columns matching the expected keys
    (e.g. ``price_EOM``, ``residual_load_EOM``, ``{node}_congestion_signal``).
    Default forecast algorithms will **not** overwrite columns found in this file.
+   To disable the use of / overwriting with ``forecasts_df`` set the flag ``use_forecasts_df`` to false in the config.
 
 2. **Direct instantiation** — when creating a simulation programmatically (without scenario loaders),
    you can pass forecast series directly to the forecaster constructor. In this case, set the
