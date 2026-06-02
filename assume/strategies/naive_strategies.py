@@ -287,13 +287,6 @@ class EnergyNaiveRedispatchStrategy(MinMaxStrategy):
                 min_power = unit.min_power
                 max_power = available_power
 
-            available_power = unit.forecaster.availability.loc[start]
-            max_power = available_power * unit.max_power
-            min_power = min(
-                unit.min_power, max_power
-            )  # TODO: choice relates to discussion in github.com/assume-framework/assume/pull/737
-            p_nom = unit.max_power
-
             bids.append(
                 {
                     "start_time": product[0],
