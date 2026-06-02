@@ -114,7 +114,7 @@ You can access the Grafana dashboards at `http://localhost:3000`.
 
 ### Using TensorBoard to display Learning Metrics
 TensorBoard is used to visualize and monitor the learning progress 
-duringreinforcement learning training. 
+during reinforcement learning training. 
 
 When running an example with learning capabilities, you can start TensorBoard to observe the learning process.
 Use the following shell command to start TensorBoard:
