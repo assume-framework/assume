@@ -7,7 +7,6 @@ import pandas as pd
 import pytest
 from pytest import importorskip
 
-# from assume.common.grid_utils import get_supported_solver_linopy
 from assume.common.grid_utils import (
     add_generators,
     add_loads,
@@ -66,9 +65,7 @@ def loads_for_n_2_bus_1line():
 
 
 def test_add_generators(n_2bus_1line, generators_for_n_2_bus_1line):
-    # add_generators is never used within our framework
     n1 = n_2bus_1line.copy()  # for adding generators as df
-    n2 = n_2bus_1line.copy()  # for adding generators as dict
     expected_generators = pd.DataFrame(
         {
             "name": ["cheap_genN", "intermediate_genS", "expensive_genS"],
@@ -83,15 +80,6 @@ def test_add_generators(n_2bus_1line, generators_for_n_2_bus_1line):
     assert n1.generators.bus.equals(expected_generators["bus"])
     assert n1.generators.p_nom.equals(expected_generators["max_power"])
     assert n1.generators["marginal_cost"].eq(0).all()
-
-    # add generators as dict and check if they are added with correct attributes
-    generators_dict = generators_for_n_2_bus_1line.T.to_dict()
-    # currently does not work, due to wrong implementation in add_generators
-    # add_generators(n2, generators_dict)
-    # assert n2.generators.index.equals(expected_generators.index)
-    # assert n2.generators.bus.equals(expected_generators["bus"])
-    # assert n2.generators.p_nom.equals(expected_generators["max_power"])
-    # assert n2.generators["marginal_cost"].eq(0).all()
 
 
 def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
@@ -164,12 +152,6 @@ def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
         expected_down_generators["marginal_cost"].to_numpy(), abs=1e-6, rel=0
     )
 
-
-def test_add_backup_generators():
-    # function add_backup_generators is never used in framework
-    pass
-
-
 def test_add_loads(n_2bus_1line, loads_for_n_2_bus_1line):
     # function add_loads is never used within our framework
     expected_loads = pd.DataFrame(
@@ -201,9 +183,6 @@ def test_add_loads(n_2bus_1line, loads_for_n_2_bus_1line):
 
 
 def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):
-    # add_redispatch_loads does the same as add_loads, with only one difference:
-    # it enforces the sign to be 1 and not -1
-    # unclear, why this is needed...
     expected_loads = pd.DataFrame(
         {
             "name": ["loadN", "loadS"],
@@ -270,8 +249,7 @@ def test_add_nodal_loads(n_2bus_1line, loads_for_n_2_bus_1line):
     actual_nodal_loads_t = n_2bus_1line.generators_t.p_set
     assert actual_nodal_loads_t.index == "now"
     # p_set should be initialized as 0 for all loads and snapshots
-    # tbd test _t values...
-    # assert (actual_nodal_loads_t == expected_nodal_loads_t).all().all()
+    assert (actual_nodal_loads_t == expected_nodal_loads_t).all().all()
 
 
 # use grid_dict fixture from test_redispatch.py - does not seem to work
@@ -281,6 +259,7 @@ nodes = pd.DataFrame(
         "v_nom": [380.0, 380.0],
     }
 ).set_index("name")
+
 lines = pd.DataFrame(
     {
         "name": ["line_N_S"],
@@ -291,6 +270,7 @@ lines = pd.DataFrame(
         "r": [0.001],
     }
 ).set_index("name")
+
 generators = pd.DataFrame(
     {
         "name": ["coal_N", "coal_S", "gas_S"],
@@ -335,7 +315,3 @@ def test_read_pypsa_grid(grid_data_dict):
     assert "AC" in n.carriers.index
     assert n.generators.empty
     assert n.loads.empty
-
-
-def test_calculate_network_meta():
-    pass
