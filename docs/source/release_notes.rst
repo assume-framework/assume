@@ -22,6 +22,7 @@ Upcoming Release
   - **Consistently distinguish 'solver' and 'solver_name'**: Users should now use 'solver_name' to specify the solver in the market configs param_dict, as 'solver' now refers to the actual solver instance.
   - **Extended ``min_max_scale`` to support arbitrary output ranges**: Added optional ``out_min`` and ``out_max`` parameters, enabling both forward scaling and inverse rescaling with a single function instead of two separate ones.
   - **Add test for portfolio learning strategy and ``min_max_scale`` function**: Added a test for the portfolio learning strategy and ``min_max_rescale`` function to ensure its functionality and stability.
+  - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
   - **Fix bug in forecasts**, that occurred when using complex clearing
