@@ -96,34 +96,6 @@ def add_redispatch_generators(
     )
 
 
-def add_loads(
-    network: pypsa.Network,
-    loads: pd.DataFrame,
-) -> None:
-    """
-    Add loads normally to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the loads are
-        loads (pandas.DataFrame): the loads dataframe
-    """
-
-    # add loads
-    network.add(
-        "Load",
-        name=loads.index,
-        bus=loads["node"],  # bus to which the generator is connected to
-        **loads,
-    )
-
-    if "p_set" not in loads.columns:
-        network.loads_t["p_set"] = pd.DataFrame(
-            np.zeros((len(network.snapshots), len(loads.index))),
-            index=network.snapshots,
-            columns=loads.index,
-        )
-
-
 def add_redispatch_loads(
     network: pypsa.Network,
     loads: pd.DataFrame,
