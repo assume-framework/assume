@@ -129,52 +129,85 @@ class RedispatchMarketRole(MarketRole):
             index="start_time", columns="unit_id", values="p_nom"
         )
 
-        # Calculate p_set, p_max_pu_up, and p_max_pu_down directly using DataFrame operations
-        p_set = volume_pivot
-
-        # Calculate p_max_pu_up as difference between max_power and accepted volume
-        p_max_pu_up = (max_power_pivot - volume_pivot).div(
-            p_nom_pivot.where(max_power_pivot != 0, np.inf)
-        )
-
-        # Calculate p_max_pu_down as difference between accepted volume and min_power
-        p_max_pu_down = (volume_pivot - min_power_pivot).div(
-            p_nom_pivot.where(max_power_pivot != 0, np.inf)
-        )
-        p_max_pu_down = p_max_pu_down.clip(lower=0)  # Ensure no negative values
-
-        # Determine the costs directly from the price pivot
-        costs = price_pivot
-
-        # Drop units with only negative volumes (if necessary)
-        negative_only_units = volume_pivot.lt(0).all()
-        p_max_pu_up = p_max_pu_up.drop(
-            columns=negative_only_units.index[negative_only_units]
-        )
-        p_max_pu_down = p_max_pu_down.drop(
-            columns=negative_only_units.index[negative_only_units]
-        )
-        costs = costs.drop(columns=negative_only_units.index[negative_only_units])
-
-        # reset indexes for all dataframes
-        p_set.reset_index(inplace=True, drop=True)
-        p_max_pu_up.reset_index(inplace=True, drop=True)
-        p_max_pu_down.reset_index(inplace=True, drop=True)
-        costs.reset_index(inplace=True, drop=True)
-        p_nom_pivot.reset_index(inplace=True, drop=True)
-
         # Update the network parameters
         redispatch_network = self.network.copy()
-        redispatch_network.generators_t.p_set = p_set
 
-        # Update p_max_pu for generators with _up and _down suffixes
-        redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
+        # EOM/day-ahead dispatch from orderbook
+        p_set = volume_pivot.copy()
+
+        # Reset all pivot indices to match redispatch_network.snapshots = range(...)
+        p_set.reset_index(inplace=True, drop=True)
+        max_power_pivot.reset_index(inplace=True, drop=True)
+        min_power_pivot.reset_index(inplace=True, drop=True)
+        price_pivot.reset_index(inplace=True, drop=True)
+        p_nom_pivot.reset_index(inplace=True, drop=True)
+
+        # Base generators and loads from the grid data
+        base_generator_names = self.grid_data["generators"].index
+        load_names = self.grid_data["loads"].index
+
+        gen_cols = p_set.columns.intersection(base_generator_names)
+        load_cols = p_set.columns.intersection(load_names)
+        other_cols = p_set.columns.difference(gen_cols.union(load_cols))  # Could be DSM units
+
+        # 1. Fixed day-ahead generator dispatch
+        gen_p_set = p_set[gen_cols].copy()
+
+        redispatch_network.generators_t.p_set = gen_p_set.reindex(
+            index=redispatch_network.snapshots,
+            columns=gen_cols,
+        )
+
+        # 2. Fixed demand/load profile
+
+        load_p_set = p_set[load_cols].copy()
+
+        # PyPSA p_set values to positive values since the sign of the p_set values is usually positive
+        load_p_set = load_p_set.abs()
+
+        redispatch_network.loads_t.p_set = load_p_set.reindex(
+            index=redispatch_network.snapshots,
+            columns=redispatch_network.loads.index,
+            fill_value=0.0,
+        )
+
+        # 3. Redispatch flexibility only for power plants
+
+        # p_nom from the orderbook and from availability factors
+        p_nom_gen = p_nom_pivot[gen_cols].copy()
+        p_nom_gen = p_nom_gen.where(p_nom_gen.notna(), max_power_pivot[gen_cols])
+        p_nom_gen = p_nom_gen.replace(0, np.inf)
+
+        # Upward redispatch capacity:
+        # Possible maximum upwards generation : availability * max_power - market_cleared_capacity
+
+        p_max_pu_up = (
+            (max_power_pivot[gen_cols] - p_set[gen_cols])
+            .div(p_nom_gen)
+            .clip(lower=0, upper=1)
+        )
+
+        # Downward redispatch capacity:
+        # Possible maximum downward generation : market_cleared_capacity
+        p_max_pu_down = (
+            (p_set[gen_cols] - min_power_pivot[gen_cols])
+            .div(p_nom_gen)
+            .clip(lower=0, upper=1)
+        )
+        costs = price_pivot[gen_cols]
+
+        redispatch_network.generators_t.p_max_pu.update(
+            p_max_pu_up.add_suffix("_up")
+        )
+
         redispatch_network.generators_t.p_max_pu.update(
             p_max_pu_down.add_suffix("_down")
         )
 
-        # Add _up and _down suffix to costs and update the network
-        redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
+        redispatch_network.generators_t.marginal_cost.update(
+            costs.add_suffix("_up")
+        )
+
         redispatch_network.generators_t.marginal_cost.update(
             costs.add_suffix("_down") * (-1)
         )

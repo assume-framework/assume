@@ -216,7 +216,6 @@ def add_redispatch_loads(
         "Load",
         name=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
-        sign=1,
         **loads_c,
     )
 
