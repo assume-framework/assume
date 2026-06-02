@@ -16,68 +16,6 @@ from assume.common.utils import SUPPORTED_SOLVERS
 logger = logging.getLogger(__name__)
 
 
-def add_generators(
-    network: pypsa.Network,
-    generators: pd.DataFrame,
-) -> None:
-    """
-    Add generators normally to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the generators are
-        generators (pandas.DataFrame): the generators dataframe
-    """
-    zeros = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(generators.index))),
-        index=network.snapshots,
-        columns=generators.index,
-    )
-
-    if isinstance(generators, dict):
-        gen_c = generators.copy()
-
-        if "p_min_pu" not in gen_c.columns:
-            gen_c["p_min_pu"] = zeros
-        if "p_max_pu" not in gen_c.columns:
-            gen_c["p_max_pu"] = zeros + 1
-        if "marginal_cost" not in gen_c.columns:
-            gen_c["marginal_cost"] = zeros
-
-        network.add(
-            "Generator",
-            name=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            **gen_c,
-        )
-    elif isinstance(generators, pd.DataFrame):
-        # add generators
-        generators.drop(
-            ["p_min_pu", "p_max_pu", "marginal_cost"],
-            axis=1,
-            inplace=True,
-            errors="ignore",
-        )
-        network.add(
-            "Generator",
-            name=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=zeros,
-            p_max_pu=zeros + 1,
-            marginal_cost=zeros,
-            **generators,
-        )
-    else:
-        raise ValueError(
-            "Generators must be provided as a pandas DataFrame or a dictionary of pandas Series."
-        )
-
-
 def add_redispatch_generators(
     network: pypsa.Network,
     generators: pd.DataFrame,
