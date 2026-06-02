@@ -8,12 +8,12 @@ import pytest
 from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order
-
 from assume.common.utils import get_available_products
 
 pypsa = pytest.importorskip("pypsa")
 
 from assume.markets.clearing_algorithms import RedispatchMarketRole
+
 
 @pytest.fixture
 def simple_redispatch_market_config():
@@ -34,6 +34,7 @@ def simple_redispatch_market_config():
         price_unit="€/MW",
         market_mechanism="redispatch",
     )
+
 
 eps = 1e-4
 
@@ -71,6 +72,7 @@ demand = pd.DataFrame(
         "max_power": [-1000.0],
     }
 ).set_index("name")
+
 
 @pytest.fixture
 def grid_data_dict_2_nodes():
@@ -131,6 +133,8 @@ def test_initialization_invalid_payment_mechanism(
 # generators index: ["coal_N", "coal_S", "gas_S"]
 # demand index: ["dem_S"]
 units_index = ["coal_N", "coal_S", "gas_S", "dem_S"]
+
+
 @pytest.mark.parametrize(
     "dummy_generation, dummy_demand, expected_up_volume, expected_down_volume, expected_accepted_orders_volume, expected_accepted_orders_price, expected_volume_change, expected_flows",
     [
@@ -445,7 +449,7 @@ def test_three_nodes_redispatch(
     assert meta[0]["node"] == "node1"
     assert meta[1]["node"] == "node2"
     assert meta[2]["node"] == "node3"
- 
+
     assert [meta[i]["supply_volume"] for i in range(len(nodes_3))] == pytest.approx(
         expected_up_volume_3
     )

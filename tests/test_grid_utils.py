@@ -152,6 +152,7 @@ def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
         expected_down_generators["marginal_cost"].to_numpy(), abs=1e-6, rel=0
     )
 
+
 def test_add_loads(n_2bus_1line, loads_for_n_2_bus_1line):
     # function add_loads is never used within our framework
     expected_loads = pd.DataFrame(
@@ -228,7 +229,7 @@ def test_add_nodal_loads(n_2bus_1line, loads_for_n_2_bus_1line):
 
     expected_nodal_loads_t = pd.DataFrame(
         {
-            "name": ["now"], # empty dataframe
+            "name": ["now"],  # empty dataframe
         }
     ).set_index("name")
 
