@@ -96,29 +96,6 @@ def add_redispatch_generators(
     )
 
 
-def add_backup_generators(
-    network: pypsa.Network,
-    backup_marginal_cost: float = 1e5,
-) -> None:
-    """
-    Add generators normally to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the generators are
-        generators (pandas.DataFrame): the generators dataframe
-    """
-
-    # add backup generators at each node
-    network.add(
-        "Generator",
-        name=network.buses.index,
-        suffix="_backup",
-        bus=network.buses.index,  # bus to which the generator is connected to
-        p_nom=10e4,
-        marginal_cost=backup_marginal_cost,
-    )
-
-
 def add_loads(
     network: pypsa.Network,
     loads: pd.DataFrame,
