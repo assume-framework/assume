@@ -228,9 +228,7 @@ def test_add_nodal_loads(n_2bus_1line, loads_for_n_2_bus_1line):
 
     expected_nodal_loads_t = pd.DataFrame(
         {
-            "name": ["now"],
-            "loadN": [0.0],
-            "loadS": [0.0],
+            "name": ["now"], # empty dataframe
         }
     ).set_index("name")
 
