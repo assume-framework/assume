@@ -8,8 +8,6 @@ import pytest
 from pytest import importorskip
 
 from assume.common.grid_utils import (
-    add_generators,
-    add_loads,
     add_nodal_loads,
     add_redispatch_generators,
     add_redispatch_loads,
@@ -62,25 +60,6 @@ def loads_for_n_2_bus_1line():
         "max_power": [0.0, 3000.0],
     }
     return pd.DataFrame(loads).set_index("name")
-
-
-def test_add_generators(n_2bus_1line, generators_for_n_2_bus_1line):
-    n1 = n_2bus_1line.copy()  # for adding generators as df
-    expected_generators = pd.DataFrame(
-        {
-            "name": ["cheap_genN", "intermediate_genS", "expensive_genS"],
-            "bus": ["N", "S", "S"],
-            "max_power": [3000.0, 1000.0, 2000.0],
-            "marginal_cost": [10.0, 20.0, 30.0],
-        }
-    ).set_index("name")
-    # add generators as df and check if they are added with correct attributes
-    add_generators(n1, generators_for_n_2_bus_1line)
-    assert n1.generators.index.equals(expected_generators.index)
-    assert n1.generators.bus.equals(expected_generators["bus"])
-    assert n1.generators.p_nom.equals(expected_generators["max_power"])
-    assert n1.generators["marginal_cost"].eq(0).all()
-
 
 def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
     expected_backup_marginal_cost = 5000
@@ -151,36 +130,6 @@ def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
     assert actual_down_generators["marginal_cost"].to_numpy() == pytest.approx(
         expected_down_generators["marginal_cost"].to_numpy(), abs=1e-6, rel=0
     )
-
-
-def test_add_loads(n_2bus_1line, loads_for_n_2_bus_1line):
-    # function add_loads is never used within our framework
-    expected_loads = pd.DataFrame(
-        {
-            "name": ["loadN", "loadS"],
-            "bus": ["N", "S"],
-            "max_power": [0.0, 3000.0],
-        }
-    ).set_index("name")
-    expected_loads_t = pd.DataFrame(
-        {
-            "name": ["now"],
-            "loadN": [0.0],
-            "loadS": [0.0],
-        }
-    ).set_index("name")
-
-    add_loads(n_2bus_1line, loads_for_n_2_bus_1line)
-
-    actual_loads = n_2bus_1line.loads
-    assert actual_loads.index.equals(expected_loads.index)
-    assert actual_loads.bus.equals(expected_loads["bus"])
-    assert actual_loads.max_power.equals(expected_loads["max_power"])
-
-    actual_loads_t = n_2bus_1line.loads_t.p_set
-    assert actual_loads_t.index == "now"
-    # p_set should be initialized as 0 for all loads and snapshots
-    assert (actual_loads_t == expected_loads_t).all().all()
 
 
 def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):
