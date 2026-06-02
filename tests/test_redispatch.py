@@ -9,14 +9,11 @@ from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct, Order
 
-# from assume.common.grid_utils import get_supported_solver_linopy
 from assume.common.utils import get_available_products
 
-try:
-    from assume.markets.clearing_algorithms import RedispatchMarketRole
-except ImportError:
-    pass
+pypsa = pytest.importorskip("pypsa")
 
+from assume.markets.clearing_algorithms import RedispatchMarketRole
 
 @pytest.fixture
 def simple_redispatch_market_config():
@@ -38,7 +35,6 @@ def simple_redispatch_market_config():
         market_mechanism="redispatch",
     )
 
-
 eps = 1e-4
 
 nodes = pd.DataFrame(
@@ -47,6 +43,7 @@ nodes = pd.DataFrame(
         "v_nom": [380.0, 380.0],
     }
 ).set_index("name")
+
 lines = pd.DataFrame(
     {
         "name": ["line_N_S"],
@@ -57,6 +54,7 @@ lines = pd.DataFrame(
         "r": [0.001],
     }
 ).set_index("name")
+
 generators = pd.DataFrame(
     {
         "name": ["coal_N", "coal_S", "gas_S"],
@@ -74,8 +72,6 @@ demand = pd.DataFrame(
     }
 ).set_index("name")
 
-
-# add this as a fixture and use in test_grid_utils as well
 @pytest.fixture
 def grid_data_dict_2_nodes():
     return {
@@ -131,124 +127,10 @@ def test_initialization_invalid_payment_mechanism(
         RedispatchMarketRole(mc)
 
 
-def test_clear():
-    pass
-
-
-def test_process_dispatch_data():
-    pass
-
-
-# case # min_power # max_power # availability # max_ramp_up # max_ramp_down #
-# 1    #     x     #            #              #                #
-# 2    #           #     x      #              #                #
-# 3    #           #            #      x       #                #
-# 4    #           #            #              #        x       #
-# 5    #           #            #              #                #       x
-# 6    #     x     #            #      x       #                #
-# 7    #           #     x      #      x       #                #
-# 8    #           #            #      x       #        x       #
-# 9    #           #            #      x       #                #       x
-# 10   #           #     x      #              #        x       #
-# 11   #           #     x      #              #                #       x
-# 12   #     x     #            #              #        x       #
-# 13   #     x     #            #              #                #       x
-# 14   #     x     #     x      #              #                #
-# 15   #     x     #     x      #      x       #                #
-# 16   #     x     #     x      #      x       #        x       #       x
-
-
-@pytest.mark.require_network
-# 1
-def test_redispatch_with_min_power():
-    pass
-
-
-# 2
-def test_redispatch_with_max_power():
-    pass
-
-
-# 3
-def test_redispatch_with_availability():
-    pass
-
-
-# 4
-def test_redispatch_with_max_ramp_up():
-    pass
-
-
-# 5
-def test_redispatch_with_max_ramp_down():
-    pass
-
-
-# 6
-def test_redispatch_with_min_power_and_availability():
-    pass
-
-
-# 7
-def test_redispatch_with_max_power_and_availability():
-    pass
-
-
-# 8
-def test_redispatch_with_max_ramp_up_and_availability():
-    pass
-
-
-# 9
-def test_redispatch_with_max_ramp_down_and_availability():
-    pass
-
-
-# 10
-def test_redispatch_with_max_power_and_max_ramp_up():
-    pass
-
-
-# 11
-def test_redispatch_with_max_power_and_max_ramp_down():
-    pass
-
-
-# 12
-def test_redispatch_with_min_power_and_max_ramp_up():
-    pass
-
-
-# 13
-def test_redispatch_with_min_power_and_max_ramp_down():
-    pass
-
-
-# 14
-def test_redispatch_with_min_max_power():
-    pass
-
-
-# 15
-def test_redispatch_with_min_max_power_and_availability():
-    pass
-
-
-# 16
-def test_redispatch_with_min_max_power_and_availability_and_max_ramp():
-    pass
-
-
-def test_redispatch_with_storage():
-    pass
-
-
 # Tests with 2 nodes and 3 generators (coal_N, coal_S, gas_S) and 1 demand (dem_S)
 # generators index: ["coal_N", "coal_S", "gas_S"]
 # demand index: ["dem_S"]
 units_index = ["coal_N", "coal_S", "gas_S", "dem_S"]
-
-
 @pytest.mark.parametrize(
     "dummy_generation, dummy_demand, expected_up_volume, expected_down_volume, expected_accepted_orders_volume, expected_accepted_orders_price, expected_volume_change, expected_flows",
     [
@@ -345,20 +227,20 @@ def test_two_nodes_redispatch(
     assert len(orderbook) == len(generators) + len(demand)
 
     rmr = RedispatchMarketRole(market_config)
-    accepted_orders, rejected_orders, meta, flows = rmr.clear(orderbook, products)
+    accepted_orders, _, meta, flows = rmr.clear(orderbook, products)
 
     assert "supply_volume" in meta[0]
     assert "supply_volume" in meta[1]
     assert "demand_volume" in meta[0]
     assert "demand_volume" in meta[1]
-    # print("Meta: " + str(meta))
+
     assert [meta[i]["supply_volume"] for i in range(len(nodes))] == pytest.approx(
         expected_up_volume
     )
     assert [meta[i]["demand_volume"] for i in range(len(nodes))] == pytest.approx(
         expected_down_volume
     )
-    # print("Accepted: " + str(accepted_orders))
+
     assert [o["accepted_volume"] for o in accepted_orders] == pytest.approx(
         expected_accepted_orders_volume
     )
@@ -370,7 +252,6 @@ def test_two_nodes_redispatch(
     )
     # check flows
     flows_df = pd.Series(flows).unstack()
-    print("Flows: " + str(flows_df))
     assert flows_df.loc[0, "line_N_S"] == pytest.approx(expected_flows[0], abs=eps)
 
 
@@ -381,6 +262,7 @@ nodes_3 = pd.DataFrame(
         "v_nom": [380.0, 380.0, 380.0],
     }
 ).set_index("name")
+
 lines_3 = pd.DataFrame(
     {
         "name": ["line_1_2", "line_1_3", "line_2_3"],
@@ -391,6 +273,7 @@ lines_3 = pd.DataFrame(
         "r": [0.001, 0.001, 0.001],
     }
 ).set_index("name")
+
 generators_3 = pd.DataFrame(
     {
         "name": [f"gen{p}" for p in range(5, 35)],
@@ -562,7 +445,7 @@ def test_three_nodes_redispatch(
     assert meta[0]["node"] == "node1"
     assert meta[1]["node"] == "node2"
     assert meta[2]["node"] == "node3"
-    # print("Meta: " + str(meta))
+ 
     assert [meta[i]["supply_volume"] for i in range(len(nodes_3))] == pytest.approx(
         expected_up_volume_3
     )
@@ -572,7 +455,7 @@ def test_three_nodes_redispatch(
     assert [meta[i]["price"] for i in range(len(nodes_3))] == pytest.approx(
         expected_accepted_nodal_price_3
     )
-    # print("Accepted: " + str(accepted_orders))
+
     assert [o["accepted_volume"] for o in accepted_orders] == pytest.approx(
         expected_accepted_orders_volume_3
     )
@@ -581,7 +464,6 @@ def test_three_nodes_redispatch(
     )
     # check flows
     flows_df = pd.Series(flows).unstack()
-    print("Flows: " + str(flows_df))
     assert flows_df.loc[0, "line_1_2"] == pytest.approx(expected_flows_3[0], abs=eps)
     assert flows_df.loc[0, "line_1_3"] == pytest.approx(expected_flows_3[1], abs=eps)
     assert flows_df.loc[0, "line_2_3"] == pytest.approx(expected_flows_3[2], abs=eps)
