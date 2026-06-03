@@ -150,7 +150,9 @@ class RedispatchMarketRole(MarketRole):
 
         gen_cols = p_set.columns.intersection(base_generator_names)
         load_cols = p_set.columns.intersection(load_names)
-        other_cols = p_set.columns.difference(gen_cols.union(load_cols))  # Could be DSM units
+        other_cols = p_set.columns.difference(
+            gen_cols.union(load_cols)
+        )  # Could be DSM units
 
         # 1. Fixed day-ahead generator dispatch
         gen_p_set = p_set[gen_cols].copy()
@@ -198,21 +200,13 @@ class RedispatchMarketRole(MarketRole):
         )
         costs = price_pivot[gen_cols]
 
-        redispatch_network.generators_t.p_max_pu.update(
-            p_max_pu_up.add_suffix("_up")
-        )
+        redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
 
-        redispatch_network.generators_t.p_max_pu.update(
-            p_max_pu_down.add_suffix("_down")
-        )
+        redispatch_network.generators_t.p_max_pu.update(p_max_pu_down.add_suffix("_down"))
 
-        redispatch_network.generators_t.marginal_cost.update(
-            costs.add_suffix("_up")
-        )
+        redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
 
-        redispatch_network.generators_t.marginal_cost.update(
-            costs.add_suffix("_down") * (-1)
-        )
+        redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_down") * (-1))
 
         # run linear powerflow
         redispatch_network.lpf()
