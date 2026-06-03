@@ -150,9 +150,6 @@ class RedispatchMarketRole(MarketRole):
 
         gen_cols = p_set.columns.intersection(base_generator_names)
         load_cols = p_set.columns.intersection(load_names)
-        other_cols = p_set.columns.difference(
-            gen_cols.union(load_cols)
-        )  # Could be DSM units
 
         # 1. Fixed day-ahead generator dispatch
         gen_p_set = p_set[gen_cols].copy()
