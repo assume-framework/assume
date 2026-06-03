@@ -1371,12 +1371,15 @@ class RenewableEnergyLearningCompatibleStrategy(EnergyLearningSingleBidStrategy)
     def __init__(self, *args, **kwargs):
         foresight = kwargs.pop("foresight", 24)
         act_dim = kwargs.pop("act_dim", 1)
-        # Force unique_obs_dim=2 so obs_dim matches storage/generator strategies
-        kwargs.pop("unique_obs_dim", None)
+        # Default unique_obs_dim=2 so obs_dim matches storage/generator strategies.
+        # Allow override (e.g. from _CongestionObsMixin, which inflates this to
+        # 2 + n_lines * congestion_foresight so the inserted congestion windows
+        # land in the unique-observation tail).
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
         super().__init__(
             foresight=foresight,
             act_dim=act_dim,
-            unique_obs_dim=2,
+            unique_obs_dim=unique_obs_dim,
             *args,
             **kwargs,
         )
