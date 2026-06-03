@@ -37,6 +37,12 @@ jobs:
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 01_minimal_manual_example.ipynb
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 02_automated_run_example.ipynb
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 03_custom_unit_example.ipynb
+    # 10_DSU_and_flexibility imports pypsa, whose pinned version (<=0.35.2, see #807) caps
+    # shapely<2.1 — which has no Python 3.14 wheel — so the install fails on 3.14. Skip it there.
+    - name: Run network notebook (pypsa)
+      if: matrix.python-version != '3.14'
+      run: |
+        cd examples/notebooks
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 10_DSU_and_flexibility.ipynb
   test:
 
@@ -77,11 +83,16 @@ jobs:
       run: |
         pytest -m "not require_learning and not require_network"
 
+    # pypsa is pinned <=0.35.2 (see #807), which caps shapely<2.1 with no Python 3.14 wheel,
+    # so the network extra can't install on 3.14. Skip the network install + tests there;
+    # the final coverage run auto-skips require_network tests via pytest.importorskip("pypsa").
     - name: Install pypsa dependencies
+      if: matrix.python-version != '3.14'
       run: |
         python -m pip install -e .[network]
 
     - name: Test with pypsa
+      if: matrix.python-version != '3.14'
       run: |
         pytest -m "require_network and not require_learning"
 
