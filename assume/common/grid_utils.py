@@ -328,9 +328,9 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
             price = 0
 
         meta.append(
-            {
-                "supply_volume": supply_volume,
-                "demand_volume": demand_volume,
+            {  # TODO: can we maybe discuss the meaning / interpretation of this? to me it seems unintuitive that the sum of all nodes is not equal to the redispatched volume (e.g. at 2023-01-02 00:00:00: sum of demand_volumes is 4.5, but sum of supply_volumes is 31 + 10 + 14.5 = 55.5)
+                "supply_volume": supply_volume,  # equals generation + upward redispatch volume at the bus ?
+                "demand_volume": demand_volume,  # equals downward redispatch volume (without loads) at the bus ?
                 "demand_volume_energy": demand_volume * duration_hours,
                 "supply_volume_energy": supply_volume * duration_hours,
                 "price": price,
