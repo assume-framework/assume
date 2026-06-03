@@ -338,10 +338,10 @@ def transfer_weights(
     return new_state_copy
 
 
-def encode_time_features(start: datetime) -> list:
+def encode_hourly_features(date: datetime) -> list:
     """
     Encode time features for a given datetime object.
-    This function extracts various time-related features from the datetime object
+    This function extracts the hour as features from the datetime object
     and encodes them using sine and cosine transformations to capture periodicity.
 
     Args:
@@ -351,17 +351,34 @@ def encode_time_features(start: datetime) -> list:
         list: A list containing the encoded time features.
     """
 
-    start_hour = start.hour / 24.0
-    start_hour_cos = np.cos(2 * np.pi * start_hour)
-    start_hour_sin = np.sin(2 * np.pi * start_hour)
+    hour = date.hour / 24.0
+    hour_cos = np.cos(2 * np.pi * hour)
+    hour_sin = np.sin(2 * np.pi * hour)
 
-    start_month = start.month / 12.0
-    start_month_cos = np.cos(2 * np.pi * start_month)
-    start_month_sin = np.sin(2 * np.pi * start_month)
+    return [
+        hour_cos,
+        hour_sin,
+    ]
 
-    return (
-        start_hour_cos,
-        start_hour_sin,
-        start_month_cos,
-        start_month_sin,
-    )
+
+def encode_monthly_features(start: datetime) -> list:
+    """
+    Encode time features for a given datetime object.
+    This function extracts the months from the datetime object
+    and encodes them using sine and cosine transformations to capture periodicity.
+
+    Args:
+        start (datetime): The datetime object to encode.
+
+    Returns:
+        list: A list containing the encoded time features.
+    """
+
+    month = start.month / 12.0
+    month_cos = np.cos(2 * np.pi * month)
+    month_sin = np.sin(2 * np.pi * month)
+
+    return [
+        month_cos,
+        month_sin,
+    ]
