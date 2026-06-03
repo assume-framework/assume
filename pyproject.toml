@@ -66,6 +66,7 @@ oeds = [
 entsoe = [
     "entsoe-py >=0.6.0",
     "yfinance",
+    "requests",
 ]
 test = [
     "ruff >=0.14.6",
