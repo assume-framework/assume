@@ -110,7 +110,6 @@ available_examples = {
 }
 
 
-
 # %%
 if __name__ == "__main__":
     """
