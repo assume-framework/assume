@@ -15,6 +15,7 @@ Upcoming Release
 
 **New Features:**
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+  - **Rolling-Horizon Optimisation for DSM Units**: DSM units now support rolling-horizon optimization, allowing re-optimization of shorter look-ahead windows after each market round while carrying component states (e.g., storage SoC) between windows. This enables more reactive bidding strategies while maintaining inter-temporal feasibility. Configure it per plant via optional columns in the DSM units CSV (``industrial_dsm_units.csv`` / ``residential_dsm_units.csv``): ``horizon_mode`` (``"rolling_horizon"`` or ``"full_horizon"``), ``look_ahead_horizon``, ``commit_horizon``, and ``rolling_step`` (durations as strings, e.g., ``"24h"``), set on the plant's first technology row. Steel plants offer three operational strategies: cost-optimized (default), profile-guided (with soft constraints to track a normalized load profile), and min-demand (enforces hourly minimum production). The rolling-horizon implementation is extensible—new DSM unit types can enable it by setting class attributes ``_demand_attr_suffix``, ``_component_schema``, and ``_extra_price_attrs``, and optionally overriding ``_primary_output_expr()`` for domain-specific outputs.
 
 **Improvements:**
   - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.
@@ -24,6 +25,7 @@ Upcoming Release
   - **Extended ``min_max_scale`` to support arbitrary output ranges**: Added optional ``out_min`` and ``out_max`` parameters, enabling both forward scaling and inverse rescaling with a single function instead of two separate ones.
   - **Add test for portfolio learning strategy and ``min_max_scale`` function**: Added a test for the portfolio learning strategy and ``min_max_rescale`` function to ensure its functionality and stability.
   - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
+  - **Generalized rolling-horizon optimization in DSMFlex**: Refactored rolling-horizon logic to remove hardcoded technology-specific constraints (previously coupled to steel plants). Extracted eight helper methods, replaced 15 technology guards with generic extension points, and reduced code by approximately 60%. The optimization engine now works for all DSM unit types via reusable class-level hooks, improving maintainability and extensibility.
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
   - **Fix bug in forecasts**, that occurred when using complex clearing
@@ -54,17 +56,6 @@ Upcoming Release
     - If no charging station is included, EVs connect directly to the building/grid balance.
     - If charging stations are included, charging stations connect to the building/grid and EVs connect to the charging stations through assignment variables.
   - **Building-specific flexible electricity-price support**: Added support for ``electricity_price_flex`` in ``BuildingForecaster`` for use with the ``electricity_price_signal`` flexibility measure.
-
-0.6.1 - (30th April 2026)
-=========================
-
-**New Features:**
-
-- **Rolling-Horizon Optimisation for DSM Units**: DSM units now support rolling-horizon optimization, allowing re-optimization of shorter look-ahead windows after each market round while carrying component states (e.g., storage SoC) between windows. This enables more reactive bidding strategies while maintaining inter-temporal feasibility. Configure it per plant via optional columns in the DSM units CSV (``industrial_dsm_units.csv`` / ``residential_dsm_units.csv``): ``horizon_mode`` (``"rolling_horizon"`` or ``"full_horizon"``), ``look_ahead_horizon``, ``commit_horizon``, and ``rolling_step`` (durations as strings, e.g., ``"24h"``), set on the plant's first technology row. Steel plants offer three operational strategies: cost-optimized (default), profile-guided (with soft constraints to track a normalized load profile), and min-demand (enforces hourly minimum production). The rolling-horizon implementation is extensible—new DSM unit types can enable it by setting class attributes ``_demand_attr_suffix``, ``_component_schema``, and ``_extra_price_attrs``, and optionally overriding ``_primary_output_expr()`` for domain-specific outputs.
-
-**Improvements:**
-
-- **Generalized rolling-horizon optimization in DSMFlex**: Refactored rolling-horizon logic to remove hardcoded technology-specific constraints (previously coupled to steel plants). Extracted eight helper methods, replaced 15 technology guards with generic extension points, and reduced code by approximately 60%. The optimization engine now works for all DSM unit types via reusable class-level hooks, improving maintainability and extensibility.
 
 0.6.0 - (18th March 2026)
 =========================
