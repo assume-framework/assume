@@ -11,8 +11,8 @@ import torch as th
 
 from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
-from assume.common.utils import min_max_rescale, min_max_scale
-from assume.reinforcement_learning.learning_utils import encode_time_features
+from assume.common.utils import min_max_scale
+from assume.reinforcement_learning.learning_utils import encode_hourly_features
 from assume.strategies.learning_strategies import TorchLearningStrategy
 from assume.strategies.portfolio_strategies import UnitOperatorStrategy
 
@@ -92,6 +92,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         # Hyperparameters for action and reward
         self.min_markup = kwargs.pop("min_markup", 1)  # min markup on marginal cost
         self.max_markup = kwargs.pop("max_markup", 3)  # max markup on marginal cost
+        self.is_prepared = False
 
         super().__init__(
             foresight=foresight,
@@ -159,16 +160,20 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
 
         actions, noise = self.get_actions(next_observation)
 
-        costs = min_max_rescale(
-            scaled_costs.cpu().numpy(), min_val=0, max_val=self.max_price
+        costs = min_max_scale(
+            scaled_costs.cpu().numpy(),
+            in_min=0,
+            in_max=1,
+            out_min=0,
+            out_max=self.max_price,
         )
 
-        markups = min_max_rescale(
+        markups = min_max_scale(
             actions.cpu().numpy(),
-            self.min_markup,
-            self.max_markup,
-            lower_bound=-1,
-            upper_bound=1,
+            in_min=-1,
+            in_max=1,
+            out_min=self.min_markup,
+            out_max=self.max_markup,
         )
 
         ### STEP 3. BID UNITS ###
@@ -300,6 +305,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
 
         # Inframarginal generation forecast
         self.scaled_gen_obs = gen_obs / residual_load
+        self.is_prepared = True
 
     def create_observation(self, units_operator, market_id, start, end):
         """
@@ -330,9 +336,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         """
 
         # ensure scaled observations are prepared
-        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
-            self, "scaled_prices_obs"
-        ):
+        if not self.is_prepared:
             self.prepare_observations(units_operator, market_id)
 
         # --- 1. Forecasted residual load, price and inframarginal capacity (forward-looking) ---
@@ -348,7 +352,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         )
 
         # --- 2. Cyclical encoding for hour of the day ---
-        hour_cos, hour_sin, _, _ = encode_time_features(start)
+        hour_features = encode_hourly_features(start)
 
         # --- 3. Individual observations ---
 
@@ -359,8 +363,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         # concat all observations into one array
         observation = np.concatenate(
             [
-                hour_cos,
-                hour_sin,
+                hour_features,
                 scaled_res_load_forecast,
                 scaled_price_forecast,
                 scaled_gen_forecast,
@@ -429,7 +432,7 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         cost_bins = np.quantile(flex_cost, q=bins)
 
         # Creates bins of marginal costs
-        scaled_costs = min_max_scale(cost_bins, min_val=0, max_val=self.max_price)
+        scaled_costs = min_max_scale(cost_bins, in_min=0, in_max=self.max_price)
 
         # Calculates the total capacity of units in those bins
         index = np.searchsorted(cost_bins, flex_cost, side="right")

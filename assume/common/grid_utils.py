@@ -27,7 +27,7 @@ def add_generators(
         network (pypsa.Network): the pypsa network to which the generators are
         generators (pandas.DataFrame): the generators dataframe
     """
-    p_set = pd.DataFrame(
+    zeros = pd.DataFrame(
         np.zeros((len(network.snapshots), len(generators.index))),
         index=network.snapshots,
         columns=generators.index,
@@ -37,11 +37,11 @@ def add_generators(
         gen_c = generators.copy()
 
         if "p_min_pu" not in gen_c.columns:
-            gen_c["p_min_pu"] = p_set
+            gen_c["p_min_pu"] = zeros
         if "p_max_pu" not in gen_c.columns:
-            gen_c["p_max_pu"] = p_set + 1
+            gen_c["p_max_pu"] = zeros + 1
         if "marginal_cost" not in gen_c.columns:
-            gen_c["marginal_cost"] = p_set
+            gen_c["marginal_cost"] = zeros
 
         network.add(
             "Generator",
@@ -52,7 +52,7 @@ def add_generators(
             ],  # Nominal capacity of the powerplant/generator
             **gen_c,
         )
-    else:
+    elif isinstance(generators, pd.DataFrame):
         # add generators
         generators.drop(
             ["p_min_pu", "p_max_pu", "marginal_cost"],
@@ -67,10 +67,14 @@ def add_generators(
             p_nom=generators[
                 "max_power"
             ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=p_set,
-            p_max_pu=p_set + 1,
-            marginal_cost=p_set,
+            p_min_pu=zeros,
+            p_max_pu=zeros + 1,
+            marginal_cost=zeros,
             **generators,
+        )
+    else:
+        raise ValueError(
+            "Generators must be provided as a pandas DataFrame or a dictionary of pandas Series."
         )
 
 
@@ -88,7 +92,7 @@ def add_redispatch_generators(
         generators (pandas.DataFrame): the generators dataframe
         backup_marginal_cost (float, optional): The cost of dispatching the backup units in [€/MW]. Defaults to 1e5.
     """
-    p_set = pd.DataFrame(
+    zeros = pd.DataFrame(
         np.zeros((len(network.snapshots), len(generators.index))),
         index=network.snapshots,
         columns=generators.index,
@@ -99,7 +103,7 @@ def add_redispatch_generators(
         "Load",
         name=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
-        p_set=p_set,
+        p_set=zeros,
         sign=1,
     )
 
@@ -110,9 +114,9 @@ def add_redispatch_generators(
         suffix="_up",
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
     )
 
     # add downward redispatch generators
@@ -122,9 +126,9 @@ def add_redispatch_generators(
         suffix="_down",
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
         sign=-1,
     )
 
@@ -237,7 +241,7 @@ def add_nodal_loads(
     The loads are added as generators with negative sign so their dispatch can be also curtailed,
     since regular load in PyPSA represents only an inelastic demand.
     """
-    p_set = pd.DataFrame(
+    zeros = pd.DataFrame(
         np.zeros((len(network.snapshots), len(loads.index))),
         index=network.snapshots,
         columns=loads.index,
@@ -253,9 +257,9 @@ def add_nodal_loads(
         name=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
         p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
         sign=-1,
         **loads_c,
     )
