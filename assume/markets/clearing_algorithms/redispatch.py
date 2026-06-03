@@ -202,11 +202,15 @@ class RedispatchMarketRole(MarketRole):
 
         redispatch_network.generators_t.p_max_pu.update(p_max_pu_up.add_suffix("_up"))
 
-        redispatch_network.generators_t.p_max_pu.update(p_max_pu_down.add_suffix("_down"))
+        redispatch_network.generators_t.p_max_pu.update(
+            p_max_pu_down.add_suffix("_down")
+        )
 
         redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_up"))
 
-        redispatch_network.generators_t.marginal_cost.update(costs.add_suffix("_down") * (-1))
+        redispatch_network.generators_t.marginal_cost.update(
+            costs.add_suffix("_down") * (-1)
+        )
 
         # run linear powerflow
         redispatch_network.lpf()
