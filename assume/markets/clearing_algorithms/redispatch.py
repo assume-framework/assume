@@ -12,6 +12,7 @@ from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
     calculate_network_meta,
+    get_supported_solver_linopy,
     read_pypsa_grid,
 )
 from assume.common.market_objects import MarketConfig, Orderbook
@@ -35,7 +36,7 @@ class RedispatchMarketRole(MarketRole):
         marketconfig (MarketConfig): The market configuration.
 
     Note:
-        Users can also configure the path to the network data, the solver to be used,
+        Users can also configure the path to the network data, the name of the solver to be used,
         and the backup marginal cost in the param_dict of the market configuration.
 
     """
@@ -69,7 +70,11 @@ class RedispatchMarketRole(MarketRole):
             loads=self.grid_data["loads"],
         )
 
-        self.solver = marketconfig.param_dict.get("solver", "highs")
+        self.solver_name = get_supported_solver_linopy(
+            marketconfig.param_dict.get("solver_name", "highs")
+        )
+
+        self.log_flows = self.marketconfig.param_dict.get("log_flows", False)
 
         # set the market clearing principle
         # as pay as bid or pay as clear
@@ -122,18 +127,21 @@ class RedispatchMarketRole(MarketRole):
         price_pivot = orderbook_df.pivot(
             index="start_time", columns="unit_id", values="price"
         )
+        p_nom_pivot = orderbook_df.pivot(
+            index="start_time", columns="unit_id", values="p_nom"
+        )
 
         # Calculate p_set, p_max_pu_up, and p_max_pu_down directly using DataFrame operations
         p_set = volume_pivot
 
         # Calculate p_max_pu_up as difference between max_power and accepted volume
         p_max_pu_up = (max_power_pivot - volume_pivot).div(
-            max_power_pivot.where(max_power_pivot != 0, np.inf)
+            p_nom_pivot.where(max_power_pivot != 0, np.inf)
         )
 
         # Calculate p_max_pu_down as difference between accepted volume and min_power
         p_max_pu_down = (volume_pivot - min_power_pivot).div(
-            max_power_pivot.where(max_power_pivot != 0, np.inf)
+            p_nom_pivot.where(max_power_pivot != 0, np.inf)
         )
         p_max_pu_down = p_max_pu_down.clip(lower=0)  # Ensure no negative values
 
@@ -155,6 +163,7 @@ class RedispatchMarketRole(MarketRole):
         p_max_pu_up.reset_index(inplace=True, drop=True)
         p_max_pu_down.reset_index(inplace=True, drop=True)
         costs.reset_index(inplace=True, drop=True)
+        p_nom_pivot.reset_index(inplace=True, drop=True)
 
         # Update the network parameters
         redispatch_network = self.network.copy()
@@ -185,11 +194,13 @@ class RedispatchMarketRole(MarketRole):
             logger.debug("Congestion detected")
 
             status, termination_condition = redispatch_network.optimize(
-                solver_name=self.solver,
+                solver_name=self.solver_name,
                 log_to_console=False,
                 # do not show tqdm progress bars for large grids
                 # https://github.com/PyPSA/linopy/pull/375
                 progress=False,
+                # Constant objective terms do not affect dispatch or nodal prices; omit for speed/stability.
+                include_objective_constant=False,
             )
 
             if status != "ok":
@@ -221,8 +232,10 @@ class RedispatchMarketRole(MarketRole):
                 calculate_network_meta(network=redispatch_network, product=product, i=i)
             )
 
-        # TODO write network flows here
-        flows = []
+        flows = {}
+        if self.log_flows:
+            # extract flows
+            flows = redispatch_network.lines_t.p0.stack(future_stack=True).to_dict()
 
         return accepted_orders, rejected_orders, meta, flows
 

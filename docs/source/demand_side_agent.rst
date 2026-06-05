@@ -88,6 +88,19 @@ Example Workflow
 2. Define objectives, such as minimizing electricity costs.
 3. Run the optimization to generate bids for the electricity market.
 
+.. note::
+
+   DSM units (e.g. :class:`~assume.units.steel_plant.SteelPlant`,
+   :class:`~assume.units.building.Building`,
+   :class:`~assume.units.hydrogen_plant.HydrogenPlant`,
+   :class:`~assume.units.steam_generation_plant.SteamGenerationPlant`) build their internal
+   optimisation model inside the forecaster's ``initialize`` step.  When running the
+   simulation through the normal world / scenario loader this happens automatically.  However,
+   if you create a unit programmatically and do **not** call
+   :meth:`~assume.common.forecaster.UnitForecaster.initialize` (or
+   :func:`~assume.world.World.init_forecasts`), you must call
+   ``unit.setup_model()`` explicitly before running optimisation on the unit.
+
 Residential Agent: Building
 ----------------------------
 

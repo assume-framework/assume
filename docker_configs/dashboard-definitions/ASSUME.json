@@ -3109,7 +3109,7 @@
       "id": 37,
       "options": {
         "afterRender": "",
-        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
+        "content": "### General Information\n\nName: {{index}} <br>\nTechnology: {{technology}} <br>\n\n### Technical Specifications\nEmissions: {{emission_factor}} t/MWh_thermal <br>\nMaximum Power: {{max_power}} MW <br>\nMinimum Power: {{min_power}} MW <br>\nEfficiency: {{efficiency}} <br>\n\n##### Unit Operator: {{unit_operator}}\n  ",
         "contentPartials": [],
         "defaultContent": "The query didn't return any results.",
         "editor": {

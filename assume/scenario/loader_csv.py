@@ -17,11 +17,12 @@ import yaml
 from tqdm import tqdm
 
 from assume.common.exceptions import AssumeException
-from assume.common.forecast_initialisation import ForecastInitialisation
+from assume.common.fast_pandas import FastIndex
 from assume.common.forecaster import (
     BuildingForecaster,
     CustomUnitForecaster,
     DemandForecaster,
+    DsmUnitForecaster,
     ExchangeForecaster,
     HydrogenForecaster,
     PowerplantForecaster,
@@ -34,6 +35,7 @@ from assume.common.utils import (
     adjust_unit_operator_for_learning,
     confirm_learning_save_path,
     convert_to_rrule_freq,
+    load_index_file,
     normalize_availability,
     set_random_seed,
 )
@@ -49,6 +51,29 @@ def bidding_strategies_from_param_dict(param_dict: dict):
         for ident, strategy in param_dict.items()
         if ident.startswith("bidding_")
     }
+
+
+def forecast_algorithm_from_param_dict(param_dict: dict) -> dict[str, str]:
+    return {
+        ident.split("forecast_")[1]: forecast_algorithm
+        for ident, forecast_algorithm in param_dict.items()
+        if ident.startswith("forecast_")
+    }
+
+
+def get_unit_forecast_algorithms(
+    forecast_algorithms: dict[str, str], plant: dict
+) -> dict[str, str]:
+    unit_forecast_algorithms = forecast_algorithm_from_param_dict(
+        plant
+    )  # get forecast specific parts
+
+    # overwrite None in plant csv with values from config if it exists!
+    for key, forecast_alg in unit_forecast_algorithms.items():
+        if forecast_alg is None or pd.isna(forecast_alg):
+            unit_forecast_algorithms[key] = forecast_algorithms.get(key)
+
+    return forecast_algorithms | unit_forecast_algorithms  # merge dicts together
 
 
 def load_file(
@@ -82,73 +107,40 @@ def load_file(
     if file_name in config:
         if config[file_name] is None:
             return None
-        file_path = f"{path}/{config[file_name]}"
+        file_path = Path(path) / config[file_name]
     else:
-        file_path = f"{path}/{file_name}.csv"
+        file_path = Path(path) / f"{file_name}.csv"
 
     try:
-        df = pd.read_csv(
-            file_path,
-            index_col=0,
-            encoding="utf-8",
-            na_values=["n.a.", "None", "-", "none", "nan"],
-            parse_dates=index is not None,
-        )
-
-        for col in df:
-            # check if the column is of dtype int
-            if df[col].dtype == "int":
-                # convert the column to float
-                df[col] = df[col].astype(float)
-
         if index is not None:
-            if len(df.index) == 1:
-                return df
+            df = load_index_file(file_path, index)
+        else:
+            df = pd.read_csv(
+                file_path,
+                index_col=0,
+                encoding="utf-8",
+                na_values=["n.a.", "None", "-", "none", "nan"],
+                parse_dates=index is not None,
+            )
+            for col in df:
+                # check if the column is of dtype int
+                if df[col].dtype == "int":
+                    # convert the column to float
+                    df[col] = df[col].astype(float)
 
-            if len(df.index) != len(index) and not isinstance(
-                df.index, pd.DatetimeIndex
-            ):
-                logger.warning(
-                    f"{file_name}: simulation time line does not match length of dataframe and index is not a datetimeindex. Returning None."
-                )
-                return None
+            if check_duplicates:
+                # Check if duplicate unit names exist and raise an error
+                duplicates = df.index[df.index.duplicated()].unique()
 
-            df.index.freq = df.index.inferred_freq
-
-            if len(df.index) < len(index) and df.index.freq == index.freq:
-                logger.warning(
-                    f"{file_name}: simulation time line is longer than length of the dataframe. Returning None."
-                )
-                return None
-
-            if df.index.freq < index.freq:
-                logger.warning(
-                    f"Resolution of {file_name} ({df.index.freq}) is higher than the simulation ({index.freq}). "
-                    "Resampling using mean(). Make sure this is what you want."
-                )
-                df = df.resample(index.freq).mean()
-                logger.info(f"Downsampling {file_name} successful.")
-
-            elif df.index.freq > index.freq or len(df.index) < len(index):
-                logger.warning("Upsampling not implemented yet. Returning None.")
-                return None
-
-            df = df.loc[index]
-
-        elif check_duplicates:
-            # Check if duplicate unit names exist and raise an error
-            duplicates = df.index[df.index.duplicated()].unique()
-
-            if len(duplicates) > 0:
-                duplicate_names = ", ".join(map(str, duplicates))
-                raise ValueError(
-                    f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
-                )
-
+                if len(duplicates) > 0:
+                    duplicate_names = ", ".join(map(str, duplicates))
+                    raise ValueError(
+                        f"Duplicate unit names found in {file_name}: {duplicate_names}. Please rename them to avoid conflicts."
+                    )
         return df
 
     except FileNotFoundError:
-        logger.info(f"{file_name} not found. Returning None")
+        logger.info(f"{file_path} not found. Returning None")
         return None
 
 
@@ -345,7 +337,7 @@ def make_market_config(
     return market_config
 
 
-def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame]:
+def read_grid(network_path: str | Path) -> dict[str, pd.DataFrame | None]:
     network_path = Path(network_path)
     buses = None
     lines = None
@@ -465,6 +457,67 @@ def read_units(
     return units_dict
 
 
+def save_unique_forecasts(units, save_path: Path) -> None:
+    """Collect unique forecasts computed by unit forecasters and write them to CSV.
+
+    Since there is one forecaster per unit but forecasts are shared across units
+    (via ``@lru_cache`` on the underlying algorithms), forecasts are deduplicated
+    by column name. Column names mirror the ``forecasts_df.csv`` convention so the
+    resulting file can be consumed as a drop-in input in a later run.
+    """
+    unique_forecasts = {
+        "price": {},
+        "residual_load": {},
+        "congestion_signal": {},
+        "renewable_utilisation": {},
+    }
+    default_values = {
+        "price": "price_naive_forecast",
+        "residual_load": "residual_load_naive_forecast",
+        "congestion_signal": "congestion_signal_naive_forecast",
+        "renewable_utilisation": "renewable_utilisation_naive_forecast",
+    }
+    for unit in units:
+        algs = unit.forecaster.forecast_algorithms
+        if isinstance(unit.forecaster, DsmUnitForecaster):
+            for key in unique_forecasts:
+                forecast_name = algs.get(key, default_values[key])
+                unique_forecasts[key][forecast_name] = unit
+        else:
+            for key in ["price", "residual_load"]:
+                forecast_name = algs.get(key, default_values[key])
+                unique_forecasts[key][forecast_name] = unit
+
+    forecast_dict = {}
+    for f_type in unique_forecasts:  # price, residual_load, ...
+        for f_name in unique_forecasts[f_type]:  #
+            unit = unique_forecasts[f_type][f_name]
+            attr_name = (
+                "renewable_utilisation_signal"
+                if f_type == "renewable_utilisation"
+                else f_type
+            )
+            forecast = getattr(unit.forecaster, attr_name)
+            if isinstance(forecast, dict):
+                for f_key in forecast:
+                    forecast_dict[f"{f_name}_{f_key}"] = forecast[f_key].as_pd_series(
+                        name=f"{f_name}_{f_key}"
+                    )
+            else:
+                forecast_dict[f"{f_name}"] = forecast.as_pd_series(name=f"{f_name}")
+
+    if not forecast_dict:
+        logger.info("No unique forecasts to save.")
+        return
+
+    df = pd.concat(forecast_dict.values(), axis=1, names=forecast_dict.keys())
+    df.index.name = "datetime"
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(save_path)
+
+    logger.info(f"Saved {len(df.columns)} unique forecasts to {save_path}")
+
+
 def load_config_and_create_forecaster(
     inputs_path: str,
     scenario: str,
@@ -551,10 +604,19 @@ def load_config_and_create_forecaster(
     )
     demand_df = load_file(path=path, config=config, file_name="demand_df", index=index)
     if demand_df is None:
+        # no demand timeseries exist, all demand is elastic. Fill missing demand timeseries with zeros and raise a warning.
         logger.warning(
             "!! No demand_df timeseries provided !! Filling demand_df with zeros. Make sure this is what you actually want."
         )
         demand_df = pd.DataFrame(index=index, columns=demand_units.index, data=0.0)
+    elif not demand_df.columns.equals(demand_units.index):
+        # there exist demand timeseries, but not for all demand units. Some demand is elastic, some is not. Fill missing demand timeseries with zeros and raise a warning.
+        logger.warning(
+            "!! Incomplete demand_df timeseries provided !! Filling demand_df for some units with zeros. Make sure this is what you actually want."
+        )
+        missing_columns = demand_units.index.difference(demand_df.columns)
+        for col in missing_columns:
+            demand_df[col] = 0.0
 
     exchanges_df = load_file(
         path=path, config=config, file_name="exchanges_df", index=index
@@ -573,120 +635,144 @@ def load_config_and_create_forecaster(
         )
         availability = normalize_availability(powerplant_units, availability)
 
+    if availability is None:
+        availability = pd.DataFrame(index=index)
+
     fuel_prices_df = load_file(
         path=path, config=config, file_name="fuel_prices_df", index=index
     )
+    if fuel_prices_df is None:
+        fuel_prices_df = pd.DataFrame(index=index)
 
-    buses = load_file(path=path, config=config, file_name="buses")
-    lines = load_file(path=path, config=config, file_name="lines")
+    if len(fuel_prices_df) <= 1:  # single value provided, extend to full index
+        fuel_prices_df.index = index[:1]
+        fuel_prices_df = fuel_prices_df.reindex(index, method="ffill")
 
-    initializer = ForecastInitialisation(
-        index=index,
-        demand_units=demand_units,
-        exchange_units=exchange_units,
-        powerplants_units=powerplant_units,
-        buses=buses,
-        lines=lines,
-        fuel_prices=fuel_prices_df,
-        market_configs=config["markets_config"],
-        forecasts=forecasts_df,
-        demand=demand_df,
-        availability=availability,
-        exchanges=exchanges_df,
+    forecast_algorithms = config.get("forecast_algorithms", {})
+
+    # create shared unit index for caching!
+    shared_unit_index = FastIndex(
+        start=index[0], end=index[-1], freq=pd.infer_freq(index)
     )
-
     unit_forecasts: dict[str, UnitForecaster] = {}
-    market_prices, residual_loads = initializer.calculate_market_forecasts()
-    congestion_signal, renewable_utilization = initializer.calc_node_forecasts()
     if powerplant_units is not None:
         for id, plant in powerplant_units.iterrows():
             unit_forecasts[id] = PowerplantForecaster(
-                index=index,
-                availability=initializer.availability(id),
-                fuel_prices=initializer.fuel_prices,
-                market_prices=market_prices,
-                residual_load=residual_loads,
+                index=shared_unit_index,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                fuel_prices=fuel_prices_df,
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, plant
+                ),
             )
     if demand_units is not None:
         for id, demand in demand_units.iterrows():
             unit_forecasts[id] = DemandForecaster(
-                index=index,
-                availability=initializer.availability(id),
+                index=shared_unit_index,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
                 demand=-demand_df[id].abs(),
-                market_prices=market_prices,
-                residual_load=residual_loads,
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, demand
+                ),
             )
     if storage_units is not None:
         for id, storage in storage_units.iterrows():
             unit_forecasts[id] = UnitForecaster(
-                index=index,
-                availability=initializer.availability(id),
-                market_prices=market_prices,
-                residual_load=residual_loads,
+                index=shared_unit_index,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, storage
+                ),
             )
     if exchange_units is not None:
         for id, exchange in exchange_units.iterrows():
             unit_forecasts[id] = ExchangeForecaster(
-                index=index,
-                availability=initializer.availability(id),
-                market_prices=market_prices,
+                index=shared_unit_index,
+                availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                forecast_algorithms=get_unit_forecast_algorithms(
+                    forecast_algorithms, exchange
+                ),
                 volume_export=exchanges_df[f"{id}_export"],
                 volume_import=exchanges_df[f"{id}_import"],
-                residual_load=residual_loads,
             )
     if dsm_units is not None:
         for type, dsm in dsm_units.items():
             for id, unit in dsm.iterrows():
+                unit_forecast_algorithms = get_unit_forecast_algorithms(
+                    forecast_algorithms, unit
+                )
                 if type == "building":
+
+                    def get_building_profile(column_name: str) -> pd.Series:
+                        default_profile = pd.Series(0.0, index=index, name=column_name)
+                        if forecasts_df is None:
+                            return default_profile
+                        return forecasts_df.get(column_name, default_profile)
+
+                    # Base aggregate building profiles
+                    building_load_profile = get_building_profile(f"{id}_load_profile")
+                    building_heat_demand = get_building_profile(f"{id}_heat_demand")
+                    building_pv_profile = get_building_profile(f"{id}_pv_profile")
+                    building_battery_profile = get_building_profile(
+                        f"{id}_battery_load_profile"
+                    )
+                    building_ev_profile = get_building_profile(f"{id}_ev_load_profile")
+                    building_electricity_price_flex = get_building_profile(
+                        f"{id}_electricity_price_flex"
+                    )
+
+                    # collect arbitrary component-level forecasts for this building
+                    extra_building_profiles = {}
+
+                    if forecasts_df is not None:
+                        building_prefix = f"{id}_"
+                        for col in forecasts_df.columns:
+                            if col.startswith(building_prefix):
+                                extra_building_profiles[col] = forecasts_df[col]
+
                     unit_forecasts[id] = BuildingForecaster(
-                        index=index,
-                        availability=initializer.availability(id),
-                        market_prices=market_prices,
-                        fuel_prices=initializer.fuel_prices,
-                        residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
-                        load_profile=0,  # TODO
-                        ev_load_profile=0,  # TODO
-                        heat_demand=0,  # TODO
-                        battery_load_profile=0,  # TODO
-                        pv_profile=0,  # TODO
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        forecast_algorithms=unit_forecast_algorithms,
+                        fuel_prices=fuel_prices_df,
+                        load_profile=building_load_profile,
+                        ev_load_profile=building_ev_profile,
+                        heat_demand=building_heat_demand,
+                        battery_load_profile=building_battery_profile,
+                        pv_profile=building_pv_profile,
+                        electricity_price_flex=building_electricity_price_flex,
+                        **extra_building_profiles,
                     )
                 if type == "steel_plant":
                     unit_forecasts[id] = SteelplantForecaster(
-                        index=index,
-                        availability=initializer.availability(id),
-                        market_prices=market_prices,
-                        fuel_prices=initializer.fuel_prices,
-                        residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
-                        congestion_signal=congestion_signal,
-                        renewable_utilisation_signal=renewable_utilization,
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        forecast_algorithms=unit_forecast_algorithms,
+                        fuel_prices=fuel_prices_df,
                     )
                 if type == "hydrogen_plant":
                     unit_forecasts[id] = HydrogenForecaster(
-                        index=index,
-                        availability=initializer.availability(id),
-                        market_prices=market_prices,
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        forecast_algorithms=unit_forecast_algorithms,
                         hydrogen_demand=unit["demand"],
-                        residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
                         seasonal_storage_schedule=0,  # TODO
                     )
                 if type == "steam_plant":
                     unit_forecasts[id] = SteamgenerationForecaster(
-                        index=index,
-                        availability=initializer.availability(id),
+                        index=shared_unit_index,
+                        availability=availability.get(
+                            id, pd.Series(1.0, index, name=id)
+                        ),
+                        forecast_algorithms=unit_forecast_algorithms,
                         demand=unit["demand"],
-                        market_prices=market_prices,
-                        fuel_prices=initializer.fuel_prices,
-                        residual_load=residual_loads,
-                        # TODO how to handle other markets?
-                        electricity_price=initializer.forecasts("price_EOM"),
-                        congestion_signal=congestion_signal,
-                        renewable_utilisation_signal=renewable_utilization,
+                        fuel_prices=fuel_prices_df,
                         electricity_price_flex=0,  # TODO
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
@@ -705,6 +791,7 @@ def load_config_and_create_forecaster(
         "dsm_units": dsm_units,
         "unit_forecasts": unit_forecasts,
         "index": index,
+        "forecasts_df": forecasts_df,
     }
 
 
@@ -745,6 +832,7 @@ def setup_world(
     exchange_units = scenario_data["exchange_units"]
     dsm_units = scenario_data["dsm_units"]
     unit_forecasts = scenario_data["unit_forecasts"]
+    forecasts_df = scenario_data["forecasts_df"]
 
     # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -930,6 +1018,18 @@ def setup_world(
         for op, op_units in units.items():
             for unit in op_units:
                 world.add_unit(**unit)
+
+    # When use_forecasts_df is False, the loaded forecasts_df does not
+    # supersede algorithmic forecast calculation.
+    use_forecasts_df = config.get("use_forecasts_df", True)
+    world.init_forecasts(forecasts_df if use_forecasts_df else None)
+
+    if config.get("save_forecasts", False):
+        forecast_save_file = Path(scenario_data["path"]) / config.get(
+            "forecast_save_file",
+            "saved_forecasts.csv",
+        )
+        save_unique_forecasts(world.units.values(), forecast_save_file)
 
     if (
         world.learning_mode

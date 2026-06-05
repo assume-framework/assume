@@ -25,7 +25,7 @@ class Demand(SupportsMinMax):
         max_power (float): The maximum power input (negative) capacity of the power plant in MW.
         min_power (float, optional): The minimum power input (negative) capacity of the power plant in MW. Defaults to 0.0 MW.
         node (str, optional): The node of the unit. Defaults to "node0".
-        price (float): The price of the unit.
+        price (float): The bidding price of the unit.
         location (tuple[float, float]): Geographical location.
         elasticity, elasticity_model, max_price, num_bids: Optional parameters for elastic demand modeling.
     """
@@ -84,17 +84,17 @@ class Demand(SupportsMinMax):
 
         # Elastic demand parameters
         self.max_price = price
-        self.elasticity = kwargs.get("elasticity", 0.0)
-        self.elasticity_model = kwargs.get("elasticity_model", None)
-        self.num_bids = int(kwargs.get("num_bids", 1))
+        self.elasticity = kwargs.get("elasticity", 0)
+        self.elasticity_model = kwargs.get("elasticity_model", 0)
+        self.num_bids = int(kwargs.get("num_bids", 0))
 
-        # Validate elastic configuration if elasticity is non-zero
-        if self.elasticity_model is not None:
+        # Validate elastic configuration if elasticity_model is provided
+        if self.elasticity_model != 0:
             if self.elasticity_model not in ("linear", "isoelastic"):
                 raise ValueError(
                     f"Invalid elasticity_model '{self.elasticity_model}' at unit {self.id}. Choose 'linear' or 'isoelastic'."
                 )
-            if self.num_bids <= 1:
+            if self.num_bids is not None and self.num_bids <= 1:
                 raise ValueError(
                     f"'num_bids' parameter must be >= 1 for elastic demand at unit {self.id}"
                 )
@@ -139,10 +139,11 @@ class Demand(SupportsMinMax):
 
         Args:
             start (pandas.Timestamp): The start time of the dispatch.
-            end (pandas.Timestamp): The end time of the dispatch.
+            end (pandas.Timestamp): The end time of the dispatch (exclusive).
+            product_type (str, optional): The product type. Defaults to "energy".
 
         Returns:
-            tuple[pandas.Series, pandas.Series]: The bid colume as both the minimum and maximum power output of the unit.
+            tuple[np.ndarray, np.ndarray]: The bid volume as both the minimum and maximum power output of the unit.
         """
 
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once

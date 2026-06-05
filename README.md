@@ -28,6 +28,9 @@ Developed as an open-source model, its primary objectives are to ensure usabilit
 A unique feature of the ASSUME toolbox is its integration of **Deep Reinforcement Learning** methods into the behavioral strategies of market agents. The model offers various predefined agent representations for both the demand and generation sides, which can be used as plug-and-play modules, simplifying the reinforcement of learning strategies.
 This setup enables research into new market designs and dynamics in energy markets.
 
+**If you have any questions - get in contact on matrix: https://matrix.to/#/#assume-framework:matrix.org**<br>
+Log into your existing matrix account or create a new one. Paste the URL in the search field.
+
 ### What can the software do?
 The main motivation of ASSUME is to overcome the limitations of fixed, rule-based behaviors in existing ABMs.
 For this, it leverages advancements in artificial intelligence, particularly deep reinforcement learning (DRL), enabling agents to adapt their behavior dynamically in response to market conditions.
@@ -87,6 +90,7 @@ pip install 'assume-framework[all]'
 
 
 ### Timescale Database and Grafana Dashboards
+The Timescale Database and Grafana Dashboard are used to store and represent simulation results.
 
 If you want to benefit from a supported database and integrated Grafana dashboards for scenario analysis, you can use the provided Docker Compose file.
 
@@ -109,6 +113,7 @@ This will launch a container for TimescaleDB and Grafana with preconfigured dash
 You can access the Grafana dashboards at `http://localhost:3000`.
 
 ### Using TensorBoard to display Learning Metrics
+TensorBoard is used to visualize and monitor the learning progress during reinforcement learning training.
 
 When running an example with learning capabilities, you can start TensorBoard to observe the learning process.
 Use the following shell command to start TensorBoard:
@@ -122,14 +127,16 @@ Please note that TensorBoard should ideally be shut down via `Ctrl + C` every ti
 
 ## Trying out ASSUME and the provided Examples
 
-To ease your way into ASSUME we provided some examples and tutorials.
-The former are helpful if you would like to get an impression of how ASSUME works and the latter introduce you into the development of ASSUME.
+To ease your way into ASSUME, we provided some tutorial notebooks and preconfigured example simulations in the examples folder.
+The former are helpful if you would like to get an impression of how ASSUME works, as they present different functionalities of ASSUME condensed in specific notebooks, and the latter provides various example simulations ranging from 8 power plant examples to the representations of Germany for one year.
 
-### The Tutorials
+### The Tutorial Notebooks
 
-The tutorials work completely detached from your own machine on google colab.
-They provide code snippets and task that show you, how you can work with the software package one your own.
-We have multiple tutorials prepared, e.g. one for introducing a new unit and three for getting reinforcement learning ready on ASSUME.
+You can run the tutorials locally using the notebooks [here](examples/notebooks) or use [google colab](https://assume.readthedocs.io/en/latest/examples_basic.html)
+The tutorials begin with the basics of ASSUME, e.g., introducing a new unit, while the later tutorials cover more advanced use cases.
+
+We particularly recommend these tutorials; more can be found under the given Link:
+
 
 How to configure a new unit in ASSUME?
 
@@ -146,9 +153,9 @@ How to use reinforcement learning for new market participants in ASSUME?
 - Storage unit: [![Open Learning Tutorial in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/assume-framework/assume/blob/main/examples/notebooks/04c_reinforcement_learning_storage_example.ipynb)
 
 
-### The Examples
+### Preconfigured Examples
 
-To explore the provided examples, follow these steps:
+To explore the provided example simualtions [here](examples/inputs), follow these steps:
 
 1. Clone the repository and navigate to its directory:
 

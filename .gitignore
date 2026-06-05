@@ -155,3 +155,4 @@ logs
 *.jar
 *.nbconvert.ipynb
 fameSetup.yaml
+.claude

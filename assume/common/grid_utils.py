@@ -2,13 +2,18 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import logging
 from datetime import timedelta
 
 import numpy as np
 import pandas as pd
 import pypsa
+from linopy import available_solvers
 
 from assume.common.market_objects import MarketProduct
+from assume.common.utils import SUPPORTED_SOLVERS
+
+logger = logging.getLogger(__name__)
 
 
 def add_generators(
@@ -22,7 +27,7 @@ def add_generators(
         network (pypsa.Network): the pypsa network to which the generators are
         generators (pandas.DataFrame): the generators dataframe
     """
-    p_set = pd.DataFrame(
+    zeros = pd.DataFrame(
         np.zeros((len(network.snapshots), len(generators.index))),
         index=network.snapshots,
         columns=generators.index,
@@ -32,11 +37,11 @@ def add_generators(
         gen_c = generators.copy()
 
         if "p_min_pu" not in gen_c.columns:
-            gen_c["p_min_pu"] = p_set
+            gen_c["p_min_pu"] = zeros
         if "p_max_pu" not in gen_c.columns:
-            gen_c["p_max_pu"] = p_set + 1
+            gen_c["p_max_pu"] = zeros + 1
         if "marginal_cost" not in gen_c.columns:
-            gen_c["marginal_cost"] = p_set
+            gen_c["marginal_cost"] = zeros
 
         network.add(
             "Generator",
@@ -47,7 +52,7 @@ def add_generators(
             ],  # Nominal capacity of the powerplant/generator
             **gen_c,
         )
-    else:
+    elif isinstance(generators, pd.DataFrame):
         # add generators
         generators.drop(
             ["p_min_pu", "p_max_pu", "marginal_cost"],
@@ -62,10 +67,14 @@ def add_generators(
             p_nom=generators[
                 "max_power"
             ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=p_set,
-            p_max_pu=p_set + 1,
-            marginal_cost=p_set,
+            p_min_pu=zeros,
+            p_max_pu=zeros + 1,
+            marginal_cost=zeros,
             **generators,
+        )
+    else:
+        raise ValueError(
+            "Generators must be provided as a pandas DataFrame or a dictionary of pandas Series."
         )
 
 
@@ -83,7 +92,7 @@ def add_redispatch_generators(
         generators (pandas.DataFrame): the generators dataframe
         backup_marginal_cost (float, optional): The cost of dispatching the backup units in [€/MW]. Defaults to 1e5.
     """
-    p_set = pd.DataFrame(
+    zeros = pd.DataFrame(
         np.zeros((len(network.snapshots), len(generators.index))),
         index=network.snapshots,
         columns=generators.index,
@@ -94,7 +103,7 @@ def add_redispatch_generators(
         "Load",
         name=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
-        p_set=p_set,
+        p_set=zeros,
         sign=1,
     )
 
@@ -105,9 +114,9 @@ def add_redispatch_generators(
         suffix="_up",
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
     )
 
     # add downward redispatch generators
@@ -117,9 +126,9 @@ def add_redispatch_generators(
         suffix="_down",
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
         sign=-1,
     )
 
@@ -232,7 +241,7 @@ def add_nodal_loads(
     The loads are added as generators with negative sign so their dispatch can be also curtailed,
     since regular load in PyPSA represents only an inelastic demand.
     """
-    p_set = pd.DataFrame(
+    zeros = pd.DataFrame(
         np.zeros((len(network.snapshots), len(loads.index))),
         index=network.snapshots,
         columns=loads.index,
@@ -248,9 +257,9 @@ def add_nodal_loads(
         name=loads.index,
         bus=loads["node"],  # bus to which the generator is connected to
         p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=p_set,
-        p_max_pu=p_set + 1,
-        marginal_cost=p_set,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
         sign=-1,
         **loads_c,
     )
@@ -333,3 +342,39 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
         )
 
     return meta
+
+
+def get_supported_solver_linopy(default_solver: str | None = None):
+    """
+    Get an available solver for linopy optimization.
+
+    Filters the list of supported solvers to find which ones are installed,
+    then returns the default solver if available, otherwise falls back to the first available solver.
+
+    Args:
+        default_solver (str | None, optional): Preferred solver name. If not available,
+            falls back to the first available solver. Defaults to None.
+
+    Returns:
+        str: Name of the selected solver.
+
+    Raises:
+        RuntimeError: If none of the supported solvers (highs, gurobi, glpk, cbc, cplex) are available.
+
+    Warning:
+        Logs a warning if the default_solver is not available and a fallback is used.
+    """
+    solvers_priority = SUPPORTED_SOLVERS
+
+    # Filter available solvers while preserving the shared fallback priority.
+    solvers = [solver for solver in solvers_priority if solver in available_solvers]
+    if not solvers:
+        raise RuntimeError(f"None of {solvers_priority} are available")
+
+    solver = default_solver or solvers[0]
+
+    if solver not in solvers:
+        logger.warning("Solver %s not available, using %s", solver, solvers[0])
+        solver = solvers[0]
+
+    return solver
