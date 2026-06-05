@@ -8,19 +8,19 @@ base_case_2013:
   time_step: 1h
   save_frequency_hours: null
   learning_config:
-    learning_mode: false
-    continue_learning: true
+    learning_mode: true
+    continue_learning: false
     trained_policies_save_path: null
     trained_policies_load_path: learned_strategies/future_markets_paper_base_case_2013_pp_all/avg_reward_eval_policies
-    max_bid_price: 500
+    max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.0001
     training_episodes: 500
-    episodes_collecting_initial_experience: 20
+    episodes_collecting_initial_experience: 10
     train_freq: 24h
     gradient_steps: 1
     batch_size: 256
-    gamma: 0
+    gamma: 1
     device: cpu
     noise_sigma: 0.4
     noise_scale: 1
