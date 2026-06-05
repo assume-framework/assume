@@ -399,6 +399,29 @@ def calculate_naive_price(
 
 
 @lru_cache
+def calculate_naive_load(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    config: MarketConfig,
+    preprocess_information=None,
+):
+    """Calculates elastic or inelastic naive load depending on demand unit types."""
+    # 1. Sort units by type and filter for units with bidding strategy for the given market_id
+    _, demand_units, _, _, _ = sort_units(units, config.market_id)
+
+    elastic_demand_units = {
+        unit.id: unit for unit in demand_units if is_elastic_demand(unit, config)
+    }
+
+    if len(elastic_demand_units) > 0:
+        return calculate_elastic_load(
+            index, units, config, elastic_demand_units.values()
+        )
+
+    return calculate_naive_residual_load(index, units, config)
+
+
+@lru_cache
 def calculate_naive_residual_load(
     index: ForecastIndex,
     units: list[BaseUnit],
@@ -427,6 +450,176 @@ def calculate_naive_residual_load(
     res_demand_df = sum_demand - vre_feed_in_df
 
     return res_demand_df
+
+
+@lru_cache
+def calculate_elastic_load(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    config: MarketConfig,
+    elastic_demand_units: list[Demand],
+    preprocess_information=None,
+) -> dict[str, ForecastSeries]:
+    """
+    Forecast market clearing volumes with price-elastic demand via pay-as-clear matching.
+
+    Storages and DSM units are ignored in this calculation.
+
+    Steps:
+        1. **Sort units and collect elastic bids** — classify units by type and compute
+            demand bids from elastic demand units for the first product interval.
+        2-4. **Build supply and demand curves** — compute per-unit marginal costs and
+            available power, then sum inelastic demand (including exchange volumes).
+        5-6. **Pay-as-clear dispatch** — for each timestep, assemble an orderbook from
+            supply offers, elastic demand bids, and the inelastic demand block, then
+            clear via ``PayAsClearRole`` to obtain the equilibrium price.
+    """
+    if isinstance(index, FastIndex):
+        index = index.as_datetimeindex()
+
+    market_id = config.market_id
+
+    elastic_demand_bids = []
+    # 1. Sort units by type and filter for units with bidding strategy for the given market_id
+    powerplants_units, demand_units, exchange_units, _, _ = sort_units(units, market_id)
+    inelastic_demand_units = [
+        unit for unit in demand_units if unit not in elastic_demand_units
+    ]
+
+    start = config.opening_hours[0]
+    end = start + config.market_products[0].duration
+
+    product_tuples = {(start, end, None)}
+
+    for unit in elastic_demand_units:
+        elastic_demand_bids.extend(
+            unit.bidding_strategies[market_id].calculate_bids(
+                unit,
+                config,
+                product_tuples=product_tuples,
+            )
+        )
+
+    # sort all bids by price descending
+    all_bids = (
+        pd.DataFrame(elastic_demand_bids)
+        .sort_values(by="price", ascending=False)
+        .reset_index(drop=True)
+    )
+
+    elastic_demand_prices = all_bids["price"]
+    elastic_demand_volumes = all_bids["volume"]
+
+    # 2. Calculate marginal costs for each unit and time step.
+    #    The resulting DataFrame has rows = time steps and columns = units.
+    #    shape: (index_len, num_pp_units)
+    marginal_costs = pd.DataFrame(
+        [unit.marginal_cost for unit in powerplants_units]
+    ).T.set_index(index)
+
+    # 3. Compute available power for each unit at each time step.
+    #    shape: (index_len, num_pp_units)
+    power = calculate_max_power(powerplants_units).T.set_index(index)
+
+    # 4. Process the demand.
+    #    Filter demand units with a bidding strategy and sum their forecasts for each time step.
+    sum_demand = pd.DataFrame(
+        calculate_sum_demand(demand_units, exchange_units), index=index
+    )
+
+    # 5. Initialize the cleared volume forecast series.
+    cleared_volume = pd.Series(index=index, data=0.0)
+
+    # clear the market forecast including elastic demand bids using the PayAsClearRole
+    for t in index:
+        # get the supply offers (marginal cost and available power) for time t
+        mc_t = marginal_costs.loc[t]
+        power_t = power.loc[t]
+        start = t
+        end = start + pd.Timedelta(config.market_products[0].duration)
+
+        supply_offers = pd.DataFrame(
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "node": "node0",
+                "price": mc_t,
+                "volume": power_t,
+                "bid_type": "SB",
+                "bid_id": [f"{unit.id}_{t}" for unit in powerplants_units],
+            }
+        )
+
+        # shape of sum_demand: (time_steps, 1)
+        demand_t = sum_demand.loc[t][0]
+
+        # get the demand bids
+        demand_bids = pd.DataFrame(
+            {
+                "start_time": start,
+                "end_time": end,
+                "only_hours": None,
+                "node": "node0",
+                "price": elastic_demand_prices,
+                "volume": elastic_demand_volumes,
+                "bid_type": "SB",
+                "bid_id": [
+                    f"elastic_demand_{t}_{i}" for i in range(len(elastic_demand_prices))
+                ],
+            }
+        )
+
+        # create an orderbook containing all supply offers and demand bids
+        orderbook = []
+        orderbook.extend(supply_offers.to_dict("records"))
+        orderbook.extend(demand_bids.to_dict("records"))
+        if demand_t > 0 and len(inelastic_demand_units) > 0:
+            inelastic_price_bid = max(
+                [unit.price[t] for unit in inelastic_demand_units]
+            )
+            orderbook.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "node": "node0",
+                    "price": inelastic_price_bid,
+                    "volume": -demand_t,
+                    "bid_type": "SB",
+                    "bid_id": f"{inelastic_demand_units[0].id}_{t}",
+                }
+            )
+
+        cleaned_orderbook = []
+        for bid in orderbook:
+            if isinstance(bid["volume"], dict):
+                if all(volume == 0 for volume in bid["volume"].values()):
+                    continue
+            elif bid["volume"] == 0:
+                continue
+            cleaned_orderbook.append(bid)
+
+        mps = get_available_products(
+            config.market_products, pd.Timestamp(start) - pd.Timedelta("1h")
+        )
+
+        if config.market_mechanism == "pay_as_bid":
+            # the forecast price is the volume-weighted average price of matched orders of each timestep
+            mechanism = PayAsBidRole(config)
+        elif config.market_mechanism == "pay_as_clear":
+            mechanism = PayAsClearRole(config)
+        elif config.market_mechanism == "complex_clearing":
+            mechanism = ComplexClearingRole(config)
+        else:
+            raise ValueError(
+                f"Invalid market mechanism {config.param_dict.get('market_mechanism')}."
+            )
+
+        _, _, meta, _ = mechanism.clear(cleaned_orderbook, mps)
+        cleared_volume.loc[t] = meta[0]["supply_volume"]
+
+    return cleared_volume
 
 
 def extract_buses_and_lines(market_configs: list[MarketConfig]):
@@ -641,7 +834,7 @@ forecast_algorithms = {
         "EOM": FastSeries(index=index, value=50)
     },
     "price_keep_given": None,
-    "residual_load_naive_forecast": calculate_naive_residual_load,
+    "residual_load_naive_forecast": calculate_naive_load,
     "residual_load_default_test": lambda *args: {},
     "residual_load_keep_given": None,
     "congestion_signal_naive_forecast": calculate_naive_congestion_signal,
