@@ -11,7 +11,7 @@ import pandas as pd
 import pypsa
 from mango import AgentAddress
 
-from assume.common.grid_utils import read_pypsa_grid
+from assume.common.grid_utils import get_supported_solver_linopy, read_pypsa_grid
 from assume.common.market_objects import MarketConfig, MarketProduct, Orderbook
 from assume.common.utils import create_incidence_matrix
 from assume.markets.base_market import MarketRole
@@ -161,7 +161,9 @@ class NodalClearingRole(MarketRole):
                 p_max_pu=1,
             )
 
-        self.solver = marketconfig.param_dict.get("solver", "highs")
+        self.solver_name = get_supported_solver_linopy(
+            marketconfig.param_dict.get("solver_name", "highs")
+        )
 
     def validate_orderbook(
         self, orderbook: Orderbook, agent_addr: AgentAddress
@@ -294,9 +296,11 @@ class NodalClearingRole(MarketRole):
         # run linear optimal powerflow
         n.optimize.fix_optimal_capacities()
         status, termination_condition = n.optimize(
-            solver=self.solver,
+            solver_name=self.solver_name,
             log_to_console=False,
             progress=False,
+            # Constant objective terms do not affect dispatch or nodal prices; omit for speed/stability.
+            include_objective_constant=False,
         )
 
         if status != "ok":

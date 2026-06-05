@@ -129,7 +129,7 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         self.has_electrolyser = "electrolyser" in self.components.keys()
 
         # Initialize the model
-        self.setup_model()
+        # self.setup_model()  # NOTE: called in forecaster initialization again!!!
 
     def define_parameters(self):
         """

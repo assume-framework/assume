@@ -23,6 +23,7 @@ from assume.world import World
 
 logger = logging.getLogger(__name__)
 
+
 translate_clearing = {
     "SAME_SHARES": "pay_as_clear",
     "FIRST_COME_FIRST_SERVE": "pay_as_bid",
@@ -184,7 +185,10 @@ def add_agent_to_world(
                         "technology": "demand",
                         "price": value,
                     },
-                    DemandForecaster(index, demand=-100000),
+                    DemandForecaster(
+                        index,
+                        demand=-100000,
+                    ),
                 )
         case "EnergyExchange" | "DayAheadMarketSingleZone":
             clearing_section = agent["Attributes"].get("Clearing", agent["Attributes"])
@@ -263,7 +267,10 @@ def add_agent_to_world(
                         "price": load["ValueOfLostLoad"],
                     },
                     # demand_series might contain more values than index
-                    DemandForecaster(index, demand=demand_series[: len(index)]),
+                    DemandForecaster(
+                        index,
+                        demand=demand_series[: len(index)],
+                    ),
                 )
 
         case "StorageTrader":
@@ -535,6 +542,8 @@ def load_amiris(
             supports,
             index,
         )
+
+    world.init_forecasts()
     # calculate market price before simulation
     world
 

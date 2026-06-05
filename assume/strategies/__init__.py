@@ -120,6 +120,10 @@ try:
         RenewableEnergyLearningSingleBidStrategy
     )
 
+    from assume.strategies.portfolio_learning_strategies import (
+        PortfolioLearningStrategy,
+    )
 
+    bidding_strategies["portfolio_learning"] = PortfolioLearningStrategy
 except ImportError:
     pass

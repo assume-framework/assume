@@ -8,7 +8,7 @@ import pytest
 
 from assume.units.dst_components import ThermalStorage
 
-use_solver = "appsi_highs"
+solver_name = "appsi_highs"
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ def short_term_storage_model(storage_config, price_profile):
         sense=pyo.minimize,
     )
 
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=False)
     return model, results
 
@@ -103,7 +103,7 @@ def long_term_storage_model(storage_config, storage_schedule, price_profile):
         sense=pyo.minimize,
     )
 
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=False)
     return model, results
 

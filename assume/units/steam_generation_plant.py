@@ -117,7 +117,7 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         self.cost_tolerance = cost_tolerance
 
         # Initialize the model
-        self.setup_model()
+        # self.setup_model()  # NOTE: called in forecaster initialization again!!!
 
     def define_parameters(self):
         """

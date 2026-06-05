@@ -378,3 +378,49 @@ def transfer_weights(
             )
 
     return new_state_copy
+
+
+def encode_hourly_features(date: datetime) -> list:
+    """
+    Encode time features for a given datetime object.
+    This function extracts the hour as features from the datetime object
+    and encodes them using sine and cosine transformations to capture periodicity.
+
+    Args:
+        start (datetime): The datetime object to encode.
+
+    Returns:
+        list: A list containing the encoded time features.
+    """
+
+    hour = date.hour / 24.0
+    hour_cos = np.cos(2 * np.pi * hour)
+    hour_sin = np.sin(2 * np.pi * hour)
+
+    return [
+        hour_cos,
+        hour_sin,
+    ]
+
+
+def encode_monthly_features(start: datetime) -> list:
+    """
+    Encode time features for a given datetime object.
+    This function extracts the months from the datetime object
+    and encodes them using sine and cosine transformations to capture periodicity.
+
+    Args:
+        start (datetime): The datetime object to encode.
+
+    Returns:
+        list: A list containing the encoded time features.
+    """
+
+    month = start.month / 12.0
+    month_cos = np.cos(2 * np.pi * month)
+    month_sin = np.sin(2 * np.pi * month)
+
+    return [
+        month_cos,
+        month_sin,
+    ]

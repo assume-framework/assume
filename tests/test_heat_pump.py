@@ -11,7 +11,7 @@ import pytest
 from assume.units.dst_components import HeatPump
 
 # Define the solver to use
-use_solver = "appsi_highs"  # Replace with the appropriate solver
+solver_name = "appsi_highs"  # Replace with the appropriate solver
 
 
 # Fixture for creating an electricity price profile, including high prices to test logic
@@ -65,7 +65,7 @@ def heat_pump_model(heat_pump_config, price_profile):
     )
 
     # Solve the model
-    solver = pyo.SolverFactory(use_solver)
+    solver = pyo.SolverFactory(solver_name)
     results = solver.solve(model, tee=False)
 
     return model, results

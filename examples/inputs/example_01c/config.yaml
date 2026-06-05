@@ -27,7 +27,7 @@ eom_only:
         - bid_type
       market_mechanism: complex_clearing
       param_dict:
-        solver: highs
+        solver_name: highs
         pricing_mechanism: pay_as_clear
 
 eom_and_crm:
@@ -58,7 +58,7 @@ eom_and_crm:
         - bid_type
       market_mechanism: complex_clearing
       param_dict:
-        solver: highs
+        solver_name: highs
         pricing_mechanism: pay_as_clear
 
     CRM_pos:
@@ -118,7 +118,7 @@ dam_with_complex_opt_clearing:
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
       param_dict:
-        solver: highs
+        solver_name: highs
         pricing_mechanism: pay_as_clear
       additional_fields:
         - bid_type
