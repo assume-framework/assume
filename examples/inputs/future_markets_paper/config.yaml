@@ -8,11 +8,11 @@ base_case_2013:
   time_step: 1h
   save_frequency_hours: null
   learning_config:
-    learning_mode: true
+    learning_mode: false
     continue_learning: false
     trained_policies_save_path: null
     trained_policies_load_path: learned_strategies/future_markets_paper_base_case_2013_pp_all/avg_reward_eval_policies
-    max_bid_price: 100
+    max_bid_price: 500
     algorithm: matd3
     learning_rate: 0.0001
     training_episodes: 500
@@ -46,6 +46,7 @@ base_case_2013:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
+
 base_case_2013_pp_bat:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
@@ -53,25 +54,25 @@ base_case_2013_pp_bat:
   save_frequency_hours: null
   learning_config:
     learning_mode: true
-    continue_learning: true
+    continue_learning: false
     trained_policies_save_path: null
-    trained_policies_load_path: learned_strategies/future_markets_paper_base_case_2013_pp_bat/avg_reward_eval_policies
-    max_bid_price: 300
+    trained_policies_load_path: null
+    max_bid_price: 500
     algorithm: matd3
     learning_rate: 0.0001
-    training_episodes: 200
-    episodes_collecting_initial_experience: 1
-    train_freq: 48h
-    gradient_steps: 1
-    batch_size: 128
+    training_episodes: 800
+    episodes_collecting_initial_experience: 40
+    train_freq: 72h
+    gradient_steps: 720
+    batch_size: 256
     gamma: 0.999
     device: cpu
     noise_sigma: 0.4
     noise_scale: 1
     noise_dt: 1
     action_noise_schedule: linear
-    validation_episodes_interval: 5
-    early_stopping_steps: 20
+    validation_episodes_interval: 10
+    early_stopping_steps: 100
     early_stopping_threshold: 0.02
   markets_config:
     EOM:
@@ -90,6 +91,7 @@ base_case_2013_pp_bat:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
+
 base_case_2013_pp_all:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
@@ -100,65 +102,21 @@ base_case_2013_pp_all:
     continue_learning: false
     trained_policies_save_path: null
     trained_policies_load_path: examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_all/last_policies
-    max_bid_price: 300
+    max_bid_price: 500
     algorithm: matd3
     learning_rate: 0.0001
-    training_episodes: 200
+    training_episodes: 500
     episodes_collecting_initial_experience: 80
     train_freq: 24h
     gradient_steps: 10
     batch_size: 256
-    gamma: 0
+    gamma: 1
     device: cpu
-    noise_sigma: 0.1
+    noise_sigma: 0.4
     noise_scale: 1
     noise_dt: 1
     action_noise_schedule: linear
-    validation_episodes_interval: 5
-    early_stopping_steps: 20
-    early_stopping_threshold: 0.05
-  markets_config:
-    EOM:
-      operator: EOM_operator
-      product_type: energy
-      start_date: 2013-01-01 00:00
-      products:
-      - duration: 1h
-        count: 1
-        first_delivery: 1h
-      opening_frequency: 1h
-      opening_duration: 1h
-      volume_unit: MWh
-      maximum_bid_volume: 100000
-      maximum_bid_price: 3000
-      minimum_bid_price: -500
-      price_unit: EUR/MWh
-      market_mechanism: complex_clearing
-base_case_2013_pp_single:
-  start_date: 2013-01-01 00:00
-  end_date: 2013-02-28 00:00
-  time_step: 1h
-  save_frequency_hours: null
-  learning_config:
-    learning_mode: false
-    continue_learning: true
-    trained_policies_save_path: null
-    trained_policies_load_path: examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_single/last_policies
-    max_bid_price: 300
-    algorithm: matd3
-    learning_rate: 0.001
-    training_episodes: 500
-    episodes_collecting_initial_experience: 10
-    train_freq: 24h
-    gradient_steps: 10
-    batch_size: 256
-    gamma: 0
-    device: gpu
-    noise_sigma: 0.6
-    noise_scale: 1
-    noise_dt: 1
-    action_noise_schedule: linear
-    validation_episodes_interval: 5
+    validation_episodes_interval: 10
     early_stopping_steps: 100
     early_stopping_threshold: 0.05
   markets_config:
@@ -178,7 +136,8 @@ base_case_2013_pp_single:
       minimum_bid_price: -500
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
-base_case_2013_bat:
+
+base_case_2013_bat_all:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
   time_step: 1h
@@ -188,10 +147,10 @@ base_case_2013_bat:
     continue_learning: false
     trained_policies_save_path: null
     trained_policies_load_path: null
-    max_bid_price: 300
+    max_bid_price: 500
     algorithm: matd3
-    learning_rate: 0.0001
-    training_episodes: 100
+    learning_rate: 0.0003
+    training_episodes: 500
     episodes_collecting_initial_experience: 5
     train_freq: 720h
     gradient_steps: 720
@@ -202,52 +161,8 @@ base_case_2013_bat:
     noise_scale: 1
     noise_dt: 1
     action_noise_schedule: linear
-    validation_episodes_interval: 5
-    early_stopping_steps: 10
-    early_stopping_threshold: 0.05
-  markets_config:
-    EOM:
-      operator: EOM_operator
-      product_type: energy
-      start_date: 2013-01-01 00:00
-      products:
-      - duration: 1h
-        count: 1
-        first_delivery: 1h
-      opening_frequency: 1h
-      opening_duration: 1h
-      volume_unit: MWh
-      maximum_bid_volume: 100000
-      maximum_bid_price: 3000
-      minimum_bid_price: -500
-      price_unit: EUR/MWh
-      market_mechanism: complex_clearing
-base_case_2013_pp_all_dispatch:
-  start_date: 2013-01-01 00:00
-  end_date: 2013-02-28 00:00
-  time_step: 1h
-  save_frequency_hours: null
-  learning_config:
-    learning_mode: false
-    continue_learning: false
-    trained_policies_save_path: examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_all/last_policies
-    trained_policies_load_path: examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_pp_all/last_policies
-    max_bid_price: 300
-    algorithm: matd3
-    learning_rate: 0.0001
-    training_episodes: 0
-    episodes_collecting_initial_experience: 0
-    train_freq: 24h
-    gradient_steps: 10
-    batch_size: 256
-    gamma: 0
-    device: cpu
-    noise_sigma: 0.1
-    noise_scale: 1
-    noise_dt: 1
-    action_noise_schedule: linear
-    validation_episodes_interval: 5
-    early_stopping_steps: 20
+    validation_episodes_interval: 10
+    early_stopping_steps: 100
     early_stopping_threshold: 0.05
   markets_config:
     EOM:
