@@ -82,7 +82,7 @@ class EnergyHeuristicFlexableStrategy(MinMaxStrategy):
             current_power = unit.outputs["energy"].at[start]
 
             # adjust max_power for ramp speed (pass start so calculate_ramp can
-            # honor any aFRR/CRM capacity commitment at this timestep)
+            # honor any CRM capacity commitment at this timestep)
             max_power = unit.calculate_ramp(
                 op_time, previous_power, max_power, current_power, start=start
             )
@@ -549,11 +549,11 @@ def calculate_EOM_price_if_on(
     if bid_quantity_inflex == 0:
         return 0
 
-    # If the unit has any aFRR/CRM commitment at this hour (capacity_pos or
+    # If the unit has any CRM commitment at this hour (capacity_pos or
     # capacity_neg > 0), it is contractually required to stay online regardless
     # of the EOM clearing outcome. The "lower the bid to avoid a costly
     # shutdown" rationale does not apply in that case, so we skip the
-    # price reduction. Without this guard, an aFRR-committed unit would
+    # price reduction. Without this guard, a CRM-committed unit would
     # over-incentivize cheap EOM bids in low-price hours.
     has_capacity_commitment = (
         float(unit.outputs["capacity_pos"].at[start]) > 0

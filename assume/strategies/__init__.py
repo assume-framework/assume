@@ -18,13 +18,13 @@ from assume.strategies.flexable_storage import (
     StorageCapacityHeuristicBalancingNegStrategy,
     StorageCapacityHeuristicBalancingPosStrategy,
 )
-from assume.strategies.flexable_afrr import (
-    PowerPlantAfrrCapBlockStrategy,
-    PowerPlantAfrrEnergyStrategy,
+from assume.strategies.flexable_crm import (
+    PowerPlantCrmPosStrategy,
+    PowerPlantCrmNegStrategy,
 )
-from assume.strategies.flexable_afrr_storage import (
-    StorageAfrrCapBlockStrategy,
-    StorageAfrrEnergyStrategy,
+from assume.strategies.flexable_crm_storage import (
+    StorageCrmPosStrategy,
+    StorageCrmNegStrategy,
 )
 from assume.strategies.naive_strategies import (
     DsmEnergyOptimizationStrategy,
@@ -86,10 +86,10 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "storage_energy_heuristic_flexable": StorageEnergyHeuristicFlexableStrategy,
     "storage_capacity_heuristic_balancing_neg": StorageCapacityHeuristicBalancingNegStrategy,
     "storage_capacity_heuristic_balancing_pos": StorageCapacityHeuristicBalancingPosStrategy,
-    "powerplant_afrr_cap_block": PowerPlantAfrrCapBlockStrategy,
-    "powerplant_afrr_energy": PowerPlantAfrrEnergyStrategy,
-    "storage_afrr_cap_block": StorageAfrrCapBlockStrategy,
-    "storage_afrr_energy": StorageAfrrEnergyStrategy,
+    "powerplant_crm_pos": PowerPlantCrmPosStrategy,
+    "powerplant_crm_neg": PowerPlantCrmNegStrategy,
+    "storage_crm_pos": StorageCrmPosStrategy,
+    "storage_crm_neg": StorageCrmNegStrategy,
     "household_capacity_heuristic_balancing_pos": DsmCapacityHeuristicBalancingPosStrategy,
     "industry_capacity_heuristic_balancing_pos": DsmCapacityHeuristicBalancingPosStrategy,
     "household_capacity_heuristic_balancing_neg": DsmCapacityHeuristicBalancingNegStrategy,

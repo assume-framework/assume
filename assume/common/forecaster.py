@@ -63,7 +63,7 @@ def calculate_base_forecasts(
         market_id = config.market_id
 
         # Honor an explicit override from forecast_df regardless of product_type.
-        # For non-energy markets (capacity_pos/neg, energy_pos/neg used by aFRR/CRM),
+        # For non-energy markets (capacity_pos/neg, energy_pos/neg used by CRM),
         # there is no merit-order forecast algorithm, so the override is the only
         # way to provide a price series.
         override = forecast_df.get(f"{prefix}_{market_id}")

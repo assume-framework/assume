@@ -2,16 +2,16 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-# Sequential aFRR + EOM scenario (German design):
-#   1. aFRR_cap_pos / aFRR_cap_neg auction opens first (4h block, opens daily)
-#   2. EOM (day-ahead) opens next                       (hourly)
-#   3. aFRR_en_pos / aFRR_en_neg opens last             (hourly, must-offer + voluntary)
+# Sequential CRM + EOM scenario (German control-reserve design):
+#   1. CRM_capacity_pos / CRM_capacity_neg auction opens first (4h block, opens daily)
+#   2. EOM (day-ahead) opens next                              (hourly)
+#   3. CRM_energy_pos / CRM_energy_neg opens last              (hourly, must-offer + voluntary)
 #
-# A unit that wins aFRR capacity is obliged to bid the won volume on the
-# matching aFRR energy market (must-offer). Units may also bid voluntary
-# aFRR energy without holding capacity.
+# A unit that wins CRM capacity is obliged to bid the won volume on the
+# matching CRM energy market (must-offer). Units may also bid voluntary
+# CRM energy without holding capacity.
 
-aFRR_demo:
+CRM_demo:
   start_date: 2019-01-01 00:00
   end_date: 2019-01-03 00:00          # 2 days for a quick smoke test
   time_step: 1h
@@ -20,20 +20,15 @@ aFRR_demo:
   # Passed to every strategy as **kwargs at construction time.
   bidding_strategy_params:
     eom_foresight: 12h
-    activation_probability: 0.05
-    capacity_price_floor: 0.0
-    voluntary_markup: 0.0
-    voluntary_discount: 0.0
-    delivery_duration_hours: 1.0
     eom_market_id: EOM
-    afrr_energy_market_id_pos: aFRR_en_pos
-    afrr_energy_market_id_neg: aFRR_en_neg
+    crm_energy_market_id_pos: CRM_energy_pos
+    crm_energy_market_id_neg: CRM_energy_neg
 
   markets_config:
 
-    # ---- aFRR CAPACITY (4h blocks) ---------------------------------------
-    aFRR_cap_pos:
-      operator: aFRR_operator
+    # ---- CRM CAPACITY (4h blocks) ----------------------------------------
+    CRM_capacity_pos:
+      operator: CRM_operator
       product_type: capacity_pos
       start_date: 2019-01-01 00:00
       products:
@@ -49,12 +44,12 @@ aFRR_demo:
       price_unit: EUR/MW
       market_mechanism: pay_as_clear
 
-    # aFRR_cap_neg opens 1h AFTER aFRR_cap_pos so neg strategies see the pos
-    # commitment when they bid. Without staggering, both markets open at the
+    # CRM_capacity_neg opens 1h AFTER CRM_capacity_pos so neg strategies see the
+    # pos commitment when they bid. Without staggering, both markets open at the
     # same sim time, the units bid independently, and the same headroom gets
     # double-committed -- leaving the unit infeasible in EOM.
-    aFRR_cap_neg:
-      operator: aFRR_operator
+    CRM_capacity_neg:
+      operator: CRM_operator
       product_type: capacity_neg
       start_date: 2019-01-01 01:00
       products:
@@ -71,9 +66,9 @@ aFRR_demo:
       market_mechanism: pay_as_clear
 
     # ---- EOM (day-ahead, hourly) -----------------------------------------
-    # Opens AFTER aFRR cap. With start_date offset by 2h and first_delivery 2h,
+    # Opens AFTER CRM capacity. With start_date offset by 2h and first_delivery 2h,
     # the EOM auction at 02:00 clears for delivery at 04:00 (same hour as the
-    # first aFRR cap block delivery). EOM sees capacity_pos/neg already
+    # first CRM capacity block delivery). EOM sees capacity_pos/neg already
     # populated and respects them via PowerPlant.calculate_min_max_power.
     EOM:
       operator: EOM_operator
@@ -92,9 +87,9 @@ aFRR_demo:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-    # ---- aFRR ENERGY (hourly, runs LAST so cap + EOM are both committed) -
-    aFRR_en_pos:
-      operator: aFRR_operator
+    # ---- CRM ENERGY (hourly, runs LAST so capacity + EOM are both committed) -
+    CRM_energy_pos:
+      operator: CRM_operator
       product_type: energy_pos
       start_date: 2019-01-01 03:00
       products:
@@ -110,8 +105,8 @@ aFRR_demo:
       price_unit: EUR/MWh
       market_mechanism: pay_as_clear
 
-    aFRR_en_neg:
-      operator: aFRR_operator
+    CRM_energy_neg:
+      operator: CRM_operator
       product_type: energy_neg
       start_date: 2019-01-01 03:00
       products:

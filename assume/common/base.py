@@ -357,7 +357,7 @@ class SupportsMinMax(BaseUnit):
             power (float): The planned power offer of the unit.
             current_power (float): The current power output of the unit.
             start (datetime, optional): The timestep being evaluated. When provided
-                and the unit holds an aFRR/CRM capacity commitment at that timestep
+                and the unit holds a CRM capacity commitment at that timestep
                 (``outputs["capacity_pos"|"capacity_neg"] > 0``), the
                 min_down_time / min_operating_time restrictions are bypassed --
                 the unit is contractually required to be online and cannot be
@@ -369,7 +369,7 @@ class SupportsMinMax(BaseUnit):
         if self.ramp_down is None and self.ramp_up is None:
             return power
 
-        # Capacity-commitment override: a unit holding aFRR/CRM cap at this
+        # Capacity-commitment override: a unit holding CRM cap at this
         # timestep must be online regardless of how recently it was shut down,
         # and cannot be forced to stay at min_power once committed elsewhere.
         has_capacity_commitment = False

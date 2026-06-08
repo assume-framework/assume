@@ -1,4 +1,4 @@
-datetime,price_aFRR_cap_pos,price_aFRR_cap_neg,price_aFRR_en_pos,price_aFRR_en_neg
+datetime,price_CRM_capacity_pos,price_CRM_capacity_neg,price_CRM_energy_pos,price_CRM_energy_neg
 2019-01-01 00:00:00,30.0,15.0,200.0,10.0
 2019-01-01 01:00:00,30.0,15.0,200.0,10.0
 2019-01-01 02:00:00,30.0,15.0,200.0,10.0
