@@ -127,7 +127,7 @@ if __name__ == "__main__":
     available_examples["exploit_multi_sched3"] = {"scenario": "exploit_example", "study_case": "multi_sched3"}
     available_examples["exploit_naive"] = {"scenario": "exploit_example", "study_case": "naive"}
     # select the example to run from the available examples above
-    example = "exploit_multi_sched3"
+    example = "exploit_naive"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

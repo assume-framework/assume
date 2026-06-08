@@ -165,7 +165,7 @@ class WriteOutput(Role):
                 "rl_grad_params",
                 "rl_meta",
                 "rl_market_orders",
-                "exploitability",
+                "rl_exploitability",
             ] and not (self.learning_mode and self.episode == 1):
                 continue
             try:
@@ -747,7 +747,7 @@ class WriteOutput(Role):
 
     async def _write_exploitability(self):
         """Compute per-(timestep, unit) exploitability from the orderbook of
-        the current simulation and write it to the ``exploitability`` table."""
+        the current simulation and write it to the ``exploitability`` table (``rl_exploitability`` for training)."""
         if self.db is None or not self.units:
             return
 
@@ -813,9 +813,10 @@ class WriteOutput(Role):
                 float_format="%.5g",
             )
 
+        table_name = "rl_exploitability" if self.evaluation_mode else "exploitability"
         try:
             with self.db.begin() as db:
-                df.to_sql("exploitability", db, if_exists="append")
+                df.to_sql(table_name, db, if_exists="append")
         except (
             ProgrammingError,
             OperationalError,
@@ -824,7 +825,7 @@ class WriteOutput(Role):
         ):
             self.check_columns("exploitability", df)
             with self.db.begin() as db:
-                df.to_sql("exploitability", db, if_exists="append")
+                df.to_sql(table_name, db, if_exists="append")
 
     def get_sum_reward(self, episode: int, evaluation_mode=True):
         """
