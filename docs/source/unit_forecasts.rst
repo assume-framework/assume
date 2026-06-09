@@ -35,6 +35,12 @@ Hydrogen Units                ``HydrogenForecaster``                    DSM attr
 Custom Units (CSV import)     ``CustomUnitForecaster``                  *(arbitrary keyword attributes)*
 ============================= ========================================= ===========================================
 
+.. note::
+   Unit operators can also own a forecaster, :class:`~assume.common.forecaster.UnitsOperatorForecaster`,
+   giving the operator its own ``price`` and ``residual_load`` forecasts (see :doc:`unit_operator`).
+   It reuses the same lifecycle, algorithms, and registries described below; its algorithms can be set per
+   operator through ``forecast_*`` columns in ``unit_operators.csv``.
+
 ***********************
 Forecast Lifecycle
 ***********************
@@ -116,6 +122,10 @@ is the ``algorithm_id``. (Prefix is empty for initialize algorithms, and ``prepr
    (only when the CSV cell is not empty/None).
 
 If neither CSV nor config specifies a certain algorithm, a default is chosen automatically.
+
+The same ``forecast_{prefix}_{forecast_metric}`` columns can be added to ``unit_operators.csv`` to set the
+algorithms of an operator's :class:`~assume.common.forecaster.UnitsOperatorForecaster` per operator, with the
+same config-fallback behaviour.
 
 ***********************************
 Available Algorithms

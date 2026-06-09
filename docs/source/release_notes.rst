@@ -15,6 +15,7 @@ Upcoming Release
 
 **New Features:**
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+  - **Operator-level forecaster**: Unit operators can now own a ``UnitsOperatorForecaster`` providing their own market price and residual load forecasts (accessible via ``units_operator.forecaster``), instead of reading them from a managed unit. Forecast algorithms can be set per operator via ``forecast_*`` columns in ``unit_operators.csv``, and the portfolio learning strategy now reads its price/residual-load observations from this operator forecaster.
 
 **Improvements:**
   - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.
