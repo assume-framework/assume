@@ -12,7 +12,7 @@ from dateutil import rrule as rr
 from dateutil.relativedelta import relativedelta as rd
 
 from assume.common.base import LearningConfig
-from assume.common.forecaster import PowerplantForecaster
+from assume.common.forecaster import PowerplantForecaster, UnitsOperatorForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 
 try:
@@ -40,6 +40,7 @@ EXPECTED_OBS_DIM = 46
 class MockUnitsOperator:
     id: str
     units: dict
+    forecaster: UnitsOperatorForecaster = None
 
 
 @pytest.fixture
@@ -86,7 +87,19 @@ def portfolio_units_operator():
             forecaster=ff,
         )
         units[f"pp_{i}"] = unit
-    return MockUnitsOperator(id="test_portfolio_operator", units=units)
+
+    # operator-level forecaster carrying the same market-wide price and residual
+    # load the units see, so portfolio strategies can read them from the operator
+    operator_forecaster = UnitsOperatorForecaster(
+        index,
+        residual_load={MARKET_ID: res_load_forecast},
+        market_prices={MARKET_ID: market_price_forecast},
+    )
+    return MockUnitsOperator(
+        id="test_portfolio_operator",
+        units=units,
+        forecaster=operator_forecaster,
+    )
 
 
 @pytest.fixture
@@ -133,6 +146,31 @@ def test_portfolio_observation_dimensions(portfolio_units_operator, portfolio_st
         strategy.unique_obs_dim + strategy.foresight * strategy.num_timeseries_obs_dim
         == EXPECTED_OBS_DIM
     )
+
+
+@pytest.mark.require_learning
+def test_portfolio_observation_uses_operator_forecaster(
+    portfolio_units_operator, portfolio_strategy
+):
+    """prepare_observations reads the operator-level forecaster: the price /
+    residual load scaling bounds reflect the operator forecaster's values, not
+    those of any individual unit (which here hold different forecasts)."""
+    strategy, _ = portfolio_strategy
+
+    # Give the operator forecaster distinct, known values so the bounds below can
+    # only come from it (the units' forecasters span 50..150 / 500..1000).
+    portfolio_units_operator.forecaster = UnitsOperatorForecaster(
+        portfolio_units_operator.forecaster.index,
+        market_prices={MARKET_ID: np.linspace(20, 80, 48)},
+        residual_load={MARKET_ID: np.linspace(100, 400, 48)},
+    )
+
+    strategy.prepare_observations(portfolio_units_operator, MARKET_ID)
+
+    assert strategy.min_price == pytest.approx(20)
+    assert strategy.max_price == pytest.approx(80)
+    assert strategy.min_res_load == pytest.approx(100)
+    assert strategy.max_res_load == pytest.approx(400)
 
 
 @pytest.mark.require_learning

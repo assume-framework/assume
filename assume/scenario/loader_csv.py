@@ -781,7 +781,7 @@ def load_config_and_create_forecaster(
                         electricity_price_flex=0,  # TODO
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
-                    )       
+                    )
     # shared inputs used to build one UnitsOperatorForecaster per operator in
     # setup_world. An operator has no availability of its own (that is a
     # per-unit concept), so only the index and algorithms are shared here.
@@ -1004,24 +1004,29 @@ def setup_world(
     for op, op_units in exchange_units.items():
         units[op].extend(op_units)
 
+    config_forecast_algorithms = units_operator_forecast_data["forecast_algorithms"]
+    operator_forecast_algorithms: dict[str, dict] = {}
     if unit_operators is not None:
         logger.info("Create unit_operators for portfolio strategies")
         unit_operators_strategies = unit_operators.to_dict("index")
         # remove starting "bidding_" string from market names
         for operator in unit_operators_strategies.keys():
-            raw_strategies = unit_operators_strategies[operator]
-            converted_strategies = bidding_strategies_from_param_dict(raw_strategies)
-            unit_operators_strategies[operator] = converted_strategies
+            raw_params = unit_operators_strategies[operator]
+            operator_forecast_algorithms[operator] = get_unit_forecast_algorithms(
+                config_forecast_algorithms, raw_params
+            )
+            unit_operators_strategies[operator] = bidding_strategies_from_param_dict(
+                raw_params
+            )
     else:
         unit_operators_strategies = {}
 
-    # build one operator-level forecaster per operator, so each operator has its
-    # own (independent) notion of future prices and residual loads. They are
-    # initialized later in world.init_forecasts once all units exist.
     operator_forecasts = {
         op: UnitsOperatorForecaster(
             index=units_operator_forecast_data["shared_unit_index"],
-            forecast_algorithms=units_operator_forecast_data["forecast_algorithms"],
+            forecast_algorithms=operator_forecast_algorithms.get(
+                op, config_forecast_algorithms
+            ),
         )
         for op in set(units.keys())
     }
