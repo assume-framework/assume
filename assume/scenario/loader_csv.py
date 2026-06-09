@@ -782,10 +782,12 @@ def load_config_and_create_forecaster(
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
                     )       
+    # shared inputs used to build one UnitsOperatorForecaster per operator in
+    # setup_world. An operator has no availability of its own (that is a
+    # per-unit concept), so only the index and algorithms are shared here.
     units_operator_forecast_data = {
         "shared_unit_index": shared_unit_index,
-        "availability": availability,
-        "forecast_algorithms": forecast_algorithms
+        "forecast_algorithms": forecast_algorithms,
     }
     return {
         "config": config,
@@ -1013,8 +1015,16 @@ def setup_world(
     else:
         unit_operators_strategies = {}
 
-
-    # FIXME: Add forecaster to units_operator
+    # build one operator-level forecaster per operator, so each operator has its
+    # own (independent) notion of future prices and residual loads. They are
+    # initialized later in world.init_forecasts once all units exist.
+    operator_forecasts = {
+        op: UnitsOperatorForecaster(
+            index=units_operator_forecast_data["shared_unit_index"],
+            forecast_algorithms=units_operator_forecast_data["forecast_algorithms"],
+        )
+        for op in set(units.keys())
+    }
 
     # if distributed_role is true - there is a manager available
     # and we can add each units_operator as a separate process
@@ -1022,12 +1032,18 @@ def setup_world(
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
             strategies = unit_operators_strategies.get(op, {})
-            world.add_units_with_operator_subprocess(op, op_units, strategies)
+            world.add_units_with_operator_subprocess(
+                op, op_units, strategies, forecaster=operator_forecasts.get(op)
+            )
     else:
         logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
             strategies = unit_operators_strategies.get(company_name, {})
-            world.add_unit_operator(id=str(company_name), strategies=strategies)
+            world.add_unit_operator(
+                id=str(company_name),
+                strategies=strategies,
+                forecaster=operator_forecasts.get(company_name),
+            )
 
         # add the units to corresponding unit operators
         for op, op_units in units.items():
