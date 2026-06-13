@@ -7,7 +7,7 @@ import math
 from itertools import groupby
 from operator import itemgetter
 
-from mango import AgentAddress, Performatives, Role, create_acl, sender_addr
+from mango import AgentAddress, Performatives, Role, addr, create_acl, sender_addr
 
 from assume.common.market_objects import (
     ClearingMessage,
@@ -761,7 +761,8 @@ class MarketRole(MarketMechanism, Role):
             market_meta: The metadata of the market.
         """
 
-        db_addr = self.context.data.get("output_agent_addr")
+        # db_addr = self.context.data.get("output_agent_addr")
+        db_addr = addr("world", "export_agent_1")
 
         if db_addr:
             message = {
