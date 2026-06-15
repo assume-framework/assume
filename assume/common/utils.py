@@ -893,14 +893,18 @@ def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
             )
 
 
-def set_random_seed(seed: int | None, torch_deterministic: bool = True):
+def set_random_seed(
+    seed: int | None,
+    torch_deterministic: bool = True,
+    learning_mode: bool = False,
+):
     """
     Args:
-     seed (int | None): Integer seed for random number generators or None to disable seeding.
-     torch_deterministic (bool): If True, enforces PyTorch deterministic algorithms.
-                           May reduce performance. Default is True.
+        seed (int | None): Integer seed for random number generators or None to disable seeding.
+        torch_deterministic (bool): If True, enforces PyTorch deterministic algorithms. May reduce performance. Default is True.
+        learning_mode (bool): If True, PyTorch seeding is enabled. Default is False and PyTorch seeding is skipped.
 
-     Notes:
+    Notes:
          - Completely reproducible results are not guaranteed across different PyTorch versions, hardware, or CUDA configurations.
          - See https://docs.pytorch.org/docs/stable/notes/randomness.html
     """
@@ -910,15 +914,18 @@ def set_random_seed(seed: int | None, torch_deterministic: bool = True):
     random.seed(seed)
     np.random.seed(seed)
 
+    if not learning_mode:
+        return
+
     try:
         import torch as th
-
-        if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
-            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
         th.manual_seed(seed)
 
         if torch_deterministic:
+            if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+                os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
             th.backends.cudnn.deterministic = True
             th.backends.cudnn.benchmark = False
 

@@ -59,7 +59,7 @@ pre-commit run --all-files
 4. Install also testing capabilities:
 
 ```bash
-pip install -e ".[testing]"
+pip install -e ".[test]"
 ```
 
 5. Implement your changes and push the changes to a fork
@@ -68,9 +68,9 @@ pip install -e ".[testing]"
 
 ### Creating a new release
 
-To release a new version, create a git tag of the release commit and release notes in GitHub (also possible via `Draft new release` function of Github). No adjusted toml file necessary anymore.
-A github action automatically uploads the release to PyPI.
-The upload to PyPi has to be confirmed by one of the core developers.
+To release a new version, create a git tag of the release commit and release notes in GitHub (also possible via `Draft new release` function of GitHub). No adjusted toml file necessary anymore.
+A GitHub Action automatically uploads the release to PyPI.
+The upload to PyPI has to be confirmed by one of the core developers.
 
 ## Building documentation
 
