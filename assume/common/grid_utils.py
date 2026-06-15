@@ -305,32 +305,41 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
 
     meta = []
     duration_hours = (product[1] - product[0]) / timedelta(hours=1)
-    # iterate over buses
+    # Only redispatch-related generator components should enter redispatch meta.
+    redispatch_generator_names = network.generators.index[
+        network.generators.index.str.endswith(("_up", "_down"))
+    ]
+
     for bus in network.buses.index:
-        # add backup dispatch to dispatch
-        # Step 1: Identify generators connected to the specified bus
         generators_connected_to_bus = network.generators[
-            network.generators.bus == bus
+            (network.generators.bus == bus)
+            & (network.generators.index.isin(redispatch_generator_names))
         ].index
 
-        # Step 2: Select dispatch levels for these generators from network.generators_t.p
-        dispatch_for_bus = network.generators_t.p[generators_connected_to_bus].iloc[i]
-        # multiple by network.generators.sign to get the correct sign for dispatch
-        dispatch_for_bus = (
-            dispatch_for_bus * network.generators.sign[generators_connected_to_bus]
-        )
+        if len(generators_connected_to_bus) > 0:
+            dispatch_for_bus = network.generators_t.p.reindex(
+                columns=generators_connected_to_bus,
+                fill_value=0.0,
+            ).iloc[i]
+
+            dispatch_for_bus = (
+                dispatch_for_bus * network.generators.sign[generators_connected_to_bus]
+            )
+        else:
+            dispatch_for_bus = pd.Series(dtype=float)
 
         supply_volume = dispatch_for_bus[dispatch_for_bus > 0].sum()
         demand_volume = -dispatch_for_bus[dispatch_for_bus < 0].sum()
+
         if not network.buses_t.marginal_price.empty:
             price = network.buses_t.marginal_price[str(bus)].iat[i]
         else:
             price = 0
 
         meta.append(
-            {  # TODO: can we maybe discuss the meaning / interpretation of this? to me it seems unintuitive that the sum of all nodes is not equal to the redispatched volume (e.g. at 2023-01-02 00:00:00: sum of demand_volumes is 4.5, but sum of supply_volumes is 31 + 10 + 14.5 = 55.5)
-                "supply_volume": supply_volume,  # equals generation + upward redispatch volume at the bus ?
-                "demand_volume": demand_volume,  # equals downward redispatch volume (without loads) at the bus ?
+            {
+                "supply_volume": supply_volume,
+                "demand_volume": demand_volume,
                 "demand_volume_energy": demand_volume * duration_hours,
                 "supply_volume_energy": supply_volume * duration_hours,
                 "price": price,
