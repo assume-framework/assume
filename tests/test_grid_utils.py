@@ -140,7 +140,7 @@ def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):
             "name": ["loadN", "loadS"],
             "bus": ["N", "S"],
             "max_power": [0.0, 3000.0],
-            "sign": [1.0, 1.0],
+            "sign": [-1.0, -1.0],
         }
     ).set_index("name")
     expected_loads_t = pd.DataFrame(
