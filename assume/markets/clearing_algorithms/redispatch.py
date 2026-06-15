@@ -152,12 +152,16 @@ class RedispatchMarketRole(MarketRole):
         load_cols = p_set.columns.intersection(load_names)
 
         # 1. Fixed day-ahead generator dispatch
-        gen_p_set = p_set[gen_cols].copy()
+        # Fix base generators using p_min_pu = p_max_pu = p_DA / p_nom
 
-        redispatch_network.generators_t.p_set = gen_p_set.reindex(
-            index=redispatch_network.snapshots,
-            columns=gen_cols,
-        )
+        p_nom_gen = p_nom_pivot[gen_cols].copy()
+        p_nom_gen = p_nom_gen.where(p_nom_gen.notna(), max_power_pivot[gen_cols])
+        p_nom_gen = p_nom_gen.replace(0, np.inf)
+
+        p_da_pu = p_set[gen_cols].div(p_nom_gen).clip(lower=0, upper=1)
+
+        redispatch_network.generators_t.p_min_pu.update(p_da_pu)
+        redispatch_network.generators_t.p_max_pu.update(p_da_pu)
 
         # 2. Fixed demand/load profile
 
@@ -171,13 +175,6 @@ class RedispatchMarketRole(MarketRole):
             columns=redispatch_network.loads.index,
             fill_value=0.0,
         )
-
-        # 3. Redispatch flexibility only for power plants
-
-        # p_nom from the orderbook and from availability factors
-        p_nom_gen = p_nom_pivot[gen_cols].copy()
-        p_nom_gen = p_nom_gen.where(p_nom_gen.notna(), max_power_pivot[gen_cols])
-        p_nom_gen = p_nom_gen.replace(0, np.inf)
 
         # Upward redispatch capacity:
         # Possible maximum upwards generation : availability * max_power - market_cleared_capacity (no incorporation of ramping constraints yet)

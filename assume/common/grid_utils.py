@@ -99,12 +99,15 @@ def add_redispatch_generators(
     )
 
     # add generators and their sold capacities as Generator to have fixed feed in
+    # The actual fixed dispatch is set later in redispatch.py by
+    # p_min_pu=p_max_pu=cleared_dispatch/p_nom
     network.add(
         "Generator",
         name=generators.index,
         bus=generators["node"],  # bus to which the generator is connected to
         p_nom=generators["max_power"],
-        p_set=zeros,
+        p_min_pu=zeros,
+        p_max_pu=zeros,
         sign=1,
     )
 
