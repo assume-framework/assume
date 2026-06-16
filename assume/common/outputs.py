@@ -199,8 +199,8 @@ class WriteOutput(Role):
             self.db = create_engine(self.db_uri)
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
-        # avoid errors in Grafana when tables do not exist yet by creating empty tables
-        create_empty_unit_meta_tables(self)
+            # avoid errors in Grafana when tables do not exist yet by creating empty tables
+            create_empty_unit_meta_tables(self)
 
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
