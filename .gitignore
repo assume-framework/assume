@@ -156,3 +156,5 @@ logs
 *.nbconvert.ipynb
 fameSetup.yaml
 .claude
+
+assume-case-py311/

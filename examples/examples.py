@@ -111,15 +111,15 @@ available_examples = {
     },
     "case_study_2013": {
         "scenario": "future_markets_paper",
-        "study_case": "base_case_2013",
+        "study_case": "base_case_2013_heu",
     },
     "case_study_2013_pp": {
         "scenario": "future_markets_paper",
-        "study_case": "base_case_2013_pp_all",
+        "study_case": "base_case_2013_pp_all_kurz_dispatch",
     },
     "case_study_2013_bat": {
-        "scenario": "future_markets_paper",
-        "study_case": "base_case_2013_bat",
+        "scenario": "future_markets_paper_kurz",
+        "study_case": "base_case_2013_bat_all",
     },
     "case_study_2013_pp_bat": {
         "scenario": "future_markets_paper",
@@ -145,10 +145,10 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "small_learning_2"
+    example = "case_study_2013_pp"
 
     if data_format == "local_db":
-        db_uri = "sqlite:///./examples/local_db/assume_db.db"
+        db_uri = "sqlite:///./examples/local_db/assume_db_pp.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 
