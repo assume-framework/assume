@@ -23,6 +23,7 @@ from assume.common.market_objects import MetaDict
 from assume.common.utils import (
     calculate_content_size,
     convert_tensors,
+    create_empty_unit_meta_tables,
     separate_orders,
 )
 
@@ -198,6 +199,8 @@ class WriteOutput(Role):
             self.db = create_engine(self.db_uri)
         if self.db is not None:
             self.delete_db_scenario(self.simulation_id)
+            # avoid errors in Grafana when tables do not exist yet by creating empty tables
+            create_empty_unit_meta_tables(self)
 
         if self.save_frequency_hours is not None:
             recurrency_task = rr.rrule(
@@ -302,6 +305,7 @@ class WriteOutput(Role):
 
         df = pd.DataFrame(market_results)
         df["simulation"] = self.simulation_id
+        df["episode"] = self.episode if not self.evaluation_mode else self.eval_episode
         return df
 
     def convert_market_orders(self, market_orders: any, market_id: str):
@@ -662,10 +666,14 @@ class WriteOutput(Role):
             return
 
         if self.learning_mode or self.evaluation_mode:
+            episode_id = self.eval_episode if self.evaluation_mode else self.episode
             queries = [
-                f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
-                f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{self.episode}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'sum_reward' as variable, simulation as ident, sum(reward) as value FROM rl_params WHERE episode='{episode_id}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'sum_regret' as variable, simulation as ident, sum(regret) as value FROM rl_params WHERE episode='{episode_id}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'sum_profit' as variable, simulation as ident, sum(profit) as value FROM rl_params WHERE episode='{episode_id}' AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'avg_price' as variable, simulation as ident, avg(price) as value FROM market_meta WHERE episode={episode_id} AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'min_price' as variable, simulation as ident, min(price) as value FROM market_meta WHERE episode={episode_id} AND simulation='{self.simulation_id}' GROUP BY simulation",
+                f"SELECT 'max_price' as variable, simulation as ident, max(price) as value FROM market_meta WHERE episode={episode_id} AND simulation='{self.simulation_id}' GROUP BY simulation",
             ]
         else:
             queries = []
@@ -693,17 +701,21 @@ class WriteOutput(Role):
 
         df = pd.concat(dfs)
         df.reset_index()
-        df["simulation"] = self.simulation_id
+        # add episode id to simualtion and with prefirx eval if in eval mode
+        df["simulation"] = (
+            self.simulation_id + f"_eval_episode_{self.eval_episode}"
+            if self.evaluation_mode
+            else self.simulation_id + f"_episode_{self.episode}"
+        )
 
-        if self.export_csv_path:
-            kpi_data_path = self.export_csv_path / "kpis.csv"
-            df.to_csv(
-                kpi_data_path,
-                mode="a",
-                header=not kpi_data_path.exists(),
-                index=None,
-                float_format="%.5g",
-            )
+        kpi_data_path = Path(f"{self.simulation_id}_kpis.csv")
+        df.to_csv(
+            kpi_data_path,
+            mode="a",
+            header=not kpi_data_path.exists(),
+            index=None,
+            float_format="%.5g",
+        )
 
         if self.db is not None and not df.empty:
             with self.db.begin() as db:

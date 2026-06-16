@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 import yaml
 from pyomo.opt import check_available_solvers
+from sqlalchemy import text
 
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.common.exceptions import AssumeException
@@ -972,3 +973,33 @@ def load_index_file(file_name: Path, index: pd.DatetimeIndex):
         return None
 
     return df.loc[index]
+
+
+def create_empty_unit_meta_tables(self):
+    """Create empty tables with standardized columns for known unit types if they don't exist."""
+    with self.db.begin() as db:
+        existing_tables = [
+            row[0]
+            for row in db.execute(
+                text(
+                    "SELECT table_name FROM information_schema.tables WHERE table_name LIKE '%_meta'"
+                )
+            ).fetchall()
+        ]
+    known_unit_meta_tables = [
+        "power_plant_meta",
+        "storage_meta",
+        "exchange_meta",
+        "demand_meta",
+    ]
+    columns = {
+        "index": pd.Series([], dtype=str),
+        "simulation": pd.Series([], dtype=str),
+        "technology": pd.Series([], dtype=str),
+    }
+
+    for table in known_unit_meta_tables:
+        if table not in existing_tables:
+            empty_df = pd.DataFrame(columns)
+            with self.db.begin() as db:
+                empty_df.to_sql(table, db)
