@@ -1,0 +1,5 @@
+variable,ident,value,simulation
+avg_price,EOM,162.85,future_markets_paper_base_case_2013_pp_all_kurz_dispatch_episode_1
+total_cost,EOM,2.8005e+09,future_markets_paper_base_case_2013_pp_all_kurz_dispatch_episode_1
+total_volume,EOM,1.9847e+07,future_markets_paper_base_case_2013_pp_all_kurz_dispatch_episode_1
+capacity_factor,EOM,0.24277,future_markets_paper_base_case_2013_pp_all_kurz_dispatch_episode_1

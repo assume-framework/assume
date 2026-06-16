@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-base_case_2013:
+base_case_2013_heu:
   start_date: 2013-01-01 00:00
   end_date: 2013-02-28 00:00
   time_step: 1h
@@ -11,7 +11,7 @@ base_case_2013:
     learning_mode: false
     continue_learning: false
     trained_policies_save_path: null
-    trained_policies_load_path: learned_strategies/future_markets_paper_base_case_2013_pp_all/avg_reward_eval_policies
+    trained_policies_load_path: null
     max_bid_price: 500
     algorithm: matd3
     learning_rate: 0.0001
@@ -21,7 +21,7 @@ base_case_2013:
     gradient_steps: 1
     batch_size: 256
     gamma: 1
-    device: cpu
+    device: cuda
     noise_sigma: 0.4
     noise_scale: 1
     noise_dt: 1
@@ -60,13 +60,14 @@ base_case_2013_pp_bat:
     max_bid_price: 500
     algorithm: matd3
     learning_rate: 0.0001
+    learning_rate_schedule: linear
     training_episodes: 800
     episodes_collecting_initial_experience: 40
     train_freq: 72h
     gradient_steps: 720
     batch_size: 256
     gamma: 0.999
-    device: cpu
+    device: cuda
     noise_sigma: 0.4
     noise_scale: 1
     noise_dt: 1
@@ -92,11 +93,12 @@ base_case_2013_pp_bat:
       price_unit: EUR/MWh
       market_mechanism: complex_clearing
 
-base_case_2013_pp_all:
-  start_date: 2013-01-01 00:00
-  end_date: 2013-02-28 00:00
+base_case_2013_pp_all_kurz_dispatch:
+  start_date: 2013-01-22 00:00
+  end_date: 2013-02-03 00:00
   time_step: 1h
   save_frequency_hours: null
+  seed: null
   learning_config:
     learning_mode: false
     continue_learning: false
@@ -105,13 +107,14 @@ base_case_2013_pp_all:
     max_bid_price: 500
     algorithm: matd3
     learning_rate: 0.0001
+    learning_rate_schedule: linear
     training_episodes: 500
-    episodes_collecting_initial_experience: 80
+    episodes_collecting_initial_experience: 10
     train_freq: 24h
     gradient_steps: 10
     batch_size: 256
     gamma: 1
-    device: cpu
+    device: cuda
     noise_sigma: 0.4
     noise_scale: 1
     noise_dt: 1
@@ -123,7 +126,7 @@ base_case_2013_pp_all:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2013-01-01 00:00
+      start_date: 2013-01-22 00:00
       products:
       - duration: 1h
         count: 1
@@ -138,25 +141,27 @@ base_case_2013_pp_all:
       market_mechanism: complex_clearing
 
 base_case_2013_bat_all:
-  start_date: 2013-01-01 00:00
-  end_date: 2013-02-28 00:00
+  start_date: 2013-01-22 00:00
+  end_date: 2013-02-03 00:00
   time_step: 1h
   save_frequency_hours: null
+  seed: 42 
   learning_config:
-    learning_mode: true
+    learning_mode: false
     continue_learning: false
     trained_policies_save_path: null
-    trained_policies_load_path: null
+    trained_policies_load_path: examples/inputs/future_markets_paper/learned_strategies/future_markets_paper_base_case_2013_bat_all/last_policies
     max_bid_price: 500
     algorithm: matd3
     learning_rate: 0.0003
+    learning_rate_schedule: linear
     training_episodes: 500
     episodes_collecting_initial_experience: 5
     train_freq: 720h
     gradient_steps: 720
     batch_size: 256
     gamma: 0.999
-    device: cpu
+    device: cuda
     noise_sigma: 0.4
     noise_scale: 1
     noise_dt: 1
@@ -168,7 +173,7 @@ base_case_2013_bat_all:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2013-01-01 00:00
+      start_date: 2013-01-22 00:00
       products:
       - duration: 1h
         count: 1
