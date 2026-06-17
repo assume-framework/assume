@@ -1,0 +1,5 @@
+param,value
+opt_name,wind_onshore_01
+big_w,100000
+k_max,2000
+demand_bids,10

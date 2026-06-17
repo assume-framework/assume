@@ -1204,6 +1204,8 @@ def find_optimal_dispatch_quadratic_with_storage(
     model.gens = pyo.Set(initialize=gens_df.index)
     model.storages = pyo.Set(initialize=storage_df.index)
     model.demand_bids = pyo.Set(initialize=np.arange(1, demand_bids + 1))
+    
+    print(f"Model sets initialized: time={list(model.time)}, gens={list(model.gens)}, storages={list(model.storages)}, demand_bids={list(model.demand_bids)}")
 
     # -------------------------------------------------------------------------
     # PRIMAL LOWER-LEVEL VARIABLES
@@ -1224,8 +1226,8 @@ def find_optimal_dispatch_quadratic_with_storage(
     # -------------------------------------------------------------------------
     # UPPER-LEVEL LEADER DECISION (strategic generator)
     # -------------------------------------------------------------------------
-    model.k = pyo.Var(model.time, bounds=(1, k_max), within=pyo.NonNegativeReals)
-    model.lambda_ = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 200))
+    model.k = pyo.Var(model.time, bounds=(-k_max, k_max), within=pyo.NonNegativeReals)
+    model.lambda_ = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 3000))
 
     # -------------------------------------------------------------------------
     # DUAL VARIABLES FOR THE ECONOMIC LOWER LEVEL
@@ -1251,7 +1253,7 @@ def find_optimal_dispatch_quadratic_with_storage(
     # -------------------------------------------------------------------------
     # HAT DUALS (relaxed KKT system)
     # -------------------------------------------------------------------------
-    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(0, 200))
+    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 3000))
     model.mu_max_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.mu_min_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.nu_max_hat = pyo.Var(
