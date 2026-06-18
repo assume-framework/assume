@@ -3,14 +3,17 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 """
-Bid-price reformulation of the MPEC with storage.
+Bid-price reformulation of the MPEC.
 
 Instead of model.k (multiplier on mc, needs k_max=300000 for renewables),
-the leader decision is model.bid_price in €/MWh directly (bounded 0..bid_price_max).
+the leader decision is model.bid_price in €/MWh directly (bounded -500..bid_price_max).
 This eliminates the huge k*mc products and keeps all coefficients well-scaled.
 
 Non-strategic generators also get pre-computed bid prices (k_values * mc)
 so the entire formulation works in €/MWh space.
+
+Storage dispatch is taken as fixed input (realized MADRL dispatch) and
+enters the balance as a parameter — no storage optimization variables needed.
 """
 
 import numpy as np
@@ -19,14 +22,13 @@ import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 
 
-def find_optimal_dispatch_bidprice_with_storage(
+def find_optimal_dispatch_bidprice(
     gens_df,
-    storage_df,
     k_values_df,
-    storage_k_values_df,
     availabilities_df,
     demand_df,
     opt_gen,
+    fixed_storage_dispatch=None,
     bid_price_max=3000,
     big_w=10000,
     time_limit=600,
@@ -36,15 +38,24 @@ def find_optimal_dispatch_bidprice_with_storage(
     mc_df=None,
 ):
     """
-    Quadratic MPEC with one strategic generator leader and non-strategic
-    storages in the lower level.
+    Quadratic MPEC with one strategic generator leader.
 
     Bid-price reformulation: the leader's decision variable is the bid price
-    in €/MWh directly (not a multiplier k on marginal cost). This avoids
-    extreme coefficient ranges when mc is near zero (renewables).
+    in €/MWh directly (not a multiplier k on marginal cost).
+
+    Storage dispatch is treated as a fixed exogenous parameter in the energy
+    balance (realized dispatch from MADRL learning), not optimized.
 
     Args:
-        bid_price_max: upper bound on the strategic generator's bid price in €/MWh
+        gens_df: Generator DataFrame (index=unit names)
+        k_values_df: k multipliers per generator per timestep
+        availabilities_df: Availability factors per generator per timestep
+        demand_df: Demand bids with price_N and volume_N columns
+        opt_gen: Name of the strategic generator
+        fixed_storage_dispatch: Series indexed by timestep with net storage
+            power in MW. Positive = net discharge (generation), negative =
+            net charge (demand). None or all-zero = no storage effect.
+        bid_price_max: Upper bound on the strategic generator's bid price in €/MWh
     """
     gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
     if mc_df is None:
@@ -60,6 +71,10 @@ def find_optimal_dispatch_bidprice_with_storage(
             continue
         gen_bid_prices_df[gen] = k_values_df[gen] * mc_df[gen]
 
+    # Prepare fixed storage dispatch lookup
+    if fixed_storage_dispatch is None:
+        fixed_storage_dispatch = pd.Series(0.0, index=demand_df.index)
+
     model = pyo.ConcreteModel()
 
     # -------------------------------------------------------------------------
@@ -67,7 +82,6 @@ def find_optimal_dispatch_bidprice_with_storage(
     # -------------------------------------------------------------------------
     model.time = pyo.Set(initialize=demand_df.index)
     model.gens = pyo.Set(initialize=gens_df.index)
-    model.storages = pyo.Set(initialize=storage_df.index)
     model.demand_bids = pyo.Set(initialize=np.arange(1, demand_bids + 1))
 
     # -------------------------------------------------------------------------
@@ -78,12 +92,6 @@ def find_optimal_dispatch_bidprice_with_storage(
     model.c_up = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.c_down = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.u = pyo.Var(model.gens, model.time, within=pyo.Binary)
-
-    model.p_charge = pyo.Var(model.storages, model.time, within=pyo.NonNegativeReals)
-    model.p_discharge = pyo.Var(
-        model.storages, model.time, within=pyo.NonNegativeReals
-    )
-    model.soc = pyo.Var(model.storages, model.time, within=pyo.NonNegativeReals)
 
     # -------------------------------------------------------------------------
     # UPPER-LEVEL: bid price in €/MWh (NOT a multiplier)
@@ -108,13 +116,6 @@ def find_optimal_dispatch_bidprice_with_storage(
     model.sigma_d = pyo.Var(model.gens, model.time, bounds=(0, 1))
     model.psi_max = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
 
-    model.alpha_charge_max = pyo.Var(
-        model.storages, model.time, within=pyo.NonNegativeReals
-    )
-    model.alpha_discharge_max = pyo.Var(
-        model.storages, model.time, within=pyo.NonNegativeReals
-    )
-
     # -------------------------------------------------------------------------
     # HAT DUALS
     # -------------------------------------------------------------------------
@@ -132,50 +133,14 @@ def find_optimal_dispatch_bidprice_with_storage(
     model.pi_u_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.pi_d_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
 
-    model.alpha_charge_max_hat = pyo.Var(
-        model.storages, model.time, within=pyo.NonNegativeReals
-    )
-    model.alpha_discharge_max_hat = pyo.Var(
-        model.storages, model.time, within=pyo.NonNegativeReals
-    )
-
     # -------------------------------------------------------------------------
     # BINARIES FOR COMPLEMENTARITY
     # -------------------------------------------------------------------------
     model.mu_max_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
-    model.nu_max_hat_binary = pyo.Var(
-        model.time, model.demand_bids, within=pyo.Binary
-    )
-    model.nu_min_hat_binary = pyo.Var(
-        model.time, model.demand_bids, within=pyo.Binary
-    )
+    model.nu_max_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
+    model.nu_min_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
     model.pi_u_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
     model.pi_d_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
-    model.alpha_charge_max_hat_binary = pyo.Var(
-        model.storages, model.time, within=pyo.Binary
-    )
-    model.alpha_discharge_max_hat_binary = pyo.Var(
-        model.storages, model.time, within=pyo.Binary
-    )
-
-    # -------------------------------------------------------------------------
-    # STORAGE BID HELPERS (pre-computed, in €/MWh)
-    # -------------------------------------------------------------------------
-    def storage_bid_charge(s, t):
-        mc_charge = (
-            storage_df.at[s, "additional_cost_charge"]
-            if "additional_cost_charge" in storage_df.columns
-            else storage_df.at[s, "mc"]
-        )
-        return storage_k_values_df.at[t, s] * mc_charge
-
-    def storage_bid_discharge(s, t):
-        mc_discharge = (
-            storage_df.at[s, "additional_cost_discharge"]
-            if "additional_cost_discharge" in storage_df.columns
-            else storage_df.at[s, "mc"]
-        )
-        return storage_k_values_df.at[t, s] * mc_discharge
 
     # Helper: bid price for any generator at time t (€/MWh)
     def gen_bid(gen, t):
@@ -196,19 +161,11 @@ def find_optimal_dispatch_bidprice_with_storage(
         )
 
     def duality_gap_part_1_rule(model):
-        # Primal lower-level objective in €/MWh space
         expr = sum(
             gen_bid(gen, t) * model.g[gen, t]
             + model.c_up[gen, t]
             + model.c_down[gen, t]
             for gen in model.gens
-            for t in model.time
-        )
-
-        expr += sum(
-            storage_bid_discharge(s, t) * model.p_discharge[s, t]
-            - storage_bid_charge(s, t) * model.p_charge[s, t]
-            for s in model.storages
             for t in model.time
         )
 
@@ -251,17 +208,6 @@ def find_optimal_dispatch_bidprice_with_storage(
 
         expr -= sum(model.psi_max[i, t] for i in model.gens for t in model.time)
 
-        expr -= sum(
-            model.alpha_charge_max[s, t] * abs(storage_df.at[s, "max_power_charge"])
-            for s in model.storages
-            for t in model.time
-        )
-        expr -= sum(
-            model.alpha_discharge_max[s, t] * storage_df.at[s, "max_power_discharge"]
-            for s in model.storages
-            for t in model.time
-        )
-
         return expr
 
     def final_objective_rule(model):
@@ -277,11 +223,13 @@ def find_optimal_dispatch_bidprice_with_storage(
     # PRIMAL LOWER-LEVEL CONSTRAINTS
     # -------------------------------------------------------------------------
     def balance_rule(model, t):
+        # fixed_storage_dispatch > 0 = net discharge (acts as generation)
+        # fixed_storage_dispatch < 0 = net charge (acts as demand)
+        net_storage = float(fixed_storage_dispatch.at[t])
         return (
             sum(model.d[t, n] for n in model.demand_bids)
-            + sum(model.p_charge[s, t] for s in model.storages)
             - sum(model.g[i, t] for i in model.gens)
-            - sum(model.p_discharge[s, t] for s in model.storages)
+            - net_storage
             == 0
         )
 
@@ -348,50 +296,6 @@ def find_optimal_dispatch_bidprice_with_storage(
         model.gens, model.time, rule=shut_down_cost_rule
     )
 
-    def charge_max_rule(model, s, t):
-        return model.p_charge[s, t] <= abs(storage_df.at[s, "max_power_charge"])
-
-    model.charge_max = pyo.Constraint(
-        model.storages, model.time, rule=charge_max_rule
-    )
-
-    def discharge_max_rule(model, s, t):
-        return model.p_discharge[s, t] <= storage_df.at[s, "max_power_discharge"]
-
-    model.discharge_max = pyo.Constraint(
-        model.storages, model.time, rule=discharge_max_rule
-    )
-
-    # -------------------------------------------------------------------------
-    # NON-DUALIZED SOC SIDE CONSTRAINTS
-    # -------------------------------------------------------------------------
-    def soc_rule(model, s, t):
-        if t == 0:
-            return (
-                model.soc[s, t]
-                - storage_df.at[s, "efficiency_charge"] * model.p_charge[s, t]
-                + model.p_discharge[s, t]
-                / storage_df.at[s, "efficiency_discharge"]
-                == storage_df.at[s, "initial_soc"] * storage_df.at[s, "capacity"]
-            )
-        return (
-            model.soc[s, t]
-            - model.soc[s, t - 1]
-            - storage_df.at[s, "efficiency_charge"] * model.p_charge[s, t]
-            + model.p_discharge[s, t]
-            / storage_df.at[s, "efficiency_discharge"]
-            == 0
-        )
-
-    model.soc_coupling = pyo.Constraint(
-        model.storages, model.time, rule=soc_rule
-    )
-
-    def soc_max_rule(model, s, t):
-        return model.soc[s, t] <= storage_df.at[s, "capacity"]
-
-    model.soc_max = pyo.Constraint(model.storages, model.time, rule=soc_max_rule)
-
     # -------------------------------------------------------------------------
     # DUAL FEASIBILITY / STATIONARITY (all in €/MWh)
     # -------------------------------------------------------------------------
@@ -437,44 +341,15 @@ def find_optimal_dispatch_bidprice_with_storage(
                 >= 0
             )
 
-    model.status_dual = pyo.Constraint(
-        model.gens, model.time, rule=status_dual_rule
-    )
+    model.status_dual = pyo.Constraint(model.gens, model.time, rule=status_dual_rule)
 
     def demand_dual_rule(model, t, n):
         return (
-            -demand_df.at[t, f"price_{n}"]
-            + model.lambda_[t]
-            + model.nu_max[t, n]
-            >= 0
+            -demand_df.at[t, f"price_{n}"] + model.lambda_[t] + model.nu_max[t, n] >= 0
         )
 
     model.demand_dual = pyo.Constraint(
         model.time, model.demand_bids, rule=demand_dual_rule
-    )
-
-    def storage_charge_dual_rule(model, s, t):
-        return (
-            -storage_bid_charge(s, t)
-            + model.lambda_[t]
-            + model.alpha_charge_max[s, t]
-            >= 0
-        )
-
-    model.storage_charge_dual = pyo.Constraint(
-        model.storages, model.time, rule=storage_charge_dual_rule
-    )
-
-    def storage_discharge_dual_rule(model, s, t):
-        return (
-            storage_bid_discharge(s, t)
-            - model.lambda_[t]
-            + model.alpha_discharge_max[s, t]
-            >= 0
-        )
-
-    model.storage_discharge_dual = pyo.Constraint(
-        model.storages, model.time, rule=storage_discharge_dual_rule
     )
 
     # -------------------------------------------------------------------------
@@ -482,12 +357,8 @@ def find_optimal_dispatch_bidprice_with_storage(
     # -------------------------------------------------------------------------
     def kkt_gen_rule(model, i, t):
         bid = gen_bid(i, t)
-        pi_u_hat_next = (
-            0 if t == model.time.at(-1) else model.pi_u_hat[i, t + 1]
-        )
-        pi_d_hat_next = (
-            0 if t == model.time.at(-1) else model.pi_d_hat[i, t + 1]
-        )
+        pi_u_hat_next = 0 if t == model.time.at(-1) else model.pi_u_hat[i, t + 1]
+        pi_d_hat_next = 0 if t == model.time.at(-1) else model.pi_d_hat[i, t + 1]
         return (
             bid
             - model.lambda_hat[t]
@@ -513,30 +384,6 @@ def find_optimal_dispatch_bidprice_with_storage(
 
     model.kkt_demand = pyo.Constraint(
         model.time, model.demand_bids, rule=kkt_demand_rule
-    )
-
-    def kkt_storage_charge_rule(model, s, t):
-        return (
-            -storage_bid_charge(s, t)
-            + model.lambda_hat[t]
-            + model.alpha_charge_max_hat[s, t]
-            >= 0
-        )
-
-    model.kkt_storage_charge = pyo.Constraint(
-        model.storages, model.time, rule=kkt_storage_charge_rule
-    )
-
-    def kkt_storage_discharge_rule(model, s, t):
-        return (
-            storage_bid_discharge(s, t)
-            - model.lambda_hat[t]
-            + model.alpha_discharge_max_hat[s, t]
-            >= 0
-        )
-
-    model.kkt_storage_discharge = pyo.Constraint(
-        model.storages, model.time, rule=kkt_storage_discharge_rule
     )
 
     # -------------------------------------------------------------------------
@@ -669,58 +516,6 @@ def find_optimal_dispatch_bidprice_with_storage(
         model.gens, model.time, rule=pi_d_hat_binary_rule_3
     )
 
-    def alpha_charge_hat_binary_rule_1(model, s, t):
-        return model.p_charge[s, t] - abs(
-            storage_df.at[s, "max_power_charge"]
-        ) <= big_M * (1 - model.alpha_charge_max_hat_binary[s, t])
-
-    def alpha_charge_hat_binary_rule_2(model, s, t):
-        return model.p_charge[s, t] - abs(
-            storage_df.at[s, "max_power_charge"]
-        ) >= -big_M * (1 - model.alpha_charge_max_hat_binary[s, t])
-
-    def alpha_charge_hat_binary_rule_3(model, s, t):
-        return (
-            model.alpha_charge_max_hat[s, t]
-            <= big_M * model.alpha_charge_max_hat_binary[s, t]
-        )
-
-    model.alpha_charge_hat_binary_constr_1 = pyo.Constraint(
-        model.storages, model.time, rule=alpha_charge_hat_binary_rule_1
-    )
-    model.alpha_charge_hat_binary_constr_2 = pyo.Constraint(
-        model.storages, model.time, rule=alpha_charge_hat_binary_rule_2
-    )
-    model.alpha_charge_hat_binary_constr_3 = pyo.Constraint(
-        model.storages, model.time, rule=alpha_charge_hat_binary_rule_3
-    )
-
-    def alpha_discharge_hat_binary_rule_1(model, s, t):
-        return model.p_discharge[s, t] - storage_df.at[
-            s, "max_power_discharge"
-        ] <= big_M * (1 - model.alpha_discharge_max_hat_binary[s, t])
-
-    def alpha_discharge_hat_binary_rule_2(model, s, t):
-        return model.p_discharge[s, t] - storage_df.at[
-            s, "max_power_discharge"
-        ] >= -big_M * (1 - model.alpha_discharge_max_hat_binary[s, t])
-
-    def alpha_discharge_hat_binary_rule_3(model, s, t):
-        return (
-            model.alpha_discharge_max_hat[s, t]
-            <= big_M * model.alpha_discharge_max_hat_binary[s, t]
-        )
-
-    model.alpha_discharge_hat_binary_constr_1 = pyo.Constraint(
-        model.storages, model.time, rule=alpha_discharge_hat_binary_rule_1
-    )
-    model.alpha_discharge_hat_binary_constr_2 = pyo.Constraint(
-        model.storages, model.time, rule=alpha_discharge_hat_binary_rule_2
-    )
-    model.alpha_discharge_hat_binary_constr_3 = pyo.Constraint(
-        model.storages, model.time, rule=alpha_discharge_hat_binary_rule_3
-    )
-
     # -------------------------------------------------------------------------
     # SOLVE
     # -------------------------------------------------------------------------
@@ -744,6 +539,7 @@ def find_optimal_dispatch_bidprice_with_storage(
         print("Model written to debug_bidprice.lp")
         try:
             import gurobipy as gp
+
             m = gp.read("debug_bidprice.lp")
             m.computeIIS()
             m.write("debug_bidprice.ilp")
@@ -773,23 +569,6 @@ def find_optimal_dispatch_bidprice_with_storage(
         for t in time_index:
             generation_df.at[t, f"gen_{gen}"] = instance.g[gen, t].value
 
-    charge_df = pd.DataFrame(
-        index=time_index, columns=[f"charge_{s}" for s in storage_df.index]
-    )
-    discharge_df = pd.DataFrame(
-        index=time_index, columns=[f"discharge_{s}" for s in storage_df.index]
-    )
-    soc_df = pd.DataFrame(
-        index=time_index, columns=[f"soc_{s}" for s in storage_df.index]
-    )
-    for s in storage_df.index:
-        for t in time_index:
-            charge_df.at[t, f"charge_{s}"] = instance.p_charge[s, t].value
-            discharge_df.at[t, f"discharge_{s}"] = instance.p_discharge[
-                s, t
-            ].value
-            soc_df.at[t, f"soc_{s}"] = instance.soc[s, t].value
-
     cleared_demand = pd.DataFrame(index=time_index, columns=["demand"])
     for t in time_index:
         cleared_demand.at[t, "demand"] = sum(
@@ -803,7 +582,7 @@ def find_optimal_dispatch_bidprice_with_storage(
         mcp_hat.at[t, "mcp_hat"] = instance.lambda_hat[t].value
 
     main_df = pd.concat(
-        [generation_df, charge_df, discharge_df, soc_df, cleared_demand, mcp, mcp_hat],
+        [generation_df, cleared_demand, mcp, mcp_hat],
         axis=1,
     )
 
