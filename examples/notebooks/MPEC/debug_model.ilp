@@ -1,0 +1,8 @@
+\ Model objective_copy
+\ LP format - for model browsing. Use MPS format to capture full model detail.
+Maximize
+ 
+Subject To
+ c_u_d_max(0_1)_: d(0_1) <= -55618.85316125539
+Bounds
+End

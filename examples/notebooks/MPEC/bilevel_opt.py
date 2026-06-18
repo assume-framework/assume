@@ -690,7 +690,7 @@ def find_optimal_dispatch_quadratic(
         expr = sum(
             (
                 (
-                    mc_df.at[t, gen] * model.k[t]
+                    mc_df.at[t, gen] * model.k[t] * model.g[gen, t]
                     + model.c_up[gen, t]
                     + model.c_down[gen, t]
                 )
@@ -1226,8 +1226,8 @@ def find_optimal_dispatch_quadratic_with_storage(
     # -------------------------------------------------------------------------
     # UPPER-LEVEL LEADER DECISION (strategic generator)
     # -------------------------------------------------------------------------
-    model.k = pyo.Var(model.time, bounds=(-k_max, k_max), within=pyo.NonNegativeReals)
-    model.lambda_ = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 3000))
+    model.k = pyo.Var(model.time, bounds=(-k_max, k_max), within=pyo.Reals)
+    model.lambda_ = pyo.Var(model.time, within=pyo.Reals, bounds=(-600, 3100))
 
     # -------------------------------------------------------------------------
     # DUAL VARIABLES FOR THE ECONOMIC LOWER LEVEL
@@ -1253,7 +1253,7 @@ def find_optimal_dispatch_quadratic_with_storage(
     # -------------------------------------------------------------------------
     # HAT DUALS (relaxed KKT system)
     # -------------------------------------------------------------------------
-    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 3000))
+    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(-600, 3100))
     model.mu_max_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.mu_min_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.nu_max_hat = pyo.Var(
@@ -1324,7 +1324,7 @@ def find_optimal_dispatch_quadratic_with_storage(
         expr = sum(
             (
                 (
-                    mc_df.at[t, gen] * model.k[t]
+                    mc_df.at[t, gen] * model.k[t] * model.g[gen, t]
                     + model.c_up[gen, t]
                     + model.c_down[gen, t]
                 )
@@ -1871,6 +1871,7 @@ def find_optimal_dispatch_quadratic_with_storage(
     }
     solver.options["NonConvex"] = 2
     results = solver.solve(instance, options=options, tee=print_results)
+    
 
     if results.solver.termination_condition == pyo.TerminationCondition.maxTimeLimit:
         print("Solver did not converge to an optimal solution")

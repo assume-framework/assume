@@ -1,0 +1,95 @@
+\ Model objective_copy
+\ LP format - for model browsing. Use MPS format to capture full model detail.
+Maximize
+ 
+Subject To
+ c_u_charge_max(Schwarzenbachwerk_0)_: p_charge(Schwarzenbachwerk_0) <= 20
+ c_u_charge_max(Schwarzenbachwerk_1)_: p_charge(Schwarzenbachwerk_1) <= 20
+ c_u_charge_max(Schwarzenbachwerk_2)_: p_charge(Schwarzenbachwerk_2) <= 20
+ c_e_soc_coupling(Schwarzenbachwerk_0)_:
+   1.219512195121951 p_discharge(Schwarzenbachwerk_0)
+   - 0.73 p_charge(Schwarzenbachwerk_0) + soc(Schwarzenbachwerk_0) = 99
+ c_e_soc_coupling(Schwarzenbachwerk_1)_:
+   1.219512195121951 p_discharge(Schwarzenbachwerk_1)
+   - 0.73 p_charge(Schwarzenbachwerk_1) - soc(Schwarzenbachwerk_0)
+   + soc(Schwarzenbachwerk_1) = 0
+ c_e_soc_coupling(Schwarzenbachwerk_2)_:
+   1.219512195121951 p_discharge(Schwarzenbachwerk_2)
+   - 0.73 p_charge(Schwarzenbachwerk_2) - soc(Schwarzenbachwerk_1)
+   + soc(Schwarzenbachwerk_2) = 0
+ c_e_kkt_demand(0_1)_: lambda_hat(0) + nu_max_hat(0_1) - nu_min_hat(0_1)
+   = 3000
+ c_e_kkt_demand(1_1)_: lambda_hat(1) + nu_max_hat(1_1) - nu_min_hat(1_1)
+   = 3000
+ c_e_kkt_demand(2_1)_: lambda_hat(2) + nu_max_hat(2_1) - nu_min_hat(2_1)
+   = 3000
+ c_l_kkt_storage_discharge(Schwarzenbachwerk_0)_: - lambda_hat(0)
+   + alpha_discharge_max_hat(Schwarzenbachwerk_0) >= -66.34126452437724
+ c_l_kkt_storage_discharge(Schwarzenbachwerk_1)_: - lambda_hat(1)
+   + alpha_discharge_max_hat(Schwarzenbachwerk_1) >= -66.34129926925009
+ c_l_kkt_storage_discharge(Schwarzenbachwerk_2)_: - lambda_hat(2)
+   + alpha_discharge_max_hat(Schwarzenbachwerk_2) >= -66.34140294588973
+ c_u_nu_max_hat_binary_constr_2(0_1)_: - d(0_1)
+   + 55618.85316125539 nu_max_hat_binary(0_1) <= 0
+ c_u_nu_max_hat_binary_constr_2(1_1)_: - d(1_1)
+   + 55618.85316125539 nu_max_hat_binary(1_1) <= 0
+ c_u_nu_max_hat_binary_constr_2(2_1)_: - d(2_1)
+   + 55618.85316125539 nu_max_hat_binary(2_1) <= 0
+ c_u_nu_max_hat_binary_constr_3(0_1)_: nu_max_hat(0_1)
+   - 10000 nu_max_hat_binary(0_1) <= 0
+ c_u_nu_max_hat_binary_constr_3(1_1)_: nu_max_hat(1_1)
+   - 10000 nu_max_hat_binary(1_1) <= 0
+ c_u_nu_max_hat_binary_constr_3(2_1)_: nu_max_hat(2_1)
+   - 10000 nu_max_hat_binary(2_1) <= 0
+ c_u_nu_min_hat_binary_constr_1(0_1)_: d(0_1)
+   + 10000 nu_min_hat_binary(0_1) <= 10000
+ c_u_nu_min_hat_binary_constr_1(1_1)_: d(1_1)
+   + 10000 nu_min_hat_binary(1_1) <= 10000
+ c_u_nu_min_hat_binary_constr_1(2_1)_: d(2_1)
+   + 10000 nu_min_hat_binary(2_1) <= 10000
+ c_u_alpha_discharge_hat_binary_constr_2(Schwarzenbachwerk_0)_:
+   - p_discharge(Schwarzenbachwerk_0)
+   + 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_0) <= 9954
+ c_u_alpha_discharge_hat_binary_constr_2(Schwarzenbachwerk_1)_:
+   - p_discharge(Schwarzenbachwerk_1)
+   + 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_1) <= 9954
+ c_u_alpha_discharge_hat_binary_constr_2(Schwarzenbachwerk_2)_:
+   - p_discharge(Schwarzenbachwerk_2)
+   + 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_2) <= 9954
+ c_u_alpha_discharge_hat_binary_constr_3(Schwarzenbachwerk_0)_:
+   alpha_discharge_max_hat(Schwarzenbachwerk_0)
+   - 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_0) <= 0
+ c_u_alpha_discharge_hat_binary_constr_3(Schwarzenbachwerk_1)_:
+   alpha_discharge_max_hat(Schwarzenbachwerk_1)
+   - 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_1) <= 0
+ c_u_alpha_discharge_hat_binary_constr_3(Schwarzenbachwerk_2)_:
+   alpha_discharge_max_hat(Schwarzenbachwerk_2)
+   - 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_2) <= 0
+Bounds
+ p_discharge(Schwarzenbachwerk_0) free
+ p_discharge(Schwarzenbachwerk_1) free
+ p_discharge(Schwarzenbachwerk_2) free
+ p_charge(Schwarzenbachwerk_0) free
+ p_charge(Schwarzenbachwerk_1) free
+ p_charge(Schwarzenbachwerk_2) free
+ d(0_1) free
+ d(1_1) free
+ d(2_1) free
+ lambda_hat(0) free
+ lambda_hat(1) free
+ lambda_hat(2) free
+ soc(Schwarzenbachwerk_0) free
+ soc(Schwarzenbachwerk_1) free
+ nu_max_hat(0_1) free
+ nu_max_hat(1_1) free
+ nu_max_hat(2_1) free
+ alpha_discharge_max_hat(Schwarzenbachwerk_0) free
+ alpha_discharge_max_hat(Schwarzenbachwerk_1) free
+ alpha_discharge_max_hat(Schwarzenbachwerk_2) free
+Binaries
+ nu_max_hat_binary(0_1) nu_max_hat_binary(1_1) nu_max_hat_binary(2_1)
+ nu_min_hat_binary(0_1) nu_min_hat_binary(1_1) nu_min_hat_binary(2_1)
+ alpha_discharge_max_hat_binary(Schwarzenbachwerk_0)
+ alpha_discharge_max_hat_binary(Schwarzenbachwerk_1)
+ alpha_discharge_max_hat_binary(Schwarzenbachwerk_2)
+End
