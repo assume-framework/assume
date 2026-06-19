@@ -690,7 +690,7 @@ def find_optimal_dispatch_quadratic(
         expr = sum(
             (
                 (
-                    mc_df.at[t, gen] * model.k[t]
+                    mc_df.at[t, gen] * model.k[t] * model.g[gen, t]
                     + model.c_up[gen, t]
                     + model.c_down[gen, t]
                 )
@@ -1204,8 +1204,10 @@ def find_optimal_dispatch_quadratic_with_storage(
     model.gens = pyo.Set(initialize=gens_df.index)
     model.storages = pyo.Set(initialize=storage_df.index)
     model.demand_bids = pyo.Set(initialize=np.arange(1, demand_bids + 1))
-    
-    print(f"Model sets initialized: time={list(model.time)}, gens={list(model.gens)}, storages={list(model.storages)}, demand_bids={list(model.demand_bids)}")
+
+    print(
+        f"Model sets initialized: time={list(model.time)}, gens={list(model.gens)}, storages={list(model.storages)}, demand_bids={list(model.demand_bids)}"
+    )
 
     # -------------------------------------------------------------------------
     # PRIMAL LOWER-LEVEL VARIABLES
@@ -1226,8 +1228,8 @@ def find_optimal_dispatch_quadratic_with_storage(
     # -------------------------------------------------------------------------
     # UPPER-LEVEL LEADER DECISION (strategic generator)
     # -------------------------------------------------------------------------
-    model.k = pyo.Var(model.time, bounds=(-k_max, k_max), within=pyo.NonNegativeReals)
-    model.lambda_ = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 3000))
+    model.k = pyo.Var(model.time, bounds=(-k_max, k_max), within=pyo.Reals)
+    model.lambda_ = pyo.Var(model.time, within=pyo.Reals, bounds=(-600, 3100))
 
     # -------------------------------------------------------------------------
     # DUAL VARIABLES FOR THE ECONOMIC LOWER LEVEL
@@ -1253,7 +1255,7 @@ def find_optimal_dispatch_quadratic_with_storage(
     # -------------------------------------------------------------------------
     # HAT DUALS (relaxed KKT system)
     # -------------------------------------------------------------------------
-    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 3000))
+    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(-600, 3100))
     model.mu_max_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.mu_min_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.nu_max_hat = pyo.Var(
@@ -1324,7 +1326,7 @@ def find_optimal_dispatch_quadratic_with_storage(
         expr = sum(
             (
                 (
-                    mc_df.at[t, gen] * model.k[t]
+                    mc_df.at[t, gen] * model.k[t] * model.g[gen, t]
                     + model.c_up[gen, t]
                     + model.c_down[gen, t]
                 )
@@ -1506,22 +1508,18 @@ def find_optimal_dispatch_quadratic_with_storage(
             return (
                 model.soc[s, t]
                 - storage_df.at[s, "efficiency_charge"] * model.p_charge[s, t]
-                + model.p_discharge[s, t]
-                / storage_df.at[s, "efficiency_discharge"]
+                + model.p_discharge[s, t] / storage_df.at[s, "efficiency_discharge"]
                 == storage_df.at[s, "initial_soc"] * storage_df.at[s, "capacity"]
             )
         return (
             model.soc[s, t]
             - model.soc[s, t - 1]
             - storage_df.at[s, "efficiency_charge"] * model.p_charge[s, t]
-            + model.p_discharge[s, t]
-            / storage_df.at[s, "efficiency_discharge"]
+            + model.p_discharge[s, t] / storage_df.at[s, "efficiency_discharge"]
             == 0
         )
 
-    model.soc_coupling = pyo.Constraint(
-        model.storages, model.time, rule=soc_rule
-    )
+    model.soc_coupling = pyo.Constraint(model.storages, model.time, rule=soc_rule)
 
     def soc_max_rule(model, s, t):
         return model.soc[s, t] <= storage_df.at[s, "capacity"]
@@ -1586,9 +1584,7 @@ def find_optimal_dispatch_quadratic_with_storage(
 
     def storage_charge_dual_rule(model, s, t):
         return (
-            -storage_bid_charge(s, t)
-            + model.lambda_[t]
-            + model.alpha_charge_max[s, t]
+            -storage_bid_charge(s, t) + model.lambda_[t] + model.alpha_charge_max[s, t]
             >= 0
         )
 
