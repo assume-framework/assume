@@ -3,93 +3,116 @@
 Maximize
 
 Subject To
- c_u_charge_max(Schwarzenbachwerk_0)_: p_charge(Schwarzenbachwerk_0) <= 20
- c_u_charge_max(Schwarzenbachwerk_1)_: p_charge(Schwarzenbachwerk_1) <= 20
- c_u_charge_max(Schwarzenbachwerk_2)_: p_charge(Schwarzenbachwerk_2) <= 20
- c_e_soc_coupling(Schwarzenbachwerk_0)_:
-   1.219512195121951 p_discharge(Schwarzenbachwerk_0)
-   - 0.73 p_charge(Schwarzenbachwerk_0) + soc(Schwarzenbachwerk_0) = 99
- c_e_soc_coupling(Schwarzenbachwerk_1)_:
-   1.219512195121951 p_discharge(Schwarzenbachwerk_1)
-   - 0.73 p_charge(Schwarzenbachwerk_1) - soc(Schwarzenbachwerk_0)
-   + soc(Schwarzenbachwerk_1) = 0
- c_e_soc_coupling(Schwarzenbachwerk_2)_:
-   1.219512195121951 p_discharge(Schwarzenbachwerk_2)
-   - 0.73 p_charge(Schwarzenbachwerk_2) - soc(Schwarzenbachwerk_1)
-   + soc(Schwarzenbachwerk_2) = 0
- c_e_kkt_demand(0_1)_: lambda_hat(0) + nu_max_hat(0_1) - nu_min_hat(0_1)
-   = 3000
- c_e_kkt_demand(1_1)_: lambda_hat(1) + nu_max_hat(1_1) - nu_min_hat(1_1)
-   = 3000
- c_e_kkt_demand(2_1)_: lambda_hat(2) + nu_max_hat(2_1) - nu_min_hat(2_1)
-   = 3000
- c_l_kkt_storage_discharge(Schwarzenbachwerk_0)_: - lambda_hat(0)
-   + alpha_discharge_max_hat(Schwarzenbachwerk_0) >= -66.34126452437724
- c_l_kkt_storage_discharge(Schwarzenbachwerk_1)_: - lambda_hat(1)
-   + alpha_discharge_max_hat(Schwarzenbachwerk_1) >= -66.34129926925009
- c_l_kkt_storage_discharge(Schwarzenbachwerk_2)_: - lambda_hat(2)
-   + alpha_discharge_max_hat(Schwarzenbachwerk_2) >= -66.34140294588973
- c_u_nu_max_hat_binary_constr_2(0_1)_: - d(0_1)
-   + 55618.85316125539 nu_max_hat_binary(0_1) <= 0
- c_u_nu_max_hat_binary_constr_2(1_1)_: - d(1_1)
-   + 55618.85316125539 nu_max_hat_binary(1_1) <= 0
- c_u_nu_max_hat_binary_constr_2(2_1)_: - d(2_1)
-   + 55618.85316125539 nu_max_hat_binary(2_1) <= 0
- c_u_nu_max_hat_binary_constr_3(0_1)_: nu_max_hat(0_1)
-   - 10000 nu_max_hat_binary(0_1) <= 0
- c_u_nu_max_hat_binary_constr_3(1_1)_: nu_max_hat(1_1)
-   - 10000 nu_max_hat_binary(1_1) <= 0
- c_u_nu_max_hat_binary_constr_3(2_1)_: nu_max_hat(2_1)
-   - 10000 nu_max_hat_binary(2_1) <= 0
- c_u_nu_min_hat_binary_constr_1(0_1)_: d(0_1)
-   + 10000 nu_min_hat_binary(0_1) <= 10000
- c_u_nu_min_hat_binary_constr_1(1_1)_: d(1_1)
-   + 10000 nu_min_hat_binary(1_1) <= 10000
- c_u_nu_min_hat_binary_constr_1(2_1)_: d(2_1)
-   + 10000 nu_min_hat_binary(2_1) <= 10000
- c_u_alpha_discharge_hat_binary_constr_2(Schwarzenbachwerk_0)_:
-   - p_discharge(Schwarzenbachwerk_0)
-   + 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_0) <= 9954
- c_u_alpha_discharge_hat_binary_constr_2(Schwarzenbachwerk_1)_:
-   - p_discharge(Schwarzenbachwerk_1)
-   + 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_1) <= 9954
- c_u_alpha_discharge_hat_binary_constr_2(Schwarzenbachwerk_2)_:
-   - p_discharge(Schwarzenbachwerk_2)
-   + 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_2) <= 9954
- c_u_alpha_discharge_hat_binary_constr_3(Schwarzenbachwerk_0)_:
-   alpha_discharge_max_hat(Schwarzenbachwerk_0)
-   - 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_0) <= 0
- c_u_alpha_discharge_hat_binary_constr_3(Schwarzenbachwerk_1)_:
-   alpha_discharge_max_hat(Schwarzenbachwerk_1)
-   - 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_1) <= 0
- c_u_alpha_discharge_hat_binary_constr_3(Schwarzenbachwerk_2)_:
-   alpha_discharge_max_hat(Schwarzenbachwerk_2)
-   - 10000 alpha_discharge_max_hat_binary(Schwarzenbachwerk_2) <= 0
+ c_e_balance(15)_: - g(OCGT_00_15) - g(OCGT_01_0_15) - g(OCGT_01_1_15)
+   - g(OCGT_01_2_15) - g(OCGT_01_3_15) - g(OCGT_01_4_15) - g(OCGT_02_15)
+   - g(OCGT_03_15) - g(OCGT_04_15) - g(OCGT_05_15) - g(OCGT_06_15)
+   - g(OCGT_07_15) - g(OCGT_08_15) - g(OCGT_09_15) - g(wind_offshore_00_15)
+   - g(wind_offshore_06_15) - g(wind_offshore_07_15)
+   - g(wind_onshore_00_0_15) - g(wind_onshore_00_1_15)
+   - g(wind_onshore_00_2_15) - g(wind_onshore_01_15)
+   - g(wind_onshore_02_15) - g(wind_onshore_03_0_15)
+   - g(wind_onshore_03_1_15) - g(wind_onshore_04_15)
+   - g(wind_onshore_05_15) - g(wind_onshore_06_0_15)
+   - g(wind_onshore_06_1_15) - g(wind_onshore_07_0_15)
+   - g(wind_onshore_07_1_15) - g(wind_onshore_07_2_15)
+   - g(wind_onshore_07_3_15) - g(wind_onshore_08_15)
+   - g(wind_onshore_09_15) + d(15_1) + d(15_2) + d(15_3) + d(15_4)
+   + d(15_5) + d(15_6) + d(15_7) + d(15_8) + d(15_9) + d(15_10)
+   - g(solar_00_15) - g(solar_01_0_15) - g(solar_01_1_15)
+   - g(solar_01_2_15) - g(solar_02_15) - g(solar_03_0_15)
+   - g(solar_03_1_15) - g(solar_03_2_15) - g(solar_04_0_15)
+   - g(solar_04_1_15) - g(solar_04_2_15) - g(solar_05_15)
+   - g(solar_06_0_15) - g(solar_06_1_15) - g(solar_06_2_15)
+   - g(solar_06_3_15) - g(solar_07_0_15) - g(solar_07_1_15)
+   - g(solar_08_15) - g(solar_09_0_15) - g(solar_09_1_15)
+   - g(solar_09_2_15) = 10818.22112934986
+ c_e_kkt_demand(15_1)_: lambda_hat(15) + nu_max_hat(15_1)
+   - nu_min_hat(15_1) = 3000
+ c_e_kkt_demand(15_2)_: lambda_hat(15) + nu_max_hat(15_2)
+   - nu_min_hat(15_2) = 1034.052465058754
+ c_e_kkt_demand(15_3)_: lambda_hat(15) + nu_max_hat(15_3)
+   - nu_min_hat(15_3) = 376.1477598489046
+ c_e_kkt_demand(15_4)_: lambda_hat(15) + nu_max_hat(15_4)
+   - nu_min_hat(15_4) = 143.6534702336155
+ c_e_kkt_demand(15_5)_: lambda_hat(15) + nu_max_hat(15_5)
+   - nu_min_hat(15_5) = 57.34204452077048
+ c_e_kkt_demand(15_6)_: lambda_hat(15) + nu_max_hat(15_6)
+   - nu_min_hat(15_6) = 23.83105459064972
+ c_e_kkt_demand(15_7)_: lambda_hat(15) + nu_max_hat(15_7)
+   - nu_min_hat(15_7) = 10.27668107589398
+ c_e_kkt_demand(15_8)_: lambda_hat(15) + nu_max_hat(15_8)
+   - nu_min_hat(15_8) = 4.584658610683742
+ c_e_kkt_demand(15_9)_: lambda_hat(15) + nu_max_hat(15_9)
+   - nu_min_hat(15_9) = 2.110383486147799
+ c_e_kkt_demand(15_10)_: lambda_hat(15) + nu_max_hat(15_10)
+   - nu_min_hat(15_10) = 1
+ c_u_nu_max_hat_binary_constr_2(15_1)_: - d(15_1)
+   + 55618.85316125539 nu_max_hat_binary(15_1) <= 0
+ c_u_nu_max_hat_binary_constr_3(15_1)_: nu_max_hat(15_1)
+   - 10000 nu_max_hat_binary(15_1) <= 0
+ c_u_nu_min_hat_binary_constr_1(15_1)_: d(15_1)
+   + 10000 nu_min_hat_binary(15_1) <= 10000
+ c_u_nu_min_hat_binary_constr_1(15_2)_: d(15_2)
+   + 10000 nu_min_hat_binary(15_2) <= 10000
+ c_u_nu_min_hat_binary_constr_1(15_3)_: d(15_3)
+   + 10000 nu_min_hat_binary(15_3) <= 10000
+ c_u_nu_min_hat_binary_constr_1(15_4)_: d(15_4)
+   + 10000 nu_min_hat_binary(15_4) <= 10000
+ c_u_nu_min_hat_binary_constr_1(15_5)_: d(15_5)
+   + 10000 nu_min_hat_binary(15_5) <= 10000
+ c_u_nu_min_hat_binary_constr_1(15_6)_: d(15_6)
+   + 10000 nu_min_hat_binary(15_6) <= 10000
+ c_u_nu_min_hat_binary_constr_1(15_7)_: d(15_7)
+   + 10000 nu_min_hat_binary(15_7) <= 10000
+ c_u_nu_min_hat_binary_constr_1(15_8)_: d(15_8)
+   + 10000 nu_min_hat_binary(15_8) <= 10000
+ c_u_nu_min_hat_binary_constr_1(15_9)_: d(15_9)
+   + 10000 nu_min_hat_binary(15_9) <= 10000
+ c_u_nu_min_hat_binary_constr_1(15_10)_: d(15_10)
+   + 10000 nu_min_hat_binary(15_10) <= 10000
+ c_u_nu_min_hat_binary_constr_3(15_2)_: nu_min_hat(15_2)
+   - 10000 nu_min_hat_binary(15_2) <= 0
+ c_u_nu_min_hat_binary_constr_3(15_3)_: nu_min_hat(15_3)
+   - 10000 nu_min_hat_binary(15_3) <= 0
+ c_u_nu_min_hat_binary_constr_3(15_4)_: nu_min_hat(15_4)
+   - 10000 nu_min_hat_binary(15_4) <= 0
+ c_u_nu_min_hat_binary_constr_3(15_5)_: nu_min_hat(15_5)
+   - 10000 nu_min_hat_binary(15_5) <= 0
+ c_u_nu_min_hat_binary_constr_3(15_6)_: nu_min_hat(15_6)
+   - 10000 nu_min_hat_binary(15_6) <= 0
+ c_u_nu_min_hat_binary_constr_3(15_7)_: nu_min_hat(15_7)
+   - 10000 nu_min_hat_binary(15_7) <= 0
+ c_u_nu_min_hat_binary_constr_3(15_8)_: nu_min_hat(15_8)
+   - 10000 nu_min_hat_binary(15_8) <= 0
+ c_u_nu_min_hat_binary_constr_3(15_9)_: nu_min_hat(15_9)
+   - 10000 nu_min_hat_binary(15_9) <= 0
+ c_u_nu_min_hat_binary_constr_3(15_10)_: nu_min_hat(15_10)
+   - 10000 nu_min_hat_binary(15_10) <= 0
 Bounds
- p_discharge(Schwarzenbachwerk_0) free
- p_discharge(Schwarzenbachwerk_1) free
- p_discharge(Schwarzenbachwerk_2) free
- p_charge(Schwarzenbachwerk_0) free
- p_charge(Schwarzenbachwerk_1) free
- p_charge(Schwarzenbachwerk_2) free
- d(0_1) free
- d(1_1) free
- d(2_1) free
- lambda_hat(0) free
- lambda_hat(1) free
- lambda_hat(2) free
- soc(Schwarzenbachwerk_0) free
- soc(Schwarzenbachwerk_1) free
- nu_max_hat(0_1) free
- nu_max_hat(1_1) free
- nu_max_hat(2_1) free
- alpha_discharge_max_hat(Schwarzenbachwerk_0) free
- alpha_discharge_max_hat(Schwarzenbachwerk_1) free
- alpha_discharge_max_hat(Schwarzenbachwerk_2) free
+ d(15_1) free
+ d(15_2) free
+ d(15_3) free
+ d(15_4) free
+ d(15_5) free
+ d(15_6) free
+ d(15_7) free
+ d(15_8) free
+ d(15_9) free
+ d(15_10) free
+ lambda_hat(15) free
+ nu_max_hat(15_1) free
+ nu_min_hat(15_2) free
+ nu_min_hat(15_3) free
+ nu_min_hat(15_4) free
+ nu_min_hat(15_5) free
+ nu_min_hat(15_6) free
+ nu_min_hat(15_7) free
+ nu_min_hat(15_8) free
+ nu_min_hat(15_9) free
+ nu_min_hat(15_10) free
 Binaries
- nu_max_hat_binary(0_1) nu_max_hat_binary(1_1) nu_max_hat_binary(2_1)
- nu_min_hat_binary(0_1) nu_min_hat_binary(1_1) nu_min_hat_binary(2_1)
- alpha_discharge_max_hat_binary(Schwarzenbachwerk_0)
- alpha_discharge_max_hat_binary(Schwarzenbachwerk_1)
- alpha_discharge_max_hat_binary(Schwarzenbachwerk_2)
+ nu_max_hat_binary(15_1) nu_min_hat_binary(15_1) nu_min_hat_binary(15_2)
+ nu_min_hat_binary(15_3) nu_min_hat_binary(15_4) nu_min_hat_binary(15_5)
+ nu_min_hat_binary(15_6) nu_min_hat_binary(15_7) nu_min_hat_binary(15_8)
+ nu_min_hat_binary(15_9) nu_min_hat_binary(15_10)
 End

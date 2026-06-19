@@ -7891,29 +7891,29 @@ objective:
 +2 lambda_hat(20) * g(wind_onshore_01_20)
 +2 lambda_hat(21) * g(wind_onshore_01_21)
 +2 lambda_hat(22) * g(wind_onshore_01_22)
--20000 g(wind_onshore_01_0) * bid_price(0)
--20000 g(wind_onshore_01_1) * bid_price(1)
--20000 g(wind_onshore_01_2) * bid_price(2)
--20000 g(wind_onshore_01_3) * bid_price(3)
--20000 g(wind_onshore_01_4) * bid_price(4)
--20000 g(wind_onshore_01_5) * bid_price(5)
--20000 g(wind_onshore_01_6) * bid_price(6)
--20000 g(wind_onshore_01_7) * bid_price(7)
--20000 g(wind_onshore_01_8) * bid_price(8)
--20000 g(wind_onshore_01_9) * bid_price(9)
--20000 g(wind_onshore_01_10) * bid_price(10)
--20000 g(wind_onshore_01_11) * bid_price(11)
--20000 g(wind_onshore_01_12) * bid_price(12)
--20000 g(wind_onshore_01_13) * bid_price(13)
--20000 g(wind_onshore_01_14) * bid_price(14)
--20000 g(wind_onshore_01_15) * bid_price(15)
--20000 g(wind_onshore_01_16) * bid_price(16)
--20000 g(wind_onshore_01_17) * bid_price(17)
--20000 g(wind_onshore_01_18) * bid_price(18)
--20000 g(wind_onshore_01_19) * bid_price(19)
--20000 g(wind_onshore_01_20) * bid_price(20)
--20000 g(wind_onshore_01_21) * bid_price(21)
--20000 g(wind_onshore_01_22) * bid_price(22)
+-300.0 g(wind_onshore_01_0) * k(0)
+-300.0 g(wind_onshore_01_1) * k(1)
+-300.0 g(wind_onshore_01_2) * k(2)
+-300.0 g(wind_onshore_01_3) * k(3)
+-300.0 g(wind_onshore_01_4) * k(4)
+-300.0 g(wind_onshore_01_5) * k(5)
+-300.0 g(wind_onshore_01_6) * k(6)
+-300.0 g(wind_onshore_01_7) * k(7)
+-300.0 g(wind_onshore_01_8) * k(8)
+-300.0 g(wind_onshore_01_9) * k(9)
+-300.0 g(wind_onshore_01_10) * k(10)
+-300.0 g(wind_onshore_01_11) * k(11)
+-300.0 g(wind_onshore_01_12) * k(12)
+-300.0 g(wind_onshore_01_13) * k(13)
+-300.0 g(wind_onshore_01_14) * k(14)
+-300.0 g(wind_onshore_01_15) * k(15)
+-300.0 g(wind_onshore_01_16) * k(16)
+-300.0 g(wind_onshore_01_17) * k(17)
+-300.0 g(wind_onshore_01_18) * k(18)
+-300.0 g(wind_onshore_01_19) * k(19)
+-300.0 g(wind_onshore_01_20) * k(20)
+-300.0 g(wind_onshore_01_21) * k(21)
+-300.0 g(wind_onshore_01_22) * k(22)
 ] / 2
 
 s.t.
@@ -49191,7 +49191,7 @@ c_e_gen_dual(wind_onshore_00_2_22)_:
 = 495.06072998046835
 
 c_e_gen_dual(wind_onshore_01_0)_:
-+1 bid_price(0)
++0.015 k(0)
 +1 pi_u(wind_onshore_01_0)
 -1 pi_u(wind_onshore_01_1)
 -1 pi_d(wind_onshore_01_0)
@@ -49202,7 +49202,7 @@ c_e_gen_dual(wind_onshore_01_0)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_1)_:
-+1 bid_price(1)
++0.015 k(1)
 +1 pi_u(wind_onshore_01_1)
 -1 pi_u(wind_onshore_01_2)
 -1 pi_d(wind_onshore_01_1)
@@ -49213,7 +49213,7 @@ c_e_gen_dual(wind_onshore_01_1)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_2)_:
-+1 bid_price(2)
++0.015 k(2)
 +1 pi_u(wind_onshore_01_2)
 -1 pi_u(wind_onshore_01_3)
 -1 pi_d(wind_onshore_01_2)
@@ -49224,7 +49224,7 @@ c_e_gen_dual(wind_onshore_01_2)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_3)_:
-+1 bid_price(3)
++0.015 k(3)
 +1 pi_u(wind_onshore_01_3)
 -1 pi_u(wind_onshore_01_4)
 -1 pi_d(wind_onshore_01_3)
@@ -49235,7 +49235,7 @@ c_e_gen_dual(wind_onshore_01_3)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_4)_:
-+1 bid_price(4)
++0.015 k(4)
 +1 pi_u(wind_onshore_01_4)
 -1 pi_u(wind_onshore_01_5)
 -1 pi_d(wind_onshore_01_4)
@@ -49246,7 +49246,7 @@ c_e_gen_dual(wind_onshore_01_4)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_5)_:
-+1 bid_price(5)
++0.015 k(5)
 +1 pi_u(wind_onshore_01_5)
 -1 pi_u(wind_onshore_01_6)
 -1 pi_d(wind_onshore_01_5)
@@ -49257,7 +49257,7 @@ c_e_gen_dual(wind_onshore_01_5)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_6)_:
-+1 bid_price(6)
++0.015 k(6)
 +1 pi_u(wind_onshore_01_6)
 -1 pi_u(wind_onshore_01_7)
 -1 pi_d(wind_onshore_01_6)
@@ -49268,7 +49268,7 @@ c_e_gen_dual(wind_onshore_01_6)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_7)_:
-+1 bid_price(7)
++0.015 k(7)
 +1 pi_u(wind_onshore_01_7)
 -1 pi_u(wind_onshore_01_8)
 -1 pi_d(wind_onshore_01_7)
@@ -49279,7 +49279,7 @@ c_e_gen_dual(wind_onshore_01_7)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_8)_:
-+1 bid_price(8)
++0.015 k(8)
 +1 pi_u(wind_onshore_01_8)
 -1 pi_u(wind_onshore_01_9)
 -1 pi_d(wind_onshore_01_8)
@@ -49290,7 +49290,7 @@ c_e_gen_dual(wind_onshore_01_8)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_9)_:
-+1 bid_price(9)
++0.015 k(9)
 +1 pi_u(wind_onshore_01_9)
 -1 pi_u(wind_onshore_01_10)
 -1 pi_d(wind_onshore_01_9)
@@ -49301,7 +49301,7 @@ c_e_gen_dual(wind_onshore_01_9)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_10)_:
-+1 bid_price(10)
++0.015 k(10)
 +1 pi_u(wind_onshore_01_10)
 -1 pi_u(wind_onshore_01_11)
 -1 pi_d(wind_onshore_01_10)
@@ -49312,7 +49312,7 @@ c_e_gen_dual(wind_onshore_01_10)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_11)_:
-+1 bid_price(11)
++0.015 k(11)
 +1 pi_u(wind_onshore_01_11)
 -1 pi_u(wind_onshore_01_12)
 -1 pi_d(wind_onshore_01_11)
@@ -49323,7 +49323,7 @@ c_e_gen_dual(wind_onshore_01_11)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_12)_:
-+1 bid_price(12)
++0.015 k(12)
 +1 pi_u(wind_onshore_01_12)
 -1 pi_u(wind_onshore_01_13)
 -1 pi_d(wind_onshore_01_12)
@@ -49334,7 +49334,7 @@ c_e_gen_dual(wind_onshore_01_12)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_13)_:
-+1 bid_price(13)
++0.015 k(13)
 +1 pi_u(wind_onshore_01_13)
 -1 pi_u(wind_onshore_01_14)
 -1 pi_d(wind_onshore_01_13)
@@ -49345,7 +49345,7 @@ c_e_gen_dual(wind_onshore_01_13)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_14)_:
-+1 bid_price(14)
++0.015 k(14)
 +1 pi_u(wind_onshore_01_14)
 -1 pi_u(wind_onshore_01_15)
 -1 pi_d(wind_onshore_01_14)
@@ -49356,7 +49356,7 @@ c_e_gen_dual(wind_onshore_01_14)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_15)_:
-+1 bid_price(15)
++0.015 k(15)
 +1 pi_u(wind_onshore_01_15)
 -1 pi_u(wind_onshore_01_16)
 -1 pi_d(wind_onshore_01_15)
@@ -49367,7 +49367,7 @@ c_e_gen_dual(wind_onshore_01_15)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_16)_:
-+1 bid_price(16)
++0.015 k(16)
 +1 pi_u(wind_onshore_01_16)
 -1 pi_u(wind_onshore_01_17)
 -1 pi_d(wind_onshore_01_16)
@@ -49378,7 +49378,7 @@ c_e_gen_dual(wind_onshore_01_16)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_17)_:
-+1 bid_price(17)
++0.015 k(17)
 +1 pi_u(wind_onshore_01_17)
 -1 pi_u(wind_onshore_01_18)
 -1 pi_d(wind_onshore_01_17)
@@ -49389,7 +49389,7 @@ c_e_gen_dual(wind_onshore_01_17)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_18)_:
-+1 bid_price(18)
++0.015 k(18)
 +1 pi_u(wind_onshore_01_18)
 -1 pi_u(wind_onshore_01_19)
 -1 pi_d(wind_onshore_01_18)
@@ -49400,7 +49400,7 @@ c_e_gen_dual(wind_onshore_01_18)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_19)_:
-+1 bid_price(19)
++0.015 k(19)
 +1 pi_u(wind_onshore_01_19)
 -1 pi_u(wind_onshore_01_20)
 -1 pi_d(wind_onshore_01_19)
@@ -49411,7 +49411,7 @@ c_e_gen_dual(wind_onshore_01_19)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_20)_:
-+1 bid_price(20)
++0.015 k(20)
 +1 pi_u(wind_onshore_01_20)
 -1 pi_u(wind_onshore_01_21)
 -1 pi_d(wind_onshore_01_20)
@@ -49422,7 +49422,7 @@ c_e_gen_dual(wind_onshore_01_20)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_21)_:
-+1 bid_price(21)
++0.015 k(21)
 +1 pi_u(wind_onshore_01_21)
 -1 pi_u(wind_onshore_01_22)
 -1 pi_d(wind_onshore_01_21)
@@ -49433,7 +49433,7 @@ c_e_gen_dual(wind_onshore_01_21)_:
 = 0
 
 c_e_gen_dual(wind_onshore_01_22)_:
-+1 bid_price(22)
++0.015 k(22)
 +1 pi_u(wind_onshore_01_22)
 -1 pi_d(wind_onshore_01_22)
 -1 lambda_(22)
@@ -69250,7 +69250,7 @@ c_e_kkt_gen(wind_onshore_00_2_22)_:
 
 c_e_kkt_gen(wind_onshore_01_0)_:
 -1 lambda_hat(0)
-+1 bid_price(0)
++0.015 k(0)
 +1 mu_max_hat(wind_onshore_01_0)
 -1 mu_min_hat(wind_onshore_01_0)
 +1 pi_u_hat(wind_onshore_01_0)
@@ -69261,7 +69261,7 @@ c_e_kkt_gen(wind_onshore_01_0)_:
 
 c_e_kkt_gen(wind_onshore_01_1)_:
 -1 lambda_hat(1)
-+1 bid_price(1)
++0.015 k(1)
 +1 mu_max_hat(wind_onshore_01_1)
 -1 mu_min_hat(wind_onshore_01_1)
 +1 pi_u_hat(wind_onshore_01_1)
@@ -69272,7 +69272,7 @@ c_e_kkt_gen(wind_onshore_01_1)_:
 
 c_e_kkt_gen(wind_onshore_01_2)_:
 -1 lambda_hat(2)
-+1 bid_price(2)
++0.015 k(2)
 +1 mu_max_hat(wind_onshore_01_2)
 -1 mu_min_hat(wind_onshore_01_2)
 +1 pi_u_hat(wind_onshore_01_2)
@@ -69283,7 +69283,7 @@ c_e_kkt_gen(wind_onshore_01_2)_:
 
 c_e_kkt_gen(wind_onshore_01_3)_:
 -1 lambda_hat(3)
-+1 bid_price(3)
++0.015 k(3)
 +1 mu_max_hat(wind_onshore_01_3)
 -1 mu_min_hat(wind_onshore_01_3)
 +1 pi_u_hat(wind_onshore_01_3)
@@ -69294,7 +69294,7 @@ c_e_kkt_gen(wind_onshore_01_3)_:
 
 c_e_kkt_gen(wind_onshore_01_4)_:
 -1 lambda_hat(4)
-+1 bid_price(4)
++0.015 k(4)
 +1 mu_max_hat(wind_onshore_01_4)
 -1 mu_min_hat(wind_onshore_01_4)
 +1 pi_u_hat(wind_onshore_01_4)
@@ -69305,7 +69305,7 @@ c_e_kkt_gen(wind_onshore_01_4)_:
 
 c_e_kkt_gen(wind_onshore_01_5)_:
 -1 lambda_hat(5)
-+1 bid_price(5)
++0.015 k(5)
 +1 mu_max_hat(wind_onshore_01_5)
 -1 mu_min_hat(wind_onshore_01_5)
 +1 pi_u_hat(wind_onshore_01_5)
@@ -69316,7 +69316,7 @@ c_e_kkt_gen(wind_onshore_01_5)_:
 
 c_e_kkt_gen(wind_onshore_01_6)_:
 -1 lambda_hat(6)
-+1 bid_price(6)
++0.015 k(6)
 +1 mu_max_hat(wind_onshore_01_6)
 -1 mu_min_hat(wind_onshore_01_6)
 +1 pi_u_hat(wind_onshore_01_6)
@@ -69327,7 +69327,7 @@ c_e_kkt_gen(wind_onshore_01_6)_:
 
 c_e_kkt_gen(wind_onshore_01_7)_:
 -1 lambda_hat(7)
-+1 bid_price(7)
++0.015 k(7)
 +1 mu_max_hat(wind_onshore_01_7)
 -1 mu_min_hat(wind_onshore_01_7)
 +1 pi_u_hat(wind_onshore_01_7)
@@ -69338,7 +69338,7 @@ c_e_kkt_gen(wind_onshore_01_7)_:
 
 c_e_kkt_gen(wind_onshore_01_8)_:
 -1 lambda_hat(8)
-+1 bid_price(8)
++0.015 k(8)
 +1 mu_max_hat(wind_onshore_01_8)
 -1 mu_min_hat(wind_onshore_01_8)
 +1 pi_u_hat(wind_onshore_01_8)
@@ -69349,7 +69349,7 @@ c_e_kkt_gen(wind_onshore_01_8)_:
 
 c_e_kkt_gen(wind_onshore_01_9)_:
 -1 lambda_hat(9)
-+1 bid_price(9)
++0.015 k(9)
 +1 mu_max_hat(wind_onshore_01_9)
 -1 mu_min_hat(wind_onshore_01_9)
 +1 pi_u_hat(wind_onshore_01_9)
@@ -69360,7 +69360,7 @@ c_e_kkt_gen(wind_onshore_01_9)_:
 
 c_e_kkt_gen(wind_onshore_01_10)_:
 -1 lambda_hat(10)
-+1 bid_price(10)
++0.015 k(10)
 +1 mu_max_hat(wind_onshore_01_10)
 -1 mu_min_hat(wind_onshore_01_10)
 +1 pi_u_hat(wind_onshore_01_10)
@@ -69371,7 +69371,7 @@ c_e_kkt_gen(wind_onshore_01_10)_:
 
 c_e_kkt_gen(wind_onshore_01_11)_:
 -1 lambda_hat(11)
-+1 bid_price(11)
++0.015 k(11)
 +1 mu_max_hat(wind_onshore_01_11)
 -1 mu_min_hat(wind_onshore_01_11)
 +1 pi_u_hat(wind_onshore_01_11)
@@ -69382,7 +69382,7 @@ c_e_kkt_gen(wind_onshore_01_11)_:
 
 c_e_kkt_gen(wind_onshore_01_12)_:
 -1 lambda_hat(12)
-+1 bid_price(12)
++0.015 k(12)
 +1 mu_max_hat(wind_onshore_01_12)
 -1 mu_min_hat(wind_onshore_01_12)
 +1 pi_u_hat(wind_onshore_01_12)
@@ -69393,7 +69393,7 @@ c_e_kkt_gen(wind_onshore_01_12)_:
 
 c_e_kkt_gen(wind_onshore_01_13)_:
 -1 lambda_hat(13)
-+1 bid_price(13)
++0.015 k(13)
 +1 mu_max_hat(wind_onshore_01_13)
 -1 mu_min_hat(wind_onshore_01_13)
 +1 pi_u_hat(wind_onshore_01_13)
@@ -69404,7 +69404,7 @@ c_e_kkt_gen(wind_onshore_01_13)_:
 
 c_e_kkt_gen(wind_onshore_01_14)_:
 -1 lambda_hat(14)
-+1 bid_price(14)
++0.015 k(14)
 +1 mu_max_hat(wind_onshore_01_14)
 -1 mu_min_hat(wind_onshore_01_14)
 +1 pi_u_hat(wind_onshore_01_14)
@@ -69415,7 +69415,7 @@ c_e_kkt_gen(wind_onshore_01_14)_:
 
 c_e_kkt_gen(wind_onshore_01_15)_:
 -1 lambda_hat(15)
-+1 bid_price(15)
++0.015 k(15)
 +1 mu_max_hat(wind_onshore_01_15)
 -1 mu_min_hat(wind_onshore_01_15)
 +1 pi_u_hat(wind_onshore_01_15)
@@ -69426,7 +69426,7 @@ c_e_kkt_gen(wind_onshore_01_15)_:
 
 c_e_kkt_gen(wind_onshore_01_16)_:
 -1 lambda_hat(16)
-+1 bid_price(16)
++0.015 k(16)
 +1 mu_max_hat(wind_onshore_01_16)
 -1 mu_min_hat(wind_onshore_01_16)
 +1 pi_u_hat(wind_onshore_01_16)
@@ -69437,7 +69437,7 @@ c_e_kkt_gen(wind_onshore_01_16)_:
 
 c_e_kkt_gen(wind_onshore_01_17)_:
 -1 lambda_hat(17)
-+1 bid_price(17)
++0.015 k(17)
 +1 mu_max_hat(wind_onshore_01_17)
 -1 mu_min_hat(wind_onshore_01_17)
 +1 pi_u_hat(wind_onshore_01_17)
@@ -69448,7 +69448,7 @@ c_e_kkt_gen(wind_onshore_01_17)_:
 
 c_e_kkt_gen(wind_onshore_01_18)_:
 -1 lambda_hat(18)
-+1 bid_price(18)
++0.015 k(18)
 +1 mu_max_hat(wind_onshore_01_18)
 -1 mu_min_hat(wind_onshore_01_18)
 +1 pi_u_hat(wind_onshore_01_18)
@@ -69459,7 +69459,7 @@ c_e_kkt_gen(wind_onshore_01_18)_:
 
 c_e_kkt_gen(wind_onshore_01_19)_:
 -1 lambda_hat(19)
-+1 bid_price(19)
++0.015 k(19)
 +1 mu_max_hat(wind_onshore_01_19)
 -1 mu_min_hat(wind_onshore_01_19)
 +1 pi_u_hat(wind_onshore_01_19)
@@ -69470,7 +69470,7 @@ c_e_kkt_gen(wind_onshore_01_19)_:
 
 c_e_kkt_gen(wind_onshore_01_20)_:
 -1 lambda_hat(20)
-+1 bid_price(20)
++0.015 k(20)
 +1 mu_max_hat(wind_onshore_01_20)
 -1 mu_min_hat(wind_onshore_01_20)
 +1 pi_u_hat(wind_onshore_01_20)
@@ -69481,7 +69481,7 @@ c_e_kkt_gen(wind_onshore_01_20)_:
 
 c_e_kkt_gen(wind_onshore_01_21)_:
 -1 lambda_hat(21)
-+1 bid_price(21)
++0.015 k(21)
 +1 mu_max_hat(wind_onshore_01_21)
 -1 mu_min_hat(wind_onshore_01_21)
 +1 pi_u_hat(wind_onshore_01_21)
@@ -69492,7 +69492,7 @@ c_e_kkt_gen(wind_onshore_01_21)_:
 
 c_e_kkt_gen(wind_onshore_01_22)_:
 -1 lambda_hat(22)
-+1 bid_price(22)
++0.015 k(22)
 +1 mu_max_hat(wind_onshore_01_22)
 -1 mu_min_hat(wind_onshore_01_22)
 +1 pi_u_hat(wind_onshore_01_22)
@@ -98545,1153 +98545,1153 @@ c_u_nu_max_hat_binary_constr_3(22_10)_:
 
 c_u_nu_min_hat_binary_constr_1(0_1)_:
 +1 d(0_1)
-+10000 nu_min_hat_binary(0_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(0_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(0_2)_:
 +1 d(0_2)
-+10000 nu_min_hat_binary(0_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(0_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(0_3)_:
 +1 d(0_3)
-+10000 nu_min_hat_binary(0_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(0_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(0_4)_:
 +1 d(0_4)
-+10000 nu_min_hat_binary(0_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(0_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(0_5)_:
 +1 d(0_5)
-+10000 nu_min_hat_binary(0_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(0_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(0_6)_:
 +1 d(0_6)
-+10000 nu_min_hat_binary(0_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(0_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(0_7)_:
 +1 d(0_7)
-+10000 nu_min_hat_binary(0_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(0_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(0_8)_:
 +1 d(0_8)
-+10000 nu_min_hat_binary(0_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(0_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(0_9)_:
 +1 d(0_9)
-+10000 nu_min_hat_binary(0_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(0_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(0_10)_:
 +1 d(0_10)
-+10000 nu_min_hat_binary(0_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(0_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(1_1)_:
 +1 d(1_1)
-+10000 nu_min_hat_binary(1_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(1_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(1_2)_:
 +1 d(1_2)
-+10000 nu_min_hat_binary(1_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(1_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(1_3)_:
 +1 d(1_3)
-+10000 nu_min_hat_binary(1_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(1_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(1_4)_:
 +1 d(1_4)
-+10000 nu_min_hat_binary(1_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(1_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(1_5)_:
 +1 d(1_5)
-+10000 nu_min_hat_binary(1_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(1_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(1_6)_:
 +1 d(1_6)
-+10000 nu_min_hat_binary(1_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(1_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(1_7)_:
 +1 d(1_7)
-+10000 nu_min_hat_binary(1_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(1_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(1_8)_:
 +1 d(1_8)
-+10000 nu_min_hat_binary(1_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(1_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(1_9)_:
 +1 d(1_9)
-+10000 nu_min_hat_binary(1_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(1_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(1_10)_:
 +1 d(1_10)
-+10000 nu_min_hat_binary(1_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(1_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(2_1)_:
 +1 d(2_1)
-+10000 nu_min_hat_binary(2_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(2_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(2_2)_:
 +1 d(2_2)
-+10000 nu_min_hat_binary(2_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(2_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(2_3)_:
 +1 d(2_3)
-+10000 nu_min_hat_binary(2_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(2_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(2_4)_:
 +1 d(2_4)
-+10000 nu_min_hat_binary(2_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(2_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(2_5)_:
 +1 d(2_5)
-+10000 nu_min_hat_binary(2_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(2_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(2_6)_:
 +1 d(2_6)
-+10000 nu_min_hat_binary(2_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(2_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(2_7)_:
 +1 d(2_7)
-+10000 nu_min_hat_binary(2_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(2_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(2_8)_:
 +1 d(2_8)
-+10000 nu_min_hat_binary(2_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(2_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(2_9)_:
 +1 d(2_9)
-+10000 nu_min_hat_binary(2_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(2_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(2_10)_:
 +1 d(2_10)
-+10000 nu_min_hat_binary(2_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(2_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(3_1)_:
 +1 d(3_1)
-+10000 nu_min_hat_binary(3_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(3_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(3_2)_:
 +1 d(3_2)
-+10000 nu_min_hat_binary(3_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(3_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(3_3)_:
 +1 d(3_3)
-+10000 nu_min_hat_binary(3_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(3_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(3_4)_:
 +1 d(3_4)
-+10000 nu_min_hat_binary(3_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(3_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(3_5)_:
 +1 d(3_5)
-+10000 nu_min_hat_binary(3_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(3_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(3_6)_:
 +1 d(3_6)
-+10000 nu_min_hat_binary(3_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(3_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(3_7)_:
 +1 d(3_7)
-+10000 nu_min_hat_binary(3_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(3_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(3_8)_:
 +1 d(3_8)
-+10000 nu_min_hat_binary(3_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(3_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(3_9)_:
 +1 d(3_9)
-+10000 nu_min_hat_binary(3_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(3_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(3_10)_:
 +1 d(3_10)
-+10000 nu_min_hat_binary(3_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(3_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(4_1)_:
 +1 d(4_1)
-+10000 nu_min_hat_binary(4_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(4_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(4_2)_:
 +1 d(4_2)
-+10000 nu_min_hat_binary(4_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(4_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(4_3)_:
 +1 d(4_3)
-+10000 nu_min_hat_binary(4_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(4_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(4_4)_:
 +1 d(4_4)
-+10000 nu_min_hat_binary(4_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(4_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(4_5)_:
 +1 d(4_5)
-+10000 nu_min_hat_binary(4_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(4_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(4_6)_:
 +1 d(4_6)
-+10000 nu_min_hat_binary(4_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(4_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(4_7)_:
 +1 d(4_7)
-+10000 nu_min_hat_binary(4_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(4_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(4_8)_:
 +1 d(4_8)
-+10000 nu_min_hat_binary(4_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(4_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(4_9)_:
 +1 d(4_9)
-+10000 nu_min_hat_binary(4_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(4_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(4_10)_:
 +1 d(4_10)
-+10000 nu_min_hat_binary(4_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(4_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(5_1)_:
 +1 d(5_1)
-+10000 nu_min_hat_binary(5_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(5_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(5_2)_:
 +1 d(5_2)
-+10000 nu_min_hat_binary(5_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(5_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(5_3)_:
 +1 d(5_3)
-+10000 nu_min_hat_binary(5_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(5_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(5_4)_:
 +1 d(5_4)
-+10000 nu_min_hat_binary(5_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(5_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(5_5)_:
 +1 d(5_5)
-+10000 nu_min_hat_binary(5_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(5_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(5_6)_:
 +1 d(5_6)
-+10000 nu_min_hat_binary(5_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(5_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(5_7)_:
 +1 d(5_7)
-+10000 nu_min_hat_binary(5_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(5_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(5_8)_:
 +1 d(5_8)
-+10000 nu_min_hat_binary(5_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(5_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(5_9)_:
 +1 d(5_9)
-+10000 nu_min_hat_binary(5_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(5_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(5_10)_:
 +1 d(5_10)
-+10000 nu_min_hat_binary(5_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(5_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(6_1)_:
 +1 d(6_1)
-+10000 nu_min_hat_binary(6_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(6_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(6_2)_:
 +1 d(6_2)
-+10000 nu_min_hat_binary(6_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(6_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(6_3)_:
 +1 d(6_3)
-+10000 nu_min_hat_binary(6_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(6_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(6_4)_:
 +1 d(6_4)
-+10000 nu_min_hat_binary(6_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(6_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(6_5)_:
 +1 d(6_5)
-+10000 nu_min_hat_binary(6_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(6_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(6_6)_:
 +1 d(6_6)
-+10000 nu_min_hat_binary(6_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(6_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(6_7)_:
 +1 d(6_7)
-+10000 nu_min_hat_binary(6_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(6_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(6_8)_:
 +1 d(6_8)
-+10000 nu_min_hat_binary(6_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(6_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(6_9)_:
 +1 d(6_9)
-+10000 nu_min_hat_binary(6_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(6_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(6_10)_:
 +1 d(6_10)
-+10000 nu_min_hat_binary(6_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(6_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(7_1)_:
 +1 d(7_1)
-+10000 nu_min_hat_binary(7_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(7_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(7_2)_:
 +1 d(7_2)
-+10000 nu_min_hat_binary(7_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(7_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(7_3)_:
 +1 d(7_3)
-+10000 nu_min_hat_binary(7_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(7_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(7_4)_:
 +1 d(7_4)
-+10000 nu_min_hat_binary(7_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(7_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(7_5)_:
 +1 d(7_5)
-+10000 nu_min_hat_binary(7_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(7_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(7_6)_:
 +1 d(7_6)
-+10000 nu_min_hat_binary(7_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(7_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(7_7)_:
 +1 d(7_7)
-+10000 nu_min_hat_binary(7_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(7_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(7_8)_:
 +1 d(7_8)
-+10000 nu_min_hat_binary(7_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(7_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(7_9)_:
 +1 d(7_9)
-+10000 nu_min_hat_binary(7_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(7_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(7_10)_:
 +1 d(7_10)
-+10000 nu_min_hat_binary(7_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(7_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(8_1)_:
 +1 d(8_1)
-+10000 nu_min_hat_binary(8_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(8_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(8_2)_:
 +1 d(8_2)
-+10000 nu_min_hat_binary(8_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(8_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(8_3)_:
 +1 d(8_3)
-+10000 nu_min_hat_binary(8_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(8_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(8_4)_:
 +1 d(8_4)
-+10000 nu_min_hat_binary(8_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(8_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(8_5)_:
 +1 d(8_5)
-+10000 nu_min_hat_binary(8_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(8_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(8_6)_:
 +1 d(8_6)
-+10000 nu_min_hat_binary(8_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(8_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(8_7)_:
 +1 d(8_7)
-+10000 nu_min_hat_binary(8_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(8_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(8_8)_:
 +1 d(8_8)
-+10000 nu_min_hat_binary(8_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(8_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(8_9)_:
 +1 d(8_9)
-+10000 nu_min_hat_binary(8_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(8_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(8_10)_:
 +1 d(8_10)
-+10000 nu_min_hat_binary(8_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(8_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(9_1)_:
 +1 d(9_1)
-+10000 nu_min_hat_binary(9_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(9_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(9_2)_:
 +1 d(9_2)
-+10000 nu_min_hat_binary(9_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(9_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(9_3)_:
 +1 d(9_3)
-+10000 nu_min_hat_binary(9_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(9_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(9_4)_:
 +1 d(9_4)
-+10000 nu_min_hat_binary(9_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(9_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(9_5)_:
 +1 d(9_5)
-+10000 nu_min_hat_binary(9_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(9_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(9_6)_:
 +1 d(9_6)
-+10000 nu_min_hat_binary(9_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(9_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(9_7)_:
 +1 d(9_7)
-+10000 nu_min_hat_binary(9_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(9_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(9_8)_:
 +1 d(9_8)
-+10000 nu_min_hat_binary(9_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(9_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(9_9)_:
 +1 d(9_9)
-+10000 nu_min_hat_binary(9_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(9_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(9_10)_:
 +1 d(9_10)
-+10000 nu_min_hat_binary(9_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(9_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(10_1)_:
 +1 d(10_1)
-+10000 nu_min_hat_binary(10_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(10_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(10_2)_:
 +1 d(10_2)
-+10000 nu_min_hat_binary(10_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(10_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(10_3)_:
 +1 d(10_3)
-+10000 nu_min_hat_binary(10_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(10_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(10_4)_:
 +1 d(10_4)
-+10000 nu_min_hat_binary(10_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(10_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(10_5)_:
 +1 d(10_5)
-+10000 nu_min_hat_binary(10_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(10_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(10_6)_:
 +1 d(10_6)
-+10000 nu_min_hat_binary(10_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(10_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(10_7)_:
 +1 d(10_7)
-+10000 nu_min_hat_binary(10_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(10_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(10_8)_:
 +1 d(10_8)
-+10000 nu_min_hat_binary(10_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(10_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(10_9)_:
 +1 d(10_9)
-+10000 nu_min_hat_binary(10_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(10_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(10_10)_:
 +1 d(10_10)
-+10000 nu_min_hat_binary(10_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(10_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(11_1)_:
 +1 d(11_1)
-+10000 nu_min_hat_binary(11_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(11_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(11_2)_:
 +1 d(11_2)
-+10000 nu_min_hat_binary(11_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(11_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(11_3)_:
 +1 d(11_3)
-+10000 nu_min_hat_binary(11_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(11_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(11_4)_:
 +1 d(11_4)
-+10000 nu_min_hat_binary(11_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(11_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(11_5)_:
 +1 d(11_5)
-+10000 nu_min_hat_binary(11_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(11_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(11_6)_:
 +1 d(11_6)
-+10000 nu_min_hat_binary(11_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(11_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(11_7)_:
 +1 d(11_7)
-+10000 nu_min_hat_binary(11_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(11_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(11_8)_:
 +1 d(11_8)
-+10000 nu_min_hat_binary(11_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(11_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(11_9)_:
 +1 d(11_9)
-+10000 nu_min_hat_binary(11_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(11_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(11_10)_:
 +1 d(11_10)
-+10000 nu_min_hat_binary(11_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(11_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(12_1)_:
 +1 d(12_1)
-+10000 nu_min_hat_binary(12_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(12_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(12_2)_:
 +1 d(12_2)
-+10000 nu_min_hat_binary(12_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(12_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(12_3)_:
 +1 d(12_3)
-+10000 nu_min_hat_binary(12_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(12_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(12_4)_:
 +1 d(12_4)
-+10000 nu_min_hat_binary(12_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(12_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(12_5)_:
 +1 d(12_5)
-+10000 nu_min_hat_binary(12_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(12_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(12_6)_:
 +1 d(12_6)
-+10000 nu_min_hat_binary(12_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(12_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(12_7)_:
 +1 d(12_7)
-+10000 nu_min_hat_binary(12_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(12_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(12_8)_:
 +1 d(12_8)
-+10000 nu_min_hat_binary(12_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(12_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(12_9)_:
 +1 d(12_9)
-+10000 nu_min_hat_binary(12_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(12_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(12_10)_:
 +1 d(12_10)
-+10000 nu_min_hat_binary(12_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(12_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(13_1)_:
 +1 d(13_1)
-+10000 nu_min_hat_binary(13_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(13_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(13_2)_:
 +1 d(13_2)
-+10000 nu_min_hat_binary(13_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(13_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(13_3)_:
 +1 d(13_3)
-+10000 nu_min_hat_binary(13_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(13_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(13_4)_:
 +1 d(13_4)
-+10000 nu_min_hat_binary(13_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(13_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(13_5)_:
 +1 d(13_5)
-+10000 nu_min_hat_binary(13_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(13_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(13_6)_:
 +1 d(13_6)
-+10000 nu_min_hat_binary(13_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(13_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(13_7)_:
 +1 d(13_7)
-+10000 nu_min_hat_binary(13_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(13_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(13_8)_:
 +1 d(13_8)
-+10000 nu_min_hat_binary(13_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(13_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(13_9)_:
 +1 d(13_9)
-+10000 nu_min_hat_binary(13_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(13_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(13_10)_:
 +1 d(13_10)
-+10000 nu_min_hat_binary(13_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(13_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(14_1)_:
 +1 d(14_1)
-+10000 nu_min_hat_binary(14_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(14_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(14_2)_:
 +1 d(14_2)
-+10000 nu_min_hat_binary(14_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(14_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(14_3)_:
 +1 d(14_3)
-+10000 nu_min_hat_binary(14_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(14_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(14_4)_:
 +1 d(14_4)
-+10000 nu_min_hat_binary(14_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(14_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(14_5)_:
 +1 d(14_5)
-+10000 nu_min_hat_binary(14_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(14_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(14_6)_:
 +1 d(14_6)
-+10000 nu_min_hat_binary(14_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(14_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(14_7)_:
 +1 d(14_7)
-+10000 nu_min_hat_binary(14_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(14_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(14_8)_:
 +1 d(14_8)
-+10000 nu_min_hat_binary(14_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(14_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(14_9)_:
 +1 d(14_9)
-+10000 nu_min_hat_binary(14_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(14_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(14_10)_:
 +1 d(14_10)
-+10000 nu_min_hat_binary(14_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(14_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(15_1)_:
 +1 d(15_1)
-+10000 nu_min_hat_binary(15_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(15_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(15_2)_:
 +1 d(15_2)
-+10000 nu_min_hat_binary(15_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(15_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(15_3)_:
 +1 d(15_3)
-+10000 nu_min_hat_binary(15_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(15_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(15_4)_:
 +1 d(15_4)
-+10000 nu_min_hat_binary(15_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(15_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(15_5)_:
 +1 d(15_5)
-+10000 nu_min_hat_binary(15_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(15_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(15_6)_:
 +1 d(15_6)
-+10000 nu_min_hat_binary(15_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(15_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(15_7)_:
 +1 d(15_7)
-+10000 nu_min_hat_binary(15_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(15_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(15_8)_:
 +1 d(15_8)
-+10000 nu_min_hat_binary(15_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(15_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(15_9)_:
 +1 d(15_9)
-+10000 nu_min_hat_binary(15_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(15_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(15_10)_:
 +1 d(15_10)
-+10000 nu_min_hat_binary(15_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(15_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(16_1)_:
 +1 d(16_1)
-+10000 nu_min_hat_binary(16_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(16_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(16_2)_:
 +1 d(16_2)
-+10000 nu_min_hat_binary(16_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(16_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(16_3)_:
 +1 d(16_3)
-+10000 nu_min_hat_binary(16_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(16_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(16_4)_:
 +1 d(16_4)
-+10000 nu_min_hat_binary(16_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(16_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(16_5)_:
 +1 d(16_5)
-+10000 nu_min_hat_binary(16_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(16_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(16_6)_:
 +1 d(16_6)
-+10000 nu_min_hat_binary(16_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(16_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(16_7)_:
 +1 d(16_7)
-+10000 nu_min_hat_binary(16_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(16_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(16_8)_:
 +1 d(16_8)
-+10000 nu_min_hat_binary(16_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(16_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(16_9)_:
 +1 d(16_9)
-+10000 nu_min_hat_binary(16_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(16_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(16_10)_:
 +1 d(16_10)
-+10000 nu_min_hat_binary(16_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(16_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(17_1)_:
 +1 d(17_1)
-+10000 nu_min_hat_binary(17_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(17_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(17_2)_:
 +1 d(17_2)
-+10000 nu_min_hat_binary(17_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(17_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(17_3)_:
 +1 d(17_3)
-+10000 nu_min_hat_binary(17_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(17_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(17_4)_:
 +1 d(17_4)
-+10000 nu_min_hat_binary(17_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(17_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(17_5)_:
 +1 d(17_5)
-+10000 nu_min_hat_binary(17_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(17_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(17_6)_:
 +1 d(17_6)
-+10000 nu_min_hat_binary(17_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(17_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(17_7)_:
 +1 d(17_7)
-+10000 nu_min_hat_binary(17_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(17_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(17_8)_:
 +1 d(17_8)
-+10000 nu_min_hat_binary(17_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(17_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(17_9)_:
 +1 d(17_9)
-+10000 nu_min_hat_binary(17_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(17_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(17_10)_:
 +1 d(17_10)
-+10000 nu_min_hat_binary(17_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(17_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(18_1)_:
 +1 d(18_1)
-+10000 nu_min_hat_binary(18_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(18_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(18_2)_:
 +1 d(18_2)
-+10000 nu_min_hat_binary(18_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(18_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(18_3)_:
 +1 d(18_3)
-+10000 nu_min_hat_binary(18_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(18_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(18_4)_:
 +1 d(18_4)
-+10000 nu_min_hat_binary(18_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(18_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(18_5)_:
 +1 d(18_5)
-+10000 nu_min_hat_binary(18_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(18_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(18_6)_:
 +1 d(18_6)
-+10000 nu_min_hat_binary(18_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(18_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(18_7)_:
 +1 d(18_7)
-+10000 nu_min_hat_binary(18_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(18_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(18_8)_:
 +1 d(18_8)
-+10000 nu_min_hat_binary(18_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(18_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(18_9)_:
 +1 d(18_9)
-+10000 nu_min_hat_binary(18_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(18_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(18_10)_:
 +1 d(18_10)
-+10000 nu_min_hat_binary(18_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(18_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(19_1)_:
 +1 d(19_1)
-+10000 nu_min_hat_binary(19_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(19_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(19_2)_:
 +1 d(19_2)
-+10000 nu_min_hat_binary(19_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(19_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(19_3)_:
 +1 d(19_3)
-+10000 nu_min_hat_binary(19_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(19_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(19_4)_:
 +1 d(19_4)
-+10000 nu_min_hat_binary(19_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(19_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(19_5)_:
 +1 d(19_5)
-+10000 nu_min_hat_binary(19_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(19_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(19_6)_:
 +1 d(19_6)
-+10000 nu_min_hat_binary(19_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(19_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(19_7)_:
 +1 d(19_7)
-+10000 nu_min_hat_binary(19_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(19_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(19_8)_:
 +1 d(19_8)
-+10000 nu_min_hat_binary(19_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(19_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(19_9)_:
 +1 d(19_9)
-+10000 nu_min_hat_binary(19_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(19_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(19_10)_:
 +1 d(19_10)
-+10000 nu_min_hat_binary(19_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(19_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(20_1)_:
 +1 d(20_1)
-+10000 nu_min_hat_binary(20_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(20_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(20_2)_:
 +1 d(20_2)
-+10000 nu_min_hat_binary(20_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(20_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(20_3)_:
 +1 d(20_3)
-+10000 nu_min_hat_binary(20_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(20_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(20_4)_:
 +1 d(20_4)
-+10000 nu_min_hat_binary(20_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(20_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(20_5)_:
 +1 d(20_5)
-+10000 nu_min_hat_binary(20_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(20_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(20_6)_:
 +1 d(20_6)
-+10000 nu_min_hat_binary(20_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(20_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(20_7)_:
 +1 d(20_7)
-+10000 nu_min_hat_binary(20_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(20_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(20_8)_:
 +1 d(20_8)
-+10000 nu_min_hat_binary(20_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(20_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(20_9)_:
 +1 d(20_9)
-+10000 nu_min_hat_binary(20_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(20_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(20_10)_:
 +1 d(20_10)
-+10000 nu_min_hat_binary(20_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(20_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(21_1)_:
 +1 d(21_1)
-+10000 nu_min_hat_binary(21_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(21_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(21_2)_:
 +1 d(21_2)
-+10000 nu_min_hat_binary(21_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(21_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(21_3)_:
 +1 d(21_3)
-+10000 nu_min_hat_binary(21_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(21_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(21_4)_:
 +1 d(21_4)
-+10000 nu_min_hat_binary(21_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(21_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(21_5)_:
 +1 d(21_5)
-+10000 nu_min_hat_binary(21_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(21_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(21_6)_:
 +1 d(21_6)
-+10000 nu_min_hat_binary(21_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(21_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(21_7)_:
 +1 d(21_7)
-+10000 nu_min_hat_binary(21_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(21_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(21_8)_:
 +1 d(21_8)
-+10000 nu_min_hat_binary(21_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(21_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(21_9)_:
 +1 d(21_9)
-+10000 nu_min_hat_binary(21_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(21_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(21_10)_:
 +1 d(21_10)
-+10000 nu_min_hat_binary(21_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(21_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(22_1)_:
 +1 d(22_1)
-+10000 nu_min_hat_binary(22_1)
-<= 10000
++55618.85316125539 nu_min_hat_binary(22_1)
+<= 55618.85316125539
 
 c_u_nu_min_hat_binary_constr_1(22_2)_:
 +1 d(22_2)
-+10000 nu_min_hat_binary(22_2)
-<= 10000
++3042.349648749401 nu_min_hat_binary(22_2)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(22_3)_:
 +1 d(22_3)
-+10000 nu_min_hat_binary(22_3)
-<= 10000
++3042.349648749401 nu_min_hat_binary(22_3)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(22_4)_:
 +1 d(22_4)
-+10000 nu_min_hat_binary(22_4)
-<= 10000
++3042.349648749401 nu_min_hat_binary(22_4)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(22_5)_:
 +1 d(22_5)
-+10000 nu_min_hat_binary(22_5)
-<= 10000
++3042.349648749401 nu_min_hat_binary(22_5)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(22_6)_:
 +1 d(22_6)
-+10000 nu_min_hat_binary(22_6)
-<= 10000
++3042.349648749401 nu_min_hat_binary(22_6)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(22_7)_:
 +1 d(22_7)
-+10000 nu_min_hat_binary(22_7)
-<= 10000
++3042.349648749401 nu_min_hat_binary(22_7)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(22_8)_:
 +1 d(22_8)
-+10000 nu_min_hat_binary(22_8)
-<= 10000
++3042.349648749401 nu_min_hat_binary(22_8)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(22_9)_:
 +1 d(22_9)
-+10000 nu_min_hat_binary(22_9)
-<= 10000
++3042.349648749401 nu_min_hat_binary(22_9)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_1(22_10)_:
 +1 d(22_10)
-+10000 nu_min_hat_binary(22_10)
-<= 10000
++3042.349648749401 nu_min_hat_binary(22_10)
+<= 3042.349648749401
 
 c_u_nu_min_hat_binary_constr_3(0_1)_:
 +1 nu_min_hat(0_1)
@@ -144412,29 +144412,29 @@ c_u_pi_d_hat_binary_constr_3(wind_onshore_09_22)_:
 <= 0
 
 bounds
-   -500 <= lambda_hat(0) <= 3100
-   -500 <= lambda_hat(1) <= 3100
-   -500 <= lambda_hat(2) <= 3100
-   -500 <= lambda_hat(3) <= 3100
-   -500 <= lambda_hat(4) <= 3100
-   -500 <= lambda_hat(5) <= 3100
-   -500 <= lambda_hat(6) <= 3100
-   -500 <= lambda_hat(7) <= 3100
-   -500 <= lambda_hat(8) <= 3100
-   -500 <= lambda_hat(9) <= 3100
-   -500 <= lambda_hat(10) <= 3100
-   -500 <= lambda_hat(11) <= 3100
-   -500 <= lambda_hat(12) <= 3100
-   -500 <= lambda_hat(13) <= 3100
-   -500 <= lambda_hat(14) <= 3100
-   -500 <= lambda_hat(15) <= 3100
-   -500 <= lambda_hat(16) <= 3100
-   -500 <= lambda_hat(17) <= 3100
-   -500 <= lambda_hat(18) <= 3100
-   -500 <= lambda_hat(19) <= 3100
-   -500 <= lambda_hat(20) <= 3100
-   -500 <= lambda_hat(21) <= 3100
-   -500 <= lambda_hat(22) <= 3100
+   0 <= lambda_hat(0) <= 200
+   0 <= lambda_hat(1) <= 200
+   0 <= lambda_hat(2) <= 200
+   0 <= lambda_hat(3) <= 200
+   0 <= lambda_hat(4) <= 200
+   0 <= lambda_hat(5) <= 200
+   0 <= lambda_hat(6) <= 200
+   0 <= lambda_hat(7) <= 200
+   0 <= lambda_hat(8) <= 200
+   0 <= lambda_hat(9) <= 200
+   0 <= lambda_hat(10) <= 200
+   0 <= lambda_hat(11) <= 200
+   0 <= lambda_hat(12) <= 200
+   0 <= lambda_hat(13) <= 200
+   0 <= lambda_hat(14) <= 200
+   0 <= lambda_hat(15) <= 200
+   0 <= lambda_hat(16) <= 200
+   0 <= lambda_hat(17) <= 200
+   0 <= lambda_hat(18) <= 200
+   0 <= lambda_hat(19) <= 200
+   0 <= lambda_hat(20) <= 200
+   0 <= lambda_hat(21) <= 200
+   0 <= lambda_hat(22) <= 200
    0 <= g(OCGT_00_0) <= +inf
    0 <= g(OCGT_00_1) <= +inf
    0 <= g(OCGT_00_2) <= +inf
@@ -148299,29 +148299,29 @@ bounds
    0 <= c_down(wind_onshore_09_20) <= +inf
    0 <= c_down(wind_onshore_09_21) <= +inf
    0 <= c_down(wind_onshore_09_22) <= +inf
-   -500 <= bid_price(0) <= 3100
-   -500 <= bid_price(1) <= 3100
-   -500 <= bid_price(2) <= 3100
-   -500 <= bid_price(3) <= 3100
-   -500 <= bid_price(4) <= 3100
-   -500 <= bid_price(5) <= 3100
-   -500 <= bid_price(6) <= 3100
-   -500 <= bid_price(7) <= 3100
-   -500 <= bid_price(8) <= 3100
-   -500 <= bid_price(9) <= 3100
-   -500 <= bid_price(10) <= 3100
-   -500 <= bid_price(11) <= 3100
-   -500 <= bid_price(12) <= 3100
-   -500 <= bid_price(13) <= 3100
-   -500 <= bid_price(14) <= 3100
-   -500 <= bid_price(15) <= 3100
-   -500 <= bid_price(16) <= 3100
-   -500 <= bid_price(17) <= 3100
-   -500 <= bid_price(18) <= 3100
-   -500 <= bid_price(19) <= 3100
-   -500 <= bid_price(20) <= 3100
-   -500 <= bid_price(21) <= 3100
-   -500 <= bid_price(22) <= 3100
+   1 <= k(0) <= 206666
+   1 <= k(1) <= 206666
+   1 <= k(2) <= 206666
+   1 <= k(3) <= 206666
+   1 <= k(4) <= 206666
+   1 <= k(5) <= 206666
+   1 <= k(6) <= 206666
+   1 <= k(7) <= 206666
+   1 <= k(8) <= 206666
+   1 <= k(9) <= 206666
+   1 <= k(10) <= 206666
+   1 <= k(11) <= 206666
+   1 <= k(12) <= 206666
+   1 <= k(13) <= 206666
+   1 <= k(14) <= 206666
+   1 <= k(15) <= 206666
+   1 <= k(16) <= 206666
+   1 <= k(17) <= 206666
+   1 <= k(18) <= 206666
+   1 <= k(19) <= 206666
+   1 <= k(20) <= 206666
+   1 <= k(21) <= 206666
+   1 <= k(22) <= 206666
    0 <= d(0_1) <= +inf
    0 <= d(0_2) <= +inf
    0 <= d(0_3) <= +inf
@@ -153611,29 +153611,29 @@ bounds
    0 <= u(wind_onshore_09_20) <= 1
    0 <= u(wind_onshore_09_21) <= 1
    0 <= u(wind_onshore_09_22) <= 1
-   -500 <= lambda_(0) <= 3100
-   -500 <= lambda_(1) <= 3100
-   -500 <= lambda_(2) <= 3100
-   -500 <= lambda_(3) <= 3100
-   -500 <= lambda_(4) <= 3100
-   -500 <= lambda_(5) <= 3100
-   -500 <= lambda_(6) <= 3100
-   -500 <= lambda_(7) <= 3100
-   -500 <= lambda_(8) <= 3100
-   -500 <= lambda_(9) <= 3100
-   -500 <= lambda_(10) <= 3100
-   -500 <= lambda_(11) <= 3100
-   -500 <= lambda_(12) <= 3100
-   -500 <= lambda_(13) <= 3100
-   -500 <= lambda_(14) <= 3100
-   -500 <= lambda_(15) <= 3100
-   -500 <= lambda_(16) <= 3100
-   -500 <= lambda_(17) <= 3100
-   -500 <= lambda_(18) <= 3100
-   -500 <= lambda_(19) <= 3100
-   -500 <= lambda_(20) <= 3100
-   -500 <= lambda_(21) <= 3100
-   -500 <= lambda_(22) <= 3100
+   -500 <= lambda_(0) <= 200
+   -500 <= lambda_(1) <= 200
+   -500 <= lambda_(2) <= 200
+   -500 <= lambda_(3) <= 200
+   -500 <= lambda_(4) <= 200
+   -500 <= lambda_(5) <= 200
+   -500 <= lambda_(6) <= 200
+   -500 <= lambda_(7) <= 200
+   -500 <= lambda_(8) <= 200
+   -500 <= lambda_(9) <= 200
+   -500 <= lambda_(10) <= 200
+   -500 <= lambda_(11) <= 200
+   -500 <= lambda_(12) <= 200
+   -500 <= lambda_(13) <= 200
+   -500 <= lambda_(14) <= 200
+   -500 <= lambda_(15) <= 200
+   -500 <= lambda_(16) <= 200
+   -500 <= lambda_(17) <= 200
+   -500 <= lambda_(18) <= 200
+   -500 <= lambda_(19) <= 200
+   -500 <= lambda_(20) <= 200
+   -500 <= lambda_(21) <= 200
+   -500 <= lambda_(22) <= 200
    0 <= mu_max(OCGT_00_0) <= +inf
    0 <= mu_max(OCGT_00_1) <= +inf
    0 <= mu_max(OCGT_00_2) <= +inf

@@ -12,6 +12,7 @@ from bilevel_opt import (
     find_optimal_dispatch_linearized,
     find_optimal_dispatch_quadratic,
 )
+from bilevel_opt_bidprice import find_optimal_dispatch_bidprice
 from matplotlib import pyplot as plt
 from pyomo.opt import SolverFactory
 from uc_problem import solve_uc_problem
@@ -325,14 +326,13 @@ def sample_seasonal_weeks(datetime_index):
             random_week = random.choice(complete_weeks)
             week_idx = datetime_index[datetime_index.isocalendar().week == random_week]
             sampled_dates.extend([d.date() for d in week_idx])
-            
+
         # if there is no complete week just use one randome day from the season
         if not complete_weeks:
             seasonal_days = datetime_index[datetime_index.month.isin(months)]
             if not seasonal_days.empty:
                 random_day = random.choice(seasonal_days)
                 sampled_dates.append(random_day.date())
-
 
         print(f"{season} complete weeks: {complete_weeks}")
 
@@ -414,7 +414,9 @@ def join_demand_market_orders(demand_df, market_orders_df):
     demand_bids = demand_bids.copy()
     demand_bids["bid_num"] = demand_bids["bid_id"].str.extract(r"(\d+)$").fillna("1")
     demand_bids["bid_num"] = demand_bids["bid_num"].astype(int)
-    demand_bids = demand_bids.sort_values(["bid_num", demand_bids.index.name or "index"])
+    demand_bids = demand_bids.sort_values(
+        ["bid_num", demand_bids.index.name or "index"]
+    )
 
     # Build merged from unique bid timestamps to avoid length mismatches when
     # demand_df has a non-unique index (e.g. constructed from market_orders index)
@@ -441,7 +443,9 @@ def obtain_k_values(k_df, gens_df):
     # delete rows where unit_id is none
     k_df = k_df[k_df["unit_id"].notna()]
 
-    k_values_df = k_df.pivot_table(index="time", columns="unit_id", values="k", aggfunc="max")
+    k_values_df = k_df.pivot_table(
+        index="time", columns="unit_id", values="k", aggfunc="max"
+    )
     # k_values_df.reset_index(inplace=True)
 
     # sort columns to match the order of the columns in the gens_df
@@ -570,7 +574,9 @@ def add_export_bids_to_demand(demand_df, export_bids):
     start_idx = max(bid_nums) if bid_nums else 1
 
     unique_bid_ids = sorted(export_bids["bid_id"].unique())
-    bid_id_to_idx = {bid_id: start_idx + i + 1 for i, bid_id in enumerate(unique_bid_ids)}
+    bid_id_to_idx = {
+        bid_id: start_idx + i + 1 for i, bid_id in enumerate(unique_bid_ids)
+    }
 
     for ts, group in export_bids.groupby(export_bids.index):
         for _, row in group.iterrows():
@@ -581,7 +587,9 @@ def add_export_bids_to_demand(demand_df, export_bids):
     return demand_df.sort_index()
 
 
-def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df, marginal_costs_df):
+def add_import_exchange_units(
+    import_bids, gens_df, k_values_df, availability_df, marginal_costs_df
+):
     """
     Add import exchange units (positive volume bids) as non-strategic virtual generators.
 
@@ -630,32 +638,32 @@ def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df
         g_max = unit_vol.max()
         if g_max <= 0:
             continue
-        
+
         unit_price = (
-            import_bids[import_bids["unit_id"] == unit_id]["price"] 
+            import_bids[import_bids["unit_id"] == unit_id]["price"]
             .reindex(time_index)
             .fillna(0)
         )
 
         # Append a new row to gens_df with the required MPEC fields
         new_row = {col: np.nan for col in gens_df.columns}
-        new_row.update({
-            "unit": unit_id,
-            "technology": "exchange",
-            "fuel_type": "exchange",
-            "g_max": g_max,
-            "u_0": 0,
-            "g_0": 0,
-            "r_up": g_max,
-            "r_down": g_max,
-            "k_up": 0,
-            "k_down": 0,
-            "mc": 1.0,  # nominal; effective bid = mc * k = 1 * k
-        })
-        gens_df = pd.concat(
-            [gens_df, pd.DataFrame([new_row])], ignore_index=True
+        new_row.update(
+            {
+                "unit": unit_id,
+                "technology": "exchange",
+                "fuel_type": "exchange",
+                "g_max": g_max,
+                "u_0": 0,
+                "g_0": 0,
+                "r_up": g_max,
+                "r_down": g_max,
+                "k_up": 0,
+                "k_down": 0,
+                "mc": 1.0,  # nominal; effective bid = mc * k = 1 * k
+            }
         )
-        
+        gens_df = pd.concat([gens_df, pd.DataFrame([new_row])], ignore_index=True)
+
         # fill nan values in gens_df with 0
         gens_df = gens_df.fillna(0)
 
@@ -666,7 +674,7 @@ def add_import_exchange_units(import_bids, gens_df, k_values_df, availability_df
 
         # availability = volume(t) / g_max, clipped to [0, 1]
         availability_df[unit_id] = (unit_vol / g_max).clip(0, 1)
-        
+
         # add marginal costs column for the new unit, set to 1.0 (nominal; effective bid = mc * k = 1 * k)
         marginal_costs_df[unit_id] = 1.0
 
@@ -719,9 +727,13 @@ def run_MPEC(
     if not use_quadratic:
         errors = []
         if demand_bids > 1:
-            errors.append(f"demand_bids={demand_bids} (linearised MPEC only supports demand_bids=1)")
+            errors.append(
+                f"demand_bids={demand_bids} (linearised MPEC only supports demand_bids=1)"
+            )
         if not (availability_df == 1.0).all().all():
-            errors.append("availability_df contains values != 1.0 (linearised MPEC ignores availabilities)")
+            errors.append(
+                "availability_df contains values != 1.0 (linearised MPEC ignores availabilities)"
+            )
         if errors:
             raise ValueError(
                 "Incompatible settings for linearised MPEC (use_quadratic=False):\n"
@@ -729,7 +741,11 @@ def run_MPEC(
                 + "\nEither set use_quadratic=True or fix the conflicting settings."
             )
 
-    gens_df = gens_df.set_index("unit").copy() if "unit" in gens_df.columns else gens_df.copy(deep=True)
+    gens_df = (
+        gens_df.set_index("unit").copy()
+        if "unit" in gens_df.columns
+        else gens_df.copy(deep=True)
+    )
     print(f"Optimising unit '{opt_gen}'")
 
     demand_df = demand_df.reset_index(drop=True).copy(deep=True)
@@ -793,22 +809,162 @@ def run_MPEC(
     k_values_df_2[opt_gen] = k_series.fillna(fallback).astype(float).values
     # Ensure all generator columns are float — Pyomo cannot handle None/NaN as
     # LP coefficients and will produce InvalidNumber(None) in the LP file.
-    gen_cols = [c for c in k_values_df_2.columns if c not in ("date", "time", "index", "level_0")]
+    gen_cols = [
+        c
+        for c in k_values_df_2.columns
+        if c not in ("date", "time", "index", "level_0")
+    ]
     for col in gen_cols:
-        k_values_df_2[col] = pd.to_numeric(k_values_df_2[col], errors="coerce").fillna(1.0)
+        k_values_df_2[col] = pd.to_numeric(k_values_df_2[col], errors="coerce").fillna(
+            1.0
+        )
 
     print(k_values_df_2.dtypes)
-    print("None-Werte:", {c: (k_values_df_2[c].apply(lambda x: x is None)).sum() for c in k_values_df_2.columns})
+    print(
+        "None-Werte:",
+        {
+            c: (k_values_df_2[c].apply(lambda x: x is None)).sum()
+            for c in k_values_df_2.columns
+        },
+    )
 
-    
     updated_main_df_2, updated_supp_df_2 = solve_uc_problem(
-        gens_df, demand_df, k_values_df_2, availability_df, demand_bids=demand_bids,
+        gens_df,
+        demand_df,
+        k_values_df_2,
+        availability_df,
+        demand_bids=demand_bids,
         mc_df=mc_df_aligned,
     )
 
-    profits_1 = calculate_profits(main_df=main_df, supp_df=supp_df, gens_df=gens_df, mc_df=mc_df_aligned)
+    profits_1 = calculate_profits(
+        main_df=main_df, supp_df=supp_df, gens_df=gens_df, mc_df=mc_df_aligned
+    )
     profits_2 = calculate_profits(
-        main_df=updated_main_df_2, supp_df=updated_supp_df_2, gens_df=gens_df, mc_df=mc_df_aligned,
+        main_df=updated_main_df_2,
+        supp_df=updated_supp_df_2,
+        gens_df=gens_df,
+        mc_df=mc_df_aligned,
+    )
+
+    return profits_1, profits_2, updated_main_df_2, updated_supp_df_2
+
+
+def run_MPEC_bidprice(
+    opt_gen,
+    gens_df,
+    demand_df,
+    k_values_df,
+    availability_df,
+    big_w,
+    fixed_storage_dispatch=None,
+    bid_price_max=3100,
+    demand_bids=1,
+    mc_df=None,
+    time_limit=600,
+    big_M=10000,
+):
+    """
+    Run the bid-price MPEC with fixed storage dispatch, then re-solve a
+    clean UC problem to get accurate market prices from duals.
+
+    Args:
+        opt_gen: Name of the strategic generator.
+        fixed_storage_dispatch: Series indexed by timestep with net storage
+            MW (positive = discharge/generation, negative = charge/demand).
+            None = no storage effect.
+        bid_price_max: Upper bound on strategic bid price in €/MWh.
+
+    Returns:
+        (profits_1, profits_2, results_main_df, results_supp_df)
+        profits_1 — profits from the MPEC solution (using lambda_ as price)
+        profits_2 — profits re-computed via clean UC with optimised bids
+        results_main_df, results_supp_df — UC output DataFrames
+    """
+    gens_df = (
+        gens_df.set_index("unit").copy()
+        if "unit" in gens_df.columns
+        else gens_df.copy(deep=True)
+    )
+    print(f"Optimising unit '{opt_gen}' (bid-price formulation)")
+
+    demand_df = demand_df.reset_index(drop=True).copy(deep=True)
+
+    if mc_df is None:
+        mc_df_aligned = pd.DataFrame(
+            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index},
+            index=demand_df.index,
+        )
+    else:
+        mc_df_aligned = mc_df.reset_index(drop=True).copy()
+
+    k_values_df = k_values_df.copy(deep=True)
+    k_values_df.reset_index(inplace=True, drop=True)
+
+    availability_df = availability_df.copy(deep=True)
+    availability_df.reset_index(inplace=True, drop=True)
+
+    if fixed_storage_dispatch is not None:
+        fixed_storage_dispatch = fixed_storage_dispatch.copy()
+        fixed_storage_dispatch.index = demand_df.index
+
+    # Step 1: Run bid-price MPEC
+    main_df, supp_df, bid_prices = find_optimal_dispatch_bidprice(
+        gens_df=gens_df,
+        k_values_df=k_values_df,
+        availabilities_df=availability_df,
+        demand_df=demand_df,
+        opt_gen=opt_gen,
+        fixed_storage_dispatch=fixed_storage_dispatch,
+        bid_price_max=bid_price_max,
+        big_w=big_w,
+        time_limit=time_limit,
+        big_M=big_M,
+        demand_bids=demand_bids,
+        mc_df=mc_df_aligned,
+    )
+
+    if main_df is None:
+        raise RuntimeError("Bid-price MPEC was infeasible or failed.")
+
+    # Step 2: Convert bid_prices back to k_values for UC re-solve
+    # bid_price = k * mc → k = bid_price / mc
+    k_values_df_2 = k_values_df.copy()
+    mc_opt = mc_df_aligned[opt_gen]
+    bid_series = pd.to_numeric(bid_prices["bid_price"], errors="coerce")
+    k_from_bid = bid_series / mc_opt
+    k_from_bid = k_from_bid.replace([np.inf, -np.inf], 1.0).fillna(1.0)
+    k_values_df_2[opt_gen] = k_from_bid.values
+
+    gen_cols = [
+        c
+        for c in k_values_df_2.columns
+        if c not in ("date", "time", "index", "level_0")
+    ]
+    for col in gen_cols:
+        k_values_df_2[col] = pd.to_numeric(k_values_df_2[col], errors="coerce").fillna(
+            1.0
+        )
+
+    # Step 3: Re-solve UC with optimised k-values and fixed storage
+    updated_main_df_2, updated_supp_df_2 = solve_uc_problem(
+        gens_df,
+        demand_df,
+        k_values_df_2,
+        availability_df,
+        demand_bids=demand_bids,
+        mc_df=mc_df_aligned,
+        fixed_storage_dispatch=fixed_storage_dispatch,
+    )
+
+    profits_1 = calculate_profits(
+        main_df=main_df, supp_df=supp_df, gens_df=gens_df, mc_df=mc_df_aligned
+    )
+    profits_2 = calculate_profits(
+        main_df=updated_main_df_2,
+        supp_df=updated_supp_df_2,
+        gens_df=gens_df,
+        mc_df=mc_df_aligned,
     )
 
     return profits_1, profits_2, updated_main_df_2, updated_supp_df_2

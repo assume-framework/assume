@@ -19,12 +19,23 @@ from pyomo.opt import SolverFactory
 
 
 # %%
-def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_bids=1, mc_df=None):
+def solve_uc_problem(
+    gens_df,
+    demand_df,
+    k_values_df,
+    availabilities_df,
+    demand_bids=1,
+    mc_df=None,
+    fixed_storage_dispatch=None,
+):
     gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
     if mc_df is None:
         mc_df = pd.DataFrame(
             {gen: gens_df.at[gen, "mc"] for gen in gens_df.index}, index=demand_df.index
         )
+
+    if fixed_storage_dispatch is None:
+        fixed_storage_dispatch = pd.Series(0.0, index=demand_df.index)
 
     model = pyo.ConcreteModel()
 
@@ -71,9 +82,11 @@ def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_
 
     # energy balance constraint
     def balance_rule(model, t):
+        net_storage = float(fixed_storage_dispatch.at[t])
         return (
             sum(model.d[t, n] for n in model.demand_bids)
             - sum(model.g[i, t] for i in model.gens)
+            - net_storage
             == 0
         )
 
@@ -160,6 +173,7 @@ def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_
     # which would produce InvalidNumber(None) in the LP for instance_fixed_u.
     milp_status = results.solver.termination_condition
     from pyomo.opt import TerminationCondition
+
     if milp_status not in (TerminationCondition.optimal, TerminationCondition.feasible):
         raise RuntimeError(
             f"UC MILP solve failed with status '{milp_status}'. "
@@ -175,7 +189,7 @@ def solve_uc_problem(gens_df, demand_df, k_values_df, availabilities_df, demand_
             u_val = instance.u[gen, t].value
             if u_val is None:
                 u_val = 0  # fallback: unit off, gurobi will chose None if the binary value does not alter result
-                # for example if I have a generation bid of an exchange unit with volume_n = 0, then the binary variable for that unit can be either 0 or 1 without changing the objective or feasibility. 
+                # for example if I have a generation bid of an exchange unit with volume_n = 0, then the binary variable for that unit can be either 0 or 1 without changing the objective or feasibility.
             instance_fixed_u.u[gen, t].fix(round(u_val))
 
     solver.solve(instance_fixed_u, tee=False)
