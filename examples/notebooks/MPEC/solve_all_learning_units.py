@@ -4,10 +4,15 @@
 
 """
 Solve quadratic MPEC with fixed storage dispatch for every learning unit
-(solar + wind), then UC re-solve for each. Plot three panels:
-  1) lambda_ (MPEC non-hat dual)
-  2) lambda_hat (MPEC hat dual)
-  3) UC re-solve MCP (actual market price)
+(solar + wind), then UC re-solve for each.
+
+Pipeline:
+  1. Load exported data from ``mpec_input_data/`` (produced by
+     ``12_eval_futur_markets_data.ipynb``).
+  2. Optionally filter to a date range (set ``SOLVE_START`` / ``SOLVE_END``).
+  3. Fold storage dispatch into demand so storage is exogenous.
+  4. For each learning unit: solve MPEC -> UC re-solve -> collect prices.
+  5. Save CSVs + plot to ``results/``.
 """
 
 import matplotlib
@@ -18,8 +23,14 @@ import time
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from compare_quadratic_vs_bidprice import find_optimal_dispatch_quadratic_fixed_storage
+from bilevel_opt import find_optimal_dispatch_quadratic_fixed_storage
 from uc_problem import solve_uc_problem
+
+# ---------------------------------------------------------------------------
+# Configuration: set to None to solve all exported dates
+# ---------------------------------------------------------------------------
+SOLVE_START = "2013-01-28"  # e.g. "2013-01-28", or None for all
+SOLVE_END = "2013-01-28"  # e.g. "2013-01-28", or None for all
 
 out_dir = "mpec_input_data"
 
@@ -35,6 +46,14 @@ for col in demand_df.columns:
     if col.startswith("volume"):
         demand_df[col] = -demand_df[col]
         demand_df[col] = demand_df[col].clip(lower=0.01)
+
+# Optional date-range filter
+if SOLVE_START and SOLVE_END:
+    mask = (k_values_df.index >= SOLVE_START) & (k_values_df.index <= pd.Timestamp(SOLVE_END) + pd.Timedelta(days=1))
+    k_values_df = k_values_df[mask]
+    demand_df = demand_df[mask]
+    availability_df = availability_df[mask]
+    print(f"Filtered to {SOLVE_START} -- {SOLVE_END}: {len(demand_df)} timesteps")
 
 dispatch_df = pd.read_csv(f"{out_dir}/dispatch_df.csv", index_col=0)
 dispatch_df["time"] = pd.to_datetime(dispatch_df["time"])
@@ -147,11 +166,11 @@ if not res_lambda:
 all_lambda = pd.DataFrame(res_lambda)
 all_lambda_hat = pd.DataFrame(res_lambda_hat)
 all_uc = pd.DataFrame(res_uc_mcp)
-all_lambda.to_csv("results_lambda_storageindemand.csv")
-all_lambda_hat.to_csv("results_lambda_hat_storageindemand.csv")
-all_uc.to_csv("results_uc_mcp_storageindemand.csv")
+all_lambda.to_csv("results/results_lambda_storageindemand.csv")
+all_lambda_hat.to_csv("results/results_lambda_hat_storageindemand.csv")
+all_uc.to_csv("results/results_uc_mcp_storageindemand.csv")
 print(
-    "Saved results to results_lambda_storageindemand.csv, results_lambda_hat_storageindemand.csv, results_uc_mcp_storageindemand.csv"
+    "Saved results to results/ directory"
 )
 
 # --- PLOT ---
@@ -182,5 +201,5 @@ for ax, title, data in zip(axes, titles, data_dicts):
 
 axes[-1].set_xlabel("Hour")
 plt.tight_layout()
-plt.savefig("mcp_all_learning_units_storageindemand.png", dpi=150, bbox_inches="tight")
-print("\nPlot saved: mcp_all_learning_units_storageindemand.png")
+plt.savefig("results/mcp_all_learning_units_storageindemand.png", dpi=150, bbox_inches="tight")
+print("\nPlot saved: results/mcp_all_learning_units_storageindemand.png")

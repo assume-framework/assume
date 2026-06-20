@@ -22,6 +22,31 @@ def find_optimal_dispatch_linearized(
     big_M=10e6,
     mc_df=None,
 ):
+    """Linearized MPEC with binary expansion of the bid multiplier k.
+
+    The leader's bid multiplier is discretised into K binary steps, turning the
+    bilinear k*g term into a sum of binary-weighted generation variables.  This
+    avoids the need for Gurobi's NonConvex=2 but is slower for large K.
+
+    Does **not** support availability factors or storage dispatch -- use the
+    quadratic variants for scenarios that need those.
+
+    Args:
+        gens_df: Generator parameter DataFrame (index or column ``unit``).
+        k_values_df: Fixed bid multipliers for non-strategic generators.
+        demand_df: Demand bids with ``volume_*`` / ``price_*`` columns.
+        k_max: Upper bound on the leader's bid multiplier.
+        opt_gen: Name of the strategic (leader) generator.
+        big_w: Duality-gap penalty weight.
+        time_limit: Gurobi solver time limit in seconds.
+        print_results: If True, print per-timestep dispatch after solving.
+        K: Number of binary expansion steps for the linearised k variable.
+        big_M: Big-M constant for complementarity linearisation.
+        mc_df: Optional marginal-cost DataFrame; derived from gens_df if None.
+
+    Returns:
+        (main_df, supp_df, k_values) or (None, None, None) if infeasible.
+    """
     gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
     if mc_df is None:
         mc_df = pd.DataFrame(
@@ -605,6 +630,33 @@ def find_optimal_dispatch_quadratic(
     demand_bids=1,
     mc_df=None,
 ):
+    """Quadratic MPEC with continuous k-multiplier (original formulation).
+
+    The leader chooses k in [1, k_max] for ``opt_gen``.  The bilinear term
+    k * mc * g is handled by Gurobi's NonConvex=2 mode.  Supports per-unit
+    availability factors but does **not** handle storage -- storage is assumed
+    to be part of the lower-level problem via a separate formulation.
+
+    Use ``find_optimal_dispatch_quadratic_fixed_storage`` when storage dispatch
+    should be treated as a fixed exogenous parameter.
+
+    Args:
+        gens_df: Generator parameters (index=unit names).
+        k_values_df: Fixed bid multipliers per generator per timestep.
+        availabilities_df: Per-unit availability factors.
+        demand_df: Demand bid volumes/prices.
+        k_max: Upper bound on k for the leader.
+        opt_gen: Strategic generator name.
+        big_w: Duality-gap penalty weight.
+        time_limit: Gurobi time limit (seconds).
+        print_results: If True, print dispatch table after solving.
+        big_M: Big-M for complementarity linearisation.
+        demand_bids: Number of demand bid tranches.
+        mc_df: Marginal-cost DataFrame; built from gens_df if None.
+
+    Returns:
+        (main_df, supp_df, k_values) or (None, None, None) if infeasible.
+    """
     gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
     if mc_df is None:
         mc_df = pd.DataFrame(
@@ -635,7 +687,7 @@ def find_optimal_dispatch_quadratic(
         model.time, bounds=(1, k_max), within=pyo.NonNegativeReals
     )  # Bidding decision at timestep t as a multiplier of the marginal costs — upper-level decision
     model.lambda_ = pyo.Var(
-        model.time, within=pyo.Reals, bounds=(-500, 200)
+        model.time, within=pyo.Reals, bounds=(0, 300)
     )  # Market clearing price — lower-level dual variable
     model.u = pyo.Var(
         model.gens, model.time, within=pyo.Binary
@@ -656,7 +708,7 @@ def find_optimal_dispatch_quadratic(
 
     # duals of LP relaxation
     # Note: ohne Hut = die „echten“ KKT-Duals, mit Komplementarität, evtl. nichtlinear.; mit Hut = linearisierte / relaxierte Variablen, die dieselben Bedingungen abbilden, aber in einem LP/MILP-freundlichen Format.
-    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(0, 200))
+    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(0, 300))
     model.mu_max_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.mu_min_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
     model.nu_max_hat = pyo.Var(
@@ -791,10 +843,11 @@ def find_optimal_dispatch_quadratic(
 
     # max ramp up constraint
     def ru_max_rule(model, i, t):
-        # 	(7h)
+        # 	(7g)
         if t == 0:
             return model.g[i, t] - gens_df.at[i, "g_0"] <= gens_df.at[i, "r_up"]
         else:
+            # 	(7h)
             return model.g[i, t] - model.g[i, t - 1] <= gens_df.at[i, "r_up"]
 
     model.ru_max = pyo.Constraint(model.gens, model.time, rule=ru_max_rule)
@@ -805,6 +858,7 @@ def find_optimal_dispatch_quadratic(
         if t == 0:
             return gens_df.at[i, "g_0"] - model.g[i, t] <= gens_df.at[i, "r_down"]
         else:
+            # (7j)
             return model.g[i, t - 1] - model.g[i, t] <= gens_df.at[i, "r_down"]
 
     model.rd_max = pyo.Constraint(model.gens, model.time, rule=rd_max_rule)
@@ -817,6 +871,7 @@ def find_optimal_dispatch_quadratic(
                 model.c_up[i, t]
                 >= (model.u[i, t] - gens_df.at[i, "u_0"]) * gens_df.at[i, "k_up"]
             )
+        # (7n)
         else:
             return (
                 model.c_up[i, t]
@@ -829,13 +884,14 @@ def find_optimal_dispatch_quadratic(
 
     # shut down cost constraint
     def shut_down_cost_rule(model, i, t):
-        # (7n)
+        # (7o)
         if t == 0:
             return (
                 model.c_down[i, t]
                 >= (gens_df.at[i, "u_0"] - model.u[i, t]) * gens_df.at[i, "k_down"]
             )
         else:
+        # (7p)
             return (
                 model.c_down[i, t]
                 >= (model.u[i, t - 1] - model.u[i, t]) * gens_df.at[i, "k_down"]
@@ -847,7 +903,7 @@ def find_optimal_dispatch_quadratic(
 
     # dual constraints
     def gen_dual_rule(model, i, t):
-        # (7aa) – Stationarity with respect to generation variable 𝑔𝑖,𝑡
+        # (7r) & (7s) – Stationarity with respect to generation variable 𝑔𝑖,𝑡
         # Conditional parts based on `i` and `t`
         k_term = model.k[t] if i == opt_gen else k_values_df.at[t, i]
         pi_u_next_term = 0 if t == model.time.at(-1) else model.pi_u[i, t + 1]
@@ -869,7 +925,7 @@ def find_optimal_dispatch_quadratic(
     model.gen_dual = pyo.Constraint(model.gens, model.time, rule=gen_dual_rule)
 
     def status_dual_rule(model, i, t):
-        # (7ab) – Stationarity w.r.t. the binary unit commitment variable
+        # (7t) – Stationarity w.r.t. the binary unit commitment variable
         if t != model.time.at(-1):
             return (
                 -model.mu_max[i, t]
@@ -883,6 +939,7 @@ def find_optimal_dispatch_quadratic(
                 >= 0
             )
         else:
+            # (7u)
             return (
                 -model.mu_max[i, t]
                 * gens_df.at[i, "g_max"]
@@ -896,7 +953,7 @@ def find_optimal_dispatch_quadratic(
     model.status_dual = pyo.Constraint(model.gens, model.time, rule=status_dual_rule)
 
     def demand_dual_rule(model, t, n):
-        # (7ac) – Stationarity w.r.t. demand variable 𝑑𝑡
+        # (7x) 
         return (
             -demand_df.at[t, f"price_{n}"] + model.lambda_[t] + model.nu_max[t, n] >= 0
         )
@@ -908,7 +965,7 @@ def find_optimal_dispatch_quadratic(
     # KKT conditions
     # Stationarity conditions
     def kkt_gen_rule(model, i, t):
-        # (7ae) – Stationarity (relaxed KKT) w.r.t. the generation variable 𝑔𝑖,𝑡
+        # (7aa) & (7ab) – Stationarity (relaxed KKT) w.r.t. the generation variable 𝑔𝑖,𝑡
         # Conditional parts based on `i` and `t`
         k_term = model.k[t] if i == opt_gen else k_values_df.at[t, i]
         pi_u_hat_next_term = 0 if t == model.time.at(-1) else model.pi_u_hat[i, t + 1]
@@ -930,7 +987,7 @@ def find_optimal_dispatch_quadratic(
     model.kkt_gen = pyo.Constraint(model.gens, model.time, rule=kkt_gen_rule)
 
     def kkt_demand_rule(model, t, n):
-        # (7af) – Stationarity (relaxed KKT) w.r.t. the demand variable 𝑑𝑡
+        # (7ac) – Stationarity (relaxed KKT) w.r.t. the demand variable 𝑑𝑡
         return (
             -demand_df.at[t, f"price_{n}"]
             + model.lambda_hat[t]
@@ -944,13 +1001,14 @@ def find_optimal_dispatch_quadratic(
     )
 
     # Complementary slackness conditions
-    # for generation and demand upper bounds
-    # (7t)–(7y), Relaxed or reformulated versions of (7ad)–(7ah), MILP-friendly using binaries + big-M
+    # MILP-friendly using binaries + big-M
+    
+    # (7af)
     def mu_max_hat_binary_rule_1(model, i, t):
         return (
             model.g[i, t]
             - gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
-        ) <= max(gens_df["g_max"] * availabilities_df.at[t, i]) * (
+        ) <= max(gens_df["g_max"]) * (
             1 - model.mu_max_hat_binary[i, t]
         )
 
@@ -958,7 +1016,7 @@ def find_optimal_dispatch_quadratic(
         return (
             model.g[i, t]
             - gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
-        ) >= -max(gens_df["g_max"] * availabilities_df.at[t, i]) * (
+        ) >= -max(gens_df["g_max"]) * (
             1 - model.mu_max_hat_binary[i, t]
         )
 
@@ -977,6 +1035,7 @@ def find_optimal_dispatch_quadratic(
 
     model.nu_max_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
 
+    # (7ah)
     def nu_max_hat_binary_rule_1(model, t, n):
         return model.d[t, n] - demand_df.at[t, f"volume_{n}"] <= max(
             demand_df[f"volume_{n}"]
@@ -1002,6 +1061,7 @@ def find_optimal_dispatch_quadratic(
 
     model.nu_min_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
 
+    # (7ag)
     def nu_min_hat_binary_rule_1(model, t, n):
         return model.d[t, n] <= big_M * (1 - model.nu_min_hat_binary[t, n])
 
@@ -1017,10 +1077,10 @@ def find_optimal_dispatch_quadratic(
     )
 
     # Complementary slackness conditions
-    # for ramp-up and ramp-down residuals
-    # (??)–(??), Relaxed or reformulated versions of (7ai)–(7aj), MILP-friendly using binaries + big-M
+    # for ramp-up and ramp-down residuals, MILP-friendly using binaries + big-M
+    
     model.pi_u_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
-
+    # (7ai)
     def pi_u_hat_binary_rule_1(model, i, t):
         if t == 0:
             return model.g[i, t] - gens_df.at[i, "g_0"] - gens_df.at[
@@ -1055,7 +1115,7 @@ def find_optimal_dispatch_quadratic(
     )
 
     model.pi_d_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
-
+    # (7aj)
     def pi_d_hat_binary_rule_1(model, i, t):
         if t == 0:
             return gens_df.at[i, "g_0"] - model.g[i, t] - gens_df.at[
@@ -1090,23 +1150,37 @@ def find_optimal_dispatch_quadratic(
     )
 
     # ---------------------------------------------------------------------------
-    # solve
+    
+    # --- SOLVE ---
     instance = model.create_instance()
-
     solver = SolverFactory("gurobi")
-    options = {
-        "LogToConsole": print_results,
-        "TimeLimit": time_limit,
-        "MIPGap": 0.03,
-        # "MIPFocus": 3,
-    }
-
     solver.options["NonConvex"] = 2
-    results = solver.solve(instance, options=options, tee=print_results)
+    options = {
+        "LogToConsole": 1,
+        "TimeLimit": time_limit,
+        "MIPGap": 1,
+        "DualReductions": 0,
+        "MIPFocus": 2,           # focus on finding feasible solutions
+        "Heuristics": 0.2,       # more heuristic effort
+        "Presolve": 2,           # aggressive presolve
+        "Cuts": 2,               # aggressive cuts
+        "DualReductions": 0,
+    }
+    results = solver.solve(instance, options=options, tee=True)
 
-    # check if solver exited due to time limit
-    if results.solver.termination_condition == pyo.TerminationCondition.maxTimeLimit:
-        print("Solver did not converge to an optimal solution")
+    print(f"\nSolver status: {results.solver.status}")
+    print(f"Termination: {results.solver.termination_condition}")
+
+    if results.solver.termination_condition in (
+        pyo.TerminationCondition.infeasible,
+        pyo.TerminationCondition.infeasibleOrUnbounded,
+    ):
+        instance.write(
+            "debug_quadratic.lp", io_options={"symbolic_solver_labels": True}
+        )
+        print("Wrote debug_quadratic.lp")
+        return None, None, None
+
 
     # ---------------------------------------------------------------------------
     # extract results
@@ -1156,578 +1230,6 @@ def find_optimal_dispatch_quadratic(
 
     return main_df, supp_df, k_values
 
-
-def find_optimal_dispatch_quadratic_fixed_storage(
-    gens_df,
-    k_values_df,
-    availabilities_df,
-    demand_df,
-    k_max,
-    opt_gen,
-    fixed_storage_dispatch=None,
-    big_w=10000,
-    time_limit=60,
-    print_results=False,
-    big_M=10e6,
-    demand_bids=1,
-    mc_df=None,
-):
-    gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
-    if mc_df is None:
-        mc_df = pd.DataFrame(
-            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index}, index=demand_df.index
-        )
-
-    if fixed_storage_dispatch is None:
-        fixed_storage_dispatch = pd.Series(0.0, index=demand_df.index)
-
-    model = pyo.ConcreteModel()
-
-    # sets
-    model.time = pyo.Set(initialize=demand_df.index)
-    model.gens = pyo.Set(initialize=gens_df.index)
-    model.demand_bids = pyo.Set(initialize=np.arange(1, demand_bids + 1))
-
-    # primary variables
-    model.g = pyo.Var(
-        model.gens, model.time, within=pyo.NonNegativeReals
-    )  # Power output of producer 𝑖 at period 𝑡 (MW) — lower-level primal variable
-    model.d = pyo.Var(
-        model.time, model.demand_bids, within=pyo.NonNegativeReals
-    )  # satisfied demand at period 𝑡, from the multiple demand-bids n (MW)
-    model.c_up = pyo.Var(
-        model.gens, model.time, within=pyo.NonNegativeReals
-    )  # Start-up cost of producer 𝑖 at period 𝑡 (€)
-    model.c_down = pyo.Var(
-        model.gens, model.time, within=pyo.NonNegativeReals
-    )  # Shut-down cost of producer 𝑖 at period 𝑡 (€)
-    model.k = pyo.Var(
-        model.time, bounds=(1, k_max), within=pyo.NonNegativeReals
-    )  # Bidding decision at timestep t as a multiplier of the marginal costs — upper-level decision
-    model.lambda_ = pyo.Var(
-        model.time, within=pyo.Reals, bounds=(-500, 200)
-    )  # Market clearing price — lower-level dual variable
-    model.u = pyo.Var(
-        model.gens, model.time, within=pyo.Binary
-    )  # Binary UC status of producer 𝑖 at period 𝑡 (𝑢 = 1 if it is on, 𝑢 = 0 if it is off)
-
-    # secondary variables
-    model.mu_max = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-    model.mu_min = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-    model.nu_max = pyo.Var(model.time, model.demand_bids, within=pyo.NonNegativeReals)
-
-    model.pi_u = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-    model.pi_d = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-
-    model.sigma_u = pyo.Var(model.gens, model.time, bounds=(0, 1))
-    model.sigma_d = pyo.Var(model.gens, model.time, bounds=(0, 1))
-
-    model.psi_max = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-
-    # duals of LP relaxation
-    # Note: ohne Hut = die „echten“ KKT-Duals, mit Komplementarität, evtl. nichtlinear.; mit Hut = linearisierte / relaxierte Variablen, die dieselben Bedingungen abbilden, aber in einem LP/MILP-freundlichen Format.
-    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(0, 200))
-    model.mu_max_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-    model.mu_min_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-    model.nu_max_hat = pyo.Var(
-        model.time, model.demand_bids, within=pyo.NonNegativeReals
-    )
-    model.nu_min_hat = pyo.Var(
-        model.time, model.demand_bids, within=pyo.NonNegativeReals
-    )
-    model.pi_u_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-    model.pi_d_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
-
-    # binary expansion variables
-    model.mu_max_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
-
-    # ---------------------------------------------------------------------------
-    # objective rules
-    def primary_objective_rule(model):
-        # This is the strategic producer’s revenue based on the market clearing price and actual production, minus their marginal cost and startup/shutdown costs.
-        # (7a) (1st line)
-        return sum(
-            model.lambda_hat[t] * model.g[opt_gen, t]
-            - mc_df.at[t, opt_gen] * model.g[opt_gen, t]
-            - model.c_up[opt_gen, t]
-            - model.c_down[opt_gen, t]
-            for t in model.time
-        )
-
-    def duality_gap_part_1_rule(model):
-        # (7a) (2nd line)
-        # Lower-level primal cost, basically system costs
-        expr = sum(
-            (
-                (
-                    mc_df.at[t, gen] * model.k[t] * model.g[gen, t]
-                    + model.c_up[gen, t]
-                    + model.c_down[gen, t]
-                )
-                if gen == opt_gen
-                else (
-                    k_values_df.at[t, gen] * mc_df.at[t, gen] * model.g[gen, t]
-                    + model.c_up[gen, t]
-                    + model.c_down[gen, t]
-                )
-            )
-            for gen in model.gens
-            for t in model.time
-        )
-        expr -= sum(
-            demand_df.at[t, f"price_{n}"] * model.d[t, n]
-            for t in model.time
-            for n in model.demand_bids
-        )
-        return expr
-
-    def duality_gap_part_2_rule(model):
-        # (7a) (3rd line)
-        # objective value of the dual problem, using the current values of the dual variables
-        expr = -sum(
-            model.nu_max[t, n] * demand_df.at[t, f"volume_{n}"]
-            for t in model.time
-            for n in model.demand_bids
-        )
-
-        expr -= sum(
-            model.pi_u[i, t] * gens_df.at[i, "r_up"]
-            for i in model.gens
-            for t in model.time
-        )
-
-        expr -= sum(
-            model.pi_d[i, t] * gens_df.at[i, "r_down"]
-            for i in model.gens
-            for t in model.time
-        )
-
-        expr -= sum(model.pi_u[i, 0] * gens_df.at[i, "g_0"] for i in model.gens)
-
-        expr += sum(model.pi_d[i, 0] * gens_df.at[i, "g_0"] for i in model.gens)
-
-        expr -= sum(
-            model.sigma_u[i, 0] * gens_df.at[i, "k_up"] * gens_df.at[i, "u_0"]
-            for i in model.gens
-        )
-
-        expr += sum(
-            model.sigma_d[i, 0] * gens_df.at[i, "k_down"] * gens_df.at[i, "u_0"]
-            for i in model.gens
-        )
-
-        expr -= sum(model.psi_max[i, t] for i in model.gens for t in model.time)
-
-        return expr
-
-    def final_objective_rule(model):
-        # (7a) overall
-        # summing up the primal objective and the duality gap (difference between the primal cost and dual value, which should be zero at optimality)
-        return primary_objective_rule(model) - big_w * (
-            duality_gap_part_1_rule(model) - duality_gap_part_2_rule(model)
-        )
-
-    model.objective = pyo.Objective(expr=final_objective_rule, sense=pyo.maximize)
-
-    # ---------------------------------------------------------------------------
-    # constraints
-    # energy balance constraint
-    def balance_rule(model, t):
-        # (7d)
-        # added fixed storage dispatch, as SoC modelling consistently on lower and higher level break computation
-        net_storage = float(fixed_storage_dispatch.at[t])
-        return (
-            sum(model.d[t, n] for n in model.demand_bids)
-            - sum(model.g[i, t] for i in model.gens)
-            - net_storage
-            == 0
-        )
-
-    model.balance = pyo.Constraint(model.time, rule=balance_rule)
-
-    # max generation constraint
-    def g_max_rule(model, i, t):
-        # (7e)
-        return (
-            model.g[i, t]
-            <= gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
-        )
-
-    model.g_max = pyo.Constraint(model.gens, model.time, rule=g_max_rule)
-
-    # max demand constraint
-    def d_max_rule(model, t, n):
-        # (7f)
-        return model.d[t, n] <= demand_df.at[t, f"volume_{n}"]
-
-    model.d_max = pyo.Constraint(model.time, model.demand_bids, rule=d_max_rule)
-
-    # max ramp up constraint
-    def ru_max_rule(model, i, t):
-        # 	(7h)
-        if t == 0:
-            return model.g[i, t] - gens_df.at[i, "g_0"] <= gens_df.at[i, "r_up"]
-        else:
-            return model.g[i, t] - model.g[i, t - 1] <= gens_df.at[i, "r_up"]
-
-    model.ru_max = pyo.Constraint(model.gens, model.time, rule=ru_max_rule)
-
-    # max ramp down constraint
-    def rd_max_rule(model, i, t):
-        # (7i)
-        if t == 0:
-            return gens_df.at[i, "g_0"] - model.g[i, t] <= gens_df.at[i, "r_down"]
-        else:
-            return model.g[i, t - 1] - model.g[i, t] <= gens_df.at[i, "r_down"]
-
-    model.rd_max = pyo.Constraint(model.gens, model.time, rule=rd_max_rule)
-
-    # start up cost constraint
-    def start_up_cost_rule(model, i, t):
-        # (7m)
-        if t == 0:
-            return (
-                model.c_up[i, t]
-                >= (model.u[i, t] - gens_df.at[i, "u_0"]) * gens_df.at[i, "k_up"]
-            )
-        else:
-            return (
-                model.c_up[i, t]
-                >= (model.u[i, t] - model.u[i, t - 1]) * gens_df.at[i, "k_up"]
-            )
-
-    model.start_up_cost = pyo.Constraint(
-        model.gens, model.time, rule=start_up_cost_rule
-    )
-
-    # shut down cost constraint
-    def shut_down_cost_rule(model, i, t):
-        # (7n)
-        if t == 0:
-            return (
-                model.c_down[i, t]
-                >= (gens_df.at[i, "u_0"] - model.u[i, t]) * gens_df.at[i, "k_down"]
-            )
-        else:
-            return (
-                model.c_down[i, t]
-                >= (model.u[i, t - 1] - model.u[i, t]) * gens_df.at[i, "k_down"]
-            )
-
-    model.shut_down_cost = pyo.Constraint(
-        model.gens, model.time, rule=shut_down_cost_rule
-    )
-
-    # dual constraints
-    def gen_dual_rule(model, i, t):
-        # (7aa) – Stationarity with respect to generation variable 𝑔𝑖,𝑡
-        # Conditional parts based on `i` and `t`
-        k_term = model.k[t] if i == opt_gen else k_values_df.at[t, i]
-        pi_u_next_term = 0 if t == model.time.at(-1) else model.pi_u[i, t + 1]
-        pi_d_next_term = 0 if t == model.time.at(-1) else model.pi_d[i, t + 1]
-
-        # Combined expression
-        return (
-            k_term * mc_df.at[t, i]
-            - model.lambda_[t]
-            + model.mu_max[i, t]
-            - model.mu_min[i, t]
-            + model.pi_u[i, t]
-            - pi_u_next_term
-            - model.pi_d[i, t]
-            + pi_d_next_term
-            == 0
-        )
-
-    model.gen_dual = pyo.Constraint(model.gens, model.time, rule=gen_dual_rule)
-
-    def status_dual_rule(model, i, t):
-        # (7ab) – Stationarity w.r.t. the binary unit commitment variable
-        if t != model.time.at(-1):
-            return (
-                -model.mu_max[i, t]
-                * gens_df.at[i, "g_max"]
-                * availabilities_df.at[t, i]
-                + (model.sigma_u[i, t] - model.sigma_u[i, t + 1])
-                * gens_df.at[i, "k_up"]
-                - (model.sigma_d[i, t] - model.sigma_d[i, t + 1])
-                * gens_df.at[i, "k_down"]
-                + model.psi_max[i, t]
-                >= 0
-            )
-        else:
-            return (
-                -model.mu_max[i, t]
-                * gens_df.at[i, "g_max"]
-                * availabilities_df.at[t, i]
-                + model.sigma_u[i, t] * gens_df.at[i, "k_up"]
-                - model.sigma_d[i, t] * gens_df.at[i, "k_down"]
-                + model.psi_max[i, t]
-                >= 0
-            )
-
-    model.status_dual = pyo.Constraint(model.gens, model.time, rule=status_dual_rule)
-
-    def demand_dual_rule(model, t, n):
-        # (7ac) – Stationarity w.r.t. demand variable 𝑑𝑡
-        return (
-            -demand_df.at[t, f"price_{n}"] + model.lambda_[t] + model.nu_max[t, n] >= 0
-        )
-
-    model.demand_dual = pyo.Constraint(
-        model.time, model.demand_bids, rule=demand_dual_rule
-    )
-
-    # KKT conditions
-    # Stationarity conditions
-    def kkt_gen_rule(model, i, t):
-        # (7ae) – Stationarity (relaxed KKT) w.r.t. the generation variable 𝑔𝑖,𝑡
-        # Conditional parts based on `i` and `t`
-        k_term = model.k[t] if i == opt_gen else k_values_df.at[t, i]
-        pi_u_hat_next_term = 0 if t == model.time.at(-1) else model.pi_u_hat[i, t + 1]
-        pi_d_hat_next_term = 0 if t == model.time.at(-1) else model.pi_d_hat[i, t + 1]
-
-        # Combined expression
-        return (
-            k_term * mc_df.at[t, i]
-            - model.lambda_hat[t]
-            + model.mu_max_hat[i, t]
-            - model.mu_min_hat[i, t]
-            + model.pi_u_hat[i, t]
-            - pi_u_hat_next_term
-            - model.pi_d_hat[i, t]
-            + pi_d_hat_next_term
-            == 0
-        )
-
-    model.kkt_gen = pyo.Constraint(model.gens, model.time, rule=kkt_gen_rule)
-
-    def kkt_demand_rule(model, t, n):
-        # (7af) – Stationarity (relaxed KKT) w.r.t. the demand variable 𝑑𝑡
-        return (
-            -demand_df.at[t, f"price_{n}"]
-            + model.lambda_hat[t]
-            + model.nu_max_hat[t, n]
-            - model.nu_min_hat[t, n]
-            == 0
-        )
-
-    model.kkt_demand = pyo.Constraint(
-        model.time, model.demand_bids, rule=kkt_demand_rule
-    )
-
-    # Complementary slackness conditions
-    # for generation and demand upper bounds
-    # (7t)–(7y), Relaxed or reformulated versions of (7ad)–(7ah), MILP-friendly using binaries + big-M
-    def mu_max_hat_binary_rule_1(model, i, t):
-        return (
-            model.g[i, t]
-            - gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
-        ) <= max(gens_df["g_max"] * availabilities_df.at[t, i]) * (
-            1 - model.mu_max_hat_binary[i, t]
-        )
-
-    def mu_max_hat_binary_rule_2(model, i, t):
-        return (
-            model.g[i, t]
-            - gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
-        ) >= -max(gens_df["g_max"] * availabilities_df.at[t, i]) * (
-            1 - model.mu_max_hat_binary[i, t]
-        )
-
-    def mu_max_hat_binary_rule_3(model, i, t):
-        return model.mu_max_hat[i, t] <= big_M * model.mu_max_hat_binary[i, t]
-
-    model.mu_max_hat_binary_constr_1 = pyo.Constraint(
-        model.gens, model.time, rule=mu_max_hat_binary_rule_1
-    )
-    model.mu_max_hat_binary_constr_2 = pyo.Constraint(
-        model.gens, model.time, rule=mu_max_hat_binary_rule_2
-    )
-    model.mu_max_hat_binary_constr_3 = pyo.Constraint(
-        model.gens, model.time, rule=mu_max_hat_binary_rule_3
-    )
-
-    model.nu_max_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
-
-    def nu_max_hat_binary_rule_1(model, t, n):
-        return model.d[t, n] - demand_df.at[t, f"volume_{n}"] <= max(
-            demand_df[f"volume_{n}"]
-        ) * (1 - model.nu_max_hat_binary[t, n])
-
-    def nu_max_hat_binary_rule_2(model, t, n):
-        return model.d[t, n] - demand_df.at[t, f"volume_{n}"] >= -max(
-            demand_df[f"volume_{n}"]
-        ) * (1 - model.nu_max_hat_binary[t, n])
-
-    def nu_max_hat_binary_rule_3(model, t, n):
-        return model.nu_max_hat[t, n] <= big_M * model.nu_max_hat_binary[t, n]
-
-    model.nu_max_hat_binary_constr_1 = pyo.Constraint(
-        model.time, model.demand_bids, rule=nu_max_hat_binary_rule_1
-    )
-    model.nu_max_hat_binary_constr_2 = pyo.Constraint(
-        model.time, model.demand_bids, rule=nu_max_hat_binary_rule_2
-    )
-    model.nu_max_hat_binary_constr_3 = pyo.Constraint(
-        model.time, model.demand_bids, rule=nu_max_hat_binary_rule_3
-    )
-
-    model.nu_min_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
-
-    def nu_min_hat_binary_rule_1(model, t, n):
-        return model.d[t, n] <= big_M * (1 - model.nu_min_hat_binary[t, n])
-
-    def nu_min_hat_binary_rule_3(model, t, n):
-        return model.nu_min_hat[t, n] <= big_M * model.nu_min_hat_binary[t, n]
-
-    model.nu_min_hat_binary_constr_1 = pyo.Constraint(
-        model.time, model.demand_bids, rule=nu_min_hat_binary_rule_1
-    )
-
-    model.nu_min_hat_binary_constr_3 = pyo.Constraint(
-        model.time, model.demand_bids, rule=nu_min_hat_binary_rule_3
-    )
-
-    # Complementary slackness conditions
-    # for ramp-up and ramp-down residuals
-    # (??)–(??), Relaxed or reformulated versions of (7ai)–(7aj), MILP-friendly using binaries + big-M
-    model.pi_u_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
-
-    def pi_u_hat_binary_rule_1(model, i, t):
-        if t == 0:
-            return model.g[i, t] - gens_df.at[i, "g_0"] - gens_df.at[
-                i, "r_up"
-            ] <= big_M * (1 - model.pi_u_hat_binary[i, t])
-        else:
-            return model.g[i, t] - model.g[i, t - 1] - gens_df.at[
-                i, "r_up"
-            ] <= big_M * (1 - model.pi_u_hat_binary[i, t])
-
-    def pi_u_hat_binary_rule_2(model, i, t):
-        if t == 0:
-            return model.g[i, t] - gens_df.at[i, "g_0"] - gens_df.at[
-                i, "r_up"
-            ] >= -big_M * (1 - model.pi_u_hat_binary[i, t])
-        else:
-            return model.g[i, t] - model.g[i, t - 1] - gens_df.at[
-                i, "r_up"
-            ] >= -big_M * (1 - model.pi_u_hat_binary[i, t])
-
-    def pi_u_hat_binary_rule_3(model, i, t):
-        return model.pi_u_hat[i, t] <= big_M * model.pi_u_hat_binary[i, t]
-
-    model.pi_u_hat_binary_constr_1 = pyo.Constraint(
-        model.gens, model.time, rule=pi_u_hat_binary_rule_1
-    )
-    model.pi_u_hat_binary_constr_2 = pyo.Constraint(
-        model.gens, model.time, rule=pi_u_hat_binary_rule_2
-    )
-    model.pi_u_hat_binary_constr_3 = pyo.Constraint(
-        model.gens, model.time, rule=pi_u_hat_binary_rule_3
-    )
-
-    model.pi_d_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
-
-    def pi_d_hat_binary_rule_1(model, i, t):
-        if t == 0:
-            return gens_df.at[i, "g_0"] - model.g[i, t] - gens_df.at[
-                i, "r_down"
-            ] <= big_M * (1 - model.pi_d_hat_binary[i, t])
-        else:
-            return model.g[i, t - 1] - model.g[i, t] - gens_df.at[
-                i, "r_down"
-            ] <= big_M * (1 - model.pi_d_hat_binary[i, t])
-
-    def pi_d_hat_binary_rule_2(model, i, t):
-        if t == 0:
-            return gens_df.at[i, "g_0"] - model.g[i, t] - gens_df.at[
-                i, "r_down"
-            ] >= -big_M * (1 - model.pi_d_hat_binary[i, t])
-        else:
-            return model.g[i, t - 1] - model.g[i, t] - gens_df.at[
-                i, "r_down"
-            ] >= -big_M * (1 - model.pi_d_hat_binary[i, t])
-
-    def pi_d_hat_binary_rule_3(model, i, t):
-        return model.pi_d_hat[i, t] <= big_M * model.pi_d_hat_binary[i, t]
-
-    model.pi_d_hat_binary_constr_1 = pyo.Constraint(
-        model.gens, model.time, rule=pi_d_hat_binary_rule_1
-    )
-    model.pi_d_hat_binary_constr_2 = pyo.Constraint(
-        model.gens, model.time, rule=pi_d_hat_binary_rule_2
-    )
-    model.pi_d_hat_binary_constr_3 = pyo.Constraint(
-        model.gens, model.time, rule=pi_d_hat_binary_rule_3
-    )
-
-    # ---------------------------------------------------------------------------
-    # solve
-    instance = model.create_instance()
-
-    solver = SolverFactory("gurobi")
-    options = {
-        "LogToConsole": print_results,
-        "TimeLimit": time_limit,
-        "MIPGap": 0.03,
-        # "MIPFocus": 3,
-    }
-
-    solver.options["NonConvex"] = 2
-    results = solver.solve(instance, options=options, tee=print_results)
-
-    # check if solver exited due to time limit
-    if results.solver.termination_condition == pyo.TerminationCondition.maxTimeLimit:
-        print("Solver did not converge to an optimal solution")
-
-    # ---------------------------------------------------------------------------
-    # extract results
-    time_index = demand_df.index
-    generation_df = pd.DataFrame(
-        index=time_index, columns=[f"gen_{gen}" for gen in gens_df.index]
-    )
-    for gen in gens_df.index:
-        for t in time_index:
-            generation_df.at[t, f"gen_{gen}"] = instance.g[gen, t].value
-
-    cleared_demand = pd.DataFrame(index=time_index, columns=["demand"])
-    for t in time_index:
-        cleared_demand.at[t, "demand"] = sum(
-            instance.d[t, n].value for n in instance.demand_bids
-        )
-
-    mcp = pd.DataFrame(index=time_index, columns=["mcp"])
-    for t in time_index:
-        mcp.at[t, "mcp"] = instance.lambda_[t].value
-
-    mcp_hat = pd.DataFrame(index=time_index, columns=["mcp_hat"])
-    for t in time_index:
-        mcp_hat.at[t, "mcp_hat"] = instance.lambda_hat[t].value
-
-    main_df = pd.concat([generation_df, cleared_demand, mcp, mcp_hat], axis=1)
-
-    start_up_cost = pd.DataFrame(
-        index=time_index, columns=[f"start_up_{gen}" for gen in gens_df.index]
-    )
-    for gen in gens_df.index:
-        for t in time_index:
-            start_up_cost.at[t, f"start_up_{gen}"] = instance.c_up[gen, t].value
-
-    shut_down_cost = pd.DataFrame(
-        index=time_index, columns=[f"shut_down_{gen}" for gen in gens_df.index]
-    )
-    for gen in gens_df.index:
-        for t in time_index:
-            shut_down_cost.at[t, f"shut_down_{gen}"] = instance.c_down[gen, t].value
-
-    supp_df = pd.concat([start_up_cost, shut_down_cost], axis=1)
-
-    k_values = pd.DataFrame(index=time_index, columns=["k"])
-    for t in time_index:
-        k_values.at[t, "k"] = instance.k[t].value
-
-    return main_df, supp_df, k_values
 
 
 def find_optimal_dispatch_quadratic_with_storage(
@@ -3327,5 +2829,547 @@ def find_optimal_dispatch_storage_leader_quadratic(
     k_values = pd.DataFrame(index=demand_df.index, columns=["k_storage"])
     for t in demand_df.index:
         k_values.at[t, "k_storage"] = instance.k[t].value
+
+    return main_df, supp_df, k_values
+
+
+def find_optimal_dispatch_quadratic_fixed_storage(
+    gens_df,
+    k_values_df,
+    availabilities_df,
+    demand_df,
+    k_max,
+    opt_gen,
+    fixed_storage_dispatch=None,
+    big_w=10000,
+    time_limit=600,
+    big_M=10e6,
+    demand_bids=1,
+    mc_df=None,
+):
+    """Quadratic MPEC with k-multiplier and fixed storage dispatch.
+
+    Variant of ``find_optimal_dispatch_quadratic`` that treats storage dispatch
+    as a fixed exogenous parameter rather than a decision variable.  Storage
+    can either be added to the power balance constraint directly (pass a
+    non-zero ``fixed_storage_dispatch`` Series) or folded into demand before
+    calling this function (pass ``fixed_storage_dispatch=None``).
+
+    The leader chooses a bid multiplier k in [1, k_max] for ``opt_gen``.  The
+    follower clears the market (power balance, ramp limits, start/shut-down
+    costs) with KKT complementarity conditions linearised via Big-M.  A
+    duality-gap penalty weighted by ``big_w`` tightens the relaxed KKT system.
+
+    Args:
+        gens_df: Generator parameters (index=unit names).
+        k_values_df: Existing bid multipliers for all generators (columns) per
+            timestep.  The column for ``opt_gen`` is replaced by the decision
+            variable k.
+        availabilities_df: Per-unit availability factors, same shape as
+            k_values_df.
+        demand_df: Demand bid volumes (``volume_1``, ...) and prices
+            (``price_1``, ...).
+        k_max: Upper bound on the leader's bid multiplier.
+        opt_gen: Name of the learning unit (leader).
+        fixed_storage_dispatch: Series indexed like ``demand_df`` giving net
+            storage injection per timestep (positive = discharge).  ``None``
+            is treated as zero everywhere.
+        big_w: Weight on the duality-gap penalty (default 10 000).
+        time_limit: Gurobi time limit in seconds.
+        big_M: Big-M constant for complementarity linearisation.
+        demand_bids: Number of demand bid tranches.
+        mc_df: Optional marginal-cost DataFrame; built from ``gens_df`` if
+            not provided.
+
+    Returns:
+        (main_df, supp_df, k_values) -- DataFrames with dispatch, prices,
+        start-up/shut-down costs, and the optimal k trajectory.  Returns
+        (None, None, None) if infeasible.
+    """
+    gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
+    if mc_df is None:
+        mc_df = pd.DataFrame(
+            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index},
+            index=demand_df.index,
+        )
+    if fixed_storage_dispatch is None:
+        fixed_storage_dispatch = pd.Series(0.0, index=demand_df.index)
+
+    model = pyo.ConcreteModel()
+
+    model.time = pyo.Set(initialize=demand_df.index)
+    model.gens = pyo.Set(initialize=gens_df.index)
+    model.demand_bids = pyo.Set(initialize=np.arange(1, demand_bids + 1))
+
+    model.g = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.d = pyo.Var(model.time, model.demand_bids, within=pyo.NonNegativeReals)
+    model.c_up = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.c_down = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.k = pyo.Var(model.time, bounds=(1, k_max), within=pyo.NonNegativeReals)
+    model.lambda_ = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 3100))
+    model.u = pyo.Var(model.gens, model.time, within=pyo.Binary)
+
+    model.mu_max = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.mu_min = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.nu_max = pyo.Var(model.time, model.demand_bids, within=pyo.NonNegativeReals)
+    model.pi_u = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.pi_d = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.sigma_u = pyo.Var(model.gens, model.time, bounds=(0, 1))
+    model.sigma_d = pyo.Var(model.gens, model.time, bounds=(0, 1))
+    model.psi_max = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+
+    model.lambda_hat = pyo.Var(model.time, within=pyo.Reals, bounds=(-500, 3100))
+    model.mu_max_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.mu_min_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.nu_max_hat = pyo.Var(
+        model.time, model.demand_bids, within=pyo.NonNegativeReals
+    )
+    model.nu_min_hat = pyo.Var(
+        model.time, model.demand_bids, within=pyo.NonNegativeReals
+    )
+    model.pi_u_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+    model.pi_d_hat = pyo.Var(model.gens, model.time, within=pyo.NonNegativeReals)
+
+    model.mu_max_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
+
+    # --- OBJECTIVE ---
+    def primary_objective_rule(model):
+        return sum(
+            model.lambda_hat[t] * model.g[opt_gen, t]
+            - mc_df.at[t, opt_gen] * model.g[opt_gen, t]
+            - model.c_up[opt_gen, t]
+            - model.c_down[opt_gen, t]
+            for t in model.time
+        )
+
+    def duality_gap_part_1_rule(model):
+        expr = sum(
+            (
+                (
+                    mc_df.at[t, gen] * model.k[t] * model.g[gen, t]
+                    + model.c_up[gen, t]
+                    + model.c_down[gen, t]
+                )
+                if gen == opt_gen
+                else (
+                    k_values_df.at[t, gen] * mc_df.at[t, gen] * model.g[gen, t]
+                    + model.c_up[gen, t]
+                    + model.c_down[gen, t]
+                )
+            )
+            for gen in model.gens
+            for t in model.time
+        )
+        expr -= sum(
+            demand_df.at[t, f"price_{n}"] * model.d[t, n]
+            for t in model.time
+            for n in model.demand_bids
+        )
+        return expr
+
+    def duality_gap_part_2_rule(model):
+        expr = -sum(
+            model.nu_max[t, n] * demand_df.at[t, f"volume_{n}"]
+            for t in model.time
+            for n in model.demand_bids
+        )
+        expr -= sum(
+            model.pi_u[i, t] * gens_df.at[i, "r_up"]
+            for i in model.gens
+            for t in model.time
+        )
+        expr -= sum(
+            model.pi_d[i, t] * gens_df.at[i, "r_down"]
+            for i in model.gens
+            for t in model.time
+        )
+        expr -= sum(model.pi_u[i, 0] * gens_df.at[i, "g_0"] for i in model.gens)
+        expr += sum(model.pi_d[i, 0] * gens_df.at[i, "g_0"] for i in model.gens)
+        expr -= sum(
+            model.sigma_u[i, 0] * gens_df.at[i, "k_up"] * gens_df.at[i, "u_0"]
+            for i in model.gens
+        )
+        expr += sum(
+            model.sigma_d[i, 0] * gens_df.at[i, "k_down"] * gens_df.at[i, "u_0"]
+            for i in model.gens
+        )
+        expr -= sum(model.psi_max[i, t] for i in model.gens for t in model.time)
+        # TODO: I do not know why this should belong here double check
+        expr += sum(
+            model.lambda_[t] * float(fixed_storage_dispatch.at[t]) for t in model.time
+        )
+        return expr
+
+    def final_objective_rule(model):
+        return primary_objective_rule(model) - big_w * (
+            duality_gap_part_1_rule(model) - duality_gap_part_2_rule(model)
+        )
+
+    model.objective = pyo.Objective(expr=final_objective_rule, sense=pyo.maximize)
+
+    # --- PRIMAL CONSTRAINTS ---
+    def balance_rule(model, t):
+        net_storage = float(fixed_storage_dispatch.at[t])
+        return (
+            sum(model.d[t, n] for n in model.demand_bids)
+            - sum(model.g[i, t] for i in model.gens)
+            - net_storage
+            == 0
+        )
+
+    model.balance = pyo.Constraint(model.time, rule=balance_rule)
+
+    def g_max_rule(model, i, t):
+        return (
+            model.g[i, t]
+            <= gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
+        )
+
+    model.g_max = pyo.Constraint(model.gens, model.time, rule=g_max_rule)
+
+    def d_max_rule(model, t, n):
+        return model.d[t, n] <= demand_df.at[t, f"volume_{n}"]
+
+    model.d_max = pyo.Constraint(model.time, model.demand_bids, rule=d_max_rule)
+
+    def ru_max_rule(model, i, t):
+        if t == 0:
+            return model.g[i, t] - gens_df.at[i, "g_0"] <= gens_df.at[i, "r_up"]
+        else:
+            return model.g[i, t] - model.g[i, t - 1] <= gens_df.at[i, "r_up"]
+
+    model.ru_max = pyo.Constraint(model.gens, model.time, rule=ru_max_rule)
+
+    def rd_max_rule(model, i, t):
+        if t == 0:
+            return gens_df.at[i, "g_0"] - model.g[i, t] <= gens_df.at[i, "r_down"]
+        else:
+            return model.g[i, t - 1] - model.g[i, t] <= gens_df.at[i, "r_down"]
+
+    model.rd_max = pyo.Constraint(model.gens, model.time, rule=rd_max_rule)
+
+    def start_up_cost_rule(model, i, t):
+        if t == 0:
+            return (
+                model.c_up[i, t]
+                >= (model.u[i, t] - gens_df.at[i, "u_0"]) * gens_df.at[i, "k_up"]
+            )
+        else:
+            return (
+                model.c_up[i, t]
+                >= (model.u[i, t] - model.u[i, t - 1]) * gens_df.at[i, "k_up"]
+            )
+
+    model.start_up_cost = pyo.Constraint(
+        model.gens, model.time, rule=start_up_cost_rule
+    )
+
+    def shut_down_cost_rule(model, i, t):
+        if t == 0:
+            return (
+                model.c_down[i, t]
+                >= (gens_df.at[i, "u_0"] - model.u[i, t]) * gens_df.at[i, "k_down"]
+            )
+        else:
+            return (
+                model.c_down[i, t]
+                >= (model.u[i, t - 1] - model.u[i, t]) * gens_df.at[i, "k_down"]
+            )
+
+    model.shut_down_cost = pyo.Constraint(
+        model.gens, model.time, rule=shut_down_cost_rule
+    )
+
+    # --- DUAL FEASIBILITY (non-hat) ---
+    def gen_dual_rule(model, i, t):
+        k_term = model.k[t] if i == opt_gen else k_values_df.at[t, i]
+        pi_u_next = 0 if t == model.time.at(-1) else model.pi_u[i, t + 1]
+        pi_d_next = 0 if t == model.time.at(-1) else model.pi_d[i, t + 1]
+        return (
+            k_term * mc_df.at[t, i]
+            - model.lambda_[t]
+            + model.mu_max[i, t]
+            - model.mu_min[i, t]
+            + model.pi_u[i, t]
+            - pi_u_next
+            - model.pi_d[i, t]
+            + pi_d_next
+            == 0
+        )
+
+    model.gen_dual = pyo.Constraint(model.gens, model.time, rule=gen_dual_rule)
+
+    def status_dual_rule(model, i, t):
+        if t != model.time.at(-1):
+            return (
+                -model.mu_max[i, t]
+                * gens_df.at[i, "g_max"]
+                * availabilities_df.at[t, i]
+                + (model.sigma_u[i, t] - model.sigma_u[i, t + 1])
+                * gens_df.at[i, "k_up"]
+                - (model.sigma_d[i, t] - model.sigma_d[i, t + 1])
+                * gens_df.at[i, "k_down"]
+                + model.psi_max[i, t]
+                >= 0
+            )
+        else:
+            return (
+                -model.mu_max[i, t]
+                * gens_df.at[i, "g_max"]
+                * availabilities_df.at[t, i]
+                + model.sigma_u[i, t] * gens_df.at[i, "k_up"]
+                - model.sigma_d[i, t] * gens_df.at[i, "k_down"]
+                + model.psi_max[i, t]
+                >= 0
+            )
+
+    model.status_dual = pyo.Constraint(model.gens, model.time, rule=status_dual_rule)
+
+    def demand_dual_rule(model, t, n):
+        return (
+            -demand_df.at[t, f"price_{n}"] + model.lambda_[t] + model.nu_max[t, n] >= 0
+        )
+
+    model.demand_dual = pyo.Constraint(
+        model.time, model.demand_bids, rule=demand_dual_rule
+    )
+
+    # --- KKT STATIONARITY (hat) ---
+    def kkt_gen_rule(model, i, t):
+        k_term = model.k[t] if i == opt_gen else k_values_df.at[t, i]
+        pi_u_hat_next = 0 if t == model.time.at(-1) else model.pi_u_hat[i, t + 1]
+        pi_d_hat_next = 0 if t == model.time.at(-1) else model.pi_d_hat[i, t + 1]
+        return (
+            k_term * mc_df.at[t, i]
+            - model.lambda_hat[t]
+            + model.mu_max_hat[i, t]
+            - model.mu_min_hat[i, t]
+            + model.pi_u_hat[i, t]
+            - pi_u_hat_next
+            - model.pi_d_hat[i, t]
+            + pi_d_hat_next
+            == 0
+        )
+
+    model.kkt_gen = pyo.Constraint(model.gens, model.time, rule=kkt_gen_rule)
+
+    def kkt_demand_rule(model, t, n):
+        return (
+            -demand_df.at[t, f"price_{n}"]
+            + model.lambda_hat[t]
+            + model.nu_max_hat[t, n]
+            - model.nu_min_hat[t, n]
+            == 0
+        )
+
+    model.kkt_demand = pyo.Constraint(
+        model.time, model.demand_bids, rule=kkt_demand_rule
+    )
+
+    # --- COMPLEMENTARITY (Big-M) ---
+    def mu_max_hat_binary_rule_1(model, i, t):
+        return (
+            model.g[i, t]
+            - gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
+        ) <= max(gens_df["g_max"]) * (1 - model.mu_max_hat_binary[i, t])
+
+    def mu_max_hat_binary_rule_2(model, i, t):
+        return (
+            model.g[i, t]
+            - gens_df.at[i, "g_max"] * availabilities_df.at[t, i] * model.u[i, t]
+        ) >= -max(gens_df["g_max"]) * (1 - model.mu_max_hat_binary[i, t])
+
+    def mu_max_hat_binary_rule_3(model, i, t):
+        return model.mu_max_hat[i, t] <= big_M * model.mu_max_hat_binary[i, t]
+
+    model.mu_max_hat_binary_constr_1 = pyo.Constraint(
+        model.gens, model.time, rule=mu_max_hat_binary_rule_1
+    )
+    model.mu_max_hat_binary_constr_2 = pyo.Constraint(
+        model.gens, model.time, rule=mu_max_hat_binary_rule_2
+    )
+    model.mu_max_hat_binary_constr_3 = pyo.Constraint(
+        model.gens, model.time, rule=mu_max_hat_binary_rule_3
+    )
+
+    model.nu_max_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
+
+    def nu_max_hat_binary_rule_1(model, t, n):
+        return model.d[t, n] - demand_df.at[t, f"volume_{n}"] <= max(
+            demand_df[f"volume_{n}"]
+        ) * (1 - model.nu_max_hat_binary[t, n])
+
+    def nu_max_hat_binary_rule_2(model, t, n):
+        return model.d[t, n] - demand_df.at[t, f"volume_{n}"] >= -max(
+            demand_df[f"volume_{n}"]
+        ) * (1 - model.nu_max_hat_binary[t, n])
+
+    def nu_max_hat_binary_rule_3(model, t, n):
+        return model.nu_max_hat[t, n] <= big_M * model.nu_max_hat_binary[t, n]
+
+    model.nu_max_hat_binary_constr_1 = pyo.Constraint(
+        model.time, model.demand_bids, rule=nu_max_hat_binary_rule_1
+    )
+    model.nu_max_hat_binary_constr_2 = pyo.Constraint(
+        model.time, model.demand_bids, rule=nu_max_hat_binary_rule_2
+    )
+    model.nu_max_hat_binary_constr_3 = pyo.Constraint(
+        model.time, model.demand_bids, rule=nu_max_hat_binary_rule_3
+    )
+
+    model.nu_min_hat_binary = pyo.Var(model.time, model.demand_bids, within=pyo.Binary)
+
+    def nu_min_hat_binary_rule_1(model, t, n):
+        return model.d[t, n] <= demand_df.at[t, f"volume_{n}"] * (
+            1 - model.nu_min_hat_binary[t, n]
+        )
+
+    def nu_min_hat_binary_rule_3(model, t, n):
+        return model.nu_min_hat[t, n] <= big_M * model.nu_min_hat_binary[t, n]
+
+    model.nu_min_hat_binary_constr_1 = pyo.Constraint(
+        model.time, model.demand_bids, rule=nu_min_hat_binary_rule_1
+    )
+    model.nu_min_hat_binary_constr_3 = pyo.Constraint(
+        model.time, model.demand_bids, rule=nu_min_hat_binary_rule_3
+    )
+
+    model.pi_u_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
+
+    def pi_u_hat_binary_rule_1(model, i, t):
+        if t == 0:
+            return model.g[i, t] - gens_df.at[i, "g_0"] - gens_df.at[
+                i, "r_up"
+            ] <= big_M * (1 - model.pi_u_hat_binary[i, t])
+        else:
+            return model.g[i, t] - model.g[i, t - 1] - gens_df.at[
+                i, "r_up"
+            ] <= big_M * (1 - model.pi_u_hat_binary[i, t])
+
+    def pi_u_hat_binary_rule_2(model, i, t):
+        if t == 0:
+            return model.g[i, t] - gens_df.at[i, "g_0"] - gens_df.at[
+                i, "r_up"
+            ] >= -big_M * (1 - model.pi_u_hat_binary[i, t])
+        else:
+            return model.g[i, t] - model.g[i, t - 1] - gens_df.at[
+                i, "r_up"
+            ] >= -big_M * (1 - model.pi_u_hat_binary[i, t])
+
+    def pi_u_hat_binary_rule_3(model, i, t):
+        return model.pi_u_hat[i, t] <= big_M * model.pi_u_hat_binary[i, t]
+
+    model.pi_u_hat_binary_constr_1 = pyo.Constraint(
+        model.gens, model.time, rule=pi_u_hat_binary_rule_1
+    )
+    model.pi_u_hat_binary_constr_2 = pyo.Constraint(
+        model.gens, model.time, rule=pi_u_hat_binary_rule_2
+    )
+    model.pi_u_hat_binary_constr_3 = pyo.Constraint(
+        model.gens, model.time, rule=pi_u_hat_binary_rule_3
+    )
+
+    model.pi_d_hat_binary = pyo.Var(model.gens, model.time, within=pyo.Binary)
+
+    def pi_d_hat_binary_rule_1(model, i, t):
+        if t == 0:
+            return gens_df.at[i, "g_0"] - model.g[i, t] - gens_df.at[
+                i, "r_down"
+            ] <= big_M * (1 - model.pi_d_hat_binary[i, t])
+        else:
+            return model.g[i, t - 1] - model.g[i, t] - gens_df.at[
+                i, "r_down"
+            ] <= big_M * (1 - model.pi_d_hat_binary[i, t])
+
+    def pi_d_hat_binary_rule_2(model, i, t):
+        if t == 0:
+            return gens_df.at[i, "g_0"] - model.g[i, t] - gens_df.at[
+                i, "r_down"
+            ] >= -big_M * (1 - model.pi_d_hat_binary[i, t])
+        else:
+            return model.g[i, t - 1] - model.g[i, t] - gens_df.at[
+                i, "r_down"
+            ] >= -big_M * (1 - model.pi_d_hat_binary[i, t])
+
+    def pi_d_hat_binary_rule_3(model, i, t):
+        return model.pi_d_hat[i, t] <= big_M * model.pi_d_hat_binary[i, t]
+
+    model.pi_d_hat_binary_constr_1 = pyo.Constraint(
+        model.gens, model.time, rule=pi_d_hat_binary_rule_1
+    )
+    model.pi_d_hat_binary_constr_2 = pyo.Constraint(
+        model.gens, model.time, rule=pi_d_hat_binary_rule_2
+    )
+    model.pi_d_hat_binary_constr_3 = pyo.Constraint(
+        model.gens, model.time, rule=pi_d_hat_binary_rule_3
+    )
+
+    # --- SOLVE ---
+    instance = model.create_instance()
+    solver = SolverFactory("gurobi")
+    solver.options["NonConvex"] = 2
+    options = {
+        "LogToConsole": 1,
+        "TimeLimit": time_limit,
+        "MIPGap": 0.05,
+        "DualReductions": 0,
+        "MIPFocus": 1,           # focus on finding feasible solutions
+        "Heuristics": 0.2,       # more heuristic effort
+        "Presolve": 2,           # aggressive presolve
+        "Cuts": 2,               # aggressive cuts
+        "DualReductions": 0,
+    }
+    results = solver.solve(instance, options=options, tee=True)
+
+    print(f"\nSolver status: {results.solver.status}")
+    print(f"Termination: {results.solver.termination_condition}")
+
+    if results.solver.termination_condition in (
+        pyo.TerminationCondition.infeasible,
+        pyo.TerminationCondition.infeasibleOrUnbounded,
+    ):
+        instance.write(
+            "debug_quadratic.lp", io_options={"symbolic_solver_labels": True}
+        )
+        print("Wrote debug_quadratic.lp")
+        return None, None, None
+
+    # --- EXTRACT ---
+    time_index = demand_df.index
+    generation_df = pd.DataFrame(
+        index=time_index, columns=[f"gen_{gen}" for gen in gens_df.index]
+    )
+    for gen in gens_df.index:
+        for t in time_index:
+            generation_df.at[t, f"gen_{gen}"] = instance.g[gen, t].value
+
+    cleared_demand = pd.DataFrame(index=time_index, columns=["demand"])
+    for t in time_index:
+        cleared_demand.at[t, "demand"] = sum(
+            instance.d[t, n].value for n in instance.demand_bids
+        )
+
+    mcp = pd.DataFrame(index=time_index, columns=["mcp"])
+    mcp_hat = pd.DataFrame(index=time_index, columns=["mcp_hat"])
+    for t in time_index:
+        mcp.at[t, "mcp"] = instance.lambda_[t].value
+        mcp_hat.at[t, "mcp_hat"] = instance.lambda_hat[t].value
+
+    main_df = pd.concat([generation_df, cleared_demand, mcp, mcp_hat], axis=1)
+
+    supp_df_parts = []
+    for prefix, var in [("start_up", instance.c_up), ("shut_down", instance.c_down)]:
+        df = pd.DataFrame(
+            index=time_index, columns=[f"{prefix}_{gen}" for gen in gens_df.index]
+        )
+        for gen in gens_df.index:
+            for t in time_index:
+                df.at[t, f"{prefix}_{gen}"] = var[gen, t].value
+        supp_df_parts.append(df)
+    supp_df = pd.concat(supp_df_parts, axis=1)
+
+    k_values = pd.DataFrame(index=time_index, columns=["k"])
+    for t in time_index:
+        k_values.at[t, "k"] = instance.k[t].value
 
     return main_df, supp_df, k_values

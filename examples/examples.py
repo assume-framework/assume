@@ -88,6 +88,10 @@ available_examples = {
         "study_case": "base_longer",
     },
     "small_learning_with_renewables": {"scenario": "example_02d", "study_case": "base"},
+    "small_learning_with_renewables_and_isoelastic_demand_and_conventionals": {
+        "scenario": "example_02a_elasticDemand_EE_Ramp",
+        "study_case": "base",
+    },
     #
     # full year examples to show real-world scenarios
     "large_2019_eom": {"scenario": "example_03", "study_case": "base_case_2019"},
@@ -145,10 +149,10 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "case_study_2013_pp"
+    example = "small_learning_with_renewables_and_isoelastic_demand_and_conventionals"
 
     if data_format == "local_db":
-        db_uri = "sqlite:///./examples/local_db/assume_db_pp.db"
+        db_uri = "sqlite:///./examples/local_db/assume_db.db"
     elif data_format == "timescale":
         db_uri = "postgresql://assume:assume@localhost:5432/assume"
 

@@ -1,0 +1,8 @@
+name,technology,bidding_EOM,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,ramp_up,ramp_down,unit_operator
+pp_1,nuclear,powerplant_energy_heuristic_flexable,uranium,0.0,1000,0,0.36,10.0,500,500,Operator 1
+pp_2,nuclear,powerplant_energy_heuristic_flexable,uranium,0,1000,0,0.36,10.0,500,500,Operator 1
+pp_3,lignite,powerplant_energy_heuristic_flexable,lignite,0.406,1000,0,0.41,2.0,500,500,Operator 1
+pp_4,hard coal,powerplant_energy_heuristic_flexable,hard coal,0.335,1000,0,0.48,1.0,500,500,Operator 1
+Wind Onshore,wind_onshore,powerplant_energy_heuristic_flexable,renewable,0,2500,0,1,0.01,2500,2500,Operator 1
+pp_6,combined cycle gas turbine,powerplant_energy_heuristic_flexable,natural gas,0.201,2500,0,0.60,4.0,2500,2500,Operator 1
+pp_7,combined cycle gas turbine,powerplant_energy_heuristic_flexable,natural gas,0.201,5000,0,0.60,34.0,5000,5000,Operator 1

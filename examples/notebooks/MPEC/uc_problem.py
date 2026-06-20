@@ -28,6 +28,29 @@ def solve_uc_problem(
     mc_df=None,
     fixed_storage_dispatch=None,
 ):
+    """Unit Commitment re-solve with fixed bid multipliers (LP relaxation).
+
+    Given k-values from a prior MPEC solve, this function re-solves a clean UC
+    problem to extract dual prices (shadow prices on the balance constraint)
+    as the true market-clearing prices.  Binary commitment variables are
+    relaxed to continuous [0, 1] so that LP duals are available.
+
+    Storage can be treated as a fixed parameter via ``fixed_storage_dispatch``
+    (or folded into demand beforehand by setting it to None).
+
+    Args:
+        gens_df: Generator parameters (index=unit names).
+        demand_df: Demand bids (``volume_*``, ``price_*`` columns).
+        k_values_df: Bid multipliers per generator per timestep (from MPEC).
+        availabilities_df: Per-unit availability factors.
+        demand_bids: Number of demand bid tranches.
+        mc_df: Marginal-cost DataFrame; derived from gens_df if None.
+        fixed_storage_dispatch: Net storage injection Series (positive =
+            discharge).  None means no storage effect.
+
+    Returns:
+        (main_df, supp_df) -- dispatch results and start-up/shut-down costs.
+    """
     gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
     if mc_df is None:
         mc_df = pd.DataFrame(

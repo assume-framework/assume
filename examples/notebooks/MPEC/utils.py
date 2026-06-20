@@ -12,13 +12,21 @@ from bilevel_opt import (
     find_optimal_dispatch_linearized,
     find_optimal_dispatch_quadratic,
 )
-from bilevel_opt_bidprice import find_optimal_dispatch_bidprice
+
 from matplotlib import pyplot as plt
 from pyomo.opt import SolverFactory
 from uc_problem import solve_uc_problem
 
 
 def calculate_profits(main_df, gens_df, price_column="mcp", supp_df=None, mc_df=None):
+    """Compute per-generator profits from dispatch results.
+
+    Profit = generation * (price - mc) minus start-up/shut-down costs (if
+    supp_df is provided).
+
+    Returns:
+        DataFrame with one column per generator and one row per timestep.
+    """
     gens_df = gens_df.set_index("unit") if "unit" in gens_df.columns else gens_df
     profits = pd.DataFrame(index=main_df.index, columns=gens_df.index)
     for gen in gens_df.index:
@@ -31,6 +39,12 @@ def calculate_profits(main_df, gens_df, price_column="mcp", supp_df=None, mc_df=
 
 
 def calculate_uplift(main_df, gens_df, gen_unit, profits, price_column="mcp"):
+    """Calculate uplift payments needed to make a generator whole.
+
+    Solves a small LP to find the minimum side payment that makes the
+    generator's total profit non-negative across all timesteps, accounting
+    for commitment constraints (min up/down times).
+    """
     model = pyo.ConcreteModel()
     # sets
     model.time = pyo.Set(initialize=main_df.index)
@@ -147,6 +161,12 @@ def calculate_uplift(main_df, gens_df, gen_unit, profits, price_column="mcp"):
 
 
 def calculate_rl_profit(gens_df, demand_df, market_orders, start, end):
+    """Compute profits of RL agents from market order history.
+
+    Reconstructs per-unit profits from accepted volumes/prices in the given
+    date range, subtracting start-up and shut-down costs based on commitment
+    transitions.
+    """
     rl_profits = pd.DataFrame(index=demand_df.index, columns=gens_df.index, data=0.0)
     for opt_gen in gens_df.index:
         rl_unit_orders = market_orders[market_orders["unit_id"] == f"Unit_{opt_gen}"]
@@ -340,14 +360,25 @@ def sample_seasonal_weeks(datetime_index):
 
 
 def create_gens_df(pp_units, dispatch_df):
+    """Transform power-plant unit CSV data into the MPEC generator DataFrame.
+
+    Adds columns required by the optimisation (g_max, mc, u_0, g_0, r_up,
+    r_down, k_up, k_down) and computes marginal costs from dispatch history.
+    """
     gens_df = pp_units.copy()
 
     # Transform gen_df into the format that is expected by the optimization problem
     # g_max	mc	u_0	g_0	r_up	r_down	k_up	k_down
     gens_df = gens_df.reset_index()
     gens_df = gens_df.rename(columns={"max_power": "g_max", "min_power": "u_0"})
-    gens_df["r_up"] = gens_df["g_max"]  # ramping up constraints
-    gens_df["r_down"] = gens_df["g_max"]  # ramping down constraints
+    if "ramp_up" in gens_df.columns:
+        gens_df["r_up"] = gens_df["ramp_up"]
+    else:
+        gens_df["r_up"] = gens_df["g_max"]
+    if "ramp_down" in gens_df.columns:
+        gens_df["r_down"] = gens_df["ramp_down"]
+    else:
+        gens_df["r_down"] = gens_df["g_max"]
     gens_df["k_up"] = 0  # start up costs
     gens_df["k_down"] = 0  # shut down costs
     gens_df["g_0"] = 0  # start with no power output
@@ -362,6 +393,11 @@ def create_gens_df(pp_units, dispatch_df):
 
 
 def create_storage_df(storage_units, dispatch_df):
+    """Transform storage unit CSV data into the MPEC storage DataFrame.
+
+    Requires symmetric charge/discharge power. Adds g_max, ramp, and
+    start-up/shut-down columns. Marginal cost is averaged from dispatch history.
+    """
     storage_df = storage_units.copy()
 
     # check if max_power_charge and max_power_discharge columns are the same value otherwise throw error that this wont work
@@ -434,6 +470,11 @@ def join_demand_market_orders(demand_df, market_orders_df):
 
 
 def obtain_k_values(k_df, gens_df):
+    """Pivot bid actions into a per-generator k-multiplier DataFrame.
+
+    k = price / marginal_cost for each unit at each timestep. Inf values
+    (zero mc) are replaced with 0. Column order matches gens_df.
+    """
     # transformed actions into k_values, one per generator
     k_df["k"] = k_df["price"] / k_df["marginal_cost"]
 
@@ -795,7 +836,7 @@ def run_MPEC(
             time_limit=3600,
             print_results=True,
             K=5,
-            big_M=10e6,
+            big_M=5000,
             mc_df=mc_df_aligned,
         )
 
@@ -835,126 +876,6 @@ def run_MPEC(
         availability_df,
         demand_bids=demand_bids,
         mc_df=mc_df_aligned,
-    )
-
-    profits_1 = calculate_profits(
-        main_df=main_df, supp_df=supp_df, gens_df=gens_df, mc_df=mc_df_aligned
-    )
-    profits_2 = calculate_profits(
-        main_df=updated_main_df_2,
-        supp_df=updated_supp_df_2,
-        gens_df=gens_df,
-        mc_df=mc_df_aligned,
-    )
-
-    return profits_1, profits_2, updated_main_df_2, updated_supp_df_2
-
-
-def run_MPEC_bidprice(
-    opt_gen,
-    gens_df,
-    demand_df,
-    k_values_df,
-    availability_df,
-    big_w,
-    fixed_storage_dispatch=None,
-    bid_price_max=3100,
-    demand_bids=1,
-    mc_df=None,
-    time_limit=600,
-    big_M=10000,
-):
-    """
-    Run the bid-price MPEC with fixed storage dispatch, then re-solve a
-    clean UC problem to get accurate market prices from duals.
-
-    Args:
-        opt_gen: Name of the strategic generator.
-        fixed_storage_dispatch: Series indexed by timestep with net storage
-            MW (positive = discharge/generation, negative = charge/demand).
-            None = no storage effect.
-        bid_price_max: Upper bound on strategic bid price in €/MWh.
-
-    Returns:
-        (profits_1, profits_2, results_main_df, results_supp_df)
-        profits_1 — profits from the MPEC solution (using lambda_ as price)
-        profits_2 — profits re-computed via clean UC with optimised bids
-        results_main_df, results_supp_df — UC output DataFrames
-    """
-    gens_df = (
-        gens_df.set_index("unit").copy()
-        if "unit" in gens_df.columns
-        else gens_df.copy(deep=True)
-    )
-    print(f"Optimising unit '{opt_gen}' (bid-price formulation)")
-
-    demand_df = demand_df.reset_index(drop=True).copy(deep=True)
-
-    if mc_df is None:
-        mc_df_aligned = pd.DataFrame(
-            {gen: gens_df.at[gen, "mc"] for gen in gens_df.index},
-            index=demand_df.index,
-        )
-    else:
-        mc_df_aligned = mc_df.reset_index(drop=True).copy()
-
-    k_values_df = k_values_df.copy(deep=True)
-    k_values_df.reset_index(inplace=True, drop=True)
-
-    availability_df = availability_df.copy(deep=True)
-    availability_df.reset_index(inplace=True, drop=True)
-
-    if fixed_storage_dispatch is not None:
-        fixed_storage_dispatch = fixed_storage_dispatch.copy()
-        fixed_storage_dispatch.index = demand_df.index
-
-    # Step 1: Run bid-price MPEC
-    main_df, supp_df, bid_prices = find_optimal_dispatch_bidprice(
-        gens_df=gens_df,
-        k_values_df=k_values_df,
-        availabilities_df=availability_df,
-        demand_df=demand_df,
-        opt_gen=opt_gen,
-        fixed_storage_dispatch=fixed_storage_dispatch,
-        bid_price_max=bid_price_max,
-        big_w=big_w,
-        time_limit=time_limit,
-        big_M=big_M,
-        demand_bids=demand_bids,
-        mc_df=mc_df_aligned,
-    )
-
-    if main_df is None:
-        raise RuntimeError("Bid-price MPEC was infeasible or failed.")
-
-    # Step 2: Convert bid_prices back to k_values for UC re-solve
-    # bid_price = k * mc → k = bid_price / mc
-    k_values_df_2 = k_values_df.copy()
-    mc_opt = mc_df_aligned[opt_gen]
-    bid_series = pd.to_numeric(bid_prices["bid_price"], errors="coerce")
-    k_from_bid = bid_series / mc_opt
-    k_from_bid = k_from_bid.replace([np.inf, -np.inf], 1.0).fillna(1.0)
-    k_values_df_2[opt_gen] = k_from_bid.values
-
-    gen_cols = [
-        c
-        for c in k_values_df_2.columns
-        if c not in ("date", "time", "index", "level_0")
-    ]
-    for col in gen_cols:
-        k_values_df_2[col] = pd.to_numeric(k_values_df_2[col], errors="coerce").fillna(
-            1.0
-        )
-
-    # Step 3: Re-solve UC with optimised k-values and fixed storage
-    updated_main_df_2, updated_supp_df_2 = solve_uc_problem(
-        gens_df,
-        demand_df,
-        k_values_df_2,
-        availability_df,
-        demand_bids=demand_bids,
-        mc_df=mc_df_aligned,
-        fixed_storage_dispatch=fixed_storage_dispatch,
     )
 
     profits_1 = calculate_profits(
