@@ -629,6 +629,7 @@ def find_optimal_dispatch_quadratic(
     big_M=10e6,
     demand_bids=1,
     mc_df=None,
+    warmstart=None,
 ):
     """Quadratic MPEC with continuous k-multiplier (original formulation).
 

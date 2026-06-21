@@ -27,7 +27,7 @@ import time
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from bilevel_opt import find_optimal_dispatch_quadratic_fixed_storage
+from bilevel_opt import find_optimal_dispatch_quadratic
 from uc_problem import solve_uc_problem
 
 # ---------------------------------------------------------------------------
@@ -101,28 +101,75 @@ for u in gen_names:
 res_lambda = {}
 res_lambda_hat = {}
 res_uc_mcp = {}
+res_k_vals = {}
 
-for i, opt_gen in enumerate(solve_units):
+def build_warmstart_from_uc(uc_main, uc_supp, gen_names):
+    """Extract primal variable values from UC result into a warmstart dict."""
+    ws = {}
+    # g: generation per unit
+    g_cols = [c for c in uc_main.columns if c.startswith("gen_")]
+    ws_g = uc_main[g_cols].rename(columns={c: c.replace("gen_", "") for c in g_cols})
+    ws["g"] = ws_g
+
+    # c_up / c_down: start-up and shut-down costs
+    cup_cols = [c for c in uc_supp.columns if c.startswith("start_up_")]
+    cdown_cols = [c for c in uc_supp.columns if c.startswith("shut_down_")]
+    ws["c_up"] = uc_supp[cup_cols].rename(
+        columns={c: c.replace("start_up_", "") for c in cup_cols}
+    )
+    ws["c_down"] = uc_supp[cdown_cols].rename(
+        columns={c: c.replace("shut_down_", "") for c in cdown_cols}
+    )
+
+    # u: commitment status (derive from generation > 0)
+    ws_u = (ws_g > 0).astype(int)
+    ws["u"] = ws_u
+
+    # mcp: market clearing price from UC
+    ws["mcp"] = uc_main["mcp"]
+
+    return ws
+
+
+# UC pre-solve with k=1 (competitive equilibrium) for warmstart
+print("\n--- UC pre-solve (k=1 baseline) for MPEC warmstart ---")
+t0_pre = time.time()
+pre_uc_main, pre_uc_supp = solve_uc_problem(
+    gens_df=gens_df_idx,
+    demand_df=demand_df_r,
+    k_values_df=k_values_r,
+    availabilities_df=avail_r,
+    demand_bids=n_demand_bids,
+    mc_df=mc_df,
+    fixed_storage_dispatch=None,
+)
+t_pre = time.time() - t0_pre
+print(f"UC pre-solve done in {t_pre:.1f}s, MCP range: "
+      f"{pre_uc_main['mcp'].min():.1f} - {pre_uc_main['mcp'].max():.1f}")
+
+#warmstart_dict = build_warmstart_from_uc(pre_uc_main, pre_uc_supp, gen_names)
+
+for i, opt_gen in enumerate(solve_units[:-3]):
     mc_val = mc_df[opt_gen].iloc[0]
-    k_max = max(int(3100 / mc_val), 10) if mc_val > 0 else 300000
+    k_max = max(int(300 / mc_val), 10) if mc_val > 0 else 300
     print(
         f"\n[{i + 1}/{len(solve_units)}] {opt_gen} (mc={mc_val:.4f}, k_max={k_max})"
     )
 
     t0 = time.time()
-    main_df, supp_df, k_vals = find_optimal_dispatch_quadratic_fixed_storage(
+    main_df, supp_df, k_vals = find_optimal_dispatch_quadratic(
         gens_df=gens_df_idx,
         k_values_df=k_values_r,
         availabilities_df=avail_r,
         demand_df=demand_df_r,
         k_max=k_max,
         opt_gen=opt_gen,
-        fixed_storage_dispatch=None,
-        big_w=10000,
-        time_limit=600,
-        big_M=10e6,
+        big_w=1,
+        time_limit=900,
+        big_M=10000,
         demand_bids=n_demand_bids,
         mc_df=mc_df,
+#        warmstart=warmstart_dict,
     )
     t_mpec = time.time() - t0
 
@@ -132,6 +179,7 @@ for i, opt_gen in enumerate(solve_units):
 
     res_lambda[opt_gen] = main_df["mcp"].astype(float)
     res_lambda_hat[opt_gen] = main_df["mcp_hat"].astype(float)
+    res_k_vals[opt_gen] = k_vals
 
     # UC re-solve: update k_values with MPEC result
     k_values_uc = k_values_r.copy()
@@ -180,9 +228,9 @@ os.makedirs("results_02a", exist_ok=True)
 all_lambda = pd.DataFrame(res_lambda)
 all_lambda_hat = pd.DataFrame(res_lambda_hat)
 all_uc = pd.DataFrame(res_uc_mcp)
-all_lambda.to_csv("results_02a/results_lambda.csv")
-all_lambda_hat.to_csv("results_02a/results_lambda_hat.csv")
-all_uc.to_csv("results_02a/results_uc_mcp.csv")
+all_lambda.to_csv("results_02a/results_lambda_generror.csv")
+all_lambda_hat.to_csv("results_02a/results_lambda_hat_generror.csv")
+all_uc.to_csv("results_02a/results_uc_mcp_generror.csv")
 print("Saved results to results_02a/")
 
 # --- PLOT ---
@@ -208,5 +256,108 @@ for ax, title, data in zip(axes, titles, data_dicts):
 
 axes[-1].set_xlabel("Hour")
 plt.tight_layout()
-plt.savefig("results_02a/mcp_all_units.png", dpi=150, bbox_inches="tight")
-print("\nPlot saved: results_02a/mcp_all_units.png")
+plt.savefig("results_02a/mcp_all_units_generror.png", dpi=150, bbox_inches="tight")
+print("\nPlot saved: results_02a/mcp_all_units_generror.png")
+
+# --- MERIT ORDER PLOTS ---
+color_map_unit = {
+    "pp_1": "#99cccc",
+    "pp_2": "#88bbbb",
+    "pp_3": "#7fb3d5",
+    "pp_4": "#d5dbdb",
+    "Wind Onshore": "#90ee90",
+    "pp_6": "#ffe680",
+    "pp_7": "#ffcc33",
+}
+
+MERIT_HOURS = [0, 6, 12, 18]
+
+for strategic_unit in res_k_vals:
+    n_hours = min(len(MERIT_HOURS), len(demand_df_r))
+    hours_to_plot = [h for h in MERIT_HOURS if h < len(demand_df_r)]
+    if not hours_to_plot:
+        hours_to_plot = [0]
+
+    fig, axes = plt.subplots(
+        len(hours_to_plot), 1,
+        figsize=(14, 5 * len(hours_to_plot)),
+        squeeze=False,
+    )
+
+    for ax_idx, hour in enumerate(hours_to_plot):
+        ax = axes[ax_idx, 0]
+        k_opt = float(res_k_vals[strategic_unit].iloc[hour])
+        mcp_uc = float(res_uc_mcp[strategic_unit].iloc[hour])
+        mcp_hat = float(res_lambda_hat[strategic_unit].iloc[hour])
+
+        supply = []
+        for unit in gen_names:
+            mc_val = gens_df_idx.at[unit, "mc"]
+            g_max = gens_df_idx.at[unit, "g_max"]
+            if unit == "Wind Onshore":
+                cap = g_max * float(avail_r.at[hour, unit])
+            else:
+                cap = g_max
+            bid_price = k_opt * mc_val if unit == strategic_unit else mc_val
+            supply.append((unit, cap, bid_price, mc_val))
+
+        supply.sort(key=lambda x: x[2])
+
+        # Demand curve
+        demand_prices = []
+        demand_cum_vols = []
+        cum = 0
+        for i in range(1, n_demand_bids + 1):
+            p = float(demand_df_r.at[hour, f"price_{i}"])
+            v = float(demand_df_r.at[hour, f"volume_{i}"])
+            demand_prices.append(p)
+            cum += v
+            demand_cum_vols.append(cum)
+
+        x_pos = 0
+        for unit, cap, bid_price, mc_val in supply:
+            color = color_map_unit.get(unit, "#cccccc")
+            edgecolor = "red" if unit == strategic_unit else "black"
+            linewidth = 2.5 if unit == strategic_unit else 1.0
+            ax.bar(
+                x_pos, bid_price, width=cap, align="edge",
+                color=color, edgecolor=edgecolor, linewidth=linewidth,
+                label=unit, zorder=2,
+            )
+            label_x = x_pos + cap / 2
+            label_y = bid_price / 2 if bid_price > 15 else bid_price + 3
+            if unit == strategic_unit:
+                label_text = f"{unit}\nk={k_opt:.2f}\nbid={bid_price:.1f}"
+            elif unit == "Wind Onshore":
+                label_text = f"Wind\n{cap:.0f} MW"
+            else:
+                label_text = f"{unit}\n{mc_val:.1f}"
+            ax.text(label_x, label_y, label_text, ha="center", va="center", fontsize=7, zorder=3)
+            x_pos += cap
+
+        demand_x = [0] + list(demand_cum_vols)
+        demand_y = [demand_prices[0]] + list(demand_prices)
+        ax.step(demand_x, demand_y, where="post", color="darkblue",
+                linewidth=2, linestyle="--", label="Demand", zorder=4)
+
+        ax.axhline(y=mcp_uc, color="red", linewidth=2, linestyle="-",
+                   label=f"UC MCP = {mcp_uc:.1f}", zorder=5)
+        ax.axhline(y=mcp_hat, color="orange", linewidth=1.5, linestyle=":",
+                   label=f"λ_hat = {mcp_hat:.1f}", zorder=5)
+
+        max_price_show = max(mcp_hat * 1.5, max(s[2] for s in supply) * 1.2, 120)
+        ax.set_ylim(0, min(max_price_show, 350))
+        ax.set_xlim(0, x_pos * 1.05)
+        ax.set_xlabel("Cumulative Capacity [MW]", fontsize=10)
+        ax.set_ylabel("Price [EUR/MWh]", fontsize=10)
+        ax.set_title(f"Merit Order — {strategic_unit} (k={k_opt:.2f}) — Hour {hour}:00", fontsize=11)
+        ax.legend(loc="upper right", fontsize=7, ncol=2)
+        ax.grid(True, alpha=0.3, zorder=0)
+
+    plt.tight_layout()
+    fname = f"results_02a/merit_order_{strategic_unit}.png"
+    plt.savefig(fname, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Merit order plot saved: {fname}")
+
+print("\nDone.")
