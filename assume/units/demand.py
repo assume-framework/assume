@@ -40,7 +40,7 @@ class Demand(SupportsMinMax):
         min_power: float,
         forecaster: DemandForecaster,
         node: str = "node0",
-        price: float = 3000.0,
+        max_price: float = 3000.0,
         location: tuple[float, float] = (0.0, 0.0),
         **kwargs,
     ):
@@ -80,10 +80,10 @@ class Demand(SupportsMinMax):
         self.max_power = max_power
         self.min_power = min_power
 
-        self.price = FastSeries(index=self.index, value=price)
+        self.price = FastSeries(index=self.index, value=max_price)
 
         # Elastic demand parameters
-        self.max_price = price
+        self.max_price = max_price
         self.elasticity = kwargs.get("elasticity", 0)
         self.elasticity_model = kwargs.get("elasticity_model", 0)
         self.num_bids = int(kwargs.get("num_bids", 0))
