@@ -134,7 +134,7 @@ class RedispatchMarketRole(MarketRole):
         # Update the network parameters
         redispatch_network = self.network.copy()
 
-        # EOM/day-ahead dispatch from orderbook
+        # Final market dispatch from orderbook
         p_set = volume_pivot.copy()
 
         # Reset all pivot indices to match redispatch_network.snapshots = range(...)
@@ -144,14 +144,14 @@ class RedispatchMarketRole(MarketRole):
         price_pivot.reset_index(inplace=True, drop=True)
         p_nom_pivot.reset_index(inplace=True, drop=True)
 
-        # Base generators and loads from the grid data
-        base_generator_names = self.grid_data["generators"].index
+        # Generators and loads from the grid data
+        generator_names = self.grid_data["generators"].index
         load_names = self.grid_data["loads"].index
 
-        gen_cols = p_set.columns.intersection(base_generator_names)
+        gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
 
-        # 1. Fixed day-ahead generator dispatch
+        # 1. Fixed generator dispatch
         gen_p_set = p_set[gen_cols].copy()
 
         redispatch_network.generators_t.p_set = gen_p_set.reindex(
@@ -178,19 +178,14 @@ class RedispatchMarketRole(MarketRole):
         # 3. Redispatch flexibility only for power plants
         # Upward redispatch capacity:
         # Possible maximum upwards generation : availability * max_power - market_cleared_capacity (no incorporation of ramping constraints yet)
-
         p_max_pu_up = (
-            (max_power_pivot[gen_cols] - gen_p_set)
-            .div(p_nom)
-            .clip(lower=0, upper=1)
+            (max_power_pivot[gen_cols] - gen_p_set).div(p_nom).clip(lower=0, upper=1)
         )
 
         # Downward redispatch capacity:
         # Possible maximum downward generation : market_cleared_capacity - min_power (no incorporation of ramping constraints yet)
         p_max_pu_down = (
-            (gen_p_set - min_power_pivot[gen_cols])
-            .div(p_nom)
-            .clip(lower=0, upper=1)
+            (gen_p_set - min_power_pivot[gen_cols]).div(p_nom).clip(lower=0, upper=1)
         )
         costs = price_pivot[gen_cols]
 
