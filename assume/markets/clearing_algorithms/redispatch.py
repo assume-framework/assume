@@ -167,10 +167,8 @@ class RedispatchMarketRole(MarketRole):
         redispatch_network.generators_t.p_max_pu.update(p_da_pu)
 
         # 2. Fixed demand/load profile
-        load_p_set = p_set[load_cols].copy().abs()
-
         # PyPSA p_set values to positive values since the sign of the p_set values is usually positive
-        load_p_set = load_p_set.abs()
+        load_p_set = p_set[load_cols].copy().abs()
 
         redispatch_network.loads_t.p_set = load_p_set.reindex(
             index=redispatch_network.snapshots,
@@ -184,7 +182,7 @@ class RedispatchMarketRole(MarketRole):
 
         p_max_pu_up = (
             (max_power_pivot[gen_cols] - gen_p_set)
-            .div(p_nom_pivot)
+            .div(p_nom)
             .clip(lower=0, upper=1)
         )
 
@@ -192,7 +190,7 @@ class RedispatchMarketRole(MarketRole):
         # Possible maximum downward generation : market_cleared_capacity - min_power (no incorporation of ramping constraints yet)
         p_max_pu_down = (
             (gen_p_set - min_power_pivot[gen_cols])
-            .div(p_nom_pivot)
+            .div(p_nom)
             .clip(lower=0, upper=1)
         )
         costs = price_pivot[gen_cols]
