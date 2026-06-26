@@ -103,6 +103,7 @@ Install using Docker
 =========================================
 
 After installing `Docker Engine <https://docs.docker.com/engine/install/>`_ you can run::
+
     docker compose up -d assume_db grafana
     docker compose run simulation -s example_01a -db "postgresql://assume:assume@assume_db:5432/assume"
 
