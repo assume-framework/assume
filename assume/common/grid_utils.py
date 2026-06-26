@@ -220,7 +220,7 @@ def add_redispatch_loads(
     if "sign" in loads_c.columns:
         del loads_c["sign"]
 
-    # add loads with opposite sign (default for loads is -1). This is needed to properly model the redispatch
+    # add loads
     network.add(
         "Load",
         name=loads.index,
