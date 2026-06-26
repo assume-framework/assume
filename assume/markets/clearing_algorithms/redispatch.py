@@ -179,17 +179,13 @@ class RedispatchMarketRole(MarketRole):
         # Upward redispatch capacity:
         # Possible maximum upwards generation : availability * max_power - market_cleared_capacity (no incorporation of ramping constraints yet)
         p_max_pu_up = (
-            (max_power_pivot[gen_cols] - gen_p_set)
-            .div(p_nom)
-            .clip(lower=0, upper=1)
+            (max_power_pivot[gen_cols] - gen_p_set).div(p_nom).clip(lower=0, upper=1)
         )
 
         # Downward redispatch capacity:
         # Possible maximum downward generation : market_cleared_capacity - min_power (no incorporation of ramping constraints yet)
         p_max_pu_down = (
-            (gen_p_set - min_power_pivot[gen_cols])
-            .div(p_nom)
-            .clip(lower=0, upper=1)
+            (gen_p_set - min_power_pivot[gen_cols]).div(p_nom).clip(lower=0, upper=1)
         )
         costs = price_pivot[gen_cols]
 
