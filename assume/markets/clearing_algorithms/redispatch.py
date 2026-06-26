@@ -161,10 +161,10 @@ class RedispatchMarketRole(MarketRole):
 
         p_nom = p_nom_pivot[gen_cols].copy()
 
-        p_da_pu = gen_p_set.div(p_nom).clip(lower=0, upper=1)
+        p_set_pu = gen_p_set.div(p_nom).clip(lower=0, upper=1)
 
-        redispatch_network.generators_t.p_min_pu.update(p_da_pu)
-        redispatch_network.generators_t.p_max_pu.update(p_da_pu)
+        redispatch_network.generators_t.p_min_pu.update(p_set_pu)
+        redispatch_network.generators_t.p_max_pu.update(p_set_pu)
 
         # 2. Fixed demand/load profile
         # PyPSA p_set values to positive values since the sign of the p_set values is usually positive
@@ -173,7 +173,6 @@ class RedispatchMarketRole(MarketRole):
         redispatch_network.loads_t.p_set = load_p_set.reindex(
             index=redispatch_network.snapshots,
             columns=redispatch_network.loads.index,
-            fill_value=0.0,
         )
 
         # 3. Redispatch flexibility only for power plants
