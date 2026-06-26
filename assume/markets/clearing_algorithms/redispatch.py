@@ -159,9 +159,15 @@ class RedispatchMarketRole(MarketRole):
             columns=gen_cols,
         )
 
-        # 2. Fixed demand/load profile
+        p_nom = p_nom_pivot[gen_cols].copy()
 
-        load_p_set = p_set[load_cols].copy()
+        p_da_pu = gen_p_set.div(p_nom).clip(lower=0, upper=1)
+
+        redispatch_network.generators_t.p_min_pu.update(p_da_pu)
+        redispatch_network.generators_t.p_max_pu.update(p_da_pu)
+
+        # 2. Fixed demand/load profile
+        load_p_set = p_set[load_cols].copy().abs()
 
         # PyPSA p_set values to positive values since the sign of the p_set values is usually positive
         load_p_set = load_p_set.abs()
@@ -173,26 +179,20 @@ class RedispatchMarketRole(MarketRole):
         )
 
         # 3. Redispatch flexibility only for power plants
-
-        # p_nom from the orderbook and from availability factors
-        p_nom_gen = p_nom_pivot[gen_cols].copy()
-        p_nom_gen = p_nom_gen.where(p_nom_gen.notna(), max_power_pivot[gen_cols])
-        p_nom_gen = p_nom_gen.replace(0, np.inf)
-
         # Upward redispatch capacity:
         # Possible maximum upwards generation : availability * max_power - market_cleared_capacity (no incorporation of ramping constraints yet)
 
         p_max_pu_up = (
-            (max_power_pivot[gen_cols] - p_set[gen_cols])
-            .div(p_nom_gen)
+            (max_power_pivot[gen_cols] - gen_p_set)
+            .div(p_nom_pivot)
             .clip(lower=0, upper=1)
         )
 
         # Downward redispatch capacity:
         # Possible maximum downward generation : market_cleared_capacity - min_power (no incorporation of ramping constraints yet)
         p_max_pu_down = (
-            (p_set[gen_cols] - min_power_pivot[gen_cols])
-            .div(p_nom_gen)
+            (gen_p_set - min_power_pivot[gen_cols])
+            .div(p_nom_pivot)
             .clip(lower=0, upper=1)
         )
         costs = price_pivot[gen_cols]
