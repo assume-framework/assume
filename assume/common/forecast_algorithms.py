@@ -414,7 +414,13 @@ def calculate_naive_residual_load(
         units, config.market_id
     )
 
-    sum_demand = calculate_sum_demand(demand_units, exchange_units)
+    if demand_units or exchange_units:
+        sum_demand = calculate_sum_demand(demand_units, exchange_units)
+    else:
+        # A market with no demand side (e.g. an intraday re-trading market where
+        # supply units buy/sell against each other) has no demand to sum -- avoid
+        # indexing an empty list. Residual load is then just the negative VRE feed-in.
+        sum_demand = np.zeros(len(index))
 
     # shape: (num_pp_units, index_len) -> (index_len)
     renewable_units = [

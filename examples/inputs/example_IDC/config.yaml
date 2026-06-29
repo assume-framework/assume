@@ -1,0 +1,56 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# EOM (day-ahead, hourly) + Intraday Continuous (IDC) approximated as rolling
+# 15-min pay-as-bid call auctions. IDC shares product_type=energy and opens
+# after EOM, so accepted IDC volumes adjust the day-ahead position. Re-trading is
+# driven by the renewable forecast error (availability_df = day-ahead forecast
+# vs availability_intraday_df = 'actual' near-real-time infeed) and the
+# data-anchored IDC price signal (price_IDC). Synthetic data here -- replace with
+# SMARD/ENTSO-E/OPSD series for a real study.
+
+IDC_demo:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-02 00:00
+  time_step: 15min
+  save_frequency_hours: 24
+
+  bidding_strategy_params:
+    eom_foresight: 12h
+    eom_market_id: EOM
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 2h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    IDC:
+      operator: IDC_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 15min
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 15min
+      opening_duration: 15min
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_bid

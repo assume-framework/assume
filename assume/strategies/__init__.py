@@ -26,6 +26,10 @@ from assume.strategies.flexable_crm_storage import (
     StorageCrmPosStrategy,
     StorageCrmNegStrategy,
 )
+from assume.strategies.flexable_intraday import (
+    EnergyIntradayAdjustmentStrategy,
+    StorageEnergyIntradayAdjustmentStrategy,
+)
 from assume.strategies.naive_strategies import (
     DsmEnergyOptimizationStrategy,
     EnergyNaiveProfileStrategy,
@@ -90,6 +94,8 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "powerplant_crm_neg": PowerPlantCrmNegStrategy,
     "storage_crm_pos": StorageCrmPosStrategy,
     "storage_crm_neg": StorageCrmNegStrategy,
+    "powerplant_energy_intraday": EnergyIntradayAdjustmentStrategy,
+    "storage_energy_intraday": StorageEnergyIntradayAdjustmentStrategy,
     "household_capacity_heuristic_balancing_pos": DsmCapacityHeuristicBalancingPosStrategy,
     "industry_capacity_heuristic_balancing_pos": DsmCapacityHeuristicBalancingPosStrategy,
     "household_capacity_heuristic_balancing_neg": DsmCapacityHeuristicBalancingNegStrategy,

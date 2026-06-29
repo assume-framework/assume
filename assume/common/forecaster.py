@@ -181,6 +181,7 @@ class UnitForecaster:
         market_prices: dict[str, ForecastSeries] = None,
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
+        availability_intraday: ForecastSeries = None,
         forecast_algorithms: dict[str, str] = {},
         forecast_registries: dict[str, dict] = None,
     ):
@@ -193,6 +194,14 @@ class UnitForecaster:
             raise ValidationError(
                 message="Availability must be between 0 and 1", field="availability"
             )
+        # Near-real-time ("intraday") availability/infeed forecast, used by the
+        # intraday-continuous strategies to compute the position delta vs the
+        # day-ahead commitment. Falls back to the day-ahead availability when no
+        # separate intraday series is provided (i.e. perfect day-ahead foresight).
+        if availability_intraday is None:
+            self.availability_intraday: FastSeries = self.availability
+        else:
+            self.availability_intraday = self._to_series(availability_intraday)
         self.forecast_algorithms = forecast_algorithms
         self._registries = forecast_registries
         if market_prices is None:
@@ -441,12 +450,14 @@ class PowerplantForecaster(UnitForecaster):
         market_prices: dict[str, ForecastSeries] = None,
         residual_load: dict[str, ForecastSeries] = None,
         availability: ForecastSeries = 1,
+        availability_intraday: ForecastSeries = None,
         forecast_algorithms: dict[str, str] = {},
         forecast_registries: dict[str, dict] = None,
     ):
         super().__init__(
             index=index,
             availability=availability,
+            availability_intraday=availability_intraday,
             forecast_algorithms=forecast_algorithms,
             forecast_registries=forecast_registries,
             market_prices=market_prices,

@@ -638,6 +638,15 @@ def load_config_and_create_forecaster(
     if availability is None:
         availability = pd.DataFrame(index=index)
 
+    # optional near-real-time ("intraday") availability/infeed forecast, read by
+    # the intraday-continuous strategies; falls back to day-ahead availability
+    # per unit when no column is provided.
+    availability_intraday = load_file(
+        path=path, config=config, file_name="availability_intraday_df", index=index
+    )
+    if availability_intraday is None:
+        availability_intraday = pd.DataFrame(index=index)
+
     fuel_prices_df = load_file(
         path=path, config=config, file_name="fuel_prices_df", index=index
     )
@@ -660,6 +669,7 @@ def load_config_and_create_forecaster(
             unit_forecasts[id] = PowerplantForecaster(
                 index=shared_unit_index,
                 availability=availability.get(id, pd.Series(1.0, index, name=id)),
+                availability_intraday=availability_intraday.get(id),
                 fuel_prices=fuel_prices_df,
                 forecast_algorithms=get_unit_forecast_algorithms(
                     forecast_algorithms, plant

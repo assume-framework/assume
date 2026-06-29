@@ -1,0 +1,2 @@
+name,technology,bidding_EOM,bidding_IDC,max_power_charge,max_power_discharge,efficiency_charge,efficiency_discharge,min_soc,max_soc,initial_soc,capacity,additional_cost_charge,additional_cost_discharge,unit_operator
+Battery,battery,storage_energy_heuristic_flexable,storage_energy_intraday,-100,100,0.95,0.95,0,1,0.5,400,2,5,BattOp

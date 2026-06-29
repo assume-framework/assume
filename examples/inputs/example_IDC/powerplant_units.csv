@@ -1,0 +1,4 @@
+name,technology,bidding_EOM,bidding_IDC,fuel_type,emission_factor,max_power,min_power,efficiency,additional_cost,ramp_up,ramp_down,min_operating_time,min_down_time,unit_operator
+Wind,wind,powerplant_energy_heuristic_flexable,powerplant_energy_intraday,renewable,0,1000,0,1,0,1000,1000,0,0,WindOp
+Coal_PP,hard coal,powerplant_energy_heuristic_flexable,powerplant_energy_intraday,hard coal,0.3,500,100,0.4,2,250,250,1,1,CoalOp
+Gas_CCGT,combined cycle gas turbine,powerplant_energy_heuristic_flexable,powerplant_energy_intraday,natural gas,0.2,400,80,0.5,5,300,300,1,1,GasOp
