@@ -33,7 +33,7 @@ Upcoming Release
   - **Fix upward redispatch potential**, so that availabilities are now correctly considered instead of the nominal power output of the unit
   - **Fix errors in portfolio learning strategies**: The ``min_max_rescale`` function was missing from ``utils.py``, causing an ``ImportError`` in ``portfolio_learning_strategies.py``. Resolved by extending ``min_max_scale`` to cover the rescaling use case. And fix minor construction bug for observation space.
   - **Skip torch seeding when torch is installed but not used**: Irrelevant seeding was performed and a warning was thrown about deterministic PyTorch behavior, even though simulation does not use RL. This is fixed by only setting the PyTorch seeds when learning is active.
-  - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In PyPSA > 0.35.2 (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.  
+  - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.  
 
 0.6.1 - (25th March 2026)
 =========================
