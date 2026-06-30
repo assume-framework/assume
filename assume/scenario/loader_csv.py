@@ -577,9 +577,13 @@ def load_config_and_create_forecaster(
     if not study_case:
         study_case = list(config.keys())[0]
     config = config[study_case]
+    learning_config = config.get("learning_config", {})
+    learning_mode = learning_config.get("learning_mode", False) or learning_config.get(
+        "continue_learning", False
+    )
 
     # Set seed, or disable with `seed: null` in config
-    set_random_seed(config.get("seed", 42))
+    set_random_seed(seed=config.get("seed", 42), learning_mode=learning_mode)
 
     simulation_id = config.get("simulation_id", f"{scenario}_{study_case}")
 

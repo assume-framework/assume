@@ -25,7 +25,7 @@ Developed as an open-source model, its primary objectives are to ensure usabilit
 
 ## Introduction
 
-A unique feature of the ASSUME toolbox is its integration of **Deep Reinforcement Learning** methods into the behavioral strategies of market agents. The model offers various predefined agent representations for both the demand and generation sides, which can be used as plug-and-play modules, simplifying the reinforcement of learning strategies.
+A unique feature of the ASSUME toolbox is its integration of **Deep Reinforcement Learning** methods into the behavioral strategies of market agents. The model offers predefined agent representations for both the demand and generation sides that can be used as plug-and-play modules, simplifying the implementation of learning strategies.
 This setup enables research into new market designs and dynamics in energy markets.
 
 **If you have any questions - get in contact on matrix: https://matrix.to/#/#assume-framework:matrix.org**<br>
@@ -72,8 +72,8 @@ pip install assume-framework
 pip install 'assume-framework[learning]'
 ```
 
-Please keep in mind, that the above installation method will install pytorch package without CUDA support.
-If you want to make use of your GPU with CUDA cores, please install pytorch with GPU support separately as described [here](https://pytorch.org/get-started/locally/).
+Please keep in mind that the above installation method will install the PyTorch package without CUDA support.
+If you want to make use of your GPU with CUDA cores, please install PyTorch with GPU support separately as described [here](https://pytorch.org/get-started/locally/).
 
 We also include **network-based market clearing algorithms** such as for the re-dispatch, zonal clearing with NTCs and nodal market clearing, which all require the PyPSA library.
 To install the package with these capabilities, use:
@@ -92,7 +92,7 @@ pip install 'assume-framework[all]'
 ### Timescale Database and Grafana Dashboards
 The Timescale Database and Grafana Dashboard are used to store and represent simulation results.
 
-If you want to benefit from a supported database and integrated Grafana dashboards for scenario analysis, you can use the provided Docker Compose file.
+If you want to use the supported TimescaleDB and integrated Grafana dashboards for scenario analysis, you can use the provided Docker Compose file.
 
 Follow these steps:
 
@@ -132,10 +132,10 @@ The former are helpful if you would like to get an impression of how ASSUME work
 
 ### The Tutorial Notebooks
 
-You can run the tutorials locally using the notebooks [here](examples/notebooks) or use [google colab](https://assume.readthedocs.io/en/latest/examples_basic.html)
+You can run the tutorials locally using the notebooks [here](examples/notebooks) or use [Google Colab](https://assume.readthedocs.io/en/latest/examples_basic.html).
 The tutorials begin with the basics of ASSUME, e.g., introducing a new unit, while the later tutorials cover more advanced use cases.
 
-We particularly recommend these tutorials; more can be found under the given Link:
+We particularly recommend these tutorials; more can be found at the linked pages:
 
 
 How to configure a new unit in ASSUME?
@@ -155,7 +155,7 @@ How to use reinforcement learning for new market participants in ASSUME?
 
 ### Preconfigured Examples
 
-To explore the provided example simualtions [here](examples/inputs), follow these steps:
+To explore the provided example simulations [here](examples/inputs), follow these steps:
 
 1. Clone the repository and navigate to its directory:
 
@@ -189,7 +189,7 @@ For additional CLI options, run `assume -h`.
 
 ## Development
 
-[The Contribution Guidelines explain how to setup your development environment and contribute to the project.](./CONTRIBUTING.md#development-setup)
+[The Contribution Guidelines explain how to set up your development environment and contribute to the project.](./CONTRIBUTING.md#development-setup)
 
 ## Creating Documentation
 
