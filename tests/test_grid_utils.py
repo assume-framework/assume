@@ -11,7 +11,6 @@ pytest.importorskip("pypsa")
 import pypsa
 
 from assume.common.grid_utils import (
-    add_nodal_loads,
     add_redispatch_generators,
     add_redispatch_loads,
     read_pypsa_grid,
@@ -163,43 +162,6 @@ def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):
     assert actual_loads_t.index == "now"
     # p_set should be initialized as 0 for all loads and snapshots
     assert (actual_loads_t == expected_loads_t).all().all()
-
-
-def test_add_nodal_loads(n_2bus_1line, loads_for_n_2_bus_1line):
-    expected_nodal_loads = pd.DataFrame(
-        {
-            "name": ["loadN", "loadS"],
-            "bus": ["N", "S"],
-            "p_nom": [0.0, 3000.0],
-            "p_min_pu": [0.0, 0.0],
-            "p_max_pu": [1.0, 1.0],
-            "marginal_cost": [0.0, 0.0],
-            "sign": [-1.0, -1.0],
-        }
-    ).set_index("name")
-
-    expected_nodal_loads_t = pd.DataFrame(
-        {
-            "name": ["now"],  # empty dataframe
-        }
-    ).set_index("name")
-
-    add_nodal_loads(n_2bus_1line, loads_for_n_2_bus_1line)
-    actual_nodal_loads = n_2bus_1line.generators.filter(like="load", axis=0)
-    assert (actual_nodal_loads.index == expected_nodal_loads.index).all()
-    assert (actual_nodal_loads.bus == expected_nodal_loads["bus"]).all()
-    assert (actual_nodal_loads.p_nom == expected_nodal_loads["p_nom"]).all()
-    assert (actual_nodal_loads.p_min_pu == expected_nodal_loads["p_min_pu"]).all()
-    assert (actual_nodal_loads.p_max_pu == expected_nodal_loads["p_max_pu"]).all()
-    assert (
-        actual_nodal_loads.marginal_cost == expected_nodal_loads["marginal_cost"]
-    ).all()
-    assert (actual_nodal_loads.sign == expected_nodal_loads["sign"]).all()
-
-    actual_nodal_loads_t = n_2bus_1line.generators_t.p_set
-    assert actual_nodal_loads_t.index == "now"
-    # p_set should be initialized as 0 for all loads and snapshots
-    assert (actual_nodal_loads_t == expected_nodal_loads_t).all().all()
 
 
 # use grid_dict fixture from test_redispatch.py - does not seem to work
