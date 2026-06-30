@@ -25,6 +25,7 @@ Upcoming Release
   - **Extended ``min_max_scale`` to support arbitrary output ranges**: Added optional ``out_min`` and ``out_max`` parameters, enabling both forward scaling and inverse rescaling with a single function instead of two separate ones.
   - **Add test for portfolio learning strategy and ``min_max_scale`` function**: Added a test for the portfolio learning strategy and ``min_max_rescale`` function to ensure its functionality and stability.
   - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
+  - **Align redispatch mechanism to latest PyPSA version release**: Updated the redispatch formulation to model cleared EOM generator dispatch for ``network.lpf()`` via ``generators_t.p_set`` and consistent generator bounds ``p_min_pu/p_max_pu``, replacing the previous load-based workaround.
 
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
@@ -33,6 +34,7 @@ Upcoming Release
   - **Fix upward redispatch potential**, so that availabilities are now correctly considered instead of the nominal power output of the unit
   - **Fix errors in portfolio learning strategies**: The ``min_max_rescale`` function was missing from ``utils.py``, causing an ``ImportError`` in ``portfolio_learning_strategies.py``. Resolved by extending ``min_max_scale`` to cover the rescaling use case. And fix minor construction bug for observation space.
   - **Skip torch seeding when torch is installed but not used**: Irrelevant seeding was performed and a warning was thrown about deterministic PyTorch behavior, even though simulation does not use RL. This is fixed by only setting the PyTorch seeds when learning is active.
+  - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.
 
 0.6.1 - (25th March 2026)
 =========================

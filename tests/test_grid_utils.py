@@ -104,20 +104,20 @@ def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
     actual_up_generators = n_2bus_1line.generators.filter(like="_up", axis=0).filter(
         like="gen", axis=0
     )
-    assert actual_up_generators.index.equals(expected_up_generators.index)
-    assert actual_up_generators.bus.equals(expected_up_generators["bus"])
-    assert actual_up_generators.p_nom.equals(expected_up_generators["max_power"])
+    assert (actual_up_generators.index == expected_up_generators.index).all()
+    assert (actual_up_generators.bus == expected_up_generators["bus"]).all()
+    assert (actual_up_generators.p_nom == expected_up_generators["max_power"]).all()
     assert actual_up_generators["marginal_cost"].to_numpy() == pytest.approx(
         expected_up_generators["marginal_cost"].to_numpy(), abs=1e-6, rel=0
     )
 
     # check if backup generators are added with correct attributes
     actual_backup_generators = n_2bus_1line.generators.filter(like="backup", axis=0)
-    assert actual_backup_generators.index.equals(expected_backup_generators.index)
-    assert actual_backup_generators.bus.equals(expected_backup_generators["bus"])
-    assert actual_backup_generators.p_nom.equals(
-        expected_backup_generators["max_power"]
-    )
+    assert (actual_backup_generators.index == expected_backup_generators.index).all()
+    assert (actual_backup_generators.bus == expected_backup_generators["bus"]).all()
+    assert (
+        actual_backup_generators.p_nom == expected_backup_generators["max_power"]
+    ).all()
     assert actual_backup_generators["marginal_cost"].to_numpy() == pytest.approx(
         expected_backup_generators["marginal_cost"].to_numpy(), abs=1e-6, rel=0
     )
@@ -126,9 +126,9 @@ def test_add_redispatch_generators(n_2bus_1line, generators_for_n_2_bus_1line):
     actual_down_generators = n_2bus_1line.generators.filter(
         like="_down", axis=0
     ).filter(like="gen", axis=0)
-    assert actual_down_generators.index.equals(expected_down_generators.index)
-    assert actual_down_generators.bus.equals(expected_down_generators["bus"])
-    assert actual_down_generators.p_nom.equals(expected_down_generators["max_power"])
+    assert (actual_down_generators.index == expected_down_generators.index).all()
+    assert (actual_down_generators.bus == expected_down_generators["bus"]).all()
+    assert (actual_down_generators.p_nom == expected_down_generators["max_power"]).all()
     assert actual_down_generators["marginal_cost"].to_numpy() == pytest.approx(
         expected_down_generators["marginal_cost"].to_numpy(), abs=1e-6, rel=0
     )
@@ -140,7 +140,7 @@ def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):
             "name": ["loadN", "loadS"],
             "bus": ["N", "S"],
             "max_power": [0.0, 3000.0],
-            "sign": [1.0, 1.0],
+            "sign": [-1.0, -1.0],
         }
     ).set_index("name")
     expected_loads_t = pd.DataFrame(
@@ -154,10 +154,10 @@ def test_add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line):
     add_redispatch_loads(n_2bus_1line, loads_for_n_2_bus_1line)
 
     actual_loads = n_2bus_1line.loads
-    assert actual_loads.index.equals(expected_loads.index)
-    assert actual_loads.bus.equals(expected_loads["bus"])
-    assert actual_loads.max_power.equals(expected_loads["max_power"])
-    assert actual_loads.sign.equals(expected_loads["sign"])
+    assert (actual_loads.index == expected_loads.index).all()
+    assert (actual_loads.bus == expected_loads["bus"]).all()
+    assert (actual_loads.max_power == expected_loads["max_power"]).all()
+    assert (actual_loads.sign == expected_loads["sign"]).all()
 
     actual_loads_t = n_2bus_1line.loads_t.p_set
     assert actual_loads_t.index == "now"
@@ -186,15 +186,15 @@ def test_add_nodal_loads(n_2bus_1line, loads_for_n_2_bus_1line):
 
     add_nodal_loads(n_2bus_1line, loads_for_n_2_bus_1line)
     actual_nodal_loads = n_2bus_1line.generators.filter(like="load", axis=0)
-    assert actual_nodal_loads.index.equals(expected_nodal_loads.index)
-    assert actual_nodal_loads.bus.equals(expected_nodal_loads["bus"])
-    assert actual_nodal_loads.p_nom.equals(expected_nodal_loads["p_nom"])
-    assert actual_nodal_loads.p_min_pu.equals(expected_nodal_loads["p_min_pu"])
-    assert actual_nodal_loads.p_max_pu.equals(expected_nodal_loads["p_max_pu"])
-    assert actual_nodal_loads.marginal_cost.equals(
-        expected_nodal_loads["marginal_cost"]
-    )
-    assert actual_nodal_loads.sign.equals(expected_nodal_loads["sign"])
+    assert (actual_nodal_loads.index == expected_nodal_loads.index).all()
+    assert (actual_nodal_loads.bus == expected_nodal_loads["bus"]).all()
+    assert (actual_nodal_loads.p_nom == expected_nodal_loads["p_nom"]).all()
+    assert (actual_nodal_loads.p_min_pu == expected_nodal_loads["p_min_pu"]).all()
+    assert (actual_nodal_loads.p_max_pu == expected_nodal_loads["p_max_pu"]).all()
+    assert (
+        actual_nodal_loads.marginal_cost == expected_nodal_loads["marginal_cost"]
+    ).all()
+    assert (actual_nodal_loads.sign == expected_nodal_loads["sign"]).all()
 
     actual_nodal_loads_t = n_2bus_1line.generators_t.p_set
     assert actual_nodal_loads_t.index == "now"
@@ -255,12 +255,12 @@ def test_read_pypsa_grid(grid_data_dict):
     n = read_pypsa_grid(n, grid_data_dict)
 
     # check if elements are added with correct attributes
-    assert n.buses.index.equals(grid_data_dict["buses"].index)
+    assert (n.buses.index == grid_data_dict["buses"].index).all()
     for _ in grid_data_dict["buses"].columns:
-        assert n.buses[_].equals(grid_data_dict["buses"][_])
-    assert n.lines.index.equals(grid_data_dict["lines"].index)
+        assert (n.buses[_] == grid_data_dict["buses"][_]).all()
+    assert (n.lines.index == grid_data_dict["lines"].index).all()
     for _ in grid_data_dict["lines"].columns:
-        assert n.lines[_].equals(grid_data_dict["lines"][_])
+        assert (n.lines[_] == grid_data_dict["lines"][_]).all()
 
     assert "AC" in n.carriers.index
     assert n.generators.empty
