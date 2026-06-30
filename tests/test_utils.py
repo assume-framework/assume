@@ -17,6 +17,7 @@ from dateutil.tz import tzlocal
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
+    aggregate_line_capacities,
     aggregate_step_amount,
     convert_to_rrule_freq,
     datetime2timestamp,
@@ -865,6 +866,78 @@ def test_load_index_file():
     assert df is None
 
 
+def test_aggregate_line_capacities_with_s_max_pu():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B2"],
+            "bus1": ["B2", "B3"],
+            "s_nom": [100.0, 200.0],
+            "s_max_pu": [1.0, 0.8],
+            "s_nom_forward": [None, 180.0],
+            "s_nom_reverse": [None, 190.0],
+        },
+        index=["L1", "L2"],
+    )
+
+    incidence_matrix = pd.DataFrame(index=["B1", "B2", "B3"], columns=["L1", "L2"])
+
+    result = aggregate_line_capacities(lines, incidence_matrix)
+
+    assert "cap_forward" in result.columns
+    assert "cap_reverse" in result.columns
+    assert list(result.index) == ["L1", "L2"]
+
+    assert result.at["L1", "cap_forward"] == 100.0
+    assert result.at["L1", "cap_reverse"] == 100.0
+
+    assert result.at["L2", "cap_forward"] == 180.0 * 0.8
+    assert result.at["L2", "cap_reverse"] == 190.0 * 0.8
+
+
+def test_aggregate_line_capacities_zonal_aggregation():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B2", "B3"],
+            "bus1": ["B2", "B4", "B4"],
+            "s_nom": [100.0, 50.0, 50.0],
+        },
+        index=["L1", "L2", "L3"],
+    )
+
+    node_mapping = {"B1": "Z1", "B2": "Z1", "B3": "Z2", "B4": "Z2"}
+
+    incidence_matrix = pd.DataFrame(
+        index=["Z1", "Z2"], columns=["Z1_Z1", "Z1_Z2", "Z2_Z2"]
+    )
+
+    result = aggregate_line_capacities(
+        lines, incidence_matrix, node_mapping=node_mapping
+    )
+
+    assert list(result.index) == ["Z1_Z1", "Z1_Z2", "Z2_Z2"]
+    assert result.at["Z1_Z1", "cap_forward"] == 100.0
+    assert result.at["Z1_Z2", "cap_forward"] == 50.0
+    assert result.at["Z2_Z2", "cap_forward"] == 50.0
+
+
+def test_aggregate_line_capacities_fallback_and_reverse():
+    lines = pd.DataFrame(
+        {
+            "bus0": ["B1", "B2"],
+            "bus1": ["B2", "B3"],
+            "s_nom": [30.0, 40.0],
+        },
+        index=["L1", "L2"],
+    )
+
+    incidence_matrix = pd.DataFrame(columns=["B2_B1", "Link_B2_B3_fallback"])
+
+    result = aggregate_line_capacities(lines, incidence_matrix)
+
+    assert result.at["B2_B1", "cap_forward"] == 30.0
+    assert result.at["B2_B1", "cap_reverse"] == 30.0
+
+
 if __name__ == "__main__":
     test_convert_rrule()
     test_available_products()
@@ -873,3 +946,6 @@ if __name__ == "__main__":
     test_initializer()
     test_sep_block_orders()
     test_aggregate_step_amount()
+    test_aggregate_line_capacities_with_s_max_pu()
+    test_aggregate_line_capacities_zonal_aggregation()
+    test_aggregate_line_capacities_fallback_and_reverse()
