@@ -16,68 +16,6 @@ from assume.common.utils import SUPPORTED_SOLVERS
 logger = logging.getLogger(__name__)
 
 
-def add_generators(
-    network: pypsa.Network,
-    generators: pd.DataFrame,
-) -> None:
-    """
-    Add generators normally to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the generators are
-        generators (pandas.DataFrame): the generators dataframe
-    """
-    zeros = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(generators.index))),
-        index=network.snapshots,
-        columns=generators.index,
-    )
-
-    if isinstance(generators, dict):
-        gen_c = generators.copy()
-
-        if "p_min_pu" not in gen_c.columns:
-            gen_c["p_min_pu"] = zeros
-        if "p_max_pu" not in gen_c.columns:
-            gen_c["p_max_pu"] = zeros + 1
-        if "marginal_cost" not in gen_c.columns:
-            gen_c["marginal_cost"] = zeros
-
-        network.add(
-            "Generator",
-            name=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            **gen_c,
-        )
-    elif isinstance(generators, pd.DataFrame):
-        # add generators
-        generators.drop(
-            ["p_min_pu", "p_max_pu", "marginal_cost"],
-            axis=1,
-            inplace=True,
-            errors="ignore",
-        )
-        network.add(
-            "Generator",
-            name=generators.index,
-            bus=generators["node"],  # bus to which the generator is connected to
-            p_nom=generators[
-                "max_power"
-            ],  # Nominal capacity of the powerplant/generator
-            p_min_pu=zeros,
-            p_max_pu=zeros + 1,
-            marginal_cost=zeros,
-            **generators,
-        )
-    else:
-        raise ValueError(
-            "Generators must be provided as a pandas DataFrame or a dictionary of pandas Series."
-        )
-
-
 def add_redispatch_generators(
     network: pypsa.Network,
     generators: pd.DataFrame,
@@ -158,57 +96,6 @@ def add_redispatch_generators(
     )
 
 
-def add_backup_generators(
-    network: pypsa.Network,
-    backup_marginal_cost: float = 1e5,
-) -> None:
-    """
-    Add generators normally to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the generators are
-        generators (pandas.DataFrame): the generators dataframe
-    """
-
-    # add backup generators at each node
-    network.add(
-        "Generator",
-        name=network.buses.index,
-        suffix="_backup",
-        bus=network.buses.index,  # bus to which the generator is connected to
-        p_nom=10e4,
-        marginal_cost=backup_marginal_cost,
-    )
-
-
-def add_loads(
-    network: pypsa.Network,
-    loads: pd.DataFrame,
-) -> None:
-    """
-    Add loads normally to the grid
-
-    Args:
-        network (pypsa.Network): the pypsa network to which the loads are
-        loads (pandas.DataFrame): the loads dataframe
-    """
-
-    # add loads
-    network.add(
-        "Load",
-        name=loads.index,
-        bus=loads["node"],  # bus to which the generator is connected to
-        **loads,
-    )
-
-    if "p_set" not in loads.columns:
-        network.loads_t["p_set"] = pd.DataFrame(
-            np.zeros((len(network.snapshots), len(loads.index))),
-            index=network.snapshots,
-            columns=loads.index,
-        )
-
-
 def add_redispatch_loads(
     network: pypsa.Network,
     loads: pd.DataFrame,
@@ -234,39 +121,6 @@ def add_redispatch_loads(
             index=network.snapshots,
             columns=loads.index,
         )
-
-
-def add_nodal_loads(
-    network: pypsa.Network,
-    loads: pd.DataFrame,
-) -> None:
-    """
-    This adds loads to the nodal PyPSA network with respective bus data to which they are connected.
-    The loads are added as generators with negative sign so their dispatch can be also curtailed,
-    since regular load in PyPSA represents only an inelastic demand.
-    """
-    zeros = pd.DataFrame(
-        np.zeros((len(network.snapshots), len(loads.index))),
-        index=network.snapshots,
-        columns=loads.index,
-    )
-    loads_c = loads.copy()
-
-    if "sign" in loads_c.columns:
-        del loads_c["sign"]
-
-    # add loads as negative generators
-    network.add(
-        "Generator",
-        name=loads.index,
-        bus=loads["node"],  # bus to which the generator is connected to
-        p_nom=loads["max_power"],  # Nominal capacity of the powerplant/generator
-        p_min_pu=zeros,
-        p_max_pu=zeros + 1,
-        marginal_cost=zeros,
-        sign=-1,
-        **loads_c,
-    )
 
 
 def read_pypsa_grid(
