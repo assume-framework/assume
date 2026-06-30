@@ -25,6 +25,22 @@ The unit operator is responsible for the following tasks:
 As one can see from all the task the unit oporator covers, that it orchestrates and coordinates the technical units and the markets.
 
 
+Operator Forecaster
+----------------------
+
+Just like each technical unit, a unit operator can own a :class:`~assume.common.forecaster.UnitsOperatorForecaster`.
+This gives the operator (or a portfolio strategy acting on its behalf) its own notion of future **market prices** and
+**residual loads**, instead of having to reach into one of its managed units for them. The forecaster is available as
+``units_operator.forecaster`` and exposes ``price[market_id]`` and ``residual_load[market_id]`` (plus any custom series
+provided at construction).
+
+It reuses the same forecasting machinery as the unit forecasters (see :doc:`unit_forecasts`): its algorithms can be
+selected per operator via ``forecast_*`` columns in ``unit_operators.csv`` (falling back to the config-level
+``forecast_algorithms``), and the series are populated automatically during
+:func:`~assume.world.World.init_forecasts`. The :class:`~assume.strategies.portfolio_learning_strategies.PortfolioLearningStrategy`
+below reads its forecasted price and residual load observations from this operator forecaster.
+
+
 Portfolio Strategies
 ----------------------
 
