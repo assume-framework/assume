@@ -37,7 +37,7 @@ from assume.common import (
 )
 from assume.common.base import LearningConfig
 from assume.common.forecast_algorithms import get_forecast_registries
-from assume.common.forecaster import UnitForecaster
+from assume.common.forecaster import UnitForecaster, UnitsOperatorForecaster
 from assume.common.utils import datetime2timestamp, timestamp2datetime
 from assume.markets import MarketRole, clearing_mechanisms
 from assume.strategies import (
@@ -398,7 +398,10 @@ class World:
             output_agent.suspendable_tasks = False
 
     def add_unit_operator(
-        self, id: str, strategies: dict[str, UnitOperatorStrategy] = {}
+        self,
+        id: str,
+        strategies: dict[str, UnitOperatorStrategy] = {},
+        forecaster: UnitsOperatorForecaster = None,
     ) -> None:
         """
         Add a unit operator to the simulation, creating a new role agent and applying the role of a unit operator to it.
@@ -407,6 +410,8 @@ class World:
 
         Args:
             id (str): The identifier for the unit operator.
+            strategies (dict[str, UnitOperatorStrategy], optional): Portfolio strategies for the operator.
+            forecaster (UnitsOperatorForecaster, optional): Operator-level forecaster. Defaults to None.
         """
 
         if self.unit_operators.get(id):
@@ -430,6 +435,7 @@ class World:
         units_operator = UnitsOperator(
             available_markets=list(self.markets.values()),
             portfolio_strategies=bidding_strategies,
+            forecaster=forecaster,
         )
 
         # creating a new role agent and apply the role of a units operator
@@ -450,7 +456,11 @@ class World:
             )
 
     def add_units_with_operator_subprocess(
-        self, id: str, units: list[dict], strategies: dict[str, UnitOperatorStrategy]
+        self,
+        id: str,
+        units: list[dict],
+        strategies: dict[str, UnitOperatorStrategy],
+        forecaster: UnitsOperatorForecaster = None,
     ):
         """
         Adds a units operator with given ID in a separate process
@@ -460,6 +470,7 @@ class World:
         Args:
             id (str): the id of the units operator
             units (list[dict]): list of unit dictionaries forwarded to create_unit
+            forecaster (UnitsOperatorForecaster, optional): Operator-level forecaster. Defaults to None.
         """
         clock_agent_name = f"clock_agent_{id}"
         markets = list(self.markets.values())
@@ -471,7 +482,9 @@ class World:
                 market.opening_hours._cache_gen = None
         self.addresses.append(addr(self.addr, clock_agent_name))
         units_operator = UnitsOperator(
-            available_markets=markets, portfolio_strategies=strategies
+            available_markets=markets,
+            portfolio_strategies=strategies,
+            forecaster=forecaster,
         )
 
         for unit in units:
@@ -936,4 +949,18 @@ class World:
                 markets,
                 forecast_df,
                 unit,
+            )
+
+        # operator-level forecasters provide market-wide price / residual load
+        # signals, so they initialize against all units and markets, with no
+        # single initializing unit.
+        for operator in self.unit_operators.values():
+            if operator.forecaster is None:
+                continue
+            if operator.forecaster._registries is None:
+                operator.forecaster._registries = registries
+            operator.forecaster.initialize(
+                units,
+                markets,
+                forecast_df,
             )

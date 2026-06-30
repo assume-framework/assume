@@ -276,11 +276,11 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         # marginal cost lower than forecasted price. Indicates the
         # leverage of the portfolio operator on the markets.
         gen_obs = 0
+        price_forecast = units_operator.forecaster.price[market_id]
+        residual_load = units_operator.forecaster.residual_load[market_id]
 
         for u_id, unit in units_operator.units.items():
             unit_gen = FastSeries(index=unit.index, value=0)
-            price_forecast = unit.forecaster.price[market_id]
-            residual_load = unit.forecaster.residual_load[market_id]
 
             for start in price_forecast.index:
                 marginal_cost = unit.calculate_marginal_cost(start, unit.max_power)
@@ -489,12 +489,12 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
         # Iterate over all orders in the orderbook to calculate order-specific profit.
         for product, product_orders in groupby(orderbook, market_getter):
             start, end, _ = product
+            comp_price = units_operator.forecaster.price[market_id][start]
 
             for order in product_orders:
                 unit_id = order["unit_id"]
                 unit = units_operator.units[unit_id]
 
-                comp_price = unit.forecaster.price[market_id][start]
                 clearing_price = order.get("accepted_price", 0)
                 accepted_volume = order.get("accepted_volume", 0)
 

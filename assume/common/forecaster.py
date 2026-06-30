@@ -1001,3 +1001,41 @@ class ExchangeForecaster(UnitForecaster):
         )
         self.volume_import = self._to_series(volume_import)
         self.volume_export = self._to_series(volume_export)
+
+
+class UnitsOperatorForecaster(UnitForecaster):
+    """Forecaster owned by a units operator (rather than a single unit).
+
+    Gives a units operator (or a portfolio manager) its own notion of future
+    market prices and residual loads, instead of having to reach into the
+    forecaster of an arbitrary unit it manages. It reuses the price and
+    residual load lifecycle of :class:`UnitForecaster` (these are market-wide
+    signals, so the operator initializes them against all units in the world).
+
+    Unlike a unit forecaster, an operator has no ``availability`` of its own, so
+    that attribute is left at the harmless inherited default and is not used.
+    Arbitrary additional operator-level forecasts can be supplied through
+    kwargs, keeping this flexible for the many ways UnitsOperators can be used.
+    """
+
+    def __init__(
+        self,
+        index: ForecastIndex,
+        market_prices: dict[str, ForecastSeries] = None,
+        residual_load: dict[str, ForecastSeries] = None,
+        forecast_algorithms: dict[str, str] = {},
+        forecast_registries: dict[str, dict] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            index=index,
+            forecast_algorithms=forecast_algorithms,
+            forecast_registries=forecast_registries,
+            market_prices=market_prices,
+            residual_load=residual_load,
+        )
+
+        for k, v in kwargs.items():
+            if isinstance(v, pd.Series):
+                v = self._to_series(v)
+            self.__setattr__(k, v)

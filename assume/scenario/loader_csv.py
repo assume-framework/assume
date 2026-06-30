@@ -29,6 +29,7 @@ from assume.common.forecaster import (
     SteamgenerationForecaster,
     SteelplantForecaster,
     UnitForecaster,
+    UnitsOperatorForecaster,
 )
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import (
@@ -781,6 +782,13 @@ def load_config_and_create_forecaster(
                         thermal_storage_schedule=0,  # TODO
                         thermal_demand=0,  # TODO
                     )
+    # shared inputs used to build one UnitsOperatorForecaster per operator in
+    # setup_world. An operator has no availability of its own (that is a
+    # per-unit concept), so only the index and algorithms are shared here.
+    units_operator_forecast_data = {
+        "shared_unit_index": shared_unit_index,
+        "forecast_algorithms": forecast_algorithms,
+    }
     return {
         "config": config,
         "simulation_id": simulation_id,
@@ -796,6 +804,7 @@ def load_config_and_create_forecaster(
         "unit_forecasts": unit_forecasts,
         "index": index,
         "forecasts_df": forecasts_df,
+        "units_operator_forecast_data": units_operator_forecast_data,
     }
 
 
@@ -837,6 +846,7 @@ def setup_world(
     dsm_units = scenario_data["dsm_units"]
     unit_forecasts = scenario_data["unit_forecasts"]
     forecasts_df = scenario_data["forecasts_df"]
+    units_operator_forecast_data = scenario_data["units_operator_forecast_data"]
 
     # save every thousand steps by default to free up memory
     save_frequency_hours = config.get("save_frequency_hours", 48)
@@ -994,16 +1004,32 @@ def setup_world(
     for op, op_units in exchange_units.items():
         units[op].extend(op_units)
 
+    config_forecast_algorithms = units_operator_forecast_data["forecast_algorithms"]
+    operator_forecast_algorithms: dict[str, dict] = {}
     if unit_operators is not None:
         logger.info("Create unit_operators for portfolio strategies")
         unit_operators_strategies = unit_operators.to_dict("index")
         # remove starting "bidding_" string from market names
         for operator in unit_operators_strategies.keys():
-            raw_strategies = unit_operators_strategies[operator]
-            converted_strategies = bidding_strategies_from_param_dict(raw_strategies)
-            unit_operators_strategies[operator] = converted_strategies
+            raw_params = unit_operators_strategies[operator]
+            operator_forecast_algorithms[operator] = get_unit_forecast_algorithms(
+                config_forecast_algorithms, raw_params
+            )
+            unit_operators_strategies[operator] = bidding_strategies_from_param_dict(
+                raw_params
+            )
     else:
         unit_operators_strategies = {}
+
+    operator_forecasts = {
+        op: UnitsOperatorForecaster(
+            index=units_operator_forecast_data["shared_unit_index"],
+            forecast_algorithms=operator_forecast_algorithms.get(
+                op, config_forecast_algorithms
+            ),
+        )
+        for op in set(units.keys())
+    }
 
     # if distributed_role is true - there is a manager available
     # and we can add each units_operator as a separate process
@@ -1011,12 +1037,18 @@ def setup_world(
         logger.info("Adding unit operators and units - with subprocesses")
         for op, op_units in units.items():
             strategies = unit_operators_strategies.get(op, {})
-            world.add_units_with_operator_subprocess(op, op_units, strategies)
+            world.add_units_with_operator_subprocess(
+                op, op_units, strategies, forecaster=operator_forecasts.get(op)
+            )
     else:
         logger.info("Adding unit operators and units")
         for company_name in set(units.keys()):
             strategies = unit_operators_strategies.get(company_name, {})
-            world.add_unit_operator(id=str(company_name), strategies=strategies)
+            world.add_unit_operator(
+                id=str(company_name),
+                strategies=strategies,
+                forecaster=operator_forecasts.get(company_name),
+            )
 
         # add the units to corresponding unit operators
         for op, op_units in units.items():
