@@ -95,8 +95,8 @@ def test_initialization(simple_redispatch_market_config, grid_data_dict_2_nodes)
 
     assert rmr.network is not None
     assert len(rmr.network.buses) == len(nodes)
-    # network should have: up and down for each generator + backup up and down at each node
-    expected_num_generators = len(generators) * 2 + len(nodes) * 2
+    # network should have: base fixed DA generator + up and down for each generator + backup up and down at each node
+    expected_num_generators = len(generators) * 3 + len(nodes) * 2
     assert len(rmr.network.generators) == expected_num_generators
     # network snapshots are not indexed by time, but length should match
     assert len(rmr.network.snapshots) == mc.market_products[0].count
