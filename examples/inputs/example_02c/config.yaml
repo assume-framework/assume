@@ -14,6 +14,10 @@ base:
     continue_learning: false
     trained_policies_save_path: null
     trained_policies_load_path: null
+    save_replay_buffer: true
+    replay_buffer_save_path: null
+    load_replay_buffer: false
+    replay_buffer_load_path: null
     max_bid_price: 100
     algorithm: matd3
     learning_rate: 0.001

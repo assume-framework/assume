@@ -867,6 +867,11 @@ class LearningConfig:
     tau: float = 0.005
     target_policy_noise: float = 0.2
     target_noise_clip: float = 0.5
+    # Replay buffer persistence
+    save_replay_buffer: bool = True
+    replay_buffer_save_path: str | None = None
+    load_replay_buffer: bool = False
+    replay_buffer_load_path: str | None = None
 
     def __post_init__(self):
         """Calculate defaults that depend on other fields and validate inputs."""

@@ -15,6 +15,7 @@ Upcoming Release
 
 **New Features:**
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+  - **Replay-buffer persistence for RL**: Training runs can now save and optionally reload replay buffers, making it easier to resume long-running learning studies after crashes or scheduled interruptions.
 
 **Improvements:**
   - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.

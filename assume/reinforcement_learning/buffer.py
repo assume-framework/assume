@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import os
 import warnings
 from typing import NamedTuple
 
@@ -174,3 +175,42 @@ class ReplayBuffer:
         )
 
         return ReplayBufferSamples(*tuple(map(self.to_torch, data)))
+
+    def save(self, path: str):
+        """Save the replay buffer state to disk."""
+        # ensure directory exists
+        dirpath = os.path.dirname(path)
+        if dirpath and not os.path.exists(dirpath):
+            os.makedirs(dirpath, exist_ok=True)
+
+        np.savez_compressed(
+            path,
+            observations=self.observations,
+            actions=self.actions,
+            rewards=self.rewards,
+            pos=np.array([self.pos]),
+            full=np.array([self.full]),
+        )
+
+    @classmethod
+    def load(cls, path: str, device: str, float_type):
+        """Load a replay buffer from disk."""
+        data = np.load(path)
+        obs = data["observations"]
+        acts = data["actions"]
+        rews = data["rewards"]
+
+        buffer = cls(
+            buffer_size=obs.shape[0],
+            obs_dim=obs.shape[2],
+            act_dim=acts.shape[2],
+            n_rl_units=obs.shape[1],
+            device=device,
+            float_type=float_type,
+        )
+        buffer.observations = obs
+        buffer.actions = acts
+        buffer.rewards = rews
+        buffer.pos = int(data["pos"][0])
+        buffer.full = bool(data["full"][0])
+        return buffer

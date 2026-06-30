@@ -34,6 +34,10 @@ The following table shows the options that can be adjusted and gives a short exp
   continue_learning                       Whether to use pre-learned strategies and then continue learning. If True, loads existing policies from trained_policies_load_path and continues training. Note: Set True when you have a pretrained model and want incremental learning under new data or scenarios. Leave False for clean experiments. Default is False.
   trained_policies_save_path              The directory path - relative to the scenario's inputs_path - where newly trained RL policies (actor and critic networks) will be saved. Only needed when learning_mode is True. Value is set in setup_world(). Defaults otherwise to None.
   trained_policies_load_path              The directory path - relative to the scenario's inputs_path - from which pre-trained policies should be loaded. Needed when continue_learning is True or using pre-trained strategies. Default is None.
+    save_replay_buffer                      Whether ASSUME should persist the replay buffer when training finishes. Keeping this enabled is useful for long-running studies that may need to be resumed after an interruption. Default is True.
+    replay_buffer_save_path                 Optional path - relative to the scenario's inputs_path - where the replay buffer should be written. If omitted, ASSUME stores it next to the saved policies under ``last_policies/replay_buffer.npz``.
+    load_replay_buffer                      Whether an existing replay buffer should be restored before training starts. Use this together with ``continue_learning`` or interrupted-run recovery. Default is False.
+    replay_buffer_load_path                 Optional path - relative to the scenario's inputs_path - from which a replay buffer should be loaded. If omitted, ASSUME falls back to ``replay_buffer_save_path`` or the default location.
   min_bid_price                           The minimum bid price which limits the action of the actor to this price. Used to constrain the actor's output to a price range. Note: Best practice is to set this parameter as unconstraining as possible. When agent bid convergence is guaranteed to occur above zero, increasing the minimum bid value can reduce training times. Default is -100.0.
   max_bid_price                           The maximum bid price which limits the action of the actor to this price. Used to constrain the actor's output to a price range. Note: Align this with realistic market constraints. Too low = limited strategy space. Too high = noisy learning.  Default is 100.0.
   device                                  The device to use for PyTorch computations. Options include "cpu", "cuda", or specific CUDA devices like "cuda:0". Default is "cpu".
@@ -173,3 +177,28 @@ Yet, the buffer is quite large to store all observations also from multiple agen
 After a certain round of training runs which is defined in the config file the RL strategy is updated by calling the update function of the respective algorithms which calls the sample function of the replay buffer.
 The sample function returns a batch of experiences which is then used to update the RL strategy.
 For more information on the learning capabilities of ASSUME, see :doc:`learning`.
+
+
+Persisting and restoring replay buffers
+---------------------------------------
+
+ASSUME can optionally persist the replay buffer alongside trained policies so interrupted training runs can be resumed without recollecting the full experience set.
+
+The following learning-config items control this behaviour:
+
+- ``save_replay_buffer``: persist the replay buffer at the end of training.
+- ``replay_buffer_save_path``: optional explicit save path.
+- ``load_replay_buffer``: restore a previously saved buffer before training starts.
+- ``replay_buffer_load_path``: optional explicit load path.
+
+If no explicit save or load path is configured, ASSUME uses the default location ``last_policies/replay_buffer.npz`` inside the scenario inputs directory. A typical interrupted-run recovery setup looks like this:
+
+.. code-block:: yaml
+
+     learning_config:
+         continue_learning: true
+         trained_policies_load_path: learned_strategies/case_0_baseline/last_policies
+         save_replay_buffer: true
+         load_replay_buffer: true
+         replay_buffer_save_path: learned_strategies/case_0_baseline/last_policies/replay_buffer.npz
+         replay_buffer_load_path: learned_strategies/case_0_baseline/last_policies/replay_buffer.npz
