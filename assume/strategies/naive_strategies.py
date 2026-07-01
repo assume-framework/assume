@@ -529,9 +529,9 @@ class EnergyHeuristicElasticStrategy(MinMaxStrategy):
         return volume
 
 
-class DsmCapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
+class DsmCapacityHeuristicBalancingStrategy(MinMaxStrategy):
     """
-    Strategy for Positive CRM Reserve (Demand Side, i.e., up & down, symmetric).
+    Strategy for Positive/Negative CRM Reserve (Demand Side, i.e., up & down, symmetric).
     """
 
     def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
@@ -561,45 +561,6 @@ class DsmCapacityHeuristicBalancingPosStrategy(MinMaxStrategy):
                         "price": 0,  # or unit.calculate_marginal_cost(...)
                         "volume": symmetric_capacity,
                         "unit_id": unit.id,
-                        "market_id": "CRM_pos",
-                    }
-                )
-        return self.remove_empty_bids(bids)
-
-
-class DsmCapacityHeuristicBalancingNegStrategy(MinMaxStrategy):
-    """
-    Strategy for Negative CRM Reserve (Demand Side, i.e., up & down, symmetric).
-    """
-
-    def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
-        # IDENTICAL LOGIC as POS, since symmetric in Germany (volume is symmetric)
-        # If you ever want to do *only* neg or pos (asymmetric), just change which cap you use!
-        bids = []
-        max_power = unit.max_plant_capacity
-        min_power = unit.min_plant_capacity
-
-        for product in product_tuples:
-            start, end, only_hours = product
-            block_times = [dt for dt in unit.index.get_date_list() if start <= dt < end]
-
-            up_caps = []
-            down_caps = []
-            for t in block_times:
-                flex = unit.flex_power_requirement.at[t]
-                up_caps.append(max_power - flex)
-                down_caps.append(flex - min_power)
-            symmetric_capacity = min(min(up_caps), min(down_caps))
-            if symmetric_capacity > 0:
-                bids.append(
-                    {
-                        "start_time": start,
-                        "end_time": end,
-                        "only_hours": only_hours,
-                        "price": 0,
-                        "volume": symmetric_capacity,
-                        "unit_id": unit.id,
-                        "market_id": "CRM_neg",
                     }
                 )
         return self.remove_empty_bids(bids)
