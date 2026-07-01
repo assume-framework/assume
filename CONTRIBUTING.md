@@ -106,7 +106,7 @@ sphinx-apidoc -o docs/source -Fa assume
 To create and serve the documentation locally, use:
 
 ```bash
-cd docs/source && python -m sphinx . ../build && cd ../.. && python -m http.server --directory docs/build
+python -m sphinx docs/source docs/build && python -m http.server --directory docs/build
 ```
 
 ## Need some help?
