@@ -3,18 +3,13 @@
 .. SPDX-License-Identifier: AGPL-3.0-or-later
 
 
-Modelling Redispatch in ASSUME
-==============================
-
+Modeling Redispatch in ASSUME
+=============================
 This section demonstrates the modeling and simulation of the redispatch mechanism using PyPSA as a plug-and-play module within the ASSUME framework.
 Modeling redispatch in ASSUME using PyPSA consists of two main steps: first, identifying network congestion based on the cleared Energy-Only Market (EOM) dispatch, and second, resolving congestion by optimizing upward and downward redispatch actions.
 
-Congestion Identification
--------------------------
-The first step is to check whether the cleared EOM dispatch leads to congestion in the network.
-
-Overview of Redispatch Modeling in PyPSA
-----------------------------------------
+Overview of Network Modeling in PyPSA
+-------------------------------------
 
 The PyPSA network model can be created to visualize line flows using EOM clearing outcomes of generation and loads at different nodes (locations).
 
@@ -40,7 +35,7 @@ Attributes
     - **carrier**: Energy carrier, such as “AC” or “DC”
     - **x**: Longitude coordinate
     - **y**: Latitude coordinate
-    - **sign**: Power sign (positive for generation, negative for consumption)
+    - **sign**: Power sign (positive by default)
 
 3. **Load**: Demand units that consume electricity
     - **name**: Unique identifier of the load
@@ -65,15 +60,17 @@ Attributes
     - **name**: Unique identifier of the network
     - **snapshots**: List of timesteps (e.g., hourly, quarter-hourly, daily, etc.)
 
-ASSUME uses PyPSA's linear power-flow method ``network.lpf()`` for this purpose. The method is computationally efficient and suitable for congestion checks after market simulations.
-The cleared EOM generation is assigned to the corresponding PyPSA generators via ``generators_t.p_set``. Demand is assigned to normal PyPSA loads via ``loads_t.p_set``. Since demand bids in ASSUME are commonly represented with negative volumes, these values are converted to positive load values before being passed to PyPSA.
+Congestion Identification
+-------------------------
+The first step is to check whether the cleared EOM dispatch leads to congestion in the network. The cleared EOM generation is assigned to the corresponding PyPSA generators via ``generators_t.p_set``. Demand is assigned as PyPSA loads via ``loads_t.p_set``. Since demand bids in ASSUME are commonly represented with negative volumes, these values are converted to positive load values before being passed to PyPSA.
 
 .. code-block:: python
 
     redispatch_network.generators_t.p_set = gen_p_set
     redispatch_network.loads_t.p_set = load_p_set.abs()
 
-The resulting line flows are retrieved from network.lines_t.p0 and compared with the available transmission capacity:
+ASSUME uses PyPSA's linear power-flow method ``network.lpf()`` for the identification of congestion. The method is computationally efficient and suitable for congestion checks after market simulations of large-scale systems.
+The resulting line flows are retrieved from ``network.lines_t.p0`` and compared with the available transmission capacity:
 
 .. code-block:: python
 
@@ -84,7 +81,7 @@ If the line loading exceeds 1, the corresponding line is congested and redispatc
 Redispatch of Power Plants
 --------------------------
 Once congestion is detected, ASSUME optimizes redispatch actions to relieve overloaded lines.
-In the updated redispatch formulation, cleared EOM generator dispatch is represented directly on the generator side. The cleared generator schedule is assigned through generators_t.p_set for linear power-flow analysis and is also reflected in the generator bounds using p_min_pu = p_max_pu.
+In the redispatch formulation, cleared EOM generator dispatch is represented directly on the generator side. The cleared generator schedule is assigned through ``generators_t.p_set`` for linear power-flow analysis and is also reflected in the generator bounds using ``p_min_pu = p_max_pu``.
 This ensures that the pre-redispatch dispatch is treated as fixed while redispatch flexibility is represented separately through additional upward and downward redispatch generators.
 
 Steps for Redispatch
@@ -92,7 +89,7 @@ Steps for Redispatch
 
 1. Fixing cleared EOM generator dispatch
 
-The cleared EOM dispatch of each generator is fixed using two complementary representations. First, generators_t.p_set is used for the linear power-flow calculation. Second, the same dispatch is converted into per-unit values and assigned as equal lower and upper bounds:
+The cleared EOM dispatch of each generator is fixed using two complementary representations. First, ``generators_t.p_set`` is used for the linear power-flow calculation. Second, the same dispatch is converted into per-unit values and assigned as equal lower and upper bounds:
 
 .. code-block:: python
 
@@ -104,17 +101,17 @@ This prevents the base generator dispatch from being freely changed during redis
 
 2. Representing upward redispatch
 
-Upward redispatch is modelled through additional generator components with positive sign. The available upward redispatch capacity is limited by the difference between the availability-adjusted maximum power and the cleared EOM dispatch:
+Upward redispatch is modeled through additional generator components with positive sign. The available upward redispatch capacity is limited by the difference between the availability-adjusted maximum power and the cleared EOM dispatch:
 
 .. code-block:: python
 
     p_max_pu_up = (max_power - gen_p_set) / p_nom
 
-Here, max_power represents the available maximum generation capacity in the respective timestep, gen_p_set is market cleared capacity and max_power is fraction of p_nom taking availability factor into account.
+Here, ``max_power`` represents the available maximum generation capacity in the respective timestep, ``gen_p_set`` is market cleared capacity and ``p_nom`` is the nominal power of the generator.
 
 3. Representing downward redispatch
 
-Downward redispatch is modelled through additional generator components with negative sign. The available downward redispatch capacity is limited by the difference between the cleared EOM dispatch and the minimum generation level:
+Downward redispatch is modeled through additional generator components with negative sign. The available downward redispatch capacity is limited by the difference between the cleared EOM dispatch and the minimum generation level:
 
 .. code-block:: python
 
