@@ -66,8 +66,8 @@ The first step is to check whether the cleared EOM dispatch leads to congestion 
 
 .. code-block:: python
 
-    redispatch_network.generators_t.p_set = gen_p_set
-    redispatch_network.loads_t.p_set = load_p_set.abs()
+    network.generators_t.p_set = gen_p_set
+    network.loads_t.p_set = load_p_set.abs()
 
 ASSUME uses PyPSA's linear power-flow method ``network.lpf()`` for the identification of congestion. The method is computationally efficient and suitable for congestion checks after market simulations of large-scale systems.
 The resulting line flows are retrieved from ``network.lines_t.p0`` and compared with the available transmission capacity:
