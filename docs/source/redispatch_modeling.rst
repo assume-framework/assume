@@ -4,27 +4,24 @@
 
 
 Modelling Redispatch in ASSUME
-===============================================
+==============================
 
 This section demonstrates the modeling and simulation of the redispatch mechanism using PyPSA as a plug-and-play module within the ASSUME framework.
 Modeling redispatch in ASSUME using PyPSA consists of two main steps: first, identifying network congestion based on the cleared Energy-Only Market (EOM) dispatch, and second, resolving congestion by optimizing upward and downward redispatch actions.
 
-In the updated redispatch formulation, cleared EOM generator dispatch is represented directly on the generator side. The cleared generator schedule is assigned through generators_t.p_set for linear power-flow analysis and is also reflected in the generator bounds using p_min_pu = p_max_pu.
-This ensures that the pre-redispatch dispatch is treated as fixed while redispatch flexibility is represented separately through additional upward and downward redispatch generators.
-
 Congestion Identification
-----------------------
+-------------------------
 The first step is to check whether the cleared EOM dispatch leads to congestion in the network.
 
 Overview of Redispatch Modeling in PyPSA
-------------------------------------------
+----------------------------------------
 
 The PyPSA network model can be created to visualize line flows using EOM clearing outcomes of generation and loads at different nodes (locations).
 
 PyPSA uses the following terminology to define grid infrastructure:
 
 Attributes
------------
+----------
 
 1. **Bus**: Nodes (locations) where power plants and loads are connected
     - **name**: Unique identifier of the bus
@@ -85,8 +82,10 @@ The resulting line flows are retrieved from network.lines_t.p0 and compared with
 If the line loading exceeds 1, the corresponding line is congested and redispatch optimization is triggered.
 
 Redispatch of Power Plants
-----------------------
-Once congestion is detected, ASSUME optimizes redispatch actions to relieve overloaded lines. The redispatch formulation separates the fixed EOM dispatch from redispatch flexibility.
+--------------------------
+Once congestion is detected, ASSUME optimizes redispatch actions to relieve overloaded lines.
+In the updated redispatch formulation, cleared EOM generator dispatch is represented directly on the generator side. The cleared generator schedule is assigned through generators_t.p_set for linear power-flow analysis and is also reflected in the generator bounds using p_min_pu = p_max_pu.
+This ensures that the pre-redispatch dispatch is treated as fixed while redispatch flexibility is represented separately through additional upward and downward redispatch generators.
 
 Steps for Redispatch
 ^^^^^^^^^^^^^^^^^^^^^
@@ -128,7 +127,7 @@ A negative generator sign means that dispatching this component reduces the phys
 Additional upward and downward backup generators are added at each node. These backup units have high marginal costs and ensure that the optimization remains feasible if market-based redispatch bids are insufficient to resolve congestion.
 
 Objective
-----------------------
+---------
 
 The redispatch optimization minimizes the net cost of redispatch actions while satisfying network constraints. Upward redispatch is assigned a positive marginal cost. Downward redispatch is assigned the negative of the submitted redispatch price, because reducing generation avoids the corresponding generation cost.
 
