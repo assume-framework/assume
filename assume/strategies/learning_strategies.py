@@ -35,6 +35,7 @@ class TorchLearningStrategy(LearningStrategy):
         super().__init__(*args, **kwargs)
 
         self.unit_id = kwargs["unit_id"]
+        self.is_prepared = False
 
         # defines bounds of actions space
         self.min_bid_price = self.learning_config.min_bid_price
@@ -136,6 +137,7 @@ class TorchLearningStrategy(LearningStrategy):
             lower_scaling_factor_price,
             upper_scaling_factor_price,
         )
+        self.is_prepared = True
 
     def create_observation(
         self, unit: BaseUnit, market_id: str, start: datetime, end: datetime
@@ -167,9 +169,7 @@ class TorchLearningStrategy(LearningStrategy):
         """
 
         # ensure scaled observations are prepared
-        if not hasattr(self, "scaled_res_load_obs") or not hasattr(
-            self, "scaled_prices_obs"
-        ):
+        if not self.is_prepared:
             self.prepare_observations(unit, market_id)
 
         # =============================================================================

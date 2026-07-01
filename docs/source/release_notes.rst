@@ -15,16 +15,26 @@ Upcoming Release
 
 **New Features:**
   - **Generic Forecasting Interface**: This interface enables to specify different forecast algorithms for preprocess, initialization and update during runtime. They can be specified in the config.yaml or unit csv files. For more information about currently implemented algorithms and how to specify them please read the documentation on Unit forecasts.
+  - **Operator-level forecaster**: Unit operators can now own a ``UnitsOperatorForecaster`` providing their own market price and residual load forecasts (accessible via ``units_operator.forecaster``), instead of reading them from a managed unit. Forecast algorithms can be set per operator via ``forecast_*`` columns in ``unit_operators.csv``, and the portfolio learning strategy now reads its price/residual-load observations from this operator forecaster.
 
 **Improvements:**
   - **In complex clearing, the solver instance is now created once during initialization of the clearing role and reused for each market clearing**. This improves performance for e.g. year-long simulations.
   - **Added a check for available solvers in redispatch & nodal_clearing**, similar to the check in complex clearing.
   - **Consistently distinguish 'solver' and 'solver_name'**: Users should now use 'solver_name' to specify the solver in the market configs param_dict, as 'solver' now refers to the actual solver instance.
+  - **Added tests for network related functionalities**: grid_utils.py and redispatch.py
+  - **Extended ``min_max_scale`` to support arbitrary output ranges**: Added optional ``out_min`` and ``out_max`` parameters, enabling both forward scaling and inverse rescaling with a single function instead of two separate ones.
+  - **Add test for portfolio learning strategy and ``min_max_scale`` function**: Added a test for the portfolio learning strategy and ``min_max_rescale`` function to ensure its functionality and stability.
+  - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
+  - **Align redispatch mechanism to latest PyPSA version release**: Updated the redispatch formulation to model cleared EOM generator dispatch for ``network.lpf()`` via ``generators_t.p_set`` and consistent generator bounds ``p_min_pu/p_max_pu``, replacing the previous load-based workaround.
+
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
   - **Fix bug in forecasts**, that occurred when using complex clearing
   - **Fix infeasible power output in PowerPlant**: ``calculate_min_max_power`` now correctly accounts for base load, positive/negative capacity reserves, and heat demand when computing additional power. If reduced availability makes the unit infeasible to run, both min and max power are set to 0. A warning is issued if previous dispatch exceeded available power.
   - **Fix upward redispatch potential**, so that availabilities are now correctly considered instead of the nominal power output of the unit
+  - **Fix errors in portfolio learning strategies**: The ``min_max_rescale`` function was missing from ``utils.py``, causing an ``ImportError`` in ``portfolio_learning_strategies.py``. Resolved by extending ``min_max_scale`` to cover the rescaling use case. And fix minor construction bug for observation space.
+  - **Skip torch seeding when torch is installed but not used**: Irrelevant seeding was performed and a warning was thrown about deterministic PyTorch behavior, even though simulation does not use RL. This is fixed by only setting the PyTorch seeds when learning is active.
+  - **Fix bug in redispatch mechanism**: Fixed the bug in redispatch evaluation due to PyPSA's version upgrade. In ``PyPSA >= 0.35.2`` (released in February 2025) the sign of load was not taken into account correctly & since the fixed EOM dispatch was modelled as a load with positive sign which was resulting in incorrect redispatch amounts.
 
 0.6.1 - (25th March 2026)
 =========================

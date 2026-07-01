@@ -25,6 +25,7 @@ from pyomo.opt import check_available_solvers
 
 from assume.common.base import BaseStrategy, LearningStrategy
 from assume.common.exceptions import AssumeException
+from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketProduct, Orderbook
 
 logger = logging.getLogger(__name__)
@@ -750,19 +751,37 @@ def calculate_content_size(content: list | dict) -> int:
     return sys.getsizeof(content)
 
 
-def min_max_scale(x, min_val: float, max_val: float):
+def min_max_scale(
+    val: np.ndarray | float,  # or th.Tensor
+    in_min: float,
+    in_max: float,
+    out_min: float = 0.0,
+    out_max: float = 1.0,
+) -> np.ndarray | float:  # or th.Tensor
     """
-    Min-Max scaling of a value x to the range [0, 1]
+    Linearly scale value from [in_min, in_max] to [out_min, out_max] (default: [0.0, 1.0]).
 
     Args:
-        x: value(s) to scale
-        min_val: minimum value of the parameter
-        max_val: maximum value of the parameter
+        val: value(s) to scale
+        in_min: minimum value of the input range
+        in_max: maximum value of the input range
+        out_min: minimum value of the output range
+        out_max: maximum value of the output range
     """
+    # Catch values outside the input range
+    if np.any(val < in_min) or np.any(val > in_max):
+        raise ValueError(
+            f"Value {val} is outside the input range [{in_min}, {in_max}]."
+        )
+    out_mean = (out_min + out_max) / 2
     # Avoid division by zero
-    if min_val == max_val:
-        return x
-    return (x - min_val) / (max_val - min_val)
+    if in_min == in_max:
+        if isinstance(val, FastSeries):
+            return val.ones_like() * out_mean
+        else:
+            return np.ones_like(val) * out_mean
+    else:
+        return out_min + (val - in_min) / (in_max - in_min) * (out_max - out_min)
 
 
 def str_to_bool(val):
@@ -874,14 +893,18 @@ def confirm_learning_save_path(save_path: str, continue_learning: bool) -> None:
             )
 
 
-def set_random_seed(seed: int | None, torch_deterministic: bool = True):
+def set_random_seed(
+    seed: int | None,
+    torch_deterministic: bool = True,
+    learning_mode: bool = False,
+):
     """
     Args:
-     seed (int | None): Integer seed for random number generators or None to disable seeding.
-     torch_deterministic (bool): If True, enforces PyTorch deterministic algorithms.
-                           May reduce performance. Default is True.
+        seed (int | None): Integer seed for random number generators or None to disable seeding.
+        torch_deterministic (bool): If True, enforces PyTorch deterministic algorithms. May reduce performance. Default is True.
+        learning_mode (bool): If True, PyTorch seeding is enabled. Default is False and PyTorch seeding is skipped.
 
-     Notes:
+    Notes:
          - Completely reproducible results are not guaranteed across different PyTorch versions, hardware, or CUDA configurations.
          - See https://docs.pytorch.org/docs/stable/notes/randomness.html
     """
@@ -891,15 +914,18 @@ def set_random_seed(seed: int | None, torch_deterministic: bool = True):
     random.seed(seed)
     np.random.seed(seed)
 
+    if not learning_mode:
+        return
+
     try:
         import torch as th
-
-        if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
-            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
         th.manual_seed(seed)
 
         if torch_deterministic:
+            if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+                os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+
             th.backends.cudnn.deterministic = True
             th.backends.cudnn.benchmark = False
 
