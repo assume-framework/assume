@@ -403,6 +403,87 @@ def test_rolling_window_second_window_triggered_at_commit_boundary(
 
 
 # ---------------------------------------------------------------------------
+# 7. State carryover across rolling windows
+#     SoC / operational_status computed at the end of one committed window must
+#     become the initial condition of the next window. Previously the update was
+#     written to a discarded local dict, so every window restarted from t=0.
+# ---------------------------------------------------------------------------
+
+
+class _SolvedVariable:
+    """A solved Pyomo variable: indexing by time step returns its optimised value."""
+
+    def __init__(self, value):
+        self._value = value
+
+    def __getitem__(self, time_step):
+        return self._value
+
+
+class _SolvedBlock:
+    """A solved component block exposing the state read back at a window boundary."""
+
+    def __init__(self, soc=None, operational_status=None):
+        if soc is not None:
+            self.soc = _SolvedVariable(soc)
+        if operational_status is not None:
+            self.operational_status = _SolvedVariable(operational_status)
+
+
+class _SolvedInstance:
+    """A solved rolling-horizon window model, keyed by component block name."""
+
+    def __init__(self, blocks: dict):
+        self.dsm_blocks = blocks
+
+
+def test_update_init_states_records_unseeded_blocks():
+    """_update_init_states must record state for blocks the seeding step never touched."""
+    plant = object.__new__(SteelPlant)
+    init_states = {"dri_storage": {"soc": 0.5}}  # only storage pre-seeded
+    instance = _SolvedInstance(
+        {
+            "dri_storage": _SolvedBlock(soc=0.9),
+            "electrolyser": _SolvedBlock(operational_status=1),  # NOT pre-seeded
+        }
+    )
+
+    plant._update_init_states(instance, commit_local=1, init_states=init_states)
+
+    # Pre-seeded storage advances in place ...
+    assert init_states["dri_storage"]["soc"] == 0.9
+    # ... and the non-seeded electrolyser's status is now recorded for the next window.
+    assert init_states["electrolyser"]["operational_status"] == 1
+
+
+def test_rolling_horizon_state_persists_across_windows(dsm_components, rh_config):
+    """Carried state is seeded once and advanced, not reset to t=0 each window."""
+    import copy
+
+    comps = copy.deepcopy(dsm_components)
+    comps["electrolyser"]["min_power"] = 10  # forces an operational_status variable
+    prices = [50.0] * N_SHORT
+    plant = _make_rh_plant_with_demand(comps, rh_config, prices, demand=60)
+
+    # Not seeded until the first window solves.
+    assert plant._rh_init_states is None
+
+    t0 = pd.Timestamp("2023-01-01 00:00")
+    assert plant._check_and_reoptimize_rolling_window(t0) is True
+
+    # Seed-once wiring populated the persistent store, and the broadened update
+    # recorded on/off status for the electrolyser (never seeded from config).
+    assert plant._rh_init_states is not None
+    assert "operational_status" in plant._rh_init_states.get("electrolyser", {})
+
+    seeded = plant._rh_init_states
+    t2 = pd.Timestamp("2023-01-01 02:00")
+    assert plant._check_and_reoptimize_rolling_window(t2) is True
+    # Same dict object reused across windows → state was seeded once, not re-collected.
+    assert plant._rh_init_states is seeded
+
+
+# ---------------------------------------------------------------------------
 # 8. End-to-end: a rolling-horizon steel-plant scenario through World.run()
 # ---------------------------------------------------------------------------
 #
@@ -418,15 +499,11 @@ def test_rolling_window_second_window_triggered_at_commit_boundary(
 # completion and produces a dispatch schedule.
 
 
-def test_loader_builds_steelplant_forecaster_without_price_column():
-    """The loader must not crash for a steel plant that has no
-    ``forecast_electricity_price_update`` column.
+def test_fixture_loader_builds_steelplant_forecaster():
+    """Fast loader-path smoke test for the self-contained ``rolling_horizon_dsm`` fixture.
 
-    Regression guard for an ``UnboundLocalError`` on ``initial_market_prices``
-    in ``load_config_and_create_forecaster``: the variable was only defined
-    inside the ``if price_update_source is not None`` branch but used
-    unconditionally. The ``rolling_horizon_dsm`` fixture's steel plant has no
-    such column, so it exercises exactly that path.
+    Builds the scenario's forecasters (no market run) and checks the three-component
+    steel plant comes up with a ``SteelplantForecaster``.
     """
     from assume.scenario.loader_csv import load_config_and_create_forecaster
 
@@ -436,6 +513,40 @@ def test_loader_builds_steelplant_forecaster_without_price_column():
         study_case="base",
     )
     assert "test_steel_plant_rh" in scenario_data["unit_forecasts"]
+
+
+def test_fixture_rolling_horizon_runs_end_to_end():
+    """The self-contained ``rolling_horizon_dsm`` fixture runs the full pipeline.
+
+    Exercises market clearing -> ``DsmEnergyOptimizationStrategy`` -> per-window
+    solve across the whole 24h horizon on a real three-component steel plant
+    (electrolyser -> dri_plant -> eaf). Asserts the rolling window advanced over
+    the full horizon and that the seeded carried-state store tracked the
+    electrolyser's on/off status across windows (Bug 2 fix, end-to-end).
+    """
+    from assume import World
+    from assume.scenario.loader_csv import load_scenario_folder
+
+    world = World(database_uri=None, export_csv_path=None)
+    load_scenario_folder(
+        world,
+        inputs_path="tests/fixtures",
+        scenario="rolling_horizon_dsm",
+        study_case="base",
+    )
+
+    plant = world.units["test_steel_plant_rh"]
+    assert plant.horizon_mode == "rolling_horizon"
+    assert {"electrolyser", "dri_plant", "eaf"}.issubset(plant.components.keys())
+
+    world.run()
+
+    # The rolling window advanced across the entire horizon (not a one-shot solve).
+    assert plant._rh_optimized_until_step == len(plant.index)
+    # Seed-once carried-state store populated, and on/off status carried across
+    # windows for the electrolyser (min_power > 0 gives it an operational_status).
+    assert plant._rh_init_states is not None
+    assert "operational_status" in plant._rh_init_states.get("electrolyser", {})
 
 
 def test_steelplant_rolling_horizon_scenario_runs_end_to_end():

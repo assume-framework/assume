@@ -78,6 +78,10 @@ class DSMFlex:
         self._rh_window_remaining_demand = (
             None  # Remaining demand in current rolling-horizon window
         )
+        # Carried initial states (SoC / operational_status) between windows. Seeded
+        # once from the original config on the first window, then advanced in place by
+        # _update_init_states so each window starts from the previous window's end state.
+        self._rh_init_states = None
 
         if self.horizon_mode == "rolling_horizon":
             if not all([self._rh_look_ahead, self._rh_commit, self._rh_step]):
@@ -153,6 +157,10 @@ class DSMFlex:
         # them with Pyomo component instances.  This snapshot is used by the rolling-
         # horizon solver to rebuild a fresh model for each look-ahead window.
         self._orig_components_dict = copy.deepcopy(self.components)
+
+        # Re-seed carried rolling-horizon state on (re)setup so a fresh simulation
+        # starts from the true configured initial conditions.
+        self._rh_init_states = None
 
         self.model = pyo.ConcreteModel()
         self.define_sets()
@@ -880,8 +888,17 @@ class DSMFlex:
     def _update_init_states(
         self, instance, commit_local: int, init_states: dict
     ) -> None:
-        """Update *init_states* in-place with end-of-commit values from the solved instance."""
-        for tech_name in list(init_states.keys()):
+        """Update *init_states* in-place with end-of-commit values from the solved instance.
+
+        Iterates over every solved block (not only the pre-seeded keys) so that on/off
+        status carries across windows even for components that never set
+        ``initial_operational_status`` in their config dict.
+
+        Note: only the on/off *flag* is carried, not the run length, so min-operating /
+        min-down-time constraints still reset their clock at each window boundary. Fully
+        carrying runtime history would need a richer component initial-state interface.
+        """
+        for tech_name in instance.dsm_blocks:
             try:
                 block = instance.dsm_blocks[tech_name]
                 state: dict = {}
@@ -1314,7 +1331,12 @@ class DSMFlex:
         saved_model = self.model if hasattr(self, "model") else None
         saved_components = self.components
 
-        init_states = self._collect_init_states()
+        # Seed the carried state once from the original config. Thereafter reuse the
+        # persistent dict so each window starts from the previous window's end state.
+        # _update_init_states (below) mutates this dict in place, so the advance survives.
+        if self._rh_init_states is None:
+            self._rh_init_states = self._collect_init_states()
+        init_states = self._rh_init_states
 
         self.index = FastIndex(
             start=saved_index[window_start],

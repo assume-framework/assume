@@ -7,7 +7,7 @@ base:
   end_date: 2023-01-01 23:00
   time_step: 1h
   seed: 42
-  exchange_units: null
+  industrial_dsm_units: industrial_dsm_units.csv
   save_frequency_hours: 720
 
   markets_config:
