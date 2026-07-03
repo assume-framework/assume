@@ -2,14 +2,19 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-base:
+base_case_2030:
   start_date: 2030-01-01 00:00
   end_date: 2030-12-31 23:00
   time_step: 1h
   save_frequency_hours: 24
 
+  bidding_strategy_params:
+    eom_market_id: EOM
+    crm_energy_market_id_pos: CRM_energy_pos
+    crm_energy_market_id_neg: CRM_energy_neg
+
   markets_config:
-    CRM_pos:
+    CRM_capacity_pos:
       operator: regelleistung_de-lu
       product_type: capacity_pos
       start_date: 2030-01-01 00:00
@@ -26,7 +31,7 @@ base:
       price_unit: EUR/MW
       market_mechanism: pay_as_bid
 
-    CRM_neg:
+    CRM_capacity_neg:
       operator: regelleistung_de-lu
       product_type: capacity_neg
       start_date: 2030-01-01 00:00
@@ -41,6 +46,171 @@ base:
       maximum_bid_price: 9999
       minimum_bid_price: -9999
       price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+
+    # CRM energy (activation): must-offer for capacity winners + voluntary,
+    # priced via PowerPlantCrmPosStrategy/NegStrategy. Opens once daily, after
+    # EOM's ~20:00 clearing and the day's CRM capacity blocks, clearing hourly
+    # products for the next day -- mirrors redispatch's own "single evening
+    # opening covers next day's 24 hourly products" convention below.
+    CRM_energy_pos:
+      operator: regelleistung_de-lu
+      product_type: energy_pos
+      start_date: 2030-01-01 23:00
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 1h
+      opening_frequency: 24h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_bid
+
+    CRM_energy_neg:
+      operator: regelleistung_de-lu
+      product_type: energy_neg
+      start_date: 2030-01-01 23:00
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 1h
+      opening_frequency: 24h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_bid
+
+    EOM:
+      start_date: 2030-01-01 00:00
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 20h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+    redispatch:
+      start_date: 2030-01-01 21:00
+      operator: network_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 3h
+      opening_frequency: 24h
+      opening_duration: 2h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+        export_dir: outputs/pypsa_nc
+
+# Short 7-day slice of base_case_2030 for fast end-to-end verification before
+# committing to the full-year run (1175 units x 6 markets x daily PyPSA LPs).
+base_case_2030_smoketest:
+  start_date: 2030-01-01 00:00
+  end_date: 2030-01-08 00:00
+  time_step: 1h
+  save_frequency_hours: 24
+
+  bidding_strategy_params:
+    eom_market_id: EOM
+    crm_energy_market_id_pos: CRM_energy_pos
+    crm_energy_market_id_neg: CRM_energy_neg
+
+  markets_config:
+    CRM_capacity_pos:
+      operator: regelleistung_de-lu
+      product_type: capacity_pos
+      start_date: 2030-01-01 00:00
+      products:
+        - duration: 4h
+          count: 1
+          first_delivery: 22h
+      opening_frequency: 4h
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+
+    CRM_capacity_neg:
+      operator: regelleistung_de-lu
+      product_type: capacity_neg
+      start_date: 2030-01-01 00:00
+      products:
+        - duration: 4h
+          count: 1
+          first_delivery: 22h
+      opening_frequency: 4h
+      opening_duration: 1h
+      volume_unit: MW
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MW
+      market_mechanism: pay_as_bid
+
+    CRM_energy_pos:
+      operator: regelleistung_de-lu
+      product_type: energy_pos
+      start_date: 2030-01-01 23:00
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 1h
+      opening_frequency: 24h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_bid
+
+    CRM_energy_neg:
+      operator: regelleistung_de-lu
+      product_type: energy_neg
+      start_date: 2030-01-01 23:00
+      products:
+        - duration: 1h
+          count: 24
+          first_delivery: 1h
+      opening_frequency: 24h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 9999
+      minimum_bid_price: -9999
+      price_unit: EUR/MWh
       market_mechanism: pay_as_bid
 
     EOM:
