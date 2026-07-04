@@ -235,7 +235,7 @@ base_case_2045_smoketest:
       opening_duration: 12h              # day-ahead gate ~12:00 D-1
       volume_unit: MWh
       maximum_bid_volume: 100000
-      minimum_bid_volume: 0.1            # EPEX day-ahead minimum bid size 0.1 MW
+      minimum_bid_volume: 0            # EPEX day-ahead minimum bid size 0.1 MW
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
