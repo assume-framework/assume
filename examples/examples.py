@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 # define the path where the simulation results in form of CSV files will be stored, for example: "examples/outputs"
 # "" means no CSV files will be stored
-csv_path = "outputs"
+csv_path = "examples/outputs"
 
 os.makedirs("./examples/local_db", exist_ok=True)
 
@@ -108,8 +108,20 @@ available_examples = {
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
     "case_2030": {
-        "scenario": "example_2030",
+        "scenario": "technologiemix_2030",
         "study_case": "base_case_2030",
+    },
+    "case_2035": {
+        "scenario": "technologiemix_2035",
+        "study_case": "base_case_2035",
+    },
+    "case_2040": {
+        "scenario": "technologiemix_2040",
+        "study_case": "base_case_2040",
+    },
+    "case_2045": {
+        "scenario": "technologiemix_2045",
+        "study_case": "base_case_2045",
     },
 }
 
