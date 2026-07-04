@@ -1,0 +1,91 @@
+name,technology,max_power,min_power,unit_operator,node
+demand_20465,DE0 0,1000000,0,eom_de,DE0 0 low voltage
+demand_20467,DE0 0 agriculture electricity,1000000,0,eom_de,DE0 0 low voltage
+demand_20472,DE0 0 industry electricity,1000000,0,eom_de,DE0 0 low voltage
+demand_20485,DE0 1,1000000,0,eom_de,DE0 1 low voltage
+demand_20487,DE0 1 agriculture electricity,1000000,0,eom_de,DE0 1 low voltage
+demand_20492,DE0 1 industry electricity,1000000,0,eom_de,DE0 1 low voltage
+demand_20505,DE0 10,1000000,0,eom_de,DE0 10 low voltage
+demand_20507,DE0 10 agriculture electricity,1000000,0,eom_de,DE0 10 low voltage
+demand_20512,DE0 10 industry electricity,1000000,0,eom_de,DE0 10 low voltage
+demand_20525,DE0 11,1000000,0,eom_de,DE0 11 low voltage
+demand_20527,DE0 11 agriculture electricity,1000000,0,eom_de,DE0 11 low voltage
+demand_20532,DE0 11 industry electricity,1000000,0,eom_de,DE0 11 low voltage
+demand_20545,DE0 12,1000000,0,eom_de,DE0 12 low voltage
+demand_20547,DE0 12 agriculture electricity,1000000,0,eom_de,DE0 12 low voltage
+demand_20552,DE0 12 industry electricity,1000000,0,eom_de,DE0 12 low voltage
+demand_20565,DE0 13,1000000,0,eom_de,DE0 13 low voltage
+demand_20567,DE0 13 agriculture electricity,1000000,0,eom_de,DE0 13 low voltage
+demand_20572,DE0 13 industry electricity,1000000,0,eom_de,DE0 13 low voltage
+demand_20585,DE0 14,1000000,0,eom_de,DE0 14 low voltage
+demand_20587,DE0 14 agriculture electricity,1000000,0,eom_de,DE0 14 low voltage
+demand_20592,DE0 14 industry electricity,1000000,0,eom_de,DE0 14 low voltage
+demand_20605,DE0 15,1000000,0,eom_de,DE0 15 low voltage
+demand_20607,DE0 15 agriculture electricity,1000000,0,eom_de,DE0 15 low voltage
+demand_20612,DE0 15 industry electricity,1000000,0,eom_de,DE0 15 low voltage
+demand_20625,DE0 16,1000000,0,eom_de,DE0 16 low voltage
+demand_20627,DE0 16 agriculture electricity,1000000,0,eom_de,DE0 16 low voltage
+demand_20632,DE0 16 industry electricity,1000000,0,eom_de,DE0 16 low voltage
+demand_20645,DE0 17,1000000,0,eom_de,DE0 17 low voltage
+demand_20647,DE0 17 agriculture electricity,1000000,0,eom_de,DE0 17 low voltage
+demand_20652,DE0 17 industry electricity,1000000,0,eom_de,DE0 17 low voltage
+demand_20665,DE0 18,1000000,0,eom_de,DE0 18 low voltage
+demand_20667,DE0 18 agriculture electricity,1000000,0,eom_de,DE0 18 low voltage
+demand_20672,DE0 18 industry electricity,1000000,0,eom_de,DE0 18 low voltage
+demand_20685,DE0 19,1000000,0,eom_de,DE0 19 low voltage
+demand_20687,DE0 19 agriculture electricity,1000000,0,eom_de,DE0 19 low voltage
+demand_20692,DE0 19 industry electricity,1000000,0,eom_de,DE0 19 low voltage
+demand_20705,DE0 2,1000000,0,eom_de,DE0 2 low voltage
+demand_20707,DE0 2 agriculture electricity,1000000,0,eom_de,DE0 2 low voltage
+demand_20712,DE0 2 industry electricity,1000000,0,eom_de,DE0 2 low voltage
+demand_20725,DE0 20,1000000,0,eom_de,DE0 20 low voltage
+demand_20727,DE0 20 agriculture electricity,1000000,0,eom_de,DE0 20 low voltage
+demand_20732,DE0 20 industry electricity,1000000,0,eom_de,DE0 20 low voltage
+demand_20745,DE0 21,1000000,0,eom_de,DE0 21 low voltage
+demand_20747,DE0 21 agriculture electricity,1000000,0,eom_de,DE0 21 low voltage
+demand_20752,DE0 21 industry electricity,1000000,0,eom_de,DE0 21 low voltage
+demand_20765,DE0 22,1000000,0,eom_de,DE0 22 low voltage
+demand_20767,DE0 22 agriculture electricity,1000000,0,eom_de,DE0 22 low voltage
+demand_20772,DE0 22 industry electricity,1000000,0,eom_de,DE0 22 low voltage
+demand_20785,DE0 23,1000000,0,eom_de,DE0 23 low voltage
+demand_20787,DE0 23 agriculture electricity,1000000,0,eom_de,DE0 23 low voltage
+demand_20792,DE0 23 industry electricity,1000000,0,eom_de,DE0 23 low voltage
+demand_20805,DE0 24,1000000,0,eom_de,DE0 24 low voltage
+demand_20807,DE0 24 agriculture electricity,1000000,0,eom_de,DE0 24 low voltage
+demand_20812,DE0 24 industry electricity,1000000,0,eom_de,DE0 24 low voltage
+demand_20825,DE0 25,1000000,0,eom_de,DE0 25 low voltage
+demand_20827,DE0 25 agriculture electricity,1000000,0,eom_de,DE0 25 low voltage
+demand_20832,DE0 25 industry electricity,1000000,0,eom_de,DE0 25 low voltage
+demand_20845,DE0 26,1000000,0,eom_de,DE0 26 low voltage
+demand_20847,DE0 26 agriculture electricity,1000000,0,eom_de,DE0 26 low voltage
+demand_20852,DE0 26 industry electricity,1000000,0,eom_de,DE0 26 low voltage
+demand_20865,DE0 27,1000000,0,eom_de,DE0 27 low voltage
+demand_20867,DE0 27 agriculture electricity,1000000,0,eom_de,DE0 27 low voltage
+demand_20872,DE0 27 industry electricity,1000000,0,eom_de,DE0 27 low voltage
+demand_20885,DE0 28,1000000,0,eom_de,DE0 28 low voltage
+demand_20887,DE0 28 agriculture electricity,1000000,0,eom_de,DE0 28 low voltage
+demand_20892,DE0 28 industry electricity,1000000,0,eom_de,DE0 28 low voltage
+demand_20905,DE0 29,1000000,0,eom_de,DE0 29 low voltage
+demand_20907,DE0 29 agriculture electricity,1000000,0,eom_de,DE0 29 low voltage
+demand_20912,DE0 29 industry electricity,1000000,0,eom_de,DE0 29 low voltage
+demand_20925,DE0 3,1000000,0,eom_de,DE0 3 low voltage
+demand_20927,DE0 3 agriculture electricity,1000000,0,eom_de,DE0 3 low voltage
+demand_20932,DE0 3 industry electricity,1000000,0,eom_de,DE0 3 low voltage
+demand_20945,DE0 4,1000000,0,eom_de,DE0 4 low voltage
+demand_20947,DE0 4 agriculture electricity,1000000,0,eom_de,DE0 4 low voltage
+demand_20952,DE0 4 industry electricity,1000000,0,eom_de,DE0 4 low voltage
+demand_20965,DE0 5,1000000,0,eom_de,DE0 5 low voltage
+demand_20967,DE0 5 agriculture electricity,1000000,0,eom_de,DE0 5 low voltage
+demand_20972,DE0 5 industry electricity,1000000,0,eom_de,DE0 5 low voltage
+demand_20985,DE0 6,1000000,0,eom_de,DE0 6 low voltage
+demand_20987,DE0 6 agriculture electricity,1000000,0,eom_de,DE0 6 low voltage
+demand_20992,DE0 6 industry electricity,1000000,0,eom_de,DE0 6 low voltage
+demand_21005,DE0 7,1000000,0,eom_de,DE0 7 low voltage
+demand_21007,DE0 7 agriculture electricity,1000000,0,eom_de,DE0 7 low voltage
+demand_21012,DE0 7 industry electricity,1000000,0,eom_de,DE0 7 low voltage
+demand_21025,DE0 8,1000000,0,eom_de,DE0 8 low voltage
+demand_21027,DE0 8 agriculture electricity,1000000,0,eom_de,DE0 8 low voltage
+demand_21032,DE0 8 industry electricity,1000000,0,eom_de,DE0 8 low voltage
+demand_21045,DE0 9,1000000,0,eom_de,DE0 9 low voltage
+demand_21047,DE0 9 agriculture electricity,1000000,0,eom_de,DE0 9 low voltage
+demand_21052,DE0 9 industry electricity,1000000,0,eom_de,DE0 9 low voltage
