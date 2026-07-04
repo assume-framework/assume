@@ -411,6 +411,25 @@ class MarketRole(MarketMechanism, Role):
                         f"Order volume {order['volume']} must be an integer when volume_tick is set in market '{market_id}'."
                     )
 
+        # Reject bids below the market's minimum bid size. An undersized offer is
+        # invalid (it cannot be clipped up), so it is dropped from the orderbook that
+        # is cleared. Only applies to scalar-volume orders (block bids are left as-is).
+        min_volume = self.marketconfig.minimum_bid_volume
+        if min_volume:
+            kept_orders = []
+            for order in orderbook:
+                if (
+                    isinstance(order["volume"], (int, float))
+                    and 0 < abs(order["volume"]) < min_volume
+                ):
+                    logger.warning(
+                        f"Order volume {order['volume']} is below the minimum bid volume "
+                        f"{min_volume} in market '{market_id}'. Rejecting order."
+                    )
+                    continue
+                kept_orders.append(order)
+            orderbook[:] = kept_orders
+
     def handle_registration(self, content: RegistrationMessage, meta: MetaDict):
         """
         Handles incoming registration messages and adds the sender to the list of registered agents.
@@ -728,6 +747,12 @@ class MarketRole(MarketMechanism, Role):
         if flows is not None and len(flows) > 0:
             await self.store_flows(flows)
 
+        # some market mechanisms (e.g. redispatch) additionally capture per-line loading
+        line_loading_results = getattr(self, "line_loading_results", None)
+        if line_loading_results:
+            await self.store_line_loading(line_loading_results)
+            self.line_loading_results = None
+
         return accepted_orderbook, market_meta
 
     async def store_order_book(self, orderbook: Orderbook):
@@ -791,6 +816,29 @@ class MarketRole(MarketMechanism, Role):
                 "type": "grid_flows",
                 "market_id": self.marketconfig.market_id,
                 "data": flows,
+            }
+            await self.context.send_message(
+                content=message,
+                receiver_addr=db_addr,
+            )
+
+    async def store_line_loading(self, line_loading: list[dict]):
+        """
+        Sends the per-line loading records to the OutputRole to be stored as a
+        dedicated grid_line_loading output.
+
+        Args:
+            line_loading (list[dict]): per-line, per-snapshot loading records.
+        """
+
+        db_addr = self.context.data.get("output_agent_addr")
+
+        if db_addr:
+            message = {
+                "context": "write_results",
+                "type": "grid_line_loading",
+                "market_id": self.marketconfig.market_id,
+                "data": line_loading,
             }
             await self.context.send_message(
                 content=message,

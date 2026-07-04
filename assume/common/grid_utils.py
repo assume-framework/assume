@@ -123,6 +123,83 @@ def add_redispatch_loads(
         )
 
 
+def add_redispatch_storage_units(
+    network: pypsa.Network,
+    storage_units: pd.DataFrame | None,
+) -> None:
+    """
+    Adds storage units to the redispatch network so they can offer bidirectional
+    redispatch around their market-committed schedule: upward (more discharge / less
+    charge) and downward (less discharge / more charge).
+
+    Each storage unit is modelled like a redispatchable generator: a fixed base
+    generator that holds the committed net dispatch (which may be negative while
+    charging), plus an ``_up`` and a ``_down`` generator carrying the redispatch
+    flexibility. All three share a single nominal power ``p_nom = |max_power_discharge|
+    + |max_power_charge|`` (the full charge+discharge span) so the per-unit dispatch
+    stays within ``[-1, 1]`` even though the charging side is negative. The actual
+    dispatch and per-snapshot head-room are filled later in ``RedispatchMarketRole.clear``.
+
+    Args:
+        network (pypsa.Network): the pypsa network to which the storage units are added
+        storage_units (pandas.DataFrame | None): the storage units dataframe, or ``None``
+            when the scenario has no storage units.
+    """
+    if storage_units is None or storage_units.empty:
+        return
+
+    zeros = pd.DataFrame(
+        np.zeros((len(network.snapshots), len(storage_units.index))),
+        index=network.snapshots,
+        columns=storage_units.index,
+    )
+
+    # full charge+discharge power span; abs() guards against the sign convention used
+    # for charge power in the input data
+    span = (
+        storage_units["max_power_discharge"].abs()
+        + storage_units["max_power_charge"].abs()
+    )
+
+    # fixed base generator holding the committed net dispatch (may be negative while
+    # charging). The actual dispatch is set later via p_min_pu=p_max_pu=base/p_nom.
+    network.add(
+        "Generator",
+        name=storage_units.index,
+        bus=storage_units["node"],
+        p_nom=span,
+        p_set=zeros,
+        p_min_pu=zeros,
+        p_max_pu=zeros,
+        sign=1,
+    )
+
+    # upward redispatch generator (more discharge / less charge)
+    network.add(
+        "Generator",
+        name=storage_units.index,
+        suffix="_up",
+        bus=storage_units["node"],
+        p_nom=span,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
+    )
+
+    # downward redispatch generator (less discharge / more charge)
+    network.add(
+        "Generator",
+        name=storage_units.index,
+        suffix="_down",
+        bus=storage_units["node"],
+        p_nom=span,
+        p_min_pu=zeros,
+        p_max_pu=zeros + 1,
+        marginal_cost=zeros,
+        sign=-1,
+    )
+
+
 def read_pypsa_grid(
     network: pypsa.Network,
     grid_dict: dict[str, pd.DataFrame],
@@ -209,6 +286,46 @@ def calculate_network_meta(network, product: MarketProduct, i: int):
         )
 
     return meta
+
+
+def calculate_line_loading(network, market_products) -> list[dict]:
+    """
+    Calculates the loading of every line for every snapshot as a fraction of the line's
+    thermal rating: ``|p0| / (s_nom * s_max_pu)``. A value greater than 1 means the line
+    is overloaded.
+
+    Args:
+        network (pypsa.Network): the solved pypsa network (the flows are read from
+            ``lines_t.p0``, so call this after ``lpf``/``optimize`` for the state of
+            interest).
+        market_products (list[MarketProduct]): the cleared products, used to map each
+            integer snapshot to its real product start time.
+
+    Returns:
+        list[dict]: one record per line and snapshot with ``datetime``, ``line``,
+        ``line_loading`` (per-unit), ``flow_mw`` (signed ``p0``) and ``s_nom``.
+    """
+    p0 = network.lines_t.p0
+    rating = network.lines.s_nom * network.lines.s_max_pu
+    loading = p0.abs() / rating
+
+    records = []
+    for i, product in enumerate(market_products):
+        timestamp = product[0]
+        p0_row = p0.iloc[i]
+        loading_row = loading.iloc[i]
+        for line in network.lines.index:
+            records.append(
+                {
+                    "datetime": timestamp,
+                    "line": line,
+                    "line_loading": float(loading_row[line]),
+                    "flow_mw": float(p0_row[line]),
+                    "s_nom": float(network.lines.at[line, "s_nom"]),
+                }
+            )
+
+    return records
 
 
 def get_supported_solver_linopy(default_solver: str | None = None):

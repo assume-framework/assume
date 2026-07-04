@@ -14,6 +14,7 @@ from assume.strategies import (
     StorageCapacityHeuristicBalancingNegStrategy,
     StorageCapacityHeuristicBalancingPosStrategy,
     StorageEnergyHeuristicFlexableStrategy,
+    StorageRedispatchFlexableStrategy,
 )
 from assume.units import Storage
 
@@ -43,6 +44,35 @@ def storage() -> Storage:
         additional_cost_discharge=4,
         additional_cost=1,
     )
+
+
+def test_flexable_redispatch_storage(mock_market_config, storage):
+    """The redispatch strategy offers a bidirectional band around the committed schedule."""
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    strategy = StorageRedispatchFlexableStrategy()
+    product_tuples = [(start, end, None)]
+
+    bids = strategy.calculate_bids(
+        storage, mock_market_config, product_tuples=product_tuples
+    )
+
+    # a committed volume of 0 must still produce a bid (no remove_empty_bids)
+    assert len(bids) == 1
+    bid = bids[0]
+
+    # bid carries the full redispatch contract required by RedispatchMarketRole.clear
+    for field in ("volume", "min_power", "max_power", "p_nom", "price", "node"):
+        assert field in bid
+
+    # p_nom is the full charge+discharge span |100| + |-100|
+    assert bid["p_nom"] == pytest.approx(200)
+    # bidirectional band: can charge (min_power < 0) and discharge (max_power > 0)
+    assert bid["min_power"] < 0 < bid["max_power"]
+    # around the committed (idle) operating point
+    assert bid["volume"] == pytest.approx(0)
+    assert bid["max_power"] == pytest.approx(storage.max_power_discharge)
+    assert bid["min_power"] == pytest.approx(storage.max_power_charge)
 
 
 def test_flexable_eom_storage(mock_market_config, storage):

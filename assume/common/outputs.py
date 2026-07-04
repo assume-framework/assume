@@ -242,7 +242,7 @@ class WriteOutput(Role):
             table_name = content_data["unit_type"] + "_meta"
             self.write_buffers[table_name].append(content_data)
 
-        elif content_type == "grid_flows":
+        elif content_type in ["grid_flows", "grid_line_loading"]:
             # these need to be converted to df individually
             self.write_buffers[content_type].append(content_data)
         elif content_type in ["market_orders", "grid_topology"]:
@@ -448,6 +448,22 @@ class WriteOutput(Role):
 
         return df
 
+    def convert_line_loading(self, data: list[dict]):
+        """
+        Convert the per-line loading records into a dataframe.
+
+        Args:
+            data: list of records with datetime, line, line_loading, flow_mw and s_nom.
+        """
+        df = pd.DataFrame.from_records(data)
+        if df.empty:
+            return df
+
+        df.set_index("datetime", inplace=True)
+        df["simulation"] = self.simulation_id
+
+        return df
+
     async def store_dfs(self):
         """
         Stores the data frames to CSV files and the database. Is scheduled as a recurrent task based on the frequency.
@@ -484,6 +500,12 @@ class WriteOutput(Role):
                         dfs = []
                         for data in data_list:
                             df = self.convert_flows(data)
+                            dfs.append(df)
+                        df = pd.concat(dfs, axis=0, join="outer")
+                    case "grid_line_loading":
+                        dfs = []
+                        for data in data_list:
+                            df = self.convert_line_loading(data)
                             dfs.append(df)
                         df = pd.concat(dfs, axis=0, join="outer")
                     case "market_orders":

@@ -11,6 +11,8 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    add_redispatch_storage_units,
+    calculate_line_loading,
     calculate_network_meta,
     get_supported_solver_linopy,
     read_pypsa_grid,
@@ -69,12 +71,23 @@ class RedispatchMarketRole(MarketRole):
             network=self.network,
             loads=self.grid_data["loads"],
         )
+        # redispatchable storage units (batteries, PSPP, ...); no-op when the scenario
+        # has no storage_units.csv (grid_data.get returns None)
+        add_redispatch_storage_units(
+            network=self.network,
+            storage_units=self.grid_data.get("storage_units"),
+        )
 
         self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
         )
 
         self.log_flows = self.marketconfig.param_dict.get("log_flows", False)
+        # when enabled, the pre-redispatch line loading is captured in clear() and
+        # emitted as a dedicated grid_line_loading output
+        self.log_line_loading = self.marketconfig.param_dict.get(
+            "log_line_loading", False
+        )
 
         # set the market clearing principle
         # as pay as bid or pay as clear
@@ -144,12 +157,15 @@ class RedispatchMarketRole(MarketRole):
         price_pivot.reset_index(inplace=True, drop=True)
         p_nom_pivot.reset_index(inplace=True, drop=True)
 
-        # Generators and loads from the grid data
+        # Generators, loads and storage units from the grid data
         generator_names = self.grid_data["generators"].index
         load_names = self.grid_data["loads"].index
+        storage_data = self.grid_data.get("storage_units")
+        storage_names = storage_data.index if storage_data is not None else pd.Index([])
 
         gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
+        storage_cols = p_set.columns.intersection(storage_names)
 
         # 1. Fixed generator dispatch
         gen_p_set = p_set[gen_cols].copy()
@@ -205,6 +221,54 @@ class RedispatchMarketRole(MarketRole):
             costs.add_suffix("_down") * (-1)
         )
 
+        # 4. Redispatch flexibility for storage units (bidirectional: up = more
+        #    discharge / less charge, down = less discharge / more charge). Storage is
+        #    handled separately from generators because both its committed base dispatch
+        #    and its lower bound (min_power) can be negative (charging), which the
+        #    generator path's clip(lower=0) would discard. p_nom is the full
+        #    charge+discharge span, so the up/down head-room fractions stay within [0, 1].
+        if len(storage_cols) > 0:
+            stor_p_set = p_set[storage_cols].copy()
+            stor_p_nom = p_nom_pivot[storage_cols].copy()
+            stor_p_nom_safe = stor_p_nom.where(stor_p_nom != 0, np.inf)
+
+            # fixed base dispatch (negative while charging -> no lower clip)
+            redispatch_network.generators_t.p_set[storage_cols] = stor_p_set.reindex(
+                index=redispatch_network.snapshots,
+                columns=storage_cols,
+                fill_value=0.0,
+            )
+            stor_p_set_pu = stor_p_set.div(stor_p_nom_safe).clip(lower=-1, upper=1)
+            redispatch_network.generators_t.p_min_pu.update(stor_p_set_pu)
+            redispatch_network.generators_t.p_max_pu.update(stor_p_set_pu)
+
+            # upward head-room (towards max_power) and downward head-room (towards
+            # min_power); both non-negative fractions of the charge+discharge span
+            stor_p_max_pu_up = (
+                (max_power_pivot[storage_cols] - stor_p_set)
+                .div(stor_p_nom_safe)
+                .clip(lower=0, upper=1)
+            )
+            stor_p_max_pu_down = (
+                (stor_p_set - min_power_pivot[storage_cols])
+                .div(stor_p_nom_safe)
+                .clip(lower=0, upper=1)
+            )
+            stor_costs = price_pivot[storage_cols]
+
+            redispatch_network.generators_t.p_max_pu.update(
+                stor_p_max_pu_up.add_suffix("_up")
+            )
+            redispatch_network.generators_t.p_max_pu.update(
+                stor_p_max_pu_down.add_suffix("_down")
+            )
+            redispatch_network.generators_t.marginal_cost.update(
+                stor_costs.add_suffix("_up")
+            )
+            redispatch_network.generators_t.marginal_cost.update(
+                stor_costs.add_suffix("_down") * (-1)
+            )
+
         # run linear powerflow
         redispatch_network.lpf()
 
@@ -212,6 +276,13 @@ class RedispatchMarketRole(MarketRole):
         line_loading = redispatch_network.lines_t.p0.abs() / (
             redispatch_network.lines.s_nom * redispatch_network.lines.s_max_pu
         )
+
+        # capture the pre-redispatch line loading (before optimize() resolves it) so the
+        # actual congestion is recorded; emitted via base_market after clearing
+        if self.log_line_loading:
+            self.line_loading_results = calculate_line_loading(
+                redispatch_network, market_products
+            )
 
         # if any line is congested, perform redispatch
         if line_loading.max().max() > 1:

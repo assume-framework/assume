@@ -323,6 +323,7 @@ def make_market_config(
         opening_duration=pd.Timedelta(market_params["opening_duration"]),
         market_mechanism=market_params["market_mechanism"],
         maximum_bid_volume=market_params.get("maximum_bid_volume", 1e6),
+        minimum_bid_volume=market_params.get("minimum_bid_volume"),
         maximum_bid_price=market_params.get("maximum_bid_price", 3000),
         minimum_bid_price=market_params.get("minimum_bid_price", -3000),
         maximum_gradient=market_params.get("max_gradient"),

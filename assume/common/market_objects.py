@@ -110,6 +110,7 @@ class MarketConfig:
         market_products (list[MarketProduct]): list of available products to be traded at the market
         product_type (str): energy or capacity or heat
         maximum_bid_volume (float | None): the maximum valid bid volume of the market
+        minimum_bid_volume (float | None): the minimum valid bid volume of the market; bids with a smaller absolute volume are rejected (e.g. the 1 MW aFRR minimum). None disables the check.
         maximum_bid_price (float | None): the maximum bid price of the market
         minimum_bid_price (float): the minimum bid price of the market
         maximum_gradient (float | None): max allowed change between bids
@@ -132,6 +133,7 @@ class MarketConfig:
     market_products: list[MarketProduct] = field(default_factory=list)
     product_type: str = "energy"
     maximum_bid_volume: float | None = 2000.0
+    minimum_bid_volume: float | None = None
     maximum_bid_price: float | None = 3000.0
     minimum_bid_price: float = -500.0
     maximum_gradient: float | None = None

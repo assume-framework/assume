@@ -40,6 +40,49 @@ def test_market_config_hash_different_instances():
     assert hash(mc1) != hash(mc2)
 
 
+def _min_volume_role(minimum_bid_volume):
+    mc = MarketConfig(
+        market_id="Test",
+        opening_hours=rr.rrule(rr.HOURLY, dtstart=start, until=end),
+        opening_duration=rd(hours=1),
+        market_mechanism="pay_as_clear",
+        market_products=[MarketProduct(rd(hours=1), 1, rd(hours=1))],
+        minimum_bid_volume=minimum_bid_volume,
+    )
+    return MarketRole(marketconfig=mc)
+
+
+def _order(volume):
+    return {
+        "start_time": start,
+        "end_time": start + rd(hours=1),
+        "only_hours": None,
+        "price": 10.0,
+        "volume": volume,
+    }
+
+
+def test_minimum_bid_volume_rejects_undersized_bids():
+    """Bids with |volume| below minimum_bid_volume are dropped; the rest pass through."""
+    role = _min_volume_role(minimum_bid_volume=1.0)
+    orderbook = [_order(0.5), _order(1.5), _order(-0.3), _order(-5.0), _order(1.0)]
+
+    role.validate_orderbook(orderbook, "agent_1")
+
+    # 0.5 and -0.3 are below the 1 MW minimum -> rejected; 1.0 (== min) is kept
+    assert sorted(o["volume"] for o in orderbook) == [-5.0, 1.0, 1.5]
+
+
+def test_no_minimum_bid_volume_keeps_all_bids():
+    """With minimum_bid_volume unset (default None) no bid is rejected."""
+    role = _min_volume_role(minimum_bid_volume=None)
+    orderbook = [_order(0.01), _order(5.0)]
+
+    role.validate_orderbook(orderbook, "agent_1")
+
+    assert len(orderbook) == 2
+
+
 @pytest.fixture
 async def market_role() -> MarketRole:
     market_id = "Test"

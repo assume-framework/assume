@@ -217,6 +217,113 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             unit.outputs["total_costs"].loc[start:end_excl] = costs
 
 
+class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
+    """
+    Redispatch bidding strategy for storage units.
+
+    The strategy offers the storage's full flexibility envelope around its
+    market-committed schedule to the redispatch market, in both directions:
+    upward (more discharge / less charge) and downward (less discharge / more
+    charge). It does not choose a direction itself -- the redispatch market role
+    (network operator) decides how much up or down to activate to relieve congestion,
+    exactly like the power-plant :class:`EnergyNaiveRedispatchStrategy`.
+
+    For every product the strategy submits an absolute feasible band
+    ``[min_power, max_power]`` around the committed net dispatch ``volume``. The band is
+    recomputed per snapshot at the running state-of-charge, so state-of-charge limits and
+    any capacity reserved on other markets (e.g. CRM) are respected automatically -- both
+    are already netted out by ``calculate_min_max_discharge``/``calculate_min_max_charge``.
+    Bids are priced at the unit's marginal cost.
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMaxCharge,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Builds one redispatch bid per product describing the storage's feasible
+        power band and marginal cost.
+
+        Args:
+            unit (SupportsMinMaxCharge): The storage unit that is dispatched.
+            market_config (MarketConfig): The market configuration.
+            product_tuples (list[Product]): List of product tuples.
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Orderbook: Bids with start_time, end_time, only_hours, price, volume,
+            max_power, min_power, p_nom and node.
+        """
+        start = product_tuples[0][0]
+        # rolling theoretic SoC used to recompute the feasible envelope per snapshot
+        theoretic_SOC = unit.outputs["soc"].at[start]
+
+        # full charge+discharge power span, constant over the horizon, used as the
+        # nominal power so the redispatch network's per-unit dispatch stays within
+        # [-1, 1] even though the charging side is negative
+        p_nom = abs(unit.max_power_discharge) + abs(unit.max_power_charge)
+
+        bids = []
+        for product in product_tuples:
+            start, end = product[0], product[1]
+
+            # committed net dispatch from the energy market (+ discharge / - charge)
+            base_p = unit.outputs["energy"].at[start]
+
+            # additional feasible head-room at the current state-of-charge; already net
+            # of reserved capacity on other markets and clipped to SoC limits
+            _, max_power_discharge = unit.calculate_min_max_discharge(
+                start, end, soc=theoretic_SOC
+            )
+            _, max_power_charge = unit.calculate_min_max_charge(
+                start, end, soc=theoretic_SOC
+            )
+
+            # absolute feasible band around the committed dispatch
+            max_power = base_p + max_power_discharge[0]  # most discharge (>= base_p)
+            min_power = (
+                base_p + max_power_charge[0]
+            )  # most charge (<= base_p, may be <0)
+
+            price = unit.calculate_marginal_cost(start, base_p)
+
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": end,
+                    "only_hours": None,
+                    "price": price,
+                    "volume": base_p,
+                    "max_power": max_power,
+                    "min_power": min_power,
+                    "p_nom": p_nom,
+                    "node": unit.node,
+                }
+            )
+
+            # advance the theoretic SoC assuming the committed schedule is followed
+            time_delta = (end - start) / timedelta(hours=1)
+            if base_p > 0:
+                delta_soc = (
+                    -(base_p * time_delta / unit.efficiency_discharge) / unit.capacity
+                )
+            elif base_p < 0:
+                delta_soc = (
+                    -(base_p * time_delta * unit.efficiency_charge) / unit.capacity
+                )
+            else:
+                delta_soc = 0
+
+            theoretic_SOC += delta_soc
+
+        # NOTE: no remove_empty_bids -- a committed volume of 0 (idle storage) is a
+        # valid redispatch bid, the unit can still be moved up or down from zero.
+        return bids
+
+
 class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
     """
     The strategy is analogue to the storage strategy in flexABLE.

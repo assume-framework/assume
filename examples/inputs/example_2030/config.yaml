@@ -20,12 +20,13 @@ base_case_2030:
       start_date: 2030-01-01 00:00
       products:
         - duration: 4h
-          count: 1
-          first_delivery: 22h            # from 08:00 D-1 → 00:00 D
-      opening_frequency: 4h
-      opening_duration: 1h
+          count: 6                       # six 4h blocks 00-04..20-24 of day D
+          first_delivery: 24h
+      opening_frequency: 24h             # single daily auction (real German aFRR)
+      opening_duration: 8h               # gate closes 08:00 D-1, before day-ahead
       volume_unit: MW
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0              # aFRR min bid size rule disabled (all units may bid)
       maximum_bid_price: 9999
       minimum_bid_price: -9999
       price_unit: EUR/MW
@@ -37,12 +38,13 @@ base_case_2030:
       start_date: 2030-01-01 00:00
       products:
         - duration: 4h
-          count: 1
-          first_delivery: 22h
-      opening_frequency: 4h
-      opening_duration: 1h
+          count: 6
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 8h
       volume_unit: MW
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0              # aFRR min bid size rule disabled (all units may bid)
       maximum_bid_price: 9999
       minimum_bid_price: -9999
       price_unit: EUR/MW
@@ -65,6 +67,7 @@ base_case_2030:
       opening_duration: 1h
       volume_unit: MWh
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0              # aFRR min bid size rule disabled (all units may bid)
       maximum_bid_price: 9999
       minimum_bid_price: -9999
       price_unit: EUR/MWh
@@ -82,6 +85,7 @@ base_case_2030:
       opening_duration: 1h
       volume_unit: MWh
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0              # aFRR min bid size rule disabled (all units may bid)
       maximum_bid_price: 9999
       minimum_bid_price: -9999
       price_unit: EUR/MWh
@@ -96,9 +100,10 @@ base_case_2030:
           count: 24
           first_delivery: 24h
       opening_frequency: 24h
-      opening_duration: 20h
+      opening_duration: 12h              # day-ahead gate ~12:00 D-1
       volume_unit: MWh
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0           # EPEX day-ahead minimum bid size 0.1 MW
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
@@ -130,6 +135,7 @@ base_case_2030:
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
         export_dir: outputs/pypsa_nc
+        log_line_loading: true
 
 # Short 7-day slice of base_case_2030 for fast end-to-end verification before
 # committing to the full-year run (1175 units x 6 markets x daily PyPSA LPs).
@@ -151,12 +157,13 @@ base_case_2030_smoketest:
       start_date: 2030-01-01 00:00
       products:
         - duration: 4h
-          count: 1
-          first_delivery: 22h
-      opening_frequency: 4h
-      opening_duration: 1h
+          count: 6
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 8h
       volume_unit: MW
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0              # aFRR min bid size rule disabled (all units may bid)
       maximum_bid_price: 9999
       minimum_bid_price: -9999
       price_unit: EUR/MW
@@ -168,12 +175,13 @@ base_case_2030_smoketest:
       start_date: 2030-01-01 00:00
       products:
         - duration: 4h
-          count: 1
-          first_delivery: 22h
-      opening_frequency: 4h
-      opening_duration: 1h
+          count: 6
+          first_delivery: 24h
+      opening_frequency: 24h
+      opening_duration: 8h
       volume_unit: MW
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0              # aFRR min bid size rule disabled (all units may bid)
       maximum_bid_price: 9999
       minimum_bid_price: -9999
       price_unit: EUR/MW
@@ -191,6 +199,7 @@ base_case_2030_smoketest:
       opening_duration: 1h
       volume_unit: MWh
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0              # aFRR min bid size rule disabled (all units may bid)
       maximum_bid_price: 9999
       minimum_bid_price: -9999
       price_unit: EUR/MWh
@@ -208,6 +217,7 @@ base_case_2030_smoketest:
       opening_duration: 1h
       volume_unit: MWh
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0              # aFRR min bid size rule disabled (all units may bid)
       maximum_bid_price: 9999
       minimum_bid_price: -9999
       price_unit: EUR/MWh
@@ -222,9 +232,10 @@ base_case_2030_smoketest:
           count: 24
           first_delivery: 24h
       opening_frequency: 24h
-      opening_duration: 20h
+      opening_duration: 12h              # day-ahead gate ~12:00 D-1
       volume_unit: MWh
       maximum_bid_volume: 100000
+      minimum_bid_volume: 0.1            # EPEX day-ahead minimum bid size 0.1 MW
       maximum_bid_price: 3000
       minimum_bid_price: -500
       price_unit: EUR/MWh
@@ -256,3 +267,4 @@ base_case_2030_smoketest:
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
         export_dir: outputs/pypsa_nc
+        log_line_loading: true
