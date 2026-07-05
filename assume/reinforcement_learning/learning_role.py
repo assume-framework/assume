@@ -172,7 +172,7 @@ class Learning(Role):
             src="no_wait",
         )
 
-    def intialize_buffer(self, time_step, validation_interval):
+    def initialize_buffer(self, time_step, validation_interval):
         """Initialize the replay buffer for reinforcement learning training.
 
         Args:

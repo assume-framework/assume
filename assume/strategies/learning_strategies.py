@@ -23,6 +23,10 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
 from assume.reinforcement_learning.learning_utils import NormalActionNoise
+from assume.reinforcement_learning.neural_network_architecture import (
+    ActorPPO,
+    LSTMActorPPO,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +52,23 @@ class TorchLearningStrategy(LearningStrategy):
 
         self.actor_architecture = self.learning_config.actor_architecture
 
-        # check if actor architecture is available
-        if self.actor_architecture in actor_architecture_aliases.keys():
+        # PPO actors have stochastic output heads and therefore must be
+        # reconstructed with their algorithm-specific architecture when a
+        # trained policy is loaded for inference.
+        if self.algorithm == "mappo":
+            ppo_actor_architecture_aliases = {
+                "mlp": ActorPPO,
+                "lstm": LSTMActorPPO,
+            }
+            if self.actor_architecture not in ppo_actor_architecture_aliases:
+                raise ValueError(
+                    f"Policy '{self.actor_architecture}' unknown for MAPPO. "
+                    f"Supported architectures are {list(ppo_actor_architecture_aliases.keys())}"
+                )
+            self.actor_architecture_class = ppo_actor_architecture_aliases[
+                self.actor_architecture
+            ]
+        elif self.actor_architecture in actor_architecture_aliases.keys():
             self.actor_architecture_class = actor_architecture_aliases[
                 self.actor_architecture
             ]
@@ -270,7 +289,19 @@ class TorchLearningStrategy(LearningStrategy):
         solely on noise to cover the action space broadly.
         For PPO, we also store log_prob and value estimates for later use.
         """
-        return self.learning_role.rl_algorithm.get_action(self, next_observation)
+        if self.learning_mode or self.evaluation_mode:
+            return self.learning_role.rl_algorithm.get_action(self, next_observation)
+
+        # A final inference run does not create an RL algorithm. Use the actor
+        # loaded by ``load_actor_params`` directly and keep PPO deterministic.
+        with th.no_grad():
+            if self.algorithm == "mappo":
+                action = self.actor(next_observation, deterministic=True)
+            else:
+                action = self.actor(next_observation)
+
+        noise = th.zeros_like(action, dtype=self.float_type)
+        return action, noise
 
 
 class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
