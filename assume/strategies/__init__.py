@@ -38,6 +38,7 @@ from assume.strategies.naive_strategies import (
     EnergyNaiveRedispatchStrategy,
     EnergyNaiveStrategy,
     ExchangeEnergyNaiveStrategy,
+    ExchangeNaiveRedispatchStrategy,
     EnergyHeuristicElasticStrategy,
     DsmCapacityHeuristicBalancingStrategy,
 )
@@ -102,6 +103,7 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "industry_capacity_heuristic_balancing_neg": DsmCapacityHeuristicBalancingStrategy,
     "powerplant_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
     "demand_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
+    "exchange_energy_naive_redispatch": ExchangeNaiveRedispatchStrategy,
     "storage_energy_flexable_redispatch": StorageRedispatchFlexableStrategy,
     "household_energy_optimization": DsmEnergyOptimizationStrategy,
     "industry_energy_optimization": DsmEnergyOptimizationStrategy,

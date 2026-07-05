@@ -75,6 +75,32 @@ def test_flexable_redispatch_storage(mock_market_config, storage):
     assert bid["min_power"] == pytest.approx(storage.max_power_charge)
 
 
+def test_flexable_redispatch_storage_uses_committed_not_clipped(
+    mock_market_config, storage
+):
+    """
+    The redispatch base must be the market-committed (pre-SoC-clip) dispatch, not the
+    SoC-clipped executed value. The generators were dispatched against the committed
+    volume, so the redispatch only balances (no spurious net up/down) when the storage
+    reports the same committed volume.
+    """
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    strategy = StorageRedispatchFlexableStrategy()
+    product_tuples = [(start, end, None)]
+
+    # market committed 60 MW of charging; the SoC clip cut the executed charge to 40 MW
+    storage.outputs["energy_committed"][start] = -60
+    storage.outputs["energy"][start] = -40
+
+    bids = strategy.calculate_bids(
+        storage, mock_market_config, product_tuples=product_tuples
+    )
+
+    # the redispatch base is the committed -60, NOT the clipped -40
+    assert bids[0]["volume"] == pytest.approx(-60)
+
+
 def test_flexable_eom_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)

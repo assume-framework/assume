@@ -200,6 +200,61 @@ def add_redispatch_storage_units(
     )
 
 
+def add_redispatch_exchange_units(
+    network: pypsa.Network,
+    exchange_units: pd.DataFrame | None,
+    p_nom: float = 10e4,
+) -> None:
+    """
+    Adds cross-border exchange units to the redispatch network as **fixed boundary
+    injections**.
+
+    In the energy-only market an exchange unit imports (adds supply) or exports
+    (adds demand) at its domestic connection bus. That cross-border position is a
+    committed schedule the national TSO does not redispatch, but it must still be
+    present in the redispatch power flow: otherwise the exported generation has no
+    sink and the optimisation spuriously ramps domestic units down to balance the
+    network (and imports have no source, spuriously ramping units up).
+
+    Each exchange unit is therefore modelled as a single fixed generator (``sign=1``,
+    no ``_up``/``_down`` companions, so it is never redispatched). Its per-snapshot
+    dispatch is the net cleared position (positive = net import, negative = net
+    export) and is fixed later in ``RedispatchMarketRole.clear`` via
+    ``p_min_pu = p_max_pu = net/p_nom``. ``p_nom`` is a large fixed capacity that
+    only needs to exceed any single interconnector's net flow; the sign of the
+    dispatch (import vs export) is carried by the (possibly negative) per-unit value.
+
+    Args:
+        network (pypsa.Network): the pypsa network to which the exchange units are added.
+        exchange_units (pandas.DataFrame | None): the exchange units dataframe, or
+            ``None`` when the scenario has no exchange units.
+        p_nom (float, optional): nominal capacity assigned to every exchange
+            generator. Defaults to ``10e4`` MW.
+    """
+    if exchange_units is None or exchange_units.empty:
+        return
+
+    zeros = pd.DataFrame(
+        np.zeros((len(network.snapshots), len(exchange_units.index))),
+        index=network.snapshots,
+        columns=exchange_units.index,
+    )
+
+    # fixed boundary injection: positive p = net import, negative p = net export.
+    # No _up/_down companions -> the exchange position is never redispatched, only
+    # honoured as a fixed flow so exports have a sink and imports have a source.
+    network.add(
+        "Generator",
+        name=exchange_units.index,
+        bus=exchange_units["node"],
+        p_nom=p_nom,
+        p_set=zeros,
+        p_min_pu=zeros,
+        p_max_pu=zeros,
+        sign=1,
+    )
+
+
 def read_pypsa_grid(
     network: pypsa.Network,
     grid_dict: dict[str, pd.DataFrame],

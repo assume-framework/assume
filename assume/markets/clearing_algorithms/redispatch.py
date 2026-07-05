@@ -9,6 +9,7 @@ import pandas as pd
 import pypsa
 
 from assume.common.grid_utils import (
+    add_redispatch_exchange_units,
     add_redispatch_generators,
     add_redispatch_loads,
     add_redispatch_storage_units,
@@ -76,6 +77,12 @@ class RedispatchMarketRole(MarketRole):
         add_redispatch_storage_units(
             network=self.network,
             storage_units=self.grid_data.get("storage_units"),
+        )
+        # cross-border exchange as fixed boundary injections so exports have a sink
+        # and imports a source; no-op when the scenario has no exchange_units.csv
+        add_redispatch_exchange_units(
+            network=self.network,
+            exchange_units=self.grid_data.get("exchange_units"),
         )
 
         self.solver_name = get_supported_solver_linopy(
@@ -157,15 +164,20 @@ class RedispatchMarketRole(MarketRole):
         price_pivot.reset_index(inplace=True, drop=True)
         p_nom_pivot.reset_index(inplace=True, drop=True)
 
-        # Generators, loads and storage units from the grid data
+        # Generators, loads, storage and exchange units from the grid data
         generator_names = self.grid_data["generators"].index
         load_names = self.grid_data["loads"].index
         storage_data = self.grid_data.get("storage_units")
         storage_names = storage_data.index if storage_data is not None else pd.Index([])
+        exchange_data = self.grid_data.get("exchange_units")
+        exchange_names = (
+            exchange_data.index if exchange_data is not None else pd.Index([])
+        )
 
         gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
         storage_cols = p_set.columns.intersection(storage_names)
+        exchange_cols = p_set.columns.intersection(exchange_names)
 
         # 1. Fixed generator dispatch
         gen_p_set = p_set[gen_cols].copy()
@@ -268,6 +280,28 @@ class RedispatchMarketRole(MarketRole):
             redispatch_network.generators_t.marginal_cost.update(
                 stor_costs.add_suffix("_down") * (-1)
             )
+
+        # 5. Fixed cross-border exchange injections (net EOM position; not
+        #    redispatchable). Positive = net import (injection), negative = net export
+        #    (withdrawal). Fixing p here gives the redispatch flow a proper sink for
+        #    exports and source for imports, so it no longer ramps domestic units to
+        #    compensate for the missing exchange. p_nom is the fixed capacity the
+        #    exchange generators were built with (see add_redispatch_exchange_units);
+        #    reading it back from the network keeps base/pu consistent regardless of
+        #    the value bid, and negative values (exports) are preserved (no lower clip).
+        if len(exchange_cols) > 0:
+            # a missing bid for a snapshot means no cross-border position -> 0 net
+            exch_p_set = p_set[exchange_cols].copy().fillna(0.0)
+            exch_p_nom = redispatch_network.generators.loc[exchange_cols, "p_nom"]
+
+            redispatch_network.generators_t.p_set[exchange_cols] = exch_p_set.reindex(
+                index=redispatch_network.snapshots,
+                columns=exchange_cols,
+                fill_value=0.0,
+            )
+            exch_p_set_pu = exch_p_set.div(exch_p_nom, axis=1).clip(lower=-1, upper=1)
+            redispatch_network.generators_t.p_min_pu.update(exch_p_set_pu)
+            redispatch_network.generators_t.p_max_pu.update(exch_p_set_pu)
 
         # run linear powerflow
         redispatch_network.lpf()

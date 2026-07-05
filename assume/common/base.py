@@ -662,6 +662,13 @@ class SupportsMinMaxCharge(BaseUnit):
         time_delta = self.index.freq / timedelta(hours=1)
 
         for t in self.index[start:end_excl]:
+            # Record the committed (pre-clip) energy schedule. Downstream markets that
+            # balance against the market-committed dispatch (e.g. redispatch) must see
+            # the same volume the energy market cleared and generators were dispatched
+            # for -- not the SoC-clipped value written back below -- otherwise a spurious
+            # supply/demand gap appears in the redispatch network.
+            self.outputs["energy_committed"].at[t] = self.outputs["energy"].at[t]
+
             next_t = t + self.index.freq
             # continue if it is the last time step
             if next_t not in self.index:

@@ -374,6 +374,62 @@ class ExchangeEnergyNaiveStrategy(MinMaxStrategy):
         return bids
 
 
+class ExchangeNaiveRedispatchStrategy(MinMaxStrategy):
+    """
+    Redispatch strategy for an exchange (cross-border) unit.
+
+    The unit's net energy-only-market position (``outputs["energy"]``: positive for
+    net import, negative for net export) is submitted to the redispatch market as a
+    **fixed, non-flexible** bid (``max_power == min_power == volume``). This makes the
+    redispatch power flow honour the committed cross-border schedule as a fixed
+    boundary injection instead of ramping domestic units up/down to compensate for
+    the missing import source / export sink. The exchange itself is never redispatched.
+    """
+
+    def calculate_bids(
+        self,
+        unit: SupportsMinMax,
+        market_config: MarketConfig,
+        product_tuples: list[Product],
+        **kwargs,
+    ) -> Orderbook:
+        """
+        Args:
+            unit (SupportsMinMax): the exchange unit to be dispatched.
+            market_config (MarketConfig): the market configuration.
+            product_tuples (list[Product]): the list of all products the unit can offer.
+
+        Returns:
+            Orderbook: one fixed bid per product carrying the net cross-border position.
+        """
+        # large fixed nominal capacity; must match add_redispatch_exchange_units so the
+        # per-unit fixed dispatch resolves back to the net position in MW.
+        p_nom = 10e4
+
+        bids = []
+        for product in product_tuples:
+            start = product[0]
+            # net cleared position from the energy-only market: >0 import, <0 export
+            net_position = unit.outputs["energy"].at[start]
+
+            bids.append(
+                {
+                    "start_time": start,
+                    "end_time": product[1],
+                    "only_hours": product[2],
+                    "price": 0.0,
+                    "volume": net_position,
+                    # fixed injection: no up/down head-room -> never redispatched
+                    "max_power": net_position,
+                    "min_power": net_position,
+                    "p_nom": p_nom,
+                    "node": unit.node,
+                }
+            )
+
+        return bids
+
+
 class EnergyHeuristicElasticStrategy(MinMaxStrategy):
     """
     A bidding strategy for a demand unit that submits multiple bids to approximate

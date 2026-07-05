@@ -276,14 +276,22 @@ class PayAsBidRole(MarketRole):
                     # diff == 0 perfect match
                     demand_order["accepted_volume"] = demand_order["volume"]
 
-                if demand_order["accepted_volume"]:
-                    accepted_demand_orders.append(demand_order)
-                # pay as bid
-                for supply_order in to_commit:
-                    supply_order["accepted_price"] = supply_order["price"]
+                if to_commit:
+                    if demand_order["accepted_volume"]:
+                        accepted_demand_orders.append(demand_order)
+                    # pay as bid
+                    for supply_order in to_commit:
+                        supply_order["accepted_price"] = supply_order["price"]
 
-                    demand_order["accepted_price"] = supply_order["price"]
-                accepted_supply_orders.extend(to_commit)
+                        demand_order["accepted_price"] = supply_order["price"]
+                    accepted_supply_orders.extend(to_commit)
+                else:
+                    # No supply could be committed for this demand order (supply is
+                    # exhausted or priced out). It cannot be served, so it must not be
+                    # accepted: otherwise the cumulative-diff branch above can leave a
+                    # bogus positive accepted_volume with no accepted_price, which then
+                    # crashes set_dispatch_plan downstream (KeyError 'accepted_price').
+                    demand_order["accepted_volume"] = 0
 
             # if demand is fulfilled, we do have some additional supply orders
             # these will be rejected
@@ -305,5 +313,17 @@ class PayAsBidRole(MarketRole):
 
         # write network flows here if applicable
         flows = []
+
+        # Guarantee every returned order carries the fields set_dispatch_plan reads
+        # (base.py accesses order["accepted_volume"] and order["accepted_price"] for
+        # both accepted and rejected orders). Rejected orders are collected above
+        # without those fields; accepted orders are always priced via the to_commit
+        # branch, but default defensively so a missing key can never crash the run.
+        for order in accepted_orders:
+            order.setdefault("accepted_volume", 0)
+            order.setdefault("accepted_price", order["price"])
+        for order in rejected_orders:
+            order["accepted_volume"] = 0
+            order.setdefault("accepted_price", 0)
 
         return accepted_orders, rejected_orders, meta, flows

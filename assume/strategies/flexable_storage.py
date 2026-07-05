@@ -261,6 +261,13 @@ class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
         # rolling theoretic SoC used to recompute the feasible envelope per snapshot
         theoretic_SOC = unit.outputs["soc"].at[start]
 
+        # the redispatch balances against the market-committed dispatch, so the base
+        # must be the committed (pre-SoC-clip) energy the generators were dispatched
+        # for. outputs["energy"] holds the SoC-clipped value; using it would make the
+        # storage's redispatch base disagree with the rest of the network and force a
+        # spurious net redispatch. energy_committed is recorded in set_dispatch_plan.
+        committed_energy = unit.outputs["energy_committed"]
+
         # full charge+discharge power span, constant over the horizon, used as the
         # nominal power so the redispatch network's per-unit dispatch stays within
         # [-1, 1] even though the charging side is negative
@@ -271,7 +278,7 @@ class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
             start, end = product[0], product[1]
 
             # committed net dispatch from the energy market (+ discharge / - charge)
-            base_p = unit.outputs["energy"].at[start]
+            base_p = committed_energy.at[start]
 
             # additional feasible head-room at the current state-of-charge; already net
             # of reserved capacity on other markets and clipped to SoC limits
