@@ -107,20 +107,20 @@ available_examples = {
     },
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
-    "fokusH2_2030": {
-        "scenario": "fokusH2_2030",
+    "fokusstrom_2030": {
+        "scenario": "fokusstrom_2030",
         "study_case": "base_case_2030",
     },
-    "fokusH2_2035": {
-        "scenario": "fokusH2_2035",
+    "fokusstrom_2035": {
+        "scenario": "fokusstrom_2035",
         "study_case": "base_case_2035",
     },
-    "fokusH2_2040": {
-        "scenario": "fokusH2_2040",
+    "fokusstrom_2040": {
+        "scenario": "fokusstrom_2040",
         "study_case": "base_case_2040",
     },
-    "fokusH2_2045": {
-        "scenario": "fokusH2_2045",
+    "fokusstrom_2045": {
+        "scenario": "fokusstrom_2045",
         "study_case": "base_case_2045",
     },
 }
@@ -139,7 +139,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "fokusH2_2030"
+    example = "fokusH2_2045"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

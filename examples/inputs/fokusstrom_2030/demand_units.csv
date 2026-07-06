@@ -1,0 +1,95 @@
+name,technology,bidding_EOM,bidding_CRM_capacity_pos,bidding_CRM_capacity_neg,bidding_CRM_energy_pos,bidding_CRM_energy_neg,bidding_redispatch,max_power,min_power,unit_operator,node
+demand_8428,DE0 0,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 0
+demand_8430,DE0 0 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 0
+demand_8435,DE0 0 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 0
+demand_8448,DE0 1,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 1
+demand_8450,DE0 1 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 1
+demand_8455,DE0 1 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 1
+demand_8468,DE0 10,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 10
+demand_8470,DE0 10 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 10
+demand_8475,DE0 10 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 10
+demand_8488,DE0 11,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 11
+demand_8490,DE0 11 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 11
+demand_8495,DE0 11 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 11
+demand_8508,DE0 12,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 12
+demand_8510,DE0 12 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 12
+demand_8515,DE0 12 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 12
+demand_8528,DE0 13,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 13
+demand_8530,DE0 13 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 13
+demand_8535,DE0 13 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 13
+demand_8548,DE0 14,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 14
+demand_8550,DE0 14 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 14
+demand_8555,DE0 14 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 14
+demand_8568,DE0 15,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 15
+demand_8570,DE0 15 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 15
+demand_8575,DE0 15 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 15
+demand_8588,DE0 16,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 16
+demand_8590,DE0 16 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 16
+demand_8595,DE0 16 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 16
+demand_8608,DE0 17,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 17
+demand_8610,DE0 17 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 17
+demand_8615,DE0 17 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 17
+demand_8628,DE0 18,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 18
+demand_8630,DE0 18 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 18
+demand_8635,DE0 18 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 18
+demand_8648,DE0 19,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 19
+demand_8650,DE0 19 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 19
+demand_8655,DE0 19 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 19
+demand_8668,DE0 2,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 2
+demand_8670,DE0 2 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 2
+demand_8675,DE0 2 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 2
+demand_8688,DE0 20,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 20
+demand_8690,DE0 20 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 20
+demand_8695,DE0 20 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 20
+demand_8708,DE0 21,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 21
+demand_8710,DE0 21 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 21
+demand_8715,DE0 21 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 21
+demand_8728,DE0 22,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 22
+demand_8730,DE0 22 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 22
+demand_8735,DE0 22 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 22
+demand_8748,DE0 23,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 23
+demand_8750,DE0 23 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 23
+demand_8755,DE0 23 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 23
+demand_8768,DE0 24,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 24
+demand_8770,DE0 24 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 24
+demand_8775,DE0 24 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 24
+demand_8788,DE0 25,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 25
+demand_8790,DE0 25 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 25
+demand_8795,DE0 25 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 25
+demand_8808,DE0 26,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 26
+demand_8810,DE0 26 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 26
+demand_8815,DE0 26 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 26
+demand_8828,DE0 27,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 27
+demand_8830,DE0 27 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 27
+demand_8835,DE0 27 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 27
+demand_8848,DE0 28,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 28
+demand_8850,DE0 28 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 28
+demand_8855,DE0 28 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 28
+demand_8868,DE0 29,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 29
+demand_8870,DE0 29 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 29
+demand_8875,DE0 29 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 29
+demand_8888,DE0 3,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 3
+demand_8890,DE0 3 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 3
+demand_8895,DE0 3 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 3
+demand_8908,DE0 4,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 4
+demand_8910,DE0 4 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 4
+demand_8915,DE0 4 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 4
+demand_8928,DE0 5,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 5
+demand_8930,DE0 5 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 5
+demand_8935,DE0 5 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 5
+demand_8948,DE0 6,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 6
+demand_8950,DE0 6 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 6
+demand_8955,DE0 6 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 6
+demand_8968,DE0 7,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 7
+demand_8970,DE0 7 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 7
+demand_8975,DE0 7 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 7
+demand_8988,DE0 8,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 8
+demand_8990,DE0 8 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 8
+demand_8995,DE0 8 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 8
+demand_9008,DE0 9,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 9
+demand_9010,DE0 9 agriculture electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 9
+demand_9015,DE0 9 industry electricity,demand_energy_naive,,,,,demand_energy_naive_redispatch,1000000,0,eom_de,DE0 9
+demand_CRM_capacity_pos,reserve_capacity,,demand_energy_naive,,,,,2200,0,crm_demand,DE0 0
+demand_CRM_capacity_neg,reserve_capacity,,,demand_energy_naive,,,,2100,0,crm_demand,DE0 0
+demand_CRM_energy_pos,reserve_energy,,,,demand_energy_naive,,,500,0,crm_demand,DE0 0
+demand_CRM_energy_neg,reserve_energy,,,,,demand_energy_naive,,600,0,crm_demand,DE0 0
