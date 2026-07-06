@@ -29,14 +29,14 @@
     {
       "asDropdown": false,
       "icon": "dashboard",
-      "includeVars": false,
+      "includeVars": true,
       "keepTime": false,
       "tags": [],
       "targetBlank": false,
-      "title": "Set time filter to full simulation extent",
+      "title": "Set time filter to full simulation horizon",
       "tooltip": "Clicking on the button will update the time range filter. The first and last timestamps of the selected simulation are used. Other filter items are preserved. The dashboard will reload: make sure to save your changes beforehand.",
       "type": "link",
-      "url": "/d/aemnxld4ukgsga?orgId=1&from=${simulation_start}&to=${simulation_end}&timezone=utc&var-simulation=${simulation}&var-market=${market}&var-Gen_Units=${Gen_Units}&var-Demand_Units=${Demand_Units}&var-Storage_Units=${Storage_Units}"
+      "url": "/d/aemnxld4ukgsga?orgId=1&from=${simulation_start}&to=${simulation_end}&timezone=utc"
     }
   ],
   "panels": [
