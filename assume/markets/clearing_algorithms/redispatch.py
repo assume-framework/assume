@@ -244,11 +244,21 @@ class RedispatchMarketRole(MarketRole):
             stor_p_nom = p_nom_pivot[storage_cols].copy()
             stor_p_nom_safe = stor_p_nom.where(stor_p_nom != 0, np.inf)
 
-            # fixed base dispatch (negative while charging -> no lower clip)
-            redispatch_network.generators_t.p_set[storage_cols] = stor_p_set.reindex(
-                index=redispatch_network.snapshots,
-                columns=storage_cols,
-                fill_value=0.0,
+            # fixed base dispatch (negative while charging -> no lower clip). Assigned
+            # via concat rather than per-column insertion so the p_set frame stays
+            # consolidated (per-column insertion of many storage columns fragments the
+            # DataFrame and triggers a pandas PerformanceWarning on storage-heavy
+            # scenarios, e.g. 2040/2045).
+            redispatch_network.generators_t.p_set = pd.concat(
+                [
+                    redispatch_network.generators_t.p_set,
+                    stor_p_set.reindex(
+                        index=redispatch_network.snapshots,
+                        columns=storage_cols,
+                        fill_value=0.0,
+                    ),
+                ],
+                axis=1,
             )
             stor_p_set_pu = stor_p_set.div(stor_p_nom_safe).clip(lower=-1, upper=1)
             redispatch_network.generators_t.p_min_pu.update(stor_p_set_pu)
@@ -294,10 +304,17 @@ class RedispatchMarketRole(MarketRole):
             exch_p_set = p_set[exchange_cols].copy().fillna(0.0)
             exch_p_nom = redispatch_network.generators.loc[exchange_cols, "p_nom"]
 
-            redispatch_network.generators_t.p_set[exchange_cols] = exch_p_set.reindex(
-                index=redispatch_network.snapshots,
-                columns=exchange_cols,
-                fill_value=0.0,
+            # concat (not per-column insertion) to keep the p_set frame consolidated
+            redispatch_network.generators_t.p_set = pd.concat(
+                [
+                    redispatch_network.generators_t.p_set,
+                    exch_p_set.reindex(
+                        index=redispatch_network.snapshots,
+                        columns=exchange_cols,
+                        fill_value=0.0,
+                    ),
+                ],
+                axis=1,
             )
             exch_p_set_pu = exch_p_set.div(exch_p_nom, axis=1).clip(lower=-1, upper=1)
             redispatch_network.generators_t.p_min_pu.update(exch_p_set_pu)
