@@ -123,6 +123,22 @@ available_examples = {
         "scenario": "technologiemix_2045",
         "study_case": "base_case_2045",
     },
+    "fokusH2_2030": {
+        "scenario": "fokusH2_2030",
+        "study_case": "base_case_2030",
+    },
+    "fokusH2_2035": {
+        "scenario": "fokusH2_2035",
+        "study_case": "base_case_2035",
+    },
+    "fokusH2_2040": {
+        "scenario": "fokusH2_2040",
+        "study_case": "base_case_2040",
+    },
+    "fokusH2_2045": {
+        "scenario": "fokusH2_2045",
+        "study_case": "base_case_2045",
+    },
 }
 
 
