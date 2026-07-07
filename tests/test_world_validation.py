@@ -158,9 +158,31 @@ def test_non_referred_market(world):
 
     world.add_market(market_operator_id="market_operator", market_config=market_config)
 
-    with pytest.warns(UserWarning, match="has no bidding participants.") as record:
+    with pytest.raises(ValueError, match="has less than two bidding participants"):
         world.run()
-    assert len(record) > 0
+
+
+def test_single_participant_market(world):
+    """A Market with only 1 participant raises an Error."""
+
+    world.add_market_operator("market_operator")
+    world.add_unit_operator("unit_operator", {"test_EOM": "naive_eom"})
+    market_opening = rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end)
+    market_products = [
+        MarketProduct(
+            duration=datetime.timedelta(hours=1),
+            count=1,
+            first_delivery=datetime.timedelta(hours=1),
+        )
+    ]
+    market_config = MarketConfig(
+        "test_EOM", opening_hours=market_opening, market_products=market_products
+    )
+
+    world.add_market(market_operator_id="market_operator", market_config=market_config)
+
+    with pytest.raises(ValueError, match="has less than two bidding participants"):
+        world.run()
 
 
 @pytest.mark.require_network
@@ -193,6 +215,7 @@ def test_redispatch_no_dispatch(grid_data, world):
 
     strategies = {"redispatch": "naive_eom"}
     world.add_unit_operator("unit_operator", strategies)
+    world.add_unit_operator("unit_operator_2", strategies)
 
     with pytest.raises(ValueError):
         world.run()
@@ -237,6 +260,7 @@ def test_redispatch_too_early(grid_data, world):
 
     strategies = {"redispatch": "naive_eom", "dispatch": "naive_eom"}
     world.add_unit_operator("unit_operator", strategies)
+    world.add_unit_operator("unit_operator_2", strategies)
 
     with pytest.raises(ValueError):
         world.run()
