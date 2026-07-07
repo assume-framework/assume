@@ -1037,7 +1037,7 @@
         "regex": "",
         "sort": 1,
         "type": "query"
-            },
+      },
       {
         "current": {
           "selected": false,
