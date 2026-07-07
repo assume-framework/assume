@@ -209,7 +209,7 @@ if __name__ == "__main__":
     end = network.snapshots[-1]
     marketdesign = [
         MarketConfig(
-            "EOM",
+            "redispatch" if market_mechanism == "redispatch" else "EOM",
             rr.rrule(rr.HOURLY, interval=1, dtstart=start, until=end),
             timedelta(hours=1),
             market_mechanism,
