@@ -26,6 +26,7 @@ Upcoming Release
   - **Add test for portfolio learning strategy and ``min_max_scale`` function**: Added a test for the portfolio learning strategy and ``min_max_rescale`` function to ensure its functionality and stability.
   - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
   - **Align redispatch mechanism to latest PyPSA version release**: Updated the redispatch formulation to model cleared EOM generator dispatch for ``network.lpf()`` via ``generators_t.p_set`` and consistent generator bounds ``p_min_pu/p_max_pu``, replacing the previous load-based workaround.
+  - **Grafana dashboard improvements**: Added button to automatically update the time range filter to the full simulation horizon.
 
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
