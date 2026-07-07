@@ -2677,7 +2677,7 @@
         "refresh": 2,
         "regex": "",
         "type": "query"
-            },
+      },
       {
         "current": {
           "selected": false,
