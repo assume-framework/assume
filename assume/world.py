@@ -660,6 +660,9 @@ class World:
             None
         """
 
+        if market_config.market_id in self.markets:
+            raise ValueError(f"Market {market_config.market_id} already exists")
+
         if mm_class := self.clearing_mechanisms.get(market_config.market_mechanism):
             market_role = mm_class(market_config)
         else:

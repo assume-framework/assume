@@ -264,3 +264,30 @@ def test_redispatch_too_early(grid_data, world):
 
     with pytest.raises(ValueError):
         world.run()
+
+
+def test_duplicate_market_id(world):
+    """Adding a market with a duplicate ID raises an Error."""
+
+    world.add_market_operator("market_operator")
+    market_opening = rr.rrule(rr.HOURLY, dtstart=world.start, until=world.end)
+    market_products = [
+        MarketProduct(
+            duration=datetime.timedelta(hours=1),
+            count=1,
+            first_delivery=datetime.timedelta(hours=1),
+        )
+    ]
+    market_config = MarketConfig(
+        "test_EOM", opening_hours=market_opening, market_products=market_products
+    )
+    duplicate_market_config = MarketConfig(
+        "test_EOM", opening_hours=market_opening, market_products=market_products
+    )
+
+    world.add_market(market_operator_id="market_operator", market_config=market_config)
+
+    with pytest.raises(ValueError, match="already exists"):
+        world.add_market(
+            market_operator_id="market_operator", market_config=duplicate_market_config
+        )
