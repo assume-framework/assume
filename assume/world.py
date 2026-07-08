@@ -1411,10 +1411,42 @@ class World:
                     pass
 
         # Add bidding strategies (handle separately for consistent formatting)
+        unit_type_name = type(unit).__name__.lower()
         for market_id, strategy in unit.bidding_strategies.items():
-            unit_dict[f"bidding_{market_id}"] = (
-                strategy.__class__.__name__ if strategy else ""
-            )
+            if not strategy:
+                unit_dict[f"bidding_{market_id}"] = ""
+                continue
+            strategy_cls = strategy.__class__
+            best_key = ""
+            for key, cls in self.bidding_strategies.items():
+                if cls == strategy_cls:
+                    if not best_key:
+                        best_key = key
+                        continue
+
+                    key_pref = key.startswith(f"{unit_type_name}_")
+                    best_pref = best_key.startswith(f"{unit_type_name}_")
+
+                    if key_pref and not best_pref:
+                        best_key = key
+                        continue
+                    if best_pref and not key_pref:
+                        continue
+
+                    if key_pref == best_pref:
+                        market_lower = market_id.lower()
+                        key_has_market = market_lower in key
+                        best_has_market = market_lower in best_key
+
+                        if key_has_market and not best_has_market:
+                            best_key = key
+                            continue
+                        if best_has_market and not key_has_market:
+                            continue
+
+                        if len(key) < len(best_key):
+                            best_key = key
+            unit_dict[f"bidding_{market_id}"] = best_key if best_key else strategy_cls.__name__
 
         # Add forecast algorithms
         if hasattr(unit.forecaster, "forecast_algorithms"):
@@ -1423,6 +1455,18 @@ class World:
 
         # Rename id to name for CSV format
         unit_dict["name"] = unit_dict.pop("id")
+
+        # Convert negative demand/charge powers back to positive for user-friendly export
+        if unit_type_name == "demand":
+            if "min_power" in unit_dict:
+                unit_dict["min_power"] = abs(unit_dict["min_power"])
+            if "max_power" in unit_dict:
+                unit_dict["max_power"] = abs(unit_dict["max_power"])
+        elif unit_type_name == "storage":
+            if "max_power_charge" in unit_dict:
+                unit_dict["max_power_charge"] = abs(unit_dict["max_power_charge"])
+            if "min_power_charge" in unit_dict:
+                unit_dict["min_power_charge"] = abs(unit_dict["min_power_charge"])
 
         return unit_dict
 
