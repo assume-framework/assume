@@ -514,7 +514,7 @@ def calculate_naive_congestion_signal(
     # Step 2: Calculate net load for each node (demand - generation)
     net_load_by_node = {}
 
-    for node in demand_unit_nodes:
+    for node in sorted(demand_unit_nodes):
         # Calculate total demand for this node
         node_demand_units = [unit for unit in demand_units if unit.node == node]
         node_demand = calculate_sum_demand(
@@ -555,7 +555,7 @@ def calculate_naive_congestion_signal(
     # Step 4: Calculate node-specific congestion signal by aggregating connected lines
     node_congestion_signal = pd.DataFrame(index=index)
 
-    for node in demand_unit_nodes:
+    for node in sorted(demand_unit_nodes):
         # Find all lines connected to this node
         connected_lines = lines[(lines["bus0"] == node) | (lines["bus1"] == node)].index
 
@@ -627,7 +627,7 @@ def calculate_naive_renewable_utilisation(
     renewable_utilisation = pd.DataFrame(index=index)
 
     # Calculate utilisation based on availability and max power for each node
-    for node in demand_unit_nodes:
+    for node in sorted(demand_unit_nodes):
         node_renewable_units = [
             unit.id for unit in renewable_units if unit.node == node
         ]

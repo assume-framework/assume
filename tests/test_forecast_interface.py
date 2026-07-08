@@ -220,19 +220,12 @@ def test_forecast_interface__calc_and_update_forecasts(
         check_freq=False,
     )
 
-    # Check congestion signal and renewable_utilization are as expected
-    # NOTE: congestion forecast is negative as max available power > demand at the nodes
-    for key in congestion_signal:
-        assert np.isclose(congestion_signal[key].data, expected_cgn[key].values).all()
-
-    for key in expected_cgn:  # also test that all keys are present
-        assert np.isclose(congestion_signal[key].data, expected_cgn[key].values).all()
-
-    for key in rn_utilization:
-        assert np.isclose(rn_utilization[key].data, expected_uti[key].values).all()
-
-    for key in expected_uti:  # also test that all keys are present
-        assert np.isclose(rn_utilization[key].data, expected_uti[key].values).all()
+    assert np.isclose(
+        congestion_signal.data, expected_cgn["north_1_congestion_severity"].values
+    ).all()
+    assert np.isclose(
+        rn_utilization.data, expected_uti["north_1_renewable_utilisation"].values
+    ).all()
 
     #############################################################
     # 4. (Act Again) Update all forecasts
@@ -270,17 +263,12 @@ def test_forecast_interface__calc_and_update_forecasts(
         check_freq=False,
     )
 
-    for key in congestion_signal:
-        assert np.isclose(congestion_signal[key].data, expected_cgn[key].values).all()
-
-    for key in expected_cgn:
-        assert np.isclose(congestion_signal[key].data, expected_cgn[key].values).all()
-
-    for key in rn_utilization:
-        assert np.isclose(rn_utilization[key].data, expected_uti[key].values).all()
-
-    for key in expected_uti:
-        assert np.isclose(rn_utilization[key].data, expected_uti[key].values).all()
+    assert np.isclose(
+        congestion_signal.data, expected_cgn["north_1_congestion_severity"].values
+    ).all()
+    assert np.isclose(
+        rn_utilization.data, expected_uti["north_1_renewable_utilisation"].values
+    ).all()
 
 
 def test_forecast_interface__uses_given_forecast(index, market_setup, forecast_setup):
@@ -321,16 +309,13 @@ def test_forecast_interface__uses_given_forecast(index, market_setup, forecast_s
         check_freq=False,
     )
 
-    # Check congestion_signal uses given forecasts (stored under congestion_severity keys)
+    # Check congestion_signal uses given forecasts (flattened to FastSeries)
     congestion_signal = mock_dsm_forecaster.congestion_signal
-    assert list(congestion_signal["north_1_congestion_severity"]) == [1.0] * len(index)
-    assert list(congestion_signal["north_2_congestion_severity"]) == [1.0] * len(index)
+    assert np.all(congestion_signal.data == 1.0)
 
-    # Check renewable_utilisation uses given forecasts
+    # Check renewable_utilisation uses given forecasts (flattened to FastSeries)
     rn_utilization = mock_dsm_forecaster.renewable_utilisation_signal
-    assert list(rn_utilization["north_1_renewable_utilisation"]) == [1.0] * len(index)
-    assert list(rn_utilization["north_2_renewable_utilisation"]) == [1.0] * len(index)
-    assert list(rn_utilization["all_nodes_renewable_utilisation"]) == [1.0] * len(index)
+    assert np.all(rn_utilization.data == 1.0)
 
 
 def test_forecast_interface__empty_grid(market_setup, forecast_setup):
@@ -343,8 +328,12 @@ def test_forecast_interface__empty_grid(market_setup, forecast_setup):
         None,
     )
 
-    assert mock_dsm_forecaster.congestion_signal == {}
-    assert mock_dsm_forecaster.renewable_utilisation_signal == {}
+    from assume.common.fast_pandas import FastSeries
+
+    assert isinstance(mock_dsm_forecaster.congestion_signal, FastSeries)
+    assert np.all(mock_dsm_forecaster.congestion_signal.data == 0.0)
+    assert isinstance(mock_dsm_forecaster.renewable_utilisation_signal, FastSeries)
+    assert np.all(mock_dsm_forecaster.renewable_utilisation_signal.data == 0.0)
 
 
 def test_forecast_interface__elastic_demand(index, market_setup, forecast_setup):

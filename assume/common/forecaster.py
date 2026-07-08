@@ -214,13 +214,28 @@ class UnitForecaster:
             result[key] = self._to_series(value)
         return result
 
+    def _flatten_signal(
+        self, signal_dict: dict[str, FastSeries], node: str, suffix: str
+    ) -> FastSeries:
+        """Extract the node-specific series from *signal_dict*, or the first value as fallback.
+
+        Returns the existing ``FastSeries`` attribute unchanged when *signal_dict* is empty,
+        preserving the default value set in ``__init__``.
+        """
+        if not signal_dict:
+            return self._to_series(0)
+        node_key = f"{node}_{suffix}"
+        if node_key in signal_dict:
+            return signal_dict[node_key]
+        return next(iter(signal_dict.values()))
+
     def preprocess(
         self,
         units: list[BaseUnit],
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
-    ):
+    ) -> None:
         """Prepare intermediate data needed by ``initialize`` and ``update``.
 
         Runs the preprocess algorithms for *price* and *residual_load* and stores results
@@ -265,7 +280,7 @@ class UnitForecaster:
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
-    ):
+    ) -> None:
         """Compute all forecast timeseries for the unit. Call once after all units are created.
 
         Delegates to ``preprocess()`` first, then computes *price* and *residual_load*
@@ -324,7 +339,7 @@ class UnitForecaster:
             )
             self.residual_load = self._dict_to_series(self.residual_load)
 
-    def update(self, *args, **kwargs):
+    def update(self, *args, **kwargs) -> None:
         """Revise forecast timeseries during runtime (e.g. during bid calculation).
 
         Called periodically to adjust forecasts based on sliding horizons or new data.
@@ -493,12 +508,13 @@ class DsmUnitForecaster(UnitForecaster):
             residual_load=residual_load,
         )
 
-        # FIXME: currently default is series while calculations are dict of series
-        self.congestion_signal = self._to_series(congestion_signal)
-        self.electricity_price = self._to_series(electricity_price)
-        self.renewable_utilisation_signal = self._to_series(
+        self.congestion_signal: FastSeries = self._to_series(congestion_signal)
+        self.electricity_price: FastSeries = self._to_series(electricity_price)
+        self.renewable_utilisation_signal: FastSeries = self._to_series(
             renewable_utilisation_signal
         )
+        # Unit node stored during initialize() for use in update()
+        self._unit_node: str = "node0"
 
     def preprocess(
         self,
@@ -506,7 +522,7 @@ class DsmUnitForecaster(UnitForecaster):
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
-    ):
+    ) -> None:
         """Prepare intermediate data for DSM-specific metrics (congestion signal, renewable utilisation).
 
         Results are stored in ``self.preprocess_information``.
@@ -556,7 +572,7 @@ class DsmUnitForecaster(UnitForecaster):
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
-    ):
+    ) -> None:
         """Initialize all forecast timeseries including DSM-specific metrics.
 
         Calls parent preprocessing and initialization for price / residual load, then
@@ -590,6 +606,10 @@ class DsmUnitForecaster(UnitForecaster):
         # TODO: how to handle other markets?
         self.electricity_price = self.price.get("EOM")
 
+        # Store the initializing unit's node so update() can extract the right signal
+        if initializing_unit is not None and hasattr(initializing_unit, "node"):
+            self._unit_node = initializing_unit.node
+
         # 5. Get congestion signal forecast
         congestion_signal_forecast_algorithm_name = self.forecast_algorithms.get(
             "congestion_signal", "congestion_signal_naive_forecast"
@@ -600,16 +620,20 @@ class DsmUnitForecaster(UnitForecaster):
         if (
             congestion_signal_forecast_algorithm is not None
         ):  # None means keep existing forecast
-            self.congestion_signal = calculate_node_wise_forecasts(
-                self.index,
-                units,
-                market_configs,
-                congestion_signal_forecast_algorithm,
-                forecast_df,
-                self.preprocess_information["congestion_signal"],
-                prefix="congestion_signal",
+            congestion_dict = self._dict_to_series(
+                calculate_node_wise_forecasts(
+                    self.index,
+                    units,
+                    market_configs,
+                    congestion_signal_forecast_algorithm,
+                    forecast_df,
+                    self.preprocess_information["congestion_signal"],
+                    prefix="congestion_signal",
+                )
             )
-            self.congestion_signal = self._dict_to_series(self.congestion_signal)
+            self.congestion_signal = self._flatten_signal(
+                congestion_dict, self._unit_node, "congestion_severity"
+            )
 
         # 6. Get renewable utilisation forecast
         renewable_utilisation_forecast_algorithm_name = self.forecast_algorithms.get(
@@ -621,20 +645,22 @@ class DsmUnitForecaster(UnitForecaster):
         if (
             renewable_utilisation_forecast_algorithm is not None
         ):  # None means keep existing forecast
-            self.renewable_utilisation_signal = calculate_node_wise_forecasts(
-                self.index,
-                units,
-                market_configs,
-                renewable_utilisation_forecast_algorithm,
-                forecast_df,
-                self.preprocess_information["renewable_utilisation"],
-                prefix="renewable_utilisation",
+            renewable_dict = self._dict_to_series(
+                calculate_node_wise_forecasts(
+                    self.index,
+                    units,
+                    market_configs,
+                    renewable_utilisation_forecast_algorithm,
+                    forecast_df,
+                    self.preprocess_information["renewable_utilisation"],
+                    prefix="renewable_utilisation",
+                )
             )
-            self.renewable_utilisation_signal = self._dict_to_series(
-                self.renewable_utilisation_signal
+            self.renewable_utilisation_signal = self._flatten_signal(
+                renewable_dict, self._unit_node, "renewable_utilisation"
             )
 
-    def update(self, *args, **kwargs):
+    def update(self, *args, **kwargs) -> None:
         """Update DSM-specific forecast timeseries during runtime.
 
         Calls parent update for price / residual load, then additionally updates
@@ -657,13 +683,19 @@ class DsmUnitForecaster(UnitForecaster):
         congestion_signal_update_algorithm = self._registries["update"].get(
             congestion_signal_update_algorithm_name
         )
-        self.congestion_signal = congestion_signal_update_algorithm(
+        raw_congestion = congestion_signal_update_algorithm(
             self.congestion_signal,
             self.preprocess_information["congestion_signal"],
             *args,
             **kwargs,
         )
-        self.congestion_signal = self._dict_to_series(self.congestion_signal)
+        if isinstance(raw_congestion, dict):
+            raw_congestion = self._dict_to_series(raw_congestion)
+            self.congestion_signal = self._flatten_signal(
+                raw_congestion, self._unit_node, "congestion_severity"
+            )
+        else:
+            self.congestion_signal = self._to_series(raw_congestion)
 
         renewable_utilisation_update_algorithm_name = self.forecast_algorithms.get(
             "update_renewable_utilisation", "renewable_utilisation_default"
@@ -671,15 +703,19 @@ class DsmUnitForecaster(UnitForecaster):
         renewable_utilisation_update_algorithm = self._registries["update"].get(
             renewable_utilisation_update_algorithm_name
         )
-        self.renewable_utilisation_signal = renewable_utilisation_update_algorithm(
+        raw_renewable = renewable_utilisation_update_algorithm(
             self.renewable_utilisation_signal,
             self.preprocess_information["renewable_utilisation"],
             *args,
             **kwargs,
         )
-        self.renewable_utilisation_signal = self._dict_to_series(
-            self.renewable_utilisation_signal
-        )
+        if isinstance(raw_renewable, dict):
+            raw_renewable = self._dict_to_series(raw_renewable)
+            self.renewable_utilisation_signal = self._flatten_signal(
+                raw_renewable, self._unit_node, "renewable_utilisation"
+            )
+        else:
+            self.renewable_utilisation_signal = self._to_series(raw_renewable)
 
 
 class SteelplantForecaster(DsmUnitForecaster):
@@ -729,7 +765,7 @@ class SteelplantForecaster(DsmUnitForecaster):
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
-    ):
+    ) -> None:
         super().initialize(
             units,
             market_configs,
@@ -806,7 +842,7 @@ class SteamgenerationForecaster(DsmUnitForecaster):
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
-    ):
+    ) -> None:
         super().initialize(
             units,
             market_configs,
@@ -900,7 +936,7 @@ class BuildingForecaster(DsmUnitForecaster):
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
-    ):
+    ) -> None:
         super().initialize(
             units,
             market_configs,
@@ -954,7 +990,7 @@ class HydrogenForecaster(DsmUnitForecaster):
         market_configs: list[MarketConfig],
         forecast_df: ForecastSeries = None,
         initializing_unit: BaseUnit = None,
-    ):
+    ) -> None:
         super().initialize(
             units,
             market_configs,
