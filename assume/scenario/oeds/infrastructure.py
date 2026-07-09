@@ -318,7 +318,7 @@ class InfrastructureInterface:
             f'COALESCE("Inbetriebnahmedatum", \'2018-01-01\') as "startDate",'
             f'"InanspruchnahmeZahlungNachEeg" as "eeg" '
             f'FROM "solar_extended" '
-            f'INNER JOIN "solar_eeg" ON "EinheitMastrNummer" = "VerknuepfteEinheit" '
+            f'LEFT JOIN "solar_eeg" ON "EinheitMastrNummer" = "VerknuepfteEinheit" '
             f'WHERE "Postleitzahl" in {plz_codes_str} '
         )
 
