@@ -126,10 +126,6 @@ def _build_config_dict(world: "World", study_case: str) -> dict:
     if world.bidding_params:
         config["bidding_strategy_params"] = world.bidding_params
 
-    # Only include forecast_algorithms if it's not empty
-    if forecast_algs := _get_forecast_algorithms(world):
-        config["forecast_algorithms"] = forecast_algs
-
     if world.learning_config:
         # Convert learning_config to a clean dictionary without internal attributes
         learning_dict = {}
@@ -300,17 +296,6 @@ def _rrule_to_frequency_str(rrule) -> str | None:
         return f"{interval}y"
     else:
         return None
-
-
-def _get_forecast_algorithms(world: "World") -> dict:
-    """Get forecast algorithms from units."""
-    forecast_algs = {}
-    for unit in world.units.values():
-        if hasattr(unit.forecaster, "forecast_algorithms"):
-            for key, value in unit.forecaster.forecast_algorithms.items():
-                if key not in forecast_algs:
-                    forecast_algs[key] = value
-    return forecast_algs
 
 
 def _export_units(world: "World", scenario_path: Path) -> None:
@@ -580,27 +565,19 @@ def _export_fuel_prices_df(world: "World", scenario_path: Path) -> None:
 
 
 def _export_forecasts_df(world: "World", scenario_path: Path) -> None:
-    """Export market forecasts (price, residual_load)."""
-    all_forecasts = {}
+    """Export the given forecasts (price, residual_load, ...) the scenario was loaded with.
 
-    for unit in world.units.values():
-        forecaster = unit.forecaster
-        if hasattr(forecaster, "price"):
-            for market_id, series in forecaster.price.items():
-                col_name = f"price_{market_id}"
-                if col_name not in all_forecasts:
-                    all_forecasts[col_name] = series
-        if hasattr(forecaster, "residual_load"):
-            for market_id, series in forecaster.residual_load.items():
-                col_name = f"residual_load_{market_id}"
-                if col_name not in all_forecasts:
-                    all_forecasts[col_name] = series
+    Forecasts that were calculated by a forecast algorithm are not exported: the
+    algorithm is stored per unit instead (see ``_unit_to_dict``) and recomputes them
+    on load.
+    """
+    forecasts_df = world.scenario_data.get("forecasts_df")
+    if forecasts_df is None or forecasts_df.empty:
+        return
 
-    if all_forecasts:
-        df = pd.DataFrame(
-            all_forecasts, index=forecaster.index.as_datetimeindex()
-        ).rename_axis("datetime")
-        df.to_csv(scenario_path / "forecasts_df.csv", index=True)
+    forecasts_df.rename_axis("datetime").to_csv(
+        scenario_path / "forecasts_df.csv", index=True
+    )
 
 
 def _export_exchanges_df(world: "World", scenario_path: Path) -> None:
