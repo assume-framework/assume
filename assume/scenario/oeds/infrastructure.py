@@ -155,7 +155,7 @@ class InfrastructureInterface:
 
         df["startDate"] = df["startDate"].fillna(pd.to_datetime("2005-05-05"))
         df["startDate"] = pd.to_datetime(df["startDate"])
-        # endDate not used here
+        df["endDate"] = pd.to_datetime(df["endDate"])
         if "combination" in df.columns:  # if no combination flag is set, set it to 0
             # 0 if None, else 1
             df["combination"] = df["combination"].notna().astype(int)
