@@ -215,7 +215,7 @@ class InfrastructureInterface:
             COALESCE(ev."Technologie", \'Kondensationsmaschine ohne Entnahme\') as "turbineTyp",
             ev."GenMastrNummer" as "generatorID"
             """
-        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = "', '".join([f"{int(x):05d}" for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
         if fuel_type != "nuclear":
             query += f"""
@@ -303,7 +303,7 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         latitude, longitude = self.get_lat_lon_area(area)
-        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = "', '".join([f"{int(x):05d}" for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
@@ -412,7 +412,7 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         latitude, longitude = self.get_lat_lon_area(area)
-        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = "', '".join([f"{int(x):05d}" for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
@@ -482,7 +482,7 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         latitude, longitude = self.get_lat_lon_area(area)
-        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = "', '".join([f"{int(x):05d}" for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
         # TODO: Add more Parameters, if the model get more complex
@@ -523,7 +523,7 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         latitude, longitude = self.get_lat_lon_area(area)
-        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = "', '".join([f"{int(x):05d}" for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
@@ -564,7 +564,7 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         latitude, longitude = self.get_lat_lon_area(area)
-        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = "', '".join([f"{int(x):05d}" for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
         query = (
@@ -689,7 +689,7 @@ class InfrastructureInterface:
                 raise Exception("invalid plz code")
 
         latitude, longitude = self.get_lat_lon_area(area)
-        plz_codes_str = "', '".join([str(x) for x in plz_codes])
+        plz_codes_str = "', '".join([f"{int(x):05d}" for x in plz_codes])
         plz_codes_str = f"('{plz_codes_str}')"
 
         query = f"""SELECT
