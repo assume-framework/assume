@@ -340,22 +340,19 @@ class InfrastructureInterface:
         # all PVs with are implemented in 2018
         df["startDate"] = pd.to_datetime(df["startDate"])
 
-        if solar_type == "roof_top":
-            df["ownConsumption"] = df["ownConsumption"].fillna(
-                (df["startDate"].dt.year > 2013).astype(int)
-            )
-            df["ownConsumption"] = df["ownConsumption"].apply(
-                lambda x: 1
-                if "Teileinspeisung" in str(x)
-                or "Eigenverbrauch" in str(x)
-                or str(x) == "689"
-                or str(x) == "1"
-                or x is True
-                or x == 1
-                else 0
-            )
-        else:
-            df["ownConsumption"] = 0
+        df["ownConsumption"] = df["ownConsumption"].fillna(
+            (df["startDate"].dt.year > 2013).astype(int)
+        )
+        df["ownConsumption"] = df["ownConsumption"].apply(
+            lambda x: 1
+            if "Teileinspeisung" in str(x)
+            or "Eigenverbrauch" in str(x)
+            or str(x) == "689"
+            or str(x) == "1"
+            or x is True
+            or x == 1
+            else 0
+        )
         # all PVs with nan are south oriented assets
         df["azimuth"] = [mastr_solar_azimuth[str(code)] for code in df["azimuthCode"]]
         del df["azimuthCode"]
