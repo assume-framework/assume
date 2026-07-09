@@ -534,7 +534,7 @@ class InfrastructureInterface:
             f'COALESCE("Laengengrad", {longitude}) as "lon", '
             f'COALESCE("Breitengrad", {latitude}) as "lat" '
             f'FROM "hydro_extended" '
-            f'WHERE "Postleitzahl"::int in {plz_codes_str} AND '
+            f'WHERE "Postleitzahl" in {plz_codes_str} AND '
             f"\"ArtDerWasserkraftanlage\" = 'Laufwasseranlage'"
         )
 
@@ -580,7 +580,7 @@ class InfrastructureInterface:
             f'COALESCE(spe."Breitengrad", {latitude}) as "lat" '
             f'FROM "storage_extended" spe '
             f'LEFT JOIN "storage_units" su ON spe."EinheitMastrNummer" = su."VerknuepfteEinheit" '
-            f'WHERE spe."Postleitzahl"::int in {plz_codes_str} AND '
+            f'WHERE spe."Postleitzahl" in {plz_codes_str} AND '
             f"spe.\"Technologie\" = 'Pumpspeicher'  AND spe.\"EinheitSystemstatus\"= 'Aktiviert' AND spe.\"Land\"= 'Deutschland' "
             f'AND "Nettonennleistung" > 500'
         )
