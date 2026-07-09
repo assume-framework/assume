@@ -374,6 +374,150 @@ def _export_exchange_units(world: "World", scenario_path: Path) -> None:
         df.to_csv(scenario_path / "exchange_units.csv", index=True)
 
 
+def _get_bidding_strategy_name(
+    world: "World", unit: BaseUnit, market_id: str, strategy
+) -> str:
+    """
+    Get the registered name for a bidding strategy.
+
+    Args:
+        world: The World instance containing bidding strategies.
+        unit: The unit for which to find the strategy name.
+        market_id: The market ID for the strategy.
+        strategy: The strategy instance.
+
+    Returns:
+        The registered name for the strategy, or the class name if not found.
+    """
+    unit_type_name = type(unit).__name__.lower()
+    if unit_type_name in ("steelplant", "hydrogenplant", "steamplant"):
+        unit_type_name = "industry"
+    elif unit_type_name == "building":
+        unit_type_name = "household"
+
+    strategy_cls = strategy.__class__
+    best_key = ""
+
+    for key, cls in world.bidding_strategies.items():
+        if cls == strategy_cls:
+            if not best_key:
+                best_key = key
+                continue
+
+            key_pref = key.startswith(f"{unit_type_name}_")
+            best_pref = best_key.startswith(f"{unit_type_name}_")
+
+            if key_pref and not best_pref:
+                best_key = key
+                continue
+            if best_pref and not key_pref:
+                continue
+
+            if key_pref == best_pref:
+                market_lower = market_id.lower()
+                key_has_market = market_lower in key
+                best_has_market = market_lower in best_key
+
+                if key_has_market and not best_has_market:
+                    best_key = key
+                    continue
+                if best_has_market and not key_has_market:
+                    continue
+
+                if len(key) < len(best_key):
+                    best_key = key
+
+    return best_key if best_key else strategy_cls.__name__
+
+
+def _dsm_unit_to_rows(world: "World", unit: BaseUnit) -> list[dict]:
+    """
+    Convert a DSM unit to multiple rows (one per component) for CSV export.
+
+    Extracts component config directly from component instances in unit.components.
+    Each component (electrolyser, dri_plant, eaf, etc.) becomes a separate row
+    with its own attributes (max_power, min_power, efficiency, fuel_type, etc.).
+
+    Args:
+        world: The World instance.
+        unit: A DSM unit (SteelPlant, Building, HydrogenPlant, SteamPlant).
+
+    Returns:
+        List of dictionaries, one per component, ready for DataFrame conversion.
+    """
+    rows = []
+    unit_type_name = UNIT_TYPE_REVERSED.get(type(unit), type(unit).__name__.lower())
+
+    # Build common attributes that apply to all components
+    common_attrs = {
+        "name": unit.id,
+        "unit_type": unit_type_name,
+        "unit_operator": unit.unit_operator,
+        "node": unit.node,
+    }
+
+    # Add DSM-specific common attributes
+    for attr in ["objective", "flexibility_measure", "cost_tolerance"]:
+        if hasattr(unit, attr):
+            common_attrs[attr] = getattr(unit, attr)
+
+    # Add demand (steel_demand for SteelPlant, demand for others)
+    if hasattr(unit, "steel_demand"):
+        common_attrs["demand"] = unit.steel_demand
+    elif hasattr(unit, "demand"):
+        common_attrs["demand"] = unit.demand
+
+    # Add bidding strategies
+    for market_id, strategy in unit.bidding_strategies.items():
+        if strategy:
+            common_attrs[f"bidding_{market_id}"] = _get_bidding_strategy_name(
+                world, unit, market_id, strategy
+            )
+        else:
+            common_attrs[f"bidding_{market_id}"] = ""
+
+    # Add location
+    if hasattr(unit, "location") and unit.location != (0.0, 0.0):
+        common_attrs["location"] = f"{unit.location[0]},{unit.location[1]}"
+
+    # Process each component
+    if hasattr(unit, "components") and unit.components:
+        for tech_name, component in unit.components.items():
+            row = common_attrs.copy()
+            row["technology"] = tech_name
+
+            # Extract all component attributes
+            # Component is an instance of a class from dst_components.py
+            # It has attributes like max_power, min_power, efficiency, fuel_type, etc.
+            for attr_name, attr_value in vars(component).items():
+                # Skip internal attributes and time_steps
+                if attr_name.startswith("_") or attr_name == "time_steps":
+                    continue
+                # Skip callable attributes (methods)
+                if callable(attr_value):
+                    continue
+                # Handle kwargs dict specially - extract its contents
+                if attr_name == "kwargs" and isinstance(attr_value, dict):
+                    for kwarg_key, kwarg_value in attr_value.items():
+                        # Skip internal kwarg keys
+                        if not kwarg_key.startswith("_"):
+                            row[kwarg_key] = kwarg_value
+                    continue
+                # Skip complex objects (Series, arrays, etc.) but allow basic types
+                if hasattr(attr_value, "__len__") and not isinstance(
+                    attr_value, (int, float, str, bool)
+                ):
+                    continue
+                row[attr_name] = attr_value
+
+            rows.append(row)
+    else:
+        # Unit has no components, create single row
+        rows.append(common_attrs)
+
+    return rows
+
+
 def _export_dsm_units(world: "World", scenario_path: Path) -> None:
     """Export DSM units (Building, SteelPlant, etc.) to CSV."""
     building_units = [u for u in world.units.values() if type(u).__name__ == "Building"]
@@ -383,29 +527,28 @@ def _export_dsm_units(world: "World", scenario_path: Path) -> None:
     ]
     steam_units = [u for u in world.units.values() if type(u).__name__ == "SteamPlant"]
 
-    if building_units:
-        _export_units_to_csv(
-            world, building_units, scenario_path, "residential_dsm_units"
-        )
-    if steel_units:
-        _export_units_to_csv(world, steel_units, scenario_path, "industrial_dsm_units")
-    if hydrogen_units or steam_units:
-        combined = hydrogen_units + steam_units
-        _export_units_to_csv(world, combined, scenario_path, "industrial_dsm_units")
+    residential_data = []
+    industrial_data = []
 
+    # Export building units to residential_dsm_units.csv
+    for unit in building_units:
+        residential_data.extend(_dsm_unit_to_rows(world, unit))
 
-def _export_units_to_csv(
-    world: "World", units: list, scenario_path: Path, filename: str
-) -> None:
-    """Helper to export a list of units to CSV."""
-    data = []
-    for unit in units:
-        row = _unit_to_dict(world, unit)
-        data.append(row)
+    # Export steel, hydrogen, and steam units to industrial_dsm_units.csv
+    for unit in steel_units + hydrogen_units + steam_units:
+        industrial_data.extend(_dsm_unit_to_rows(world, unit))
 
-    df = pd.DataFrame(data).set_index("name")
-    if not df.empty:
-        df.to_csv(scenario_path / f"{filename}.csv", index=True)
+    # Save residential DSM units
+    if residential_data:
+        df = pd.DataFrame(residential_data).set_index("name")
+        if not df.empty:
+            df.to_csv(scenario_path / "residential_dsm_units.csv", index=True)
+
+    # Save industrial DSM units
+    if industrial_data:
+        df = pd.DataFrame(industrial_data).set_index("name")
+        if not df.empty:
+            df.to_csv(scenario_path / "industrial_dsm_units.csv", index=True)
 
 
 def _unit_to_dict(world: "World", unit: BaseUnit) -> dict:
@@ -448,43 +591,9 @@ def _unit_to_dict(world: "World", unit: BaseUnit) -> dict:
                 pass
 
     # Add bidding strategies (handle separately for consistent formatting)
-    unit_type_name = type(unit).__name__.lower()
     for market_id, strategy in unit.bidding_strategies.items():
-        if not strategy:
-            unit_dict[f"bidding_{market_id}"] = ""
-            continue
-        strategy_cls = strategy.__class__
-        best_key = ""
-        for key, cls in world.bidding_strategies.items():
-            if cls == strategy_cls:
-                if not best_key:
-                    best_key = key
-                    continue
-
-                key_pref = key.startswith(f"{unit_type_name}_")
-                best_pref = best_key.startswith(f"{unit_type_name}_")
-
-                if key_pref and not best_pref:
-                    best_key = key
-                    continue
-                if best_pref and not key_pref:
-                    continue
-
-                if key_pref == best_pref:
-                    market_lower = market_id.lower()
-                    key_has_market = market_lower in key
-                    best_has_market = market_lower in best_key
-
-                    if key_has_market and not best_has_market:
-                        best_key = key
-                        continue
-                    if best_has_market and not key_has_market:
-                        continue
-
-                    if len(key) < len(best_key):
-                        best_key = key
-        unit_dict[f"bidding_{market_id}"] = (
-            best_key if best_key else strategy_cls.__name__
+        unit_dict[f"bidding_{market_id}"] = _get_bidding_strategy_name(
+            world, unit, market_id, strategy
         )
 
     # Add forecast algorithms
