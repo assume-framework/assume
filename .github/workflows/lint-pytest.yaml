@@ -14,7 +14,30 @@ on:
     branches: [ "main" ]
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+    - uses: actions/checkout@v7.0.0
+    - uses: dorny/paths-filter@v4.0.2
+      id: filter
+      with:
+        filters: |
+          code:
+            - '**'
+            - '!docs/**'
+            - '!**/*.md'
+            - '!.gitignore'
+            - '!.dockerignore'
+            - '!.readthedocs.yaml'
+            - '!LICENSE.txt'
+            - '!LICENSES/**'
+            - '!REUSE.toml'
+
   pre-commit:
+    needs: changes
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v7.0.0
@@ -33,7 +56,8 @@ jobs:
         extra_args: --all-files --show-diff-on-failure
 
   jupyter:
-    needs: pre-commit
+    needs: [changes, pre-commit]
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -59,7 +83,8 @@ jobs:
         jupyter nbconvert --to notebook --execute --ExecutePreprocessor.timeout=60 --output output.ipynb 10_DSU_and_flexibility.ipynb
 
   test:
-    needs: pre-commit
+    needs: [changes, pre-commit]
+    if: ${{ needs.changes.outputs.code == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
