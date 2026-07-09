@@ -10,12 +10,15 @@ from typing import TYPE_CHECKING
 import pandas as pd
 import yaml
 
-from assume.units import BaseUnit
+from assume.common.fast_pandas import FastSeries
+from assume.units import BaseUnit, unit_types
 
 if TYPE_CHECKING:
     from assume.world import World
 
 logger = logging.getLogger(__name__)
+
+UNIT_TYPE_REVERSED = {v: k for k, v in unit_types.items()}
 
 
 def export_to_folder(
@@ -366,7 +369,7 @@ def _export_exchange_units(world: "World", scenario_path: Path) -> None:
         row = _unit_to_dict(world, unit)
         data.append(row)
 
-    df = pd.DataFrame(data).set_index("name")
+    df = pd.DataFrame(data).set_index("name").drop("technology", axis=1)
     if not df.empty:
         df.to_csv(scenario_path / "exchange_units.csv", index=True)
 
@@ -419,8 +422,6 @@ def _unit_to_dict(world: "World", unit: BaseUnit) -> dict:
         "total_op_time",
         "bidding_strategies",
         "unit_type",
-        "marginal_cost",
-        "price",  # unit_type handled separately
     }
 
     # Dynamically add all missing attributes from unit and its bases
@@ -430,11 +431,15 @@ def _unit_to_dict(world: "World", unit: BaseUnit) -> dict:
         if attr not in unit_dict:
             try:
                 value = getattr(unit, attr)
-                # Skip callable attributes (methods) and None values
-                if callable(value) or value is None:
+                # Skip callable attributes (methods), Series, and None values
+                if (
+                    callable(value)
+                    or value is None
+                    or type(value) in (FastSeries, pd.Series)
+                ):
                     continue
                 # Format location specially as "lat,lng" string
-                if attr == "location" and value:
+                if attr == "location" and value and value != (0.0, 0.0):
                     unit_dict["location"] = f"{value[0]},{value[1]}"
                 else:
                     unit_dict[attr] = value
@@ -491,6 +496,7 @@ def _unit_to_dict(world: "World", unit: BaseUnit) -> dict:
     unit_dict["name"] = unit_dict.pop("id")
 
     # Convert negative demand/charge powers back to positive for user-friendly export
+    unit_type_name = UNIT_TYPE_REVERSED.get(type(unit))
     if unit_type_name == "demand":
         if "min_power" in unit_dict:
             unit_dict["min_power"] = abs(unit_dict["min_power"])
