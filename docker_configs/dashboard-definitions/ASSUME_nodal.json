@@ -62,8 +62,46 @@
         "content": "# Nodal Analysing Board\n\nThis board can be used to visualize the Grid statistics and usage.\nAs well as the prices at different locations of the grid.",
         "mode": "markdown"
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "12.2.1",
       "title": "Nodal Dashboard",
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 30,
+      "panels": [],
+      "title": "Market Data",
+      "type": "row"
+    },
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 17,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
+        "mode": "markdown"
+      },
+      "pluginVersion": "12.2.1",
+      "title": "",
       "type": "text"
     },
     {
@@ -82,15 +120,15 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "#EAB839",
-                "value": 0.5
+                "value": 0.7
               },
               {
                 "color": "red",
-                "value": 0.8
+                "value": 1.0
               }
             ]
           }
@@ -114,7 +152,7 @@
         "h": 9,
         "w": 12,
         "x": 0,
-        "y": 4
+        "y": 8
       },
       "id": 101,
       "options": {
@@ -190,7 +228,7 @@
           "group": [],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime, coalesce(abs(flow),0)/(s_nom * s_max_pu) as \"usage\", l.line as name, bus0, bus1, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, l.simulation\nFROM lines_geo l\nleft join grid_flows g on l.line = g.line and l.simulation = g.simulation\nWHERE\n  $__timeFilter(datetime) AND\nl.simulation = '$simulation'\nORDER BY 1\n",
+          "rawSql": "SELECT\n  datetime, coalesce(abs(flow),0)/(s_nom * s_max_pu) as \"usage\", l.line as name, bus0, bus1, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, l.simulation\nFROM lines_geo l\nleft join grid_flows g on l.line = g.line and l.simulation = g.simulation\nWHERE\n  $__timeFilter(datetime) \n  AND l.simulation = '$simulation'\n  AND g.market = '$market'\nORDER BY 1\n",
           "refId": "A",
           "select": [
             [
@@ -225,7 +263,7 @@
           "where": []
         }
       ],
-      "title": "Grid Information",
+      "title": "Line Loading",
       "type": "orchestracities-map-panel"
     },
     {
@@ -263,6 +301,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -278,7 +317,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -294,7 +333,7 @@
         "h": 9,
         "w": 12,
         "x": 12,
-        "y": 4
+        "y": 8
       },
       "id": 103,
       "options": {
@@ -307,11 +346,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -337,7 +377,7 @@
           ],
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "select $__timeGroupAlias(datetime, $__interval), line, avg(flow) as flow from grid_flows where simulation = '$simulation'\nAND $__timeFilter(datetime)\nGROUP BY 1, line\nORDER BY 1;\n",
+          "rawSql": "select $__timeGroupAlias(datetime, $__interval), line, avg(flow) as flow from grid_flows where simulation = '$simulation'\nAND $__timeFilter(datetime) AND market = '$market'\nGROUP BY 1, line\nORDER BY 1;\n",
           "refId": "A",
           "select": [
             [
@@ -428,44 +468,6 @@
       "type": "timeseries"
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 13
-      },
-      "id": 30,
-      "panels": [],
-      "title": "Market Data",
-      "type": "row"
-    },
-    {
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 3,
-        "w": 24,
-        "x": 0,
-        "y": 14
-      },
-      "id": 17,
-      "options": {
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        },
-        "content": "# Market-specific Data\n\nData specific for the market depending on the choice made at te top of the panel\n\n",
-        "mode": "markdown"
-      },
-      "pluginVersion": "11.3.1",
-      "title": "",
-      "type": "text"
-    },
-    {
       "datasource": {
         "type": "grafana-postgresql-datasource",
         "uid": "P7B13B9DF907EC40C"
@@ -483,6 +485,7 @@
             "axisLabel": "",
             "axisPlacement": "left",
             "barAlignment": 0,
+            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 1,
             "gradientMode": "none",
@@ -502,6 +505,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -517,7 +521,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -569,11 +573,13 @@
           ""
         ],
         "tooltip": {
+          "hideZeros": false,
           "maxHeight": 600,
           "mode": "multi",
           "sort": "none"
         }
       },
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -665,6 +671,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -680,7 +687,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -709,11 +716,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -846,6 +854,7 @@
               "type": "linear"
             },
             "showPoints": "auto",
+            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -861,7 +870,7 @@
             "steps": [
               {
                 "color": "green",
-                "value": null
+                "value": 0
               },
               {
                 "color": "red",
@@ -890,11 +899,12 @@
           "showLegend": true
         },
         "tooltip": {
+          "hideZeros": false,
           "mode": "multi",
           "sort": "desc"
         }
       },
-      "pluginVersion": "11.3.1",
+      "pluginVersion": "12.2.1",
       "targets": [
         {
           "datasource": {
@@ -994,7 +1004,7 @@
     }
   ],
   "preload": false,
-  "schemaVersion": 40,
+  "schemaVersion": 42,
   "tags": [],
   "templating": {
     "list": [
@@ -1040,7 +1050,6 @@
       },
       {
         "current": {
-          "selected": false,
           "text": "",
           "value": ""
         },
@@ -1098,6 +1107,5 @@
   "timezone": "",
   "title": "ASSUME: Nodal view",
   "uid": "nodalview",
-  "version": 21,
-  "weekStart": ""
+  "version": 1
 }
