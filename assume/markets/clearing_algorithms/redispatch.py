@@ -258,8 +258,13 @@ class RedispatchMarketRole(MarketRole):
 
         flows = {}
         if self.log_flows:
+            # restore the correct datetime index for the flows dataframe
+            datetime_index = [product[0] for product in market_products]
+
             # extract flows
-            flows = redispatch_network.lines_t.p0.stack(future_stack=True).to_dict()
+            flows_df = redispatch_network.lines_t.p0.stack(future_stack=True)
+            flows_df.index = flows_df.index.set_levels(datetime_index, level=0)
+            flows = flows_df.to_dict()
 
         return accepted_orders, rejected_orders, meta, flows
 
