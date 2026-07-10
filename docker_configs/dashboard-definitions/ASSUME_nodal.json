@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
+  "id": 2,
   "links": [
     {
       "asDropdown": false,
@@ -109,6 +109,7 @@
         "type": "postgres",
         "uid": "P7B13B9DF907EC40C"
       },
+      "description": "Description of values:\n- avg_loading: average line loading during the selected time range, relative to the maximum allowed absolute apparent power flow\n \n- max_loading: maximum line loading during the selected time range, relative to the maximum allowed absolute apparent power flow\n\n- overload_count: number of time steps with line loading exceeding maximum allowed apparent power limit of line\n\nColor shows average line loading during selected time range.\n",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -128,7 +129,7 @@
               },
               {
                 "color": "red",
-                "value": 1.0
+                "value": 1
               }
             ]
           }
@@ -137,7 +138,19 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "usage"
+              "options": "avg_loading"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "max_loading"
             },
             "properties": [
               {
@@ -176,14 +189,14 @@
               "clusterMinDistance": 0,
               "clusterValue": "size",
               "color": {
-                "field": "usage",
+                "field": "avg_loading",
                 "fixed": "dark-green"
               },
               "enableGradient": false,
               "enableShadow": false,
               "fillOpacity": 0.4,
               "iconSize": 9,
-              "pinShape": "marker",
+              "pinShape": "bubble",
               "shape": "circle",
               "showLegend": true,
               "showPin": false,
@@ -196,15 +209,17 @@
             "displayProperties": [
               "bus0",
               "bus1",
-              "usage"
+              "avg_loading",
+              "max_loading",
+              "overload_count"
             ],
             "location": {
               "geohash": "geometry",
               "geojson": "geometry",
               "mode": "geojson"
             },
-            "name": "Grid Data",
-            "query": "A",
+            "name": "Overload Count",
+            "query": "Aggregated Line Loading Metrics",
             "titleField": "name",
             "type": "markers"
           }
@@ -226,9 +241,10 @@
           "editorMode": "code",
           "format": "table",
           "group": [],
+          "hide": true,
           "metricColumn": "none",
           "rawQuery": true,
-          "rawSql": "SELECT\n  datetime, coalesce(abs(flow),0)/(s_nom * s_max_pu) as \"usage\", l.line as name, bus0, bus1, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, l.simulation\nFROM lines_geo l\nleft join grid_flows g on l.line = g.line and l.simulation = g.simulation\nWHERE\n  $__timeFilter(datetime) \n  AND l.simulation = '$simulation'\n  AND g.market = '$market'\nORDER BY 1\n",
+          "rawSql": "SELECT\n  datetime, coalesce(abs(flow),0)/(s_nom * coalesce(s_max_pu, 1)) as \"usage\", l.name, bus0, bus1, ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry, l.simulation\nFROM lines_geo l\nleft join grid_flows g on l.name = g.line and l.simulation = g.simulation\nWHERE\n  $__timeFilter(datetime) \n  AND l.simulation = '$simulation'\n  AND g.market = '$market'\nORDER BY 1\n",
           "refId": "A",
           "select": [
             [
@@ -261,6 +277,36 @@
           "timeColumn": "datetime",
           "timeColumnType": "timestamp",
           "where": []
+        },
+        {
+          "dataset": "assume",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "P7B13B9DF907EC40C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "hide": false,
+          "rawQuery": true,
+          "rawSql": "SELECT\r\n  l.name,\r\n  bus0,\r\n  bus1,\r\n  ST_AsGeoJSON(ST_GeomFromEWKT(wkt_srid_4326)) as geometry,\r\n  l.simulation,\r\n  COUNT(CASE WHEN coalesce(abs(flow),0)/(s_nom * coalesce(s_max_pu, 1)) > 1 THEN 1 END) as overload_count,\r\n  AVG(coalesce(abs(flow),0)/(s_nom * coalesce(s_max_pu, 1))) as avg_loading,\r\n  MAX(coalesce(abs(flow),0)/(s_nom * coalesce(s_max_pu, 1))) as max_loading\r\nFROM lines_geo l\r\nLEFT JOIN grid_flows g ON l.name = g.line AND l.simulation = g.simulation\r\nWHERE\r\n  $__timeFilter(datetime)\r\n  AND l.simulation = '$simulation'\r\n  AND g.market = '$market'\r\nGROUP BY l.name, bus0, bus1, geometry, l.simulation",
+          "refId": "Aggregated Line Loading Metrics",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
         }
       ],
       "title": "Line Loading",
@@ -1104,7 +1150,7 @@
       "1h"
     ]
   },
-  "timezone": "",
+  "timezone": "utc",
   "title": "ASSUME: Nodal view",
   "uid": "nodalview",
   "version": 1
