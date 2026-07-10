@@ -633,7 +633,9 @@ def calculate_nodal_lmp_forecast(
     if config is None:
         return {}
 
-    powerplants_units, demand_units, exchange_units, storage_units, _ = sort_units(units)
+    powerplants_units, demand_units, exchange_units, storage_units, _ = sort_units(
+        units
+    )
 
     valid_nodes = set(buses.index)
     powerplants_units = [u for u in powerplants_units if u.node in valid_nodes]
@@ -653,16 +655,18 @@ def calculate_nodal_lmp_forecast(
 
     zones_id = config.param_dict.get("zones_identifier")
     node_to_zone = (
-        buses[zones_id].to_dict()
-        if zones_id and zones_id in buses.columns
-        else None
+        buses[zones_id].to_dict() if zones_id and zones_id in buses.columns else None
     )
 
     network = pypsa.Network()
     network.set_snapshots(index)
 
     # Buses: drop the zone column (not a PyPSA attribute) and ensure a carrier exists.
-    buses_c = buses.drop(columns=[zones_id], errors="ignore").copy() if zones_id else buses.copy()
+    buses_c = (
+        buses.drop(columns=[zones_id], errors="ignore").copy()
+        if zones_id
+        else buses.copy()
+    )
     if "carrier" not in buses_c.columns:
         buses_c["carrier"] = "AC"
     lines_c = lines.copy()

@@ -14,13 +14,14 @@ from assume.common.market_objects import MarketConfig, Orderbook, Product
 
 
 class GenericEnergyMultiMarketStrategy:
-    '''
+    """
     Placeholder class to be developed in the future for multi-market energy and/or capacity bidding strategies.
-    '''
-    pass
+    """
 
-class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMaxStrategy):
 
+class EnergyHeuristicRedispatchStrategy(
+    GenericEnergyMultiMarketStrategy, MinMaxStrategy
+):
     def calculate_bids(self, unit, market_config, product_tuples, **kwargs):
         if market_config.market_mechanism == "redispatch":
             return self.calculate_redispatch_bids(
@@ -40,8 +41,6 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
         **kwargs,
     ) -> Orderbook:
         start = product_tuples[0][0]
-        #end_all = product_tuples[-1][1]
-        previous_power = unit.get_output_before(start)
         min_power, max_power = unit.min_power, unit.max_power
 
         bids = []
@@ -49,7 +48,7 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
             start = product[0]
             end = product[1]
             current_power = unit.outputs["energy"].at[start]
-            
+
             # get the bid price from the EOM bids calculated before
             # the bid price on the redispatch market is based on the EOM bid price
             # as to represent regulated bids based on the spot market bids
@@ -104,25 +103,30 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
         # =============================================================================
         # 1. Get the LMP forecast, which are the basis of the following decision
         # =============================================================================
-        lines = marketconfig.param_dict['grid_data']['lines']
+        lines = marketconfig.param_dict["grid_data"]["lines"]
         # the LMP forecast is a per-node time series keyed as "{node}_lmp"
         lmp = unit.forecaster.lmp
         node = unit.node
+        if f"{node}_lmp" not in lmp:
+            raise ValueError(
+                f"No LMP forecast for node '{node}'. {type(self).__name__} requires the "
+                "'lmp_nodal_forecast' algorithm; set 'forecast_algorithms: {lmp: lmp_nodal_forecast}' "
+                "in the study case config."
+            )
         own_lmp_series = lmp[f"{node}_lmp"]
         own_lmp = [own_lmp_series.at[i] for i in start_times]
 
         # get neighbouring nodes from lines.csv
         neighboring_nodes = set()
         for _, line in lines.iterrows():
-            if line['bus0'] == node:
-                neighboring_nodes.add(line['bus1'])
-            elif line['bus1'] == node:
-                neighboring_nodes.add(line['bus0'])
+            if line["bus0"] == node:
+                neighboring_nodes.add(line["bus1"])
+            elif line["bus1"] == node:
+                neighboring_nodes.add(line["bus0"])
         neighboring_nodes = [n for n in neighboring_nodes if f"{n}_lmp" in lmp]
-        neighboring_lmps = np.array([
-            [lmp[f"{n}_lmp"].at[i] for n in neighboring_nodes]
-            for i in start_times
-        ])
+        neighboring_lmps = np.array(
+            [[lmp[f"{n}_lmp"].at[i] for n in neighboring_nodes] for i in start_times]
+        )
 
         # =============================================================================
         # 2. Create bids, based on the forecasted LMPs
@@ -161,7 +165,7 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
                     bid_price = own_lmp[i]
             else:
                 bid_price = marginal_cost
-                
+
             # actually formulate bids in orderbook format
             bids.append(
                 {
@@ -210,8 +214,6 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
         costs = 0
         profit = 0
 
-        reward = 0
-
         # iterate over all orders in the orderbook, to calculate order specific profit
         for order in orderbook:
             start = order["start_time"]
@@ -241,7 +243,10 @@ class EnergyHeuristicRedispatchStrategy(GenericEnergyMultiMarketStrategy, MinMax
         unit.outputs["redispatch_profit"].loc[start:end_excl] = profit
         unit.outputs["redispatch_costs"].loc[start:end_excl] = costs
 
-        unit.outputs['profit'].loc[start:end_excl] = unit.outputs["eom_profit"].loc[start:end_excl] + unit.outputs["redispatch_profit"].loc[start:end_excl]
+        unit.outputs["profit"].loc[start:end_excl] = (
+            unit.outputs["eom_profit"].loc[start:end_excl]
+            + unit.outputs["redispatch_profit"].loc[start:end_excl]
+        )
 
     def calculate_EOM_profit(
         self,
