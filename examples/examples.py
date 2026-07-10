@@ -107,6 +107,16 @@ available_examples = {
     },
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
+    # inc-dec gaming on sequential markets (EOM followed by redispatch)
+    "redispatch_hirth": {"scenario": "2_nodes", "study_case": "base_case"},
+    "inc_dec_heuristic_redispatch_hirth": {
+        "scenario": "2_nodes",
+        "study_case": "inc_dec_heuristic",
+    },
+    "learning_diesel_redispatch_hirth": {
+        "scenario": "2_nodes",
+        "study_case": "learning_diesel",
+    },
 }
 
 

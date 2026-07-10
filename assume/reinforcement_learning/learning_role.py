@@ -646,6 +646,11 @@ class Learning(Role):
         for unit_id in sorted(cache["obs"][next(iter(cache["obs"]))].keys()):
             starts = cache["obs"].keys()
             for idx, start in enumerate(starts):
+                # if hour with first reward and simulation start hour are not the same, the following produces a key error
+                # this is e.g. the case in a setup with zonal market and subsequent redispatch market
+                # check for existence first
+                if unit_id not in cache["rewards"][start]:
+                    continue
                 output_dict = {
                     "datetime": start,
                     "unit": unit_id,

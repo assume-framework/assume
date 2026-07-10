@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+import pypsa
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import ForecastIndex, ForecastSeries
@@ -578,6 +579,213 @@ def calculate_naive_congestion_signal(
     return node_congestion_signal
 
 
+def _find_lmp_market_config(
+    market_configs: list[MarketConfig],
+) -> MarketConfig | None:
+    """Return the first market config that carries usable grid data, else None."""
+    for config in market_configs:
+        grid_data = config.param_dict.get("grid_data")
+        if (
+            grid_data is not None
+            and grid_data.get("buses") is not None
+            and grid_data.get("lines") is not None
+        ):
+            return config
+    return None
+
+
+@lru_cache
+def calculate_nodal_lmp_forecast(
+    index: ForecastIndex,
+    units: list[BaseUnit],
+    market_configs: list[MarketConfig],
+    preprocess_information=None,
+) -> dict[str, ForecastSeries]:
+    """
+    Forecast locational marginal prices (LMPs) per node via a linear optimal power flow.
+
+    A PyPSA network is assembled from the grid data (buses/lines) together with every
+    unit that sits on a known bus: power plants become generators with time-varying
+    availability and marginal cost, demands become negative generators priced at the
+    market's maximum bid price (value of lost load), storages become storage units, and
+    exchanges become fixed injections. The network is solved for each snapshot and the
+    dual price of each nodal balance constraint is returned as that node's LMP.
+
+    Returns a DataFrame with one column ``{node}_lmp`` per bus, or an empty dict if grid
+    data is unavailable, no market carries grid data, or no dispatchable units remain.
+
+    If the market defines a ``zones_identifier``, nodal LMPs are collapsed to a single
+    price per zone (the mean of the member buses) and broadcast back onto every node in
+    that zone, yielding zonal prices mapped onto nodes.
+
+    .. note::
+        Elastic demands are treated like any other demand here (their bid price is not
+        modelled); the forecast is a physical dispatch signal, not a market clearing.
+    """
+    if isinstance(index, FastIndex):
+        index = index.as_datetimeindex()
+
+    buses, lines = extract_buses_and_lines(market_configs)
+    if buses is None or lines is None:
+        return {}
+
+    config = _find_lmp_market_config(market_configs)
+    if config is None:
+        return {}
+
+    powerplants_units, demand_units, exchange_units, storage_units, _ = sort_units(units)
+
+    valid_nodes = set(buses.index)
+    powerplants_units = [u for u in powerplants_units if u.node in valid_nodes]
+    demand_units = [u for u in demand_units if u.node in valid_nodes]
+    storage_units = [u for u in storage_units if u.node in valid_nodes]
+    exchange_units = [u for u in exchange_units if u.node in valid_nodes]
+
+    # Without both supply and demand the LMP problem is ill-posed.
+    if not powerplants_units or not demand_units:
+        return {}
+
+    from assume.common.grid_utils import get_supported_solver_linopy
+
+    def _arr(series) -> np.ndarray:
+        """Extract a float numpy array from a FastSeries (or array-like)."""
+        return np.asarray(getattr(series, "data", series), dtype=float)
+
+    zones_id = config.param_dict.get("zones_identifier")
+    node_to_zone = (
+        buses[zones_id].to_dict()
+        if zones_id and zones_id in buses.columns
+        else None
+    )
+
+    network = pypsa.Network()
+    network.set_snapshots(index)
+
+    # Buses: drop the zone column (not a PyPSA attribute) and ensure a carrier exists.
+    buses_c = buses.drop(columns=[zones_id], errors="ignore").copy() if zones_id else buses.copy()
+    if "carrier" not in buses_c.columns:
+        buses_c["carrier"] = "AC"
+    lines_c = lines.copy()
+    if "carrier" not in lines_c.columns:
+        lines_c["carrier"] = "AC"
+
+    network.add("Carrier", "AC")
+    network.add("Bus", buses_c.index, **buses_c)
+    network.add("Line", lines_c.index, **lines_c)
+
+    # Power plants -> generators with availability-limited output and time-varying cost.
+    pp_ids = [u.id for u in powerplants_units]
+    p_max_pu_df = pd.DataFrame(
+        {
+            u.id: np.clip(_arr(u.forecaster.availability), 0.0, 1.0)
+            for u in powerplants_units
+        },
+        index=index,
+    )
+    marginal_cost_df = pd.DataFrame(
+        {u.id: _arr(u.marginal_cost) for u in powerplants_units},
+        index=index,
+    )
+    network.add(
+        "Generator",
+        pp_ids,
+        bus=[u.node for u in powerplants_units],
+        p_nom=[float(u.max_power) for u in powerplants_units],
+        p_min_pu=0.0,
+        p_max_pu=p_max_pu_df,
+        marginal_cost=marginal_cost_df,
+    )
+
+    # Demands -> negative generators (loads) priced at the value of lost load so that
+    # curtailment only happens when the network physically cannot serve the demand.
+    voll = float(config.maximum_bid_price)
+    demand_p_nom = {u.id: abs(float(u.max_power)) or 1.0 for u in demand_units}
+    p_min_pu_demand = pd.DataFrame(
+        {
+            u.id: np.clip(
+                -np.abs(_arr(u.forecaster.demand)) / demand_p_nom[u.id],
+                -1.0,
+                0.0,
+            )
+            for u in demand_units
+        },
+        index=index,
+    )
+    network.add(
+        "Generator",
+        [u.id for u in demand_units],
+        bus=[u.node for u in demand_units],
+        p_nom=[demand_p_nom[u.id] for u in demand_units],
+        p_min_pu=p_min_pu_demand,
+        p_max_pu=0.0,
+        marginal_cost=voll,
+    )
+
+    # Storages -> storage units sized by the larger of charge/discharge power.
+    if storage_units:
+        p_nom_storage = [
+            max(float(u.max_power_discharge), abs(float(u.max_power_charge)))
+            for u in storage_units
+        ]
+        network.add(
+            "StorageUnit",
+            [u.id for u in storage_units],
+            bus=[u.node for u in storage_units],
+            p_nom=p_nom_storage,
+            max_hours=[
+                (float(u.capacity) / pn if pn else 1.0)
+                for u, pn in zip(storage_units, p_nom_storage)
+            ],
+            marginal_cost=[
+                float(getattr(u, "additional_cost_discharge", 0.0) or 0.0)
+                for u in storage_units
+            ],
+        )
+
+    # Exchanges -> fixed net injections (import positive, export negative) per node.
+    for u in exchange_units:
+        net = _arr(u.volume_import) + _arr(u.volume_export)
+        p_nom = max(float(np.abs(net).max()), 1.0)
+        network.add(
+            "Generator",
+            f"{u.id}_exchange",
+            bus=u.node,
+            p_nom=p_nom,
+            p_min_pu=pd.Series(net / p_nom, index=index),
+            p_max_pu=pd.Series(net / p_nom, index=index),
+        )
+
+    solver_name = get_supported_solver_linopy(config.param_dict.get("solver"))
+    status, termination_condition = network.optimize(
+        solver_name=solver_name,
+        log_to_console=False,
+        progress=False,
+        include_objective_constant=False,
+    )
+
+    if status != "ok":
+        log.error(
+            f"LMP forecast solver exited with {termination_condition}; "
+            "returning no LMP forecast."
+        )
+        return {}
+
+    # Nodal LMPs are the dual prices of the per-bus energy balance.
+    lmp = network.buses_t.marginal_price.reindex(columns=buses.index)
+
+    if node_to_zone is not None:
+        # Collapse to one price per zone (mean of member buses) and broadcast back.
+        zone_series = pd.Series(node_to_zone)
+        zonal_price = lmp.T.groupby(zone_series).mean().T
+        lmp = pd.DataFrame(
+            {node: zonal_price[node_to_zone[node]] for node in buses.index},
+            index=index,
+        )
+
+    lmp.columns = [f"{node}_lmp" for node in lmp.columns]
+    return lmp
+
+
 @lru_cache
 def calculate_naive_renewable_utilisation(
     index: ForecastIndex,
@@ -662,6 +870,9 @@ forecast_algorithms = {
         index=index, value=0.0
     ),
     "renewable_utilisation_keep_given": None,
+    "lmp_nodal_forecast": calculate_nodal_lmp_forecast,
+    "lmp_default_test": lambda index, *args: {},
+    "lmp_keep_given": None,
 }
 
 
@@ -692,6 +903,7 @@ forecast_preprocess_algorithms = {
     "residual_load_prepare_multiple": prepare_unit_specific_residual_load_forecasts,
     "congestion_signal_default": default_preprocess,
     "renewable_utilisation_default": default_preprocess,
+    "lmp_default": default_preprocess,
 }
 
 
@@ -711,6 +923,7 @@ forecast_update_algorithms = {
     "residual_load_set_preloaded": set_preloaded_forecast_by_name,
     "congestion_signal_default": default_update,
     "renewable_utilisation_default": default_update,
+    "lmp_default": default_update,
 }
 
 

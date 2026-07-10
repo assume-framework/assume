@@ -199,6 +199,9 @@ class UnitForecaster:
         self.residual_load: dict[str, ForecastSeries] = self._dict_to_series(
             residual_load
         )
+        # Per-node locational marginal prices, keyed ``{node}_lmp``. Only populated
+        # when a unit selects an lmp forecast algorithm (default: keep empty).
+        self.lmp: dict[str, ForecastSeries] = {}
         self.preprocess_information = {}
 
     def _to_series(self, item: ForecastSeries) -> FastSeries:
@@ -323,6 +326,27 @@ class UnitForecaster:
                 prefix="residual_load",
             )
             self.residual_load = self._dict_to_series(self.residual_load)
+
+        # 3. Get locational marginal price (LMP) forecast (per node).
+        #    Defaults to "lmp_keep_given" (None) so it is a no-op unless a unit
+        #    explicitly opts in via its forecast_algorithms (e.g. "lmp_nodal_forecast").
+        lmp_forecast_algorithm_name = self.forecast_algorithms.get(
+            "lmp", "lmp_keep_given"
+        )
+        lmp_forecast_algorithm = self._registries["init"].get(
+            lmp_forecast_algorithm_name
+        )
+        if lmp_forecast_algorithm is not None:  # None means keep existing forecast
+            self.lmp = calculate_node_wise_forecasts(
+                self.index,
+                units,
+                market_configs,
+                lmp_forecast_algorithm,
+                forecast_df,
+                None,
+                prefix="lmp",
+            )
+            self.lmp = self._dict_to_series(self.lmp)
 
     def update(self, *args, **kwargs):
         """Revise forecast timeseries during runtime (e.g. during bid calculation).

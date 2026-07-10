@@ -36,6 +36,9 @@ from assume.strategies.portfolio_strategies import (
     UnitsOperatorDirectStrategy,
     UnitsOperatorEnergyHeuristicCournotStrategy,
 )
+from assume.strategies.multi_market_strategies import (
+    EnergyHeuristicRedispatchStrategy,
+)
 
 # TODO remove after a few releases
 deprecated_bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
@@ -83,6 +86,8 @@ bidding_strategies: dict[str, type[BaseStrategy | UnitOperatorStrategy]] = {
     "industry_capacity_heuristic_balancing_neg": DsmCapacityHeuristicBalancingStrategy,
     "powerplant_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
     "demand_energy_naive_redispatch": EnergyNaiveRedispatchStrategy,
+    "powerplant_energy_heuristic_redispatch": EnergyHeuristicRedispatchStrategy,
+    "demand_energy_heuristic_redispatch": EnergyHeuristicRedispatchStrategy,
     "household_energy_optimization": DsmEnergyOptimizationStrategy,
     "industry_energy_optimization": DsmEnergyOptimizationStrategy,
     "household_energy_naive_redispatch": DsmEnergyNaiveRedispatchStrategy,
@@ -101,6 +106,7 @@ try:
         EnergyLearningSingleBidStrategy,
         StorageEnergyLearningStrategy,
         RenewableEnergyLearningSingleBidStrategy,
+        EnergyLearningSingleBidRedispatchStrategy,
     )
 
     deprecated_bidding_strategies["pp_learning"] = EnergyLearningStrategy
@@ -117,6 +123,9 @@ try:
     bidding_strategies["storage_energy_learning"] = StorageEnergyLearningStrategy
     bidding_strategies["renewable_energy_learning_single_bid"] = (
         RenewableEnergyLearningSingleBidStrategy
+    )
+    bidding_strategies["powerplant_energy_learning_redispatch"] = (
+        EnergyLearningSingleBidRedispatchStrategy
     )
 
     from assume.strategies.portfolio_learning_strategies import (
