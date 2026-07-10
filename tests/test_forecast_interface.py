@@ -64,7 +64,7 @@ def market_setup():
     ]
     market_configs_dict["EOM"]["market_products"] = products
 
-    lines = pd.read_csv(path / "lines.csv", index_col="line")
+    lines = pd.read_csv(path / "lines.csv", index_col="name")
     buses = pd.read_csv(path / "buses.csv", index_col="name")
 
     market_configs_dict["EOM"]["param_dict"]["grid_data"] = {
