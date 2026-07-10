@@ -256,7 +256,9 @@ def test_two_nodes_redispatch(
     )
     # check flows
     flows_df = pd.Series(flows).unstack()
-    assert flows_df.loc[0, "line_N_S"] == pytest.approx(expected_flows[0], abs=eps)
+    assert flows_df.loc[products[0][0], "line_N_S"] == pytest.approx(
+        expected_flows[0], abs=eps
+    )
 
 
 # Tests with 3 nodes and 30 generators (gen5 to gen34) and 3 demand (dem1 to dem3)
@@ -468,6 +470,12 @@ def test_three_nodes_redispatch(
     )
     # check flows
     flows_df = pd.Series(flows).unstack()
-    assert flows_df.loc[0, "line_1_2"] == pytest.approx(expected_flows_3[0], abs=eps)
-    assert flows_df.loc[0, "line_1_3"] == pytest.approx(expected_flows_3[1], abs=eps)
-    assert flows_df.loc[0, "line_2_3"] == pytest.approx(expected_flows_3[2], abs=eps)
+    assert flows_df.loc[products[0][0], "line_1_2"] == pytest.approx(
+        expected_flows_3[0], abs=eps
+    )
+    assert flows_df.loc[products[0][0], "line_1_3"] == pytest.approx(
+        expected_flows_3[1], abs=eps
+    )
+    assert flows_df.loc[products[0][0], "line_2_3"] == pytest.approx(
+        expected_flows_3[2], abs=eps
+    )
