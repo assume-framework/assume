@@ -27,6 +27,7 @@ Upcoming Release
   - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
   - **Align redispatch mechanism to latest PyPSA version release**: Updated the redispatch formulation to model cleared EOM generator dispatch for ``network.lpf()`` via ``generators_t.p_set`` and consistent generator bounds ``p_min_pu/p_max_pu``, replacing the previous load-based workaround.
   - **Grafana dashboard improvements**: Added button to automatically update the time range filter to the full simulation horizon.
+  - **Rework the redispatch use case in the DSU & flexibility tutorial**: The redispatch example in ``examples/notebooks/10_DSU_and_flexibility.ipynb`` now places the renewable surplus in the north and the load plus dispatchable plants in the south, so the redispatch is balanced (total upward volume equals total downward volume) and clearly demonstrates renewable curtailment on the congested side together with dispatchable ramp-up on the other. A summary table of the redispatch volumes per energy source was added below the redispatch plot, and the explanatory text was updated accordingly.
 
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
