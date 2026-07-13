@@ -180,8 +180,7 @@ storage_energy_optimization_dmas             EOM                 Storage strateg
 Optimization method API references:
 
 - :py:meth:`assume.strategies.naive_strategies.DsmEnergyOptimizationStrategy`
-- :py:meth:`assume.strategies.naive_strategies.DsmCapacityHeuristicBalancingPosStrategy`
-- :py:meth:`assume.strategies.naive_strategies.DsmCapacityHeuristicBalancingNegStrategy`
+- :py:meth:`assume.strategies.naive_strategies.DsmCapacityHeuristicBalancingStrategy`
 - :py:meth:`assume.strategies.dmas_powerplant.EnergyOptimizationDmasStrategy`
 - :py:meth:`assume.strategies.dmas_storage.StorageEnergyOptimizationDmasStrategy`
 

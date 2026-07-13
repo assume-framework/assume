@@ -26,6 +26,7 @@ Upcoming Release
   - **Add test for portfolio learning strategy and ``min_max_scale`` function**: Added a test for the portfolio learning strategy and ``min_max_rescale`` function to ensure its functionality and stability.
   - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
   - **Align redispatch mechanism to latest PyPSA version release**: Updated the redispatch formulation to model cleared EOM generator dispatch for ``network.lpf()`` via ``generators_t.p_set`` and consistent generator bounds ``p_min_pu/p_max_pu``, replacing the previous load-based workaround.
+  - **Grafana dashboard improvements**: Added button to automatically update the time range filter to the full simulation horizon.
 
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
@@ -56,8 +57,10 @@ Upcoming Release
   - **Electric vehicle model for buildings**: Added an updated ``ElectricVehicle`` DSM component with explicit mobility-related energy use, availability-dependent operation, external range input, bidirectional or unidirectional power flow, and binary non-simultaneity for charging and discharging.
   - **Charging station model for buildings**: Added a dedicated ``ChargingStation`` DSM component with optional availability profiles, ramp constraints, and support for unidirectional or bidirectional operation.
   - **Integrated EV and charging-station building topology**: Buildings now support two connection modes:
+
     - If no charging station is included, EVs connect directly to the building/grid balance.
     - If charging stations are included, charging stations connect to the building/grid and EVs connect to the charging stations through assignment variables.
+
   - **Building-specific flexible electricity-price support**: Added support for ``electricity_price_flex`` in ``BuildingForecaster`` for use with the ``electricity_price_signal`` flexibility measure.
 
 0.6.0 - (18th March 2026)
@@ -65,9 +68,11 @@ Upcoming Release
 
 **Improvements:**
 - **Deterministic behavior with seed setting**: Simulations are now deterministic by default for improved reproducibility. This can be controlled via a seed setting in `config.yaml` files, therefore it only applies for scenarios loaded via `load_scenario_folder`. Note that complete determinism is not guaranteed for all hardware and software configurations, especially with PyTorch-based learning strategies. It may also decrease performance of reinforcement learning due to disabled non-deterministic optimizations.
+
   - ``seed`` not set in top-level of config: Sets the seed to a fixed default value (42) for deterministic behavior.
   - ``seed: <int>``: Sets the seed for all random number generators to provided <int>.
   - ``seed: null``: Disables seed setting, allowing for non-deterministic behavior as before. May improve performance of reinforcement learning.
+
 - **Delete environment.yaml**: The environment.yaml file has been removed from the repository to simplify maintenance and was completely redundant with the `pyproject.toml`. Users can as before create their own environment using the provided pip installation instructions, which allows for more flexibility and easier updates.
 - **Add validation for simulation setup**: Added checks to validate the simulation setup for common issues, such as missing bidding strategies or inconsistent market configurations. Warnings are issued to inform users of potential problems that could affect simulation results.
 - **Added reward calculation for unit operators**: Unit operators have now the opportunity to calculate rewards based on the returned orderbooks for their own purposes. This enables learning strategies on unit operator level / portfolio learning strategies.

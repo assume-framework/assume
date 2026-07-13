@@ -28,4 +28,3 @@ Here you can find several tutorials on how to use ASSUME framework to get you st
    examples/10_DSU_and_flexibility.nblink
    examples/10a_DSU_and_flexibility.nblink
    examples/11_redispatch.nblink
-   examples/11a_redispatch_dsm.nblink

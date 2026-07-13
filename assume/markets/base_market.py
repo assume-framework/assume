@@ -670,7 +670,7 @@ class MarketRole(MarketMechanism, Role):
                         0,
                     )
 
-        self.open_auctions - set(market_products)
+        self.open_auctions -= set(market_products)
 
         accepted_orderbook = sorted(
             accepted_orderbook, key=lambda x: str(x["agent_addr"])
