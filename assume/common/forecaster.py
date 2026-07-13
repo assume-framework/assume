@@ -687,6 +687,11 @@ class DsmUnitForecaster(UnitForecaster):
             else self._to_series(self.renewable_utilisation_signal)
         )
 
+        unit = kwargs.get("unit")
+        if unit is not None and "EOM" in self.price:
+            self.electricity_price = self.price["EOM"]
+            unit.electricity_price = self.electricity_price
+
 
 class SteelplantForecaster(DsmUnitForecaster):
     """Forecaster for steelplant units.
@@ -774,48 +779,6 @@ class SteelplantForecaster(DsmUnitForecaster):
             initializing_unit.normalized_load_profile = self.normalized_load_profile
 
         initializing_unit.setup_model()
-
-    def update(self, *args, **kwargs):
-        """Update DSM-specific forecasts including adaptive electricity price learning.
-
-        Calls parent update for DSM signals (congestion, renewable utilisation),
-        then updates electricity price using the configured algorithm. If using
-        the adaptive price learning algorithm, clears prices are extracted from
-        the unit's outputs and used to forecast next period.
-
-        Args:
-            *args: Passed through to the underlying update algorithms.
-            **kwargs: Passed through to the underlying update algorithms, must include 'unit'.
-        """
-        # Call parent DsmUnitForecaster.update() for DSM signals
-        super().update(*args, **kwargs)
-
-        # Update electricity price via configured algorithm
-        price_update_algorithm_name = self.forecast_algorithms.get(
-            "update_price", "price_default"
-        )
-        price_update_algorithm = self._registries["update"].get(
-            price_update_algorithm_name
-        )
-
-        if price_update_algorithm is not None:
-            # Call the price update algorithm (may be price_default or adaptive)
-            self.price = price_update_algorithm(
-                self.price,
-                self.preprocess_information.get("price", {}),
-                *args,
-                **kwargs,
-            )
-            self.price = self._dict_to_series(self.price)
-
-            # Sync electricity_price with updated price from EOM market
-            if "EOM" in self.price:
-                self.electricity_price = self.price["EOM"]
-
-            # Push updated price to the unit so it uses the latest forecast in optimization
-            unit = kwargs.get("unit")
-            if unit is not None:
-                unit.electricity_price = self.electricity_price
 
 
 class SteamgenerationForecaster(DsmUnitForecaster):
