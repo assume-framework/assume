@@ -202,12 +202,16 @@ class ClearingMessage(TypedDict):
     Args:
         context (str): the context of the message
         market_id (str): the id of the market
+        start_time (float): the start time of the market
+        end_time (float): the stop time of the market
         accepted_orders (Orderbook): the orders accepted by the market
         rejected_orders (Orderbook): the orders rejected by the market
     """
 
     context: str
     market_id: str
+    start_time: float
+    end_time: float
     accepted_orders: Orderbook
     rejected_orders: Orderbook
 

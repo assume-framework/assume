@@ -697,6 +697,10 @@ class MarketRole(MarketMechanism, Role):
             closing: ClearingMessage = {
                 "context": "clearing",
                 "market_id": self.marketconfig.market_id,
+                "start_time": market_meta[0].get("product_start"),
+                "end_time": market_meta[-1].get(
+                    "product_end"
+                ),  # TODO: check if the market_meta is sorted by product_start
                 "accepted_orders": accepted_orders.get(agent, []),
                 "rejected_orders": rejected_orders.get(agent, []),
             }

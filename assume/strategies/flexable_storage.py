@@ -62,6 +62,12 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
         # =============================================================================
         # save a theoretic SOC to calculate the ramping
         start = product_tuples[0][0]
+        end = product_tuples[-1][1]
+
+        # propagate SoC forward to ensure that (even without market participation)
+        # the SoC is kept up to date for the next market opening
+        unit.update_soc(market_config, start, end)
+
         theoretic_SOC = unit.outputs["soc"].at[start]
         previous_power = unit.get_output_before(start)
 
@@ -264,6 +270,10 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
 
+        # propagate SoC forward to ensure that (even without market participation)
+        # the SoC is kept up to date for the next market opening
+        unit.update_soc(market_config, start, end)
+
         previous_power = unit.get_output_before(start)
         theoretic_SOC = unit.outputs["soc"].at[start]
 
@@ -398,6 +408,10 @@ class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
         """
         start = product_tuples[0][0]
         end = product_tuples[-1][1]
+
+        # propagate SoC forward to ensure that (even without market participation)
+        # the SoC is kept up to date for the next market opening
+        unit.update_soc(market_config, start, end)
 
         previous_power = unit.get_output_before(start)
 
