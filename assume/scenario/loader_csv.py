@@ -46,6 +46,22 @@ from assume.world import World
 logger = logging.getLogger(__name__)
 
 
+def get_unit_forecast_column(
+    forecasts_df: pd.DataFrame | None,
+    unit_id: str,
+    column_name: str,
+) -> pd.Series | None:
+    """Return a forecast column, preferring ``{unit_id}_{column_name}`` over ``column_name``."""
+    if forecasts_df is None:
+        return None
+    prefixed = f"{unit_id}_{column_name}"
+    if prefixed in forecasts_df.columns:
+        return forecasts_df[prefixed]
+    if column_name in forecasts_df.columns:
+        return forecasts_df[column_name]
+    return None
+
+
 def bidding_strategies_from_param_dict(param_dict: dict):
     return {
         ident.split("bidding_")[1]: strategy
@@ -779,26 +795,12 @@ def load_config_and_create_forecaster(
                         **extra_building_profiles,
                     )
                 if type == "steel_plant":
-                    # Fetch ID-prefixed data for operational strategy selection
-                    # Strategy 1: Normalized load profile (profile-guided operation)
-                    normalized_profile = None
-                    profile_col = f"{id}_normalized_load_profile"
-
-                    steel_demand = None
-                    demand_col = f"{id}_steel_demand"
-                    if forecasts_df is not None:
-                        if profile_col in forecasts_df.columns:
-                            normalized_profile = forecasts_df[profile_col]
-                        elif "normalized_load_profile" in forecasts_df.columns:
-                            # Fallback: use generic column if ID-specific not found
-                            normalized_profile = forecasts_df["normalized_load_profile"]
-
-                        # Strategy 2: Hourly minimum steel demand (min-demand operation)
-                        if demand_col in forecasts_df.columns:
-                            steel_demand = forecasts_df[demand_col]
-                        elif "steel_demand" in forecasts_df.columns:
-                            # Fallback: use generic column if ID-specific not found
-                            steel_demand = forecasts_df["steel_demand"]
+                    normalized_profile = get_unit_forecast_column(
+                        forecasts_df, id, "normalized_load_profile"
+                    )
+                    steel_demand = get_unit_forecast_column(
+                        forecasts_df, id, "steel_demand"
+                    )
 
                     unit_forecasts[id] = SteelplantForecaster(
                         index=shared_unit_index,
