@@ -140,7 +140,7 @@ class ReplayBuffer:
         self.actions[self.pos : self.pos + len_obs] = actions.copy()
         self.rewards[self.pos : self.pos + len_obs] = np.squeeze(
             reward.copy(), axis=-1
-        )  # alsways one reward value per agent and time-step hence squezze
+        )  # always one reward value per agent and time-step hence squezze
 
         self.pos += len_obs
         if self.pos + len_obs >= self.buffer_size:

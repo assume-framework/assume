@@ -27,8 +27,9 @@ class DSMFlex:
             model
         ),
         "cost_based_load_shift": lambda self, model: self.cost_based_flexibility(model),
-        "congestion_management_flexibility": lambda self,
-        model: self.grid_congestion_management(model),
+        "congestion_management_flexibility": lambda self, model: (
+            self.grid_congestion_management(model)
+        ),
         "symmetric_flexible_block": lambda self, model: self.symmetric_flexible_block(
             model
         ),
