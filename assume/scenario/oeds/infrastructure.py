@@ -309,8 +309,8 @@ class InfrastructureInterface:
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
             f'"Nettonennleistung" as "maxPower", '
-            f'COALESCE("Laengengrad", {longitude}) as "lon", '
-            f'COALESCE("Breitengrad", {latitude}) as "lat", '
+            f'"Laengengrad" as "lon", '
+            f'"Breitengrad" as "lat", '
             f'"Postleitzahl" as "plzCode", '
             f'COALESCE("Hauptausrichtung", \'Süd\') as "azimuthCode", '
             f'"Leistungsbegrenzung" as "limited", '
@@ -337,6 +337,14 @@ class InfrastructureInterface:
         # If the response Dataframe is not empty set technical parameter
         if df.empty:
             return df
+
+        # Localized postcode centroid fallback
+        df["plzCode_int"] = pd.to_numeric(df["plzCode"], errors="coerce")
+        df["lon"] = df["lon"].fillna(df["plzCode_int"].map(self.plz_nuts["longitude"]))
+        df["lat"] = df["lat"].fillna(df["plzCode_int"].map(self.plz_nuts["latitude"]))
+        df["lon"] = df["lon"].fillna(longitude)
+        df["lat"] = df["lat"].fillna(latitude)
+        del df["plzCode_int"]
 
         # all PVs with are implemented in 2018
         df["startDate"] = pd.to_datetime(df["startDate"])
@@ -416,8 +424,8 @@ class InfrastructureInterface:
         query = (
             f'SELECT "EinheitMastrNummer" as "unitID", '
             f'"Nettonennleistung" as "maxPower", '
-            f'COALESCE("Laengengrad", {longitude}) as "lon", '
-            f'COALESCE("Breitengrad", {latitude}) as "lat", '
+            f'"Laengengrad" as "lon", '
+            f'"Breitengrad" as "lat", '
             f'"Postleitzahl" as "plzCode", '
             f'"Typenbezeichnung" as "typ", '
             f'COALESCE("Hersteller", \'unknown\') as "manufacturer", '
@@ -441,10 +449,18 @@ class InfrastructureInterface:
 
         # Get Data from Postgres
         with self.databases["mastr"].connect() as conn:
-            df = pd.read_sql(query, conn)
+            df = pd.read_sql_query(query, conn)
         # If the response Dataframe is not empty set technical parameter
         if df.empty:
             return df
+
+        # Localized postcode centroid fallback
+        df["plzCode_int"] = pd.to_numeric(df["plzCode"], errors="coerce")
+        df["lon"] = df["lon"].fillna(df["plzCode_int"].map(self.plz_nuts["longitude"]))
+        df["lat"] = df["lat"].fillna(df["plzCode_int"].map(self.plz_nuts["latitude"]))
+        df["lon"] = df["lon"].fillna(longitude)
+        df["lat"] = df["lat"].fillna(latitude)
+        del df["plzCode_int"]
         # all WEA with nan set height to mean value
         if math.isnan(df["height"].mean()):
             mean_height = 80
