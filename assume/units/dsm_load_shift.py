@@ -916,7 +916,7 @@ class DSMFlex:
     def _detect_operation_strategy(self, N: int, saved_attrs: dict) -> tuple:
         """Detect the operation strategy for the current unit.
 
-        Checks for unit-ID-prefixed attributes in precedence order:
+        Checks standard unit forecast attributes in precedence order:
         *profile_guided* → *min_demand* → *cost_optimized* (default).
 
         Returns ``(strategy, full_horizon_load_profile, full_horizon_min_demand)``.
@@ -928,8 +928,6 @@ class DSMFlex:
         """
         if not self._has_demand_tracking:
             return "cost_optimized", None, None
-
-        unit_id = str(getattr(self, "id", None))
 
         def _fit_to_horizon(attr_name: str, pad_value=None):
             if not (attr_name and hasattr(self, attr_name)):
@@ -953,18 +951,11 @@ class DSMFlex:
                 saved_attrs[attr_name] = val
             return lst
 
-        profile = _fit_to_horizon(
-            f"{unit_id}_normalized_load_profile" if unit_id else None
-        )
+        profile = _fit_to_horizon("normalized_load_profile")
         if profile is not None:
             return "profile_guided", profile, None
 
-        demand = _fit_to_horizon(
-            f"{unit_id}_{self._demand_attr_suffix}"
-            if (unit_id and self._demand_attr_suffix)
-            else None,
-            pad_value=0.0,
-        )
+        demand = _fit_to_horizon("steel_demand_per_timestep", pad_value=0.0)
         if demand is not None:
             return "min_demand", None, demand
 

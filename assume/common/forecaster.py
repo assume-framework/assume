@@ -767,21 +767,6 @@ class SteelplantForecaster(DsmUnitForecaster):
             self.renewable_utilisation_signal
         )
 
-        # Get the unit's ID for dynamic attribute naming
-        unit_id = str(getattr(initializing_unit, "id", None))
-
-        # Set ID-prefixed attributes for operational strategy selection
-        # Strategy 1: Normalized load profile (if provided)
-        if self.normalized_load_profile is not None and unit_id:
-            profile_attr = f"{unit_id}_normalized_load_profile"
-            setattr(initializing_unit, profile_attr, self.normalized_load_profile)
-
-        # Strategy 2: Hourly minimum steel demand (if provided)
-        if self.steel_demand is not None and unit_id:
-            demand_attr = f"{unit_id}_steel_demand"
-            setattr(initializing_unit, demand_attr, self.steel_demand)
-
-        # Backward compatibility: also set non-prefixed attributes
         if self.steel_demand is not None:
             initializing_unit.steel_demand_per_timestep = self.steel_demand
 
