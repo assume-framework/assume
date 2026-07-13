@@ -122,6 +122,8 @@ class BaseUnit:
         self,
         marketconfig: MarketConfig,
         orderbook: Orderbook,
+        start_time: float,
+        end_time: float,
     ) -> None:
         """
         Iterates through the orderbook, adding the accepted volumes to the corresponding time slots
@@ -130,6 +132,8 @@ class BaseUnit:
         Args:
             marketconfig (MarketConfig): The market configuration.
             orderbook (Orderbook): The orderbook.
+            start_time (float): The start time of the market.
+            end_time (float): The end time of the market.
 
         """
 
@@ -627,40 +631,42 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
-    def set_dispatch_plan(
-        self, marketconfig: MarketConfig, orderbook: Orderbook
+    def update_soc(
+        self, marketconfig: MarketConfig, start_time: float, end_time: float
     ) -> None:
-        """Updates the SOC for storage units."""
-        super().set_dispatch_plan(marketconfig, orderbook)
+        """
+        Propagate SoC forward through the given time period based on current dispatch.
 
-        if not orderbook:
-            return
-
-        # also update the SOC when setting the dispatch plan
-        start = min(order["start_time"] for order in orderbook)
-        end = max(order["end_time"] for order in orderbook)
+        Args:
+            marketconfig: Market configuration
+            start_time: Start time (timestamp)
+            end_time: End time (timestamp)
+        """
+        start = start_time
+        end = end_time
         # end includes the end of the last product, to get the last products' start time we deduct the frequency once
         end_excl = end - self.index.freq
         time_delta = self.index.freq / timedelta(hours=1)
+        product_type = marketconfig.product_type
 
         for t in self.index[start:end_excl]:
             next_t = t + self.index.freq
             # continue if it is the last time step
             if next_t not in self.index:
                 continue
-            current_power = self.outputs["energy"].at[t]
 
+            current_power = self.outputs[product_type].at[t]
             # calculate the change in state of charge
-            delta_soc = 0
             soc = self.outputs["soc"].at[t]
+            delta_soc = 0
 
             # discharging
             if current_power > 0:
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
                 if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
+                    logger.warning(
+                        f"Unit {self.id}, Market {marketconfig.id}, Time {t}: SoC violation! Power output {current_power} violating discharge limit {max_soc_discharge}"
+                    )
                 delta_soc = (
                     -current_power * time_delta / self.efficiency_discharge
                 ) / self.capacity
@@ -668,17 +674,29 @@ class SupportsMinMaxCharge(BaseUnit):
             # charging
             elif current_power < 0:
                 max_soc_charge = self.calculate_soc_max_charge(soc)
-
                 if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
+                    logger.warning(
+                        f"Unit {self.id}, Market {marketconfig.id}, Time {t}: SoC violation! Power withdrawal {current_power} violating charge limit {max_soc_charge}"
+                    )
                 delta_soc = (
                     -current_power * time_delta * self.efficiency_charge
                 ) / self.capacity
 
-            # update the values of the state of charge and the energy
             self.outputs["soc"].at[next_t] = soc + delta_soc
-            self.outputs["energy"].at[t] = current_power
+
+    def set_dispatch_plan(
+        self,
+        marketconfig: MarketConfig,
+        orderbook: Orderbook,
+        start_time: float,
+        end_time: float,
+    ) -> None:
+        """Updates the SOC for storage units."""
+        super().set_dispatch_plan(marketconfig, orderbook, start_time, end_time)
+
+        # Update the state of charge (SoC) based on the dispatch plan
+        # TODO: Dispatch volumes are no longer corrected for SoC violations to show infeasible strategies (which might be solved by multi-market bidding)
+        self.update_soc(marketconfig, start_time, end_time)
 
 
 class BaseStrategy:

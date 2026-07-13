@@ -240,7 +240,9 @@ class UnitsOperator(Role):
 
         marketconfig = self.registered_markets[content["market_id"]]
         self.valid_orders[marketconfig.product_type].extend(orderbook)
-        self.set_unit_dispatch(orderbook, marketconfig)
+        self.set_unit_dispatch(
+            orderbook, marketconfig, content["start_time"], content["end_time"]
+        )
         self.write_actual_dispatch(marketconfig.product_type)
 
         # now once we have the market results and the dispatch has been set
@@ -309,7 +311,11 @@ class UnitsOperator(Role):
         )
 
     def set_unit_dispatch(
-        self, orderbook: Orderbook, marketconfig: MarketConfig
+        self,
+        orderbook: Orderbook,
+        marketconfig: MarketConfig,
+        start_time: float,
+        end_time: float,
     ) -> None:
         """
         Feeds the current market result back to the units.
@@ -317,6 +323,8 @@ class UnitsOperator(Role):
         Args:
             orderbook (Orderbook): The orderbook of the market.
             marketconfig (MarketConfig): The market configuration.
+            start_time (float): The start time of the market.
+            end_time (float): The end time of the market.
         """
         orderbook.sort(key=itemgetter("unit_id"))
         for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
@@ -324,6 +332,8 @@ class UnitsOperator(Role):
             self.units[unit_id].set_dispatch_plan(
                 marketconfig=marketconfig,
                 orderbook=orderbook,
+                start_time=start_time,
+                end_time=end_time,
             )
 
     def calculate_unit_cashflow_and_reward(
