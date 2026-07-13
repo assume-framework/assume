@@ -448,18 +448,34 @@ def _dsm_unit_to_rows(world: "World", unit: BaseUnit) -> list[dict]:
     rows = []
     unit_type_name = UNIT_TYPE_REVERSED.get(type(unit), type(unit).__name__.lower())
 
-    # Build common attributes that apply to all components
     common_attrs = {
         "name": unit.id,
         "unit_type": unit_type_name,
-        "unit_operator": unit.unit_operator,
-        "node": unit.node,
     }
 
     # Add DSM-specific common attributes
-    for attr in ["objective", "flexibility_measure", "cost_tolerance"]:
+    common_columns = [
+        "unit_operator",
+        "objective",
+        "demand",
+        "cost_tolerance",
+        "node",
+        "flexibility_measure",
+        "congestion_threshold",
+        "peak_load_cap",
+    ]
+
+    for attr in common_columns:
         if hasattr(unit, attr):
             common_attrs[attr] = getattr(unit, attr)
+
+    # Special string handling for "is_prosumer"
+    if hasattr(unit, "is_prosumer"):
+        is_prosumer = getattr(unit, "is_prosumer")
+        if is_prosumer:
+            common_attrs["is_prosumer"] = "Yes"
+        else:
+            common_attrs["is_prosumer"] = "No"
 
     # Add demand (steel_demand for SteelPlant, demand for others)
     if hasattr(unit, "steel_demand"):
