@@ -100,17 +100,9 @@ jobs:
       run: |
         python -m pip install -e .[learning]
 
-    # On 3.14 the network extra isn't installed (pypsa pin, see #807), so exclude the
-    # require_network tests — some aren't importorskip-guarded (e.g. world_validation, cli).
     - name: Test pytest with torch & integration tests
-      if: matrix.python-version != '3.14'
       run: |
         pytest --cov --cov-report=xml --junitxml="result.xml"
-
-    - name: Test pytest with torch & integration tests (skip network)
-      if: matrix.python-version == '3.14'
-      run: |
-        pytest -m "not require_network" --cov --cov-report=xml --junitxml="result.xml"
 
     - name: Upload tests results
       uses: actions/upload-artifact@v7.0.0
