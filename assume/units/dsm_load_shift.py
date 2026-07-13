@@ -1008,10 +1008,10 @@ class DSMFlex:
                 initialize=remaining_demand, mutable=True
             )
             self.model.window_demand_con = pyo.Constraint(
-                rule=lambda m: sum(
-                    self._primary_output_expr(m, t) for t in m.time_steps
+                rule=lambda m: (
+                    sum(self._primary_output_expr(m, t) for t in m.time_steps)
+                    <= m.window_demand_limit
                 )
-                <= m.window_demand_limit
             )
 
         if (
@@ -1041,10 +1041,10 @@ class DSMFlex:
                     initialize=min_commit, mutable=True
                 )
                 self.model.window_min_commit_con = pyo.Constraint(
-                    rule=lambda m: sum(
-                        self._primary_output_expr(m, t) for t in range(n_commit)
+                    rule=lambda m: (
+                        sum(self._primary_output_expr(m, t) for t in range(n_commit))
+                        >= m.min_commit_production
                     )
-                    >= m.min_commit_production
                 )
                 logger.info(
                     "[RH-STRATEGY] profile_guided: min_commit=%.1f MWh over %d steps",
@@ -1065,8 +1065,9 @@ class DSMFlex:
             )
             self.model.min_hourly_demand_con = pyo.Constraint(
                 range(n_steps),
-                rule=lambda m, t: self._primary_output_expr(m, t)
-                >= m.min_hourly_demand_param[t],
+                rule=lambda m, t: (
+                    self._primary_output_expr(m, t) >= m.min_hourly_demand_param[t]
+                ),
             )
             logger.info(
                 "[RH-STRATEGY] min_demand: per-hour constraints over %d steps", n_steps
