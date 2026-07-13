@@ -598,7 +598,10 @@ def _unit_to_dict(world: "World", unit: BaseUnit) -> dict:
                 ):
                     continue
                 # Format location specially as "lat,lng" string
-                if attr == "location" and value and value != (0.0, 0.0):
+                elif attr == "location" and value:
+                    if value == (0.0, 0.0):
+                        continue
+
                     unit_dict["location"] = f"{value[0]},{value[1]}"
                 else:
                     unit_dict[attr] = value
