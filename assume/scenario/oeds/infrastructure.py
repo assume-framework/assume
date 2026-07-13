@@ -465,7 +465,7 @@ class InfrastructureInterface:
         if math.isnan(df["height"].mean()):
             mean_height = 80
         else:
-            mean_height = df["height"].mean() == float("nan")
+            mean_height = df["height"].mean()
         df["height"] = df["height"].fillna(mean_height)
         # all WEA with nan set height to mean diameter
         df["diameter"] = df["diameter"].fillna(df["diameter"].mean())
@@ -712,8 +712,9 @@ spe."LokationMastrNummer" as "unitID",
 spe."EinheitMastrNummer" as "unitMastrID",
 so."Nettonennleistung" as "maxPower",
 spe."Nettonennleistung" as "batPower",
-COALESCE(so."Laengengrad", {longitude}) as "lon",
-COALESCE(so."Breitengrad", {latitude}) as "lat",
+so."Laengengrad" as "lon",
+so."Breitengrad" as "lat",
+so."Postleitzahl" as "plzCode",
 COALESCE(so."Hauptausrichtung", 'Süd') as "azimuthCode",
 COALESCE(so."Leistungsbegrenzung", 'Nein') as "limited",
 COALESCE(so."Einspeisungsart", 'Teileinspeisung (einschließlich Eigenverbrauch)') as "ownConsumption",
@@ -737,6 +738,14 @@ WHERE so."Postleitzahl" in {plz_codes_str}
         # If the response Dataframe is not empty set technical parameter
         if df.empty:
             return df
+
+        # Localized postcode centroid fallback
+        df["plzCode_int"] = pd.to_numeric(df["plzCode"], errors="coerce")
+        df["lon"] = df["lon"].fillna(df["plzCode_int"].map(self.plz_nuts["longitude"]))
+        df["lat"] = df["lat"].fillna(df["plzCode_int"].map(self.plz_nuts["latitude"]))
+        df["lon"] = df["lon"].fillna(longitude)
+        df["lat"] = df["lat"].fillna(latitude)
+        del df["plzCode_int"]
 
         df["VMax"] = df["VMax"].fillna(10)
         df["ownConsumption"] = df["ownConsumption"].apply(
