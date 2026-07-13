@@ -54,7 +54,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
     # Rolling-horizon extensibility hooks (DSMFlex)
     _demand_attr_suffix = "steel_demand"
     _extra_price_attrs = [
-        "electricity_price",
         "hydrogen_price",
         "natural_gas_price",
         "steel_price",
@@ -132,7 +131,6 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         # FIXME assuming only one market
         self.market_id = list(bidding_strategies.keys())[0]
 
-        self.electricity_price = forecaster.electricity_price
         self.steel_demand = demand  # Global demand (total production by end of horizon)
         self.steel_demand_rolling = (
             None  # Will be used in rolling-horizon to track cumulative remaining demand
@@ -191,7 +189,12 @@ class SteelPlant(DSMFlex, SupportsMinMax):
         """
         self.model.electricity_price = pyo.Param(
             self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.electricity_price)},
+            initialize={
+                t: value
+                for t, value in enumerate(
+                    self._values_for_model(self.forecaster.electricity_price)
+                )
+            },
         )
 
         if self.components["dri_plant"]["fuel_type"] in ["natural_gas", "both"]:

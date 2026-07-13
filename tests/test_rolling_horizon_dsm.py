@@ -16,7 +16,7 @@ Covers:
 import pandas as pd
 import pytest
 
-from assume.common.fast_pandas import FastSeries
+from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import SteelplantForecaster
 from assume.strategies.naive_strategies import DsmEnergyOptimizationStrategy
 from assume.units.steel_plant import SteelPlant
@@ -199,19 +199,37 @@ def test_collect_and_restore_series_attrs(dsm_components, rh_config):
     plant.setup_model(presolve=False)
 
     N = len(plant.index)
-    # electricity_price is a FastSeries of length N on the plant
-    original_price = plant.electricity_price
+    original_price = plant.natural_gas_price
 
     saved = plant._collect_series_attrs_for_window(0, 4, N)
 
-    # After collection the attr is replaced with a numpy array (window slice)
-    assert len(plant.electricity_price) == 4
+    assert len(plant.natural_gas_price) == 4
 
     plant._restore_series_attrs(saved)
 
-    # After restore the original FastSeries is back
-    assert len(plant.electricity_price) == N
-    assert isinstance(plant.electricity_price, FastSeries)
+    assert len(plant.natural_gas_price) == N
+    assert isinstance(plant.natural_gas_price, FastSeries)
+
+
+def test_values_for_model_slices_forecaster_during_rolling_window(
+    dsm_components, rh_config
+):
+    """Forecaster series stay full-length; _values_for_model returns the window slice."""
+    plant = _make_rh_plant(dsm_components, rh_config)
+    N = len(plant.index)
+    full_prices = list(plant.forecaster.electricity_price.data)
+
+    plant._rh_window_start = 2
+    plant._rh_full_horizon_len = N
+    plant.index = FastIndex(
+        start=plant.index[2],
+        end=plant.index[3],
+        freq=plant.index.freq,
+    )
+
+    window_values = list(plant._values_for_model(plant.forecaster.electricity_price))
+    assert window_values == full_prices[2:4]
+    assert len(plant.forecaster.electricity_price) == N
 
 
 # ---------------------------------------------------------------------------

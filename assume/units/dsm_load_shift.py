@@ -54,6 +54,29 @@ class DSMFlex:
     # saved and sliced to the window during _solve_rolling_horizon_next_window.
     _extra_price_attrs: list = []
 
+    def _values_for_model(self, series):
+        """Return values aligned to the current model index for Pyomo params.
+
+        During rolling-horizon window solves the unit index is shortened while
+        forecaster series keep the full horizon length; slice those here instead
+        of mutating the forecaster.
+        """
+        if isinstance(series, FastSeries):
+            data = series.data
+        else:
+            data = series
+
+        full_len = self._rh_full_horizon_len
+        window_start = self._rh_window_start
+        if (
+            full_len is not None
+            and window_start is not None
+            and len(data) == full_len
+            and len(data) != len(self.index)
+        ):
+            return data[window_start : window_start + len(self.index)]
+        return data
+
     def __init__(self, components, **kwargs):
         # Extract rolling-horizon optimisation config before passing **kwargs up the MRO.
         dsm_opt = kwargs.pop("dsm_optimisation_config", None)
@@ -82,6 +105,9 @@ class DSMFlex:
         # once from the original config on the first window, then advanced in place by
         # _update_init_states so each window starts from the previous window's end state.
         self._rh_init_states = None
+        # Set during _solve_rolling_horizon_next_window while slicing forecaster series.
+        self._rh_window_start = None
+        self._rh_full_horizon_len = None
 
         if self.horizon_mode == "rolling_horizon":
             if not all([self._rh_look_ahead, self._rh_commit, self._rh_step]):
@@ -1108,7 +1134,7 @@ class DSMFlex:
 
             logger.info(
                 "[LOAD-PROFILE-RH] Window [%d:%d]: soft constraint active "
-                "(penalty=%.1f, deviation=%.0%%)",
+                "(penalty=%.1f, deviation=%.0f%%)",
                 window_start,
                 window_end,
                 penalty,
@@ -1335,6 +1361,8 @@ class DSMFlex:
             freq=freq,
         )
         saved_attrs = self._collect_series_attrs_for_window(window_start, window_end, N)
+        self._rh_window_start = window_start
+        self._rh_full_horizon_len = N
 
         # Detect operation strategy; preserve full-horizon sequences in saved_attrs
         operation_strategy, full_horizon_load_profile, full_horizon_min_demand = (
@@ -1440,6 +1468,8 @@ class DSMFlex:
 
         finally:
             self._restore_series_attrs(saved_attrs)
+            self._rh_window_start = None
+            self._rh_full_horizon_len = None
             self.index = saved_index
             if saved_model is not None:
                 self.model = saved_model

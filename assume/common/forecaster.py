@@ -482,7 +482,7 @@ class DsmUnitForecaster(UnitForecaster):
         forecast_registries: dict[str, dict] = None,
         congestion_signal: ForecastSeries = 0.0,
         renewable_utilisation_signal: ForecastSeries = 0.0,
-        electricity_price: ForecastSeries = 0.0,
+        electricity_price: ForecastSeries = None,
     ):
         super().__init__(
             index=index,
@@ -495,7 +495,10 @@ class DsmUnitForecaster(UnitForecaster):
 
         # FIXME: currently default is series while calculations are dict of series
         self.congestion_signal = self._to_series(congestion_signal)
-        self.electricity_price = self._to_series(electricity_price)
+        if electricity_price is None:
+            self.electricity_price = self._to_series(self.price.get("EOM", 0))
+        else:
+            self.electricity_price = self._to_series(electricity_price)
         self.renewable_utilisation_signal = self._to_series(
             renewable_utilisation_signal
         )
@@ -687,10 +690,8 @@ class DsmUnitForecaster(UnitForecaster):
             else self._to_series(self.renewable_utilisation_signal)
         )
 
-        unit = kwargs.get("unit")
-        if unit is not None and "EOM" in self.price:
+        if "EOM" in self.price:
             self.electricity_price = self.price["EOM"]
-            unit.electricity_price = self.electricity_price
 
 
 class SteelplantForecaster(DsmUnitForecaster):
@@ -766,7 +767,6 @@ class SteelplantForecaster(DsmUnitForecaster):
         )
 
         # Always set standard DSM signals
-        initializing_unit.electricity_price = self.electricity_price
         initializing_unit.congestion_signal = self.congestion_signal
         initializing_unit.renewable_utilisation_signal = (
             self.renewable_utilisation_signal
@@ -849,7 +849,6 @@ class SteamgenerationForecaster(DsmUnitForecaster):
             initializing_unit,
         )
 
-        initializing_unit.electricity_price = self.electricity_price
         initializing_unit.congestion_signal = self.congestion_signal
         initializing_unit.renewable_utilisation_signal = (
             self.renewable_utilisation_signal
@@ -943,7 +942,6 @@ class BuildingForecaster(DsmUnitForecaster):
             initializing_unit,
         )
 
-        initializing_unit.electricity_price = self.electricity_price
         initializing_unit.setup_model(presolve=True)
 
 
@@ -951,8 +949,7 @@ class HydrogenForecaster(DsmUnitForecaster):
     """Forecaster for hydrogen units.
 
     Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus hydrogen-specific
-    timeseries. After initialization, electricity price is copied to the unit and
-    ``setup_model()`` is called.
+    timeseries. After initialization, ``setup_model()`` is called on the unit.
 
     Attributes:
         hydrogen_demand (ForecastSeries): Forecasted hydrogen demand.
@@ -969,7 +966,7 @@ class HydrogenForecaster(DsmUnitForecaster):
         availability: ForecastSeries = 1,
         market_prices: dict[str, ForecastSeries] = None,
         residual_load: dict[str, ForecastSeries] = None,
-        electricity_price: ForecastSeries = 0.0,
+        electricity_price: ForecastSeries = None,
     ):
         super().__init__(
             index=index,
@@ -997,7 +994,6 @@ class HydrogenForecaster(DsmUnitForecaster):
             initializing_unit,
         )
 
-        initializing_unit.electricity_price = self.electricity_price
         # initializing_unit.congestion_signal = self.congestion_signal
         # initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
 
