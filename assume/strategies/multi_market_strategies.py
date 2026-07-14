@@ -40,14 +40,23 @@ class EnergyHeuristicRedispatchStrategy(
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
-        start = product_tuples[0][0]
-        min_power, max_power = unit.min_power, unit.max_power
+        p_nom = unit.max_power
 
         bids = []
         for product in product_tuples:
             start = product[0]
             end = product[1]
             current_power = unit.outputs["energy"].at[start]
+
+            available_power = unit.forecaster.availability.at[start] * unit.max_power
+            # if the available power is below the technical minimum, the unit cannot run
+            # and therefore offers no redispatch potential
+            if available_power < unit.min_power:
+                min_power = current_power
+                max_power = current_power
+            else:
+                min_power = unit.min_power
+                max_power = available_power
 
             # get the bid price from the EOM bids calculated before
             # the bid price on the redispatch market is based on the EOM bid price
@@ -62,11 +71,12 @@ class EnergyHeuristicRedispatchStrategy(
                     "volume": current_power,
                     "max_power": max_power,
                     "min_power": min_power,
+                    "p_nom": p_nom,
                     "node": unit.node,
                 }
             )
 
-        unit.outputs["redispatch_bids"].loc[product_tuples[0][0]] = price
+            unit.outputs["redispatch_bids"].loc[start] = price
 
         return bids
 

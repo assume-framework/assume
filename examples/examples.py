@@ -117,6 +117,11 @@ available_examples = {
         "scenario": "2_nodes",
         "study_case": "learning_diesel",
     },
+    # replication of Hirth & Schlecht (2019), all generators anticipate redispatch
+    "inc_dec_hirth_replication": {
+        "scenario": "2_nodes_finn",
+        "study_case": "inc_dec_heuristic",
+    },
 }
 
 

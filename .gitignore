@@ -152,3 +152,4 @@ examples/notebooks/outputs
 *.nbconvert.ipynb
 fameSetup.yaml
 .claude
+**CLAUDE.md

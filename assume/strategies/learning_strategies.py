@@ -1335,10 +1335,16 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
 
 class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy):
     def __init__(self, *args, **kwargs):
-        super().__init__(act_dim=1, *args, **kwargs)
-
-        # select 24h foresight
-        self.foresight = 24
+        foresight = kwargs.pop("foresight", 24)
+        act_dim = kwargs.pop("act_dim", 1)
+        unique_obs_dim = kwargs.pop("unique_obs_dim", 2)
+        super().__init__(
+            foresight=foresight,
+            act_dim=act_dim,
+            unique_obs_dim=unique_obs_dim,
+            *args,
+            **kwargs,
+        )
 
     def calculate_bids(
         self,
