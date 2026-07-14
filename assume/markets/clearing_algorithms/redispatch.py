@@ -11,6 +11,7 @@ import pypsa
 from assume.common.grid_utils import (
     add_redispatch_generators,
     add_redispatch_loads,
+    add_redispatch_storages,
     calculate_network_meta,
     get_supported_solver_linopy,
     read_pypsa_grid,
@@ -69,6 +70,15 @@ class RedispatchMarketRole(MarketRole):
             network=self.network,
             loads=self.grid_data["loads"],
         )
+
+        # storage units are optional; they participate in redispatch as
+        # bidirectional generators (fixed baseline + up + down)
+        storage_units = self.grid_data.get("storage_units")
+        if storage_units is not None and not storage_units.empty:
+            add_redispatch_storages(
+                network=self.network,
+                storages=storage_units,
+            )
 
         self.solver_name = get_supported_solver_linopy(
             marketconfig.param_dict.get("solver_name", "highs")
@@ -144,18 +154,26 @@ class RedispatchMarketRole(MarketRole):
         price_pivot.reset_index(inplace=True, drop=True)
         p_nom_pivot.reset_index(inplace=True, drop=True)
 
-        # Generators and loads from the grid data
+        # Generators, loads and storage units from the grid data
         generator_names = self.grid_data["generators"].index
         load_names = self.grid_data["loads"].index
+        storage_units = self.grid_data.get("storage_units")
+        storage_names = (
+            storage_units.index if storage_units is not None else pd.Index([])
+        )
 
         gen_cols = p_set.columns.intersection(generator_names)
         load_cols = p_set.columns.intersection(load_names)
+        storage_cols = p_set.columns.intersection(storage_names)
 
         # 1. Fixed generator dispatch
         gen_p_set = p_set[gen_cols].copy()
 
-        redispatch_network.generators_t.p_set = gen_p_set.reindex(
-            index=redispatch_network.snapshots, columns=gen_cols, fill_value=0.0
+        # storage baselines may be negative (charging); include them alongside the
+        # generator dispatch in the fixed feed-in used for the congestion power flow
+        fixed_cols = gen_cols.union(storage_cols)
+        redispatch_network.generators_t.p_set = p_set[fixed_cols].reindex(
+            index=redispatch_network.snapshots, columns=fixed_cols, fill_value=0.0
         )
 
         p_nom = p_nom_pivot[gen_cols].copy()
@@ -204,6 +222,60 @@ class RedispatchMarketRole(MarketRole):
         redispatch_network.generators_t.marginal_cost.update(
             costs.add_suffix("_down") * (-1)
         )
+
+        # 4. Redispatch flexibility for storage units (bidirectional)
+        # Storage can be pushed both ways around its cleared (signed) dispatch:
+        # discharge more / charge less (up) or charge more / discharge less (down).
+        if len(storage_cols) > 0:
+            storage_p_set = p_set[storage_cols].copy()
+            p_nom_storage = p_nom_pivot[storage_cols].copy()
+            safe_p_nom_storage = p_nom_storage.where(p_nom_storage != 0, np.inf)
+
+            # Pin the storage baseline. Unlike a power plant the baseline may be
+            # negative (charging), so clip to [-1, 1] instead of [0, 1].
+            storage_p_set_pu = storage_p_set.div(safe_p_nom_storage).clip(
+                lower=-1, upper=1
+            )
+            redispatch_network.generators_t.p_min_pu.update(storage_p_set_pu)
+            redispatch_network.generators_t.p_max_pu.update(storage_p_set_pu)
+
+            # Upward redispatch: discharge more / charge less.
+            # max_power is the SoC-aware discharge bound (>= 0).
+            p_max_pu_up_storage = (
+                (max_power_pivot[storage_cols] - storage_p_set)
+                .div(safe_p_nom_storage)
+                .clip(lower=0, upper=1)
+            )
+            # Downward redispatch: charge more / discharge less.
+            # min_power is the SoC-aware charge bound (<= 0).
+            p_max_pu_down_storage = (
+                (storage_p_set - min_power_pivot[storage_cols])
+                .div(safe_p_nom_storage)
+                .clip(lower=0, upper=1)
+            )
+            costs_storage = price_pivot[storage_cols]
+
+            redispatch_network.generators_t.p_max_pu.update(
+                p_max_pu_up_storage.add_suffix("_up")
+            )
+            redispatch_network.generators_t.p_max_pu.update(
+                p_max_pu_down_storage.add_suffix("_down")
+            )
+
+            # Upward redispatch (discharge more / charge less) costs the opportunity
+            # cost of the stored energy, discouraging cheap over-discharge.
+            redispatch_network.generators_t.marginal_cost.update(
+                costs_storage.add_suffix("_up")
+            )
+            # Downward redispatch (charge more / discharge less) is priced at zero.
+            # A power plant's downward redispatch earns a negative marginal cost
+            # because reducing output refunds its avoided fuel cost; charging a
+            # storage is NOT a cost saving, so pricing it at -price would let the
+            # optimiser charge the storage purely for profit (a "money pump"). At
+            # zero cost the storage only absorbs surplus when the network needs it.
+            redispatch_network.generators_t.marginal_cost.update(
+                (costs_storage * 0.0).add_suffix("_down")
+            )
 
         # run linear powerflow
         redispatch_network.lpf()

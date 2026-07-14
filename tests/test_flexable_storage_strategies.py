@@ -14,6 +14,7 @@ from assume.strategies import (
     StorageCapacityHeuristicBalancingNegStrategy,
     StorageCapacityHeuristicBalancingPosStrategy,
     StorageEnergyHeuristicFlexableStrategy,
+    StorageEnergyHeuristicRedispatchStrategy,
 )
 from assume.units import Storage
 
@@ -43,6 +44,55 @@ def storage() -> Storage:
         additional_cost_discharge=4,
         additional_cost=1,
     )
+
+
+def test_redispatch_storage(mock_market_config, storage):
+    index = pd.date_range("2023-07-01", periods=4, freq="h")
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    strategy = StorageEnergyHeuristicRedispatchStrategy()
+    mc = mock_market_config
+    product_tuples = [(start, end, None)]
+
+    # constant EOM price of 50
+    storage.forecaster = UnitForecaster(index, market_prices={"EOM": 50})
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+
+    assert len(bids) == 1
+    bid = bids[0]
+
+    # cost-basis price: round-trip adjusted market price plus variable costs
+    expected_price = (
+        50 / (storage.efficiency_charge * storage.efficiency_discharge)
+        + storage.additional_cost_charge
+        + storage.additional_cost_discharge
+    )
+    assert bid["price"] == pytest.approx(expected_price)
+    # full nameplate power span as p_nom (charge is negative, so this adds)
+    assert bid["p_nom"] == pytest.approx(
+        storage.max_power_discharge - storage.max_power_charge
+    )
+    # idle storage: zero baseline, but bidirectional SoC-aware flex bounds
+    assert bid["volume"] == 0
+    assert bid["max_power"] == pytest.approx(storage.max_power_discharge)
+    assert bid["min_power"] == pytest.approx(storage.max_power_charge)
+    assert "node" in bid
+
+    # near-empty storage offers less additional discharge (SoC-aware upper bound)
+    storage.outputs["soc"].at[start] = 0.05
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert bids[0]["max_power"] == pytest.approx(
+        0.05 * storage.capacity * storage.efficiency_discharge
+    )
+    assert bids[0]["max_power"] < storage.max_power_discharge
+
+    # near-full storage offers less additional charge (SoC-aware lower bound)
+    storage.outputs["soc"].at[start] = 0.98
+    bids = strategy.calculate_bids(storage, mc, product_tuples=product_tuples)
+    assert bids[0]["min_power"] == pytest.approx(
+        (0.98 - storage.max_soc) * storage.capacity / storage.efficiency_charge
+    )
+    assert bids[0]["min_power"] > storage.max_power_charge
 
 
 def test_flexable_eom_storage(mock_market_config, storage):
