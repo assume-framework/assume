@@ -482,7 +482,7 @@ class DsmUnitForecaster(UnitForecaster):
         forecast_registries: dict[str, dict] = None,
         congestion_signal: ForecastSeries = 0.0,
         renewable_utilisation_signal: ForecastSeries = 0.0,
-        electricity_price: ForecastSeries = 0.0,
+        electricity_price: ForecastSeries = None,
     ):
         super().__init__(
             index=index,
@@ -495,7 +495,10 @@ class DsmUnitForecaster(UnitForecaster):
 
         # FIXME: currently default is series while calculations are dict of series
         self.congestion_signal = self._to_series(congestion_signal)
-        self.electricity_price = self._to_series(electricity_price)
+        if electricity_price is None:
+            self.electricity_price = self._to_series(self.price.get("EOM", 0))
+        else:
+            self.electricity_price = self._to_series(electricity_price)
         self.renewable_utilisation_signal = self._to_series(
             renewable_utilisation_signal
         )
@@ -663,7 +666,11 @@ class DsmUnitForecaster(UnitForecaster):
             *args,
             **kwargs,
         )
-        self.congestion_signal = self._dict_to_series(self.congestion_signal)
+        self.congestion_signal = (
+            self._dict_to_series(self.congestion_signal)
+            if isinstance(self.congestion_signal, dict)
+            else self._to_series(self.congestion_signal)
+        )
 
         renewable_utilisation_update_algorithm_name = self.forecast_algorithms.get(
             "update_renewable_utilisation", "renewable_utilisation_default"
@@ -677,19 +684,31 @@ class DsmUnitForecaster(UnitForecaster):
             *args,
             **kwargs,
         )
-        self.renewable_utilisation_signal = self._dict_to_series(
-            self.renewable_utilisation_signal
+        self.renewable_utilisation_signal = (
+            self._dict_to_series(self.renewable_utilisation_signal)
+            if isinstance(self.renewable_utilisation_signal, dict)
+            else self._to_series(self.renewable_utilisation_signal)
         )
+
+        if "EOM" in self.price:
+            self.electricity_price = self.price["EOM"]
 
 
 class SteelplantForecaster(DsmUnitForecaster):
     """Forecaster for steelplant units.
 
-    Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus fuel prices.
+    Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus fuel prices and steel demand.
     After initialization, DSM signals are copied to the unit and ``setup_model()`` is called.
+
+    Supports three operational strategies:
+    1. **Profile-guided**: If ``normalized_load_profile`` is provided, production follows the profile shape.
+    2. **Min-demand**: If hourly minimum demand (``steel_demand``) is provided, meets per-hour minimums.
+    3. **Cost-optimized**: If neither is provided, minimizes cost without shape constraints.
 
     Attributes:
         fuel_prices (dict[str, ForecastSeries]): Map of fuel type to forecasted fuel prices.
+        steel_demand (ForecastSeries): Per-timestep steel production demand (optional).
+        normalized_load_profile (ForecastSeries): Normalized profile to guide production shape (optional).
     """
 
     def __init__(
@@ -704,6 +723,8 @@ class SteelplantForecaster(DsmUnitForecaster):
         congestion_signal: ForecastSeries = 0.0,
         renewable_utilisation_signal: ForecastSeries = 0.0,
         electricity_price: ForecastSeries = None,
+        steel_demand: ForecastSeries = None,
+        normalized_load_profile: ForecastSeries = None,
     ):
         super().__init__(
             index=index,
@@ -717,6 +738,14 @@ class SteelplantForecaster(DsmUnitForecaster):
             electricity_price=electricity_price,
         )
         self.fuel_prices = self._dict_to_series(fuel_prices)
+        self.steel_demand = (
+            self._to_series(steel_demand) if steel_demand is not None else None
+        )
+        self.normalized_load_profile = (
+            self._to_series(normalized_load_profile)
+            if normalized_load_profile is not None
+            else None
+        )
 
     def get_price(self, fuel: str) -> FastSeries:
         if fuel not in self.fuel_prices:
@@ -737,11 +766,17 @@ class SteelplantForecaster(DsmUnitForecaster):
             initializing_unit,
         )
 
-        initializing_unit.electricity_price = self.electricity_price
+        # Always set standard DSM signals
         initializing_unit.congestion_signal = self.congestion_signal
         initializing_unit.renewable_utilisation_signal = (
             self.renewable_utilisation_signal
         )
+
+        if self.steel_demand is not None:
+            initializing_unit.steel_demand_per_timestep = self.steel_demand
+
+        if self.normalized_load_profile is not None:
+            initializing_unit.normalized_load_profile = self.normalized_load_profile
 
         initializing_unit.setup_model()
 
@@ -814,7 +849,6 @@ class SteamgenerationForecaster(DsmUnitForecaster):
             initializing_unit,
         )
 
-        initializing_unit.electricity_price = self.electricity_price
         initializing_unit.congestion_signal = self.congestion_signal
         initializing_unit.renewable_utilisation_signal = (
             self.renewable_utilisation_signal
@@ -908,7 +942,6 @@ class BuildingForecaster(DsmUnitForecaster):
             initializing_unit,
         )
 
-        initializing_unit.electricity_price = self.electricity_price
         initializing_unit.setup_model(presolve=True)
 
 
@@ -916,8 +949,7 @@ class HydrogenForecaster(DsmUnitForecaster):
     """Forecaster for hydrogen units.
 
     Provides all DSM forecasts (see :class:`DsmUnitForecaster`) plus hydrogen-specific
-    timeseries. After initialization, electricity price is copied to the unit and
-    ``setup_model()`` is called.
+    timeseries. After initialization, ``setup_model()`` is called on the unit.
 
     Attributes:
         hydrogen_demand (ForecastSeries): Forecasted hydrogen demand.
@@ -934,7 +966,7 @@ class HydrogenForecaster(DsmUnitForecaster):
         availability: ForecastSeries = 1,
         market_prices: dict[str, ForecastSeries] = None,
         residual_load: dict[str, ForecastSeries] = None,
-        electricity_price: ForecastSeries = 0.0,
+        electricity_price: ForecastSeries = None,
     ):
         super().__init__(
             index=index,
@@ -962,7 +994,6 @@ class HydrogenForecaster(DsmUnitForecaster):
             initializing_unit,
         )
 
-        initializing_unit.electricity_price = self.electricity_price
         # initializing_unit.congestion_signal = self.congestion_signal
         # initializing_unit.renewable_utilisation_signal = self.renewable_utilisation_signal
 
