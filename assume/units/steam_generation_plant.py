@@ -103,7 +103,6 @@ class SteamPlant(DSMFlex, SupportsMinMax):
                 )
 
         # Add price forecasts
-        self.electricity_price = forecaster.electricity_price
         self.electricity_price_flex = forecaster.electricity_price_flex
         self.demand = demand
         self.thermal_demand = forecaster.thermal_demand
@@ -125,7 +124,12 @@ class SteamPlant(DSMFlex, SupportsMinMax):
         """
         self.model.electricity_price = pyo.Param(
             self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.electricity_price)},
+            initialize={
+                t: value
+                for t, value in enumerate(
+                    self._values_for_model(self.forecaster.electricity_price)
+                )
+            },
         )
 
         if self.has_boiler and self.components["boiler"]["fuel_type"] == "natural_gas":
