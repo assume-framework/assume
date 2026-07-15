@@ -115,7 +115,6 @@ class Building(DSMFlex, SupportsMinMax):
 
         self.market_id = "EOM"  # FIXME enable other markets
 
-        self.electricity_price = self.forecaster.electricity_price
         self.natural_gas_price = self.forecaster.get_price("natural_gas")
         self.heat_demand = self.forecaster.heat_demand
         self.ev_load_profile = self.forecaster.ev_load_profile
@@ -306,7 +305,12 @@ class Building(DSMFlex, SupportsMinMax):
     def define_parameters(self):
         self.model.electricity_price = pyo.Param(
             self.model.time_steps,
-            initialize={t: value for t, value in enumerate(self.electricity_price)},
+            initialize={
+                t: value
+                for t, value in enumerate(
+                    self._values_for_model(self.forecaster.electricity_price)
+                )
+            },
         )
         self.model.natural_gas_price = pyo.Param(
             self.model.time_steps,

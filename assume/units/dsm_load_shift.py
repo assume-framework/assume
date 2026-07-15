@@ -2,10 +2,12 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import copy
 import logging
 from collections.abc import Callable
 from datetime import datetime
 
+import pandas as pd
 import pyomo.environ as pyo
 from pyomo.opt import (
     SolverFactory,
@@ -13,7 +15,7 @@ from pyomo.opt import (
     TerminationCondition,
 )
 
-from assume.common.fast_pandas import FastSeries
+from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.utils import get_supported_solver_pyomo
 from assume.units.dst_components import demand_side_technologies
 
@@ -42,11 +44,78 @@ class DSMFlex:
     }
     big_M = 10000000
 
+    # Rolling-horizon extensibility hooks (override in subclasses)
+    # Set _demand_attr_suffix to the instance attribute that holds total demand
+    # (e.g. "steel_demand" → self.steel_demand).  None means no demand tracking.
+    _demand_attr_suffix: str | None = None
+    # Per-block extraction schema used by _extract_component_operations.
+    # Format: {block_name: (pwr_attr, out_attr, pwr_col_name, out_col_name)}
+    _component_schema: dict = {}
+    # Additional time-series attributes (full-horizon length) that must be
+    # saved and sliced to the window during _solve_rolling_horizon_next_window.
+    _extra_price_attrs: list = []
+
+    def _values_for_model(self, series):
+        """Return values aligned to the current model index for Pyomo params.
+
+        During rolling-horizon window solves the unit index is shortened while
+        forecaster series keep the full horizon length; slice those here instead
+        of mutating the forecaster.
+        """
+        if isinstance(series, FastSeries):
+            data = series.data
+        else:
+            data = series
+
+        full_len = self._rh_full_horizon_len
+        window_start = self._rh_window_start
+        if (
+            full_len is not None
+            and window_start is not None
+            and len(data) == full_len
+            and len(data) != len(self.index)
+        ):
+            return data[window_start : window_start + len(self.index)]
+        return data
+
     def __init__(self, components, **kwargs):
+        # Extract rolling-horizon optimisation config before passing **kwargs up the MRO.
+        dsm_opt = kwargs.pop("dsm_optimisation_config", None)
+        if not isinstance(dsm_opt, dict):
+            dsm_opt = {}
+
         super().__init__(**kwargs)
 
         self.components = components
         self.solver = SolverFactory(get_supported_solver_pyomo())
+
+        # Rolling-horizon settings (populated from config; default is full horizon)
+        self.horizon_mode = dsm_opt.get("horizon_mode", "full_horizon")
+        self._rh_look_ahead = dsm_opt.get("look_ahead_horizon")  # e.g. "72h"
+        self._rh_commit = dsm_opt.get("commit_horizon")  # e.g. "24h"
+        self._rh_step = dsm_opt.get("rolling_step")  # e.g. "24h"
+
+        # Rolling-horizon state tracking (for per-market-round re-optimization)
+        self._rh_optimized_until_step = (
+            0  # How far we've optimized (in full horizon steps)
+        )
+        self._rh_window_remaining_demand = (
+            None  # Remaining demand in current rolling-horizon window
+        )
+        # Carried initial states (SoC / operational_status) between windows. Seeded
+        # once from the original config on the first window, then advanced in place by
+        # _update_init_states so each window starts from the previous window's end state.
+        self._rh_init_states = None
+        # Set during _solve_rolling_horizon_next_window while slicing forecaster series.
+        self._rh_window_start = None
+        self._rh_full_horizon_len = None
+
+        if self.horizon_mode == "rolling_horizon":
+            if not all([self._rh_look_ahead, self._rh_commit, self._rh_step]):
+                raise ValueError(
+                    "Rolling horizon mode requires look_ahead_horizon, "
+                    "commit_horizon, and rolling_step to be specified."
+                )
 
     def initialize_components(self):
         """
@@ -109,6 +178,17 @@ class DSMFlex:
         # and the objective functions
 
         self.optimisation_counter = 0
+
+        # Snapshot the component *dicts* (including any time-series injected by the
+        # subclass __init__, e.g. pv_profile) before initialize_components() replaces
+        # them with Pyomo component instances.  This snapshot is used by the rolling-
+        # horizon solver to rebuild a fresh model for each look-ahead window.
+        self._orig_components_dict = copy.deepcopy(self.components)
+
+        # Re-seed carried rolling-horizon state on (re)setup so a fresh simulation
+        # starts from the true configured initial conditions.
+        self._rh_init_states = None
+
         self.model = pyo.ConcreteModel()
         self.define_sets()
         self.define_parameters()
@@ -692,15 +772,744 @@ class DSMFlex:
 
             return maximise_renewable_utilisation
 
+    # ------------------------------------------------------------------
+    # Rolling-horizon helpers
+    # ------------------------------------------------------------------
+
+    def _parse_duration_to_steps(self, duration_str: str) -> int:
+        """Convert a duration string such as '24h' or '72h' to an integer
+        number of time steps, based on the current ``self.index.freq``."""
+        duration_seconds = pd.to_timedelta(duration_str).total_seconds()
+        step_seconds = self.index.freq.total_seconds()
+        return int(duration_seconds / step_seconds)
+
+    def _collect_series_attrs_for_window(
+        self, window_start: int, window_end: int, full_len: int
+    ) -> dict:
+        """Replace every :class:`FastSeries` attribute whose length matches the
+        full simulation horizon with the corresponding numpy slice for the
+        current window.
+
+        Returns a dict of ``{attr_name: original_FastSeries}`` that is used by
+        :meth:`_restore_series_attrs` to undo the substitution afterwards.
+        """
+        saved: dict = {}
+        for attr_name, val in list(self.__dict__.items()):
+            if isinstance(val, FastSeries) and len(val) == full_len:
+                saved[attr_name] = val
+                # Replace with a plain numpy slice; enumerate() works on ndarrays
+                # so define_parameters() calls enumerate(self.attr) still work.
+                setattr(self, attr_name, val.data[window_start:window_end])
+        return saved
+
+    def _restore_series_attrs(self, saved_attrs: dict) -> None:
+        """Restore unit-level attributes previously saved by
+        :meth:`_collect_series_attrs_for_window`."""
+        for attr_name, val in saved_attrs.items():
+            setattr(self, attr_name, val)
+
+    def _deep_slice_component_data(
+        self,
+        comp_data,
+        window_start: int,
+        window_end: int,
+        full_len: int,
+    ):
+        """Recursively copy *comp_data*, replacing any :class:`FastSeries` values
+        of length *full_len* with a new :class:`FastSeries` aligned to the current
+        window index (``self.index`` must already be the window :class:`FastIndex`
+        at the time this is called).
+
+        Dicts are recursed into; all other types are returned unchanged.
+        """
+        if isinstance(comp_data, dict):
+            return {
+                k: self._deep_slice_component_data(
+                    v, window_start, window_end, full_len
+                )
+                for k, v in comp_data.items()
+            }
+        if isinstance(comp_data, FastSeries) and len(comp_data) == full_len:
+            window_data = comp_data.data[window_start:window_end]
+            return FastSeries(index=self.index, value=window_data)
+        return comp_data
+
+    def _prepare_window_components(
+        self,
+        window_start: int,
+        window_end: int,
+        full_len: int,
+        init_states: dict,
+        remaining_demand: float = None,
+    ) -> dict:
+        """Build a fresh dict-of-dicts for the components in the current window.
+
+        Concretely this:
+        * deep-copies ``self._orig_components_dict`` (preserving dict structure),
+        * slices any nested :class:`FastSeries` to the window length,
+        * patches ``initial_soc`` for stateful storage components using the
+          state carried over from the previous committed period,
+        * patches operational_status, start_up, shut_down states for generation units,
+        * patches remaining_demand for steel plants (cumulative demand tracking).
+
+        ``self.index`` must already be the window :class:`FastIndex` at call time.
+        """
+        window_comps: dict = {}
+        for tech_name, comp_data in self._orig_components_dict.items():
+            sliced = self._deep_slice_component_data(
+                comp_data, window_start, window_end, full_len
+            )
+            # Patch carried-over state variables for this technology
+            if tech_name in init_states:
+                state_dict = init_states[tech_name]
+                # Patch SoC if present (storage components)
+                if "soc" in state_dict:
+                    sliced["initial_soc"] = state_dict["soc"]
+                # Patch operational status if present (generation/load units)
+                if "operational_status" in state_dict:
+                    sliced["initial_operational_status"] = state_dict[
+                        "operational_status"
+                    ]
+                # Note: start_up and shut_down are derived from operational_status transitions,
+                # so they don't need to be explicitly patched
+            window_comps[tech_name] = sliced
+
+        # Store remaining_demand as an instance attribute (not in components dict)
+        # so rolling-horizon constraints can access it without polluting the components
+        if remaining_demand is not None and self._has_demand_tracking:
+            self._rh_window_remaining_demand = remaining_demand
+
+        return window_comps
+
+    # ------------------------------------------------------------------
+    # Rolling-horizon shared helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def _has_demand_tracking(self) -> bool:
+        """True when this unit tracks a cumulative production demand across windows."""
+        return self._demand_attr_suffix is not None
+
+    def _primary_output_expr(self, m, t):
+        """Return the Pyomo expression for the unit's primary production output at step *t*.
+
+        Override in subclasses whose rolling-horizon demand tracking is based on
+        a physical output other than total electrical power input
+        (e.g. SteelPlant tracks tonnes of steel rather than MWh consumed).
+        """
+        return m.total_power_input[t]
+
+    def _collect_init_states(self) -> dict:
+        """Collect initial states (SoC, operational_status) from the original component dicts."""
+        init_states: dict = {}
+        for tech, data in self._orig_components_dict.items():
+            state: dict = {}
+            if "initial_soc" in data:
+                state["soc"] = data["initial_soc"]
+            if "initial_operational_status" in data:
+                state["operational_status"] = data["initial_operational_status"]
+            if state:
+                init_states[tech] = state
+        return init_states
+
+    def _update_init_states(
+        self, instance, commit_local: int, init_states: dict
+    ) -> None:
+        """Update *init_states* in-place with end-of-commit values from the solved instance.
+
+        Iterates over every solved block (not only the pre-seeded keys) so that on/off
+        status carries across windows even for components that never set
+        ``initial_operational_status`` in their config dict.
+
+        Note: only the on/off *flag* is carried, not the run length, so min-operating /
+        min-down-time constraints still reset their clock at each window boundary. Fully
+        carrying runtime history would need a richer component initial-state interface.
+        """
+        for tech_name in instance.dsm_blocks:
+            try:
+                block = instance.dsm_blocks[tech_name]
+                state: dict = {}
+                if hasattr(block, "soc"):
+                    state["soc"] = pyo.value(block.soc[commit_local])
+                if hasattr(block, "operational_status"):
+                    state["operational_status"] = int(
+                        round(pyo.value(block.operational_status[commit_local]))
+                    )
+                if state:
+                    init_states[tech_name] = state
+            except (KeyError, AttributeError):
+                pass
+
+    def _detect_operation_strategy(self, N: int, saved_attrs: dict) -> tuple:
+        """Detect the operation strategy for the current unit.
+
+        Checks standard unit forecast attributes in precedence order:
+        *profile_guided* → *min_demand* → *cost_optimized* (default).
+
+        Returns ``(strategy, full_horizon_load_profile, full_horizon_min_demand)``.
+        Each non-``None`` sequence is padded/truncated to exactly *N* steps and
+        its original value is preserved in *saved_attrs* for later restoration.
+
+        When ``_demand_attr_suffix`` is ``None`` (no demand tracking) the method
+        always returns ``("cost_optimized", None, None)``.
+        """
+        if not self._has_demand_tracking:
+            return "cost_optimized", None, None
+
+        def _fit_to_horizon(attr_name: str, pad_value=None):
+            if not (attr_name and hasattr(self, attr_name)):
+                return None
+            val = getattr(self, attr_name)
+            if val is None:
+                return None
+            try:
+                lst = list(val)
+            except TypeError:
+                return None
+            if not lst:
+                return None
+            if len(lst) < N:
+                lst.extend(
+                    [lst[-1] if pad_value is None else pad_value] * (N - len(lst))
+                )
+            else:
+                lst = lst[:N]
+            if attr_name not in saved_attrs:
+                saved_attrs[attr_name] = val
+            return lst
+
+        profile = _fit_to_horizon("normalized_load_profile")
+        if profile is not None:
+            return "profile_guided", profile, None
+
+        demand = _fit_to_horizon("steel_demand_per_timestep", pad_value=0.0)
+        if demand is not None:
+            return "min_demand", None, demand
+
+        return "cost_optimized", None, None
+
+    def _add_window_demand_constraints(
+        self,
+        strategy: str,
+        remaining_demand: float,
+        full_horizon_load_profile,
+        full_horizon_min_demand,
+        window_start: int,
+        commit_end: int,
+    ) -> None:
+        """Add demand-related constraints to the current window model.
+
+        Uses ``_primary_output_expr`` so subclasses can track any physical output
+        (e.g. steel tonnes, hydrogen kg) rather than just electrical energy.
+        """
+        # Upper-bound on total window production (skipped for min_demand strategy)
+        if strategy != "min_demand":
+            self.model.window_demand_limit = pyo.Param(
+                initialize=remaining_demand, mutable=True
+            )
+            self.model.window_demand_con = pyo.Constraint(
+                rule=lambda m: (
+                    sum(self._primary_output_expr(m, t) for t in m.time_steps)
+                    <= m.window_demand_limit
+                )
+            )
+
+        if (
+            strategy == "profile_guided"
+            and full_horizon_load_profile is not None
+            and remaining_demand > 0
+        ):
+            remaining_profile = (
+                list(full_horizon_load_profile[window_start:])
+                if hasattr(full_horizon_load_profile, "__getitem__")
+                else list(full_horizon_load_profile)[window_start:]
+            )
+            commit_profile = (
+                list(full_horizon_load_profile[window_start:commit_end])
+                if hasattr(full_horizon_load_profile, "__getitem__")
+                else list(full_horizon_load_profile)[window_start:commit_end]
+            )
+            remaining_sum = sum(remaining_profile) if remaining_profile else 1.0
+            commit_sum = sum(commit_profile) if commit_profile else 0.0
+            if remaining_sum > 0:
+                fraction = commit_sum / remaining_sum
+                min_commit = (
+                    remaining_demand * fraction * (1.0 - self.load_profile_deviation)
+                )
+                n_commit = commit_end - window_start
+                self.model.min_commit_production = pyo.Param(
+                    initialize=min_commit, mutable=True
+                )
+                self.model.window_min_commit_con = pyo.Constraint(
+                    rule=lambda m: (
+                        sum(self._primary_output_expr(m, t) for t in range(n_commit))
+                        >= m.min_commit_production
+                    )
+                )
+                logger.info(
+                    "[RH-STRATEGY] profile_guided: min_commit=%.1f MWh over %d steps",
+                    min_commit,
+                    n_commit,
+                )
+
+        elif strategy == "min_demand" and full_horizon_min_demand is not None:
+            n_steps = commit_end - window_start
+            min_window = (
+                list(full_horizon_min_demand[window_start:commit_end])
+                if hasattr(full_horizon_min_demand, "__getitem__")
+                else list(full_horizon_min_demand)[window_start:commit_end]
+            )
+            min_window = (min_window + [0.0] * n_steps)[:n_steps]
+            self.model.min_hourly_demand_param = pyo.Param(
+                range(n_steps), initialize=dict(enumerate(min_window))
+            )
+            self.model.min_hourly_demand_con = pyo.Constraint(
+                range(n_steps),
+                rule=lambda m, t: (
+                    self._primary_output_expr(m, t) >= m.min_hourly_demand_param[t]
+                ),
+            )
+            logger.info(
+                "[RH-STRATEGY] min_demand: per-hour constraints over %d steps", n_steps
+            )
+
+        else:
+            logger.info("[RH-STRATEGY] cost_optimized: pure cost minimisation")
+
+    def _add_profile_soft_constraints(
+        self, window_start: int, window_end: int, full_horizon_load_profile
+    ) -> bool:
+        """Add soft profile-tracking deviation variables and a penalised objective.
+
+        Returns ``True`` if the constraints were added successfully.
+        """
+        try:
+            window_len = window_end - window_start
+            window_profile = (
+                list(full_horizon_load_profile[window_start:window_end])
+                if hasattr(full_horizon_load_profile, "__getitem__")
+                else list(full_horizon_load_profile)[window_start:window_end]
+            )
+            if len(window_profile) < window_len and window_profile:
+                window_profile.extend(
+                    [window_profile[-1]] * (window_len - len(window_profile))
+                )
+            window_profile = window_profile[:window_len]
+            if (
+                not window_profile
+                or max(window_profile) == 0
+                or sum(window_profile) == 0
+            ):
+                return False
+
+            max_power = getattr(self, "max_power", 922.0)
+            targets = {
+                t: window_profile[t] * max_power for t in range(len(window_profile))
+            }
+            self.model.profile_dev_pos = pyo.Var(
+                self.model.time_steps, within=pyo.NonNegativeReals
+            )
+            self.model.profile_dev_neg = pyo.Var(
+                self.model.time_steps, within=pyo.NonNegativeReals
+            )
+            self.model.profile_target = pyo.Param(
+                self.model.time_steps, initialize=targets, default=0.0
+            )
+
+            @self.model.Constraint(self.model.time_steps)
+            def profile_deviation_con(m, t):
+                return (
+                    m.total_power_input[t]
+                    == m.profile_target[t] + m.profile_dev_pos[t] - m.profile_dev_neg[t]
+                )
+
+            penalty = 10.0 / max(self.load_profile_deviation, 0.01)
+            self.model.del_component(self.model.obj_rule_opt)
+
+            @self.model.Objective(sense=pyo.minimize)
+            def obj_rule_opt(m):
+                return pyo.quicksum(
+                    m.variable_cost[t] for t in m.time_steps
+                ) + penalty * pyo.quicksum(
+                    m.profile_dev_pos[t] + m.profile_dev_neg[t] for t in m.time_steps
+                )
+
+            logger.info(
+                "[LOAD-PROFILE-RH] Window [%d:%d]: soft constraint active "
+                "(penalty=%.1f, deviation=%.0f%%)",
+                window_start,
+                window_end,
+                penalty,
+                self.load_profile_deviation * 100,
+            )
+            return True
+        except Exception as e:
+            logger.warning(
+                "[LOAD-PROFILE-RH] Failed to add profile soft constraint: %s. "
+                "Continuing without.",
+                e,
+            )
+            return False
+
+    def _solve_with_profile_fallback(
+        self, load_profile_added: bool, window_start: int, window_end: int
+    ):
+        """Create instance and solve; retry without profile penalty if infeasible.
+
+        Returns ``(instance, results)``.
+        """
+        _profile_comps = [
+            "profile_deviation_con",
+            "profile_dev_pos",
+            "profile_dev_neg",
+            "profile_target",
+            "obj_rule_opt",
+        ]
+
+        def _strip_profile_and_plain_obj():
+            for c in _profile_comps:
+                if hasattr(self.model, c):
+                    self.model.del_component(c)
+
+            @self.model.Objective(sense=pyo.minimize)
+            def obj_rule_opt(m):
+                return pyo.quicksum(m.variable_cost[t] for t in m.time_steps)
+
+        instance = self.model.create_instance()
+        try:
+            results = self.solver.solve(instance, options={})
+        except RuntimeError as e:
+            if not load_profile_added:
+                raise
+            logger.warning(
+                "[LOAD-PROFILE-RH] Solver error in window [%d:%d] with profile: %.80s. "
+                "Re-solving without.",
+                window_start,
+                window_end,
+                str(e),
+            )
+            _strip_profile_and_plain_obj()
+            instance = self.model.create_instance()
+            results = self.solver.solve(instance, options={})
+            load_profile_added = False
+
+        if (
+            load_profile_added
+            and results.solver.status == SolverStatus.ok
+            and results.solver.termination_condition == TerminationCondition.infeasible
+        ):
+            logger.warning(
+                "[LOAD-PROFILE-RH] Profile infeasible in window [%d:%d]; re-solving without.",
+                window_start,
+                window_end,
+            )
+            _strip_profile_and_plain_obj()
+            instance = self.model.create_instance()
+            results = self.solver.solve(instance, options={})
+
+        return instance, results
+
+    def _log_solver_status(self, results, window_start: int, window_end: int) -> None:
+        """Log the solver termination status for a window."""
+        tc = results.solver.termination_condition
+        if (
+            results.solver.status == SolverStatus.ok
+            and tc == TerminationCondition.optimal
+        ):
+            logger.debug("Window [%d:%d] solved optimally.", window_start, window_end)
+        elif tc == TerminationCondition.infeasible:
+            logger.warning(
+                "Window [%d:%d] infeasible — committed values remain zero.",
+                window_start,
+                window_end,
+            )
+        else:
+            logger.warning(
+                "Window [%d:%d] solver status: %s / %s",
+                window_start,
+                window_end,
+                results.solver.status,
+                tc,
+            )
+
+    def _extract_component_operations(
+        self,
+        instance,
+        window_start: int,
+        commit_end: int,
+        saved_index,
+    ) -> None:
+        """Append per-component operational data for the committed window steps."""
+        if not hasattr(self, "_component_operations"):
+            self._component_operations = []
+
+        _block_schema = self._component_schema
+
+        for local_t in range(commit_end - window_start):
+            global_t = window_start + local_t
+            row: dict = {
+                "global_t": global_t,
+                "timestamp": str(saved_index[global_t]),
+            }
+            try:
+                if hasattr(instance, "dsm_blocks"):
+                    for blk, (
+                        pwr_attr,
+                        out_attr,
+                        pwr_key,
+                        out_key,
+                    ) in _block_schema.items():
+                        row[pwr_key] = 0.0
+                        row[out_key] = 0.0
+                        if blk not in instance.dsm_blocks:
+                            continue
+                        b = instance.dsm_blocks[blk]
+                        if hasattr(b, pwr_attr) and local_t in getattr(b, pwr_attr):
+                            row[pwr_key] = float(
+                                pyo.value(getattr(b, pwr_attr)[local_t])
+                            )
+                        if hasattr(b, out_attr) and local_t in getattr(b, out_attr):
+                            row[out_key] = float(
+                                pyo.value(getattr(b, out_attr)[local_t])
+                            )
+            except Exception as ex:
+                logger.debug(
+                    "Could not extract component data for t=%d: %s", local_t, ex
+                )
+            self._component_operations.append(row)
+
+    # ------------------------------------------------------------------
+    # /Rolling-horizon helpers
+    # ------------------------------------------------------------------
+
+    def _check_and_reoptimize_rolling_window(self, current_time) -> bool:
+        """Check whether to re-optimise for the next rolling window.
+
+        Called by the bidding strategy each time it generates bids.
+        Returns ``True`` if re-optimisation was performed.
+        """
+        if self.horizon_mode != "rolling_horizon":
+            return False
+
+        try:
+            current_step = self.index._get_idx_from_date(current_time)
+        except (KeyError, ValueError, AttributeError, TypeError) as e:
+            logger.debug(
+                "Could not map %s to index step: %s. Skipping re-optimisation.",
+                current_time,
+                e,
+            )
+            return False
+
+        if current_step >= self._rh_optimized_until_step:
+            logger.info(
+                "[RH-MARKET-TRIGGER] %s | step=%d >= opt_until=%d | "
+                "re-optimising window for %s",
+                current_time,
+                current_step,
+                self._rh_optimized_until_step,
+                self.id,
+            )
+            self._solve_rolling_horizon_next_window(current_step)
+            return True
+
+        return False
+
+    def _solve_rolling_horizon_next_window(self, current_step: int) -> None:
+        """Optimise the next rolling window starting from *current_step*.
+
+        Called after each market round to re-optimise for the next window only,
+        using the current component states as the initial condition.
+        """
+        N = len(self.index)
+        freq = self.index.freq
+
+        if not hasattr(self, "_rh_full_horizon_production"):
+            self._rh_full_horizon_production = [0.0] * N
+
+        look_ahead_steps = self._parse_duration_to_steps(self._rh_look_ahead)
+        commit_steps = self._parse_duration_to_steps(self._rh_commit)
+
+        window_start = current_step
+        window_end = min(window_start + look_ahead_steps, N)
+        commit_end = min(window_start + commit_steps, N)
+
+        if window_start >= N:
+            return
+
+        logger.info(
+            "[RH-WINDOW-START] %s | window=[%d:%d], commit=[%d:%d]",
+            self.id,
+            window_start,
+            window_end,
+            window_start,
+            commit_end,
+        )
+
+        saved_index = self.index
+        saved_model = self.model if hasattr(self, "model") else None
+        saved_components = self.components
+
+        # Seed the carried state once from the original config. Thereafter reuse the
+        # persistent dict so each window starts from the previous window's end state.
+        # _update_init_states (below) mutates this dict in place, so the advance survives.
+        if self._rh_init_states is None:
+            self._rh_init_states = self._collect_init_states()
+        init_states = self._rh_init_states
+
+        self.index = FastIndex(
+            start=saved_index[window_start],
+            end=saved_index[window_end - 1],
+            freq=freq,
+        )
+        saved_attrs = self._collect_series_attrs_for_window(window_start, window_end, N)
+        self._rh_window_start = window_start
+        self._rh_full_horizon_len = N
+
+        # Detect operation strategy; preserve full-horizon sequences in saved_attrs
+        operation_strategy, full_horizon_load_profile, full_horizon_min_demand = (
+            self._detect_operation_strategy(N, saved_attrs)
+        )
+        if operation_strategy != "cost_optimized":
+            logger.info("[RH-SETUP] strategy=%s", operation_strategy)
+
+        # Save full-horizon time-series attributes not yet captured by
+        # _collect_series_attrs_for_window (subclass-specific, e.g. commodity prices)
+        for attr_name in self._extra_price_attrs:
+            if attr_name not in saved_attrs and hasattr(self, attr_name):
+                val = getattr(self, attr_name)
+                try:
+                    if len(val) == N and hasattr(val, "__getitem__"):
+                        saved_attrs[attr_name] = val
+                        setattr(self, attr_name, val[window_start:window_end])
+                except (TypeError, AttributeError):
+                    pass
+
+        _pending_opr_updates: dict = {}
+        window_production = 0.0
+
+        try:
+            remaining_demand = None
+            if self._has_demand_tracking:
+                produced_so_far = sum(
+                    float(v)
+                    for v in self._rh_full_horizon_production[:current_step]
+                    if v and v > 0
+                )
+                total_demand = getattr(self, self._demand_attr_suffix)
+                remaining_demand = max(0.0, total_demand - produced_so_far)
+                logger.info(
+                    "[RH-WINDOW-DEMAND] global=%.2f, produced=%.2f, remaining=%.2f",
+                    total_demand,
+                    produced_so_far,
+                    remaining_demand,
+                )
+
+            self.components = self._prepare_window_components(
+                window_start, window_end, N, init_states, remaining_demand
+            )
+
+            self.model = pyo.ConcreteModel()
+            self.define_sets()
+            self.define_parameters()
+            self.define_variables()
+            self.initialize_components()
+            self.initialize_process_sequence()
+            self.define_constraints()
+
+            if remaining_demand is not None and self._has_demand_tracking:
+                self._add_window_demand_constraints(
+                    operation_strategy,
+                    remaining_demand,
+                    full_horizon_load_profile,
+                    full_horizon_min_demand,
+                    window_start,
+                    commit_end,
+                )
+
+            self.define_objective_opt()
+
+            load_profile_added = False
+            if (
+                self._has_demand_tracking
+                and operation_strategy == "profile_guided"
+                and full_horizon_load_profile is not None
+            ):
+                load_profile_added = self._add_profile_soft_constraints(
+                    window_start, window_end, full_horizon_load_profile
+                )
+
+            instance, results = self._solve_with_profile_fallback(
+                load_profile_added, window_start, window_end
+            )
+            self._log_solver_status(results, window_start, window_end)
+
+            n_commit = commit_end - window_start
+            for local_t in range(n_commit):
+                global_t = window_start + local_t
+                power_val = pyo.value(instance.total_power_input[local_t])
+                _pending_opr_updates[global_t] = power_val
+
+                try:
+                    prod_val = pyo.value(self._primary_output_expr(instance, local_t))
+                except (KeyError, AttributeError, TypeError):
+                    prod_val = power_val
+
+                window_production += prod_val
+                if hasattr(self, "_rh_full_horizon_production"):
+                    self._rh_full_horizon_production[global_t] = prod_val
+
+            logger.info("[RH-MARKET] Window production: %.2f MWh", window_production)
+
+            if self._has_demand_tracking:
+                self._extract_component_operations(
+                    instance, window_start, commit_end, saved_index
+                )
+
+            self._update_init_states(instance, n_commit - 1, init_states)
+
+        finally:
+            self._restore_series_attrs(saved_attrs)
+            self._rh_window_start = None
+            self._rh_full_horizon_len = None
+            self.index = saved_index
+            if saved_model is not None:
+                self.model = saved_model
+            self.components = saved_components
+
+        for global_t, power_val in _pending_opr_updates.items():
+            try:
+                self.opt_power_requirement[saved_index[global_t]] = power_val
+            except (IndexError, KeyError, AttributeError, TypeError) as e:
+                logger.debug(
+                    "Could not update opt_power_requirement[%d]: %s", global_t, e
+                )
+
+        self._rh_optimized_until_step = commit_end
+        logger.info(
+            "[RH-WINDOW-COMPLETE] production=%.2f MWh | opt_until=%d | states=%s",
+            window_production,
+            commit_end,
+            list(init_states.keys()),
+        )
+
+    # ------------------------------------------------------------------
+
     def determine_optimal_operation_without_flex(self, switch_flex_off=True):
         """
         Determines the optimal operation of the steel plant without considering flexibility.
+
+        This performs a single full-horizon solve. For rolling-horizon units it is
+        the setup-time presolve that seeds ``_rh_full_horizon_production``; the
+        per-window re-optimisation at market time is handled separately by
+        ``_check_and_reoptimize_rolling_window``.
         """
         # create an instance of the model
         instance = self.model.create_instance()
         # switch the instance to the optimal mode by deactivating the flexibility constraints and objective
         if switch_flex_off:
             instance = self.switch_to_opt(instance)
+
         # solve the instance
         results = self.solver.solve(instance, options={})
 
@@ -709,18 +1518,24 @@ class DSMFlex:
             results.solver.termination_condition == TerminationCondition.optimal
         ):
             logger.debug("The model was solved optimally.")
-
             # Display the Objective Function Value
             objective_value = instance.obj_rule_opt()
             logger.debug("The value of the objective function is %s.", objective_value)
 
         elif results.solver.termination_condition == TerminationCondition.infeasible:
-            logger.debug("The model is infeasible.")
+            logger.warning("The model is infeasible - check constraints.")
+            if switch_flex_off and self._has_demand_tracking:
+                total_demand = getattr(self, self._demand_attr_suffix)
+                logger.warning(
+                    "  Full-horizon solve is INFEASIBLE with demand constraint of %.2f",
+                    total_demand,
+                )
+            return
 
         else:
-            logger.debug("Solver Status: ", results.solver.status)
+            logger.debug("Solver Status: %s", results.solver.status)
             logger.debug(
-                "Termination Condition: ", results.solver.termination_condition
+                "Termination Condition: %s", results.solver.termination_condition
             )
 
         opt_power_requirement = [
@@ -729,6 +1544,34 @@ class DSMFlex:
         self.opt_power_requirement = FastSeries(
             index=self.index, value=opt_power_requirement
         )
+
+        # CRITICAL: If rolling horizon is enabled, populate the full-horizon accumulator
+        # This ensures the first market call has correct production history
+        if self.horizon_mode == "rolling_horizon":
+            if not hasattr(self, "_rh_full_horizon_production"):
+                self._rh_full_horizon_production = [0.0] * len(self.index)
+
+            # Track primary production output (subclass may override _primary_output_expr)
+            try:
+                production_schedule = [
+                    pyo.value(self._primary_output_expr(instance, t))
+                    for t in instance.time_steps
+                ]
+            except (KeyError, AttributeError):
+                production_schedule = opt_power_requirement
+
+            for i, prod_val in enumerate(production_schedule):
+                self._rh_full_horizon_production[i] = prod_val
+
+            # Log the full-horizon production profile
+            total_full_horizon = sum(production_schedule)
+            logger.info(
+                f"[RH-SETUP] Full-horizon solve complete: Total production = {total_full_horizon:.2f} MWh, "
+                f"First 24 hours = {sum(production_schedule[:24]):.2f} MWh"
+            )
+            logger.debug(
+                f"[RH-SETUP] Full-horizon production schedule (first 24h): {[f'{v:.1f}' for v in production_schedule[:24]]}"
+            )
 
         self.total_cost = sum(
             instance.variable_cost[t].value for t in instance.time_steps
@@ -748,8 +1591,17 @@ class DSMFlex:
         instance = self.model.create_instance()
         # switch the instance to the flexibility mode by deactivating the optimal constraints and objective
         instance = self.switch_to_flex(instance)
-        # solve the instance
-        results = self.solver.solve(instance)
+
+        # solve the instance with error handling
+        try:
+            results = self.solver.solve(instance)
+        except RuntimeError as e:
+            # If solver fails, log warning and continue with current solution
+            logger.warning(
+                f"[FLEX-PHASE] Solver raised RuntimeError during flexibility phase: {str(e)[:80]}... "
+                "Continuing with current optimal operation without flexibility."
+            )
+            return
 
         # Check solver status and termination condition
         if (results.solver.status == SolverStatus.ok) and (
