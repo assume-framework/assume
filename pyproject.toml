@@ -63,6 +63,11 @@ oeds = [
     "pvlib >=0.10.2",
     "windpowerlib >=0.2.1",
 ]
+entsoe = [
+    "entsoe-py >=0.6.0",
+    "yfinance",
+    "requests",
+]
 test = [
     "ruff >=0.14.6",
     "mypy >=1.1.1",
@@ -73,7 +78,7 @@ test = [
     "pre-commit >=4.0.0"
 ]
 all = [
-    "assume-framework[oeds, network, learning, test]",
+    "assume-framework[oeds, entsoe, network, learning, test]",
 ]
 docs = [
   "sphinx >=8",
