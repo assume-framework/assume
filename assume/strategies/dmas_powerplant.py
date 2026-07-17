@@ -26,6 +26,7 @@ from pyomo.opt import (
 )
 
 from assume.common.base import MinMaxStrategy, SupportsMinMax
+from assume.common.exceptions import ValidationError
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import get_supported_solver_pyomo
 
@@ -91,7 +92,18 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
         Returns:
             np.ndarray: Cashflow.
         """
-        runtime = runtime or unit.get_operation_time(start)
+        if (
+            unit.index.freq != timedelta(hours=1)
+            or not unit.min_down_time.is_integer()
+            or not unit.min_operating_time.is_integer()
+        ):
+            raise ValidationError(
+                message=f"The DMAS strategy for unit {unit.id} is only applicable with hourly resolution. Check the unit's minimum up/down times and the simulation frequency.",
+                id=self.id,
+                field="unit",
+            )
+
+        runtime = runtime or int(unit.get_operation_time(start))
         p0 = p0 or unit.get_output_before(start)
         self.model.clear()
         tr = np.arange(hour_count)
@@ -163,14 +175,15 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
                 self.model.stop_time.add(
                     1 - self.model.z[t]
                     >= quicksum(
-                        self.model.w[k] for k in range(t - unit.min_down_time, t)
+                        self.model.w[k] for k in range(t - int(unit.min_down_time), t)
                     )
                 )
             if t > unit.min_operating_time:
                 self.model.run_time.add(
                     self.model.z[t]
                     >= quicksum(
-                        self.model.v[k] for k in range(t - unit.min_operating_time, t)
+                        self.model.v[k]
+                        for k in range(t - int(unit.min_operating_time), t)
                     )
                 )
             if t > 0:
@@ -182,9 +195,9 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
                     == 0
                 )
 
-            if runtime > 0 and t < unit.min_operating_time - runtime:
+            if runtime > 0 and t < int(unit.min_operating_time) - runtime:
                 self.model.initial_on.add(self.model.z[t] == 1)
-            elif runtime < 0 and t < unit.min_down_time - (-runtime):
+            elif runtime < 0 and t < int(unit.min_down_time) - (-runtime):
                 self.model.initial_off.add(self.model.z[t] == 0)
 
         # -> fuel costs
@@ -480,7 +493,7 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
             This does search the most profitable hours, even if the first hour might be sufficient to match our marginal costs
             """
             max_profit, start_hour = 0, 0
-            run_time = unit.min_operating_time
+            run_time = int(unit.min_operating_time)
             for t in range(start, hour_count - run_time):
                 p = np.sum(unit.min_power * base_price[t : t + run_time])
 
