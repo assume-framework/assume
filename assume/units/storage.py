@@ -72,8 +72,8 @@ class Storage(SupportsMinMaxCharge):
         ramp_down_charge: float | None = None,
         ramp_up_discharge: float | None = None,
         ramp_down_discharge: float | None = None,
-        min_operating_time: float = 0,  # hours
-        min_down_time: float = 0,  # hours
+        min_operating_time: float = 0.0,  # hours
+        min_down_time: float = 0.0,  # hours
         location: tuple[float, float] = (0, 0),
         node: str = "node0",
         **kwargs,
