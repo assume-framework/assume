@@ -665,7 +665,7 @@ class SupportsMinMaxCharge(BaseUnit):
                 max_soc_discharge = self.calculate_soc_max_discharge(soc)
                 if current_power > max_soc_discharge:
                     logger.warning(
-                        f"Unit {self.id}, Market {marketconfig.id}, Time {t}: SoC violation! Power output {current_power} violating discharge limit {max_soc_discharge}"
+                        f"Unit {self.id}, Market {marketconfig.market_id}, Time {t}: SoC violation! Power output {current_power} violating discharge limit {max_soc_discharge}"
                     )
                 delta_soc = (
                     -current_power * time_delta / self.efficiency_discharge
@@ -676,7 +676,7 @@ class SupportsMinMaxCharge(BaseUnit):
                 max_soc_charge = self.calculate_soc_max_charge(soc)
                 if current_power < max_soc_charge:
                     logger.warning(
-                        f"Unit {self.id}, Market {marketconfig.id}, Time {t}: SoC violation! Power withdrawal {current_power} violating charge limit {max_soc_charge}"
+                        f"Unit {self.id}, Market {marketconfig.market_id}, Time {t}: SoC violation! Power withdrawal {current_power} violating charge limit {max_soc_charge}"
                     )
                 delta_soc = (
                     -current_power * time_delta * self.efficiency_charge
