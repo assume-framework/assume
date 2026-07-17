@@ -291,11 +291,11 @@ class BaseUnit:
                 cashflow * elapsed_intervals
             )
 
-    def get_starting_costs(self, op_time: int) -> float:
+    def get_starting_costs(self, op_time: float) -> float:
         """
         Returns the start-up cost for the given operation time.
         If operation time is positive, the unit is running, so no start-up costs are returned.
-        If operation time is negative, the unit is not running, so start-up costs are returned
+        If operation time is negative, the unit is not running, so start-up costs are returned.
 
         Args:
             op_time (float): The time the unit was shut down in hours.
@@ -318,8 +318,8 @@ class SupportsMinMax(BaseUnit):
     ramp_up: float = None
     efficiency: float
     emission_factor: float
-    min_operating_time: int = 1
-    min_down_time: int = 1
+    min_operating_time: float = 0.0
+    min_down_time: float = 0.0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -345,7 +345,7 @@ class SupportsMinMax(BaseUnit):
 
     def calculate_ramp(
         self,
-        op_time: int,
+        op_time: float,
         previous_power: float,
         power: float,
         current_power: float = 0,
@@ -354,7 +354,7 @@ class SupportsMinMax(BaseUnit):
         Corrects the possible power to offer according to ramping restrictions.
 
         Args:
-            op_time (int): The operation time.
+            op_time (float): The operation time.
             previous_power (float): The previous power output of the unit.
             power (float): The planned power offer of the unit.
             current_power (float): The current power output of the unit.
@@ -395,17 +395,17 @@ class SupportsMinMax(BaseUnit):
             )
         return power
 
-    def get_max_lookback_optime(self):
+    def get_max_lookback_op_time(self):
         max_time = max(
             self.min_operating_time,
             self.min_down_time,
-            1,
+            1.0,
         )
         return max_time
 
-    def get_operation_time(self, start: datetime) -> int:
+    def get_operation_time(self, start: datetime) -> float:
         """
-        Returns the time the unit is operating (positive) or shut down (negative).
+        Returns the time in simulation frequency steps the unit is operating (positive) or shut down (negative).
 
         The lookback window covers the longest of the minimum operating time
         and the minimum down time (or the warm-start downtime threshold if the
@@ -416,15 +416,15 @@ class SupportsMinMax(BaseUnit):
             start (datetime.datetime): The start time.
 
         Returns:
-            int: The operation time as a positive integer if operating, or negative if shut down.
+            float: The operation time as a positive float if operating, or negative if shut down.
         """
-        max_time = self.get_max_lookback_optime()
+        max_time = self.get_max_lookback_op_time()
 
         begin = max(start - self.index.freq * max_time, self.index[0])
         end = start - self.index.freq
 
         if start <= self.index[0]:
-            # this assumes that all powerplants are running at the start of the simulation
+            # This assumes that all units are running at the start of the simulation.
             return max_time
 
         # Check energy output in the defined time window, reversed for most recent state
@@ -435,13 +435,13 @@ class SupportsMinMax(BaseUnit):
             is_off = not arr[0]
         else:
             is_off = False
-        run = 0
+        run = 0.0
 
         # Count consecutive periods with the same status, break on change
         for val in arr:
             if val != (not is_off):  # Stop if the state changes
                 break
-            run += 1
+            run += 1.0
 
         # Return positive time if operating, negative if shut down
         return -run if is_off else run
@@ -480,8 +480,8 @@ class SupportsMinMaxCharge(BaseUnit):
     capacity: float
     efficiency_charge: float
     efficiency_discharge: float
-    min_operating_time: int = 1
-    min_down_time: int = 1
+    min_operating_time: float = 0.0
+    min_down_time: float = 0.0
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

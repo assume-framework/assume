@@ -35,13 +35,13 @@ class PowerPlant(SupportsMinMax):
         emission_factor (float, optional): The emission factor associated with the power plant's fuel type (tons of CO2 emissions per MWh). Defaults to 0.0.
         ramp_up (Union[float, None], optional): The ramp-up rate of the power plant, indicating how quickly it can increase power output. Defaults to None.
         ramp_down (Union[float, None], optional): The ramp-down rate of the power plant, indicating how quickly it can decrease power output. Defaults to None.
-        hot_start_cost (float, optional): The cost of a hot start, where the power plant is restarted after a recent shutdown. Defaults to 0.
-        warm_start_cost (float, optional): The cost of a warm start, where the power plant is restarted after a moderate downtime. Defaults to 0.
-        cold_start_cost (float, optional): The cost of a cold start, where the power plant is restarted after a prolonged downtime. Defaults to 0.
-        min_operating_time (float, optional): The minimum duration that the power plant must operate once started, in hours. Defaults to 0.
-        min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours. Defaults to 0.
-        downtime_hot_start (int, optional): The downtime required after a hot start before the power plant can be restarted, in hours. Defaults to 8.
-        downtime_warm_start (int, optional): The downtime required after a warm start before the power plant can be restarted, in hours. Defaults to 48.
+        hot_start_cost (float, optional): The cost of a hot start [in €/MW installed capacity], where the power plant is restarted after a recent shutdown. Defaults to 0.0.
+        warm_start_cost (float, optional): The cost of a warm start [in €/MW installed capacity], where the power plant is restarted after a moderate downtime. Defaults to 0.0.
+        cold_start_cost (float, optional): The cost of a cold start [in €/MW installed capacity], where the power plant is restarted after a prolonged downtime. Defaults to 0.0.
+        min_operating_time (float, optional): The minimum duration that the power plant must operate once started, in hours. Defaults to 0.0.
+        min_down_time (float, optional): The minimum downtime required after a shutdown before the power plant can be restarted, in hours. Defaults to 0.0.
+        downtime_hot_start (float, optional): The downtime threshold for hot start classification, in hours. If the unit has been shut down for this long or less, a hot start cost applies. Defaults to 0.0.
+        downtime_warm_start (float, optional): The downtime threshold for warm start classification, in hours. If the unit has been shut down for longer than downtime_hot_start but this long or less, a warm start cost applies. Defaults to 0.0.
         max_heat_extraction (float, optional): The maximum amount of heat that the power plant can extract for external use, in some suitable unit. Defaults to 0.
         location (Tuple[float, float], optional): The geographical coordinates (latitude and longitude) of the power plant's location. Defaults to (0.0, 0.0).
         node (str, optional): The identifier of the electrical bus or network node to which the power plant is connected. Defaults to "node0".
@@ -64,14 +64,14 @@ class PowerPlant(SupportsMinMax):
         emission_factor: float = 0.0,
         ramp_up: float | None = None,
         ramp_down: float | None = None,
-        hot_start_cost: float = 0,
-        warm_start_cost: float = 0,
-        cold_start_cost: float = 0,
-        min_operating_time: int = 1,  # hours
-        min_down_time: int = 1,  # hours
-        downtime_hot_start: int = 0,  # hours
-        downtime_warm_start: int = 0,  # hours
-        max_heat_extraction: float = 0,
+        hot_start_cost: float = 0.0,
+        warm_start_cost: float = 0.0,
+        cold_start_cost: float = 0.0,
+        min_operating_time: float = 0.0,  # hours
+        min_down_time: float = 0.0,  # hours
+        downtime_hot_start: float = 0.0,  # hours
+        downtime_warm_start: float = 0.0,  # hours
+        max_heat_extraction: float = 0.0,
         location: tuple[float, float] = (0.0, 0.0),
         node: str = "node0",
         **kwargs,
@@ -209,7 +209,7 @@ class PowerPlant(SupportsMinMax):
         self.calculate_generation_cost(start, end, "energy")
         return self.outputs["energy"].loc[start:end]
 
-    def get_starting_costs(self, op_time: int) -> float:
+    def get_starting_costs(self, op_time: float) -> float:
         """
         Returns the start-up cost for the given operation time.
 
@@ -469,14 +469,14 @@ class PowerPlant(SupportsMinMax):
 
         return unit_dict
 
-    def get_max_lookback_optime(self):
-        # Add 1 to the warm/hot-start threshold so the window is big enough to
+    def get_max_lookback_op_time(self):
+        # Add one time step to the warm/hot-start threshold so the window is big enough to
         # distinguish warm/hot from cold starts (downtime > downtime_warm_start).
         max_time = max(
             self.min_operating_time,
             self.min_down_time,
-            self.downtime_hot_start + 1,
-            self.downtime_warm_start + 1,
-            1,
+            self.downtime_hot_start + 1.0,
+            self.downtime_warm_start + 1.0,
+            1.0,
         )
         return max_time
