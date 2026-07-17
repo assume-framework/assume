@@ -342,7 +342,12 @@ def test_storage_rl_strategy_soc_and_cost_stored_energy(
             all_bids.append(bid)
 
             # Set dispatch plan
-            storage_unit.set_dispatch_plan(mc, orderbook=[bid])
+            storage_unit.set_dispatch_plan(
+                mc,
+                orderbook=[bid],
+                start_time=product_index[0],
+                end_time=product_index[-1],
+            )
 
             # Apply profit and reward update for this step
             strategy.calculate_reward(storage_unit, mock_market_config, orderbook=[bid])

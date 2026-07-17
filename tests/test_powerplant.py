@@ -179,7 +179,7 @@ def test_powerplant_feedback(power_plant_1, mock_market_config):
 
     # min_power gets accepted
     mc = mock_market_config
-    power_plant_1.set_dispatch_plan(mc, orderbook)
+    power_plant_1.set_dispatch_plan(mc, orderbook, start, end)
 
     # second market request for same interval
     min_power, max_power = power_plant_1.calculate_min_max_power(
@@ -504,7 +504,7 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
     ]
 
     # min_power gets accepted by fictional market
-    power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
+    power_plant_1.set_dispatch_plan(mock_market_config, orderbook, start, end)
 
     # second market request for same interval
     min_power, max_power = power_plant_1.calculate_min_max_power(
@@ -529,7 +529,7 @@ def test_powerplant_min_feedback(power_plant_1, mock_market_config):
     ]
 
     # min_power gets accepted
-    power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
+    power_plant_1.set_dispatch_plan(mock_market_config, orderbook, start, end)
 
     min_power, max_power = power_plant_1.calculate_min_max_power(
         start, end, product_type=product_type
@@ -585,7 +585,7 @@ def test_powerplant_ramp_feedback(power_plant_1, mock_market_config):
     ]
 
     # min_power gets accepted by fictional market
-    power_plant_1.set_dispatch_plan(mock_market_config, orderbook)
+    power_plant_1.set_dispatch_plan(mock_market_config, orderbook, start, end)
 
     # second market request for same interval
     min_power, max_power = power_plant_1.calculate_min_max_power(
