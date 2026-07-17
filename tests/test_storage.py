@@ -178,7 +178,7 @@ def test_storage_feedback(storage_unit, mock_market_config):
     ]
     # max_power_charge gets accepted
     mc = mock_market_config
-    storage_unit.set_dispatch_plan(mc, orderbook)
+    storage_unit.set_dispatch_plan(mc, orderbook, start, end)
 
     # second market request for same interval
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
@@ -329,7 +329,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     assert len(bids) == 0
 
     # dispatch full discharge
-    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.set_dispatch_plan(mc, bids, start, end)
     storage_unit.execute_current_dispatch(start, end)
 
     assert storage_unit.outputs["energy"][start] == 100
@@ -341,7 +341,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["energy"][start] = -100
     storage_unit.outputs["soc"][start] = 0.5
 
-    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.set_dispatch_plan(mc, bids, start, end)
     storage_unit.execute_current_dispatch(start, end)
 
     assert storage_unit.outputs["energy"][start] == -100
@@ -353,7 +353,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["energy"][start] = 100
     storage_unit.outputs["soc"][start] = 0.05
 
-    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.set_dispatch_plan(mc, bids, start, end)
     storage_unit.execute_current_dispatch(start, end)
 
     assert math.isclose(
@@ -365,7 +365,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["energy"][start] = -100
     storage_unit.outputs["soc"][start] = 0.95
 
-    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.set_dispatch_plan(mc, bids, start, end)
     storage_unit.execute_current_dispatch(start, end)
 
     assert math.isclose(
@@ -417,7 +417,7 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     bids[1]["accepted_price"] = 45
 
     # now dispatch full discharge
-    storage_unit.set_dispatch_plan(mc, bids)
+    storage_unit.set_dispatch_plan(mc, bids, start, end)
 
     # is the dispatch plan set correctly
     for i in range(1, 3):

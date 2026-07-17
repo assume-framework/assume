@@ -86,7 +86,9 @@ async def test_set_unit_dispatch(units_operator: UnitsOperator):
 
     assert units_operator.units["testdemand"].outputs["energy"].max() == 0
 
-    units_operator.set_unit_dispatch(orderbook, marketconfig)
+    units_operator.set_unit_dispatch(
+        orderbook, marketconfig, start, start + rd(hours=1)
+    )
     assert units_operator.units["testdemand"].outputs["energy"].max() == 500
 
 
