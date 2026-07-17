@@ -175,7 +175,8 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             theoretic_SOC += delta_soc
             previous_power = bid_quantity + current_power
 
-        bids = self.remove_empty_bids(bids)
+        # issue #562 needs to be fixed first to enable this again
+        # bids = self.remove_empty_bids(bids)
 
         return bids
 
@@ -353,7 +354,8 @@ class StorageCapacityHeuristicBalancingPosStrategy(MinMaxChargeStrategy):
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
 
-        bids = self.remove_empty_bids(bids)
+        # issue #562 needs to be fixed first to enable this again
+        # bids = self.remove_empty_bids(bids)
 
         return bids
 
@@ -460,7 +462,8 @@ class StorageCapacityHeuristicBalancingNegStrategy(MinMaxChargeStrategy):
                     f"Product {market_config.product_type} is not supported by this strategy."
                 )
 
-        bids = self.remove_empty_bids(bids)
+        # issue #562 needs to be fixed first to enable this again
+        # bids = self.remove_empty_bids(bids)
 
         return bids
 
