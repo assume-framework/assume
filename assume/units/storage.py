@@ -227,6 +227,9 @@ class Storage(SupportsMinMaxCharge):
         self.ramp_up_discharge = ramp_up_discharge
         self.ramp_down_discharge = ramp_down_discharge
 
+        # Convert time parameters from hours to index steps
+        hours_to_steps = timedelta(hours=1) / self.index.freq
+
         # How long the storage unit has to be in operation before it can be shut down.
         if min_operating_time < 0:
             raise ValidationError(
@@ -234,7 +237,7 @@ class Storage(SupportsMinMaxCharge):
                 id=self.id,
                 field="min_operating_time",
             )
-        self.min_operating_time = min_operating_time
+        self.min_operating_time = min_operating_time * hours_to_steps
         # How long the storage unit has to be shut down before it can be started.
         if min_down_time < 0:
             raise ValidationError(
@@ -242,7 +245,7 @@ class Storage(SupportsMinMaxCharge):
                 id=self.id,
                 field="min_down_time",
             )
-        self.min_down_time = min_down_time
+        self.min_down_time = min_down_time * hours_to_steps
 
     def execute_current_dispatch(self, start: datetime, end: datetime) -> np.ndarray:
         """

@@ -144,26 +144,27 @@ class PowerPlant(SupportsMinMax):
         self.ramp_down = None if ramp_down == 0 else ramp_down
         self.ramp_up = None if ramp_up == 0 else ramp_up
 
+        # Convert time parameters from hours to index steps
+        hours_to_steps = timedelta(hours=1) / self.index.freq
+
         if min_operating_time < 0:
             raise ValidationError(
-                message=f"{min_operating_time=} must be > 0 for unit {self.id}",
+                message=f"{min_operating_time=} must be >= 0 for unit {self.id}",
                 id=self.id,
                 field="min_operating_time",
             )
-        self.min_operating_time = min_operating_time
+        self.min_operating_time = min_operating_time * hours_to_steps
+
         if min_down_time < 0:
             raise ValidationError(
-                message=f"{min_down_time=} must be > 0 for unit {self.id}",
+                message=f"{min_down_time=} must be >= 0 for unit {self.id}",
                 id=self.id,
                 field="min_down_time",
             )
-        self.min_down_time = min_down_time
-        self.downtime_hot_start = downtime_hot_start / (
-            self.index.freq / timedelta(hours=1)
-        )
-        self.downtime_warm_start = downtime_warm_start / (
-            self.index.freq / timedelta(hours=1)
-        )
+        self.min_down_time = min_down_time * hours_to_steps
+
+        self.downtime_hot_start = downtime_hot_start * hours_to_steps
+        self.downtime_warm_start = downtime_warm_start * hours_to_steps
 
         self.marginal_cost = self.calc_simple_marginal_cost()
 
