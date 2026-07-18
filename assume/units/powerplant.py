@@ -393,9 +393,9 @@ class PowerPlant(SupportsMinMax):
                 "efficiency": self.efficiency,
                 "fuel_type": self.fuel_type,
                 "max_heat_extraction": self.max_heat_extraction,
-                "hot_start_cost": self.hot_start_cost,
-                "warm_start_cost": self.warm_start_cost,
-                "cold_start_cost": self.cold_start_cost,
+                "hot_start_cost": self.hot_start_cost / self.max_power,
+                "warm_start_cost": self.warm_start_cost / self.max_power,
+                "cold_start_cost": self.cold_start_cost / self.max_power,
                 "unit_type": "power_plant",
             }
         )

@@ -42,7 +42,7 @@ def load_pypsa(
     """
     index = network.snapshots
     index.freq = index.inferred_freq
-    start = index[0]
+    start = index[0] - timedelta(hours=1)
     end = index[-1]
     simulation_id = f"{scenario}_{study_case}"
     logger.info(f"loading scenario {simulation_id}")
@@ -86,7 +86,9 @@ def load_pypsa(
 
         max_power = generator.max_power or 1000
         # if p_nom is not set, generator.p_nom_extendable must be
-        ramp_up = generator.ramp_limit_start_up * max_power
+        ramp_up = (
+            generator.ramp_limit_start_up * max_power
+        )  # TODO: check ramping options and why nan: ramp_limit_up NaN, ramp_limit_down NaN, ramp_limit_start_up NaN, ramp_limit_shut_down NaN
         ramp_down = generator.ramp_limit_shut_down * max_power
         world.add_unit(
             generator.name,
@@ -188,7 +190,7 @@ if __name__ == "__main__":
     world = World(database_uri=db_uri)
     scenario = "world_pypsa"
     study_case = "scigrid_de"
-    # "pay_as_clear", "redispatch" or "nodal"
+    # "pay_as_clear", "complex_clearing", "redispatch" or "nodal_clearing"
     market_mechanism = "complex_clearing"
 
     match study_case:
@@ -208,12 +210,14 @@ if __name__ == "__main__":
 
     study_case = f"{study_case}_{market_mechanism}"
 
-    start = network.snapshots[0]
+    start = network.snapshots[0] - timedelta(hours=1)
     end = network.snapshots[-1]
     marketdesign = [
         MarketConfig(
             "redispatch" if market_mechanism == "redispatch" else "EOM",
-            rr.rrule(rr.HOURLY, interval=1, dtstart=start, until=end),
+            rr.rrule(
+                rr.HOURLY, interval=1, dtstart=start + timedelta(hours=1), until=end
+            ),
             timedelta(hours=1),
             market_mechanism,
             [MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
@@ -230,7 +234,7 @@ if __name__ == "__main__":
                 rr.rrule(
                     rr.HOURLY,
                     interval=1,
-                    dtstart=start - timedelta(hours=0.5),
+                    dtstart=start + timedelta(hours=0.5),
                     until=end,
                 ),
                 timedelta(hours=0.25),
