@@ -233,8 +233,16 @@ class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
     recomputed per snapshot at the running state-of-charge, so state-of-charge limits and
     any capacity reserved on other markets (e.g. CRM) are respected automatically -- both
     are already netted out by ``calculate_min_max_discharge``/``calculate_min_max_charge``.
-    Bids are priced at the unit's marginal cost.
+    Bids are priced at the round-trip opportunity cost of the stored energy (the
+    reference market price it was procured at, adjusted for round-trip efficiency,
+    plus the variable charge/discharge costs), so the optimiser only moves storage
+    when it is economically worthwhile rather than treating stored energy as free.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.foresight = parse_duration(kwargs.get("eom_foresight", "12h"))
 
     def calculate_bids(
         self,
@@ -273,6 +281,16 @@ class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
         # [-1, 1] even though the charging side is negative
         p_nom = abs(unit.max_power_discharge) + abs(unit.max_power_charge)
 
+        # reference market price used to value the stored energy. Redispatch clears
+        # after the EOM, so the EOM price reflects what the energy was traded at.
+        # Fall back gracefully if no EOM forecast is available.
+        if "EOM" in unit.forecaster.price:
+            price_forecast = unit.forecaster.price["EOM"]
+        elif market_config.market_id in unit.forecaster.price:
+            price_forecast = unit.forecaster.price[market_config.market_id]
+        else:
+            price_forecast = next(iter(unit.forecaster.price.values()))
+
         bids = []
         for product in product_tuples:
             start, end = product[0], product[1]
@@ -295,7 +313,19 @@ class StorageRedispatchFlexableStrategy(MinMaxChargeStrategy):
                 base_p + max_power_charge[0]
             )  # most charge (<= base_p, may be <0)
 
-            price = unit.calculate_marginal_cost(start, base_p)
+            # opportunity cost of the stored energy: the round-trip-adjusted market
+            # price plus the variable charge and discharge costs. Prevents the
+            # optimiser from treating stored energy as a near-free redispatch resource.
+            average_price = calculate_price_average(
+                current_time=start,
+                foresight=self.foresight,
+                price_forecast=price_forecast,
+            )
+            price = (
+                average_price / (unit.efficiency_charge * unit.efficiency_discharge)
+                + unit.additional_cost_charge
+                + unit.additional_cost_discharge
+            )
 
             bids.append(
                 {

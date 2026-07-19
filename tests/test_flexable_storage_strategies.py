@@ -101,6 +101,31 @@ def test_flexable_redispatch_storage_uses_committed_not_clipped(
     assert bids[0]["volume"] == pytest.approx(-60)
 
 
+def test_flexable_redispatch_storage_prices_opportunity_cost(
+    mock_market_config, storage
+):
+    """
+    The redispatch bid is priced at the round-trip opportunity cost of the stored
+    energy (reference EOM price / round-trip efficiency + variable charge/discharge
+    costs), NOT the near-zero variable cost alone -- otherwise the optimiser would
+    treat stored energy as an almost-free redispatch resource and over-use it.
+    """
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    strategy = StorageRedispatchFlexableStrategy()
+    product_tuples = [(start, end, None)]
+
+    bids = strategy.calculate_bids(
+        storage, mock_market_config, product_tuples=product_tuples
+    )
+
+    # avg EOM price (50) / (eff_charge * eff_discharge) + add_cost_charge + add_cost_discharge
+    expected = 50 / (0.9 * 0.95) + 3 + 4
+    assert bids[0]["price"] == pytest.approx(expected)
+    # sanity: this is far above the old variable-cost-only price (~3-4)
+    assert bids[0]["price"] > 60
+
+
 def test_flexable_eom_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)

@@ -107,20 +107,52 @@ available_examples = {
     },
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
-    "fokusstrom_2030": {
-        "scenario": "fokusstrom_2030",
+    "niedrigenachfrage_2030": {
+        "scenario": "niedrigenachfrage_2030",
         "study_case": "base_case_2030",
-    },
-    "fokusstrom_2035": {
-        "scenario": "fokusstrom_2035",
+    },  # PC
+    "niedrigenachfrage_2035": {
+        "scenario": "niedrigenachfrage_2035",
         "study_case": "base_case_2035",
-    },
-    "fokusstrom_2040": {
-        "scenario": "fokusstrom_2040",
+    },  # VC
+    "niedrigenachfrage_2040": {
+        "scenario": "niedrigenachfrage_2040",
         "study_case": "base_case_2040",
     },
-    "fokusstrom_2045": {
-        "scenario": "fokusstrom_2045",
+    "niedrigenachfrage_2045": {
+        "scenario": "niedrigenachfrage_2045",
+        "study_case": "base_case_2045",
+    },
+    "hohenachfrage_2030": {
+        "scenario": "hohenachfrage_2030",
+        "study_case": "base_case_2030",
+    },
+    "hohenachfrage_2035": {
+        "scenario": "hohenachfrage_2035",
+        "study_case": "base_case_2035",
+    },
+    "hohenachfrage_2040": {
+        "scenario": "hohenachfrage_2040",
+        "study_case": "base_case_2040",
+    },
+    "hohenachfrage_2045": {
+        "scenario": "hohenachfrage_2045",
+        "study_case": "base_case_2045",
+    },
+    "aktuellepolitiken_2030": {
+        "scenario": "aktuellepolitiken_2030",
+        "study_case": "base_case_2030",
+    },
+    "aktuellepolitiken_2035": {
+        "scenario": "aktuellepolitiken_2035",
+        "study_case": "base_case_2035",
+    },
+    "aktuellepolitiken_2040": {
+        "scenario": "aktuellepolitiken_2040",
+        "study_case": "base_case_2040",
+    },
+    "aktuellepolitiken_2045": {
+        "scenario": "aktuellepolitiken_2045",
         "study_case": "base_case_2045",
     },
 }
@@ -139,7 +171,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "fokusstrom_2035"
+    example = "niedrigenachfrage_2030"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"

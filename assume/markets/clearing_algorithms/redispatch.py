@@ -284,11 +284,19 @@ class RedispatchMarketRole(MarketRole):
             redispatch_network.generators_t.p_max_pu.update(
                 stor_p_max_pu_down.add_suffix("_down")
             )
+            # Upward redispatch (discharge more / charge less) costs the storage's
+            # opportunity cost, discouraging cheap over-discharge.
             redispatch_network.generators_t.marginal_cost.update(
                 stor_costs.add_suffix("_up")
             )
+            # Downward redispatch (charge more / discharge less) is priced at zero.
+            # A power plant's downward redispatch earns a negative marginal cost
+            # because reducing output refunds its avoided fuel cost; charging a
+            # storage is NOT a cost saving, so pricing it at -price would let the
+            # optimiser charge the storage purely for profit (a "money pump"). At
+            # zero cost the storage only absorbs surplus when the network needs it.
             redispatch_network.generators_t.marginal_cost.update(
-                stor_costs.add_suffix("_down") * (-1)
+                (stor_costs * 0.0).add_suffix("_down")
             )
 
         # 5. Fixed cross-border exchange injections (net EOM position; not
