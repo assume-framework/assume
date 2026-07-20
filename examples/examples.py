@@ -126,7 +126,7 @@ available_examples = {
     "hohenachfrage_2030": {
         "scenario": "hohenachfrage_2030",
         "study_case": "base_case_2030",
-    },
+    }, # VC
     "hohenachfrage_2035": {
         "scenario": "hohenachfrage_2035",
         "study_case": "base_case_2035",
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
-    example = "niedrigenachfrage_2045"
+    example = "hohenachfrage_2030"
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
