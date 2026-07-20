@@ -95,6 +95,89 @@ def test_redispatch_storage(mock_market_config, storage):
     assert bids[0]["min_power"] > storage.max_power_charge
 
 
+def test_redispatch_storage_uses_committed_not_clipped(mock_market_config, storage):
+    """
+    The redispatch base must be the market-committed (pre-SoC-clip) dispatch, not the
+    SoC-clipped executed value. The generators were dispatched against the committed
+    volume, so the redispatch network only balances (supply == demand, no spurious
+    net up/down) when storage reports that same committed volume.
+    """
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    strategy = StorageEnergyHeuristicRedispatchStrategy()
+    product_tuples = [(start, end, None)]
+
+    # market committed 60 MW of charging; the SoC clip cut the executed charge to 40 MW
+    storage.outputs["energy_committed"][start] = -60
+    storage.outputs["energy"][start] = -40
+
+    bids = strategy.calculate_bids(
+        storage, mock_market_config, product_tuples=product_tuples
+    )
+
+    # the redispatch base is the committed -60, NOT the clipped -40
+    assert bids[0]["volume"] == pytest.approx(-60)
+
+
+def test_storage_records_committed_energy_before_soc_clip(mock_market_config, storage):
+    """
+    Storage.set_dispatch_plan must mirror the market-committed (pre-clip) energy into
+    outputs["energy_committed"] BEFORE the SoC clip rewrites outputs["energy"].
+    The redispatch baseline is taken from that committed volume, because the
+    generators were dispatched against it.
+    """
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    mc = mock_market_config
+    mc.product_type = "energy"
+
+    # nearly empty battery: it can physically deliver only
+    # soc * capacity * efficiency_discharge = 0.01 * 1000 * 0.95 = 9.5 MW
+    storage.outputs["soc"].at[start] = 0.01
+
+    orderbook = [
+        {
+            "start_time": start,
+            "end_time": end,
+            "accepted_volume": 100,  # market committed 100 MW of discharge
+            "accepted_price": 50,
+        }
+    ]
+    storage.set_dispatch_plan(mc, orderbook)
+
+    # the committed schedule keeps the unclipped 100 ...
+    assert storage.outputs["energy_committed"].at[start] == pytest.approx(100)
+    # ... while the executed energy is clipped down to what the SoC allows
+    assert storage.outputs["energy"].at[start] == pytest.approx(
+        0.01 * storage.capacity * storage.efficiency_discharge
+    )
+    assert storage.outputs["energy"].at[start] < 100
+
+
+def test_redispatch_storage_excludes_reserved_crm_capacity(mock_market_config, storage):
+    """
+    Capacity already sold on the CRM/aFRR markets must not be offered again to the
+    redispatch market. Reserving upward capacity has to shrink the upward (discharge)
+    head-room by the same amount, otherwise the same MW are committed twice.
+    """
+    start = datetime(2023, 7, 1)
+    end = datetime(2023, 7, 1, 1)
+    strategy = StorageEnergyHeuristicRedispatchStrategy()
+    product_tuples = [(start, end, None)]
+
+    baseline = strategy.calculate_bids(
+        storage, mock_market_config, product_tuples=product_tuples
+    )[0]
+
+    # reserve 30 MW of upward capacity on the CRM market
+    storage.outputs["capacity_pos"][start] = 30
+    reserved = strategy.calculate_bids(
+        storage, mock_market_config, product_tuples=product_tuples
+    )[0]
+
+    assert reserved["max_power"] == pytest.approx(baseline["max_power"] - 30)
+
+
 def test_flexable_eom_storage(mock_market_config, storage):
     index = pd.date_range("2023-07-01", periods=4, freq="h")
     start = datetime(2023, 7, 1)

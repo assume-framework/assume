@@ -9,7 +9,11 @@ from dateutil import rrule as rr
 
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.utils import get_available_products
-from assume.markets.clearing_algorithms import PayAsClearRole, clearing_mechanisms
+from assume.markets.clearing_algorithms import (
+    PayAsBidRole,
+    PayAsClearRole,
+    clearing_mechanisms,
+)
 
 from .utils import create_orderbook, extend_orderbook
 
@@ -61,6 +65,71 @@ def test_market():
     print(pd.DataFrame(mr.all_orders))
     print(pd.DataFrame(accepted))
     print(meta)
+
+
+def test_pay_as_bid_demand_exceeds_supply_completes_orders():
+    """
+    Regression: when demand exceeds the offered supply (e.g. an aFRR reserve
+    shortfall), PayAsBidRole must still return every accepted and rejected order with
+    both ``accepted_volume`` and ``accepted_price`` set. Previously a demand order
+    left unserved after supply was exhausted got a bogus positive ``accepted_volume``
+    with no ``accepted_price``, which crashed ``set_dispatch_plan`` downstream
+    (``KeyError: 'accepted_price'``) on long runs.
+    """
+    config = MarketConfig(
+        market_id="crm_like_pay_as_bid",
+        market_products=[MarketProduct(timedelta(hours=1), 1, timedelta(hours=1))],
+        additional_fields=["node"],
+        opening_hours=rr.rrule(
+            rr.HOURLY,
+            dtstart=datetime(2005, 6, 1),
+            until=datetime(2005, 6, 2),
+            cache=True,
+        ),
+        opening_duration=timedelta(hours=1),
+        volume_unit="MW",
+        price_unit="€/MW",
+        market_mechanism="pay_as_bid",
+    )
+    products = get_available_products(
+        config.market_products, config.opening_hours.after(datetime(2005, 6, 1))
+    )
+    p = products[0]
+
+    # mimic real bids: no accepted_* keys pre-set (unlike the test helper). Three
+    # 600 MW demand blocks (1800 MW) but only 500 MW of supply offered.
+    def order(uid, volume, price):
+        return {
+            "start_time": p[0],
+            "end_time": p[1],
+            "only_hours": p[2],
+            "agent_addr": uid,
+            "bid_id": f"{uid}_bid",
+            "volume": volume,
+            "price": price,
+            "node": "node0",
+        }
+
+    orderbook = [
+        order("dem1", -600, 3000),
+        order("dem2", -600, 3000),
+        order("dem3", -600, 3000),
+        order("gen1", 500, 50),
+    ]
+
+    role = PayAsBidRole(config)
+    accepted, rejected, meta, flows = role.clear(orderbook, products)
+
+    # every returned order carries the fields set_dispatch_plan reads
+    for o in accepted + rejected:
+        assert "accepted_volume" in o
+        assert o.get("accepted_price") is not None
+
+    # no phantom demand: accepted demand matches the 500 MW that could be served
+    acc_sup = sum(o["accepted_volume"] for o in accepted if o["volume"] > 0)
+    acc_dem = sum(o["accepted_volume"] for o in accepted if o["volume"] < 0)
+    assert acc_sup == 500
+    assert acc_dem == -500
 
 
 async def test_simple_market_mechanism():

@@ -12,6 +12,7 @@ from assume.common.base import SupportsMinMaxCharge
 from assume.common.exceptions import ValidationError
 from assume.common.fast_pandas import FastSeries
 from assume.common.forecaster import UnitForecaster
+from assume.common.market_objects import MarketConfig, Orderbook
 
 logger = logging.getLogger(__name__)
 EPS = 1e-4
@@ -365,6 +366,51 @@ class Storage(SupportsMinMaxCharge):
         marginal_cost = additional_cost
 
         return marginal_cost
+
+    def set_dispatch_plan(
+        self, marketconfig: MarketConfig, orderbook: Orderbook
+    ) -> None:
+        """
+        Records the committed (pre-SoC-clip) energy schedule, then delegates to the
+        base implementation.
+
+        ``SupportsMinMaxCharge.set_dispatch_plan`` first accumulates the accepted
+        volumes into ``outputs["energy"]`` and then clips them down to what the state
+        of charge actually allows, overwriting the committed values. Markets that
+        balance against the *market-committed* dispatch need that pre-clip schedule:
+        in redispatch the generators were dispatched against the unclipped storage
+        volume, so if storage reported only the clipped value the network would not
+        balance and the optimiser would ramp real generation to close the gap.
+
+        The committed schedule is therefore mirrored into
+        ``outputs["energy_committed"]`` here - before the clip runs - by repeating the
+        same accumulation the base implementation performs. Only the energy product is
+        mirrored; capacity products do not feed the redispatch baseline.
+
+        Args:
+            marketconfig (MarketConfig): The market configuration.
+            orderbook (Orderbook): The orderbook.
+        """
+        if orderbook and marketconfig.product_type == "energy":
+            start = min(order["start_time"] for order in orderbook)
+            end_excl = max(order["end_time"] for order in orderbook) - self.index.freq
+
+            # seed with the energy already booked (i.e. after the previous clip) ...
+            self.outputs["energy_committed"].loc[start:end_excl] = self.outputs[
+                "energy"
+            ].loc[start:end_excl]
+
+            # ... then add this clearing's accepted volumes, exactly as BaseUnit does
+            for order in orderbook:
+                order_end_excl = order["end_time"] - self.index.freq
+                accepted_volume = order["accepted_volume"]
+                if isinstance(accepted_volume, dict):
+                    accepted_volume = list(accepted_volume.values())
+                self.outputs["energy_committed"].loc[
+                    order["start_time"] : order_end_excl
+                ] += accepted_volume
+
+        super().set_dispatch_plan(marketconfig, orderbook)
 
     def calculate_soc_max_discharge(self, soc) -> float:
         """

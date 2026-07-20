@@ -301,18 +301,28 @@ class StorageEnergyHeuristicRedispatchStrategy(MinMaxChargeStrategy):
         for product in product_tuples:
             start, end = product[0], product[1]
 
-            # currently cleared dispatch (+ discharge, - charge)
-            current_power = unit.outputs["energy"].at[start]
+            # Committed (pre-SoC-clip) dispatch (+ discharge, - charge). The redispatch
+            # balances against the volume the energy market cleared and the generators
+            # were dispatched for. outputs["energy"] holds the SoC-clipped value; using
+            # it would make storage disagree with the rest of the network and force a
+            # spurious net redispatch. energy_committed is recorded in set_dispatch_plan.
+            current_power = unit.outputs["energy_committed"].at[start]
 
-            # state-of-charge aware absolute injection bounds
-            max_power_discharge = min(
-                unit.max_power_discharge,
-                unit.calculate_soc_max_discharge(theoretic_SOC),
+            # Additional feasible head-room at the current state of charge, already net
+            # of the cleared dispatch and of capacity reserved on other markets (CRM),
+            # so reserve MW that were already sold are not offered again to redispatch.
+            _, max_power_discharge = unit.calculate_min_max_discharge(
+                start, end, soc=theoretic_SOC
             )
-            max_power_charge = max(
-                unit.max_power_charge,
-                unit.calculate_soc_max_charge(theoretic_SOC),
+            _, max_power_charge = unit.calculate_min_max_charge(
+                start, end, soc=theoretic_SOC
             )
+
+            # Absolute injection bounds around the committed dispatch, matching the
+            # clearing's head-room formula (up = max_power - volume, down = volume -
+            # min_power).
+            max_power_discharge = current_power + max_power_discharge[0]
+            max_power_charge = current_power + max_power_charge[0]
 
             # opportunity cost of the stored energy: round-trip adjusted market
             # price plus the variable charge/discharge costs
