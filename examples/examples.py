@@ -107,22 +107,6 @@ available_examples = {
     },
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
-    "niedrigenachfrage_2030": {
-        "scenario": "niedrigenachfrage_2030",
-        "study_case": "base_case_2030",
-    },  # PC
-    "niedrigenachfrage_2035": {
-        "scenario": "niedrigenachfrage_2035",
-        "study_case": "base_case_2035",
-    },  # VC
-    "niedrigenachfrage_2040": {
-        "scenario": "niedrigenachfrage_2040",
-        "study_case": "base_case_2040",
-    },  # VC
-    "niedrigenachfrage_2045": {
-        "scenario": "niedrigenachfrage_2045",
-        "study_case": "base_case_2045",
-    },  # PC
     "hohenachfrage_2030": {
         "scenario": "hohenachfrage_2030",
         "study_case": "base_case_2030",
