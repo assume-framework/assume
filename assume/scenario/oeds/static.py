@@ -19,39 +19,49 @@ fuel_translation = {
     "Speicher": "storage",
 }
 
+mastr_wind_type = {
+    "on_shore": "Windkraft an Land",
+    "off_shore": "Windkraft auf See",
+}
+
 
 # SolarLage
 mastr_solar_codes = {
-    "free_area": "852",
-    "roof_top": "853",
-    "other": "2484",
-    "balcony": "2961",
-    "water": "3002",
-    "parking_lot": "3058",
+    "free_area": "Freiflächensolaranlage",  # 852
+    "roof_top": "Gebäudesolaranlage",  # 853
+    "other": "Sonstige Solaranlage",  # 2484
+    "balcony": "Steckerfertige Solaranlage (sog. Balkonkraftwerk)",  # 2961
 }
 
 mastr_solar_azimuth = {
-    "695": "0",
-    "696": "45",
-    "697": "90",
-    "698": "135",
-    "699": "180",
-    "700": "225",
-    "701": "270",
-    "702": "315",
-    "703": "360",
-    "704": "-1",
-    "806": "90",
-    "807": "75",
-    "808": "50",
-    "809": "30",
-    "810": "10",
-    "811": "0",
-    "802": "100",
-    "803": "70",
-    "804": "60",
-    "805": "50",
-    "1535": "100",
+    # Hauptausrichtung
+    "Nord": "0",  # 695
+    "Nord-Ost": "45",  # 696
+    "Ost": "90",  # 697
+    "Süd-Ost": "135",  # 698
+    "Süd": "180",  # 699
+    "Süd-West": "225",  # 700
+    "West": "270",  # 701
+    "Nord-West": "315",  # 702
+    "nachgeführt": "180",  # Assumption: most pv are facing south#703
+    "Nachgeführt": "180",  # Assumption: most pv are facing south#703
+    "Ost-West": "360",  # 704 half ost, half west
+    # Neigungswinkel
+    "90 Grad (vertikal) ": "90",  # 806
+    "61 - 89 Grad": "75",  # 807
+    "41 - 60 Grad": "50",  # 808
+    "21 - 40 Grad": "30",  # 809
+    "5 - 20 Grad": "10",  # 810
+    "unter 5 Grad (horizontal)": "0",  # 811
+}
+
+# Power limit
+mastr_solar_power_limit = {
+    "Nein": 1.0,  # 802
+    "Ja, sonstige": 0.8,  # 1535
+    "Ja, auf 70%": 0.7,  # 803
+    "Ja, auf 60%": 0.6,  # 804
+    "Ja, auf 50%": 0.5,  # 805
 }
 
 mastr_storage = {
