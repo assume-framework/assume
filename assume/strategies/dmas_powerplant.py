@@ -171,14 +171,14 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
                         <= unit.ramp_down * self.model.z[t]
                     )
             # minimal run and stop time
-            if t > unit.min_down_time:
+            if t > int(unit.min_down_time):
                 self.model.stop_time.add(
                     1 - self.model.z[t]
                     >= quicksum(
                         self.model.w[k] for k in range(t - int(unit.min_down_time), t)
                     )
                 )
-            if t > unit.min_operating_time:
+            if t > int(unit.min_operating_time):
                 self.model.run_time.add(
                     self.model.z[t]
                     >= quicksum(
@@ -519,7 +519,7 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
         yesterday = start.date() - timedelta(days=1)
 
         index = 0
-        runtime = unit.get_operation_time(start)
+        runtime = int(unit.get_operation_time(start))
 
         # TODO add ramping constraints from
         # unit.calculate_ramp(runtime, last_power, unit.min_power)
@@ -535,7 +535,7 @@ class EnergyOptimizationDmasStrategy(MinMaxStrategy):
                 # pwp is on and must runtime is reached
                 if result["power"][0] > 0 and runtime > 0:
                     reduction = 0
-                    hours_needed_to_run = unit.min_operating_time - runtime
+                    hours_needed_to_run = int(unit.min_operating_time) - runtime
                     hours = (
                         list(range(hours_needed_to_run))
                         if hours_needed_to_run > 0

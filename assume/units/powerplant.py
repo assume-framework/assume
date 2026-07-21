@@ -67,8 +67,8 @@ class PowerPlant(SupportsMinMax):
         hot_start_cost: float = 0.0,
         warm_start_cost: float = 0.0,
         cold_start_cost: float = 0.0,
-        min_operating_time: float = 0.0,  # hours
-        min_down_time: float = 0.0,  # hours
+        min_operating_time: float = 1.0,  # hours, but I really don't like this. It should be 0 as a default.
+        min_down_time: float = 1.0,  # hours
         downtime_hot_start: float = 0.0,  # hours
         downtime_warm_start: float = 0.0,  # hours
         max_heat_extraction: float = 0.0,
@@ -149,7 +149,7 @@ class PowerPlant(SupportsMinMax):
 
         if min_operating_time < 0:
             raise ValidationError(
-                message=f"{min_operating_time=} must be >= 0 for unit {self.id}",
+                message=f"{min_operating_time=} must be > 0 for unit {self.id}",  # operator not alingned with statement above
                 id=self.id,
                 field="min_operating_time",
             )
@@ -157,7 +157,7 @@ class PowerPlant(SupportsMinMax):
 
         if min_down_time < 0:
             raise ValidationError(
-                message=f"{min_down_time=} must be >= 0 for unit {self.id}",
+                message=f"{min_down_time=} must be > 0 for unit {self.id}",
                 id=self.id,
                 field="min_down_time",
             )
