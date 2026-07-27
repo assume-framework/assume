@@ -110,3 +110,14 @@ def test_glob_with_no_matches_returns_empty_list():
     )
 
     assert data["key"] == []
+
+
+def test_mapping_node_is_not_supported():
+    # only scalar (`!include "path"`) and sequence (`!include ["path", ...]`)
+    # forms are needed by AMIRIS scenario files; a mapping form such as
+    # `!include {urlpath: ...}` should fail loudly rather than silently.
+    with pytest.raises(TypeError, match="MappingNode"):
+        yaml.load(
+            'key: !include {urlpath: "schema.yaml"}',
+            Loader=_loader_with_base_dir(FIXTURE_PATH),
+        )

@@ -36,8 +36,8 @@ they appear in.
 from __future__ import annotations
 
 import glob
-import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -71,15 +71,15 @@ class Constructor:
         else:
             raise TypeError(f"!include does not support {type(node).__name__} nodes")
 
-        path = os.path.join(self.base_dir, urlpath)
+        path = Path(self.base_dir) / urlpath
         loader_type = type(loader)
 
         if any(char in urlpath for char in WILDCARD_CHARS):
-            matches = sorted(glob.glob(path, recursive=True))
+            matches = sorted(glob.glob(str(path), recursive=True))
             return [self._load(match, loader_type) for match in matches]
         return self._load(path, loader_type)
 
     @staticmethod
-    def _load(path: str, loader_type: type) -> Any:
+    def _load(path: Path | str, loader_type: type) -> Any:
         with open(path, "rb") as f:
             return yaml.load(f, loader_type)
