@@ -72,7 +72,7 @@ class Constructor:
 
         base = Path(self.base_dir)
         loader_type = type(loader)
-        
+
         if any(char in urlpath for char in WILDCARD_CHARS):
             matches = sorted(base.glob(urlpath))
             return [self._load(match, loader_type) for match in matches]
