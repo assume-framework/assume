@@ -27,6 +27,7 @@ Upcoming Release
   - **Readme naming of examples/tutorials**: Slight changing of tutorial and example in the read me to make difference clearer and more consistent with the naming of the notebooks and to align with readthedocs.
   - **Align redispatch mechanism to latest PyPSA version release**: Updated the redispatch formulation to model cleared EOM generator dispatch for ``network.lpf()`` via ``generators_t.p_set`` and consistent generator bounds ``p_min_pu/p_max_pu``, replacing the previous load-based workaround.
   - **Grafana dashboard improvements**: Added button to automatically update the time range filter to the full simulation horizon.
+  - **Replace GPL-licensed ``pyyaml-include`` dependency**: AMIRIS scenario loading no longer depends on the GPLv3-licensed ``pyyaml-include`` package, which was incompatible with distributing ASSUME under a permissive license. The subset of ``!include`` YAML-tag behavior AMIRIS scenario files rely on is now implemented in-house in ``assume.scenario.yaml_include``.
 
 **Bug Fixes:**
   - **Dependencies**: pin xarray and setuptools dependencies until upstream fixes are available
