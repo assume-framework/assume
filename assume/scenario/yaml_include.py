@@ -35,7 +35,6 @@ they appear in.
 
 from __future__ import annotations
 
-import glob
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
