@@ -107,36 +107,12 @@ available_examples = {
     },
     # redispatch example
     "redisp_3_nodes": {"scenario": "example_04a", "study_case": "base"},
-    "hohenachfrage_2030": {
-        "scenario": "hohenachfrage_2030",
-        "study_case": "base_case_2030",
-    },  # VC
-    "hohenachfrage_2035": {
-        "scenario": "hohenachfrage_2035",
+    "fokusstrom_2035": {
+        "scenario": "fokusstrom_2035",
         "study_case": "base_case_2035",
     },
-    "hohenachfrage_2040": {
-        "scenario": "hohenachfrage_2040",
-        "study_case": "base_case_2040",
-    },
-    "hohenachfrage_2045": {
-        "scenario": "hohenachfrage_2045",
-        "study_case": "base_case_2045",
-    },
-    "aktuellepolitiken_2030": {
-        "scenario": "aktuellepolitiken_2030",
-        "study_case": "base_case_2030",
-    },
-    "aktuellepolitiken_2035": {
-        "scenario": "aktuellepolitiken_2035",
-        "study_case": "base_case_2035",
-    },
-    "aktuellepolitiken_2040": {
-        "scenario": "aktuellepolitiken_2040",
-        "study_case": "base_case_2040",
-    },
-    "aktuellepolitiken_2045": {
-        "scenario": "aktuellepolitiken_2045",
+    "fokusstrom_2045": {
+        "scenario": "fokusstrom_2045",
         "study_case": "base_case_2045",
     },
 }
@@ -155,7 +131,7 @@ if __name__ == "__main__":
     data_format = "local_db"  # "local_db" or "timescale"
 
     # select the examples to run, one after another, from the available examples above
-    examples_to_run = ["hohenachfrage_2045", "aktuellepolitiken_2040"]
+    examples_to_run = ["fokusstrom_2035", "fokusstrom_2045"]  # list of examples to run
 
     if data_format == "local_db":
         db_uri = "sqlite:///./examples/local_db/assume_db.db"
