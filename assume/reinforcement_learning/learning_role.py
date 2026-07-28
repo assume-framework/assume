@@ -22,6 +22,7 @@ from assume.reinforcement_learning.algorithms.matd3 import TD3
 from assume.reinforcement_learning.buffer import ReplayBuffer
 from assume.reinforcement_learning.learning_utils import (
     linear_schedule_func,
+    cosine_annealing_func,
     transform_buffer_data,
 )
 from assume.reinforcement_learning.tensorboard_logger import TensorBoardLogger
@@ -85,7 +86,13 @@ class Learning(Role):
             # configure additional learning parameters if we are in learning or evaluation mode
             if self.learning_config.learning_rate_schedule == "linear":
                 self.calc_lr_from_progress = linear_schedule_func(
-                    self.learning_config.learning_rate
+                    self.learning_config.learning_rate,
+                    self.learning_config.min_learning_rate
+                )
+            elif self.learning_config.learning_rate_schedule == "cosine":
+                self.calc_lr_from_progress = cosine_annealing_func(
+                    self.learning_config.learning_rate,
+                    self.learning_config.min_learning_rate
                 )
             else:
                 self.calc_lr_from_progress = (
@@ -262,6 +269,10 @@ class Learning(Role):
                 self.all_obs[ts] = current_obs[ts]
                 self.all_actions[ts] = current_actions[ts]
                 self.all_noises[ts] = current_noises[ts]
+
+            if len(timestamps_to_process) == 0:
+                logger.warning("No reward retrieved to store in buffer at update step!")
+                return
 
             # Create filtered cache (only complete timesteps)
             cache = {
@@ -646,11 +657,6 @@ class Learning(Role):
         for unit_id in sorted(cache["obs"][next(iter(cache["obs"]))].keys()):
             starts = cache["obs"].keys()
             for idx, start in enumerate(starts):
-                # if hour with first reward and simulation start hour are not the same, the following produces a key error
-                # this is e.g. the case in a setup with zonal market and subsequent redispatch market
-                # check for existence first
-                if unit_id not in cache["rewards"][start]:
-                    continue
                 output_dict = {
                     "datetime": start,
                     "unit": unit_id,
