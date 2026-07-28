@@ -52,6 +52,12 @@ from assume.strategies import (  # noqa: E402
 )
 from assume.units import Demand, PowerPlant  # noqa: E402
 
+pytest.importorskip("torch")
+
+from assume.strategies.learning_strategies import (  # noqa: E402
+    EnergyLearningSingleBidRedispatchStrategy,
+)
+
 # results from the paper, in EUR/MWh and MW
 NODAL_PRICE_NORTH = 30
 NODAL_PRICE_SOUTH = 60
@@ -428,3 +434,167 @@ def test_strategy_redispatch_clears_at_paper_prices(
         assert cost == pytest.approx(450_000)
 
     assert len(meta) == N_PRODUCTS * len(buses)
+
+
+# ---------------------------------------------------------------------------
+# EnergyLearningSingleBidRedispatchStrategy
+#
+# The learning strategy shares the redispatch-bid code path with the heuristic one:
+# on the redispatch market it re-offers its spot (EOM) bid for its cleared volume. Its
+# EOM bid comes from a torch actor, but the redispatch bidding itself is deterministic
+# and does not touch the network, so it can be exercised without any training.
+# ---------------------------------------------------------------------------
+
+
+def _learning_redispatch_strategy() -> EnergyLearningSingleBidRedispatchStrategy:
+    """Instantiate the strategy without running ``__init__`` (which would build a torch
+    actor and require a learning role). ``calculate_redispatch_bids`` never touches
+    ``self``, so a bare instance is enough to exercise the redispatch bidding path."""
+    return EnergyLearningSingleBidRedispatchStrategy.__new__(
+        EnergyLearningSingleBidRedispatchStrategy
+    )
+
+
+def _make_powerplant(index, availability, max_power=1000.0, min_power=100.0, node="north"):
+    registries = get_forecast_registries()
+    fuel_prices = pd.DataFrame(
+        0.0,
+        index=index.as_datetimeindex(),
+        columns=["renewable", "co2"],
+    )
+    forecaster = PowerplantForecaster(
+        index=index,
+        availability=availability,
+        fuel_prices=fuel_prices,
+        forecast_registries=registries,
+    )
+    return PowerPlant(
+        id="learner",
+        unit_operator="operator",
+        technology="diesel",
+        bidding_strategies={"EOM": EnergyNaiveStrategy()},
+        forecaster=forecaster,
+        max_power=max_power,
+        min_power=min_power,
+        efficiency=1.0,
+        additional_cost=30.0,
+        node=node,
+    )
+
+
+def test_learning_redispatch_bid_carries_p_nom_and_available_bounds(index):
+    """The learning redispatch bid must expose ``p_nom`` and availability-limited
+    max/min power, matching the naive/heuristic redispatch bids.
+
+    A missing ``p_nom`` makes the redispatch clearing pivot to NaN for the learning
+    unit, so its fixed dispatch and redispatch potential are silently dropped -- the
+    bug this guards against. When availability falls below the technical minimum the
+    unit cannot run and offers no redispatch flexibility.
+    """
+    products = get_available_products(
+        [MarketProduct(timedelta(hours=1), N_PRODUCTS, timedelta(hours=1))],
+        datetime(2019, 1, 1),
+    )
+    full, reduced = products[0][0], products[1][0]
+
+    # fully available in the first product hour, barely available (0.05 * 1000 = 50 MW,
+    # below the 100 MW minimum) in the second
+    availability = pd.Series(1.0, index=index.as_datetimeindex())
+    availability.loc[reduced] = 0.05
+    unit = _make_powerplant(index, availability)
+
+    # spot outcome handed over from the (mocked) EOM stage
+    unit.outputs["energy"].loc[full] = 1000.0
+    unit.outputs["energy"].loc[reduced] = 50.0
+    unit.outputs["eom_bids"].loc[full] = 30.0
+    unit.outputs["eom_bids"].loc[reduced] = 30.0
+
+    # calculate_redispatch_bids does not use the market config
+    bids = _learning_redispatch_strategy().calculate_redispatch_bids(
+        unit, None, products
+    )
+    by_start = {b["start_time"]: b for b in bids}
+
+    # every bid carries the nominal capacity and re-offers the spot bid for its volume
+    for bid in bids:
+        assert bid["p_nom"] == pytest.approx(1000.0)
+        assert bid["price"] == pytest.approx(30.0)
+        assert bid["node"] == "north"
+
+    # fully available hour: min/max power are the technical bounds
+    assert by_start[full]["max_power"] == pytest.approx(1000.0)
+    assert by_start[full]["min_power"] == pytest.approx(100.0)
+    assert by_start[full]["volume"] == pytest.approx(1000.0)
+
+    # available power (0.05 * 1000 = 50) is below the 100 MW minimum: no flexibility,
+    # bounds collapse onto the current dispatch
+    assert by_start[reduced]["max_power"] == pytest.approx(50.0)
+    assert by_start[reduced]["min_power"] == pytest.approx(50.0)
+    assert by_start[reduced]["volume"] == pytest.approx(50.0)
+
+    # the offered price is recorded per hour for later reward calculation
+    assert unit.outputs["redispatch_bids"].at[full] == pytest.approx(30.0)
+    assert unit.outputs["redispatch_bids"].at[reduced] == pytest.approx(30.0)
+
+
+@pytest.mark.require_network
+def test_learning_deviator_redispatches_in_inc_dec_setup(units, eom_config, redispatch_config):
+    """A single learning unit embedded in the gamed inc-dec setup is redispatched
+    correctly. Its redispatch bid (from the learning strategy) must be a drop-in for
+    the heuristic one, so the market still clears at the paper's 15 GW / 30-60 EUR/MWh.
+    """
+    products = get_available_products(
+        eom_config.market_products, eom_config.opening_hours.after(datetime(2019, 1, 1))
+    )
+
+    # 1. spot clearing, as for the heuristic case
+    eom_orderbook = _collect_bids(units, eom_config, products)
+    accepted, rejected, _, _ = PayAsClearRole(eom_config).clear(eom_orderbook, products)
+    by_unit = {unit.id: unit for unit in units}
+    for order in accepted + rejected:
+        by_unit[order["unit_id"]].set_dispatch_plan(eom_config, [order])
+
+    # 2. redispatch bids -- but diesel_0 bids through the learning strategy instead of
+    #    the heuristic one (both simply re-offer the recorded EOM bid)
+    learning_strategy = _learning_redispatch_strategy()
+    rd_orderbook = []
+    for unit in units:
+        if unit.id == "diesel_0":
+            raw = learning_strategy.calculate_redispatch_bids(
+                unit, redispatch_config, products
+            )
+        else:
+            raw = unit.bidding_strategies[redispatch_config.market_id].calculate_bids(
+                unit, redispatch_config, products
+            )
+        for i, bid in enumerate(raw):
+            bid["unit_id"] = unit.id
+            bid["bid_id"] = f"{unit.id}_{i}"
+            rd_orderbook.append(bid)
+
+    accepted_rd, _, _, _ = RedispatchMarketRole(redispatch_config).clear(
+        rd_orderbook, products
+    )
+
+    node_of = generators["node"].to_dict()
+    for start, _, _ in products:
+        up = [
+            o for o in accepted_rd if o["start_time"] == start and o["accepted_volume"] > 0
+        ]
+        down = [
+            o for o in accepted_rd if o["start_time"] == start and o["accepted_volume"] < 0
+        ]
+
+        assert sum(o["accepted_volume"] for o in up) == pytest.approx(REDISPATCH_VOLUME)
+        assert sum(o["accepted_volume"] for o in down) == pytest.approx(
+            -REDISPATCH_VOLUME
+        )
+        assert {node_of[o["unit_id"]] for o in up} == {"south"}
+        assert {node_of[o["unit_id"]] for o in down} == {"north"}
+
+        # the learning diesel is one of the units redispatched down, at its own bid
+        down_units = {o["unit_id"]: o for o in down}
+        assert "diesel_0" in down_units
+        assert down_units["diesel_0"]["accepted_price"] == pytest.approx(
+            NODAL_PRICE_NORTH
+        )

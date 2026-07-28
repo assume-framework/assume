@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
     # select to store the simulation results in a local database or in timescale
     # when using timescale, you need to have docker installed and can access the grafana dashboard
-    data_format = "local_db"  # "local_db" or "timescale"
+    data_format = "timescale"  # "local_db" or "timescale"
 
     # select the example to run from the available examples above
     example = "small_with_vre_and_storage"
@@ -152,8 +152,8 @@ if __name__ == "__main__":
     load_scenario_folder(
         world,
         inputs_path="examples/inputs",
-        scenario=available_examples[example]["scenario"],
-        study_case=available_examples[example]["study_case"],
+        scenario="2_nodes_paper",  #available_examples[example]["scenario"],
+        study_case="inc_dec_learning_single",  # available_examples[example]["study_case"],
     )
 
     # to add custom bidding strategies, you need to import them

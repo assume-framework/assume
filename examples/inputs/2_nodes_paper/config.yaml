@@ -1,0 +1,214 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Replication of Hirth & Schlecht (2019), "Market-Based Redispatch in
+# Zonal Electricity Markets", as exercised by tests/test_inc_dec_redispatch.py.
+inc_dec_heuristic:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-01 05:00
+  time_step: 1h
+  learning_mode: false
+  save_frequency_hours: 0
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 2
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      param_dict:
+        network_path: .
+        solver_name: highs
+
+    Redispatch:
+      operator: Redispatch_operator
+      product_type: energy
+      start_date: 2019-01-01 02:00
+      products:
+        - duration: 1h
+          count: 2
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver_name: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+
+
+inc_dec_learning:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-01 05:00
+  time_step: 1h
+  save_frequency_hours: 0
+  powerplant_units: powerplant_units_learning.csv
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    # learning_rate_schedule: linear
+    training_episodes: 8
+    episodes_collecting_initial_experience: 2
+    train_freq: 1h
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    # action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 2
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 2
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      param_dict:
+        network_path: .
+        solver_name: highs
+
+    Redispatch:
+      operator: Redispatch_operator
+      product_type: energy
+      start_date: 2019-01-01 02:00
+      products:
+        - duration: 1h
+          count: 2
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver_name: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+
+
+# Single-agent variant: only the marginal northern diesel (diesel_0) learns to
+# inc-dec game, every other generator bids naively. Mirrors the single-learner
+# convention of the 2_nodes 'learning_diesel' study case.
+inc_dec_learning_single:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-01 05:00
+  time_step: 1h
+  save_frequency_hours: 0
+  powerplant_units: powerplant_units_learning_single.csv
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    # learning_rate_schedule: linear
+    training_episodes: 8
+    episodes_collecting_initial_experience: 2
+    train_freq: 1h
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    # action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 2
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 2
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      param_dict:
+        network_path: .
+        solver_name: highs
+
+    Redispatch:
+      operator: Redispatch_operator
+      product_type: energy
+      start_date: 2019-01-01 02:00
+      products:
+        - duration: 1h
+          count: 2
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver_name: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
