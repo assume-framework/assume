@@ -1346,6 +1346,28 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
             **kwargs,
         )
 
+    def get_actions(self, next_observation):
+        # Get the base action and associated noise from the parent implementation
+        curr_action, noise = super().get_actions(next_observation)
+
+        if self.learning_mode and not self.evaluation_mode:
+            if self.collect_initial_experience_mode:
+                marginal_cost = next_observation[
+                    -1
+                ].detach()  # ensure no gradients flow through
+                # Add marginal cost to the action directly for initial random exploration
+                curr_action -= marginal_cost
+                curr_action += 0.35
+                #noise = th.rand_like(noise) * 2 - 1 
+
+                # =============================================================================
+                # 2.1 Get Actions and handle exploration
+                # =============================================================================
+                # only use noise as the action to enforce exploration
+                #curr_action = noise
+
+        return curr_action, noise
+
     def calculate_bids(
         self,
         unit: SupportsMinMax,
@@ -1557,6 +1579,13 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         # calculate reward
         scaling = 1 / (self.max_bid_price * unit.max_power)
         reward = unit.outputs["profit"].loc[start] * scaling
+        price = order.get("price", "rofl")
+        print(start, price, accepted_price, accepted_volume, total_profit)
+        print("total", unit.outputs["eom_profit"].loc[start], "+", + unit.outputs["redispatch_profit"].loc[start])
+        print("reward", reward)
+
+        if reward > 0:
+            reward *= 10
 
         # write rl-rewards to buffer
         if self.learning_mode:

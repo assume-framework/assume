@@ -2,6 +2,20 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+# Fast-iteration copy of the 2_nodes_paper scenario: same study cases, but the
+# 51-unit fleet is aggregated 5-to-1 into 11 units (1 wind, 4 lignite, 1 diesel,
+# 5 gas). Installed capacity per technology and the merit order are preserved --
+# each aggregate has 5x max_power at the mean additional_cost of its group.
+#
+# This lives in its own scenario folder rather than as an extra study case in
+# 2_nodes_paper because read_grid() in loader_csv.py always builds the PyPSA
+# grid model from powerplant_units.csv, ignoring a study case's
+# `powerplant_units:` override. A study case whose unit file differs in unit
+# names or capacities from powerplant_units.csv therefore hands the redispatch
+# market a grid that does not match the bidding agents, and clearing fails as
+# infeasible. All three unit files here describe the same fleet and differ only
+# in their bidding strategies, which keeps the grid model consistent.
+
 # Replication of Hirth & Schlecht (2019), "Market-Based Redispatch in
 # Zonal Electricity Markets", as exercised by tests/test_inc_dec_redispatch.py.
 inc_dec_heuristic:
@@ -139,8 +153,8 @@ inc_dec_learning:
 # inc-dec game, every other generator bids naively. Mirrors the single-learner
 # convention of the 2_nodes 'learning_diesel' study case.
 inc_dec_learning_single:
-  start_date: 2019-01-01 00:00
-  end_date: 2019-01-01 12:00
+  start_date: 2019-01-01 07:00
+  end_date: 2019-01-03 19:00
   time_step: 1h
   save_frequency_hours: false
   powerplant_units: powerplant_units_learning_single.csv
@@ -150,29 +164,30 @@ inc_dec_learning_single:
     continue_learning: false
     trained_policies_save_path: null
     max_bid_price: 100
+    min_bid_price: -100
     algorithm: matd3
-    learning_rate: 0.0002
-    learning_rate_schedule: cosine
-    min_learning_rate: 0.000002
-    training_episodes: 20
-    episodes_collecting_initial_experience: 2
-    train_freq: 6h
-    gradient_steps: 16
-    batch_size: 32
-    gamma: 0.99
+    learning_rate: 0.0001
+    # learning_rate_schedule: cosine
+    # min_learning_rate: 0.000002
+    training_episodes: 50
+    episodes_collecting_initial_experience: 10
+    train_freq: 12h
+    gradient_steps: 1024
+    batch_size: 8
+    gamma: 0.0
     device: cpu
-    action_noise_schedule: linear
-    noise_sigma: 0.3
+    # action_noise_schedule: linear
+    noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 2
-    policy_delay: 4
+    policy_delay: 64
 
   markets_config:
     EOM:
       operator: EOM_operator
       product_type: energy
-      start_date: 2019-01-01 00:00
+      start_date: 2019-01-01 07:00
       products:
         - duration: 1h
           count: 1
@@ -192,7 +207,7 @@ inc_dec_learning_single:
     Redispatch:
       operator: Redispatch_operator
       product_type: energy
-      start_date: 2019-01-01 02:00
+      start_date: 2019-01-01 09:00
       products:
         - duration: 1h
           count: 1

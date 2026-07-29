@@ -1,0 +1,12 @@
+name,technology,node,bidding_EOM,bidding_Redispatch,forecast_lmp,fuel_type,max_power,min_power,additional_cost,unit_operator,emission_factor,efficiency
+wind,wind,north,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,renewable,20000.0,0.0,1.0,operator,0.0,1.0
+coal_0,coal,north,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,lignite,5000.0,0.0,23.0,operator,0.0,1.0
+coal_1,coal,north,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,lignite,5000.0,0.0,28.0,operator,0.0,1.0
+coal_2,coal,north,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,lignite,5000.0,0.0,33.0,operator,0.0,1.0
+coal_3,coal,north,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,lignite,5000.0,0.0,38.0,operator,0.0,1.0
+diesel_0,diesel,north,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,diesel,5000.0,0.0,68.0,operator,0.0,1.0
+gas_0,gas,south,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,natural gas,5000.0,0.0,43.0,operator,0.0,1.0
+gas_1,gas,south,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,natural gas,5000.0,0.0,48.0,operator,0.0,1.0
+gas_2,gas,south,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,natural gas,5000.0,0.0,53.0,operator,0.0,1.0
+gas_3,gas,south,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,natural gas,5000.0,0.0,58.0,operator,0.0,1.0
+gas_4,gas,south,powerplant_energy_heuristic_redispatch,powerplant_energy_heuristic_redispatch,lmp_nodal_forecast,natural gas,5000.0,0.0,63.0,operator,0.0,1.0

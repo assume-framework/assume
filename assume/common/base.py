@@ -797,6 +797,7 @@ class LearningConfig:
             More steps can lead to better learning but increase computation time. Default is 100.
         learning_rate (float): The learning rate (step size) for the optimizer, which controls how much the
             policy and value networks are updated during training. Default is 0.001.
+        min_learning_rate (float): Minimal learning rate the cosine annealing scheduler will use. Default is 0.0.
         learning_rate_schedule (str | None): Which learning rate decay schedule to use. Currently only "linear"
             decay is available, which linearly decreases the learning rate over time. Default is None (constant learning rate).
         early_stopping_steps (int | None): The number of validation steps over which the moving average reward
@@ -851,6 +852,7 @@ class LearningConfig:
     batch_size: int = 128
     gradient_steps: int = 100
     learning_rate: float = 0.001
+    min_learning_rate: float = 0.0
     learning_rate_schedule: str | None = None
     early_stopping_steps: int | None = None
     early_stopping_threshold: float = 0.05

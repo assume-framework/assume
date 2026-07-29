@@ -1,53 +1,53 @@
 name,technology,node,bidding_EOM,bidding_Redispatch,forecast_lmp,fuel_type,max_power,min_power,additional_cost,unit_operator,emission_factor,efficiency
 wind,wind,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,20000.0,0.0,1.0,operator,0.0,1.0
-coal_0,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,21.0,operator,0.0,1.0
-coal_1,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,22.0,operator,0.0,1.0
-coal_2,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,23.0,operator,0.0,1.0
-coal_3,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,24.0,operator,0.0,1.0
-coal_4,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,25.0,operator,0.0,1.0
-coal_5,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,26.0,operator,0.0,1.0
-coal_6,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,27.0,operator,0.0,1.0
-coal_7,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,28.0,operator,0.0,1.0
-coal_8,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,29.0,operator,0.0,1.0
-coal_9,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,30.0,operator,0.0,1.0
-coal_10,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,31.0,operator,0.0,1.0
-coal_11,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,32.0,operator,0.0,1.0
-coal_12,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,33.0,operator,0.0,1.0
-coal_13,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,34.0,operator,0.0,1.0
-coal_14,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,35.0,operator,0.0,1.0
-coal_15,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,36.0,operator,0.0,1.0
-coal_16,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,37.0,operator,0.0,1.0
-coal_17,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,38.0,operator,0.0,1.0
-coal_18,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,39.0,operator,0.0,1.0
-coal_19,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,40.0,operator,0.0,1.0
-diesel_0,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,66.0,operator,0.0,1.0
-diesel_1,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,67.0,operator,0.0,1.0
-diesel_2,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,68.0,operator,0.0,1.0
-diesel_3,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,69.0,operator,0.0,1.0
-diesel_4,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,70.0,operator,0.0,1.0
-gas_0,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,41.0,operator,0.0,1.0
-gas_1,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,42.0,operator,0.0,1.0
-gas_2,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,43.0,operator,0.0,1.0
-gas_3,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,44.0,operator,0.0,1.0
-gas_4,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,45.0,operator,0.0,1.0
-gas_5,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,46.0,operator,0.0,1.0
-gas_6,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,47.0,operator,0.0,1.0
-gas_7,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,48.0,operator,0.0,1.0
-gas_8,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,49.0,operator,0.0,1.0
-gas_9,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,50.0,operator,0.0,1.0
-gas_10,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,51.0,operator,0.0,1.0
-gas_11,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,52.0,operator,0.0,1.0
-gas_12,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,53.0,operator,0.0,1.0
-gas_13,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,54.0,operator,0.0,1.0
-gas_14,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,55.0,operator,0.0,1.0
-gas_15,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,56.0,operator,0.0,1.0
-gas_16,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,57.0,operator,0.0,1.0
-gas_17,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,58.0,operator,0.0,1.0
-gas_18,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,59.0,operator,0.0,1.0
-gas_19,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,60.0,operator,0.0,1.0
-gas_20,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,61.0,operator,0.0,1.0
-gas_21,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,62.0,operator,0.0,1.0
-gas_22,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,63.0,operator,0.0,1.0
-gas_23,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,64.0,operator,0.0,1.0
-gas_24,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,renewable,1000.0,0.0,65.0,operator,0.0,1.0
+coal_0,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,21.0,operator,0.0,1.0
+coal_1,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,22.0,operator,0.0,1.0
+coal_2,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,23.0,operator,0.0,1.0
+coal_3,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,24.0,operator,0.0,1.0
+coal_4,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,25.0,operator,0.0,1.0
+coal_5,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,26.0,operator,0.0,1.0
+coal_6,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,27.0,operator,0.0,1.0
+coal_7,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,28.0,operator,0.0,1.0
+coal_8,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,29.0,operator,0.0,1.0
+coal_9,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,30.0,operator,0.0,1.0
+coal_10,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,31.0,operator,0.0,1.0
+coal_11,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,32.0,operator,0.0,1.0
+coal_12,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,33.0,operator,0.0,1.0
+coal_13,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,34.0,operator,0.0,1.0
+coal_14,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,35.0,operator,0.0,1.0
+coal_15,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,36.0,operator,0.0,1.0
+coal_16,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,37.0,operator,0.0,1.0
+coal_17,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,38.0,operator,0.0,1.0
+coal_18,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,39.0,operator,0.0,1.0
+coal_19,coal,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,lignite,1000.0,0.0,40.0,operator,0.0,1.0
+diesel_0,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,diesel,1000.0,0.0,66.0,operator,0.0,1.0
+diesel_1,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,diesel,1000.0,0.0,67.0,operator,0.0,1.0
+diesel_2,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,diesel,1000.0,0.0,68.0,operator,0.0,1.0
+diesel_3,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,diesel,1000.0,0.0,69.0,operator,0.0,1.0
+diesel_4,diesel,north,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,diesel,1000.0,0.0,70.0,operator,0.0,1.0
+gas_0,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,41.0,operator,0.0,1.0
+gas_1,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,42.0,operator,0.0,1.0
+gas_2,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,43.0,operator,0.0,1.0
+gas_3,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,44.0,operator,0.0,1.0
+gas_4,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,45.0,operator,0.0,1.0
+gas_5,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,46.0,operator,0.0,1.0
+gas_6,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,47.0,operator,0.0,1.0
+gas_7,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,48.0,operator,0.0,1.0
+gas_8,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,49.0,operator,0.0,1.0
+gas_9,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,50.0,operator,0.0,1.0
+gas_10,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,51.0,operator,0.0,1.0
+gas_11,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,52.0,operator,0.0,1.0
+gas_12,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,53.0,operator,0.0,1.0
+gas_13,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,54.0,operator,0.0,1.0
+gas_14,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,55.0,operator,0.0,1.0
+gas_15,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,56.0,operator,0.0,1.0
+gas_16,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,57.0,operator,0.0,1.0
+gas_17,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,58.0,operator,0.0,1.0
+gas_18,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,59.0,operator,0.0,1.0
+gas_19,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,60.0,operator,0.0,1.0
+gas_20,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,61.0,operator,0.0,1.0
+gas_21,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,62.0,operator,0.0,1.0
+gas_22,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,63.0,operator,0.0,1.0
+gas_23,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,64.0,operator,0.0,1.0
+gas_24,gas,south,powerplant_energy_learning_redispatch,powerplant_energy_learning_redispatch,lmp_nodal_forecast,natural gas,1000.0,0.0,65.0,operator,0.0,1.0
 

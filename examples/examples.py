@@ -152,7 +152,7 @@ if __name__ == "__main__":
     load_scenario_folder(
         world,
         inputs_path="examples/inputs",
-        scenario="2_nodes_paper",  #available_examples[example]["scenario"],
+        scenario="2_nodes_paper_small",  #available_examples[example]["scenario"],
         study_case="inc_dec_learning_single",  # available_examples[example]["study_case"],
     )
 
