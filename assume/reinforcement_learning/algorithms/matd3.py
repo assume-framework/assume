@@ -618,13 +618,13 @@ class TD3(RLAlgorithm):
                 current_Q_values = critic(all_states, all_actions)
 
 
-                if th.rand(1) > 0.995: 
+                if th.rand(1) > 0.9: 
                     print("Q values", current_Q_values[0][0], target_Q_values[0])
                     print("Actions", all_actions[0])
                     #print("states", all_states[0])
                     print([f"{critic(all_states[0:1], (th.zeros_like(all_actions[0:1])+ sample_i) / 10 - 1)[0].item():.4f}" for sample_i in range(20)])
 
-                if target_Q_values[0] > 1 and th.rand(1) > 0.95: 
+                if target_Q_values[0] > 0: 
                     print("Q values", current_Q_values[0][0], target_Q_values[0])
                     print("Actions", all_actions[0])
                     #print("states", all_states[0])
@@ -638,7 +638,7 @@ class TD3(RLAlgorithm):
                 # Store the critic loss for this unit ID
                 unit_params[step][strategy.unit_id]["critic_loss"] = critic_loss.item()
                 total_critic_loss += critic_loss
-            if th.rand(1) > 0.99: 
+            if th.rand(1) > 0.9: 
                 print(f"{total_critic_loss.detach().item():.5f}", end=" ")
             # Single backward pass for all agents' critics
             total_critic_loss.backward()

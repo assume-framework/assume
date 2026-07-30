@@ -1352,19 +1352,15 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
 
         if self.learning_mode and not self.evaluation_mode:
             if self.collect_initial_experience_mode:
-                marginal_cost = next_observation[
-                    -1
-                ].detach()  # ensure no gradients flow through
+                #marginal_cost = next_observation[
+                #    -1
+                #].detach()  # ensure no gradients flow through
                 # Add marginal cost to the action directly for initial random exploration
-                curr_action -= marginal_cost
-                curr_action += 0.35
-                #noise = th.rand_like(noise) * 2 - 1 
+                #curr_action -= marginal_cost
+                #curr_action += 0.35
 
-                # =============================================================================
-                # 2.1 Get Actions and handle exploration
-                # =============================================================================
-                # only use noise as the action to enforce exploration
-                #curr_action = noise
+                noise = th.rand_like(noise) * 2 - 1  # uniform sample in [-1, 1]
+                curr_action = noise
 
         return curr_action, noise
 
@@ -1579,13 +1575,13 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         # calculate reward
         scaling = 1 / (self.max_bid_price * unit.max_power)
         reward = unit.outputs["profit"].loc[start] * scaling
-        price = order.get("price", "rofl")
-        print(start, price, accepted_price, accepted_volume, total_profit)
-        print("total", unit.outputs["eom_profit"].loc[start], "+", + unit.outputs["redispatch_profit"].loc[start])
-        print("reward", reward)
+        #price = order.get("price", "rofl")
+        #print(start, price, accepted_price, accepted_volume, total_profit)
+        #print("total", unit.outputs["eom_profit"].loc[start], "+", + unit.outputs["redispatch_profit"].loc[start])
+        #print("reward", reward)
 
         if reward > 0:
-            reward *= 10
+            reward *= 1  #0
 
         # write rl-rewards to buffer
         if self.learning_mode:

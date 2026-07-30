@@ -153,8 +153,8 @@ inc_dec_learning:
 # inc-dec game, every other generator bids naively. Mirrors the single-learner
 # convention of the 2_nodes 'learning_diesel' study case.
 inc_dec_learning_single:
-  start_date: 2019-01-01 07:00
-  end_date: 2019-01-03 19:00
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-04 00:00
   time_step: 1h
   save_frequency_hours: false
   powerplant_units: powerplant_units_learning_single.csv
@@ -166,22 +166,23 @@ inc_dec_learning_single:
     max_bid_price: 100
     min_bid_price: -100
     algorithm: matd3
-    learning_rate: 0.0001
-    # learning_rate_schedule: cosine
-    # min_learning_rate: 0.000002
+    learning_rate: 0.01
+    learning_rate_schedule: cosine
+    min_learning_rate: 0.0001
     training_episodes: 50
     episodes_collecting_initial_experience: 10
     train_freq: 12h
-    gradient_steps: 1024
-    batch_size: 8
+    gradient_steps: 32
+    batch_size: 256
     gamma: 0.0
+    tau: 0.2
     device: cpu
     # action_noise_schedule: linear
     noise_sigma: 0.1
     noise_scale: 1
     noise_dt: 1
     validation_episodes_interval: 2
-    policy_delay: 64
+    policy_delay: 8
 
   markets_config:
     EOM:
