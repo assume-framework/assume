@@ -1224,15 +1224,66 @@ def run_learning(
 
     # -----------------------------------------
     # Information that needs to be stored across episodes, aka one simulation run
-    inter_episodic_data = {
-        "buffer": ReplayBuffer(
+    # Read optional replay-buffer persistence settings from learning_config
+    lc = world.learning_role.learning_config
+    cfg_save_flag = getattr(lc, "save_replay_buffer", True)
+    cfg_save_path = getattr(lc, "replay_buffer_save_path", None)
+    cfg_load_flag = getattr(lc, "load_replay_buffer", False)
+    cfg_load_path = getattr(lc, "replay_buffer_load_path", None)
+
+    # default path next to saved policies
+    default_buffer_path = f"{save_path}/last_policies/replay_buffer.npz"
+    buffer_save_path = (
+        cfg_save_path if cfg_save_path is not None else default_buffer_path
+    )
+
+    buffer = None
+    # Load only when explicitly requested via load_replay_buffer
+    if cfg_load_flag:
+        # choose explicit load path if provided, otherwise fall back to configured save path or default
+        path_to_load = (
+            cfg_load_path
+            if cfg_load_path is not None
+            else (cfg_save_path if cfg_save_path is not None else default_buffer_path)
+        )
+        if not os.path.exists(path_to_load):
+            raise AssumeException(
+                f"load_replay_buffer is true but no buffer file found at {path_to_load}"
+            )
+        try:
+            buffer = ReplayBuffer.load(
+                path_to_load,
+                device=world.learning_role.device,
+                float_type=world.learning_role.float_type,
+            )
+            logger.info(f"Loaded replay buffer from {path_to_load}")
+            # disable initial experience collection when buffer provided
+            try:
+                world.learning_role.learning_config.episodes_collecting_initial_experience = 0
+                logger.info(
+                    "Replay buffer provided — skipping initial experience collection (episodes_collecting_initial_experience set to 0)."
+                )
+            except Exception:
+                logger.warning(
+                    "Could not set episodes_collecting_initial_experience to 0 on learning_config"
+                )
+        except Exception as e:
+            raise AssumeException(
+                f"Failed to load replay buffer from {path_to_load}: {e}"
+            )
+    else:
+        # create fresh buffer
+        buffer = ReplayBuffer(
             buffer_size=world.learning_role.learning_config.replay_buffer_size,
             obs_dim=world.learning_role.rl_algorithm.obs_dim,
             act_dim=world.learning_role.rl_algorithm.act_dim,
             n_rl_units=len(world.learning_role.rl_strats),
             device=world.learning_role.device,
             float_type=world.learning_role.float_type,
-        ),
+        )
+
+    inter_episodic_data = {
+        "buffer": buffer,
         "actors_and_critics": None,
         "max_eval": defaultdict(lambda: -1e9),
         "all_eval": defaultdict(list),
@@ -1323,6 +1374,15 @@ def run_learning(
 
         world.reset()
 
+        if cfg_save_flag:
+            try:
+                inter_episodic_data["buffer"].save(buffer_save_path)
+                logger.debug(
+                    f"Replay buffer saved to {buffer_save_path} after episode {episode}"
+                )
+            except Exception:
+                logger.warning(f"Failed to save replay buffer to {buffer_save_path}")
+
         # save the policies after each episode in case the simulation is stopped or crashes
         if (
             episode
@@ -1332,6 +1392,9 @@ def run_learning(
             world.learning_role.rl_algorithm.save_params(
                 directory=f"{world.learning_role.learning_config.trained_policies_save_path}/last_policies"
             )
+
+    if cfg_save_flag:
+        logger.info(f"Replay buffer saved to {buffer_save_path}")
 
     # container shutdown implicitly with new initialisation
     logger.info("################")

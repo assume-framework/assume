@@ -152,17 +152,25 @@ inc_dec_learning:
 # Single-agent variant: only the marginal northern diesel (diesel_0) learns to
 # inc-dec game, every other generator bids naively. Mirrors the single-learner
 # convention of the 2_nodes 'learning_diesel' study case.
-inc_dec_learning_single:
+inc_dec_learning_single: &single_case
   start_date: 2019-01-01 00:00
   end_date: 2019-01-04 00:00
   time_step: 1h
   save_frequency_hours: false
   powerplant_units: powerplant_units_learning_single.csv
 
-  learning_config:
+  learning_config: &single_learning_config
     learning_mode: true
     continue_learning: false
     trained_policies_save_path: null
+    # Reuse the exploration episodes collected once by the
+    # inc_dec_collect_buffer study case instead of re-running them per case.
+    # Loading a buffer forces episodes_collecting_initial_experience to 0, so
+    # this run starts training from episode 1.
+    load_replay_buffer: true
+    replay_buffer_load_path: learning_strategies/buffers/single_10ep_standard.npz
+    # don't write the buffer back - study-case runs must not mutate the shared one
+    save_replay_buffer: false
     max_bid_price: 100
     min_bid_price: -100
     algorithm: matd3
@@ -170,12 +178,12 @@ inc_dec_learning_single:
     learning_rate_schedule: cosine
     min_learning_rate: 0.0001
     training_episodes: 50
-    episodes_collecting_initial_experience: 10
+    episodes_collecting_initial_experience: 0
     train_freq: 12h
     gradient_steps: 32
     batch_size: 256
     gamma: 0.0
-    tau: 0.2
+    tau: 0.005  # default
     device: cpu
     # action_noise_schedule: linear
     noise_sigma: 0.1
@@ -230,3 +238,43 @@ inc_dec_learning_single:
         solver_name: highs
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
+
+
+# Buffer-collection run for the inc_dec_learning_single family. Run this once,
+# then every study case that inherits `single_case` loads the resulting buffer
+# and starts learning immediately.
+#
+# Inherits the fleet, horizon and markets of inc_dec_learning_single, because a
+# saved buffer is only reusable in a scenario with the same number of RL units
+# and the same observation/action dimensions - i.e. the same units file, the
+# same simulation horizon and the same replay_buffer_size.
+#
+# Note on the episode count: run_learning() rewrites the buffer after every
+# episode, but it requires
+# training_episodes >= episodes_collecting_initial_experience + validation_interval,
+# so it cannot stop at episode 10. With validation_episodes_interval: 1 that
+# makes 11 the smallest workable value: episodes 1-10 are pure random
+# exploration and episode 11 is the first learning episode.
+#
+# You therefore have two equally valid ways to end this run:
+#   - let it finish: the file holds 10 exploration episodes plus 1 episode from a
+#     barely-trained actor. Harmless for an off-policy algorithm like MATD3,
+#     whose buffer is meant to hold a mixture of behaviour policies anyway.
+#   - interrupt it after episode 10: because the buffer is written every episode,
+#     the file on disk is already complete and is then pure raw exploration.
+inc_dec_collect_buffer:
+  <<: *single_case
+
+  learning_config:
+    <<: *single_learning_config
+    training_episodes: 11
+    episodes_collecting_initial_experience: 10
+    validation_episodes_interval: 1
+    # collect and write, never load
+    load_replay_buffer: false
+    replay_buffer_load_path: null
+    save_replay_buffer: true
+    # kept outside learned_strategies/ on purpose: a fresh (continue_learning:
+    # false) run rmtree's trained_policies_save_path, which would delete a
+    # buffer stored at the default location next to the policies
+    replay_buffer_save_path: learning_strategies/buffers/single_10ep.npz

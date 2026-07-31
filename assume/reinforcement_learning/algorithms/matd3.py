@@ -472,8 +472,6 @@ class TD3(RLAlgorithm):
         strategies = list(self.learning_role.rl_strats.values())
         n_rl_agents = len(strategies)
 
-        self.log_buffer_stats(strategies)
-
         unit_params = [
             {
                 u_id: {
@@ -617,18 +615,6 @@ class TD3(RLAlgorithm):
                 # Get current Q-values estimates for each critic network
                 current_Q_values = critic(all_states, all_actions)
 
-
-                if th.rand(1) > 0.9: 
-                    print("Q values", current_Q_values[0][0], target_Q_values[0])
-                    print("Actions", all_actions[0])
-                    #print("states", all_states[0])
-                    print([f"{critic(all_states[0:1], (th.zeros_like(all_actions[0:1])+ sample_i) / 10 - 1)[0].item():.4f}" for sample_i in range(20)])
-
-                if target_Q_values[0] > 0: 
-                    print("Q values", current_Q_values[0][0], target_Q_values[0])
-                    print("Actions", all_actions[0])
-                    #print("states", all_states[0])
-                    print([f"{critic(all_states[0:1], (th.zeros_like(all_actions[0:1])+ sample_i) / 10 - 1)[0].item():.4f}" for sample_i in range(20)])
                 # Accumulate critic loss for this agent
                 critic_loss = sum(
                     F.mse_loss(current_q, target_Q_values)
@@ -638,8 +624,7 @@ class TD3(RLAlgorithm):
                 # Store the critic loss for this unit ID
                 unit_params[step][strategy.unit_id]["critic_loss"] = critic_loss.item()
                 total_critic_loss += critic_loss
-            if th.rand(1) > 0.9: 
-                print(f"{total_critic_loss.detach().item():.5f}", end=" ")
+
             # Single backward pass for all agents' critics
             total_critic_loss.backward()
 
@@ -775,118 +760,4 @@ class TD3(RLAlgorithm):
 
         self.learning_role.write_rl_grad_params_to_output(learning_rate, unit_params)
 
-        self.log_critic_landscape(
-            strategies, states, actions, unique_obs_from_others, n_rl_agents
-        )
 
-    def log_buffer_stats(self, strategies):
-        """
-        Print how the rewards currently in the replay buffer are distributed.
-
-        With a sparse reward landscape the critic can only learn the profitable
-        region if enough transitions actually land in it, so the share of
-        positive-reward samples is the quantity to watch across training.
-        """
-
-        stats = self.learning_role.buffer.stats()
-        if not stats:
-            return
-
-        for strategy, s in zip(strategies, stats):
-            print(
-                f"[buffer] n_updates={self.n_updates} unit={strategy.unit_id} "
-                f"size={s['size']} | "
-                f"r>0: {s['n_pos']} ({s['share_pos']:6.2%})  "
-                f"r=0: {s['n_zero']} ({s['share_zero']:6.2%})  "
-                f"r<0: {s['n_neg']} ({s['share_neg']:6.2%}) | "
-                f"r mean={s['mean']:+.4f} min={s['min']:+.4f} max={s['max']:+.4f}"
-            )
-
-    def log_critic_landscape(
-        self, strategies, states, actions, unique_obs_from_others, n_rl_agents
-    ):
-        """
-        Print the critic's Q-value over a sweep of the first action dimension.
-
-        For every grid action in ``CRITIC_PROBE_ACTIONS`` the agent's own action is
-        replaced by that value while all other agents keep the actions sampled from
-        the buffer. Q is then averaged over the whole sampled batch, so the printed
-        curve shows what the critic believes an action is worth across the states it
-        is actually being trained on.
-
-        Note:
-            Only the first action dimension is swept; remaining dimensions (if any)
-            stay at their sampled values.
-        """
-
-        batch_size = self.learning_config.batch_size
-        grid_size = len(CRITIC_PROBE_ACTIONS)
-
-        with th.no_grad():
-            for i, strategy in enumerate(strategies):
-                critic = strategy.critics
-
-                other_unique_obs = th.cat(
-                    (
-                        unique_obs_from_others[:, :i],
-                        unique_obs_from_others[:, i + 1 :],
-                    ),
-                    dim=1,
-                )
-                all_states = th.cat(
-                    (
-                        states[:, i, :].reshape(batch_size, -1),
-                        other_unique_obs.reshape(batch_size, -1),
-                    ),
-                    dim=1,
-                )
-
-                # what the actor currently wants to do in these states
-                actor_actions = strategy.actor(states[:, i, :])
-                mean_action = actor_actions[:, 0].mean().item()
-
-                # repeat the batch once per grid point, overwriting action dim 0
-                repeated_states = all_states.repeat(grid_size, 1)
-                repeated_actions = actions.repeat(grid_size, 1, 1)
-                grid = th.tensor(
-                    CRITIC_PROBE_ACTIONS,
-                    dtype=repeated_actions.dtype,
-                    device=repeated_actions.device,
-                ).repeat_interleave(batch_size)
-                repeated_actions[:, i, 0] = grid
-                repeated_actions = repeated_actions.view(grid_size * batch_size, -1)
-
-                q1, q2 = critic(repeated_states, repeated_actions)
-                # average over the batch -> one Q per grid point
-                q1 = q1.view(grid_size, batch_size).mean(dim=1)
-                q2 = q2.view(grid_size, batch_size).mean(dim=1)
-                q_min = th.min(q1, q2)
-
-                best_idx = int(q_min.argmax())
-                best_action = CRITIC_PROBE_ACTIONS[best_idx]
-                max_bid_price = strategy.max_bid_price
-
-                print(
-                    f"[critic] n_updates={self.n_updates} unit={strategy.unit_id} "
-                    f"actor={mean_action:+.3f} (bid {mean_action * max_bid_price:6.2f}) | "
-                    f"argmax Q={best_action:+.2f} (bid {best_action * max_bid_price:6.2f})"
-                )
-                print(
-                    "[critic]    a: "
-                    + " ".join(f"{a:+7.2f}" for a in CRITIC_PROBE_ACTIONS)
-                )
-                print(
-                    "[critic]  bid: "
-                    + " ".join(
-                        f"{a * max_bid_price:+7.1f}" for a in CRITIC_PROBE_ACTIONS
-                    )
-                )
-                print(
-                    "[critic]   Q1: " + " ".join(f"{q:+7.3f}" for q in q1.tolist())
-                )
-                print(
-                    "[critic]   Q2: " + " ".join(f"{q:+7.3f}" for q in q2.tolist())
-                )
-                print(
-                    "[critic]  min: " + " ".join(f"{q:+7.3f}" for q in q_min.tolist())
-                )

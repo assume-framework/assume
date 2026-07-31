@@ -869,6 +869,11 @@ class LearningConfig:
     tau: float = 0.005
     target_policy_noise: float = 0.2
     target_noise_clip: float = 0.5
+    # Replay buffer persistence
+    save_replay_buffer: bool = True
+    replay_buffer_save_path: str | None = None
+    load_replay_buffer: bool = False
+    replay_buffer_load_path: str | None = None
 
     def __post_init__(self):
         """Calculate defaults that depend on other fields and validate inputs."""
@@ -879,7 +884,7 @@ class LearningConfig:
 
         # if we do not have initial experience collected we will get an error as no samples are available on the
         # buffer from which we can draw experience to adapt the strategy, hence we set it to minimum one episode
-        if self.episodes_collecting_initial_experience < 1:
+        if self.episodes_collecting_initial_experience < 1 and not self.load_replay_buffer:
             logger.warning(
                 f"episodes_collecting_initial_experience need to be at least 1 to sample from buffer, got {self.episodes_collecting_initial_experience}. setting to 1"
             )

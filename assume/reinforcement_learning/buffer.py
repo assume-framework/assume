@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import os
 import warnings
 from typing import NamedTuple
 
@@ -102,49 +103,6 @@ class ReplayBuffer:
         """
         return self.buffer_size if self.full else self.pos
 
-    def stats(self) -> list[dict]:
-        """
-        Summarise the reward distribution currently held in the buffer.
-
-        Diagnostic helper: for a sparse reward landscape it matters how much of
-        the stored experience actually carries a positive signal, since that is
-        what the critic has to fit the interesting part of the Q-landscape from.
-
-        Returns:
-            list[dict]: one entry per RL unit with the buffer fill level and the
-            absolute and relative number of transitions with positive, zero and
-            negative reward.
-        """
-
-        size = self.size()
-        if size == 0:
-            return []
-
-        rewards = self.rewards[:size]
-
-        stats = []
-        for i in range(self.n_rl_units):
-            r = rewards[:, i]
-            n_pos = int((r > 0).sum())
-            n_neg = int((r < 0).sum())
-            n_zero = size - n_pos - n_neg
-            stats.append(
-                {
-                    "size": size,
-                    "n_pos": n_pos,
-                    "n_zero": n_zero,
-                    "n_neg": n_neg,
-                    "share_pos": n_pos / size,
-                    "share_zero": n_zero / size,
-                    "share_neg": n_neg / size,
-                    "mean": float(r.mean()),
-                    "min": float(r.min()),
-                    "max": float(r.max()),
-                }
-            )
-
-        return stats
-
     def to_torch(self, array: np.array, copy=True):
         """
         Converts a numpy array to a PyTorch tensor. Note: It copies the data by default.
@@ -217,3 +175,42 @@ class ReplayBuffer:
         )
 
         return ReplayBufferSamples(*tuple(map(self.to_torch, data)))
+
+    def save(self, path: str):
+        """Save the replay buffer state to disk."""
+        # ensure directory exists
+        dirpath = os.path.dirname(path)
+        if dirpath and not os.path.exists(dirpath):
+            os.makedirs(dirpath, exist_ok=True)
+
+        np.savez_compressed(
+            path,
+            observations=self.observations,
+            actions=self.actions,
+            rewards=self.rewards,
+            pos=np.array([self.pos]),
+            full=np.array([self.full]),
+        )
+
+    @classmethod
+    def load(cls, path: str, device: str, float_type):
+        """Load a replay buffer from disk."""
+        data = np.load(path)
+        obs = data["observations"]
+        acts = data["actions"]
+        rews = data["rewards"]
+
+        buffer = cls(
+            buffer_size=obs.shape[0],
+            obs_dim=obs.shape[2],
+            act_dim=acts.shape[2],
+            n_rl_units=obs.shape[1],
+            device=device,
+            float_type=float_type,
+        )
+        buffer.observations = obs
+        buffer.actions = acts
+        buffer.rewards = rews
+        buffer.pos = int(data["pos"][0])
+        buffer.full = bool(data["full"][0])
+        return buffer
