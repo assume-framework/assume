@@ -354,7 +354,9 @@ class Boiler:
                     == b.hydrogen_gas_in[t] * model.hydrogen_gas_price[t]
                 )
 
-        # Ramp-up constraint and ramp-down constraints
+        # Ramp-up constraint and ramp-down constraints. The first step has no
+        # predecessor to decrease from, so ramp_down is skipped there rather than
+        # also capping it (ramp_up already limits the rise from a standing start).
         if self.fuel_type == "natural_gas":
 
             @model_block.Constraint(self.time_steps)
@@ -366,7 +368,7 @@ class Boiler:
             @model_block.Constraint(self.time_steps)
             def ramp_down_constraint(b, t):
                 if t == self.time_steps.at(1):
-                    return b.natural_gas_in[t] <= b.ramp_down
+                    return pyo.Constraint.Skip
                 return b.natural_gas_in[t - 1] - b.natural_gas_in[t] <= b.ramp_down
 
         elif self.fuel_type == "hydrogen_gas":
@@ -380,7 +382,7 @@ class Boiler:
             @model_block.Constraint(self.time_steps)
             def ramp_down_constraint(b, t):
                 if t == self.time_steps.at(1):
-                    return b.hydrogen_gas_in[t] <= b.ramp_down
+                    return pyo.Constraint.Skip
                 return b.hydrogen_gas_in[t - 1] - b.hydrogen_gas_in[t] <= b.ramp_down
 
         elif self.fuel_type == "electricity":
@@ -578,17 +580,20 @@ class GenericStorage:
                 return b.discharge[t] <= b.ramp_up
             return b.discharge[t] - b.discharge[t - 1] <= b.ramp_up
 
-        # Apply ramp-down constraints if ramp_down is specified
+        # Apply ramp-down constraints if ramp_down is specified. The first step has no
+        # predecessor to decrease from, so it is left uncapped here rather than also
+        # bounding it by ramp_down (ramp_up above already caps how fast it can rise
+        # from a standing start).
         @model_block.Constraint(self.time_steps)
         def charge_ramp_down_constraint(b, t):
             if t == self.time_steps.at(1):
-                return b.charge[t] <= b.ramp_down
+                return pyo.Constraint.Skip
             return b.charge[t - 1] - b.charge[t] <= b.ramp_down
 
         @model_block.Constraint(self.time_steps)
         def discharge_ramp_down_constraint(b, t):
             if t == self.time_steps.at(1):
-                return b.discharge[t] <= b.ramp_down
+                return pyo.Constraint.Skip
             return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
 
         return model_block
@@ -603,17 +608,30 @@ class ThermalStorage(GenericStorage):
 
     - For 'short-term': behaves like GenericStorage without behavioral restrictions.
     - For 'long-term': follows a storage schedule (0: charge-only, 1: discharge-only).
+    - For 'short-term_with_generator': an electric heater charges the storage, making it
+      a power-to-heat unit (E-TES). ``charge`` is then produced from ``power_in`` at
+      ``eta_electric`` and priced at the electricity price.
 
     Args:
-        storage_type (str): Type of storage behavior: 'short-term' or 'long-term'.
+        storage_type (str): Type of storage behavior: 'short-term', 'long-term' or 'short-term_with_generator'.
         storage_schedule_profile (pd.Series, optional): Binary schedule for discharge availability (only required for 'long-term').
+        eta_electric (float, optional): Efficiency of the electric heater (only used with a generator). Defaults to 0.97.
+        max_power (float, optional): Cap on the electric heater power (MW). Defaults to ``max_power_charge / eta_electric``.
         **kwargs: All other parameters are inherited from GenericStorage.
     """
+
+    supported_storage_types = (
+        "short-term",
+        "long-term",
+        "short-term_with_generator",
+    )
 
     def __init__(
         self,
         storage_type: str = "short-term",
         storage_schedule_profile: pd.Series | None = None,
+        eta_electric: float = 0.97,
+        max_power: float | None = None,
         **kwargs,
     ):
         """
@@ -621,7 +639,7 @@ class ThermalStorage(GenericStorage):
 
         Raises:
             ValueError: If `storage_type` is 'long-term' and no schedule is provided.
-            ValueError: If `storage_type` is not one of ['short-term', 'long-term'].
+            ValueError: If `storage_type` is not a supported storage type.
         """
         super().__init__(**kwargs)
 
@@ -633,8 +651,22 @@ class ThermalStorage(GenericStorage):
                 "storage_schedule_profile is required for 'long-term' storage_type."
             )
 
-        if self.storage_type not in ["short-term", "long-term"]:
-            raise ValueError("storage_type must be either 'short-term' or 'long-term'.")
+        if self.storage_type not in self.supported_storage_types:
+            raise ValueError(
+                "storage_type must be one of: "
+                f"{', '.join(self.supported_storage_types)}."
+            )
+
+        self.eta_electric = eta_electric
+        if self.storage_type == "short-term_with_generator":
+            self.max_power = (
+                self.max_power_charge / max(eta_electric, 1e-6)
+                if max_power is None
+                else max_power
+            )
+        else:
+            # No electric heater: the power port exists but is fixed to zero
+            self.max_power = 0.0
 
     def add_to_model(
         self, model: pyo.ConcreteModel, model_block: pyo.Block
@@ -643,6 +675,7 @@ class ThermalStorage(GenericStorage):
         Adds thermal storage constraints to the model based on storage type.
 
         - If 'long-term', restrict charge/discharge based on the binary schedule profile.
+        - If 'short-term_with_generator', charge the storage with an electric heater.
         - Otherwise, behaves identically to GenericStorage.
 
         Args:
@@ -653,6 +686,45 @@ class ThermalStorage(GenericStorage):
             pyo.Block: Updated model block with thermal storage constraints.
         """
         model_block = super().add_to_model(model, model_block)
+
+        # The power port is always defined so plant-level load aggregation and
+        # reporting can treat every thermal storage alike; without a generator it is
+        # fixed to zero.
+        model_block.eta_electric = pyo.Param(initialize=self.eta_electric)
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.power_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+        )
+        model_block.operating_cost = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+
+        if self.storage_type == "short-term_with_generator":
+            if not hasattr(model, "electricity_price"):
+                raise ValueError(
+                    "ThermalStorage with an electric heater requires an electricity "
+                    "price profile in the model."
+                )
+
+            @model_block.Constraint(self.time_steps)
+            def electric_heater_charge(b, t):
+                return b.charge[t] == b.power_in[t] * b.eta_electric
+
+            @model_block.Constraint(self.time_steps)
+            def storage_operating_cost_constraint(b, t):
+                return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+
+        else:
+
+            @model_block.Constraint(self.time_steps)
+            def no_electric_heater(b, t):
+                return b.power_in[t] == 0
+
+            @model_block.Constraint(self.time_steps)
+            def storage_operating_cost_constraint(b, t):
+                return b.operating_cost[t] == 0
 
         if self.storage_type == "long-term":
 
@@ -1780,10 +1852,13 @@ class ChargingStation:
                 return b.charge[t] <= b.ramp_up
             return b.charge[t] - b.charge[t - 1] <= b.ramp_up
 
+        # The first step has no predecessor to decrease from, so ramp_down is skipped
+        # there rather than also capping it (ramp_up above already limits how fast it
+        # can rise from a standing start).
         @model_block.Constraint(self.time_steps)
         def charge_ramp_down_constraint(b, t):
             if t == self.time_steps.at(1):
-                return b.charge[t] <= b.ramp_down
+                return pyo.Constraint.Skip
             return b.charge[t - 1] - b.charge[t] <= b.ramp_down
 
         # Ramping: discharge
@@ -1796,7 +1871,7 @@ class ChargingStation:
         @model_block.Constraint(self.time_steps)
         def discharge_ramp_down_constraint(b, t):
             if t == self.time_steps.at(1):
-                return b.discharge[t] <= b.ramp_down
+                return pyo.Constraint.Skip
             return b.discharge[t - 1] - b.discharge[t] <= b.ramp_down
 
         return model_block
@@ -2037,6 +2112,628 @@ class DRIStorage(GenericStorage):
         return model_block
 
 
+class GrindingMill:
+    """
+    A class to represent a generic grinding mill in a cement plant model.
+
+    The same class covers raw material milling (limestone and additives to raw meal)
+    and cement grinding (clinker and additives to cement), since both are purely
+    electric grinding steps that differ only in their parameterisation.
+
+    Args:
+        max_power (float): Maximum allowable power input to the mill (MW).
+        specific_electricity_consumption (float): Electricity consumption per tonne of
+            material output (MWh/t).
+        time_steps (list[int]): A list of time steps over which the mill operates.
+        min_power (float, optional): Minimum allowable power input to the mill. Defaults to 0.0.
+        efficiency (float, optional): Mass ratio of material output to material input.
+            Defaults to 1.0 (no mass losses).
+        ramp_up (float, optional): Maximum allowed increase in power input per time step.
+            Defaults to `max_power`.
+        ramp_down (float, optional): Maximum allowed decrease in power input per time step.
+            Defaults to `max_power`.
+        min_operating_steps (int, optional): Minimum number of consecutive time steps the
+            mill must operate once started. Defaults to 0.
+        min_down_steps (int, optional): Minimum number of consecutive time steps the mill
+            must remain off after shutdown. Defaults to 0.
+        initial_operational_status (int, optional): Operational status before the first
+            time step (0 for off, 1 for on). Defaults to 1.
+    """
+
+    def __init__(
+        self,
+        max_power: float,
+        specific_electricity_consumption: float,
+        time_steps: list[int],
+        min_power: float = 0.0,
+        efficiency: float = 1.0,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        **kwargs,
+    ):
+        super().__init__()
+
+        self.max_power = max_power
+        self.min_power = min_power
+        self.efficiency = efficiency
+        self.specific_electricity_consumption = specific_electricity_consumption
+        self.time_steps = time_steps
+        self.ramp_up = max_power if ramp_up is None else ramp_up
+        self.ramp_down = max_power if ramp_down is None else ramp_down
+        self.min_operating_steps = int(min_operating_steps)
+        self.min_down_steps = int(min_down_steps)
+        self.initial_operational_status = initial_operational_status
+        self.kwargs = kwargs
+
+        if specific_electricity_consumption <= 0:
+            raise ValueError(
+                "GrindingMill requires a positive specific_electricity_consumption."
+            )
+        if efficiency <= 0:
+            raise ValueError("GrindingMill requires a positive efficiency.")
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """
+        Adds a grinding mill block to the Pyomo model, defining parameters, variables and constraints.
+
+        Pyomo Components:
+            - **Parameters**: `max_power`, `min_power`, `efficiency`,
+              `specific_electricity_consumption`, `ramp_up`, `ramp_down`,
+              `min_operating_steps`, `min_down_steps`, `initial_operational_status`.
+            - **Variables**: `power_in[t]`, `material_input[t]`, `material_output[t]`,
+              `operating_cost[t]`, and optionally `operational_status[t]` (binary).
+            - **Constraints**: material input/output relation, electricity demand of the
+              grinding step, operating cost, ramping, and minimum up/down times.
+
+        Args:
+            model (pyo.ConcreteModel): The optimisation model the block belongs to.
+            model_block (pyo.Block): The block the mill is added to.
+
+        Returns:
+            pyo.Block: The block representing the grinding mill.
+        """
+
+        # Define parameters
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.min_power = pyo.Param(initialize=self.min_power)
+        model_block.efficiency = pyo.Param(initialize=self.efficiency)
+        model_block.specific_electricity_consumption = pyo.Param(
+            initialize=self.specific_electricity_consumption
+        )
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.min_operating_steps = pyo.Param(
+            initialize=self.min_operating_steps, within=pyo.NonNegativeIntegers
+        )
+        model_block.min_down_steps = pyo.Param(
+            initialize=self.min_down_steps, within=pyo.NonNegativeIntegers
+        )
+        model_block.initial_operational_status = pyo.Param(
+            initialize=self.initial_operational_status
+        )
+
+        # Define variables
+        model_block.power_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+        )
+        model_block.material_input = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.material_output = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.operating_cost = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+
+        # Mass balance over the mill
+        @model_block.Constraint(self.time_steps)
+        def material_input_output_relation(b, t):
+            return b.material_input[t] == b.material_output[t] / b.efficiency
+
+        # Electricity demand of the grinding step
+        @model_block.Constraint(self.time_steps)
+        def material_flow_constraint(b, t):
+            return (
+                b.power_in[t]
+                == b.material_output[t] * b.specific_electricity_consumption
+            )
+
+        # Operating costs
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_constraint_rule(b, t):
+            return b.operating_cost[t] == b.power_in[t] * model.electricity_price[t]
+
+        # Ramp-up and ramp-down constraints
+        add_ramping_constraints(
+            model_block=model_block,
+            time_steps=self.time_steps,
+        )
+
+        # Define additional variables and constraints for startup/shutdown and operational status
+        if (
+            self.min_operating_steps > 1
+            or self.min_down_steps > 1
+            or self.min_power > 0
+        ):
+            add_min_up_down_time_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+            )
+
+        return model_block
+
+
+class ThermalProcessStage:
+    """
+    Base class for the fuel-switchable thermal stages of a cement kiln line.
+
+    A stage converts an energy carrier into process heat, and its heat throughput sets
+    the material throughput of the stage. Four firing modes are supported:
+
+    - ``"electricity"``: ``heat_out = eta_electric × power_in``
+    - ``"fossil"``: ``heat_out = eta_fossil × (natural_gas_in + coal_in)``, split by ``fossil_ng_share``
+    - ``"both"``: the sum of the electric and the fossil contribution
+    - ``"hydrogen"``: ``heat_out = eta_fossil × hydrogen_in`` (``eta_fossil`` acts as the burner efficiency)
+
+    Auxiliary electricity (fans, drives, transport) is modelled separately from the
+    electric heating path in ``aux_power``, so it is part of the plant load in every
+    firing mode - not only when the stage is heated electrically.
+
+    Args:
+        max_heat_out (float): Maximum thermal output of the stage (MW_th).
+        specific_heat_demand (float): Thermal energy per tonne of throughput (MWh_th/t).
+        time_steps (list[int]): A list of time steps over which the stage operates.
+        min_heat_out (float, optional): Minimum thermal output while the stage is on (MW_th). Defaults to 0.0.
+        specific_electricity_aux (float, optional): Auxiliary electricity per tonne of throughput (MWh_el/t). Defaults to 0.0.
+        fuel_type (str, optional): Firing mode, see above. Defaults to ``"electricity"``.
+        eta_electric (float, optional): Efficiency of the electric heating path. Defaults to 0.95.
+        eta_fossil (float, optional): Efficiency of the burner (fossil or hydrogen). Defaults to 0.90.
+        fossil_ng_share (float, optional): Share of natural gas in the fossil fuel mix (1.0 = only gas, 0.0 = only coal). Defaults to 1.0.
+        max_power (float, optional): Cap on the electric heating power (MW_el). Defaults to ``max_heat_out / eta_electric``.
+        ramp_up (float, optional): Maximum increase in thermal output per time step. Defaults to `max_heat_out`.
+        ramp_down (float, optional): Maximum decrease in thermal output per time step. Defaults to `max_heat_out`.
+        ng_co2_factor (float, optional): Emissions of natural gas (t CO2/MWh_th). Defaults to 0.202.
+        coal_co2_factor (float, optional): Emissions of coal (t CO2/MWh_th). Defaults to 0.341.
+        min_operating_steps (int, optional): Minimum number of consecutive operating steps. Defaults to 0.
+        min_down_steps (int, optional): Minimum number of consecutive down steps. Defaults to 0.
+        initial_operational_status (int, optional): Status before the first time step (0 for off, 1 for on). Defaults to 1.
+        availability_profile (pd.Series | FastSeries | None, optional): Per-time-step
+            availability of the stage (1 available, 0 unavailable). Defaults to None.
+    """
+
+    supported_fuel_types = ("electricity", "fossil", "both", "hydrogen")
+    #: Name of the block variable holding the material throughput of the stage.
+    throughput_name = "throughput"
+
+    def __init__(
+        self,
+        max_heat_out: float,
+        specific_heat_demand: float,
+        time_steps: list[int],
+        min_heat_out: float = 0.0,
+        specific_electricity_aux: float = 0.0,
+        fuel_type: str = "electricity",
+        eta_electric: float = 0.95,
+        eta_fossil: float = 0.90,
+        fossil_ng_share: float = 1.0,
+        max_power: float | None = None,
+        ramp_up: float | None = None,
+        ramp_down: float | None = None,
+        ng_co2_factor: float = 0.202,
+        coal_co2_factor: float = 0.341,
+        min_operating_steps: int = 0,
+        min_down_steps: int = 0,
+        initial_operational_status: int = 1,
+        availability_profile=None,
+        **kwargs,
+    ):
+        super().__init__()
+
+        self.fuel_type = str(fuel_type).lower()
+        if self.fuel_type not in self.supported_fuel_types:
+            raise ValueError(
+                f"Unsupported fuel_type '{fuel_type}' for {type(self).__name__}. "
+                f"Choose one of {', '.join(self.supported_fuel_types)}."
+            )
+        if specific_heat_demand <= 0:
+            raise ValueError(
+                f"{type(self).__name__} requires a positive specific_heat_demand."
+            )
+        if not 0 <= fossil_ng_share <= 1:
+            raise ValueError("fossil_ng_share must be between 0 and 1.")
+
+        self.time_steps = time_steps
+        self.max_heat_out = max_heat_out
+        self.min_heat_out = min_heat_out
+        self.specific_heat_demand = specific_heat_demand
+        self.specific_electricity_aux = specific_electricity_aux
+
+        self.eta_electric = eta_electric
+        self.eta_fossil = eta_fossil
+        self.fossil_ng_share = fossil_ng_share
+
+        self.max_power = (
+            max_heat_out / max(eta_electric, 1e-6) if max_power is None else max_power
+        )
+        self.ramp_up = max_heat_out if ramp_up is None else ramp_up
+        self.ramp_down = max_heat_out if ramp_down is None else ramp_down
+
+        self.ng_co2_factor = ng_co2_factor
+        self.coal_co2_factor = coal_co2_factor
+
+        self.min_operating_steps = int(min_operating_steps)
+        self.min_down_steps = int(min_down_steps)
+        self.initial_operational_status = initial_operational_status
+        self.availability_profile = sanitize_availability_profile(
+            availability_profile, type(self).__name__
+        )
+        self.kwargs = kwargs
+
+    @property
+    def uses_electricity(self) -> bool:
+        return self.fuel_type in ("electricity", "both")
+
+    @property
+    def uses_fossil(self) -> bool:
+        return self.fuel_type in ("fossil", "both")
+
+    def _check_prices(self, model: pyo.ConcreteModel) -> None:
+        """Verify the plant model provides every price series this stage needs."""
+        required = ["electricity_price"]  # auxiliaries are always electric
+        if self.uses_fossil:
+            required += ["natural_gas_price", "coal_price"]
+        if self.fuel_type == "hydrogen":
+            required += ["hydrogen_price"]
+        for attr in required:
+            if not hasattr(model, attr):
+                raise ValueError(
+                    f"{type(self).__name__} with fuel_type '{self.fuel_type}' requires "
+                    f"a '{attr}' profile in the model."
+                )
+
+    def _add_common_parameters(self, model_block: pyo.Block) -> None:
+        model_block.max_heat_out = pyo.Param(initialize=self.max_heat_out)
+        model_block.min_heat_out = pyo.Param(initialize=self.min_heat_out)
+        model_block.specific_heat_demand = pyo.Param(
+            initialize=self.specific_heat_demand
+        )
+        model_block.specific_electricity_aux = pyo.Param(
+            initialize=self.specific_electricity_aux
+        )
+        model_block.eta_electric = pyo.Param(initialize=self.eta_electric)
+        model_block.eta_fossil = pyo.Param(initialize=self.eta_fossil)
+        model_block.fossil_ng_share = pyo.Param(
+            initialize=self.fossil_ng_share, within=pyo.UnitInterval
+        )
+        model_block.max_power = pyo.Param(initialize=self.max_power)
+        model_block.ramp_up = pyo.Param(initialize=self.ramp_up)
+        model_block.ramp_down = pyo.Param(initialize=self.ramp_down)
+        model_block.ng_co2_factor = pyo.Param(initialize=self.ng_co2_factor)
+        model_block.coal_co2_factor = pyo.Param(initialize=self.coal_co2_factor)
+        model_block.min_operating_steps = pyo.Param(
+            initialize=self.min_operating_steps, within=pyo.NonNegativeIntegers
+        )
+        model_block.min_down_steps = pyo.Param(
+            initialize=self.min_down_steps, within=pyo.NonNegativeIntegers
+        )
+        model_block.initial_operational_status = pyo.Param(
+            initialize=self.initial_operational_status
+        )
+
+    def _add_common_variables(self, model_block: pyo.Block) -> None:
+        model_block.heat_out = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_heat_out),
+            doc="Useful process heat generated by the stage",
+        )
+        model_block.power_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            bounds=(0, model_block.max_power),
+            doc="Electric heating power",
+        )
+        model_block.aux_power = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            doc="Auxiliary electricity of fans, drives and transport",
+        )
+        model_block.natural_gas_in = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+        model_block.coal_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.fossil_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.hydrogen_in = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.co2_energy = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+        model_block.operating_cost = pyo.Var(
+            self.time_steps, within=pyo.NonNegativeReals
+        )
+
+    def _add_firing_constraints(self, model_block: pyo.Block) -> None:
+        """Heat balance, fossil fuel split and zeroing of the unused carriers."""
+
+        @model_block.Constraint(self.time_steps)
+        def heat_balance(b, t):
+            generated = 0
+            if self.uses_electricity:
+                generated += b.power_in[t] * b.eta_electric
+            if self.uses_fossil:
+                generated += b.fossil_in[t] * b.eta_fossil
+            if self.fuel_type == "hydrogen":
+                generated += b.hydrogen_in[t] * b.eta_fossil
+            return b.heat_out[t] == generated + self._external_heat_expr(b, t)
+
+        if self.uses_fossil:
+
+            @model_block.Constraint(self.time_steps)
+            def fossil_sum(b, t):
+                return b.fossil_in[t] == b.natural_gas_in[t] + b.coal_in[t]
+
+            @model_block.Constraint(self.time_steps)
+            def fossil_split_ng(b, t):
+                return b.natural_gas_in[t] == b.fossil_ng_share * b.fossil_in[t]
+
+        else:
+
+            @model_block.Constraint(self.time_steps)
+            def no_fossil_input(b, t):
+                return b.natural_gas_in[t] + b.coal_in[t] + b.fossil_in[t] == 0
+
+        if not self.uses_electricity:
+
+            @model_block.Constraint(self.time_steps)
+            def no_electric_heating(b, t):
+                return b.power_in[t] == 0
+
+        if self.fuel_type != "hydrogen":
+
+            @model_block.Constraint(self.time_steps)
+            def no_hydrogen_input(b, t):
+                return b.hydrogen_in[t] == 0
+
+    def _external_heat_expr(self, model_block: pyo.Block, t: int):
+        """Heat supplied from outside the stage (overridden where applicable)."""
+        return 0
+
+    def _add_aux_and_cost_constraints(self, model_block: pyo.Block, model) -> None:
+        throughput = getattr(model_block, self.throughput_name)
+
+        @model_block.Constraint(self.time_steps)
+        def aux_power_constraint(b, t):
+            return b.aux_power[t] == throughput[t] * b.specific_electricity_aux
+
+        @model_block.Constraint(self.time_steps)
+        def energy_co2_constraint(b, t):
+            return (
+                b.co2_energy[t]
+                == b.natural_gas_in[t] * b.ng_co2_factor
+                + b.coal_in[t] * b.coal_co2_factor
+            )
+
+        @model_block.Constraint(self.time_steps)
+        def operating_cost_constraint(b, t):
+            cost = (b.power_in[t] + b.aux_power[t]) * model.electricity_price[t]
+            if self.uses_fossil:
+                cost += (
+                    b.natural_gas_in[t] * model.natural_gas_price[t]
+                    + b.coal_in[t] * model.coal_price[t]
+                )
+            if self.fuel_type == "hydrogen":
+                cost += b.hydrogen_in[t] * model.hydrogen_price[t]
+            cost += self._emission_cost_expr(b, t, model)
+            return b.operating_cost[t] == cost
+
+    def _emission_cost_expr(self, model_block: pyo.Block, t: int, model):
+        """CO2 cost of the stage; extended by stages with process emissions."""
+        return model_block.co2_energy[t] * model.co2_price[t]
+
+    def _add_operational_constraints(self, model_block: pyo.Block) -> None:
+        """Availability, ramping and, where configured, unit commitment on the heat output."""
+        if self.availability_profile is not None:
+
+            @model_block.Constraint(self.time_steps)
+            def availability_constraint(b, t):
+                return (
+                    b.heat_out[t]
+                    <= availability_at(self.availability_profile, t) * b.max_heat_out
+                )
+
+        add_ramping_constraints(
+            model_block=model_block,
+            time_steps=self.time_steps,
+            quantity="heat_out",
+        )
+
+        if (
+            self.min_operating_steps > 1
+            or self.min_down_steps > 1
+            or self.min_heat_out > 0
+        ):
+            add_min_up_down_time_constraints(
+                model_block=model_block,
+                time_steps=self.time_steps,
+                quantity="heat_out",
+                min_quantity="min_heat_out",
+                max_quantity="max_heat_out",
+            )
+
+    def add_to_model(
+        self, model: pyo.ConcreteModel, model_block: pyo.Block
+    ) -> pyo.Block:
+        """
+        Adds the thermal stage to the Pyomo model, defining parameters, variables and constraints.
+
+        Pyomo Components:
+            - **Parameters**: `max_heat_out`, `min_heat_out`, `specific_heat_demand`,
+              `specific_electricity_aux`, `eta_electric`, `eta_fossil`, `fossil_ng_share`,
+              `max_power`, `ramp_up`, `ramp_down`, `ng_co2_factor`, `coal_co2_factor`,
+              `min_operating_steps`, `min_down_steps`, `initial_operational_status`.
+            - **Variables**: `heat_out[t]`, `power_in[t]`, `aux_power[t]`,
+              `natural_gas_in[t]`, `coal_in[t]`, `fossil_in[t]`, `hydrogen_in[t]`,
+              `co2_energy[t]`, `operating_cost[t]`, the stage throughput, and optionally
+              `operational_status[t]` / `start_up[t]` / `shut_down[t]` (binary).
+            - **Constraints**: heat balance for the configured firing mode, fossil fuel
+              split, zeroing of unused carriers, throughput from heat, auxiliary
+              electricity, energy emissions, operating cost, ramping and minimum
+              up/down times.
+
+        Args:
+            model (pyo.ConcreteModel): The optimisation model the block belongs to.
+            model_block (pyo.Block): The block the stage is added to.
+
+        Returns:
+            pyo.Block: The block representing the thermal stage.
+        """
+        self._check_prices(model)
+        self._add_common_parameters(model_block)
+        self._add_stage_parameters(model_block)
+        self._add_common_variables(model_block)
+        self._add_stage_variables(model_block)
+        self._add_firing_constraints(model_block)
+        self._add_stage_constraints(model_block, model)
+        self._add_aux_and_cost_constraints(model_block, model)
+        self._add_operational_constraints(model_block)
+        return model_block
+
+    # Stage-specific hooks
+    def _add_stage_parameters(self, model_block: pyo.Block) -> None:
+        pass
+
+    def _add_stage_variables(self, model_block: pyo.Block) -> None:
+        pass
+
+    def _add_stage_constraints(self, model_block: pyo.Block, model) -> None:
+        pass
+
+
+class Preheater(ThermalProcessStage):
+    """
+    A fuel-switchable preheater for cement raw meal (medium temperature, ~300-800 °C).
+
+    The stage heats raw meal with electricity, natural gas, coal or hydrogen, and can
+    additionally use waste heat recovered elsewhere in the plant. The recovered heat
+    enters through ``external_heat_in``, which the plant unit links to its waste heat
+    source (and fixes to zero when there is none).
+
+    Args:
+        See :class:`ThermalProcessStage`; ``specific_heat_demand`` is given per tonne of
+        raw meal (MWh_th/t) and the throughput variable is ``raw_meal_out``.
+    """
+
+    throughput_name = "raw_meal_out"
+
+    def _add_stage_variables(self, model_block: pyo.Block) -> None:
+        model_block.raw_meal_out = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            doc="Preheated raw meal leaving the stage (t)",
+        )
+        model_block.external_heat_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            doc="Waste heat supplied from elsewhere in the plant (MWh_th)",
+        )
+
+    def _external_heat_expr(self, model_block: pyo.Block, t: int):
+        return model_block.external_heat_in[t]
+
+    def _add_stage_constraints(self, model_block: pyo.Block, model) -> None:
+        @model_block.Constraint(self.time_steps)
+        def throughput_from_heat(b, t):
+            return b.raw_meal_out[t] == b.heat_out[t] / b.specific_heat_demand
+
+
+class Calciner(ThermalProcessStage):
+    """
+    A fuel-switchable calciner for cement raw meal (high temperature, ~920-930 °C).
+
+    Calcination releases process CO2 in proportion to the clinker produced, on top of
+    the energy emissions of the fuel. The heat that actually drives calcination is
+    ``effective_heat_in``, which the plant unit links to the burner output plus any
+    thermal storage discharge - this is what lets an electric thermal storage displace
+    burner heat in expensive hours.
+
+    Args:
+        calcination_emission_factor (float, optional): Process emissions per tonne of clinker (t CO2/t). Defaults to 0.525.
+        Other arguments: see :class:`ThermalProcessStage`; ``specific_heat_demand`` is
+        given per tonne of clinker (MWh_th/t) and the throughput variable is ``clinker_out``.
+    """
+
+    throughput_name = "clinker_out"
+
+    def __init__(self, *args, calcination_emission_factor: float = 0.525, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.calcination_emission_factor = calcination_emission_factor
+
+    def _add_stage_parameters(self, model_block: pyo.Block) -> None:
+        model_block.calcination_emission_factor = pyo.Param(
+            initialize=self.calcination_emission_factor
+        )
+
+    def _add_stage_variables(self, model_block: pyo.Block) -> None:
+        model_block.clinker_out = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            doc="Calcined material leaving the stage (t)",
+        )
+        model_block.effective_heat_in = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            doc="Heat driving calcination, incl. thermal storage discharge (MWh_th)",
+        )
+        model_block.co2_process = pyo.Var(self.time_steps, within=pyo.NonNegativeReals)
+
+    def _add_stage_constraints(self, model_block: pyo.Block, model) -> None:
+        @model_block.Constraint(self.time_steps)
+        def throughput_from_heat(b, t):
+            return b.clinker_out[t] == b.effective_heat_in[t] / b.specific_heat_demand
+
+        @model_block.Constraint(self.time_steps)
+        def process_co2_constraint(b, t):
+            return b.co2_process[t] == b.clinker_out[t] * b.calcination_emission_factor
+
+    def _emission_cost_expr(self, model_block: pyo.Block, t: int, model):
+        return (
+            model_block.co2_energy[t] + model_block.co2_process[t]
+        ) * model.co2_price[t]
+
+
+class Kiln(ThermalProcessStage):
+    """
+    A fuel-switchable rotary kiln for final clinkerisation (~1450 °C).
+
+    Unlike the calciner the kiln has no process emissions - the calcination CO2 has
+    already been released upstream - so only the energy emissions of its fuel are
+    accounted for. Its thermal demand per tonne of clinker is correspondingly higher.
+
+    Args:
+        See :class:`ThermalProcessStage`; ``specific_heat_demand`` is given per tonne of
+        clinker (MWh_th/t) and the throughput variable is ``clinker_out``.
+    """
+
+    throughput_name = "clinker_out"
+
+    def _add_stage_variables(self, model_block: pyo.Block) -> None:
+        model_block.clinker_out = pyo.Var(
+            self.time_steps,
+            within=pyo.NonNegativeReals,
+            doc="Clinker leaving the kiln (t)",
+        )
+
+    def _add_stage_constraints(self, model_block: pyo.Block, model) -> None:
+        @model_block.Constraint(self.time_steps)
+        def throughput_from_heat(b, t):
+            return b.clinker_out[t] == b.heat_out[t] / b.specific_heat_demand
+
+
 # Mapping of component type identifiers to their respective classes
 demand_side_technologies: dict = {
     "electrolyser": Electrolyser,
@@ -2052,38 +2749,102 @@ demand_side_technologies: dict = {
     "generic_storage": GenericStorage,
     "pv_plant": PVPlant,
     "thermal_storage": ThermalStorage,
+    "raw_material_mill": GrindingMill,
+    "cement_mill": GrindingMill,
+    "preheater": Preheater,
+    "calciner": Calciner,
+    "kiln": Kiln,
 }
 
 
-def add_ramping_constraints(model_block, time_steps):
+def sanitize_availability_profile(availability_profile, component_name: str):
+    """Return *availability_profile* if it can be indexed per time step, else ``None``.
+
+    Availability is expected as a per-time-step series. Scalar flags (such as the
+    ``"yes"``/``"no"`` strings sometimes present in DSM input files) carry no temporal
+    information and are dropped with a warning rather than failing the run.
+    """
+    if availability_profile is None:
+        return None
+    if isinstance(availability_profile, str) or not hasattr(
+        availability_profile, "__getitem__"
+    ):
+        logger.warning(
+            "%s received a non-series availability_profile (%r); "
+            "the availability constraint is skipped.",
+            component_name,
+            availability_profile,
+        )
+        return None
+    return availability_profile
+
+
+def availability_at(availability_profile, t: int) -> float:
+    """Positional lookup of an availability value for local time step *t*."""
+    if hasattr(availability_profile, "iat"):
+        return float(availability_profile.iat[t])
+    return float(availability_profile[t])
+
+
+def add_ramping_constraints(model_block, time_steps, quantity: str = "power_in"):
+    """Limit the change of *quantity* between consecutive time steps.
+
+    *quantity* names the block variable the ramp limits apply to - ``power_in`` for
+    electric components, ``heat_out`` for thermally driven ones.
+
+    The first time step has no predecessor, so it is only capped by ``ramp_up`` (how
+    fast the component can rise from an assumed standing start of zero). ``ramp_down``
+    is skipped there rather than also capping the first value: there is no preceding
+    value to decrease *from*, so a low ``ramp_down`` must not choke off a legitimately
+    high first-step value the way it would if it were treated as a second, tighter
+    absolute cap alongside ``ramp_up``.
+    """
+    ramped = getattr(model_block, quantity)
+
     # Ramp-up constraint
     @model_block.Constraint(time_steps)
     def ramp_up_constraint(b, t):
         if t == time_steps.at(1):
-            return b.power_in[t] <= b.ramp_up
-        return b.power_in[t] - b.power_in[t - 1] <= b.ramp_up
+            return ramped[t] <= b.ramp_up
+        return ramped[t] - ramped[t - 1] <= b.ramp_up
 
     # Ramp-down constraint
     @model_block.Constraint(time_steps)
     def ramp_down_constraint(b, t):
         if t == time_steps.at(1):
-            return b.power_in[t] <= b.ramp_down
-        return b.power_in[t - 1] - b.power_in[t] <= b.ramp_down
+            return pyo.Constraint.Skip
+        return ramped[t - 1] - ramped[t] <= b.ramp_down
 
     return model_block
 
 
-def add_min_up_down_time_constraints(model_block, time_steps):
+def add_min_up_down_time_constraints(
+    model_block,
+    time_steps,
+    quantity: str = "power_in",
+    min_quantity: str = "min_power",
+    max_quantity: str = "max_power",
+):
+    """Add an on/off status with minimum up- and down-time to a component block.
+
+    *quantity* names the block variable the status switches (``power_in`` for electric
+    components, ``heat_out`` for thermally driven ones), bounded by the *min_quantity*
+    and *max_quantity* parameters while the component is on.
+    """
     model_block.operational_status = pyo.Var(time_steps, within=pyo.Binary)
 
-    # Power constraints based on operational status
+    switched = getattr(model_block, quantity)
+    min_level = getattr(model_block, min_quantity)
+    max_level = getattr(model_block, max_quantity)
+
+    # Output constraints based on operational status
     @model_block.Constraint(time_steps)
     def min_power_constraint(b, t):
-        return b.power_in[t] >= b.min_power * b.operational_status[t]
+        return switched[t] >= min_level * b.operational_status[t]
 
     @model_block.Constraint(time_steps)
     def max_power_constraint(b, t):
-        return b.power_in[t] <= b.max_power * b.operational_status[t]
+        return switched[t] <= max_level * b.operational_status[t]
 
     if model_block.min_operating_steps > 0 or model_block.min_down_steps > 0:
         model_block.start_up = pyo.Var(time_steps, within=pyo.Binary)
