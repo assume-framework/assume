@@ -1575,13 +1575,18 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         # calculate reward
         scaling = 1 / (self.max_bid_price * unit.max_power)
         reward = unit.outputs["profit"].loc[start] * scaling
-        #price = order.get("price", "rofl")
-        #print(start, price, accepted_price, accepted_volume, total_profit)
+        price = order.get("price", "rofl")
+        print(start, price, accepted_price, accepted_volume, total_profit)
         #print("total", unit.outputs["eom_profit"].loc[start], "+", + unit.outputs["redispatch_profit"].loc[start])
-        #print("reward", reward)
+        print("reward", reward)
 
         if reward > 0:
-            reward *= 1  #0
+            reward *= 10
+        else:
+            if price < 32:
+                reward = (price - marginal_cost) / 100
+            if price > 45:
+                reward = (marginal_cost - price) / 100
 
         # write rl-rewards to buffer
         if self.learning_mode:
