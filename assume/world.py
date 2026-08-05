@@ -969,3 +969,27 @@ class World:
                 markets,
                 forecast_df,
             )
+
+    def export(
+        self,
+        scenario_save_path: str | Path = "scenario_exports",
+        study_case: str = "base",
+    ) -> None:
+        """
+        Export the current world setup to a CSV-based scenario folder.
+
+        Creates a scenario folder with config.yaml and CSV files compatible with
+        the CSV loader (loader_csv.py). The exported scenario can be adjusted, loaded and
+        re-run using load_scenario_folder().
+
+        Args:
+            scenario_save_path: Path where the scenario folder will be created.
+                Defaults to "scenario_exports", which creates a subfolder with simulation_id under scenario_exports/.
+            study_case: Name of the study case to use in config.yaml. Defaults to "base"
+
+        Raises:
+            ValueError: If world.setup() has not been called or required attributes are missing.
+        """
+        from assume.scenario.exporter_csv import export_to_folder
+
+        export_to_folder(self, scenario_save_path, study_case)

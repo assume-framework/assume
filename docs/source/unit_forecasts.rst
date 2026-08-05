@@ -151,7 +151,7 @@ Price forecast algorithms:
      - Merit-order dispatch against demand (excl. storages and DSM units) for all timesteps. Automatically uses elastic or inelastic clearing depending on demand unit types. Columns in ``forecast_df`` take precedence over calculated values.
    * - Keep
      - ``price_keep_given``
-     - Keeps the forecast series provided at instantiation unchanged.
+     - Keeps the forecast series provided at instantiation unchanged. Nothing is calculated, so a ``price_EOM`` column in ``forecasts_df`` is **not** applied either.
    * - Test
      - ``price_default_test``
      - Returns a constant price of 50 for the EOM market (for testing only).
@@ -170,7 +170,7 @@ Residual load forecast algorithms:
      - Total demand (incl. exchange volumes) minus renewable generation (wind/solar) for all timesteps.
    * - Keep
      - ``residual_load_keep_given``
-     - Keeps the forecast series provided at instantiation unchanged.
+     - Keeps the forecast series provided at instantiation unchanged. Nothing is calculated, so a ``residual_load_EOM`` column in ``forecasts_df`` is **not** applied either.
    * - Test
      - ``residual_load_default_test``
      - Returns an empty dict (for testing only).
@@ -189,7 +189,7 @@ Congestion signal forecast algorithms (DSM units only):
      - Per-node congestion severity: for each node, takes the max ratio of net load to line capacity across all connected transmission lines. Returns empty dict if grid data is unavailable.
    * - Keep
      - ``congestion_signal_keep_given``
-     - Keeps the forecast series provided at instantiation unchanged.
+     - Keeps the forecast series provided at instantiation unchanged. Nothing is calculated, so a ``{node}_congestion_signal`` column in ``forecasts_df`` is **not** applied either.
    * - Test
      - ``congestion_signal_default_test``
      - Returns a constant zero signal (for testing only).
@@ -208,7 +208,7 @@ Renewable utilisation forecast algorithms (DSM units only):
      - Per-node renewable generation (availability × max_power) plus an all-nodes aggregate. Returns empty dict if grid data is unavailable.
    * - Keep
      - ``renewable_utilisation_keep_given``
-     - Keeps the forecast series provided at instantiation unchanged.
+     - Keeps the forecast series provided at instantiation unchanged. Nothing is calculated, so a ``{node}_renewable_utilisation`` column in ``forecasts_df`` is **not** applied either.
    * - Test
      - ``renewable_utilisation_default_test``
      - Returns a constant zero signal (for testing only).
@@ -277,15 +277,24 @@ Other Ways to Provide Forecasts
 
 Besides configuring algorithms, there are two additional ways to supply forecast data:
 
-1. **Via forecast_df.csv** — create a CSV file with columns matching the expected keys
+1. **Via forecasts_df.csv** — create a CSV file with columns matching the expected keys
    (e.g. ``price_EOM``, ``residual_load_EOM``, ``{node}_congestion_signal``).
    Default forecast algorithms will **not** overwrite columns found in this file.
-   To disable the use of / overwriting with ``forecasts_df`` set the flag ``use_forecasts_df`` to false in the config.
+   To disable the use of / overwriting with ``forecastss_df`` set the flag ``use_forecasts_df`` to false in the config.
 
 2. **Direct instantiation** — when creating a simulation programmatically (without scenario loaders),
    you can pass forecast series directly to the forecaster constructor. In this case, set the
    corresponding algorithm to ``{forecast_metric}_keep_given`` to prevent the initialize step
    from overwriting your data.
+
+.. important::
+
+   ``{forecast_metric}_keep_given`` takes precedence over ``forecasts_df``. Columns from
+   ``forecasts_df`` are only picked up *while an algorithm calculates the metric* — since
+   ``keep_given`` skips that calculation entirely, a matching column is ignored and the series
+   passed at instantiation is kept. The two mechanisms are therefore alternatives, not a fallback
+   chain: use ``keep_given`` for series you pass in yourself (e.g. for tests / fast development), and leave the calculating algorithm
+   in place for metrics you want to supply through ``forecasts_df``.
 
 .. note::
 
