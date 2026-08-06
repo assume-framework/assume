@@ -29,6 +29,7 @@ Demand Units                  ``DemandForecaster``                      ``demand
 Exchange Units                ``ExchangeForecaster``                    ``volume_import``, ``volume_export``
 DSM Units                     ``DsmUnitForecaster``                     ``congestion_signal``, ``renewable_utilisation_signal``, ``electricity_price``
 Steelplant Units              ``SteelplantForecaster``                  DSM attrs + ``fuel_prices``
+Cement Plant Units            ``CementForecaster``                      DSM attrs + ``fuel_prices``, ``clinker_demand``, ``normalized_load_profile``, ``electricity_price_flex``, ``thermal_storage_schedule``, ``availability_profiles``
 Steam Generation Units        ``SteamgenerationForecaster``             DSM attrs + ``fuel_prices``, ``demand``, ``thermal_demand``, ``thermal_storage_schedule``, ``electricity_price_flex``
 Building Units                ``BuildingForecaster``                    DSM attrs + ``fuel_prices``, ``heat_demand``, ``ev_load_profile``, ``battery_load_profile``, ``pv_profile``, ``load_profile``
 Hydrogen Units                ``HydrogenForecaster``                    DSM attrs + ``hydrogen_demand``, ``seasonal_storage_schedule``

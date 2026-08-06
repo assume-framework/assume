@@ -117,6 +117,20 @@ class DSMFlex:
                     "commit_horizon, and rolling_step to be specified."
                 )
 
+    def _component_power_expr(self, m, t):
+        """Electric load of all component blocks at step *t*.
+
+        Used by the flexibility measures as the technology-agnostic counterpart of
+        ``total_power_input``: every block that draws power contributes its ``power_in``.
+        Units whose load also contains generation or bidirectional terms (e.g. PV or
+        batteries in a building) handle that in their own branch of the measure.
+        """
+        return pyo.quicksum(
+            m.dsm_blocks[block].power_in[t]
+            for block in m.dsm_blocks
+            if hasattr(m.dsm_blocks[block], "power_in")
+        )
+
     def initialize_components(self):
         """
         Initializes the DSM components by creating and adding blocks to the model.
@@ -406,6 +420,12 @@ class DSMFlex:
                     == total_power
                 )
 
+            else:
+                # Any other DSM unit: the plant load is the sum of its component loads
+                return m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[
+                    t
+                ] == self._component_power_expr(m, t)
+
         @self.model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):
             """
@@ -589,6 +609,12 @@ class DSMFlex:
                     == total_power
                 )
 
+            else:
+                # Any other DSM unit: the plant load is the sum of its component loads
+                return m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[
+                    t
+                ] == self._component_power_expr(m, t)
+
         @self.model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):
             """
@@ -653,38 +679,16 @@ class DSMFlex:
         # Power input constraint with flexibility based on congestion
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_with_peak_shift(m, t):
-            if self.has_electrolyser:
-                return (
-                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                )
-            else:
-                return (
-                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                )
+            return m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[
+                t
+            ] == self._component_power_expr(m, t)
 
         @model.Constraint(model.time_steps)
         def peak_threshold_constraint(m, t):
             """
             Ensures that the power input during peak periods does not exceed the peak threshold value.
             """
-            if self.has_electrolyser:
-                return (
-                    m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_load_cap_value
-                )
-            else:
-                return (
-                    m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                    <= peak_load_cap_value
-                )
+            return self._component_power_expr(m, t) <= peak_load_cap_value
 
         @self.model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):
@@ -747,19 +751,9 @@ class DSMFlex:
         # Power input constraint integrating flexibility
         @model.Constraint(model.time_steps)
         def total_power_input_constraint_flex(m, t):
-            if self.has_electrolyser:
-                return (
-                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["electrolyser"].power_in[t]
-                    + m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                )
-            else:
-                return (
-                    m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[t]
-                    == m.dsm_blocks["eaf"].power_in[t]
-                    + m.dsm_blocks["dri_plant"].power_in[t]
-                )
+            return m.total_power_input[t] + m.load_shift_pos[t] - m.load_shift_neg[
+                t
+            ] == self._component_power_expr(m, t)
 
         @self.model.Objective(sense=pyo.maximize)
         def obj_rule_flex(m):
@@ -959,7 +953,11 @@ class DSMFlex:
         def _fit_to_horizon(attr_name: str, pad_value=None):
             if not (attr_name and hasattr(self, attr_name)):
                 return None
-            val = getattr(self, attr_name)
+            # Prefer the saved full-horizon series: the attribute itself may already
+            # have been sliced down to the current window by
+            # _collect_series_attrs_for_window, and window offsets are applied to the
+            # returned sequence later on.
+            val = saved_attrs.get(attr_name, getattr(self, attr_name))
             if val is None:
                 return None
             try:
@@ -982,7 +980,9 @@ class DSMFlex:
         if profile is not None:
             return "profile_guided", profile, None
 
-        demand = _fit_to_horizon("steel_demand_per_timestep", pad_value=0.0)
+        demand = _fit_to_horizon(
+            f"{self._demand_attr_suffix}_per_timestep", pad_value=0.0
+        )
         if demand is not None:
             return "min_demand", None, demand
 
@@ -1156,7 +1156,11 @@ class DSMFlex:
     ):
         """Create instance and solve; retry without profile penalty if infeasible.
 
-        Returns ``(instance, results)``.
+        Returns ``(instance, results)``, or ``(None, None)`` when the window has no
+        feasible solution at all. Some solver interfaces (e.g. appsi HiGHS) raise
+        instead of reporting an infeasible termination condition, so an unsolvable
+        window must be reported back rather than crashing the caller: the window is
+        then left uncommitted and the simulation continues.
         """
         _profile_comps = [
             "profile_deviation_con",
@@ -1180,7 +1184,14 @@ class DSMFlex:
             results = self.solver.solve(instance, options={})
         except RuntimeError as e:
             if not load_profile_added:
-                raise
+                logger.warning(
+                    "Window [%d:%d] has no feasible solution (%.80s); "
+                    "leaving it uncommitted.",
+                    window_start,
+                    window_end,
+                    str(e),
+                )
+                return None, None
             logger.warning(
                 "[LOAD-PROFILE-RH] Solver error in window [%d:%d] with profile: %.80s. "
                 "Re-solving without.",
@@ -1190,7 +1201,17 @@ class DSMFlex:
             )
             _strip_profile_and_plain_obj()
             instance = self.model.create_instance()
-            results = self.solver.solve(instance, options={})
+            try:
+                results = self.solver.solve(instance, options={})
+            except RuntimeError as retry_error:
+                logger.warning(
+                    "Window [%d:%d] has no feasible solution without the profile "
+                    "either (%.80s); leaving it uncommitted.",
+                    window_start,
+                    window_end,
+                    str(retry_error),
+                )
+                return None, None
             load_profile_added = False
 
         if (
@@ -1205,7 +1226,17 @@ class DSMFlex:
             )
             _strip_profile_and_plain_obj()
             instance = self.model.create_instance()
-            results = self.solver.solve(instance, options={})
+            try:
+                results = self.solver.solve(instance, options={})
+            except RuntimeError as retry_error:
+                logger.warning(
+                    "Window [%d:%d] has no feasible solution without the profile "
+                    "either (%.80s); leaving it uncommitted.",
+                    window_start,
+                    window_end,
+                    str(retry_error),
+                )
+                return None, None
 
         return instance, results
 
@@ -1442,6 +1473,10 @@ class DSMFlex:
             instance, results = self._solve_with_profile_fallback(
                 load_profile_added, window_start, window_end
             )
+            if instance is None:
+                # Unsolvable window: keep the schedule as it is and move on, so the
+                # simulation continues with the previously committed values.
+                return
             self._log_solver_status(results, window_start, window_end)
 
             n_commit = commit_end - window_start

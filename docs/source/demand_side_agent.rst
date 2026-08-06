@@ -189,6 +189,7 @@ Example Workflow
 .. note::
 
    DSM units (e.g. :class:`~assume.units.steel_plant.SteelPlant`,
+   :class:`~assume.units.cement_plant.CementPlant`,
    :class:`~assume.units.building.Building`,
    :class:`~assume.units.hydrogen_plant.HydrogenPlant`,
    :class:`~assume.units.steam_generation_plant.SteamGenerationPlant`) build their internal
@@ -198,6 +199,82 @@ Example Workflow
    :meth:`~assume.common.forecaster.UnitForecaster.initialize` (or
    :func:`~assume.world.World.init_forecasts`), you must call
    ``unit.setup_model()`` explicitly before running optimisation on the unit.
+
+Industrial Agent: Cement Plant
+------------------------------
+
+The **Cement Plant** agent models the kiln line of a cement works: a preheater heats the
+raw meal, a calciner drives the calcination reaction that releases the process CO2, and a
+kiln finishes the clinker at high temperature. Every stage is fuel-switchable between
+electricity, a natural gas / coal mix and hydrogen, so one plant description covers both
+a conventional and an electrified configuration. Demand is expressed in tonnes to be
+produced over the horizon - clinker when a kiln line is configured, or a standalone
+mill's own ground tonnage when it isn't (see *Grinding mills* below).
+
+Waste heat recovered from the kiln reduces the fuel the preheater needs, and an optional
+electric thermal storage lets the plant buy power when it is cheap and displace calciner
+burner heat later - which is where most of the plant's demand-side flexibility comes from.
+
+Attributes
+^^^^^^^^^^^
+
+- **Technology**: Represents components such as Preheater, Calciner, Kiln, Thermal Storage, Electrolyser, Raw Material Mill, and Cement Mill.
+- **Node**: Connection point in the energy system.
+- **Bidding Strategy**: Defines how the cement plant bids in electricity markets. Example: `DsmEnergyOptimizationStrategy`.
+- **Objective**: Minimising variable cost (``min_variable_cost``).
+- **Flexibility Measure**: Any measure provided by :class:`~assume.units.dsm_load_shift.DSMFlex`, e.g. load shifting, peak load shifting, congestion management, or renewable utilisation.
+
+Components
+^^^^^^^^^^^
+
+- **Preheater**: Heats the raw meal (:class:`~assume.units.dst_components.Preheater`) and can additionally use waste heat recovered from the kiln.
+- **Calciner**: Drives calcination (:class:`~assume.units.dst_components.Calciner`), releasing process CO2 in proportion to the calcined material. The heat that reaches the reaction includes any thermal storage discharge.
+- **Kiln**: Finishes the clinker (:class:`~assume.units.dst_components.Kiln`) at a correspondingly higher specific heat demand, with energy emissions only.
+- **Thermal Storage**: In its ``short-term_with_generator`` mode (:class:`~assume.units.dst_components.ThermalStorage`) an electric heater charges the storage, making it a power-to-heat buffer for the calciner.
+- **Electrolyser**: Produces hydrogen on site for the calciner and kiln burners; the plant routes the production between them.
+- **Raw Material Mill** and **Cement Mill**: Electric grinding steps (:class:`~assume.units.dst_components.GrindingMill`) that convert raw materials to raw meal and clinker to cement respectively.
+
+All three thermal stages account for auxiliary electricity (fans, drives, transport) per
+tonne of throughput in ``aux_power``, separately from the electric heating path, so the
+auxiliaries are part of the plant load in every firing mode.
+
+Grinding mills
+^^^^^^^^^^^^^^^
+
+The raw material mill and cement mill are **not** automatically wired into the kiln
+line. A cement mill alongside a kiln line grinds that line's clinker output as before;
+a plant made of only a raw material mill and/or only a cement mill - with no
+preheater/calciner/kiln at all - runs as a **standalone grinding operation**, and the
+declared demand then targets that mill's own ground tonnage directly (cement for a lone
+cement mill, raw meal for a lone raw material mill). If both mills are present with no
+kiln line, the cement mill takes priority as the demand target and the raw material mill
+stays idle. A mill left present but unconnected alongside a kiln line (e.g. a raw
+material mill next to a full kiln line) likewise stays idle, since nothing requires or
+rewards running it.
+
+Rolling horizon
+^^^^^^^^^^^^^^^^
+
+The cement plant supports the same production guidance modes as the steel plant. The
+forecaster accepts generic or unit-specific forecast columns:
+
+- ``clinker_demand`` or ``<unit_id>_clinker_demand`` - per-timestep minimum production (clinker, or a standalone mill's ground tonnage)
+- ``normalized_load_profile`` or ``<unit_id>_normalized_load_profile`` - profile-guided production
+- ``electricity_price_flex`` or ``<unit_id>_electricity_price_flex`` - price signal for the ``electricity_price_signal`` measure
+- ``thermal_storage_schedule`` or ``<unit_id>_thermal_storage_schedule`` - schedule of a long-term thermal storage
+- ``<component>_availability`` or ``<unit_id>_<component>_availability`` - availability of the preheater, calciner or kiln (the mills do not take an availability profile)
+
+Across rolling-horizon windows the plant carries thermal storage fill levels and
+component on/off states, and tracks the clinker (or standalone mill output) still to be
+produced.
+
+Example Workflow
+^^^^^^^^^^^^^^^^^^
+
+1. Instantiate the CementPlant agent with the stages of the kiln line it should contain
+   (or just a mill, for a standalone grinding operation).
+2. Define the production demand, the firing mode of each stage and the flexibility measure.
+3. Run the optimization to generate bids for the electricity market.
 
 Residential Agent: Building
 ----------------------------
