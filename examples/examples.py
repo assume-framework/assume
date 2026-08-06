@@ -153,7 +153,7 @@ if __name__ == "__main__":
         world,
         inputs_path="examples/inputs",
         scenario="2_nodes_paper_small",  #available_examples[example]["scenario"],
-        study_case="inc_dec_learning_single",  # available_examples[example]["study_case"],
+        study_case="inc_dec_learning_single_g0",  # available_examples[example]["study_case"],
     )
 
     # to add custom bidding strategies, you need to import them

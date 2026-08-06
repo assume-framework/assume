@@ -1580,8 +1580,8 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         #print("total", unit.outputs["eom_profit"].loc[start], "+", + unit.outputs["redispatch_profit"].loc[start])
         print("reward", reward)
 
-        if reward > 0:
-            reward *= 10
+        if reward > 0: #-100:
+            reward *= 1  # 0
         else:
             if price < 32:
                 reward = (price - marginal_cost) / 100

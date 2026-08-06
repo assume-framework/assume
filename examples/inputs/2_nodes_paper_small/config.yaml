@@ -154,7 +154,7 @@ inc_dec_learning:
 # convention of the 2_nodes 'learning_diesel' study case.
 inc_dec_learning_single: &single_case
   start_date: 2019-01-01 00:00
-  end_date: 2019-01-04 00:00
+  end_date: 2019-01-02 00:00
   time_step: 1h
   save_frequency_hours: false
   powerplant_units: powerplant_units_learning_single.csv
@@ -168,21 +168,21 @@ inc_dec_learning_single: &single_case
     # Loading a buffer forces episodes_collecting_initial_experience to 0, so
     # this run starts training from episode 1.
     load_replay_buffer: true
-    replay_buffer_load_path: learning_strategies/buffers/single_10ep_standard.npz
+    replay_buffer_load_path: learned_strategies\buffers\single_10ep_standard.npz
     # don't write the buffer back - study-case runs must not mutate the shared one
     save_replay_buffer: false
     max_bid_price: 100
     min_bid_price: -100
     algorithm: matd3
-    learning_rate: 0.01
-    learning_rate_schedule: cosine
-    min_learning_rate: 0.0001
-    training_episodes: 50
+    learning_rate: 0.001
+    #learning_rate_schedule: cosine
+    #min_learning_rate: 0.0001
+    training_episodes: 10
     episodes_collecting_initial_experience: 0
     train_freq: 12h
     gradient_steps: 32
     batch_size: 256
-    gamma: 0.0
+    gamma: 0.99
     tau: 0.005  # default
     device: cpu
     # action_noise_schedule: linear
@@ -277,4 +277,89 @@ inc_dec_collect_buffer:
     # kept outside learned_strategies/ on purpose: a fresh (continue_learning:
     # false) run rmtree's trained_policies_save_path, which would delete a
     # buffer stored at the default location next to the policies
-    replay_buffer_save_path: learning_strategies/buffers/single_10ep.npz
+    replay_buffer_save_path: learned_strategies/buffers/single_10ep.npz
+
+
+inc_dec_learning_single_g0:
+  simulation_id: inc_dec_learning_single_g0_2
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-02 00:00
+  time_step: 1h
+  save_frequency_hours: false
+  powerplant_units: powerplant_units_learning_single.csv
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    load_replay_buffer: true
+    replay_buffer_load_path: learned_strategies\buffers\single_10ep_gradient.npz
+    #save_replay_buffer: true
+    #replay_buffer_save_path: learning_strategies/buffers/single_10ep_gradient.npz
+    max_bid_price: 100
+    min_bid_price: -100
+    algorithm: matd3
+    learning_rate: 0.001
+    #learning_rate_schedule: cosine
+    #min_learning_rate: 0.0001
+    training_episodes: 10  # 20 for create buffer
+    episodes_collecting_initial_experience: 0  # 10 for create buffer
+    train_freq: 12h
+    gradient_steps: 32
+    batch_size: 256
+    gamma: 0.99
+    tau: 0.005  # default
+    device: cpu
+    # action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 2
+    policy_delay: 8
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 07:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      param_dict:
+        network_path: .
+        solver_name: highs
+
+    Redispatch:
+      operator: Redispatch_operator
+      product_type: energy
+      start_date: 2019-01-01 09:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver_name: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
