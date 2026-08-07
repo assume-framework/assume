@@ -43,67 +43,21 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import torch as th
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _layout import OUT_DIR  # noqa: E402  (also puts the folders on sys.path)
+from critic_probe import (  # noqa: E402
+    MODEL_DIRS,
+    critic_curve,
+    greedy_action,
+    load_model,
+)
 from incdec_env import IncDecEnv  # noqa: E402
 from incdec_reward import PAPER_SMALL, reward_from_bid  # noqa: E402
 from run_benchmark import COLORS, INK, MUTED  # noqa: E402
 
 HERE = Path(__file__).parent
-
-
-#: Where --save-models writes, and where the archived networks live. Both are
-#: searched, newest working directory first.
-OUT_DIR = HERE.parents[2] / "outputs" / HERE.parents[0].name / "rl_benchmark"
-MODEL_DIRS = (
-    OUT_DIR / "models",
-    OUT_DIR / "runs" / "data" / "02-critic" / "models",
-)
-
-
-def load_model(algo: str, seed: int, env, model_dir: Path | None = None):
-    from stable_baselines3 import DDPG, SAC, TD3
-
-    classes = {"TD3": TD3, "DDPG": DDPG, "SAC": SAC}
-    if algo not in classes:
-        raise ValueError(f"{algo} has no critic to inspect (off-policy only)")
-
-    candidates = [model_dir] if model_dir else MODEL_DIRS
-    for directory in candidates:
-        path = directory / f"{algo}_seed{seed}.zip"
-        if path.exists():
-            return classes[algo].load(path, env=env, device="cpu")
-
-    searched = "\n  ".join(str(d) for d in candidates)
-    raise FileNotFoundError(
-        f"no saved {algo} seed {seed} in:\n  {searched}\n"
-        f"run: python run_benchmark.py --algos {algo} --save-models"
-    )
-
-
-def critic_curve(model, obs: np.ndarray, actions: np.ndarray) -> np.ndarray:
-    """Evaluate the critic over a grid of actions at one fixed observation.
-
-    Returns the value the actor actually climbs: for twin-critic algorithms
-    (TD3, SAC) that is ``min(Q1, Q2)``, matching how the target is formed.
-    """
-    obs_batch = th.as_tensor(
-        np.repeat(obs[None, :], len(actions), axis=0), dtype=th.float32
-    )
-    act_batch = th.as_tensor(actions[:, None], dtype=th.float32)
-
-    with th.no_grad():
-        qs = model.critic(obs_batch, act_batch)
-
-    stacked = th.cat([q.reshape(1, -1) for q in qs], dim=0)
-    return stacked.min(dim=0).values.numpy()
-
-
-def greedy_action(model, obs: np.ndarray) -> float:
-    action, _ = model.predict(obs, deterministic=True)
-    return float(np.asarray(action).ravel()[0])
 
 
 def main() -> None:
@@ -136,7 +90,7 @@ def main() -> None:
 
     for col, algo in enumerate(args.algos):
         model = load_model(algo, args.seed, env, args.models)
-        q = critic_curve(model, obs, actions)
+        q, dq_dbid = critic_curve(model, obs, actions, p.max_bid_price)
         a_greedy = greedy_action(model, obs)
         color = COLORS.get(algo, MUTED)
 
@@ -172,7 +126,8 @@ def main() -> None:
         ax = axes[1][col]
         ax.axvspan(p.dec_threshold, p.eom_price, color="#1baf7a", alpha=0.08, lw=0)
         ax.axhline(0.0, lw=1, color=MUTED, zorder=0)
-        ax.plot(bids, np.gradient(q, bids), lw=2, color=color)
+        # autograd, not np.gradient: this is what actor_loss.backward() delivers
+        ax.plot(bids, dq_dbid, lw=2, color=color)
         ax.axvline(p.optimal_bid, ls="--", lw=1.2, color=INK, zorder=0)
         ax.axvline(a_greedy * p.max_bid_price, ls="-", lw=1.4, color=color, alpha=0.5)
         ax.set_xlabel("bid price (EUR/MWh)")

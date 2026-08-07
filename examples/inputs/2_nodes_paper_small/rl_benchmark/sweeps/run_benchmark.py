@@ -45,17 +45,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from stable_baselines3.common.noise import ActionNoise
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from _layout import OUT_DIR  # noqa: E402  (also puts the folders on sys.path)
+from critic_probe import critic_curve  # noqa: E402
 from incdec_env import IncDecEnv  # noqa: E402
 from incdec_reward import PAPER_SMALL, reward_from_bid, sweep  # noqa: E402
 
 HERE = Path(__file__).parent
-
-# The code lives in the tracked scenario input folder, but results and figures
-# are outputs -- write them next to the rest of the scenario's outputs, which is
-# gitignored, so runs never dirty a tracked directory.
-OUT_DIR = HERE.parents[2] / "outputs" / HERE.parents[0].name / "rl_benchmark"
 
 # Categorical hues in fixed order -- an algorithm keeps its colour regardless of
 # how many are plotted.
@@ -93,12 +90,29 @@ class RunConfig:
     noise_schedule: str = "const"
     buffer_size: int = 10_000
     batch_size: int = 256
+    #: Environment steps between training blocks. 0 keeps SB3's default of one
+    #: block per episode -- 24 steps here. ASSUME's counterpart is ``train_freq``,
+    #: set to ``12h`` in the scenario config.
+    train_freq: int = 0
+    #: Gradient steps per training block. 0 keeps SB3's default of -1, i.e. one
+    #: per environment step elapsed. ASSUME uses 32 per 12 steps, so the real
+    #: setup takes ~2.7 gradient steps per environment step, not 1.
+    gradient_steps: int = 0
     #: TD3 only. Critic updates per actor update. The idea was that letting the
     #: critic become accurate before the actor commits would keep it off the flat
     #: plateau. Measured: it does not (2 and 8 both end at the +100 ceiling,
     #: 64 lands at 68 +- 28). ASSUME's config uses 8.
     policy_delay: int = 2
+    #: Output squashing of the TD3/DDPG actor. SB3 hardcodes ``tanh``, whose
+    #: gradient underflows to *exactly* zero in float32 by |z| ~ 9. ASSUME's
+    #: Actor defaults to ``softsign``, whose gradient decays polynomially and
+    #: never reaches zero. See docs/actor_saturation.md.
+    actor_activation: str = "tanh"
     save_models: bool = False
+    #: Sweep the critic and its autograd gradient at every probe, on a grid of
+    #: this many actions. 0 disables. Off-policy algorithms only -- PPO has no
+    #: action-value critic to sweep.
+    critic_grid: int = 0
     #: SAC only. ``"auto"`` tunes the entropy temperature against
     #: ``target_entropy``; a float pins it. See ``target_entropy``.
     ent_coef: str = "auto"
@@ -172,6 +186,34 @@ def make_noise(cfg: RunConfig, seed: int) -> ActionNoise:
     raise ValueError(f"unknown noise schedule {cfg.noise_schedule!r}")
 
 
+def _set_actor_activation(model, activation: str):
+    """Swap the TD3/DDPG actor's output squashing.
+
+    SB3 builds the actor as ``create_mlp(..., squash_output=True)``, which appends
+    a fixed ``nn.Tanh()``; there is no constructor argument for it. Replacing that
+    last module is enough -- the rest of the network, the action bounds and the
+    optimizer are all unchanged, since softsign shares tanh's ``(-1, 1)`` range.
+
+    Both the actor and its Polyak target must be swapped, or the target would keep
+    squashing differently from the online network.
+    """
+    import torch.nn as nn
+
+    if activation == "tanh":
+        return model
+    if activation != "softsign":
+        raise ValueError(f"unknown actor activation {activation!r}")
+
+    for net in (model.actor, model.actor_target):
+        if not isinstance(net.mu[-1], nn.Tanh):
+            raise RuntimeError(
+                f"expected a Tanh output layer, found {type(net.mu[-1]).__name__} "
+                "-- SB3's actor layout has changed"
+            )
+        net.mu[-1] = nn.Softsign()
+    return model
+
+
 def make_model(algo: str, env, seed: int, cfg: RunConfig):
     """Build an SB3 model. Hyperparameters follow the ASSUME learning config where
     they have a counterpart (lr 1e-3, batch 256, sigma 0.1, gamma 0.99).
@@ -196,15 +238,27 @@ def make_model(algo: str, env, seed: int, cfg: RunConfig):
         verbose=0,
         device="cpu",
     )
+    # Left at SB3's defaults unless asked: train_freq=(1, "episode") with
+    # gradient_steps=-1 gives one gradient step per environment step here.
+    if cfg.train_freq:
+        off_policy["train_freq"] = cfg.train_freq
+    if cfg.gradient_steps:
+        off_policy["gradient_steps"] = cfg.gradient_steps
 
     if algo == "TD3":
-        return TD3(
-            action_noise=make_noise(cfg, seed),
-            policy_delay=cfg.policy_delay,
-            **off_policy,
+        return _set_actor_activation(
+            TD3(
+                action_noise=make_noise(cfg, seed),
+                policy_delay=cfg.policy_delay,
+                **off_policy,
+            ),
+            cfg.actor_activation,
         )
     if algo == "DDPG":
-        return DDPG(action_noise=make_noise(cfg, seed), **off_policy)
+        return _set_actor_activation(
+            DDPG(action_noise=make_noise(cfg, seed), **off_policy),
+            cfg.actor_activation,
+        )
     if algo == "SAC":
         # SAC has its own entropy-driven exploration, so no action noise.
         return SAC(
@@ -233,16 +287,19 @@ def make_model(algo: str, env, seed: int, cfg: RunConfig):
 
 def _train_one(
     algo: str, seed: int, cfg: RunConfig
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, np.ndarray | None]:
     """Train one (algorithm, seed) and record its full bidding history.
 
     Returns
     -------
-    (steps, greedy_bids, placed_bids)
+    (steps, greedy_bids, placed_bids, critic_q, critic_grad)
         ``steps`` are the probe timesteps and ``greedy_bids`` the noise-free bid
         the policy would place at each of them, both in EUR/MWh. ``placed_bids``
         is every bid actually placed, one per environment step -- the behaviour
         policy including exploration noise, which is what fills the replay buffer.
+        The last two are ``(n_probes, critic_grid)`` sweeps of the actor's
+        objective and its autograd gradient, or ``None`` when ``critic_grid`` is
+        0 or the algorithm has no action-value critic.
     """
     from stable_baselines3.common.callbacks import BaseCallback
 
@@ -251,6 +308,8 @@ def _train_one(
 
     steps: list[int] = []
     bids: list[float] = []
+    q_snaps: list[np.ndarray] = []
+    g_snaps: list[np.ndarray] = []
 
     if algo == "Random search":
         # Reference line: what uniform exploration alone would find, if you could
@@ -267,7 +326,12 @@ def _train_one(
             if t % cfg.eval_every == 0:
                 steps.append(t)
                 bids.append(best_bid)
-        return np.array(steps), np.array(bids), np.array(placed)
+        return np.array(steps), np.array(bids), np.array(placed), None, None
+
+    # PPO's critic is a state-value V(s), not Q(s,a), so there is no action
+    # sweep to take.
+    record_critic = cfg.critic_grid > 0 and algo != "PPO"
+    grid = np.linspace(-1.0, 1.0, cfg.critic_grid) if record_critic else None
 
     class Probe(BaseCallback):
         def _on_step(self) -> bool:
@@ -275,6 +339,12 @@ def _train_one(
                 action, _ = self.model.predict(probe_obs, deterministic=True)
                 steps.append(self.num_timesteps)
                 bids.append(float(action[0]) * PAPER_SMALL.max_bid_price)
+                if record_critic:
+                    q, g = critic_curve(
+                        self.model, probe_obs, grid, PAPER_SMALL.max_bid_price
+                    )
+                    q_snaps.append(q)
+                    g_snaps.append(g)
             return True
 
     model = make_model(algo, env, seed, cfg)
@@ -296,6 +366,8 @@ def _train_one(
         steps_arr[keep],
         bids_arr[keep],
         np.array(env.bid_history[: cfg.timesteps]),
+        np.array(q_snaps)[keep] if q_snaps else None,
+        np.array(g_snaps)[keep] if g_snaps else None,
     )
 
 
@@ -305,17 +377,21 @@ def probe_grid(cfg: RunConfig) -> np.ndarray:
 
 
 def run(algos: list[str], seeds: int, cfg: RunConfig):
-    """Returns ``(probe_steps, greedy_bids, placed_bids)``, the latter two keyed by
-    algorithm with one row per seed."""
+    """Returns ``(probe_steps, greedy_bids, placed_bids, critic)``. The bid dicts
+    are keyed by algorithm with one row per seed; ``critic`` maps algorithm to
+    ``(q, grad)`` arrays of shape ``(seeds, n_probes, critic_grid)``, and is empty
+    unless ``cfg.critic_grid`` is set."""
     greedy: dict[str, np.ndarray] = {}
     placed: dict[str, np.ndarray] = {}
+    critic: dict[str, tuple[np.ndarray, np.ndarray]] = {}
     steps = probe_grid(cfg)
 
     for algo in algos:
         per_seed_greedy, per_seed_placed = [], []
+        per_seed_q, per_seed_g = [], []
         t0 = time.perf_counter()
         for seed in range(seeds):
-            algo_steps, bids, bid_history = _train_one(algo, seed, cfg)
+            algo_steps, bids, bid_history, q, g = _train_one(algo, seed, cfg)
             if not np.array_equal(algo_steps, steps):
                 raise RuntimeError(
                     f"{algo} seed {seed} probed {len(algo_steps)} times, "
@@ -323,11 +399,16 @@ def run(algos: list[str], seeds: int, cfg: RunConfig):
                 )
             per_seed_greedy.append(bids)
             per_seed_placed.append(bid_history)
+            if q is not None:
+                per_seed_q.append(q)
+                per_seed_g.append(g)
         greedy[algo] = np.vstack(per_seed_greedy)
         placed[algo] = np.vstack(per_seed_placed)
+        if per_seed_q:
+            critic[algo] = (np.stack(per_seed_q), np.stack(per_seed_g))
         print(f"  {algo:<14} {time.perf_counter() - t0:6.1f}s")
 
-    return steps, greedy, placed
+    return steps, greedy, placed, critic
 
 
 def save_results(
@@ -336,15 +417,30 @@ def save_results(
     greedy: dict[str, np.ndarray],
     placed: dict[str, np.ndarray],
     cfg: RunConfig,
+    critic: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
 ) -> None:
     """Persist a run. Written before plotting, so a plotting failure never costs
     a training run -- recover it with ``--replot``."""
+    critic = critic or {}
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    extra: dict[str, np.ndarray] = {}
+    if critic:
+        # the action grid the sweeps were taken on, in EUR/MWh
+        extra["critic_bids"] = (
+            np.linspace(-1.0, 1.0, cfg.critic_grid) * PAPER_SMALL.max_bid_price
+        )
+        for algo, (q, g) in critic.items():
+            extra[f"critic_q/{algo}"] = q
+            extra[f"critic_grad/{algo}"] = g
+
     np.savez(
         path,
         steps=steps,
         **{f"greedy/{k}": v for k, v in greedy.items()},
         **{f"placed/{k}": v for k, v in placed.items()},
         **{f"cfg/{k}": v for k, v in asdict(cfg).items()},
+        **extra,
     )
 
 
@@ -385,11 +481,22 @@ def describe(cfg: RunConfig) -> str:
     else:
         sigma = f"sigma {cfg.sigma:g} const"
     reach = 1.96 * cfg.sigma * p.max_bid_price
-    return (
-        f"warmup {cfg.warmup} | {sigma} (+-{reach:.0f} EUR at 95%, band is "
-        f"{p.eom_price - p.dec_threshold:.0f} EUR) | buffer {cfg.buffer_size} | "
-        f"lr {cfg.learning_rate:g}"
-    )
+    parts = [
+        f"warmup {cfg.warmup}",
+        f"{sigma} (+-{reach:.0f} EUR at 95%, band is "
+        f"{p.eom_price - p.dec_threshold:.0f} EUR)",
+        f"buffer {cfg.buffer_size}",
+        f"lr {cfg.learning_rate:g}",
+    ]
+    # the two settings that decide whether this landscape is solvable at all --
+    # spell them out rather than leaving a figure that looks like a default run
+    if cfg.actor_activation != "tanh":
+        parts.append(f"actor {cfg.actor_activation} (TD3/DDPG)")
+    if cfg.ent_coef != "auto":
+        parts.append(f"ent_coef {cfg.ent_coef} (SAC)")
+    if cfg.policy_delay != 2:
+        parts.append(f"policy_delay {cfg.policy_delay}")
+    return " | ".join(parts)
 
 
 def summarize(results: dict[str, np.ndarray], tol: float = 0.5) -> None:
@@ -634,6 +741,19 @@ def main() -> None:
     )
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument(
+        "--train-freq",
+        type=int,
+        default=0,
+        help="environment steps between training blocks; 0 = SB3 default (once "
+        "per 24-step episode). ASSUME uses 12",
+    )
+    parser.add_argument(
+        "--gradient-steps",
+        type=int,
+        default=0,
+        help="gradient steps per training block; 0 = SB3 default (-1). ASSUME uses 32",
+    )
+    parser.add_argument(
         "--ent-coef",
         default="auto",
         help="SAC entropy temperature: 'auto' or a float, e.g. 0.001",
@@ -654,6 +774,20 @@ def main() -> None:
         "--save-models",
         action="store_true",
         help="write trained networks to models/ for critic_landscape.py",
+    )
+    parser.add_argument(
+        "--actor-activation",
+        choices=("tanh", "softsign"),
+        default="tanh",
+        help="TD3/DDPG output squashing. tanh is SB3's; softsign is ASSUME's "
+        "default and keeps a non-zero gradient when saturated",
+    )
+    parser.add_argument(
+        "--critic-grid",
+        type=int,
+        default=0,
+        help="sweep the critic and its autograd gradient at every probe, on this "
+        "many actions (e.g. 201); 0 disables. Off-policy algorithms only",
     )
     parser.add_argument(
         "--out", type=Path, default=OUT_DIR / "benchmark.png", help="output figure path"
@@ -678,8 +812,12 @@ def main() -> None:
         noise_schedule=args.noise_schedule,
         buffer_size=args.buffer_size,
         batch_size=args.batch_size,
+        train_freq=args.train_freq,
+        gradient_steps=args.gradient_steps,
         policy_delay=args.policy_delay,
+        actor_activation=args.actor_activation,
         save_models=args.save_models,
+        critic_grid=args.critic_grid,
         ent_coef=args.ent_coef,
         target_entropy=args.target_entropy,
     )
@@ -698,10 +836,15 @@ def main() -> None:
             f"uniform warmup data is evicted after step {cfg.buffer_size}\n"
         )
 
-    steps, greedy, placed = run(args.algos, args.seeds, cfg)
+    steps, greedy, placed, critic = run(args.algos, args.seeds, cfg)
 
     summarize(greedy)
-    save_results(args.results, steps, greedy, placed, cfg)
+    save_results(args.results, steps, greedy, placed, cfg, critic)
+    if critic:
+        print(
+            f"  critic sweeps: {len(critic)} algo(s) x {len(steps)} probes "
+            f"x {cfg.critic_grid} actions -> {args.results.name}"
+        )
     plot(steps, greedy, placed, cfg, args.out)
 
 

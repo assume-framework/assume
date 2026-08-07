@@ -35,7 +35,6 @@ from __future__ import annotations
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
-
 from incdec_reward import PAPER_SMALL, IncDecParams, profits_from_bid, reward_from_bid
 
 __all__ = ["IncDecEnv"]

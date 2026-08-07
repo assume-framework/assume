@@ -1580,13 +1580,15 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         #print("total", unit.outputs["eom_profit"].loc[start], "+", + unit.outputs["redispatch_profit"].loc[start])
         print("reward", reward)
 
-        if reward > 0: #-100:
-            reward *= 1  # 0
-        else:
-            if price < 32:
-                reward = (price - marginal_cost) / 100
-            if price > 45:
-                reward = (marginal_cost - price) / 100
+        # TEMPORARILY DISABLED for the unshaped run of assume_training_probe.py.
+        # Restore with: git checkout -- assume/strategies/learning_strategies.py
+        # if reward > 0: #-100:
+        #     reward *= 1  # 0
+        # else:
+        #     if price < 32:
+        #         reward = (price - marginal_cost) / 100
+        #     if price > 45:
+        #         reward = (marginal_cost - price) / 100
 
         # write rl-rewards to buffer
         if self.learning_mode:
