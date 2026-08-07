@@ -1,0 +1,19 @@
+name,unit_type,technology,node,objective,steel_demand,fuel_type,max_power,min_power,ramp_up,ramp_down,min_operating_time,min_down_time,efficiency,lime_co2_factor,specific_dri_demand,specific_electricity_consumption,specific_natural_gas_consumption,specific_hydrogen_consumption,specific_iron_ore_consumption,specific_lime_demand,start_price,max_capacity,min_capacity,initial_soc,storage_loss_rate,efficiency_charge,efficiency_discharge,max_operating_hours,specific_coal_consumption
+P100000120423_dri_eaf_coal_external,steel_plant,dri_plant,Saarland,min_variable_cost,,coal,13.706043,0,13.706043,13.706043,0,0,,,,0.09,,,1.4,,5,,,,,,,,5.24
+P100000120423_dri_eaf_coal_external,steel_plant,eaf,Saarland,,,,67.007322,0,67.007322,67.007322,0,0,,0.1,1,0.44,,,,0.05,5,,,,,,,,
+P100000120426_dri_eaf_coal_external,steel_plant,dri_plant,Bremen,min_variable_cost,,coal,37.303541,0,37.303541,37.303541,0,0,,,,0.09,,,1.4,,5,,,,,,,,5.24
+P100000120426_dri_eaf_coal_external,steel_plant,eaf,Bremen,,,,182.372869,0,182.372869,182.372869,0,0,,0.1,1,0.44,,,,0.05,5,,,,,,,,
+P100000120428_dri_eaf_coal_external,steel_plant,dri_plant,North Rhine-Westphalia,min_variable_cost,,coal,12.0334,0,12.0334,12.0334,0,0,,,,0.09,,,1.4,,5,,,,,,,,5.24
+P100000120428_dri_eaf_coal_external,steel_plant,eaf,North Rhine-Westphalia,,,,58.829958,0,58.829958,58.829958,0,0,,0.1,1,0.44,,,,0.05,5,,,,,,,,
+P100000120425_dri_eaf_coal_external,steel_plant,dri_plant,Brandenburg,min_variable_cost,,coal,21.660121,0,21.660121,21.660121,0,0,,,,0.09,,,1.4,,5,,,,,,,,5.24
+P100000120425_dri_eaf_coal_external,steel_plant,eaf,Brandenburg,,,,105.893924,0,105.893924,105.893924,0,0,,0.1,1,0.44,,,,0.05,5,,,,,,,,
+P100000120427_dri_eaf_coal_external,steel_plant,dri_plant,Hamburg,min_variable_cost,,coal,9.62672,0,9.62672,9.62672,0,0,,,,0.09,,,1.4,,5,,,,,,,,5.24
+P100000120427_dri_eaf_coal_external,steel_plant,eaf,Hamburg,,,,47.063966,0,47.063966,47.063966,0,0,,0.1,1,0.44,,,,0.05,5,,,,,,,,
+P100000120422_dri_eaf_coal_external,steel_plant,dri_plant,North Rhine-Westphalia,min_variable_cost,,coal,44.315446,0,44.315446,44.315446,0,0,,,,0.09,,,1.4,,5,,,,,,,,5.24
+P100000120422_dri_eaf_coal_external,steel_plant,eaf,North Rhine-Westphalia,,,,216.653291,0,216.653291,216.653291,0,0,,0.1,1,0.44,,,,0.05,5,,,,,,,,
+P100000120432_dri_eaf_coal_external,steel_plant,dri_plant,Saarland,min_variable_cost,,coal,26.268913,0,26.268913,26.268913,0,0,,,,0.09,,,1.4,,5,,,,,,,,5.24
+P100000120432_dri_eaf_coal_external,steel_plant,eaf,Saarland,,,,128.425798,0,128.425798,128.425798,0,0,,0.1,1,0.44,,,,0.05,5,,,,,,,,
+P100000120424_dri_eaf_coal_external,steel_plant,dri_plant,Lower Saxony,min_variable_cost,,coal,54.865568,0,54.865568,54.865568,0,0,,,,0.09,,,1.4,,5,,,,,,,,5.24
+P100000120424_dri_eaf_coal_external,steel_plant,eaf,Lower Saxony,,,,268.231666,0,268.231666,268.231666,0,0,,0.1,1,0.44,,,,0.05,5,,,,,,,,
+P100000120421_dri_eaf_coal_external,steel_plant,dri_plant,North Rhine-Westphalia,min_variable_cost,,coal,94.959637,0,94.959637,94.959637,0,0,,,,0.09,,,1.4,,5,,,,,,,,5.24
+P100000120421_dri_eaf_coal_external,steel_plant,eaf,North Rhine-Westphalia,,,,464.247115,0,464.247115,464.247115,0,0,,0.1,1,0.44,,,,0.05,5,,,,,,,,

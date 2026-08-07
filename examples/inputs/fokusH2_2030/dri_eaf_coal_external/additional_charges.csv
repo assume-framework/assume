@@ -1,0 +1,9 @@
+component,unit,P100000120423_dri_eaf_coal_external,P100000120426_dri_eaf_coal_external,P100000120428_dri_eaf_coal_external,P100000120425_dri_eaf_coal_external,P100000120427_dri_eaf_coal_external,P100000120422_dri_eaf_coal_external,P100000120432_dri_eaf_coal_external,P100000120424_dri_eaf_coal_external,P100000120421_dri_eaf_coal_external
+grid_energy_charge_high,EUR/MWh,6.9,6.9,6.9,6.9,6.9,6.9,6.9,6.9,6.9
+grid_energy_charge_low,EUR/MWh,6.9,6.9,6.9,6.9,6.9,6.9,6.9,6.9,6.9
+grid_capacity_charge_high,EUR/MW.a,53060,53060,53060,53060,53060,53060,53060,53060,53060
+grid_capacity_charge_low,EUR/MW.a,53060,53060,53060,53060,53060,53060,53060,53060,53060
+metering_and_operation,EUR/MWh,2,2,2,2,2,2,2,2,2
+concession_fee,EUR/MWh,1.1,1.1,1.1,1.1,1.1,1.1,1.1,1.1,1.1
+surcharges_and_levies,EUR/MWh,1.6,1.6,1.6,1.6,1.6,1.6,1.6,1.6,1.6
+electricity_tax,EUR/MWh,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5

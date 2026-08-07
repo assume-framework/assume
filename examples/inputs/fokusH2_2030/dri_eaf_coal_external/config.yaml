@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: FLEXIMOD Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+cases:
+  steel_plant_DE:
+    name: steel_plant_DE
+    country: DE
+    timestep_minutes: 15
+    simulation_start: "2030-01-02 00:00"
+    simulation_end: "2030-12-30 23:45"
+    additional_charges: true
+    strategy:
+      name: steel_cost_minimization
+      dispatch:
+        dispatch_method: pyomo
+        rolling_horizon_enabled: true
+        dispatch_horizon_hours: 48
+        rolling_step_hours: 24
+    solver:
+      name: highs
+      fallback_solvers: []
+      tee: false
+    market_sequence:
+      - day_ahead
+    markets:
+      afrr_capacity:
+        enabled: false
+        direction: down
+        product_length: 4h
+        price_unit: EUR_per_MW_per_h
+        gate_open:
+          day_relation: D-7
+          time: "10:00"
+        gate_close:
+          day_relation: D-1
+          time: "09:00"
+        product_rules:
+          min_bid_mw: 1.0
+          bid_increment_mw: 1.0
+          divisible: true
+        signals:
+          price: aFRR_capacity_down_price
+      day_ahead:
+        enabled: true
+        product_resolution: 15min
+        gate_close:
+          day_relation: D-1
+          time: "12:00"
+        signals:
+          price: DE_DA_price
+      afrr_energy:
+        enabled: false
+        direction: down
+        product_resolution: 15min
+        gate_close:
+          relative_to_delivery_start_minutes: -25
+        product_rules:
+          min_bid_mw: 1.0
+          bid_increment_mw: 1.0
+          validity_period_minutes: 15
+        signals:
+          price: aFRR_energy_down_price
+          system_activation: aFRR_energy_down_quantity
+        interpretation:
+          activation_unit: MW
