@@ -88,8 +88,8 @@ class Learning(Role):
                     self.learning_config.learning_rate
                 )
             else:
-                self.calc_lr_from_progress = (
-                    lambda x: self.learning_config.learning_rate
+                self.calc_lr_from_progress = lambda x: (
+                    self.learning_config.learning_rate
                 )
 
             if self.learning_config.action_noise_schedule == "linear":

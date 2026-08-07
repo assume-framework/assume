@@ -660,6 +660,9 @@ class World:
             None
         """
 
+        if market_config.market_id in self.markets:
+            raise ValueError(f"Market {market_config.market_id} already exists")
+
         if mm_class := self.clearing_mechanisms.get(market_config.market_mechanism):
             market_role = mm_class(market_config)
         else:
@@ -703,15 +706,17 @@ class World:
                     raise ValueError(msg)
 
         # For each market: Should be referenced by a market strategy.
-        referenced_markets = {
-            market
-            for market in operator.portfolio_strategies.keys()
-            for operator in unit_operators
-        }
+        from collections import defaultdict
+
+        market_participants = defaultdict(int)
+        for operator in unit_operators:
+            for market_id in operator.portfolio_strategies.keys():
+                market_participants[market_id] += 1
+
         for market_id in self.markets.keys():
-            if market_id not in referenced_markets:
-                msg = f"Added market {market_id}, has no bidding participants."
-                warnings.warn(msg)
+            if market_participants[market_id] < 2:
+                msg = f"Added market {market_id} has less than two bidding participants ({market_participants[market_id]})."
+                raise ValueError(msg)
 
         # A Re-Dispatch market can only open if an earlier market closed.
         dispatch_markets = [

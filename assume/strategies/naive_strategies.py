@@ -147,6 +147,9 @@ class DsmEnergyOptimizationStrategy(MinMaxStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit. The bid volume is the optimal power requirement of
     the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
+
+    For rolling-horizon configured units, this strategy triggers re-optimization at each market clearing round,
+    ensuring the unit optimizes for the next window using updated state and remaining demand.
     """
 
     def calculate_bids(
@@ -169,8 +172,19 @@ class DsmEnergyOptimizationStrategy(MinMaxStrategy):
             Orderbook: The bids consisting of the start time, end time, only hours, price and volume.
         """
 
-        # check if unit has opt_power_requirement attribute
-        if unit.optimisation_counter == 0:
+        if unit.horizon_mode == "rolling_horizon":
+            current_market_time = product_tuples[0][0]
+            # Hook to refresh runtime forecasts before re-optimising the next window.
+            # Currently the configured update algorithms default to no-ops; the hook is
+            # kept so price/forecast learning can be plugged in without touching strategies.
+            unit.forecaster.update(unit=unit)
+            did_reoptimize = unit._check_and_reoptimize_rolling_window(
+                current_market_time
+            )
+            if not did_reoptimize and unit.optimisation_counter == 0:
+                unit.determine_optimal_operation_with_flex()
+                unit.optimisation_counter = 1
+        elif unit.optimisation_counter == 0:
             unit.determine_optimal_operation_with_flex()
             unit.optimisation_counter = 1
 
@@ -201,6 +215,8 @@ class DsmEnergyNaiveRedispatchStrategy(MinMaxStrategy):
     """
     A naive strategy of a Demand Side Management (DSM) unit that bids the available flexibility of the unit on the redispatch market.
     The bid volume is the flexible power requirement of the unit at the start time of the product. The bid price is the marginal cost of the unit at the start time of the product.
+
+    For rolling-horizon configured units, this strategy triggers re-optimization at each market clearing round.
     """
 
     def calculate_bids(
@@ -210,6 +226,14 @@ class DsmEnergyNaiveRedispatchStrategy(MinMaxStrategy):
         product_tuples: list[Product],
         **kwargs,
     ) -> Orderbook:
+        if unit.horizon_mode == "rolling_horizon":
+            current_market_time = product_tuples[0][0]
+            # Hook to refresh runtime forecasts before re-optimising the next window.
+            # Currently the configured update algorithms default to no-ops; the hook is
+            # kept so price/forecast learning can be plugged in without touching strategies.
+            unit.forecaster.update(unit=unit)
+            unit._check_and_reoptimize_rolling_window(current_market_time)
+
         # calculate the optimal operation of the unit according to the objective function
         unit.determine_optimal_operation_with_flex()
 

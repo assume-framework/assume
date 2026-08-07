@@ -194,3 +194,7 @@ def test_forecast_interface__save_forecasts():
         saved_forecasts["residual_load_naive_forecast_EOM"]
         == expected_load["load_forecast"]
     ).all()
+
+
+if __name__ == "__main__":
+    pytest.main(["-s", __file__])
