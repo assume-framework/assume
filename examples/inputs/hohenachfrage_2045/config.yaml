@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 base_case_2045:
-  start_date: 2045-01-01 00:00
+  output_tables: [grid_line_loading, market_meta, market_orders]
+  start_date: 2044-12-31 00:00
   end_date: 2045-12-31 23:00
   time_step: 1h
   save_frequency_hours: 24
@@ -17,7 +18,7 @@ base_case_2045:
     CRM_capacity_pos:
       operator: regelleistung_de-lu
       product_type: capacity_pos
-      start_date: 2045-01-01 00:00
+      start_date: 2044-12-31 00:00
       products:
         - duration: 4h
           count: 6                       # six 4h blocks 00-04..20-24 of day D
@@ -35,7 +36,7 @@ base_case_2045:
     CRM_capacity_neg:
       operator: regelleistung_de-lu
       product_type: capacity_neg
-      start_date: 2045-01-01 00:00
+      start_date: 2044-12-31 00:00
       products:
         - duration: 4h
           count: 6
@@ -58,7 +59,7 @@ base_case_2045:
     CRM_energy_pos:
       operator: regelleistung_de-lu
       product_type: energy_pos
-      start_date: 2045-01-01 23:00
+      start_date: 2044-12-31 23:00
       products:
         - duration: 1h
           count: 24
@@ -76,7 +77,7 @@ base_case_2045:
     CRM_energy_neg:
       operator: regelleistung_de-lu
       product_type: energy_neg
-      start_date: 2045-01-01 23:00
+      start_date: 2044-12-31 23:00
       products:
         - duration: 1h
           count: 24
@@ -92,7 +93,7 @@ base_case_2045:
       market_mechanism: pay_as_bid
 
     EOM:
-      start_date: 2045-01-01 00:00
+      start_date: 2044-12-31 00:00
       operator: EOM_operator
       product_type: energy
       products:
@@ -110,7 +111,7 @@ base_case_2045:
       market_mechanism: pay_as_clear
 
     redispatch:
-      start_date: 2045-01-01 21:00
+      start_date: 2044-12-31 21:00
       operator: network_operator
       product_type: energy
       products:
@@ -140,6 +141,7 @@ base_case_2045:
 # Short 7-day slice of base_case_2045 for fast end-to-end verification before
 # committing to the full-year run (1175 units x 6 markets x daily PyPSA LPs).
 base_case_2045_smoketest:
+  output_tables: [grid_line_loading, market_meta, market_orders]
   start_date: 2045-01-01 00:00
   end_date: 2045-01-08 00:00
   time_step: 1h
