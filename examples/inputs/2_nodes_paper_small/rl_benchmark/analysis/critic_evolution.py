@@ -54,13 +54,17 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LinearSegmentedColormap, SymLogNorm
+from matplotlib.colors import SymLogNorm
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _layout import OUT_DIR, resolve  # noqa: E402  (also sets sys.path)
 from incdec_reward import PAPER_SMALL  # noqa: E402
-from run_benchmark import COLORS, INK, MUTED  # noqa: E402
+
+# DIVERGING lives with the rest of the house palette in run_benchmark, which also
+# draws with it; it is re-exported from here because descent_window.py and
+# real_matd3/assume_film.py import it from this module.
+from run_benchmark import COLORS, DIVERGING, INK, MUTED  # noqa: E402
 
 HERE = Path(__file__).parent
 
@@ -87,12 +91,6 @@ def headroom(action: np.ndarray, activation: str) -> np.ndarray:
     if activation == "softsign":
         return np.maximum(1 - a, 0.0) ** 2
     raise ValueError(f"unknown actor activation {activation!r}")
-
-# Diverging ramp: two poles with a neutral -- not a hue -- at the midpoint, so
-# "no gradient" reads as absence of colour rather than as a colour.
-DIVERGING = LinearSegmentedColormap.from_list(
-    "grad", ["#2a78d6", "#9dc2ec", "#f2f2f0", "#f4b79c", "#eb6834"]
-)
 
 
 def load(path: Path):

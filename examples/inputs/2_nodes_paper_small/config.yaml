@@ -148,6 +148,81 @@ inc_dec_learning:
         payment_mechanism: pay_as_bid
         backup_marginal_cost: 10000
 
+inc_dec_learning_single_base:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-02 00:00
+  time_step: 1h
+  save_frequency_hours: false
+  powerplant_units: powerplant_units_learning_single.csv
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.0001
+    # learning_rate_schedule: linear
+    training_episodes: 50
+    episodes_collecting_initial_experience: 5
+    train_freq: 12h
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    # action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 3h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+      param_dict:
+        network_path: .
+        solver_name: highs
+
+    Redispatch:
+      operator: Redispatch_operator
+      product_type: energy
+      start_date: 2019-01-01 02:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: redispatch
+      additional_fields:
+        - node
+        - min_power
+        - max_power
+      param_dict:
+        network_path: .
+        solver_name: highs
+        payment_mechanism: pay_as_bid
+        backup_marginal_cost: 10000
+
 
 # Single-agent variant: only the marginal northern diesel (diesel_0) learns to
 # inc-dec game, every other generator bids naively. Mirrors the single-learner
@@ -262,8 +337,20 @@ inc_dec_learning_single: &single_case
 #     whose buffer is meant to hold a mixture of behaviour policies anyway.
 #   - interrupt it after episode 10: because the buffer is written every episode,
 #     the file on disk is already complete and is then pure raw exploration.
+#
+# To reproduce the archived buffers/single_10ep.npz (620 transitions, SHA256
+# 5f1b80b4..., the checksum-guarded starting point of benchmark runs 09-12) this
+# case needs a 72h horizon, which is why end_date is overridden below rather than
+# inherited from *single_case. Transitions per episode is (hours - 10) here, the
+# market opening offsets eating the first ten: 24h gives 14, 72h gives 62, and
+# 620 = 62 x 10 is the file as written after episode 10. Running all 11 episodes
+# gives 682 instead. A fresh run is a different RNG draw, so it is statistically
+# equivalent -- the actions are uniform and no policy is involved -- but not
+# bit-identical, and the guards in rl_benchmark/real_matd3/ would need updating.
+# See rl_benchmark/RUNS.md section 9.
 inc_dec_collect_buffer:
   <<: *single_case
+  end_date: 2019-01-04 00:00  # 72h -> 62 transitions/episode (see the note above)
 
   learning_config:
     <<: *single_learning_config

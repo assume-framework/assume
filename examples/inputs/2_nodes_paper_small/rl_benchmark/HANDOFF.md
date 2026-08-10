@@ -11,10 +11,34 @@ ASSUME's **own** MATD3 rather than an SB3 analogue. Closed-form reward, no marke
 clearing, so a 10 000-step surrogate run takes ~3 min instead of a HiGHS solve
 per action.
 
+**If you read one finding, read 17.** Run 12 answers what runs 07–11 were circling:
+on the true reward the critic fails because the action is 1 of 75 of its input
+dimensions, and raising that share solves the task 3/3 at the same budget — the
+archive's first solve, and without the reward shaping.
+
 **Code** (tracked): `examples/inputs/2_nodes_paper_small/rl_benchmark/`
+**Run log** (tracked): `RUNS.md`, next to this file — describes every run in
+order, with its commands, numbers and corrections. **Read it for detail; this file
+is only the summary.** It used to live in the archive and was moved because
+`examples/outputs` is gitignored.
 **Run archive** (gitignored): `examples/outputs/2_nodes_paper_small/rl_benchmark/runs/`
-— three headline figures sit at its top level; `README.md` there describes every
-run in order, with the commands.
+— the `.npz` files and figures `RUNS.md` links to; four headline figures sit at
+its top level. Runs 01b, 08, 09 and 12 have no `img/NN-*` file because their
+figure *is* one of those four, which is the usual reason a run looks like it has
+no plot.
+
+⚠️ **A fresh clone has no starting buffer.**
+`learned_strategies/buffers/single_10ep_standard.npz` — 24 KB, SHA256 `5f1b80b4…`,
+checksum-guarded by both sweep runners — is gitignored by `.gitignore:142`, and
+without it those runners refuse to start. It is a byte-identical copy of
+`single_10ep.npz`. **It is recreatable and contains no policy** (no gradient step
+runs during collection, and the actor is never queried — the actions are uniform
+draws), so a fresh one is statistically equivalent; it is just not bit-identical,
+so the guards would need updating and runs 09–12 re-running. `RUNS.md` §9 has the
+tracked/not-tracked table and the exact recipe — note it needs a **72 h horizon**
+(`end_date: 2019-01-04`), not the 24 h `inc_dec_collect_buffer` currently
+inherits, and the file wanted is the one written after **episode 10** (620 = 62 ×
+10; running all 11 gives 682).
 
 Needs `gymnasium` + `stable-baselines3` in the `assume` conda env (installed, not
 in `pyproject.toml`). Run scripts with `conda run -n assume python`.
@@ -23,12 +47,21 @@ in `pyproject.toml`). Run scripts with `conda run -n assume python`.
 
 ```
 rl_benchmark/
+├── HANDOFF.md       this file — the summary
+├── RUNS.md          the run log: every run in order, with its numbers
 ├── _layout.py       sys.path + OUT_DIR + resolve(); every script imports it
 ├── surrogate/       the closed-form landscape and the Gymnasium env
 ├── sweeps/          training drivers: run_benchmark.py, td3_stability.py
 ├── analysis/        reads a recorded run and explains it; makes the figures
 └── real_matd3/      probes ASSUME's own MATD3, live or from saved .pt files
 ```
+
+`sweeps/run_benchmark.py` owns the house palette — `COLORS`, `INK`, `MUTED` and
+the diverging `DIVERGING` ramp used for every signed gradient field. Import
+colours from there. `analysis/critic_evolution.py` re-exports `DIVERGING` only
+because `descent_window.py` and `real_matd3/assume_film.py` already import it
+from that module; defining it there instead would make the import cycle real,
+since `critic_evolution` imports `COLORS` from `run_benchmark`.
 
 Every script runs directly from any working directory —
 `python analysis/descent_window.py` — because importing `_layout` puts all four
@@ -87,19 +120,40 @@ action space carries any gradient.
    **DDPG softsign 31.86 ± 0.51**, TD3 softsign 1.59 ± 52.26, PPO 100.00. Note
    the ordering: **DDPG is more reliable than TD3 on this landscape**, despite
    having none of TD3's stabilisers.
-9. **A stochastic policy should not aim at 30.** With σ = 1 EUR, centring on the
-   optimum earns 0.006 vs 0.163 at the constrained optimum of 32.31 — half the
-   samples fall off the cliff. SAC's 32.34 *is* correct behaviour.
+9. **The window is the landscape's, but spending it is the algorithm's** (run 01b,
+   critic row). Across all 12 runs (TD3/DDPG/SAC × 4 seeds) the plateau slope
+   flips at **step 1400** — 11/12 plateau-wide, 12/12 measured at the actor's own
+   action. Identical for all three algorithms, so the window is a property of the
+   landscape and the buffer. What differs is only how fast each actor uses it:
+   first probe back inside the band is **SAC 1400–1800, DDPG 1600–1800, TD3
+   2000** (and never, for the seed that fails). **`policy_delay = 2` is the
+   cause** — TD3 takes half as many actor updates per environment step, so its
+   600-step crossing is ~300 actor updates against DDPG's 200–400, both inside
+   finding 7's 190–410. Same actor updates, twice the environment steps, against
+   a window counted in environment steps. This explains the DDPG > TD3 ordering
+   in finding 8 and reframes finding ❌ "`policy_delay` fixes it": run 04 turned
+   the knob the wrong way. **Untested: TD3 at `--policy-delay 1` should match
+   DDPG.**
+10. **A converged critic here is correct exactly where the reward has a gradient.**
+    After step 5000, inside the band `[30, 49)` **85–94 %** of grid cells carry the
+    true negative slope at median `|dQ/d(bid)| ≈ 9.5e-3`; on both flat regions it
+    is `~1.5e-4` and the sign is a coin flip (47–50 % down on `[70,100]`, 51–54 %
+    up on the `<30` shelf). So the "fragmentation" of finding 7 phase (c) is the
+    flat regions being fitted *correctly*, and the `<30` shelf has **no restoring
+    force** — which is why an actor that steps past the band never returns.
+11. **A stochastic policy should not aim at 30.** With σ = 1 EUR, centring on the
+    optimum earns 0.006 vs 0.163 at the constrained optimum of 32.31 — half the
+    samples fall off the cliff. SAC's 32.34 *is* correct behaviour.
 
 ## Findings about ASSUME's own MATD3
 
-10. **The budget is the first-order problem** (run 07). Saved optimizer state, all
+12. **The budget is the first-order problem** (run 07). Saved optimizer state, all
     three study cases: `critic_optimizer step = 640`, `actor_optimizer step = 80`,
     against the 190–410 actor updates a crossing costs in the surrogate. At that
     budget the *unshaped* case is frozen in phase 1 — `Q1` monotone in the bid,
     `argmax Q` = 100.0, actor at 95.2, `dQ/da` still positive. Not a converged
     critic the actor failed to follow: **the critic never reached the flip.**
-11. **On the true reward the critic never leaves phase 1 — the shaping is what
+13. **On the true reward the critic never leaves phase 1 — the shaping is what
     moves it** (run 09, the films). Over 40 episodes = **2560 critic updates**,
     4× the default budget:
 
@@ -112,7 +166,7 @@ action space carries any gradient.
     coherent sign structure — the critic never develops a preference to follow,
     and the actor parks at the ceiling. The shaped run's field is smooth and
     single-signed and converges to the band's rim. So this is *not* the budget
-    of finding 10; it is a different failure, and it is the one that made the
+    of finding 12; it is a different failure, and it is the one that made the
     shaping necessary in the first place.
 
     Leading explanation, untested: the surrogate is single-context, so its critic
@@ -120,27 +174,131 @@ action space carries any gradient.
     observations** from ~600–1200 transitions, and on a reward that is 90 % flat
     it never resolves the action dependence. The shaping makes `Q` depend on the
     action everywhere, which is a far easier regression — that may be the real
-    mechanism behind the cheat, rather than the gradient story of finding 12.
-12. **The shaping creates a decoy** (run 07). `learning_strategies.py:1583-1589`
+    mechanism behind the cheat, rather than the gradient story of finding 14.
+14. **The shaping creates a decoy** (run 07). `learning_strategies.py:1583-1589`
     fires only when `reward <= 0`, so it does not apply inside the band and
     re-enters at full height at bid 49. The shaped landscape has **two local
     maxima — +0.190 at bid 30, and +0.170 at bid 49, where the true reward is
     0.000** — still separated by the same cliff. It does what it was designed to
     do (a permanent ramp replacing run 06's transient window, walking the actor
     down from +100), but it terminates one euro above the band.
+15. **Both of finding 13's outcomes reproduce across 6 seeds — but drop the
+    "100.0"** (run 10). ASSUME has a real seed knob: `loader_csv.py:555` calls
+    `set_random_seed(config.get("seed", 42))` once while the scenario is read,
+    and nothing re-seeds after. `assume_training_probe.py --seed` re-applies that
+    call after the load; since the CSVs and the forecaster contain no RNG draws,
+    what is left downstream is exactly network init, exploration noise and the
+    batch draws. 6 seeds per condition, 40 episodes each:
+
+    | condition | argmax `Q1` last | spread over the 6 obs | actor last | reaches the band at any frame |
+    |---|---|---|---|---|
+    | shaped | 49.5 ± 4.4 | 10.4 | **50.6 ± 3.0** | **6/6** |
+    | unshaped | 89.7 ± 10.6 | **56.4** | 94.3 ± 7.0 | **1/6** |
+
+    The two conditions do not overlap at all on final actor bid — shaped
+    44.9–54.1, unshaped 79.3–99.2 — so finding 13's *conclusion* holds. Its
+    *number* does not: only 2/6 unshaped seeds end at exactly 100.0. The median
+    `argmax` is a weak statistic here, because the six probed observations of a
+    single unshaped run disagree about the preferred bid by 56.4 EUR on average
+    (shaped: 10.4). Say **the unshaped critic never forms a coherent
+    preference**, not that it prefers the ceiling. Five of the six shaped seeds
+    stop just *above* the band, as finding 14 predicts; one ends inside at 44.9
+    for +0.041, which is one seed and not a rate.
+
+    Side result: unshaped seed 42 reproduces run 09's film to **0.119 EUR** over
+    all 80 frames while running at one torch thread where run 09 did not. **Run
+    08's thread-chaos does not transfer to ASSUME** — treat it as a property of
+    the SB3 surrogate until shown otherwise.
+16. **No simple configuration change rescues true-reward MATD3; update budget is
+    the only lever that visibly helps** (run 11). The broad screen is 30
+    configurations × 3 seeds, 40 episodes, starting from the same immutable
+    unshaped replay buffer and then growing private per-run buffers. Baseline is
+    the requested `lr=1e-3`, 10 gradient steps, batch 128 and policy delay 2
+    (`gamma=.99`, `tau=.005`, exploration sigma `.1`):
+
+    | configuration | final actor bid | final true reward | solved |
+    |---|---:|---:|---:|
+    | baseline | 99.4 ± 0.1 | +0.000 | 0/3 |
+    | `lr-1e-4` | 95.5 ± 0.3 | +0.000 | 0/3 |
+    | `policy-delay-1` | 99.8 ± 0.1 | +0.000 | 0/3 |
+    | **`grad-32`** | **78.7 ± 16.1** (60.7–99.8) | **+0.002 ± 0.003** | 0/3 |
+    | `lr-1e-4-grad-32` | 98.2 | +0.000 | 0/3 |
+
+    Every one of the 30 configurations is 0/3 solved. Low learning rate does not
+    transfer from the surrogate at 800 critic updates; policy delay 1, gamma 0,
+    target smoothing, exploration noise, batch size and tau do not rescue it
+    either. Only `grad-32` (2560 critic updates) forms a substantial descending
+    critic region and moves actors materially off the ceiling, but it is
+    seed-unstable and does not solve the task. Its low-LR interaction removes the
+    movement again, so more updates are not interchangeable with smaller steps
+    in this horizon.
+
+    All **90/90 final archives** contain Q1/Q2 and both autograd action-gradient
+    fields on 401 bids × 6 fixed observations at all 80 training blocks. The
+    all-config critic plot shows nearly every field staying positive over most of
+    the action range — phase 1 — with `grad-32` the conspicuous but inconsistent
+    exception. This is a 3-seed broad screen, not a stability-rate claim, and
+    changing gradient steps also changes total optimisation work.
+17. **The cause is the action's share of the critic's input, and raising it solves
+    the true-reward task** (run 12). The action is **1 of 75 critic inputs**; the
+    other 74 carry 97 % of the input variation. Define
+
+        act_share = sd(a) / (sd(a) + sum_j sd(obs_j))      = 0.030 for ASSUME
+        var_share = sd(a)^2 / (sd(a)^2 + sum_j sd(obs_j)^2) = 0.055
+
+    (`var_share` is the one with a mechanism: Xavier makes the first-layer weights
+    iid across inputs, so contributions to the pre-activation variance add in
+    quadrature. Both order every sweep identically.) Live, 40 episodes, true
+    reward, run 11's `BASELINE`, 3 seeds:
+
+    | condition | act_share | obs_dim | final bid | true reward | solved |
+    |---|---:|---:|---|---:|---:|
+    | baseline | 0.030 | 74 | 99.4 ± 0.1 | +0.000 | 0/3 |
+    | `foresight-6` | 0.108 | 20 | 63.9 ± 24.2 | +0.012 | 0/3 |
+    | `foresight-3` | 0.191 | 11 | 40.4 ± 2.5 | +0.087 | 0/3 |
+    | `act-x10` | 0.234 | 74 | −7.4 ± 61.0 | +0.033 | 0/3 |
+    | **`act-x30`** | 0.479 | 74 | **33.0 ± 0.2** | **+0.160** | **3/3** |
+
+    `baseline` reproduces run 11's own cell, so the table is the levers. **`act-x30`
+    is the first solve in this archive** against 0/90 in run 11, and it lands on
+    §6's constrained optimum (32.31 for σ ≈ 1), not on 30. Two mechanically
+    unrelated levers — removing observation dimensions, scaling the critic's action
+    input — land on one curve, so `act_share` is the variable, not either lever.
+    Run 10's 56.4-EUR disagreement between probed observations falls to **1.5**.
+    `act-x10` is bimodal: 2 seeds converge, seed 42 overshoots to −93.7, which is
+    **run 08's failure mode arriving in ASSUME** now that the critic works.
+18. **The window it creates is not run 06's transient one** (run 12). Measured with
+    `descent_window.py`'s definitions: at `act_share ≥ 0.23` the first unbroken
+    descent path appears at update **20** — the second frame — instead of 585, and
+    the share of frames carrying one *rises* with `act_share` rather than decaying.
+    Phase 1 is shortened, not skipped: peak bid falls from 99.5 to ~74.5. Crossing
+    costs 180–580 updates, comfortably inside finding 12's 190–410, because it no
+    longer has to be paid inside a closing window. `pulled left` (sign of `dQ1/d(bid)`
+    at the actor's own action, last frame) separates converged from still-moving:
+    `act-x30` 50 % (a coin flip, i.e. converged), `foresight-3` **100 %** — it was
+    still descending at bid 40.4 when the budget ran out.
 
 ## Refuted or revised — do not re-test
 
 - ❌ "The critic smooths the cliff into a ramp." It doesn't; see finding 2.
-- ❌ "`policy_delay` fixes it." 2 → 100.0, 8 → 100.0, 64 → 68 ± 28 (tanh); with
-  softsign, `policy-delay-8` is **0/8**.
+- ⚠️ "`policy_delay` fixes it." Raising it does not: 2 → 100.0, 8 → 100.0,
+  64 → 68 ± 28 (tanh); with softsign, `policy-delay-8` is **0/8**. **But the knob
+  is not inert — run 04 turned it the wrong way.** Finding 9: at `policy_delay 2`
+  TD3 already crosses the plateau 200–600 environment steps later than DDPG and
+  SAC, purely because it takes half as many actor updates per step, and that is
+  what loses it the window. Lowering it to 1 remains untested in the surrogate;
+  on real ASSUME MATD3 it is now tested and is **0/3** at 40 episodes / 800 critic
+  updates (run 11).
+- ❌ "The surrogate's `lr-1e-4` result transfers directly to ASSUME." Run 11's
+  real-MATD3 screen ends at actor 95.5 ± 0.3 and 0/3 solved. That rejects an easy
+  transfer at 40 episodes / 800 critic updates, not a longer-horizon benefit.
 - ❌ "A 1e-5 gradient is too small to move the actor." Adam steps by
   `lr·G/(G+eps)`; anything two orders above `eps = 1e-8` gives a full-sized step.
   Only a hard zero kills it.
 - ⚠️ "The fragmented gradient field is not the binding constraint, because
   softsign scores *worse* on every path metric and crosses anyway."
   **The evidence was pooled over the wrong interval** — see finding 7 and
-  `runs/README.md` correction 6. During the crossing the path is clean 91–100 %
+  `RUNS.md` correction 6. During the crossing the path is clean 91–100 %
   of the time for *both* activations; the pooled numbers are dominated by the
   post-crossing phase, which for tanh is a consequence of the actor parking at
   the ceiling and feeding the buffer there (after step 2000 the tanh runs place
@@ -149,6 +307,33 @@ action space carries any gradient.
   the result, `policy_delay` and low `lr` should." **Half wrong** (run 08).
   `policy-delay-8` fails as predicted, but `lr-1e-4` is the *best* configuration
   in the sweep and `warmup-3000` is no worse than baseline.
+- ⚠️ "Without shaping, ASSUME's `argmax Q1` stays at 100.0." **The conclusion
+  survives 6 seeds, the number does not** (run 10, finding 15). 89.7 ± 10.6, and
+  only 2/6 seeds end at 100.0. Do not quote a single unshaped `argmax` — quote
+  the 56.4 EUR disagreement between probed observations, or the fact that 5/6
+  runs never reach the band at all (the sixth grazes it for 13 of 480 cells and
+  still ends at 94.4).
+- ⚠️ "Any single-configuration result here is a sample from a bimodal
+  distribution, because BLAS thread count alone flipped a seed" (finding 5).
+  **True of the SB3 surrogate, not shown for ASSUME.** Run 10's unshaped seed 42
+  reproduces run 09's film to 0.119 EUR across a change of thread count.
+- ❌ "The real critic fails because it must fit `Q(s, a)` across 548 observations
+  rather than `Q(a)` at one" (finding 13's leading explanation). **Wrong in that
+  form** — run 12 has the controls. The reward is 95 % a function of the bid
+  alone; the observation carries no generalising reward information at all
+  (leave-one-out 1-NN R² = **−1.07**); an offline critic fed **shuffled**
+  observations fails *identically* to one fed the real ones, so it is not real
+  contextual structure; and a critic that memorises harder (`obs-x0.1`, train MSE
+  → 0) learns the band correctly, so it is not memorisation capacity. The number
+  of observations was standing in for the number of input **dimensions**. Keep all
+  548 contexts and just weight the action more, and the learner solves it.
+  Rerun the controls with `real_matd3/assume_offline_critic.py` — γ = 0 on the
+  frozen buffer, no simulation, ~15 min. `shuffled-obs` is the one row that is not
+  seed-stable between scripts (the permutation consumes RNG), so quote it as
+  "fails like `full-obs`", not by its digits.
+- ❌ "Nothing but the update budget helps on the true reward" (finding 16). True of
+  every knob in run 11's 30 configurations, and none of them was `act_share`.
+  Finding 17 solves it at the *same* 800-update budget.
 
 ## Things that did not work, and cost time
 
@@ -163,14 +348,45 @@ action space carries any gradient.
 - **A fresh `run_learning` deletes `trained_policies_save_path`**
   (`common/utils.py:885`, and `interactive_input` defaults to *yes*). The probe
   forces a separate `learned_strategies/probe_<case>` folder and its own SQLite
-  file. Never point it at a folder holding results you want.
+  file. Never point it at a folder holding results you want. If the folder already
+  exists and there is **no TTY**, `interactive_input` raises `EOFError` rather
+  than taking the default, so an unattended rerun dies at startup — delete the
+  folder first.
 - **`trained_policies_save_path` must be relative** to the scenario inputs path —
   `replace_paths()` prefixes it on every `setup_world()`, so an absolute path
   becomes `.../inputs/2_nodes_paper_small/C:/...` and `os.makedirs` fails.
 - **16 parallel workers is past the knee.** Throughput saturates near 11
   short-runs/min on this 20-thread machine; 16 single-thread workers each run ~6×
-  slower than one solo run. Budget from throughput, not from the solo timing.
+  slower than one solo run. Run 11 also tried 10 long one-thread probes, which
+  pushed this 16 GB machine to **97.8 % memory** before producing results. Six
+  workers left about 2 GB free, kept at least two CPU cores available, and
+  completed the sweep. Budget from memory and throughput, not solo timing.
 - **`conda run python -c` rejects newlines** in the command. Write a file.
+- **`conda run` buffers the child's stdout to the end**, so a backgrounded run's
+  log stays *empty* for the whole run and looks like a hang — `python -u` does not
+  help, the buffering is conda's. Pass `--no-capture-output` when you want to
+  watch progress, or poll for the output file instead of the log.
+- **Two `conda run` calls at once can collide** on `%TEMP%\__conda_tmp_*.txt`
+  ("Der Prozess kann nicht auf die Datei zugreifen"). Harmless for a one-off;
+  just retry. For anything that launches runs in **parallel** it is not a retry
+  problem — call the env interpreter directly instead:
+  `C:/Users/finnr/miniconda3/envs/assume/python.exe`. Three concurrent probes
+  under `conda run` killed two of three; the same three under the direct
+  interpreter all completed, and it also removes conda's output buffering.
+  `assume_stability.py` launches its children with `sys.executable` for this
+  reason.
+- **The shaped and unshaped conditions cannot run concurrently.** The shaping is
+  a source edit, not a config flag, so the whole process tree is in one condition
+  at a time; run 10's two 6-seed batches had to go serially (29 min + 17 min).
+  `assume_stability.py` checks `learning_strategies.py` against `--condition` and
+  refuses to start on a mismatch — worth the five lines, since the failure is
+  silent and only shows up in the table at the end.
+- **`--critic-grid` is nearly free at training time and expensive to add later.**
+  It is one extra forward+backward pass on a batch of `N` actions per probe —
+  seconds across a whole run — but a run recorded without it cannot be explained
+  afterwards without repeating the training. Run 01b was originally recorded
+  without it and cost a **~55 min** re-run to get the critic row onto its figure.
+  Record `--critic-grid 401` on anything you may later want to explain.
 - **Overriding a path-valued `learning_config` entry needs *both* forms.**
   `replace_paths()` prefixes them with the scenario inputs path on every
   `setup_world()`, so `world.scenario_data` must hold the *relative* one; but
@@ -181,6 +397,13 @@ action space carries any gradient.
 - **`run_learning` writes `tensorboard/` and `assume.log` into the current
   working directory**, so running the probes from this folder drops them here.
   Both are gitignored, but they are not wanted output.
+- **Concurrent TensorBoard writers can fail before learning completes.** Six run
+  11 trials hit an async-writer `FileNotFoundError`; this was a logging race, not
+  an algorithm result. `assume_training_probe.py --disable-tensorboard` replaces
+  only TensorBoard with a no-op inside that probe process while preserving the
+  database address, update cadence and learning dynamics. The runner now uses it.
+  The six retries completed; their two-frame partial archives are retained under
+  `partial_failures_before_retry/` rather than mixed into the final 90 files.
 
 ## Known caveats in the current results
 
@@ -192,7 +415,7 @@ action space carries any gradient.
   cosmetic: the mislabelled run appears to flip, the clean one never does.
 - **`summarize()` in `run_benchmark.py` still prints `hit (<0.5 EUR)` and
   `regret`** against the *deterministic* optimum. Both penalise a correctly
-  behaving stochastic policy (finding 9). Replace with expected reward under the
+  behaving stochastic policy (finding 11). Replace with expected reward under the
   policy's own spread.
 - **All surrogate runs are single-context**: the 74-dim observation is a constant
   vector, so `Q(s,a)` is effectively `Q(a)`. The real scenario varies hour to hour
@@ -201,27 +424,83 @@ action space carries any gradient.
   `IncDecEnv(params=[...])` takes a context list for the harder version.
 - **The reward shaping is currently commented out** in
   `assume/strategies/learning_strategies.py:1583-1589`, deliberately, so the repo
-  is in "true reward" state.
+  is in "true reward" state. Run 10 uncommented it for its shaped batch and
+  restored it with `git checkout --`. Runs 11 and 12 both ran in this state, and
+  `assume_actshare_sweep.py`'s `preflight()` refuses to start if it is live —
+  finding 17 is a claim about the *true* reward and would be worthless otherwise.
+- **`argmax Q1` is a brittle summary when `Q` is nearly flat.** Over a 401-point
+  grid it is decided by differences of ~1e-2 in `Q`, which is why run 09's
+  unshaped film reads 100.0 and its bit-near-identical rerun reads 99.2. Run 10
+  reports the spread of `argmax` across probed observations alongside it; use
+  both or neither.
+- **Run 10 is 6 seeds per condition.** Enough to separate the two conditions
+  (they do not overlap on final actor bid at all), not enough for any finer
+  claim — in particular the 1/6 shaped seeds ending *inside* the band is one
+  seed, not a rate.
+- **Run 11 is 3 seeds per configuration and 40 episodes.** Its 0/3 cells are a
+  broad-screen result, not stable failure rates. `gradient_steps` configurations
+  also receive different total critic-update budgets: baseline 800, `grad-32`
+  2560. Compare fixed-update and fixed-exposure designs before attributing the
+  difference specifically to gradient steps.
+- **Run 12 is 3 seeds per condition on one scenario.** `act-x30`'s 3/3 is the
+  archive's first solve, not a success rate; S = 30 is one arbitrary point.
+  Reduced `foresight` also discards forecast dimensions — free here, where they
+  carry no reward information, and not in general. Recorded `dQ/d(bid)` carries
+  the factor S in the action-scale runs, so **signs are comparable across
+  conditions and magnitudes are not**; the figure draws each facet on its own
+  robust scale for that reason.
+- **The debug prints at `matd3.py:618-628` are live in the working tree** (commit
+  `f60e885c`). Besides the console noise they draw `th.rand(1)` from the global
+  torch RNG on every gradient step per agent, which shifts the exploration and
+  batch-sampling stream. Run 12's `baseline` still reproduced run 11, so they did
+  not break comparability there — but they should come out before any new seed
+  work, and any bit-identity claim against runs 09/10 has to account for them.
 - The archive is gitignored; committing it needs an exception or LFS.
 
 ## Open
 
-- **Why does the real critic learn nothing from the true reward?** Finding 11 —
-  the single most important open question, since it is what forced the shaping.
-  Two testable candidates: *(a)* the contextual regression is the problem — run
-  the surrogate with `IncDecEnv(params=[...])` so it too must fit `Q(s, a)` over
-  many contexts, and see whether its flip disappears; *(b)* it is coverage — seed
-  the buffer with in-band transitions and see whether `argmax Q1` moves off the
-  ceiling.
+- ~~**Why does the real critic learn nothing from the true reward?**~~ **Answered
+  by finding 17** — the action is 1 of 75 critic inputs. Candidate *(a)*, the
+  contextual regression, is refuted; candidate *(b)*, coverage, was already
+  refuted by finding 1. What remains open is how to fix it *properly*: run 12's
+  two levers are experiment monkeypatches, not an API. The principled version is
+  input scaling or normalisation inside `CriticTD3` — a library change affecting
+  every scenario, so it needs checking against the other examples before it goes
+  anywhere near `assume/`.
+- **Where does `act_share` saturate, and where does the overshoot stop?** The
+  ladder jumps 0.234 → 0.479 with the bimodal `act-x10` in between. Run
+  0.28/0.33/0.40 at more seeds to find whether the overshoot region is real or
+  seed luck, and test above 0.5 for a downside.
+- **Does `foresight-3` solve it with more episodes?** Finding 18 says it was still
+  descending at the budget's end (`pulled left` 100 %, bid 40.4). 128 episodes
+  would settle it, and it is the cheaper lever of the two.
+- **Does raising `act_share` remove the need for the shaping in general?** Run 12
+  is one scenario with one learning unit. The multi-agent case is the interesting
+  one, since a centralised critic *lowers* each actor's own share as agents are
+  added (0.030 at N = 1, 0.017 at N = 16) — so the problem should get worse, and
+  measurably so.
 - **Why does even the shaped run stop at the band's rim (49) rather than 30?**
-  The decoy of finding 12 explains where it stops; whether fixing the decoy is
-  enough to get to 30 is untested.
+  The decoy of finding 14 explains where it stops; whether fixing the decoy is
+  enough to get to 30 is untested. Run 10 sharpens the target: all 6 shaped seeds
+  *do* dip into the band during the run (best true reward at any frame +0.036 on
+  average, best single frame +0.065 at bid ≈ 42.5), they just do not stay. So the
+  question is retention inside the band, not reaching it.
 - **Fix the shaping decoy.** Untested candidate: make the shaped branch
   continuous with the true reward at the band edges — `(49 - price)/100` above 49
   (zero at 49, −0.51 at 100) and `-0.17 - (30 - price)/100` below 30 — so both
   ramps point *into* the band instead of terminating at its rim.
-- **Does `lr-1e-4` transfer to ASSUME?** It is the only stable setting found
-  (finding 6) and has not been tried on the real MATD3.
+- **Is `grad-32` a real escape or only delayed movement?** It is run 11's only
+  material signal, but 0/3 solve and one seed still ends at 99.8. Extend baseline,
+  `grad-20` and `grad-32` to 128 episodes / more seeds, and compare two designs:
+  fixed episode exposure with different updates, then fixed total updates with
+  different gradient steps. That separates optimisation budget from fresh data.
+- **Does low LR help ASSUME only on a longer horizon?** `lr-1e-4` and its
+  `grad-32` interaction fail within 40 episodes, but the screen does not match
+  update distance. If retried, give it the same actor/critic optimisation budget,
+  rather than repeating the already-negative 800-update cell.
+- **Does surrogate TD3 at `--policy-delay 1` match DDPG?** Finding 9's surrogate
+  hypothesis is still open. Run 11 only settles the real-ASSUME version at the
+  baseline horizon: delay 1 is 0/3 and does not create a coherent critic field.
 
 ## Commands
 
@@ -230,11 +509,17 @@ cd examples/inputs/2_nodes_paper_small/rl_benchmark
 O=../../../outputs/2_nodes_paper_small/rl_benchmark
 
 # the three headline figures, all redrawn from archived data
-python sweeps/run_benchmark.py --replot     --results $O/runs/data/01b-best-known/headline_comparison.npz
+# (--critic-seed 3 is TD3's failing seed, which is what the archived figure draws)
+python sweeps/run_benchmark.py --replot --critic-seed 3 \
+    --results $O/runs/data/01b-best-known/headline_comparison.npz \
+    --out    $O/runs/01-algorithms-best-known-settings.png
 python sweeps/td3_stability.py --replot \
     --results <runs>/data/08-stability/td3_stability.npz \
                <runs>/data/08-stability/td3_stability_10k.npz
 python real_matd3/assume_film.py
+python real_matd3/assume_stability.py --report   # run 10, from the archive
+python real_matd3/assume_config_sweep.py --phase broad --report-only \
+    --critic-out $O/runs/img/11-assume-config-critic-evolution-broad.png  # run 11
 
 # the mechanism figures
 python analysis/descent_window.py         # when the descent path is open
@@ -246,6 +531,36 @@ python analysis/actor_saturation.py       # regenerates actor_saturation.md
 python sweeps/td3_stability.py --seeds 8 --workers 15      # ~40 min
 python real_matd3/assume_critic_probe.py                   # saved .pt files
 python real_matd3/assume_training_probe.py --episodes 40 --label <what-reward>
+
+# run 10's sweep. One condition per invocation: the shaping is a source edit,
+# so uncomment learning_strategies.py:1583-1589 between the two and put it back
+# afterwards. ~30 min per batch at 6 workers.
+python real_matd3/assume_stability.py --condition unshaped --seeds 42 1 2 3 4 5
+python real_matd3/assume_stability.py --condition shaped   --seeds 42 1 2 3 4 5
+
+# run 11's broad screen: 30 configs x 3 seeds, 40 episodes, six one-thread
+# workers. Each child loads the same checksum-guarded clean buffer and then owns
+# its online buffer. The archived full launch manifest is manifest-initial-broad.json.
+python real_matd3/assume_config_sweep.py --phase broad --workers 6
+
+# temporal Q1/Q2 gradients plus final twin-critic landscape from any run 11 npz
+python real_matd3/assume_run_diagnostics.py --results <run-11.npz> --out <plot.png>
+
+# run 12's act_share ladder: 5 conditions x 3 seeds, 40 episodes, ~15 min each.
+# Both levers are patches installed in the child before the scenario loads, so
+# assume/ is untouched -- but the shaping must stay commented out and preflight()
+# refuses to start otherwise. The truncated buffers it derives are cached next to
+# the shared one as buffers/single_10ep_standard_f{k}.npz.
+python real_matd3/assume_actshare_sweep.py --workers 5
+python real_matd3/assume_actshare_sweep.py --report-only
+
+# run 12's two figures and the descent-window table, from the archive
+python real_matd3/assume_actshare_film.py
+
+# run 12's offline gamma=0 fits -- where act_share was found. No simulation, no
+# archive needed, ~15 min for all three rounds from the frozen buffer alone.
+python real_matd3/assume_offline_critic.py
+python real_matd3/assume_offline_critic.py --round conditions   # just round 1
 ```
 
 Results and figures always write to the **outputs** folder, never the tracked

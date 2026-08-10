@@ -43,6 +43,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LinearSegmentedColormap, SymLogNorm
 from stable_baselines3.common.noise import ActionNoise
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -65,6 +66,19 @@ COLORS = {
 }
 INK = "#0b0b0b"
 MUTED = "#8a8985"
+
+#: Diverging ramp for signed fields such as ``dQ/d(bid)``: two poles with a
+#: *neutral* -- not a hue -- at the midpoint, so "no gradient" reads as absence of
+#: colour rather than as a colour. It lives here, with the rest of the house
+#: palette, because both ``critic_evolution.py`` and this module draw with it and
+#: the analysis scripts already import their colours from here.
+DIVERGING = LinearSegmentedColormap.from_list(
+    "grad", ["#2a78d6", "#9dc2ec", "#f2f2f0", "#f4b79c", "#eb6834"]
+)
+#: Below this the symlog colour scale is linear. The field spans a ~1e-1 spike at
+#: the cliff and a ~1e-5 background on the plateaus, so a plain linear scale would
+#: show the spike and nothing else.
+GRAD_LINTHRESH = 1e-4
 
 DEFAULT_ALGOS = ["TD3", "DDPG", "SAC", "PPO", "Random search"]
 
@@ -444,15 +458,21 @@ def save_results(
     )
 
 
-def load_results(
-    path: Path, fallback: RunConfig
-) -> tuple[np.ndarray, dict[str, np.ndarray], dict[str, np.ndarray], RunConfig]:
+def load_results(path: Path, fallback: RunConfig) -> tuple[
+    np.ndarray,
+    dict[str, np.ndarray],
+    dict[str, np.ndarray],
+    RunConfig,
+    dict[str, tuple[np.ndarray, np.ndarray]],
+]:
     """Reload a saved run for re-plotting. Runs saved before the config was
-    recorded fall back to the config given on the command line."""
+    recorded fall back to the config given on the command line; runs recorded
+    without ``--critic-grid`` come back with an empty ``critic`` dict."""
     data = np.load(path)
     steps = data["steps"]
 
     greedy, placed = {}, {}
+    critic_q, critic_grad = {}, {}
     for key in data.files:
         prefix, _, algo = key.partition("/")
         if prefix == "greedy":
@@ -460,6 +480,12 @@ def load_results(
             greedy[algo] = data[key][:, : len(steps)]
         elif prefix == "placed":
             placed[algo] = data[key]
+        elif prefix == "critic_q":
+            critic_q[algo] = data[key]
+        elif prefix == "critic_grad":
+            critic_grad[algo] = data[key]
+
+    critic = {a: (critic_q[a], g) for a, g in critic_grad.items() if a in critic_q}
 
     # ``from __future__ import annotations`` makes field.type a string, so take
     # the concrete type from the fallback instance instead of the annotation.
@@ -470,7 +496,7 @@ def load_results(
     }
     cfg = RunConfig(**{**asdict(fallback), **values}) if values else fallback
 
-    return steps, greedy, placed, cfg
+    return steps, greedy, placed, cfg, critic
 
 
 def describe(cfg: RunConfig) -> str:
@@ -530,14 +556,47 @@ def plot(
     placed: dict[str, np.ndarray],
     cfg: RunConfig,
     out: Path,
+    critic: dict[str, tuple[np.ndarray, np.ndarray]] | None = None,
+    critic_seed: int = 0,
 ) -> None:
+    """Draw the comparison figure.
+
+    Two rows always: the landscape with the reward curves, then one learning
+    history per algorithm. A run recorded with ``--critic-grid`` gets a third row
+    showing the critic gradient field each actor was climbing, on the *same* axes
+    as the history above it, so a column reads straight down.
+    """
     p = PAPER_SMALL
     names = list(results)
+    critic = critic or {}
+    # Only algorithms that both appear in this figure and carry a sweep. PPO's
+    # critic is a state-value V(s) and random search has no network, so the row
+    # is narrower than the one above it -- see the note drawn in the gap.
+    critic_names = [a for a in names if a in critic]
 
-    fig = plt.figure(figsize=(16, 9.5))
-    outer = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.05], hspace=0.32)
+    if critic_names:
+        fig = plt.figure(figsize=(16, 15))
+        outer = fig.add_gridspec(3, 1, height_ratios=[1.0, 1.05, 1.05], hspace=0.30)
+    else:
+        fig = plt.figure(figsize=(16, 9.5))
+        outer = fig.add_gridspec(2, 1, height_ratios=[1.0, 1.05], hspace=0.32)
     top = outer[0].subgridspec(1, 2, width_ratios=[1.0, 1.5], wspace=0.2)
     bottom = outer[1].subgridspec(1, len(names), wspace=0.1)
+
+    def row_heading(spec, text: str) -> None:
+        """Left-margin heading for a faceted row, placed from the grid rather
+        than from a hardcoded figure fraction, so adding a row cannot slide it
+        onto the panels above. The offset is in inches -- 0.3 clears the facets'
+        own titles, which sit in the same band -- so it does not shrink as the
+        figure grows taller."""
+        fig.text(
+            0.007,
+            spec.get_position(fig).y1 + 0.3 / fig.get_figheight(),
+            text,
+            fontsize=11,
+            color=INK,
+            va="bottom",
+        )
 
     ax_land = fig.add_subplot(top[0])
     ax_curve = fig.add_subplot(top[1])
@@ -673,16 +732,178 @@ def plot(
         else:
             ax.tick_params(labelleft=False)
 
-    hist_axes[0].figure.text(
-        0.007,
-        0.485,
-        "learning history: every bid placed (dots) and the greedy policy (line)",
-        fontsize=11,
-        color=INK,
+    row_heading(
+        outer[1], "learning history: every bid placed (dots) and the greedy policy (line)"
     )
 
-    for ax in (ax_land, ax_curve, *hist_axes):
-        ax.grid(True, color=MUTED, alpha=0.2, lw=0.7)
+    # --- row 3: the gradient field the actor was climbing --------------------
+    # Same x (environment steps) and y (bid price) as the facet directly above,
+    # and shared with it, so a column reads straight down: where the policy went,
+    # then the field that sent it there. The actor never sees the reward -- it
+    # ascends the critic -- so this is the landscape that actually drove row 2.
+    heat_axes = []
+    if critic_names:
+        third = outer[2].subgridspec(1, len(names), wspace=0.1)
+        # the action grid the sweeps were taken on, in EUR/MWh (see save_results)
+        n_grid = critic[critic_names[0]][1].shape[-1]
+        grid_bids = np.linspace(-1.0, 1.0, n_grid) * p.max_bid_price
+        seed = min(critic_seed, critic[critic_names[0]][1].shape[0] - 1)
+        # one colour scale for the whole row, so the panels are comparable
+        vmax = max(np.abs(critic[a][1][seed]).max() for a in critic_names)
+        norm = SymLogNorm(
+            linthresh=GRAD_LINTHRESH, vmin=-vmax, vmax=vmax, base=10
+        )
+
+        for i, algo in enumerate(names):
+            if algo not in critic:
+                continue
+            ax = fig.add_subplot(third[i], sharex=hist_axes[i], sharey=hist_axes[i])
+            heat_axes.append(ax)
+            grad = critic[algo][1][seed]  # (probes, grid)
+            mesh = ax.pcolormesh(
+                steps,
+                grid_bids,
+                grad.T,
+                cmap=DIVERGING,
+                norm=norm,
+                shading="nearest",
+                rasterized=True,
+            )
+            for y in (p.dec_threshold, p.eom_price):
+                ax.axhline(y, color=INK, lw=0.9, alpha=0.45, ls="--")
+            if 0 < cfg.warmup < steps[-1]:
+                # left of this the critic has taken no gradient step at all --
+                # the field there is the random initialisation
+                ax.axvline(cfg.warmup, ls=":", lw=1.2, color=INK, zorder=2)
+            # the greedy policy again, haloed so it stays readable over both poles
+            ax.plot(steps, results[algo][seed], lw=3.2, color="white", zorder=3)
+            ax.plot(steps, results[algo][seed], lw=1.4, color=INK, zorder=4)
+
+            ax.set_title(algo, loc="left", fontsize=10, color=COLORS.get(algo, INK))
+            ax.set_xlabel("environment steps")
+            if i == 0:
+                ax.set_ylabel("bid price (EUR/MWh)")
+            else:
+                ax.tick_params(labelleft=False)
+
+        # --- the gap where PPO and random search would be -------------------
+        # One shared colourbar for the row -- the panels are only comparable
+        # because they share a scale, and per-panel bars would hide that -- plus
+        # the reason those two algorithms have no panel. Better than a blank:
+        # the absence is itself a fact about them.
+        spare = [i for i, a in enumerate(names) if a not in critic]
+        gap = cax = None
+        # Only borrow the gap when it is one unbroken block of columns; an
+        # algorithm without a critic sitting *between* two that have one would
+        # otherwise put the legend on top of a panel.
+        if spare and spare == list(range(spare[0], spare[-1] + 1)):
+            gap = fig.add_subplot(third[0, spare[0] : spare[-1] + 1])
+            gap.axis("off")
+            cax = gap.inset_axes([0.04, 0.60, 0.66, 0.022])
+
+        cbar = fig.colorbar(
+            mesh,
+            ax=None if cax is not None else heat_axes,
+            cax=cax,
+            orientation="horizontal",
+            # pad clears the panels' own x labels, which sit in between
+            **({} if cax is not None else {"fraction": 0.04, "pad": 0.22}),
+        )
+        cbar.ax.tick_params(colors=MUTED, labelsize=8)
+        cbar.outline.set_visible(False)
+        if cax is None:
+            cbar.set_label(
+                "dQ/d(bid) of the actor's own objective  (autograd; symlog below "
+                "1e-4).  Black line: the greedy policy.",
+                fontsize=9,
+                color=MUTED,
+            )
+
+        if gap is not None:
+            # Written out by hand rather than with set_label/annotations at one
+            # height: three captions on the colourbar's own baseline collide.
+            # Each line gets its own band, top to bottom.
+            gap.text(
+                0.04,
+                0.94,
+                "the black line is the greedy policy -- the same line as the "
+                "facet directly above.",
+                fontsize=9,
+                color=INK,
+                va="top",
+                transform=gap.transAxes,
+            )
+            gap.text(
+                0.04,
+                0.86,
+                "no critic panel for "
+                + " or ".join(names[i] for i in spare)
+                + ": PPO's critic is a state-value V(s), which has no gradient\n"
+                "with respect to the action, and random search has no network "
+                "at all.",
+                fontsize=9,
+                color=MUTED,
+                va="top",
+                transform=gap.transAxes,
+            )
+            gap.text(
+                0.04,
+                0.68,
+                "dQ/d(bid) of the actor's own objective  (autograd; symlog below "
+                "1e-4)",
+                fontsize=9,
+                color=MUTED,
+                va="bottom",
+                transform=gap.transAxes,
+            )
+            gap.text(
+                0.04,
+                0.50,
+                "◀  pulls the bid down",
+                fontsize=8.5,
+                color=COLORS["TD3"],
+                va="top",
+                ha="left",
+                transform=gap.transAxes,
+            )
+            gap.text(
+                0.70,
+                0.50,
+                "pushes it up  ▶",
+                fontsize=8.5,
+                color=COLORS["DDPG"],
+                va="top",
+                ha="right",
+                transform=gap.transAxes,
+            )
+            gap.text(
+                0.04,
+                0.36,
+                "Reading a column: the actor climbs this field, never the reward.\n"
+                "An all-orange panel means the critic prefers a higher bid "
+                "everywhere,\n"
+                "so the actor runs to the +100 ceiling on a correct gradient over an\n"
+                "incomplete critic. Blue opening up over [49, 100] is the descent "
+                "path\n"
+                "back into the band. Mottling is a flat region fitted correctly: a\n"
+                "converged critic on a plateau has only a noise gradient left.",
+                fontsize=8.5,
+                color=INK,
+                va="top",
+                linespacing=1.5,
+                transform=gap.transAxes,
+            )
+
+        row_heading(
+            outer[2],
+            f"the field the actor is climbing: dQ/d(bid) of its own objective "
+            f"(seed {seed} of {critic[critic_names[0]][1].shape[0]})",
+        )
+
+    for ax in (ax_land, ax_curve, *hist_axes, *heat_axes):
+        # No grid over a heatmap: the mesh is the data, and rules on top of it
+        # read as structure that is not there.
+        ax.grid(ax not in heat_axes, color=MUTED, alpha=0.2, lw=0.7)
         ax.set_axisbelow(True)
         for side in ("top", "right"):
             ax.spines[side].set_visible(False)
@@ -690,17 +911,22 @@ def plot(
             ax.spines[side].set_color(MUTED)
         ax.tick_params(colors=MUTED, labelsize=9)
 
+    # Title and strapline sit above the axes in *inches*, not in figure
+    # fractions, so the header keeps its spacing when a row is added.
+    height = fig.get_figheight()
     fig.suptitle(
         "Can RL find the inc-dec optimum?  diesel_0, 2_nodes_paper_small",
         x=0.007,
-        y=1.005,
+        y=1 + 0.05 / height,
         ha="left",
         fontsize=13.5,
         fontweight="bold",
         color=INK,
     )
     # the settings are the experiment -- record them so swept figures stay legible
-    fig.text(0.007, 0.973, describe(cfg), fontsize=9, color=MUTED, ha="left")
+    fig.text(
+        0.007, 1 - 0.26 / height, describe(cfg), fontsize=9, color=MUTED, ha="left"
+    )
 
     fig.savefig(out, dpi=150, bbox_inches="tight")
     print(f"\n  wrote {out}")
@@ -790,6 +1016,13 @@ def main() -> None:
         "many actions (e.g. 201); 0 disables. Off-policy algorithms only",
     )
     parser.add_argument(
+        "--critic-seed",
+        type=int,
+        default=0,
+        help="which seed's critic field the bottom row of the figure draws; the "
+        "rest of the figure keeps all seeds",
+    )
+    parser.add_argument(
         "--out", type=Path, default=OUT_DIR / "benchmark.png", help="output figure path"
     )
     parser.add_argument(
@@ -823,10 +1056,10 @@ def main() -> None:
     )
 
     if args.replot:
-        steps, greedy, placed, cfg = load_results(args.results, cfg)
+        steps, greedy, placed, cfg, critic = load_results(args.results, cfg)
         print(f"\n  replotting {args.results}\n  {describe(cfg)}\n")
         summarize(greedy)
-        plot(steps, greedy, placed, cfg, args.out)
+        plot(steps, greedy, placed, cfg, args.out, critic, args.critic_seed)
         return
 
     print(f"\n  {args.seeds} seeds x {cfg.timesteps} steps\n  {describe(cfg)}\n")
@@ -845,7 +1078,7 @@ def main() -> None:
             f"  critic sweeps: {len(critic)} algo(s) x {len(steps)} probes "
             f"x {cfg.critic_grid} actions -> {args.results.name}"
         )
-    plot(steps, greedy, placed, cfg, args.out)
+    plot(steps, greedy, placed, cfg, args.out, critic, args.critic_seed)
 
 
 if __name__ == "__main__":

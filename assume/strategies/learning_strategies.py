@@ -1575,13 +1575,11 @@ class EnergyLearningSingleBidRedispatchStrategy(EnergyLearningSingleBidStrategy)
         # calculate reward
         scaling = 1 / (self.max_bid_price * unit.max_power)
         reward = unit.outputs["profit"].loc[start] * scaling
-        price = order.get("price", "rofl")
-        print(start, price, accepted_price, accepted_volume, total_profit)
+        #price = order.get("price", "rofl")
+        #print(start, price, accepted_price, accepted_volume, total_profit)
         #print("total", unit.outputs["eom_profit"].loc[start], "+", + unit.outputs["redispatch_profit"].loc[start])
-        print("reward", reward)
+        #print("reward", reward)
 
-        # TEMPORARILY DISABLED for the unshaped run of assume_training_probe.py.
-        # Restore with: git checkout -- assume/strategies/learning_strategies.py
         # if reward > 0: #-100:
         #     reward *= 1  # 0
         # else:

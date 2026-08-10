@@ -48,6 +48,8 @@ it. The default is the local SQLite file the examples use.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import sys
 from pathlib import Path
 
@@ -96,8 +98,10 @@ class Recorder:
         #: 32, 64, 32, 64, ... across a run).
         self.updates = 0
         self.steps: list[int] = []
-        self.q: list[np.ndarray] = []
-        self.grad: list[np.ndarray] = []
+        self.q1: list[np.ndarray] = []
+        self.q2: list[np.ndarray] = []
+        self.grad1: list[np.ndarray] = []
+        self.grad2: list[np.ndarray] = []
         self.actor_bids: list[np.ndarray] = []
         self.buffer_fill: list[int] = []
 
@@ -121,13 +125,18 @@ class Recorder:
         )
         act.requires_grad_(True)
 
-        # q1_forward is what matd3.py differentiates for the actor loss
-        q = strategy.critics.q1_forward(obs_batch, act)
-        (grad,) = th.autograd.grad(q.sum(), act)
+        # Q1 is what matd3.py differentiates for the actor loss. Record Q2 as
+        # well so a saved run can later draw the complete twin-critic landscape
+        # without retaining or reloading a model checkpoint.
+        q1, q2 = strategy.critics(obs_batch, act)
+        (grad1,) = th.autograd.grad(q1.sum(), act, retain_graph=True)
+        (grad2,) = th.autograd.grad(q2.sum(), act)
 
         shape = (len(self.obs), len(self.bids))
-        self.q.append(q.detach().numpy().reshape(shape))
-        self.grad.append(grad.numpy().reshape(shape) / MAX_BID_PRICE)
+        self.q1.append(q1.detach().numpy().reshape(shape))
+        self.q2.append(q2.detach().numpy().reshape(shape))
+        self.grad1.append(grad1.numpy().reshape(shape) / MAX_BID_PRICE)
+        self.grad2.append(grad2.numpy().reshape(shape) / MAX_BID_PRICE)
 
         with th.no_grad():
             actions = strategy.actor(th.as_tensor(self.obs, dtype=th.float32))
@@ -139,18 +148,35 @@ class Recorder:
         )
         self.steps.append(self.updates)
 
-    def save(self, path: Path, algo: str = "MATD3", label: str = "") -> None:
+    def save(
+        self,
+        path: Path,
+        algo: str = "MATD3",
+        label: str = "",
+        seed: int | None = None,
+        config: dict | None = None,
+        buffer_path: Path | None = None,
+    ) -> None:
         if not self.steps:
             print("  nothing recorded -- did any training block run?")
             return
         path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(
+        buffer_sha256 = (
+            hashlib.sha256(buffer_path.read_bytes()).hexdigest()
+            if buffer_path is not None
+            else ""
+        )
+        np.savez_compressed(
             path,
             steps=np.array(self.steps),
             critic_bids=self.bids,
             **{
-                f"critic_q/{algo}": np.stack(self.q, axis=1),
-                f"critic_grad/{algo}": np.stack(self.grad, axis=1),
+                # Existing analysis scripts consume these Q1 compatibility keys.
+                f"critic_q/{algo}": np.stack(self.q1, axis=1),
+                f"critic_grad/{algo}": np.stack(self.grad1, axis=1),
+                # Twin-critic diagnostics use these additional arrays.
+                f"critic_q2/{algo}": np.stack(self.q2, axis=1),
+                f"critic_grad2/{algo}": np.stack(self.grad2, axis=1),
                 f"greedy/{algo}": np.stack(self.actor_bids, axis=1),
             },
             observations=self.obs,
@@ -159,6 +185,12 @@ class Recorder:
             # learning_strategies.py:1583 is unconditional, so nothing in the
             # config records this -- it has to be carried by the caller.
             label=np.array(label),
+            # ASSUME's config seed for this run, -1 when it was left at the
+            # default. The stability sweep groups films by it.
+            seed=np.array(-1 if seed is None else seed),
+            config_json=np.array(json.dumps(config or {}, sort_keys=True)),
+            buffer_path=np.array(str(buffer_path or "")),
+            buffer_sha256=np.array(buffer_sha256),
             # critic_evolution.py reads cfg/warmup to draw the warmup marker; there
             # is no separate warmup here, the buffer is preloaded
             **{"cfg/warmup": 0, "cfg/timesteps": self.steps[-1]},
@@ -214,6 +246,13 @@ def main() -> None:
     parser.add_argument("--train-freq", default=None, help="e.g. 1h")
     parser.add_argument("--gradient-steps", type=int, default=None)
     parser.add_argument(
+        "--overrides-json",
+        default="{}",
+        help="JSON object of LearningConfig fields to override. Values are "
+        "applied to both scenario_data and the live learning role before "
+        "run_learning constructs the episode networks.",
+    )
+    parser.add_argument(
         "--save-path",
         type=Path,
         default=None,
@@ -232,12 +271,67 @@ def main() -> None:
         "unshaped one",
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="ASSUME's own seed knob, applied again. loader_csv.py:555 calls "
+        "set_random_seed(config.get('seed', 42)) once, while the scenario is "
+        "being read, and nothing re-seeds afterwards -- so re-applying it here, "
+        "after the scenario is loaded and before run_learning() builds the "
+        "networks, is the same call with a different number. Default: leave "
+        "ASSUME's 42 in place",
+    )
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        help="torch.set_num_threads. Run 08 found the BLAS thread count alone "
+        "moves a surrogate seed from +31.60 to -60.49, so a sweep whose runs "
+        "share a machine should pin this rather than let each process pick a "
+        "different effective width",
+    )
+    parser.add_argument(
+        "--disable-tensorboard",
+        action="store_true",
+        help="replace only TensorBoard's asynchronous writer with a no-op. The "
+        "probe records richer diagnostics itself, while concurrent Windows "
+        "runs can otherwise lose the event directory during writer startup. "
+        "Database logging and learning dynamics are unchanged.",
+    )
+    parser.add_argument(
         "--out", type=Path, default=OUT_DIR / "assume_training_probe.npz"
     )
     args = parser.parse_args()
 
+    try:
+        config_overrides = json.loads(args.overrides_json)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"invalid --overrides-json: {exc}") from exc
+    if not isinstance(config_overrides, dict):
+        raise SystemExit("--overrides-json must decode to an object")
+
+    if args.threads is not None:
+        th.set_num_threads(args.threads)
+
     from assume import World
+    from assume.common.utils import set_random_seed
+    from assume.reinforcement_learning.learning_role import Learning
     from assume.scenario.loader_csv import load_scenario_folder, run_learning
+
+    if args.disable_tensorboard:
+        original_init_logging = Learning.init_logging
+
+        class _NoTensorBoard:
+            def update_tensorboard(self) -> None:
+                pass
+
+        def init_logging_without_tensorboard(self, *init_args, **init_kwargs):
+            # Keep init_logging's db_addr, datetime, and update_steps setup; only
+            # replace the logger before its first update creates SummaryWriter.
+            original_init_logging(self, *init_args, **init_kwargs)
+            self.tensor_board_logger = _NoTensorBoard()
+
+        Learning.init_logging = init_logging_without_tensorboard
 
     world = World(database_uri=args.db_uri, export_csv_path="")
     load_scenario_folder(
@@ -246,6 +340,19 @@ def main() -> None:
         scenario=args.scenario,
         study_case=args.study_case,
     )
+
+    # Reseed *after* the scenario is read. The forecaster and the unit tables are
+    # deterministic CSV loads, so everything that a seed can still change --
+    # network init (run_learning calls initialize_policy at loader_csv.py:1213),
+    # the exploration noise, and the replay-buffer batch draws -- happens after
+    # this line. The value is written back into scenario_data for the record
+    # only: config["seed"] is read exactly once, at load time, and setup_world()
+    # never looks at it again.
+    if args.seed is not None:
+        print(f"  override seed: {world.scenario_data['config'].get('seed', 42)}"
+              f" -> {args.seed}")
+        world.scenario_data["config"]["seed"] = args.seed
+        set_random_seed(seed=args.seed, learning_mode=True)
 
     # A fresh run deletes trained_policies_save_path before it starts, so never
     # let it point at a folder that already holds results worth keeping. A path
@@ -266,13 +373,43 @@ def main() -> None:
         "training_episodes": args.episodes,
         "train_freq": args.train_freq,
         "gradient_steps": args.gradient_steps,
+        **config_overrides,
     }
     lc = world.scenario_data["config"]["learning_config"]
     for key, value in overrides.items():
         if value is not None:
+            if not hasattr(world.learning_role.learning_config, key):
+                raise SystemExit(f"unknown LearningConfig override: {key}")
             print(f"  override {key}: {lc.get(key)} -> {value}")
             lc[key] = value
             setattr(world.learning_role.learning_config, key, value)
+
+    # These callables are derived in Learning.__init__, before the command-line
+    # overrides above are applied. Rebuild them so schedule sweeps change the
+    # live learner rather than merely changing the recorded dataclass.
+    from assume.reinforcement_learning.learning_utils import (
+        cosine_annealing_func,
+        linear_schedule_func,
+    )
+
+    live = world.learning_role.learning_config
+    if live.learning_rate_schedule == "linear":
+        world.learning_role.calc_lr_from_progress = linear_schedule_func(
+            live.learning_rate, live.min_learning_rate
+        )
+    elif live.learning_rate_schedule == "cosine":
+        world.learning_role.calc_lr_from_progress = cosine_annealing_func(
+            live.learning_rate, live.min_learning_rate
+        )
+    else:
+        world.learning_role.calc_lr_from_progress = lambda _: live.learning_rate
+
+    if live.action_noise_schedule == "linear":
+        world.learning_role.calc_noise_from_progress = linear_schedule_func(
+            live.noise_dt
+        )
+    else:
+        world.learning_role.calc_noise_from_progress = lambda _: live.noise_dt
 
     # Path-valued config entries need both forms. replace_paths() prefixes them
     # with the scenario inputs path on every setup_world(), so scenario_data must
@@ -280,6 +417,7 @@ def main() -> None:
     # override and run_learning reads its *already-resolved* value directly, so
     # that one needs the absolute path. Setting the relative form on both is the
     # bug that makes run_learning raise "no buffer file found".
+    absolute_buffer = None
     if args.load_buffer:
         rel_buffer = f"learned_strategies/{args.load_buffer}"
         print(f"  override replay_buffer_load_path: {lc.get('replay_buffer_load_path')}"
@@ -289,6 +427,7 @@ def main() -> None:
         if not absolute.exists():
             raise SystemExit(f"no replay buffer at {absolute}")
         world.learning_role.learning_config.replay_buffer_load_path = str(absolute)
+        absolute_buffer = absolute
 
     print(f"  override trained_policies_save_path: {lc.get('trained_policies_save_path')} -> {relative}")
     lc["trained_policies_save_path"] = str(relative).replace("\\", "/")
@@ -303,7 +442,17 @@ def main() -> None:
     try:
         run_learning(world)
     finally:
-        recorder.save(args.out, label=args.label)
+        resolved_config = {
+            key: getattr(world.learning_role.learning_config, key)
+            for key in world.learning_role.learning_config.__dataclass_fields__
+        }
+        recorder.save(
+            args.out,
+            label=args.label,
+            seed=args.seed,
+            config=resolved_config,
+            buffer_path=absolute_buffer,
+        )
 
 
 if __name__ == "__main__":
