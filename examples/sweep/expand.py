@@ -117,8 +117,11 @@ def main():
 
     scenarios_dir = Path(out["scenarios_dir"]).resolve()
     manifest_path = Path(out["manifest"]).resolve()
+    # SLURM logs live beside the run outputs, not in a global slurm/ folder.
+    logs_dir = Path(out.get("logs_dir") or scenarios_dir / "logs").resolve()
     scenarios_dir.mkdir(parents=True, exist_ok=True)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
 
     variants = build_variants(sweep)
     if not variants:
@@ -146,6 +149,8 @@ def main():
             run_id = f"{idx:04d}_{current_time}_{variant_name}"
             variant_dir = scenarios_dir / run_id
             variant_dir.mkdir(parents=True, exist_ok=True)
+            # Per-variant log folder, beside that variant's own outputs.db.
+            (variant_dir / "logs").mkdir(exist_ok=True)
 
             # simulation_id encodes the three things you need to trace a row in
             # outputs.db back to a specific run: array_idx, variant scenario,
@@ -178,14 +183,20 @@ def main():
 
     print(f"Generated {len(variants)} variants -> {scenarios_dir}")
     print(f"Manifest: {manifest_path}")
+    print(f"Logs:     {logs_dir}")
     print()
 
     max_par = sweep.get("max_parallel")
     array_spec = f"1-{len(variants)}"
     if isinstance(max_par, int) and max_par > 0:
         array_spec += f"%{max_par}"
-    print("Submit with:")
-    print(f"  sbatch --array={array_spec} run_array.sh {manifest_path}")
+    print("Submit with (submit.sh does this for you, resources included):")
+    print(
+        f"  sbatch --array={array_spec}"
+        f" --output={logs_dir}/sweep-%A_%a.out"
+        f" --error={logs_dir}/sweep-%A_%a.err"
+        f" run_array.sh {manifest_path}"
+    )
 
 
 if __name__ == "__main__":

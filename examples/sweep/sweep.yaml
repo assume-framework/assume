@@ -19,10 +19,24 @@ output:
   scenarios_dir: examples/outputs/MY_SCENARIO_OUTPUT
   # Manifest the array job consumes (TSV: one row per task)
   manifest: examples/outputs/MY_SCENARIO_OUTPUT/manifest.tsv
+  # SLURM stdout/stderr for the array. Defaults to <scenarios_dir>/logs, i.e.
+  # the logs sit beside the run outputs they belong to, not in a global folder.
+  # Each variant additionally gets its own <variant_dir>/logs/run.log.
+  logs_dir: examples/outputs/MY_SCENARIO_OUTPUT/logs
 
 # Cap how many array tasks run concurrently (SLURM "%K" syntax). null = no cap.
-# H100 nodes are scarce; capping is polite.
 max_parallel: 8
+
+# Resources per array task. submit.sh passes these to sbatch, overriding the
+# #SBATCH defaults in run_array.sh — so you never have to edit that file.
+# NO GPU IS NEEDED for ASSUME learning runs: two small MLPs against a CPU-bound
+# simulator. Asking for one only lengthens the queue. Leave `gres` unset.
+slurm:
+  partition: cpu_il          # cpu_il | cpu | highmem
+  time: "04:00:00"           # walltime hh:mm:ss, per task
+  cpus_per_task: 4
+  mem: 8G
+  # gres: gpu:1              # leave commented out — see above
 
 # How to combine `parameters` below:
 #   grid:      cartesian product of all value lists
