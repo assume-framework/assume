@@ -51,9 +51,20 @@ set -euo pipefail
 
 MODE="${MODE:-submit}"
 
-HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BENCH="$(dirname "$HERE")"                     # .../rl_benchmark
-REPO="$(cd "$BENCH/../../../.." && pwd)"       # repo root
+# Where the code is. At submit time this file sits in the checkout, so the
+# paths can be derived from it -- but SLURM COPIES the batch script into its
+# spool directory before running it, so in MODE=trial / MODE=collect
+# ${BASH_SOURCE[0]} is /var/spool/slurmd/.../slurm_script and climbing four
+# levels off it lands on "/". The submit branch therefore exports both paths
+# and the array tasks take them from the environment.
+if [[ -n "${ASSUME_BENCH:-}" && -n "${ASSUME_REPO:-}" ]]; then
+    BENCH="$ASSUME_BENCH"
+    REPO="$ASSUME_REPO"
+else
+    HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    BENCH="$(dirname "$HERE")"                 # .../rl_benchmark
+    REPO="$(cd "$BENCH/../../../.." && pwd)"   # repo root
+fi
 PYTHON="${ASSUME_PYTHON:-$HOME/miniconda3/envs/assume/bin/python}"
 
 OUT="$REPO/examples/outputs/2_nodes_paper_small/rl_benchmark/runs"
@@ -152,7 +163,7 @@ if [[ "$MODE" == "submit" ]]; then
         --array="$ARRAY" \
         --output="$LOGS/run13-%A_%a.out" \
         --error="$LOGS/run13-%A_%a.err" \
-        --export=ALL,MODE=trial \
+        --export=ALL,MODE=trial,ASSUME_REPO="$REPO",ASSUME_BENCH="$BENCH" \
         "${BASH_SOURCE[0]}")
     echo "  array job : $JOB"
 
@@ -168,7 +179,7 @@ if [[ "$MODE" == "submit" ]]; then
         --dependency=afterany:"$JOB" \
         --output="$LOGS/run13-collect-%j.out" \
         --error="$LOGS/run13-collect-%j.err" \
-        --export=ALL,MODE=collect,ARRAY_JOB="$JOB" \
+        --export=ALL,MODE=collect,ARRAY_JOB="$JOB",ASSUME_REPO="$REPO",ASSUME_BENCH="$BENCH" \
         "${BASH_SOURCE[0]}")
     echo "  collect   : $COLLECT (runs after the array, whatever it does)"
     echo
@@ -184,6 +195,11 @@ fi
 # -------------------------------------------------------------------- trial
 
 if [[ "$MODE" == "trial" ]]; then
+    # fail with the cause rather than with sed's "no such file": a wrong REPO
+    # makes every path here wrong at once
+    [[ -f "$RUNNER" ]] || { echo "no runner at $RUNNER -- ASSUME_REPO/ASSUME_BENCH did not survive the submit (got REPO=$REPO)" >&2; exit 1; }
+    [[ -f "$TRIALS" ]] || { echo "no trial list at $TRIALS" >&2; exit 1; }
+
     TRIAL=$(sed -n "${SLURM_ARRAY_TASK_ID}p" "$TRIALS")
     [[ -n "$TRIAL" ]] || { echo "no trial on line $SLURM_ARRAY_TASK_ID of $TRIALS" >&2; exit 1; }
     COND=${TRIAL% *}
