@@ -615,17 +615,19 @@ class TD3(RLAlgorithm):
                 # Get current Q-values estimates for each critic network
                 current_Q_values = critic(all_states, all_actions)
 
-                if th.rand(1) > 0.9: 
-                    print("Q values", current_Q_values[0][0], target_Q_values[0])
-                    print("Actions", all_actions[0])
-                    #print("states", all_states[0])
-                    print([f"{critic(all_states[0:1], (th.zeros_like(all_actions[0:1])+ sample_i) / 10 - 1)[0].item():.4f}" for sample_i in range(20)])
+                # Debug prints, commented out for run 13: the th.rand(1) draw
+                # shifts the exploration/batch stream (HANDOFF caveat), and the
+                # 20 extra forward passes fire on most steps in the multi-agent
+                # inc-dec case, where target_Q_values is often positive.
+                # if th.rand(1) > 0.9:
+                #     print("Q values", current_Q_values[0][0], target_Q_values[0])
+                #     print("Actions", all_actions[0])
+                #     print([f"{critic(all_states[0:1], (th.zeros_like(all_actions[0:1])+ sample_i) / 10 - 1)[0].item():.4f}" for sample_i in range(20)])
 
-                if target_Q_values[0] > 0: 
-                    print("Q values", current_Q_values[0][0], target_Q_values[0])
-                    print("Actions", all_actions[0])
-                    #print("states", all_states[0])
-                    print([f"{critic(all_states[0:1], (th.zeros_like(all_actions[0:1])+ sample_i) / 10 - 1)[0].item():.4f}" for sample_i in range(20)])
+                # if target_Q_values[0] > 0:
+                #     print("Q values", current_Q_values[0][0], target_Q_values[0])
+                #     print("Actions", all_actions[0])
+                #     print([f"{critic(all_states[0:1], (th.zeros_like(all_actions[0:1])+ sample_i) / 10 - 1)[0].item():.4f}" for sample_i in range(20)])
 
                 # Accumulate critic loss for this agent
                 critic_loss = sum(

@@ -1074,6 +1074,155 @@ prints at `matd3.py:618-628` were live for all 15 trials; they consume a
 `th.rand(1)` draw per gradient step, but they affect every condition equally and
 `baseline` reproduced run 11, so comparability holds.
 
+### 13 — eleven learning agents: does run 12 transfer?
+
+**Why:** run 12 is one learning unit. §7 predicted the multi-agent case should be
+*worse*, because a centralised critic adds `unique_obs_dim` observation dimensions
+**and one action dimension** per agent while agent *i*'s own action stays a single
+scalar — 0.030 at N = 1 falling to 0.017 at N = 16. `inc_dec_learning` is that
+case: all 11 units of `powerplant_units_learning.csv` learn, on a 72 h horizon.
+Each agent's critic sees **94 observation + 11 action = 105 inputs**.
+
+```bash
+python real_matd3/assume_multiagent_actshare.py                       # the two 50-episode runs
+python real_matd3/assume_multiagent_actshare.py --conditions act-all-x2 --seeds 42 1 2
+python real_matd3/assume_multiagent_actshare.py --report-only
+python real_matd3/assume_multiagent_grids.py    # the three per-seed figures
+python real_matd3/assume_multiagent_window.py   # the descent-window table
+```
+
+- data: `data/13-multiagent-actshare/` — 18 `assume_ma_<condition>_seed<seed>.npz`
+- img: `img/13-multiagent-critic-grid.png`, `img/13-multiagent-bids-grid.png`,
+  `img/13-multiagent-summary.png`, plus `img/13-multiagent-window.png`
+- **6 conditions × 3 seeds** (`42, 1, 2`), true reward (shaping commented out), the
+  study case as it stood in the working tree. Only early stopping is disabled
+  (`early_stopping_steps` 1e6), so both budgets are guaranteed. ~31 min per
+  25-episode trial, ~59 min per 50-episode trial
+
+⚠️ **The `inc_dec_learning` study case in the working tree is not the committed
+one, and run 13 used the working-tree version.** At the time of the runs
+`config.yaml` was modified but uncommitted:
+
+| field | committed at `9cf080eb` | used by run 13 |
+|---|---|---|
+| `end_date` | 2019-01-01 **05:00** | 2019-01-**04** 00:00 (72 h) |
+| `learning_rate` | 0.001 | **0.0001** |
+| `training_episodes` | 8 | 50 |
+| `episodes_collecting_initial_experience` | 2 | 5 |
+| `train_freq` | **1h** | **12h** |
+| `validation_episodes_interval` | 2 | 5 |
+
+The horizon matters most: 72 h at `train_freq` 12h gives 6 training blocks per
+episode, which is where 45 × 6 = 270 recorded frames and 2700 critic updates come
+from. A fresh clone would instead run a 5 h horizon at `train_freq` 1h — the
+setting §"things that did not work" records as dying with
+`AssumeException: No rewards were collected during evaluation run`. **Restore the
+table above before re-running run 13.**
+
+#### The lever had to change, and that is itself a result
+
+Run 12's action lever multiplies the critic's **whole** action input by S. With N
+agents that raises every agent's action together, so an agent's own share
+**saturates at 1/N — 0.091 here — for any S**. The requested 0.2 is unreachable
+that way. So two levers are run:
+
+| mode | what it scales | own share at S = 15 | action-block share |
+|---|---|---:|---:|
+| `act-all` | the whole action vector (run 12's patch verbatim) | 0.069 | 0.764 |
+| `act-own` | only critic *i*'s own action column | 0.197 | 0.329 |
+
+`act-own` is symmetric across agents (each critic upweights its own actor's
+action, none is privileged), is the input `matd3.py:711` differentiates for the
+actor loss, and reduces to run 12's patch at N = 1. Because the two move the own
+share and the block share in *opposite* proportions, they separate two things run
+12 moved together. `act-all-x2` was added as the block-matched control: block
+0.302 against `act-own-x15`'s 0.329, own share only 0.027.
+
+#### The result: the ordering is `act_share`, at both budgets
+
+`act_share` here is measured on each run's **final** buffer, which is lower than
+the value the lever was set from — the policy concentrates, `sd(a)` falls. Set
+from the collection buffer, `act-own-x15` is 0.197; it reads 0.137 at the end.
+
+| condition | updates | own share | `diesel_0` final bid, per seed | mean ± sd | `diesel_0` reward | fleet |
+|---|---:|---:|---|---:|---:|---:|
+| `baseline-25` | 1200 | 0.015 | 97.2, 96.8, 97.3 | **97.1 ± 0.2** | +0.018 | +6.26 |
+| `act-all-x2` | 1200 | 0.024 | 60.9, 95.3, 81.6 | 79.2 ± 14.1 | +0.232 | +5.92 |
+| `act-all-x15` | 1200 | 0.065 | 49.1, 44.8, 47.3 | **47.1 ± 1.7** | +0.526 | +5.01 |
+| `baseline` | 2700 | 0.013 | 73.8, 69.3, 97.3 | 80.1 ± 12.3 | +0.232 | +5.93 |
+| `act-all-x2-50` | 2700 | 0.023 | 45.6, 47.6, 62.5 | 51.9 ± 7.5 | +0.378 | +4.20 |
+| `act-own-x15` | 2700 | 0.137 | 39.2, 25.7, 22.1 | **29.0 ± 7.4** | +0.493 | +5.00 |
+
+**The ordering is monotone in the own share at each budget separately** —
+97.1 → 79.2 → 47.1 at 1200 updates, 80.1 → 51.9 → 29.0 at 2700 — and mean reward
+follows it. **The action-block share does not predict**: `act-all-x15` carries
+3.2× `act-own-x15`'s block share (0.728 vs 0.230) and ends 18 EUR further from the
+band. So it is not the action block the critic must notice; it is each critic's
+own actor's action, which is also the only thing uniform scaling cannot deliver.
+
+#### But it buys rate, not feasibility — run 12's framing does **not** transfer
+
+`act-all-x2` reaches 79.2 in 1200 updates. **The baseline reaches 80.1 in 2700** —
+the same place for ~2.25× the budget. And the baseline is not frozen: all three
+seeds sit at 97.1 ± 0.2 at 1200 updates, but by 2700 two of three have descended
+to 73.8 and 69.3, with a coherent leftward field forming from ~2000 updates
+(`img/13-multiagent-critic-grid.png`, row 4).
+
+That is a real departure from runs 09–12. There the unshaped single-agent critic
+never formed a preference in 2560 updates and the shaping or `act_share` was what
+made learning possible at all. Here **every condition descends eventually** and
+`act_share` sets how fast. Any claim of the form "MATD3 cannot learn this without
+X" must be stated with a budget attached.
+
+#### The multi-agent baseline is also not the single-agent failure mode
+
+`diesel_0` does park at 97.1 with `argmax Q1` exactly 100.0, which reproduces. But
+the northern units go to the **floor** (wind and coals at ≈ −95 in several seeds)
+and come back off it, and the critic's preference is coherent and bang-bang rather
+than incoherent. **Run 10's incoherence statistic does not transfer**: the
+condition that works best, `act-own-x15`, has the *highest* observation
+disagreement about `argmax Q1` (~35–45 EUR) and the baseline the lowest (~10–20) —
+the reverse of run 12, where the fix drove it from 18.1 to 1.5. With eleven agents
+the critic's preferred bid genuinely *should* depend on the observation, so the
+statistic stops being a failure diagnostic here.
+
+#### The window is a slow opening, not a transient
+
+Measured with run 06's definitions (`assume_multiagent_window.py`, which imports
+`descent_stop` from `assume_actshare_film` so the numbers are on one footing):
+at its 1200-update budget `act-all-x2` ends with `pulled left` — the sign of
+`dQ1/d(bid)` at the actor's own bid — at **1.00 in 6/6 probed observations on two
+of three seeds**, its plateau pull still rising and its descent path still
+deepening. That is run 12's `foresight-3` signature, "still descending when the
+budget ran out", and doubling the budget confirms it: 79.2 → **51.9 ± 7.5**, with
+the seed spread halving.
+
+#### Two reproducibility results, free
+
+Both short conditions are **bit-identical prefixes of their long counterparts**,
+on `greedy`, `critic_q`, `critic_grad`, `rewards` and `steps`, for all three seeds:
+
+- `baseline-25` == `baseline` truncated to 120 frames, 3/3
+- `act-all-x2` == `act-all-x2-50` truncated to 120 frames, 3/3
+
+So nothing in this configuration depends on `training_episodes` (no learning-rate
+or noise schedule is active and early stopping is off), the runs are deterministic
+given seed and thread count, and the doubling comparison above is **the same three
+trajectories continued**, not a fresh sample. It also confirms run 10's finding
+that ASSUME does not inherit the surrogate's BLAS-thread chaos.
+
+⚠️ **Fleet reward runs opposite to `diesel_0`'s in every row.** The best condition
+for `diesel_0` (`act-all-x15`, +0.526) has the second-lowest fleet total, and
+`act-all-x2-50` the lowest at +4.20. Agents compete, so bids falling means prices
+falling; total reward is not what any agent maximises. **"Solved" cannot be defined
+by fleet profit here**, and none of these numbers should be read as a welfare
+result without a separate equilibrium analysis.
+
+⚠️ **Three seeds and one scenario.** `act-all-x2` at 25 episodes spans 60.9–95.3
+and the 50-episode baseline spans 69.3–97.3; those are wide. The ordering is
+consistent across two independent budgets, which is the strongest thing on offer
+at n = 3, but it is not a rate.
+
 ---
 
 ## 4. Corrections made along the way
@@ -1144,6 +1293,21 @@ Recorded so they are not silently reintroduced.
     carry 97 % of the input variation. Keep the observation, keep all 548 contexts,
     keep the memorisation — just weight the action more — and the same learner
     solves the task.
+12. **"Without the shaping or a raised `act_share`, ASSUME's MATD3 never forms a
+    usable action preference" (runs 09–12).** True of the single-agent case at
+    the budgets tested; **false as stated for the multi-agent one** (run 13).
+    With eleven learners the unmodified baseline sits at 97.1 ± 0.2 at 1200
+    critic updates but descends to 80.1 ± 12.3 by 2700, two of three seeds
+    reaching ~70. Raising `act_share` still orders the outcome monotonically at
+    both budgets, but what it buys is **rate**: `act-all-x2` reaches 79.2 in 1200
+    updates where the baseline needs ~2700 for the same place. State a budget
+    with any "cannot learn" claim.
+13. **"Run 10's `argmax Q1` disagreement measures critic incoherence" (runs 10,
+    12).** It does in the single-agent case, where the observation carries no
+    reward information. In run 13's genuine multi-agent setting the best
+    condition has the *highest* disagreement and the failing baseline the lowest,
+    so the statistic inverts. Do not carry it across without first checking that
+    the observation is uninformative about the reward.
 
 ## 5. Known bug fixed during this work
 
@@ -1211,6 +1375,20 @@ change that adds observation dimensions lowers `act_share`, and for a centralise
 critic **adding agents lowers each actor's own share** (0.030 at N = 1 to 0.017 at
 N = 16), because every extra agent contributes `unique_obs_dim` observation
 dimensions and one action dimension while agent *i*'s own action stays one.
+
+**Run 13 tested that prediction on 11 agents and it holds, with two amendments.**
+The measured own share is **0.016**, about half the single-agent 0.030, and the
+outcome orders monotonically by it at two independent budgets. But:
+
+* **Scaling the action input no longer generalises.** Applied to the whole action
+  vector — run 12's patch as written — the own share saturates at **1/N**, 0.091
+  here, for any S. Only scaling each critic's *own* action column reaches 0.2, and
+  the block-share control shows the block is not what matters. Whatever the
+  principled fix inside `CriticTD3` turns out to be, it has to be per-agent.
+* **The effect is on rate, not feasibility.** With eleven agents even the
+  untouched baseline descends given ~2700 updates. `act_share` is worth roughly a
+  2.25× budget multiplier between 0.015 and 0.024, not the difference between
+  learning and not learning. The single-agent framing does not survive here.
 
 **But the TD3/DDPG results here do not transfer to MATD3 unqualified.** Two
 findings changed this section:
@@ -1297,6 +1475,15 @@ been crossable, so "partial consistency is enough" is unsupported.
   curve that saturates somewhere above `act_share` ≈ 0.25. Its two levers are
   monkeypatches for the experiment, not a proposed API. The offline γ = 0 fits
   behind it are 5 seeds on a single frozen buffer.
+- **Run 13 is 3 seeds per condition, and its spreads are wide** — `act-all-x2`
+  spans 60.9–95.3, the 50-episode baseline 69.3–97.3. What is solid is that the
+  ordering by own `act_share` reproduces at *two independent budgets*; the
+  individual cells are not rates. Its **reward numbers are not welfare numbers**:
+  eleven agents compete, fleet reward moves opposite to `diesel_0`'s in every
+  condition, and no equilibrium analysis has been done. The closed-form
+  `incdec_reward` landscape does **not** apply there — it was derived with the
+  rest of the fleet bidding naively — so run 13 reads rewards from the run's own
+  buffer and has no "solved ≥ +0.15" column.
 - **`examples/outputs` is gitignored** (`.gitignore:143`), so this archive is
   untracked — the ~21 MB of `.npz` and model zips would need an exception or LFS
   to be committed. The source code is tracked, at
@@ -1423,6 +1610,26 @@ python real_matd3/assume_offline_critic.py --round conditions
 # and preflight() refuses to start otherwise.
 python real_matd3/assume_actshare_sweep.py --workers 5
 python real_matd3/assume_actshare_sweep.py --report-only
+
+# run 13: the multi-agent sweep. No starting buffer exists for 11 agents, so each
+# trial collects its own 5 exploration episodes and nothing is shared between
+# trials. Memory, not cores, is the limit -- each trial holds ~0.85 GB, so
+# --workers 4 is about right on a 16 GB machine. Leave --threads at 1 (the
+# runner's default): every recorded run used one torch thread, and run 08 found
+# thread count alone can flip an outcome.
+python real_matd3/assume_multiagent_actshare.py                    # baseline + act-own-x15
+python real_matd3/assume_multiagent_actshare.py \
+    --conditions baseline act-own-x15 --seeds 1 2 --workers 3
+python real_matd3/assume_multiagent_actshare.py --report-only \
+    --conditions baseline act-all-x2 act-all-x15 act-own-x15
+
+# run 13: pick S for a target act_share from any recorded run's buffer statistics
+python real_matd3/assume_multiagent_actshare.py --measure <run.npz> --target 0.2
+
+# run 13: its four figures, all from the archive
+python real_matd3/assume_multiagent_grids.py    # critic grid, bid grid, summary
+python real_matd3/assume_multiagent_film.py     # the pooled four-condition view
+python real_matd3/assume_multiagent_window.py   # run 06's window table
 ```
 
 ## 10. Layout
@@ -1446,7 +1653,8 @@ runs/
 │   ├── 09-assume-films/          assume_probe_{shaped,unshaped,unshaped_clean}.npz
 │   ├── 10-assume-stability/      assume_stab_{shaped,unshaped}_seed{42,1,2,3,4,5}.npz
 │   ├── 11-assume-config-stability/broad/  30 configs × 3 seeds, Q1/Q2 films included
-│   └── 12-actshare/              5 conditions × 3 seeds, the act_share ladder
+│   ├── 12-actshare/              5 conditions × 3 seeds, the act_share ladder
+│   └── 13-multiagent-actshare/   6 conditions × 3 seeds, 11 learning agents
 └── img/                          the detail figures, numbered by run
 ```
 
@@ -1504,3 +1712,7 @@ python sweeps/run_benchmark.py --algos TD3
 | `real_matd3/assume_actshare_sweep.py` | run 12 — the `act_share` ladder: forces `foresight` and/or scales the critic's action input, both as patches installed before the scenario loads |
 | `real_matd3/assume_offline_critic.py` | run 12 — the γ = 0 offline fits that located `act_share`, all three rounds |
 | `real_matd3/assume_actshare_film.py` | run 12 — the descent-window figure and the dose-response figure |
+| `real_matd3/assume_multiagent_actshare.py` | run 13 — the multi-agent runner, the `act-own`/`act-all` patches, the multi-agent recorder, and `--measure` for choosing S |
+| `real_matd3/assume_multiagent_film.py` | run 13 — the four-condition figure, seeds pooled with observations |
+| `real_matd3/assume_multiagent_grids.py` | run 13 — the three per-seed views: critic grid, bid grid, summary row |
+| `real_matd3/assume_multiagent_window.py` | run 13 — run 06's window statistics on the multi-agent runs |

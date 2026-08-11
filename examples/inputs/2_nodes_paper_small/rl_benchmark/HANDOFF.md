@@ -11,10 +11,14 @@ ASSUME's **own** MATD3 rather than an SB3 analogue. Closed-form reward, no marke
 clearing, so a 10 000-step surrogate run takes ~3 min instead of a HiGHS solve
 per action.
 
-**If you read one finding, read 17.** Run 12 answers what runs 07–11 were circling:
-on the true reward the critic fails because the action is 1 of 75 of its input
-dimensions, and raising that share solves the task 3/3 at the same budget — the
-archive's first solve, and without the reward shaping.
+**If you read one finding, read 17, then 19.** Run 12 answers what runs 07–11 were
+circling: on the true reward the critic fails because the action is 1 of 75 of its
+input dimensions, and raising that share solves the task 3/3 at the same budget —
+the archive's first solve, and without the reward shaping. **Run 13 then takes it
+to the multi-agent case and finds the effect is real but is on *rate*, not
+feasibility** — with eleven learners even the untouched baseline eventually
+descends. Anything in this file phrased as "MATD3 cannot learn X" is a
+single-agent statement with a budget attached.
 
 **Code** (tracked): `examples/inputs/2_nodes_paper_small/rl_benchmark/`
 **Run log** (tracked): `RUNS.md`, next to this file — describes every run in
@@ -54,6 +58,8 @@ rl_benchmark/
 ├── sweeps/          training drivers: run_benchmark.py, td3_stability.py
 ├── analysis/        reads a recorded run and explains it; makes the figures
 └── real_matd3/      probes ASSUME's own MATD3, live or from saved .pt files
+                     (runs 07–12 single-agent, run 13 the `assume_multiagent_*`
+                      quartet for the 11-agent `inc_dec_learning` case)
 ```
 
 `sweeps/run_benchmark.py` owns the house palette — `COLORS`, `INK`, `MUTED` and
@@ -278,6 +284,62 @@ action space carries any gradient.
     `act-x30` 50 % (a coin flip, i.e. converged), `foresight-3` **100 %** — it was
     still descending at bid 40.4 when the budget ran out.
 
+## Findings about the multi-agent case (run 13)
+
+`inc_dec_learning` — all 11 units of `powerplant_units_learning.csv` learn, 72 h
+horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**.
+6 conditions × 3 seeds, true reward, the study case as written.
+
+19. **`act_share` orders the outcome, but it buys rate rather than feasibility.**
+    The measured own-action share is **0.016**, half the single-agent 0.030, as
+    §7 predicted. Final `diesel_0` bid, by own share, at two budgets:
+
+    | updates | own 0.015 | own 0.024 | own 0.065 / 0.137 |
+    |---|---:|---:|---:|
+    | 1200 | 97.1 ± 0.2 | 79.2 ± 14.1 | **47.1 ± 1.7** (0.065) |
+    | 2700 | 80.1 ± 12.3 | 51.9 ± 7.5 | **29.0 ± 7.4** (0.137) |
+
+    Monotone at each budget separately, and mean reward follows. **But the
+    baseline is slow, not stuck**: 97.1 ± 0.2 at 1200 updates, 80.1 ± 12.3 by
+    2700, two of three seeds reaching ~70, with a coherent leftward field forming
+    from ~2000 updates. `act-all-x2` reaches 79.2 in 1200 updates where the
+    baseline needs ~2700 — roughly a **2.25× budget multiplier** for a shift of
+    0.015 → 0.024. Runs 09–12's "the critic never forms a preference" does not
+    transfer.
+20. **It is the *own* action's share, not the action block's.** Run 12's lever
+    scales the whole action vector; with N agents that raises everyone together
+    and **caps each agent's own share at 1/N** (0.091 here) for any S. Scaling
+    only critic *i*'s own action column has no such cap. The two move own share
+    and block share in opposite proportions, which separates them: `act-all-x15`
+    carries 3.2× `act-own-x15`'s block share (0.728 vs 0.230) and ends 18 EUR
+    further out; the block-matched control `act-all-x2` (block 0.302 vs 0.329,
+    own 0.027) tracks the ladder by its own share, not its block. **Any principled
+    fix inside `CriticTD3` therefore has to be per-agent.**
+21. **Run 10's incoherence statistic inverts here — do not carry it over.** The
+    best condition (`act-own-x15`) has the *highest* disagreement between probed
+    observations about `argmax Q1` (~35–45 EUR) and the failing baseline the
+    lowest (~10–20), the reverse of run 12's 18.1 → 1.5. With eleven agents the
+    critic's preferred bid genuinely should depend on the observation, so
+    disagreement stops being evidence of a broken critic. The multi-agent
+    baseline's failure is also not run 09's: `diesel_0` parks at 97.1 with
+    `argmax Q1` exactly 100.0, but the northern units go to the **floor** and the
+    critic's preference is coherent and bang-bang, not incoherent.
+22. **Both short conditions are bit-identical prefixes of their long
+    counterparts**, on `greedy`, `critic_q`, `critic_grad`, `rewards` and `steps`,
+    3/3 seeds each: `baseline-25` == `baseline`[:120 frames] and `act-all-x2` ==
+    `act-all-x2-50`[:120 frames]. So nothing depends on `training_episodes` (no
+    schedule is active, early stopping off), the runs are deterministic given seed
+    and thread count, and the budget-doubling comparison is **the same
+    trajectories continued**, not a fresh sample. Confirms finding 15's side
+    result: ASSUME does not inherit the surrogate's BLAS-thread chaos.
+23. **Fleet reward runs opposite to `diesel_0`'s in every condition.** Best for
+    `diesel_0` (`act-all-x15`, +0.526) is second-lowest for the fleet;
+    `act-all-x2-50` is lowest at +4.20. Agents compete, so falling bids mean
+    falling prices. **"Solved" cannot be defined by fleet profit here**, and the
+    closed-form `incdec_reward` landscape does not apply at all — it was derived
+    with the rest of the fleet bidding naively. Run 13 reads rewards from each
+    run's own buffer for that reason.
+
 ## Refuted or revised — do not re-test
 
 - ❌ "The critic smooths the cliff into a ramp." It doesn't; see finding 2.
@@ -334,6 +396,16 @@ action space carries any gradient.
 - ❌ "Nothing but the update budget helps on the true reward" (finding 16). True of
   every knob in run 11's 30 configurations, and none of them was `act_share`.
   Finding 17 solves it at the *same* 800-update budget.
+- ⚠️ "Without the shaping or a raised `act_share`, ASSUME's MATD3 never forms a
+  usable action preference" (findings 13, 15, 17). **A single-agent statement, and
+  budget-dependent.** With 11 learners the untouched baseline descends from
+  97.1 ± 0.2 at 1200 updates to 80.1 ± 12.3 at 2700 (finding 19). Raising
+  `act_share` still orders the outcome, but it multiplies the budget rather than
+  enabling learning. Attach a budget to any "cannot learn" claim.
+- ⚠️ "Scaling the critic's action input raises `act_share`" (finding 17's second
+  lever). **Only at N = 1.** Applied to the whole action vector with N agents it
+  saturates at 1/N — 0.091 at N = 11 (finding 20). Scale each critic's *own*
+  action column instead.
 
 ## Things that did not work, and cost time
 
@@ -355,6 +427,22 @@ action space carries any gradient.
 - **`trained_policies_save_path` must be relative** to the scenario inputs path —
   `replace_paths()` prefixes it on every `setup_world()`, so an absolute path
   becomes `.../inputs/2_nodes_paper_small/C:/...` and `os.makedirs` fails.
+- **`assume_training_probe.py` refuses to film a multi-agent run**, by design —
+  its recorder sweeps `critics(obs, a)` with a single action column. Run 13's
+  `MultiAgentRecorder` replaces it through the same monkeypatch route the run 12
+  sweep uses (`probe.Recorder = ...`), so `assume_training_probe.py` is untouched
+  and runs 09–12 stay reproducible. It builds each critic's observation input the
+  way `matd3.py:584-591` does and sweeps agent *i*'s own action with the others
+  held at their actors' outputs.
+- **Run 13 is memory-bound, not core-bound.** Each 11-agent trial holds ~0.85 GB;
+  six concurrent left 1.4 GB free on this 16 GB machine. Four is comfortable.
+  Cores are not the constraint — do not raise `--threads` to compensate, since
+  every recorded run used one torch thread and run 08 found thread count alone can
+  flip an outcome.
+- **The single-agent starting buffer cannot seed a multi-agent run** — its arrays
+  are shaped `(n, 1, obs_dim)`. Run 13 therefore collects its own 5 exploration
+  episodes per trial, so unlike runs 09–12 the trials do not share a start. That
+  also means no checksum guard applies and none is needed.
 - **16 parallel workers is past the knee.** Throughput saturates near 11
   short-runs/min on this 20-thread machine; 16 single-thread workers each run ~6×
   slower than one solo run. Run 11 also tried 10 long one-thread probes, which
@@ -449,12 +537,26 @@ action space carries any gradient.
   the factor S in the action-scale runs, so **signs are comparable across
   conditions and magnitudes are not**; the figure draws each facet on its own
   robust scale for that reason.
-- **The debug prints at `matd3.py:618-628` are live in the working tree** (commit
-  `f60e885c`). Besides the console noise they draw `th.rand(1)` from the global
-  torch RNG on every gradient step per agent, which shifts the exploration and
-  batch-sampling stream. Run 12's `baseline` still reproduced run 11, so they did
-  not break comparability there — but they should come out before any new seed
-  work, and any bit-identity claim against runs 09/10 has to account for them.
+- **The debug prints at `matd3.py:618-628` are now commented out** — run 13 did
+  that before starting, as this list previously recommended. They drew `th.rand(1)`
+  per gradient step per agent, shifting the exploration and batch-sampling stream,
+  and their `target_Q_values[0] > 0` branch fires on most steps in the multi-agent
+  case. **Runs 09–12 were recorded with them live**, so a bit-identity claim
+  against those archives now has to account for their *absence*; run 13 is
+  internally consistent. Restore with
+  `git checkout -- assume/reinforcement_learning/algorithms/matd3.py`.
+- ⚠️ **Run 13 used a working-tree `inc_dec_learning` that is not the committed
+  one.** `config.yaml` was modified but uncommitted during the runs: 72 h horizon
+  (committed: 5 h), `learning_rate` 1e-4 (0.001), 50 episodes (8), 5 collecting
+  (2), `train_freq` 12h (**1h**). The horizon drives everything — 72 h at 12h
+  gives 6 blocks/episode, hence 270 frames and 2700 updates — and the committed
+  `train_freq: 1h` is the setting that dies with "No rewards were collected".
+  `RUNS.md` §13 has the full table. **Restore it before re-running, or commit it.**
+- **Run 13's `act_share` figures are measured on each run's final buffer** and are
+  lower than the value its lever was set from: `act-own-x15` is 0.197 on the
+  collection buffer and reads 0.137 at the end, because the policy concentrates
+  and `sd(a)` falls. Run 12 quotes the initialisation value throughout and has the
+  same drift unmeasured. Say which one you mean.
 - The archive is gitignored; committing it needs an exception or LFS.
 
 ## Open
@@ -474,11 +576,25 @@ action space carries any gradient.
 - **Does `foresight-3` solve it with more episodes?** Finding 18 says it was still
   descending at the budget's end (`pulled left` 100 %, bid 40.4). 128 episodes
   would settle it, and it is the cheaper lever of the two.
-- **Does raising `act_share` remove the need for the shaping in general?** Run 12
-  is one scenario with one learning unit. The multi-agent case is the interesting
-  one, since a centralised critic *lowers* each actor's own share as agents are
-  added (0.030 at N = 1, 0.017 at N = 16) — so the problem should get worse, and
-  measurably so.
+- ~~**Does raising `act_share` remove the need for the shaping in general?**~~
+  **Answered for the multi-agent case by run 13** (findings 19–23): the own share
+  does halve at 11 agents and does order the outcome, but the effect is a ~2.25×
+  budget multiplier rather than the difference between learning and not learning,
+  and uniform action scaling caps at 1/N. What is left open is *why* the budgets
+  differ so much between the two settings — the single-agent unshaped critic never
+  moved in 2560 updates, the 11-agent one moves by ~2000. More agents means more
+  transitions per episode into the shared buffer (62 vs 14 per episode) and a
+  non-stationary opponent set; neither has been isolated.
+- **How far does run 13's ladder go?** Only `act-own-x15` was run at own share
+  0.137, and it ends at 29.0 ± 7.4 — still above the single-agent constrained
+  optimum. `act-own-x30` (own share ≈ 0.33) and a 100-episode budget are the two
+  obvious next points, and `act-own` above 0.5 is untested for a downside, as it
+  is in run 12.
+- **Is the multi-agent outcome an equilibrium?** Fleet reward moves *opposite* to
+  `diesel_0`'s in every run 13 condition (finding 23). Nothing here distinguishes
+  "the agents learned to bid better" from "the agents competed the price down",
+  and the archive has no equilibrium analysis at all. This is the gap that most
+  limits what run 13 can be used to claim.
 - **Why does even the shaped run stop at the band's rim (49) rather than 30?**
   The decoy of finding 14 explains where it stops; whether fixing the decoy is
   enough to get to 30 is untested. Run 10 sharpens the target: all 6 shaped seeds
@@ -561,6 +677,24 @@ python real_matd3/assume_actshare_film.py
 # archive needed, ~15 min for all three rounds from the frozen buffer alone.
 python real_matd3/assume_offline_critic.py
 python real_matd3/assume_offline_critic.py --round conditions   # just round 1
+
+# run 13, the 11-agent case. No shared starting buffer exists at N > 1, so each
+# trial collects its own 5 exploration episodes. Memory-bound: ~0.85 GB per trial,
+# so --workers 4 on a 16 GB machine. Leave --threads at 1. ~31 min per 25-episode
+# trial, ~59 min per 50-episode trial.
+python real_matd3/assume_multiagent_actshare.py                  # baseline + act-own-x15
+python real_matd3/assume_multiagent_actshare.py \
+    --conditions baseline act-own-x15 --seeds 1 2 --workers 3
+python real_matd3/assume_multiagent_actshare.py --report-only \
+    --conditions baseline act-all-x2 act-all-x15 act-own-x15
+
+# pick S for a target own-action share, from any recorded run's buffer statistics
+python real_matd3/assume_multiagent_actshare.py --measure <run.npz> --target 0.2
+
+# run 13's figures, from the archive
+python real_matd3/assume_multiagent_grids.py    # critic grid, bid grid, summary
+python real_matd3/assume_multiagent_film.py     # pooled four-condition view
+python real_matd3/assume_multiagent_window.py   # run 06's window statistics
 ```
 
 Results and figures always write to the **outputs** folder, never the tracked
