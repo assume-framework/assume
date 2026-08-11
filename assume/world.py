@@ -628,8 +628,9 @@ class World:
     def add_market_operator(self, id: str) -> None:
         """
         Add a market operator to the simulation by creating a new role agent for the market operator
-        and setting additional context parameters. If not in learning mode and not in evaluation mode,
-        it includes the output agent address and ID in the role context data dictionary.
+        and setting additional context parameters. The output agent address and ID are included in the
+        role context data dictionary for plain simulations and for evaluation episodes, and omitted
+        during training episodes.
 
         Args:
             id (str): The identifier for the market operator.
@@ -642,8 +643,11 @@ class World:
         market_operator_agent.suspendable_tasks = False
         market_operator_agent.markets = []
 
-        # after creation of an agent - we set additional context params
-        if not self.learning_mode and not self.evaluation_mode:
+        # after creation of an agent - we set additional context params.
+        # Output is written for plain simulations and for evaluation episodes,
+        # and skipped only during training episodes -- the evaluation orderbook
+        # is what the exploitability calculation reads.
+        if not self.learning_mode or self.evaluation_mode:
             market_operator_agent._role_context.data.update(
                 {"output_agent_addr": self.output_agent_addr}
             )
