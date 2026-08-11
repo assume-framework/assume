@@ -308,8 +308,17 @@ rl_benchmark/
 ├── sweeps/          training drivers: run_benchmark.py, td3_stability.py
 ├── analysis/        reads a recorded run and explains it; makes the figures
 ├── real_matd3/      probes ASSUME's own MATD3 (07–12 single, 13 multi-agent)
-└── test_rl_benchmark.py
+├── test_rl_benchmark.py
+├── test_exploitability.py               22 unit tests of the clearing /
+│                                        exploitability maths (workstream C)
+└── exploitability_two_bid_walkthrough.py  why the search is exhaustive rather
+                                          than a heuristic; prints its own
+                                          derivation, needs no data
 ```
+
+The exploitability code itself lives in `assume/` — `reinforcement_learning/
+exploitability.py` and the `WriteOutput` hooks in `common/outputs.py`. Only its
+test and its explanation are kept here.
 
 Every script runs from any working directory and resolves archived runs
 automatically, so figures redraw with no arguments. `sweeps/run_benchmark.py`
@@ -317,15 +326,19 @@ owns the house palette; `analysis/critic_coherence.py` owns the
 observation-disagreement statistics runs 10–13 share.
 
 ```bash
-conda run -n assume python -m pytest \
-    examples/inputs/2_nodes_paper_small/rl_benchmark/test_rl_benchmark.py -v
+R=examples/inputs/2_nodes_paper_small/rl_benchmark
+conda run -n assume python -m pytest $R/test_rl_benchmark.py $R/test_exploitability.py -v
 ```
 
-~8 s, no simulation, no archive. Four groups, all covering things that would fail
-*silently* — the figures would keep rendering from the wrong input:
-`MultiAgentRecorder` against a real `TD3.update_policy` gradient step (**extend
-this when workstream A lands**); the run-13 action-scale lever; `act_share`; the
-coherence statistic and the per-episode transition count.
+~15 s, no simulation, no archive, and both run from any working directory.
+`test_rl_benchmark.py` covers four things that would fail *silently* — the
+figures would keep rendering from the wrong input: `MultiAgentRecorder` against a
+real `TD3.update_policy` gradient step (**extend this when workstream A lands**);
+the run-13 action-scale lever; `act_share`; the coherence statistic and the
+per-episode transition count. `test_exploitability.py` adds 22 pure unit tests of
+the clearing and exploitability maths — no scenario, no database. (Its `_main()`
+below the tests is a scratch driver for plotting against a Postgres run; it is not
+collected by pytest and is partly dead code.)
 
 Commands for every run are in `RUNS.md`. Results always write to the **outputs**
 folder, never the tracked input folder.

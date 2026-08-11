@@ -22,12 +22,36 @@ working-tree config differs from the committed one.
   seeds, ~15 min, no simulation, and it already reproduces the live failure. Only
   what survives there is worth a cluster array.
 * **C — do the conclusions generalise?** Port the probes to `example_02a`–`02c`
-  (plain EOM, no redispatch) and bring exploitability tracking across from the
-  `exploitability` branch — `assume/reinforcement_learning/exploitability.py`,
-  `examples/test_exploitability.py`,
-  `examples/exploitability_two_bid_walkthrough.py`, `examples/inputs/exploit_example/`.
-  **Cherry-pick those files; do not merge the branch** — its diff against `main`
-  is ~176 files and deletes test fixtures.
+  (plain EOM, no redispatch) and read exploitability alongside them.
+  **Exploitability is already on this branch** (ported 2026-08-11, not merged —
+  the branch's diff against `main` is ~176 files and deletes test fixtures):
+  `assume/reinforcement_learning/exploitability.py` plus the `WriteOutput` hooks
+  in `assume/common/outputs.py`, with `test_exploitability.py` and
+  `exploitability_two_bid_walkthrough.py` next to this file and the scenario at
+  `examples/inputs/exploit_example/`. ⚠️ It required a `world.py` change so
+  evaluation episodes write market output at all — see the note below.
+
+⚠️ **The exploitability port changed when market output is written.**
+`world.py`'s `add_market_operator` used to withhold `output_agent_addr` whenever
+`learning_mode` **or** `evaluation_mode` was set; it now withholds it only during
+*training* episodes. Exploitability needs this — it reads the evaluation
+orderbook from `rl_market_orders`, which is empty otherwise — but it means
+**evaluation episodes now write full orderbooks**. Three consequences for cluster
+runs:
+
+* **Database size grows**, and orderbooks are the largest table. Check
+  `assume_db.db` per variant on the first array before scaling up.
+* **More work at evaluation shutdown**, which is exactly where correction 16
+  (the two-rows-per-episode truncation) already bites. This may worsen it or
+  expose it. **Count rows per episode before and after rather than assuming** —
+  it is entangled with workstream A.
+* **No contamination**: evaluation orders go to `rl_market_orders`, not
+  `market_orders`, and rows carry `evaluation_mode` / `eval_episode` tags.
+  Training is untouched — these are database writes and consume no torch RNG, so
+  runs 09–13 stay comparable on the learning side.
+
+It is isolated in its own commit (`world: write market output during evaluation
+episodes`) so it can be reverted without losing the rest.
 
 ## House rules
 

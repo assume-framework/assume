@@ -871,6 +871,8 @@ never have these.
 | `sweeps/run_benchmark.py` | training driver, CLI, plotting, **the house palette** |
 | `sweeps/td3_stability.py` | run 08 — the configuration sweep and its figure |
 | `test_rl_benchmark.py` | the four things that would fail silently |
+| `test_exploitability.py` | 22 unit tests of the clearing / exploitability maths; `_main()` is an uncollected scratch driver |
+| `exploitability_two_bid_walkthrough.py` | why the exploitability search is exhaustive, not a heuristic — prints its own derivation, needs no data |
 | `analysis/critic_probe.py` | reads a trained critic: `actor_objective`, autograd `critic_curve` |
 | `analysis/critic_coherence.py` | `argmax_disagreement` / `argmax_range` — **the one definition runs 10–13 share** |
 | `analysis/critic_landscape.py` / `critic_evolution.py` / `activation_comparison.py` | final-critic figure; gradient field over training; tanh vs softsign |
