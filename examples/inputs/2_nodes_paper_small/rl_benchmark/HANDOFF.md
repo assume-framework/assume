@@ -266,20 +266,50 @@ Everything above is one redispatch/multi-market scenario with a 90 %-flat reward
 Nothing says the conclusions survive on an ordinary energy-only market.
 
 * **Port the probes to `example_02a`–`02c`** (`examples/inputs/example_02a` …
-  `02c`). The recorder and the offline harness both need the scenario only through
-  `create_observation` and `CriticTD3`, so the work is in the study-case config and
-  the buffer collection, not in the analysis.
-* **Bring exploitability tracking across from the `exploitability` branch**, which
-  carries `assume/reinforcement_learning/exploitability.py`,
-  `examples/test_exploitability.py`, `examples/exploitability_two_bid_walkthrough.py`
-  and `examples/inputs/exploit_example/`. Cherry-pick those onto the working branch
-  rather than merging the branch — its diff against `main` is ~176 files and
-  deletes test fixtures.
-* **This is also the answer to run 13's open equilibrium question.** Fleet reward
-  moves *opposite* to `diesel_0`'s in every run 13 condition, so nothing there
-  distinguishes "learned to bid better" from "competed the price down". An
-  exploitability metric is exactly the missing measurement, and it is worth having
-  on the 02x examples before trying to read it on the 11-agent redispatch case.
+  `02c`). ✅ **Done** — `real_matd3/eom_critic_film.py` films the critics of the
+  **learning units only** (1, 5 and 10 of them), `analysis/eom_critic_evolution.py`
+  draws them, and `cluster/eom_critic_evolution.sh` runs the 3 × 3 batch in one
+  call. Two things had to change and are worth knowing: `MultiAgentRecorder`
+  refuses `act_dim != 1`, and `EnergyLearningStrategy` is **two** actions per unit
+  (inflexible / flexible block), so the new recorder is generic in `act_dim` and
+  takes `act_dim + 1` sweeps per agent — one per component plus the **diagonal**,
+  which is the unit moving its whole bid and the only axis comparable with runs
+  09–13. The offline harness is still single-bid-axis and is **not** ported.
+* **The single-bid ladder is the one that runs by default.**
+  `examples/inputs/example_02_single_bid/` is the same three fleets bidding with
+  `EnergyLearningSingleBidStrategy` (`act_dim` 1, one bid for the whole
+  `max_power`), as three study cases of one folder differing only in
+  `powerplant_units`; demand, fuel prices, naive fleet and market are
+  byte-identical to the originals, so each `sb02x` is an A/B against `02x`. At
+  `act_dim` 1 the film has a single bid axis — the shape runs 09–13 recorded —
+  and each unit submits one bid, which is exactly what the exploitability probe
+  handles without its ordered-bids decomposition. ⚠️ **The strategy also defaults
+  `foresight` to 24 against the two-bid strategy's 12**, so its observation is
+  50-dimensional against 26: an `act_share` comparison *across* the two ladders
+  moves two things at once. Within a ladder it is clean.
+* **Bring exploitability tracking across from the `exploitability` branch.**
+  ✅ **Done** (2026-08-11, ported not merged): `assume/reinforcement_learning/
+  exploitability.py`, the `WriteOutput` hooks in `assume/common/outputs.py`, the
+  22 unit tests and the walkthrough beside this file, and
+  `examples/inputs/exploit_example/`. It needed a `world.py` change so evaluation
+  episodes write market output at all — `RUNS_Continuation.md` has the three
+  consequences for cluster runs.
+  ⚠️ **It is only correct for a single day-ahead market with no storages**, so it
+  can be read on `example_02a`–`02c` and **not** on any inc-dec scenario:
+  `_write_exploitability` selects the orderbook without filtering by market, so
+  EOM and Redispatch bids are grouped by `start_time` and cleared as if they were
+  one auction, and even filtered to the EOM a unit's day-ahead profit is not its
+  total profit. Storages are scored by a volume-preserving Tier-1 rule that holds
+  the SoC path fixed, which is a lower bound and not comparable with the thermal
+  units it would be averaged against.
+* **Run 13's open equilibrium question is now explicitly out of reach.** Fleet
+  reward moves *opposite* to `diesel_0`'s in every run 13 condition, so nothing
+  there distinguishes "learned to bid better" from "competed the price down", and
+  an exploitability metric is exactly the missing measurement — but the metric as
+  written **cannot be read on that scenario at all** (two markets; see above).
+  Answering it needs either a market-filtered, multi-market-aware exploitability
+  or an argument from the 02x examples by analogy. Do not close the question with
+  a number off `rl_exploitability` on an inc-dec run.
 
 ## Parked
 
@@ -307,7 +337,9 @@ rl_benchmark/
 ├── surrogate/       the closed-form landscape and the Gymnasium env
 ├── sweeps/          training drivers: run_benchmark.py, td3_stability.py
 ├── analysis/        reads a recorded run and explains it; makes the figures
-├── real_matd3/      probes ASSUME's own MATD3 (07–12 single, 13 multi-agent)
+├── real_matd3/      probes ASSUME's own MATD3 (07–12 single, 13 multi-agent,
+│                    eom_critic_film.py for example_02a–c)
+├── cluster/         one-call SLURM launchers; see its README
 ├── test_rl_benchmark.py
 ├── test_exploitability.py               22 unit tests of the clearing /
 │                                        exploitability maths (workstream C)
@@ -318,7 +350,18 @@ rl_benchmark/
 
 The exploitability code itself lives in `assume/` — `reinforcement_learning/
 exploitability.py` and the `WriteOutput` hooks in `common/outputs.py`. Only its
-test and its explanation are kept here.
+test and its explanation are kept here. ⚠️ **The measure is only correct for a
+single day-ahead market with no storages** — the SCOPE note at the top of
+`exploitability.py` says why, and it rules out every inc-dec scenario in this
+archive.
+
+Anything cluster-bound goes through [`cluster/`](cluster/), one file per
+experiment, each its own submitter, array body and collector:
+
+```bash
+bash .../rl_benchmark/cluster/rerun_run13.sh            # 18 tasks + tarball
+bash .../rl_benchmark/cluster/eom_critic_evolution.sh   #  9 tasks + tarball
+```
 
 Every script runs from any working directory and resolves archived runs
 automatically, so figures redraw with no arguments. `sweeps/run_benchmark.py`

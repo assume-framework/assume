@@ -1,0 +1,240 @@
+# SPDX-FileCopyrightText: ASSUME Developers
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Single-bid copy of example_02a / 02b / 02c, as three study cases of one folder.
+#
+# Why this exists
+# ---------------
+# The three stock examples bid with `powerplant_energy_learning`
+# (EnergyLearningStrategy): TWO actions per unit, assigned to fixed volume
+# blocks by min/max in calculate_bids -- min action -> inflexible block (P_min),
+# max action -> flexible block (P_max - P_min). This folder is the same three
+# fleets bidding with `powerplant_energy_learning_single_bid`
+# (EnergyLearningSingleBidStrategy): ONE action, one bid, the unit's full
+# max_power. Everything else -- demand, fuel prices, the naive fleet, the market
+# -- is byte-identical to the originals, so a run here is an A/B against the
+# corresponding example_02x run with the bid structure as the only difference.
+#
+# Two things follow from act_dim 1 that are the point of running it:
+#   * the critic film has a single bid axis per agent, the same shape runs
+#     09-13 recorded on the inc-dec scenario, so the `diag` / `a0` / `a1`
+#     distinction the two-bid films need disappears and the two studies become
+#     directly comparable;
+#   * exploitability's ordered-bids prefix decomposition is not exercised at
+#     all -- one bid per unit is the case its probe handles exactly. (Both
+#     folders are single pay-as-clear EOM with no storage, which is the only
+#     setting the measure is valid in; see the SCOPE note in
+#     assume/reinforcement_learning/exploitability.py.)
+#
+# The strategy also differs in `foresight`: 24 rather than the two-bid
+# strategy's 12, "to be in line with the storage strategies" (its docstring).
+# So the observation is 50-dimensional here against 26 there, and the critic's
+# input count changes for a second reason besides the action count. It is not a
+# free parameter of this folder -- it is the strategy's own default -- but any
+# act_share comparison across the two folders has to say so.
+#
+# The three study cases differ ONLY in `powerplant_units`, i.e. in how many of
+# the CCGTs learn:
+#   02a   pp_6                 1 learner  (2500 MW) against a naive fleet
+#   02b   pp_6 .. pp_10        5 learners (500 MW each)
+#   02c   pp_6 .. pp_15       10 learners (500 MW each)
+#
+# NOTE: this file must stay pure ASCII. load_config_and_create_forecaster opens
+# it with the platform default encoding (cp1252 on Windows), so a stray non-ASCII
+# character -- an em dash, a warning sign -- fails the scenario load with a
+# UnicodeDecodeError far from its cause.
+#
+# `02a` ends a day earlier than `02b`/`02c` (2019-03-31 vs 2019-04-01). That
+# is inherited from upstream example_02a and is kept deliberately, so each case
+# stays a faithful A/B against its own original. It does mean the three cases
+# here are not a perfectly clean horizon ladder among themselves -- 02a is 720 h,
+# the other two 744 h.
+
+02a:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-03-31 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  seed: null
+  powerplant_units: powerplant_units_02a.csv
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    trained_policies_load_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 100
+    episodes_collecting_initial_experience: 5
+    train_freq: 100h
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-03-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+02b:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-01 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  seed: null
+  powerplant_units: powerplant_units_02b.csv
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    trained_policies_load_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 100
+    episodes_collecting_initial_experience: 5
+    train_freq: 100h
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+02c:
+  start_date: 2019-03-01 00:00
+  end_date: 2019-04-01 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  seed: null
+  powerplant_units: powerplant_units_02c.csv
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    trained_policies_load_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 100
+    episodes_collecting_initial_experience: 5
+    train_freq: 100h
+    gradient_steps: 10
+    batch_size: 128
+    gamma: 0.99
+    device: cpu
+    action_noise_schedule: linear
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear
+
+# Smoke test, not a run: 4 days and 10 episodes on the 02c fleet, so the whole
+# probe path -- ten agents, the recorder, the figures -- exercises in ~1 min.
+# example_02a's own `tiny` case is the two-bid counterpart.
+tiny:
+  start_date: 2019-01-01 00:00
+  end_date: 2019-01-05 00:00
+  time_step: 1h
+  save_frequency_hours: null
+  seed: null
+  powerplant_units: powerplant_units_02c.csv
+
+  learning_config:
+    learning_mode: true
+    continue_learning: false
+    trained_policies_save_path: null
+    trained_policies_load_path: null
+    max_bid_price: 100
+    algorithm: matd3
+    learning_rate: 0.001
+    training_episodes: 10
+    episodes_collecting_initial_experience: 3
+    train_freq: 24h
+    gradient_steps: 24
+    batch_size: 64
+    gamma: 0.99
+    device: cpu
+    noise_sigma: 0.1
+    noise_scale: 1
+    noise_dt: 1
+    validation_episodes_interval: 5
+
+  markets_config:
+    EOM:
+      operator: EOM_operator
+      product_type: energy
+      start_date: 2019-01-01 00:00
+      products:
+        - duration: 1h
+          count: 1
+          first_delivery: 1h
+      opening_frequency: 1h
+      opening_duration: 1h
+      volume_unit: MWh
+      maximum_bid_volume: 100000
+      maximum_bid_price: 3000
+      minimum_bid_price: -500
+      price_unit: EUR/MWh
+      market_mechanism: pay_as_clear

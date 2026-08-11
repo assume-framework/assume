@@ -747,7 +747,27 @@ class WriteOutput(Role):
 
     async def _write_exploitability(self):
         """Compute per-(timestep, unit) exploitability from the orderbook of
-        the current simulation and write it to the ``exploitability`` table (``rl_exploitability`` for training)."""
+        the current simulation and write it to the ``exploitability`` table (``rl_exploitability`` for training).
+
+        The result is only a correct exploitability for a scenario with a
+        **single day-ahead (energy-only, pay-as-clear) market and no storage
+        units** — see the SCOPE note in
+        ``assume.reinforcement_learning.exploitability``. Two limits bite here
+        in particular:
+
+        * the query below selects the whole orderbook of the simulation and is
+          **not filtered by market**, so in a multi-market scenario (e.g. the
+          inc-dec redispatch cases) bids from every market are grouped by
+          ``start_time`` and cleared together as if they were one auction. The
+          numbers written are then meaningless, not merely a lower bound;
+        * storage units are scored by the volume-preserving Tier-1 rule, which
+          holds the state-of-charge path fixed and is therefore not a best
+          response — and it is not comparable with the thermal units it would
+          be averaged against.
+
+        On anything outside that scope, do not read the ``exploitability``
+        table.
+        """
         if self.db is None or not self.units:
             return
 

@@ -358,8 +358,15 @@ def main() -> None:
     # let it point at a folder that already holds results worth keeping. A path
     # that does not exist yet also means confirm_learning_save_path() returns
     # early instead of prompting, which matters when this runs unattended.
+    # Resolved against the scenario actually being run, not against this
+    # benchmark's own scenario: --scenario points elsewhere for the plain-EOM
+    # probes (example_02a-c), and replace_paths() will prefix the *relative*
+    # form with that scenario's inputs path on every setup_world(). Anchoring
+    # the absolute form on SCENARIO instead would send the initial rmtree /
+    # confirmation to a folder the run never writes to.
+    scenario_dir = INPUTS / args.scenario
     relative = args.save_path or Path("learned_strategies") / f"probe_{args.study_case}"
-    save_path = SCENARIO / relative
+    save_path = scenario_dir / relative
     if save_path.exists() and any(save_path.iterdir()):
         raise SystemExit(
             f"{save_path} already has contents and a fresh run would delete them.\n"

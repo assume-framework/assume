@@ -1,0 +1,154 @@
+<!--
+SPDX-FileCopyrightText: ASSUME Developers
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
+# Cluster launchers
+
+Two one-call SLURM launchers. Each preflights the checkout, submits a job array
+with **one task per trial**, and chains a collector that rebuilds the report and
+the figures and packs everything into a single tarball for `scp`.
+
+| script | what it runs | tasks |
+|---|---|---|
+| [`rerun_run13.sh`](rerun_run13.sh) | run 13 again — eleven learning agents on `inc_dec_learning` | 6 conditions × 3 seeds = 18 |
+| [`eom_critic_evolution.sh`](eom_critic_evolution.sh) | workstream C — critic films of the **learning units only** on the plain-EOM examples | 3 cases × 3 seeds = 9 |
+
+`eom_critic_evolution.sh` knows six cases, three of which run by default:
+
+| case | scenario / study case | learners | bid structure |
+|---|---|---:|---|
+| `02a` | `example_02a` / `base` | 1 | two-bid (`EnergyLearningStrategy`) |
+| `02b` | `example_02b` / `base` | 5 | two-bid |
+| `02c` | `example_02c` / `base` | 10 | two-bid |
+| **`sb02a`** | `example_02_single_bid` / `02a` | 1 | **single-bid** (`EnergyLearningSingleBidStrategy`) |
+| **`sb02b`** | `example_02_single_bid` / `02b` | 5 | **single-bid** |
+| **`sb02c`** | `example_02_single_bid` / `02c` | 10 | **single-bid** |
+
+The `sb*` trio is the default. Each is the same fleet, demand, fuel prices and
+market as the `02x` case above it, so the pair is an A/B with the bid structure
+as the only deliberate difference — `act_dim` 1 and one bid for the unit's whole
+`max_power`, against `act_dim` 2 and an inflexible + flexible block. `CASES="02a
+02b 02c"` runs the two-bid originals; passing all six runs both ladders as one
+18-task array.
+
+```bash
+# on the cluster, from anywhere
+bash examples/inputs/2_nodes_paper_small/rl_benchmark/cluster/rerun_run13.sh
+bash examples/inputs/2_nodes_paper_small/rl_benchmark/cluster/eom_critic_evolution.sh
+```
+
+Both print the array job id, the collector job id, and the exact `scp` line for
+the tarball they will produce. Nothing else has to be launched by hand.
+
+## Why they look the way they do
+
+Each script is **its own array body and its own collector**: SLURM re-invokes it
+with `MODE=trial` and `MODE=collect`. That keeps one experiment in one file, and
+it is why `--chdir` never has to be edited — it is derived from where the file
+sits, unlike `examples/sweep/run_array.sh`.
+
+The probe sweeps install monkeypatches before the scenario loads and record
+critic films, so they cannot be expressed as a config sweep — this is
+`RUNS_Continuation.md`'s "kind (b)" job. One task per (condition, seed) with
+`--workers 1` means SLURM does the scheduling and a crashed trial does not take
+the batch with it.
+
+**No GPUs.** ASSUME learning is two small MLPs against a CPU-bound simulator.
+`gres` is left unset and the parallelism comes from the array width.
+
+**One thread per task.** `--cpus-per-task 1` and `--threads 1`, so the results
+stay comparable with the archive: run 08 found BLAS thread count alone flipping
+a surrogate seed from +31.60 to −60.49.
+
+## Knobs
+
+Both take the same environment overrides; `head -60` of either lists them with
+defaults. The ones that actually get used:
+
+```bash
+ASSUME_PYTHON=/path/to/env/bin/python \
+PARTITION=cpu MAX_PARALLEL=6 \
+  bash .../cluster/rerun_run13.sh
+
+# one case, one seed — the "one short test task first" of the preflight list
+CASES=sb02a SEEDS=42 \
+  bash .../cluster/eom_critic_evolution.sh
+
+# both ladders in one 18-task array
+CASES="02a 02b 02c sb02a sb02b sb02c" \
+  bash .../cluster/eom_critic_evolution.sh
+```
+
+Locally, without SLURM, the same trials run through the runner directly:
+
+```bash
+python real_matd3/eom_critic_film.py --workers 3          # the sb* trio
+python real_matd3/eom_critic_film.py --cases 02a 02b 02c  # the two-bid trio
+
+# ~1 min smoke test of the whole path: ten agents, 4 days, 10 episodes
+python real_matd3/eom_critic_film.py --cases sb02c --seeds 42 \
+    --study-case tiny --grid 51 --n-obs 3 --workers 1
+```
+
+`eom_critic_evolution.sh` additionally takes `GRID` / `NOBS` / `EVERY`, which set
+the recorder's resolution and therefore the file size. The defaults
+(`201 / 4 / 4`) put `example_02c` near 30 MB per seed; `GRID=401 EVERY=1` is
+~1.5 GB per seed and is what makes a batch un-`scp`-able. Whatever a run used
+belongs in its `RUNS_Continuation.md` section.
+
+## Getting the results back
+
+The collector writes one tarball per batch:
+
+```
+examples/outputs/2_nodes_paper_small/rl_benchmark/runs/exports/
+├── run13_<arrayjobid>.tar.gz
+└── eom_<arrayjobid>.tar.gz
+```
+
+Each holds the films (`data/<run>/*.npz`), the per-trial logs, the SLURM
+streams, the `sacct` accounting (`MaxRSS` is what sets the next `--mem`), the
+regenerated report as plain text, and the figures. Saved policies are excluded —
+they are bulk and no analysis reads them.
+
+Databases are excluded from the run 13 tarball and **kept** in the EOM one,
+because the EOM runs are the ones exploitability is valid on (one pay-as-clear
+market, no storage — see the SCOPE note in
+`assume/reinforcement_learning/exploitability.py`) and the `rl_exploitability`
+table lives in the sqlite file. `KEEP_DB=0` drops them if the tarball gets
+awkward.
+
+```bash
+# from your laptop
+scp <cluster>:.../runs/exports/eom_1234567.tar.gz .
+tar xzf eom_1234567.tar.gz
+```
+
+The tarball extracts into the same `data/ logs/ img/` layout the local scripts
+read, so unpacking it inside
+`examples/outputs/2_nodes_paper_small/rl_benchmark/runs/` makes every figure
+script redraw with no arguments.
+
+## Re-running failures
+
+Just launch the same script again. Both runners validate an existing `.npz`
+(schema, label, seed, frame/reward consistency) and skip a trial that already
+passes in seconds, so a second submission only re-does what failed. Pass
+`--rerun` through the runner directly if you want to force a redo.
+
+## Before the first big batch
+
+`RUNS_Continuation.md` § Preflight checklist is the full list. What these scripts
+already check for you:
+
+- the reward shaping at `learning_strategies.py:1583` is commented out;
+- `inc_dec_learning` is run 13's config, not the 5 h / `train_freq: 1h` version
+  that dies with `No rewards were collected during evaluation run` (run 13 only);
+- the scenario config files exist (EOM only);
+- the log directories exist — sbatch does not create them, and a job whose
+  `--output` path is missing fails at launch with nothing to read.
+
+What they do not check, and you should: that `$ASSUME_PYTHON` is the environment
+you mean, and that a `dev_*` partition test task has been through once.

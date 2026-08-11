@@ -30,6 +30,15 @@ working-tree config differs from the committed one.
   `exploitability_two_bid_walkthrough.py` next to this file and the scenario at
   `examples/inputs/exploit_example/`. ⚠️ It required a `world.py` change so
   evaluation episodes write market output at all — see the note below.
+  ⚠️ **Exploitability is only correct for a single day-ahead market with no
+  storages**, which is why it is read on `example_02a`–`02c` and **not** on the
+  inc-dec cases: `WriteOutput._write_exploitability` selects the whole orderbook
+  without filtering by market, so EOM and Redispatch bids are grouped by
+  `start_time` and cleared together as if they were one auction, and even
+  filtered to the EOM a unit's day-ahead profit is not its total profit. The
+  SCOPE note at the top of `assume/reinforcement_learning/exploitability.py` has
+  the full statement. **Do not read the `exploitability` table off a run 13-style
+  run.**
 
 ⚠️ **The exploitability port changed when market output is written.**
 `world.py`'s `add_market_operator` used to withhold `output_agent_addr` whenever
@@ -149,35 +158,26 @@ before the scenario loads and record critic films, so they cannot be expressed a
 a config override. They already have their own `--conditions/--seeds/--workers`
 process pool. **Do not give one task the whole sweep and let it fan out**; submit
 **one array task per (condition, seed)** with `--workers 1`, so SLURM does the
-scheduling and one crashed trial does not take the batch with it. A minimal array
-script for that pattern:
+scheduling and one crashed trial does not take the batch with it.
+
+Two launchers already do this, each in **one call** — see
+[`cluster/README.md`](cluster/README.md):
 
 ```bash
-#!/bin/bash
-#SBATCH --job-name=rl_probe
-#SBATCH --partition=cpu_il
-#SBATCH --time=02:00:00
-#SBATCH --nodes=1 --ntasks=1 --cpus-per-task=1 --mem=4G
-#SBATCH --chdir=<repo checkout>
-set -euo pipefail
+# run 13 again: 6 conditions x 3 seeds on inc_dec_learning
+bash examples/inputs/2_nodes_paper_small/rl_benchmark/cluster/rerun_run13.sh
 
-O=examples/outputs/2_nodes_paper_small/rl_benchmark/runs
-LOGS="$O/logs/14-<name>"          # beside the run's data, as above
-mkdir -p "$LOGS"
-
-# one line per trial: "<condition> <seed>"
-TRIAL=$(sed -n "$((SLURM_ARRAY_TASK_ID + 1))p" trials.txt)
-COND=${TRIAL% *}; SEED=${TRIAL#* }
-
-"$HOME/miniconda3/envs/assume/bin/python" \
-    examples/inputs/2_nodes_paper_small/rl_benchmark/real_matd3/assume_multiagent_actshare.py \
-    --conditions "$COND" --seeds "$SEED" --workers 1 --threads 1 \
-    2>&1 | tee -a "$LOGS/${COND}_seed${SEED}.log"
+# workstream C: critic films of the learning units on example_02a-c
+bash examples/inputs/2_nodes_paper_small/rl_benchmark/cluster/eom_critic_evolution.sh
 ```
 
-Submit with `sbatch --array=1-$(wc -l < trials.txt) --output=$LOGS/%A_%a.out ...`.
-Then run the `--report-only` / figure scripts once, locally or in a single task,
-against the collected archive.
+Each preflights the checkout (shaping commented out, `inc_dec_learning` is run
+13's config, log directories exist), submits the array, and chains a collector
+job on `afterany` that reruns `--report-only` and the figure scripts and packs
+films + logs + `sacct` + figures into **one tarball** under `runs/exports/`. Both
+scripts are their own array body and their own collector, so `--chdir` is derived
+rather than edited, and both skip a trial whose `.npz` already validates —
+resubmitting the same command re-runs only the failures.
 
 ### Preflight checklist
 
@@ -218,10 +218,113 @@ Cheap to check, expensive to discover after a 200-task batch:
 
 ## Runs
 
-*None yet — run 14 is the next number.*
+### 13-rerun — run 13 on the cluster, from the committed config
+
+**Why:** run 13's numbers came from a working-tree `inc_dec_learning`; that
+config is now committed (`d717a2a5`), the `matd3.py:618-628` debug prints that
+were live for runs 09–12 are commented out, and the recorder's `REWARD_WINDOW`
+is 69 rather than the 62 inherited from the single-agent case. So the archive's
+bid / critic / `act_share` columns should reproduce **bit-identically** and its
+`rewards` column should not. That is the check: anything else moving means
+something changed that nobody meant to change. It also lifts the local 4-worker
+memory ceiling, so all 18 trials run at once.
+
+```bash
+bash examples/inputs/2_nodes_paper_small/rl_benchmark/cluster/rerun_run13.sh
+```
+
+- data: `runs/data/13-multiagent-actshare/` (same folder — delete or move the
+  archived `.npz` first, or the runner will validate them and skip)
+- tarball: `runs/exports/run13_<jobid>.tar.gz`
+- 6 conditions × 3 seeds, 1200 / 2700 critic updates, cluster, ~1 h per task
+
+| condition | final bid | vs. `RUNS.md` §13 | reward |
+|---|---:|---:|---:|
+|  |  |  |  |
+
+**Reading:** *(after the batch)*
+
+⚠️ **Caveats:** predates workstream A — the critic slice is still the
+current-policy sweep, not the stored-action one (`RUNS.md` correction 17).
+
+---
+
+### 14 — critic evolution on the plain-EOM examples (workstream C)
+
+**Why:** every finding in `RUNS.md` is one redispatch/multi-market scenario with
+a 90 %-flat reward. These are the same learner on an ordinary energy-only market
+at 1, 5 and 10 learning agents, which is the cheapest test of whether the
+`act_share` ordering and the "critic never forms a preference" readings are about
+MATD3 or about the inc-dec landscape. It is also the only setting exploitability
+is valid on, so both readings come off the same runs.
+
+**Six cases, in two ladders.** `02a`–`02c` are the stock examples with
+`EnergyLearningStrategy` (`act_dim` 2: inflexible + flexible block).
+`sb02a`–`sb02c` are the same three fleets with
+`EnergyLearningSingleBidStrategy` (`act_dim` 1: one bid for the whole
+`max_power`), as three study cases of the new folder
+`examples/inputs/example_02_single_bid/`, differing only in `powerplant_units`.
+Everything else — demand, fuel prices, naive fleet, market — is byte-identical to
+the originals, so each pair is an A/B on the bid structure. **The `sb*` trio is
+what runs by default**, and it is the cleaner half for both readings: one bid
+axis per agent, the same shape runs 09–13 recorded, and one bid per unit is
+exactly what the exploitability probe handles with no ordered-bids decomposition.
+
+```bash
+# the sb* trio, 9 tasks
+bash examples/inputs/2_nodes_paper_small/rl_benchmark/cluster/eom_critic_evolution.sh
+# the two-bid originals, or both ladders as one 18-task array
+CASES="02a 02b 02c" bash .../cluster/eom_critic_evolution.sh
+CASES="02a 02b 02c sb02a sb02b sb02c" bash .../cluster/eom_critic_evolution.sh
+
+# locally, or to redraw from a downloaded tarball
+python real_matd3/eom_critic_film.py --report-only
+python analysis/eom_critic_evolution.py
+```
+
+- data: `runs/data/14-eom-critic-evolution/eom_film_<case>_seed<seed>.npz`
+- img: `runs/img/14-eom-<case>-seed<seed>.png`, `runs/img/14-eom-summary.png`
+- tarball: `runs/exports/eom_<jobid>.tar.gz`
+- 3 cases × 3 seeds, 100 episodes at `train_freq: 100h`, `lr 1e-3`, recorder at
+  **grid 201, 4 observations, every 4th block**
+
+| case | learners | act_dim | final bid | act_share | reward | exploitability |
+|---|---:|---:|---:|---:|---:|---:|
+| `sb02a` | 1 | 1 |  |  |  |  |
+| `sb02b` | 5 | 1 |  |  |  |  |
+| `sb02c` | 10 | 1 |  |  |  |  |
+| `02a` | 1 | 2 |  |  |  |  |
+| `02b` | 5 | 2 |  |  |  |  |
+| `02c` | 10 | 2 |  |  |  |  |
+
+**Reading:** *(after the batch)*
+
+⚠️ **Caveats:**
+
+- **The two ladders differ by more than the action count.**
+  `EnergyLearningSingleBidStrategy` defaults `foresight` to **24** against the
+  two-bid strategy's 12, so its observation is 50-dimensional against 26. That is
+  the strategy's own default, not a choice of this scenario — but it means the
+  critic's input count moves for two reasons at once, and an `act_share`
+  comparison **across** ladders has to say so. Within a ladder it is clean.
+- **"final bid" means different things per ladder.** At `act_dim` 2 it is the
+  inflexible price (`min` of the two actions, as `calculate_bids` assigns them);
+  at `act_dim` 1 there is only one price. The films likewise carry three sweeps
+  per agent (`a0`, `a1`, `diag`) in the two-bid cases and one in the single-bid
+  cases — named `diag` in both, so the figures' default reads either.
+- `02a` and `sb02a` end a day earlier than the other four (2019-03-31 vs
+  2019-04-01), inherited from upstream `example_02a` and kept so each pair stays
+  a faithful A/B.
+- The recorder grid is 201, not the house rule's 401, because 401 × the ten
+  agents of `02c` is ~1.5 GB per seed and the results have to be scp-able.
+- `lr` is the study cases' own 1e-3, not the 1e-4 runs 11–13 used, so a
+  difference against run 13 is not a clean single-variable comparison.
+- Predates workstream A.
+
+---
 
 <!-- ------------------------------------------------------------------------
-### 14 — <short title>
+### 15 — <short title>
 
 **Why:** what question forces this run, and what the alternative answers would
 mean. One paragraph.
@@ -230,8 +333,8 @@ mean. One paragraph.
 <the exact command, including --workers/--threads and any sbatch array line>
 ```
 
-- data: `runs/data/14-<name>/`
-- img: `runs/img/14-<name>.png`
+- data: `runs/data/15-<name>/`
+- img: `runs/img/15-<name>.png`
 - <N conditions × M seeds>, <episodes> episodes = **<K> critic updates**,
   <where it ran: local / cluster jobid>, <wall time>
 
