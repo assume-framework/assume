@@ -91,7 +91,8 @@ def main() -> None:
     reward = reward_from_bid(bids, PAPER_SMALL)
     ax_land_r = ax_land.twinx()
     reward_line, = ax_land_r.plot(
-        bids, reward, color="#1baf7a", lw=1.7, alpha=0.75, label="true reward"
+        bids, reward, color="#1baf7a", lw=1.7, alpha=0.75,
+        label="surrogate reward (not the simulator's)"
     )
     legend_lines = []
     for values, color, name in ((q1[:, -1], "#2a78d6", "Q1"),

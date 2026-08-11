@@ -5,10 +5,39 @@
 """
 Analytic surrogate of the inc-dec reward landscape.
 
-This reproduces, in closed form, the curve that ``reward_landscape.png`` measures
-by sweeping the real EOM + redispatch clearing for the learning diesel unit of the
-``2_nodes_paper_small`` scenario. It exists so that RL algorithms can be compared
-on *this landscape shape* without paying for a HiGHS solve per candidate action.
+This reproduces, in closed form, the *shape* of the curve that
+``reward_landscape.png`` measures by sweeping the EOM + redispatch clearing for
+the learning diesel unit of the ``2_nodes_paper_small`` scenario. It exists so
+that RL algorithms can be compared on *this landscape shape* without paying for a
+HiGHS solve per candidate action.
+
+⚠️ **It is a surrogate, not the scenario's reward. Never use it to score a real
+ASSUME run.**
+
+Checked against the 620 stored rewards of ``buffers/single_10ep_standard.npz``
+(the frozen true-reward buffer runs 09-12 all start from), ``reward_from_bid``
+agrees with what the simulator actually paid on only **24.8 %** of transitions:
+MAE 0.038, maximum error 0.369, R² 0.78, 466 of 620 rows differing. The
+discrepancy is structural, not noise:
+
+* the real EOM price varies hour to hour, so the loss shelf is **three** values
+  (−0.20, −0.25, −0.30, implying clearing prices 48/43/38) where this module has
+  the single −0.17 of a fixed ``eom_price = 49``;
+* ``diesel_0`` carries ``additional_cost 68`` in
+  ``powerplant_units_learning_single.csv``, not the 66 assumed here (``volume``
+  is harmless — it cancels between the profit legs and the reward normaliser);
+* the profitable region measured in that buffer runs 28.1 to 47.4, so bids below
+  ``dec_threshold`` are sometimes profitable and the cliff is not exactly at 30.
+
+The consequence, recorded in ``RUNS.md`` correction 15: every "true reward",
+"regret", "solved ≥ +0.15" and constrained-optimum figure that the ``real_matd3/``
+scripts *reconstruct* from a recorded bid is a statement about **this curve**, not
+about the simulator. Those columns are labelled "recon" for that reason. Measured
+rewards come from the run's own replay buffer or its ``rl_params`` table.
+
+None of that touches the SB3 surrogate work (runs 01-08): there this module *is*
+the environment, by construction, and ``IncDecEnv`` is exactly consistent with it.
+``test_rl_benchmark.py`` pins the divergence so it cannot be forgotten again.
 
 The landscape
 -------------

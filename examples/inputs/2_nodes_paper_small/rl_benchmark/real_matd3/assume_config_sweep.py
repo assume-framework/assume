@@ -350,6 +350,8 @@ def load_runs(root: Path, names: list[str]) -> dict[str, dict[int, dict[str, np.
 
 
 def run_metrics(run_data: dict[str, np.ndarray]) -> dict[str, float]:
+    from critic_coherence import argmax_disagreement, argmax_range
+
     greedy = run_data["greedy"]
     rewards = reward_from_bid(greedy, PAPER_SMALL)
     tail = slice(max(0, int(0.75 * greedy.shape[1])), None)
@@ -360,19 +362,29 @@ def run_metrics(run_data: dict[str, np.ndarray]) -> dict[str, float]:
         "positive_obs": float((final_rewards > 0).mean()),
         "tail_reward": float(rewards[:, tail].mean()),
         "final_bid": float(np.median(greedy[:, -1])),
-        "argmax_spread": float(final_argmax.max() - final_argmax.min()),
+        # shared with runs 10, 12 and 13 -- see analysis/critic_coherence.py.
+        # This column used to be the range alone, which is roughly twice the
+        # disagreement and was once compared against it across runs.
+        "argmax_disagreement": float(argmax_disagreement(final_argmax)),
+        "argmax_range": float(argmax_range(final_argmax)),
     }
 
 
 def summarize(runs: dict[str, dict[int, dict[str, np.ndarray]]]) -> None:
     print(
-        f"\n  solved = mean true reward over fixed observations >= {SOLVED_REWARD:.2f}\n"
+        f"\n  recon solved = mean RECONSTRUCTED reward over fixed observations "
+        f">= {SOLVED_REWARD:.2f}"
     )
     print(
-        f"  {'config':<29}{'seeds':>6}{'solved':>9}{'final reward':>22}"
-        f"{'tail reward':>16}{'positive obs':>15}{'critic spread':>16}"
+        "  WARNING: the reward columns apply the SURROGATE curve to the recorded bid; it\n"
+        "      agrees with the simulator's stored rewards on 24.8 % of transitions.\n"
+        "      See surrogate/incdec_reward.py and RUNS.md correction 15.\n"
     )
-    print("  " + "-" * 111)
+    print(
+        f"  {'config':<29}{'seeds':>6}{'recon solved':>14}{'recon reward':>22}"
+        f"{'recon tail':>16}{'recon pos obs':>15}{'disagree':>11}{'range':>8}"
+    )
+    print("  " + "-" * 123)
     for name, seeds in runs.items():
         values = [run_metrics(run_data) for run_data in seeds.values()]
         if not values:
@@ -380,13 +392,14 @@ def summarize(runs: dict[str, dict[int, dict[str, np.ndarray]]]) -> None:
         final = np.array([v["final_reward"] for v in values])
         tail = np.array([v["tail_reward"] for v in values])
         positive = np.array([v["positive_obs"] for v in values])
-        spread = np.array([v["argmax_spread"] for v in values])
+        disagree = np.array([v["argmax_disagreement"] for v in values])
+        spread = np.array([v["argmax_range"] for v in values])
         solved = int((final >= SOLVED_REWARD).sum())
         print(
-            f"  {name:<29}{len(values):>6}{f'{solved}/{len(values)}':>9}"
+            f"  {name:<29}{len(values):>6}{f'{solved}/{len(values)}':>14}"
             f"{final.mean():>+12.3f} +- {final.std():<6.3f}"
             f"{tail.mean():>+11.3f}"
-            f"{positive.mean():>15.1%}{spread.mean():>16.1f}"
+            f"{positive.mean():>15.1%}{disagree.mean():>11.1f}{spread.mean():>8.1f}"
         )
     print()
 
@@ -420,7 +433,8 @@ def plot(runs: dict[str, dict[int, dict[str, np.ndarray]]], out: Path, phase: st
     ax.set_yticks(ys, names, fontsize=9)
     ax.set_ylim(-0.7, len(names) - 0.3)
     ax.set_xlim(-0.18, PAPER_SMALL.optimal_reward + 0.035)
-    ax.set_xlabel("mean true reward of the final greedy policy over fixed observations")
+    ax.set_xlabel("mean RECONSTRUCTED reward of the final greedy policy "
+                  "(surrogate curve, not the simulator)")
     ax.set_title("every seed, every configuration  (| = median, right = seeds solved)", loc="left")
 
     facet_axes = []
@@ -519,7 +533,8 @@ def plot_critic_sweep(
     ax.set_yticks(ys, names, fontsize=9)
     ax.set_ylim(-0.7, len(names) - 0.3)
     ax.set_xlim(-0.18, PAPER_SMALL.optimal_reward + 0.035)
-    ax.set_xlabel("mean true reward of the final greedy policy over fixed observations")
+    ax.set_xlabel("mean RECONSTRUCTED reward of the final greedy policy "
+                  "(surrogate curve, not the simulator)")
     ax.set_title("outcome per seed  (| = median, right = seeds solved)", loc="left")
 
     heat_axes = []

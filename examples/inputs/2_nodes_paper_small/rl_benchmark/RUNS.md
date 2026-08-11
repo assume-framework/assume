@@ -54,7 +54,8 @@ ASSUME's MATD3 fails at stage 1 on its default budget — 640 critic updates and
 **80 actor updates**, against the 190–410 actor updates a crossing costs here.
 Give it 4× the budget and, **on the true reward, it still never leaves stage 1**:
 the critic's field stays incoherent for all 2560 updates — its preferred bid
-disagrees by 56 EUR across probed observations — and 5 of 6 seeds never place a
+disagrees by 24.5 EUR between an average pair of probed observations, 56 EUR end
+to end — and 5 of 6 seeds never place a
 bid in the band at all. With the reward shaping switched on, all 6 seeds leave the
 ceiling within 96–192 updates and settle at the band's rim. So on the real
 scenario the binding problem is not the crossing at all — it is that the critic
@@ -744,10 +745,18 @@ this varies the learner and holds the environment fixed. Two runs at `--seed 1`
 are bit-identical in every recorded array; `--seed 2` is not. Seed 42 is ASSUME's
 own default, i.e. a rerun of run 09.
 
-| condition | seeds | argmax `Q1` last | spread over the 6 observations | actor last | true reward | positive reward at any frame |
-|---|---|---|---|---|---|---|
-| shaped | 6 | **49.5 ± 4.4** | 10.4 | **50.6 ± 3.0** | +0.007 ± 0.015 | **6/6** |
-| unshaped | 6 | 89.7 ± 10.6 | **56.4** | 94.3 ± 7.0 | +0.000 ± 0.000 | **1/6** |
+| condition | seeds | argmax `Q1` last | disagreement over the 6 obs | range | actor last | true reward | positive reward at any frame |
+|---|---|---|---|---|---|---|---|
+| shaped | 6 | **49.5 ± 4.4** | 4.2 | 10.4 | **50.6 ± 3.0** | +0.007 ± 0.015 | **6/6** |
+| unshaped | 6 | 89.7 ± 10.6 | **24.5** | 56.4 | 94.3 ± 7.0 | +0.000 ± 0.000 | **1/6** |
+
+> **Two columns, because this run originally reported only the second and run 12
+> compared its own *first* against it.** `disagreement` is the mean over distinct
+> pairs of probed observations; `range` is `max − min`, roughly twice as large and
+> more sensitive to one outlying observation. Both are now defined once, in
+> [`analysis/critic_coherence.py`](analysis/critic_coherence.py), and every run
+> from 10 to 13 reports the same pair. **Only `disagreement` is comparable across
+> runs**; see correction 14.
 
 **The shaped result reproduces.** All six seeds leave the ceiling within 96–192
 critic updates and settle at the band's rim: final actor bids 44.9, 49.9, 50.2,
@@ -763,7 +772,8 @@ the final median `argmax` is 89.7 ± 10.6, and only two seeds end at 100.0 — t
 others end at 73.2, 81.0, 84.8, 99.2. **Read on its own, that median is close to
 meaningless here**, which is the more useful finding: at the last frame the six
 probed observations of a single unshaped run disagree about the preferred bid by
-**56.4 EUR on average** (seed 4: 16.5 to 90.0). The shaped runs disagree by 10.4.
+**24.5 EUR between an average pair**, and span 56.4 EUR end to end (seed 4: 16.5
+to 90.0). The shaped runs disagree by 4.2, spanning 10.4.
 That is run 09's "mottled noise, no coherent sign structure" turned into a number,
 and it says the unshaped critic has not learned a preference rather than that it
 has learned to prefer +100.
@@ -998,11 +1008,42 @@ one with `direction="backward"` (`fast_pandas.py:864-867`).
 
 | condition | act_share | obs_dim | final bid | final true reward | argmax Q1 | obs spread | band_neg | solved |
 |---|---:|---:|---|---:|---|---:|---:|---:|
-| `baseline` | 0.030 | 74 | 99.4 ± 0.1 | +0.000 | 85.5 ± 11.2 | 18.1 | 0.11 | 0/3 |
-| `foresight-6` | 0.108 | 20 | 63.9 ± 24.2 | +0.012 | 53.3 ± 13.2 | 18.7 | 0.38 | 0/3 |
-| `foresight-3` | 0.191 | 11 | 40.4 ± 2.5 | +0.087 | 37.5 ± 1.8 | 1.5 | 0.61 | 0/3 |
-| `act-x10` | 0.234 | 74 | −7.4 ± 61.0 | +0.033 | 35.2 ± 2.2 | 7.4 | 0.72 | 0/3 |
-| **`act-x30`** | 0.479 | 74 | **33.0 ± 0.2** | **+0.160** | 33.2 ± 1.1 | 1.5 | 0.81 | **3/3** |
+| `baseline` | 0.030 | 74 | 99.4 ± 0.1 | +0.000 | 85.5 ± 11.2 | 21.7 | 0.11 | 0/3 |
+| `foresight-6` | 0.108 | 20 | 63.9 ± 24.2 | +0.012 | 53.3 ± 13.2 | 22.5 | 0.38 | 0/3 |
+| `foresight-3` | 0.191 | 11 | 40.4 ± 2.5 | +0.087 | 37.5 ± 1.8 | 1.8 | 0.61 | 0/3 |
+| `act-x10` | 0.234 | 74 | −7.4 ± 61.0 | +0.033 | 35.2 ± 2.2 | 8.8 | 0.72 | 0/3 |
+| **`act-x30`** | 0.479 | 74 | **33.0 ± 0.2** | **+0.160** | 33.2 ± 1.1 | 1.8 | 0.81 | **3/3** |
+
+> The `obs spread` column is now the shared `argmax_disagreement` of
+> [`analysis/critic_coherence.py`](analysis/critic_coherence.py): the mean over
+> **distinct** pairs of probed observations. Earlier versions of this table
+> divided by `n²` and so included the `n` zero self-pairs, reading 5/6 of these
+> (18.1, 18.7, 1.5, 7.4, 1.5). See correction 14.
+
+⚠️ **`final true reward` above is *reconstructed*, not measured** — it applies the
+surrogate curve to the recorded bid, and that curve matches what the simulator
+actually paid on only 24.8 % of the frozen buffer's transitions (correction 15).
+The measured counterpart, read from each trial's own `rl_params` table:
+
+| condition | measured (eval) | reconstructed | per-seed measured | final bid |
+|---|---:|---:|---|---:|
+| `baseline` | +0.000 ± 0.000 | +0.000 | 0.000, 0.000, 0.000 | 99.4 |
+| `foresight-6` | +0.041 ± 0.058 | +0.012 | 0.123, 0.000, 0.000 | 63.9 |
+| `foresight-3` | +0.088 ± 0.015 | +0.087 | 0.105, 0.091, 0.067 | 40.4 |
+| `act-x10` | +0.025 ± 0.159 | +0.033 | −0.200, 0.135, 0.139 | −7.4 |
+| **`act-x30`** | **+0.167 ± 0.005** | +0.160 | 0.167, 0.173, 0.162 | 33.0 |
+
+**The headline survives on measured reward and `act-x30` measures slightly better
+than the reconstruction claimed.** The ordering, the monotonicity in `act_share`
+and the 3/3 all hold. What is *not* established against the simulator is the
+`+0.15` bar itself, the `regret` figures, the `32.31` constrained optimum and the
+exact `[30, 49]` band — all four are properties of the surrogate curve.
+
+⚠️ Second caveat on that column: the `rl_params` table holds only the **first two
+products of each episode** (10:00 and 11:00 of 14), so it is an early-hours
+sample, not the episode mean (correction 16). Settling this properly needs the
+probe to record buffer rewards the way `MultiAgentRecorder` already does, and a
+re-run — deferred.
 
 **`baseline` reproduces run 11's own baseline cell** — 99.4 ± 0.1, +0.000, 0/3,
 with the incoherent critic (per-seed `argmax Q1` 100.0 / 83.8 / 72.8). The rest of
@@ -1015,9 +1056,17 @@ deterministic optimum of 30 and should not: §6's constrained optimum for a poli
 of residual width σ ≈ 1 is 32.31, which is where SAC lands in the surrogate.
 
 **Run 10's incoherence statistic collapses.** The disagreement between the six
-probed observations about the preferred bid — 56.4 EUR for run 10's unshaped
-condition, 18.1 for `baseline` here — falls to **1.5** at both `foresight-3` and
-`act-x30`. The critic forms a preference, and it is the right one.
+probed observations about the preferred bid — 24.5 EUR for run 10's unshaped
+condition and 21.7 for `baseline` here, i.e. *the same failure* — falls to **1.8**
+at both `foresight-3` and `act-x30`. The critic forms a preference, and it is the
+right one.
+
+> ⚠️ An earlier version of this paragraph read "56.4 EUR for run 10's unshaped
+> condition, 18.1 for `baseline` here", which compared run 10's **range** against
+> run 12's **mean pairwise** number and made `baseline` look three times more
+> coherent than run 10's unshaped critic. On either statistic the two are in fact
+> indistinguishable — 24.5 vs 21.7 as a disagreement, 56.4 vs 45.3 as a range —
+> which is what `baseline` reproducing run 11 should have predicted. Correction 14.
 
 **`act-x10` is bimodal, and the failure is run 08's.** Its −7.4 ± 61.0 is not a
 spread around a mean: seeds 1 and 2 converge into the band (+0.123, +0.146) while
@@ -1181,8 +1230,9 @@ the northern units go to the **floor** (wind and coals at ≈ −95 in several s
 and come back off it, and the critic's preference is coherent and bang-bang rather
 than incoherent. **Run 10's incoherence statistic does not transfer**: the
 condition that works best, `act-own-x15`, has the *highest* observation
-disagreement about `argmax Q1` (~35–45 EUR) and the baseline the lowest (~10–20) —
-the reverse of run 12, where the fix drove it from 18.1 to 1.5. With eleven agents
+disagreement about `argmax Q1` (47.7 EUR, mean over the eleven agents at the final
+frame) and the baselines the lowest (13.7 at 1200 updates, 21.2 at 2700) —
+the reverse of run 12, where the fix drove it from 21.7 to 1.8. With eleven agents
 the critic's preferred bid genuinely *should* depend on the observation, so the
 statistic stops being a failure diagnostic here.
 
@@ -1276,7 +1326,8 @@ Recorded so they are not silently reintroduced.
     survives 6 seeds, the number does not — across run 10's seeds the final
     median `argmax` is 89.7 ± 10.6 and only 2/6 end at 100.0. The median is a
     poor summary here: the six probed observations of one unshaped run disagree
-    about the preferred bid by 56.4 EUR. The defensible statement is that the
+    about the preferred bid by 24.5 EUR between an average pair, spanning 56.4 EUR
+    end to end. The defensible statement is that the
     unshaped critic never develops a coherent preference, and that 5/6 runs never
     place a probed bid in the band at all while the sixth only grazes it (13 of
     480 cells) before ending at 94.4.
@@ -1308,6 +1359,66 @@ Recorded so they are not silently reintroduced.
     condition has the *highest* disagreement and the failing baseline the lowest,
     so the statistic inverts. Do not carry it across without first checking that
     the observation is uninformative about the reward.
+14. **"Run 10's unshaped critic disagrees by 56.4 EUR and run 12's `baseline` by
+    18.1, so the baseline is markedly more coherent."** Those are **two different
+    statistics**. Run 10 (and run 11) reported the *range*, `max − min` over the
+    probed observations; runs 12 and 13 reported a *mean pairwise* difference —
+    and divided it by `n²`, including the `n` zero self-pairs, so it was a further
+    5/6 of the true pairwise mean. Matched, the two conditions are
+    indistinguishable: **24.5 vs 21.7** as a disagreement, **56.4 vs 45.3** as a
+    range. That is the right answer — `baseline` was built to reproduce run 11 and
+    it does, on coherence as well as on the final bid — but it is not what the
+    archive said. Both statistics now live in
+    [`analysis/critic_coherence.py`](analysis/critic_coherence.py) and every run
+    from 10 to 13 reports both, so they cannot drift apart again. The affected
+    numbers, all recomputed from the archive rather than rescaled: run 10 unshaped
+    24.5 (was 56.4) and shaped 4.2 (was 10.4); run 12 `baseline` 21.7, `foresight-6`
+    22.5, `foresight-3` 1.8, `act-x10` 8.8, `act-x30` 1.8 (was 18.1, 18.7, 1.5, 7.4,
+    1.5); run 13 `act-own-x15` 47.7 against the baselines' 13.7 and 21.2.
+    **No conclusion changes** — the collapse at high `act_share` and the inversion
+    of correction 13 both survive on either statistic.
+15. **"`reward_from_bid` is the scenario's reward, so a recorded bid can be scored
+    with it."** It is not. Against the 620 stored rewards of the frozen
+    `single_10ep_standard` buffer, the closed form agrees on **24.8 %** of
+    transitions: MAE 0.038, maximum error 0.369, R² 0.78, 466/620 rows differing.
+    The mismatch is structural — the real EOM price varies hour to hour, so the
+    loss shelf is **three** values (−0.20, −0.25, −0.30, implying clearing prices
+    48/43/38) against the surrogate's single −0.17; `diesel_0` carries
+    `additional_cost 68`, not 66; and the measured profitable region runs 28.1 to
+    47.4, so bids below the cliff sometimes pay and the band's top does not.
+    (`max_power` 5000 vs 1000 is *not* part of it — volume cancels between the
+    profit legs and the reward normaliser.)
+    **What this does and does not invalidate.** Bids, critic fields, `act_share`,
+    the offline MSE fits and every trajectory remain measured quantities. What was
+    never established against the simulator is the *reconstructed* reward: the
+    `+0.15` solved bar, `regret`, the `32.31` constrained optimum and the exact
+    `[30, 49]` band. §12 now tabulates the measured reward beside it and the
+    headline holds; §11's and §10's reward columns have **not** been recomputed and
+    are relabelled `recon` rather than corrected.
+    The fix is *not* to retune `PAPER_SMALL` — one shelf cannot represent three,
+    and the surrogate is exact for runs 01–08 by construction, since `IncDecEnv`
+    is defined from it. The fix is to stop scoring real runs with it.
+    Pinned by `test_rl_benchmark.py`.
+16. **"The evaluation reward summarises the episode."** Every inspected run-12
+    database holds exactly **two rows per episode**, at 10:00 and 11:00 — the
+    first two of the episode's 14 delivery products — while the replay buffer
+    grows by 14. `run_learning` (`loader_csv.py:1347`) calls `get_sum_reward()`
+    immediately after `world.run()`, and the writes are scheduled as instant
+    messages in `learning_role.py:647`, so the tail is not flushed before the
+    query. Consequences: `compare_and_save_policies`, early stopping and any
+    evaluation score depend on two particular hours. Runs 11–13 disabled early
+    stopping, so their trajectories are unaffected; run 09/10's saved "best"
+    policies and §12's measured column are not. **Training is unaffected** — it
+    reads the cache directly, not the database.
+17. **"Run 13's recorded critic field is the objective the actor differentiates."**
+    It is a valid slice of the same critic, but not that objective. `matd3.py:704`
+    clones the **replay batch's** actions and replaces only column *i*, so the
+    other agents sit at stored behaviour actions; `MultiAgentRecorder` holds them
+    at their **current actors' greedy outputs**. The recorder documents which it
+    takes, but the window, `pulled left` and coherence readings of §13 therefore
+    describe the critic's response to the current joint policy. **At N = 1 the
+    distinction is empty** — there are no other columns — so runs 09–12 are
+    untouched. Pinned by `test_rl_benchmark.py`.
 
 ## 5. Known bug fixed during this work
 
@@ -1488,6 +1599,19 @@ been crossable, so "partial consistency is enough" is unsupported.
   untracked — the ~21 MB of `.npz` and model zips would need an exception or LFS
   to be committed. The source code is tracked, at
   `examples/inputs/2_nodes_paper_small/rl_benchmark/`.
+- **Two `ReplayBuffer` defects in `assume/`, neither triggered here.**
+  `add()` (`buffer.py:124`) increments `pos` *before* testing `pos + len_obs`, so
+  it marks the buffer full early and resets `pos` to 0, discarding the tail;
+  `sample()` then treats all `buffer_size` rows as valid, so after a wrap it can
+  return unwritten zero rows as transitions. Every benchmark buffer stays far
+  below the 50 000 capacity (run 13's largest is 3 450), so **no result here is
+  affected** — but any longer run would train on zeros. Separately, `sample()`
+  builds `next_observations` as `observations[idx + 1]` with no terminal flag, so
+  roughly 1 transition in 69 bootstraps from the first observation of the next
+  episode; the effect is softened because this task is a contextual bandit whose
+  actions do not drive the next state. Left open deliberately: fixing them is an
+  ASSUME change affecting every scenario and needs checking against the other
+  examples.
 - **Environment:** requires `gymnasium 1.3.0` and `stable-baselines3 2.9.0`,
   installed into the `assume` conda env for this work and *not* declared in
   `pyproject.toml`.
@@ -1697,7 +1821,9 @@ python sweeps/run_benchmark.py --algos TD3
 | `surrogate/incdec_env.py` | the Gymnasium environment |
 | `sweeps/run_benchmark.py` | training driver, CLI, plotting |
 | `sweeps/td3_stability.py` | run 08 — the configuration sweep and its figure |
+| `test_rl_benchmark.py` | the three things that would fail silently: the run 13 lever, `act_share`, the per-episode transition count |
 | `analysis/critic_probe.py` | reads a trained critic: `actor_objective`, autograd `critic_curve` |
+| `analysis/critic_coherence.py` | `argmax_disagreement` / `argmax_range` — **the one definition runs 10–13 share**, see correction 14 |
 | `analysis/critic_landscape.py` | final-critic figure |
 | `analysis/critic_evolution.py` | critic gradient field over training |
 | `analysis/activation_comparison.py` | tanh vs softsign |

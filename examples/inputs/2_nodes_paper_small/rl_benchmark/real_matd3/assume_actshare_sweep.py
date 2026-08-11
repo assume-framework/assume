@@ -264,9 +264,40 @@ def preflight() -> None:
         )
 
 
+#: training blocks per episode: the study case runs 24 h at train_freq 12h, and
+#: the shared buffer means no collection episodes, so every episode leaves 2 frames
+BLOCKS_PER_EPISODE = 2
+
+
+def validate_result(path: Path, name: str, seed: int, episodes: int) -> None:
+    """Refuse to treat a partial archive as a finished trial.
+
+    ``assume_training_probe`` deliberately writes its film from ``finally``, so a
+    run that died mid-way still leaves an ``.npz`` behind -- which is what makes a
+    failure inspectable. The cost is that "the file exists" is not the same as
+    "the trial finished", and this runner otherwise skips on existence alone.
+    Run 11 has had this guard since its six TensorBoard failures; run 12 and 13
+    did not, and the hazard grows with the number of parallel workers.
+    """
+    d = np.load(path, allow_pickle=False)
+    missing = {"steps", "critic_bids", "critic_q/MATD3", "critic_grad/MATD3",
+               "greedy/MATD3"} - set(d.files)
+    if missing:
+        raise RuntimeError(f"{path.name} is missing {sorted(missing)}")
+    if int(d["seed"]) != seed or str(d["label"]) != name:
+        raise RuntimeError(f"{path.name} carries the wrong seed or label")
+    expected = episodes * BLOCKS_PER_EPISODE
+    if len(d["steps"]) != expected:
+        raise RuntimeError(
+            f"{path.name} has {len(d['steps'])} frames, expected {expected} "
+            f"({episodes} episodes x {BLOCKS_PER_EPISODE} blocks) -- partial run"
+        )
+
+
 def launch(name: str, seed: int, args) -> tuple[str, int, int, float, Path]:
     out = result_path(args.out_dir, name, seed)
     if out.exists() and not args.rerun:
+        validate_result(out, name, seed, args.episodes)
         return name, seed, 0, 0.0, out
 
     k = int(CONDITIONS[name]["foresight"])
@@ -321,7 +352,14 @@ def run(args) -> None:
         for fut in concurrent.futures.as_completed(futures):
             name, seed, rc, secs, out = fut.result()
             done += 1
-            status = "ok" if rc == 0 and out.exists() else f"FAILED rc={rc}"
+            if rc == 0 and out.exists():
+                try:
+                    validate_result(out, name, seed, args.episodes)
+                    status = "ok"
+                except RuntimeError as exc:
+                    status = f"INCOMPLETE ({exc})"
+            else:
+                status = f"FAILED rc={rc}"
             print(f"  [{done}/{len(jobs)}] {name} seed {seed}: {status} "
                   f"({secs / 60:.1f} min)", flush=True)
 
@@ -330,16 +368,25 @@ def run(args) -> None:
 
 
 def report(args) -> None:
+    from critic_coherence import argmax_disagreement
     from incdec_reward import PAPER_SMALL, reward_from_bid
 
     print(f"\nrun 12: live MATD3 on the TRUE reward, {args.episodes} episodes, "
           f"{len(args.seeds)} seeds")
+    print("WARNING: every 'recon' column is reconstructed by applying the SURROGATE curve")
+    print("    to the recorded bid -- it is NOT what the simulator paid. That curve")
+    print("    matches the frozen buffer's stored rewards on 24.8 % of transitions")
+    print("    (surrogate/incdec_reward.py, RUNS.md correction 15). Bids, critics and")
+    print("    act_share are measured; the reward columns are a model of the reward.")
     print("band_neg = share of grid cells in [30, 49] with dQ1/d(bid) < 0 at the "
-          "last frame (the true slope there is negative)")
-    print("'solved' = final mean true reward over the probed observations >= +0.15\n")
+          "last frame (the surrogate's slope there is negative)")
+    print("'disagree' = mean |argmax Q1 difference| over distinct pairs of the "
+          "probed observations")
+    print("'recon solved' = final mean RECONSTRUCTED reward over the probed "
+          "observations >= +0.15\n")
     header = (f"{'condition':<13} {'act_share':>9} {'obs_dim':>7} {'final bid':>15} "
-              f"{'final reward':>13} {'best frame':>11} {'argmax Q1':>15} "
-              f"{'spread':>7} {'band_neg':>9} {'in band':>8} {'solved':>7}")
+              f"{'recon reward':>13} {'recon best':>11} {'argmax Q1':>15} "
+              f"{'disagree':>9} {'band_neg':>9} {'in band':>8} {'recon solved':>13}")
     print(header)
     print("-" * len(header))
 
@@ -366,7 +413,7 @@ def report(args) -> None:
                 float(np.mean(rew[:, -1])),
                 float(np.max(rew)),
                 float(np.median(argmax)),
-                float(np.mean([abs(a - b) for a in argmax for b in argmax])),
+                float(argmax_disagreement(argmax)),
                 float(np.mean((grad[:, -1, :][:, band] < 0))),
                 float(np.mean([BAND[0] <= b <= BAND[1] for b in greedy[:, -1]])),
             ))
@@ -380,12 +427,16 @@ def report(args) -> None:
               f"{a[:,1].mean():+13.3f} {a[:,2].mean():+11.3f} "
               f"{a[:,3].mean():8.1f} +-{a[:,3].std():4.1f} {a[:,4].mean():7.1f} "
               f"{a[:,5].mean():9.2f} {a[:,6].mean():8.2f} "
-              f"{solved:4d}/{len(rows)}")
+              f"{f'{solved}/{len(rows)}':>13}")
 
     print("\ncaveats: gradient magnitudes are not comparable across action-scale "
           "conditions (the recorded dQ/d(bid) carries the factor S); reduced-"
           "foresight runs also see a smaller observation, which in this scenario "
           "carries no reward information but in general would.")
+    print("\nfor MEASURED reward, read each trial's own rl_params table under "
+          "scratch/<condition>_seed<seed>/probe.db -- but note it holds only the "
+          "first two products of each episode (RUNS.md correction 16), so it is an "
+          "early-hours sample. RUNS.md section 12 tabulates both.")
 
 
 def main() -> None:

@@ -50,7 +50,7 @@ from assume_multiagent_actshare import (  # noqa: E402
     act_share_from_sd,
     result_path,
 )
-from assume_multiagent_film import CONDITION_COLOR, FOCUS  # noqa: E402
+from assume_multiagent_film import CONDITION_COLOR, FOCUS, argmax_spread  # noqa: E402
 from run_benchmark import DIVERGING, INK, MUTED  # noqa: E402
 
 #: rows of every grid, ordered by budget then own act_share -- the order the
@@ -225,12 +225,9 @@ def plot_bids(runs: dict, conditions: list[str], seeds: list[int], out: Path) ->
 # ------------------------------------------------------------------ summary
 
 
-def argmax_spread(run: dict) -> np.ndarray:
-    bids, q1 = run["bids"], run["q1"]
-    peak = bids[np.argmax(q1, axis=3)]
-    n_obs = peak.shape[1]
-    s = np.abs(peak[:, :, None, :] - peak[:, None, :, :]).sum(axis=(1, 2))
-    return (s / (n_obs * n_obs)).mean(axis=0)
+# argmax_spread is imported from assume_multiagent_film at the top of this
+# module, so the per-seed grid and the pooled view cannot drift apart. Its
+# definition lives in analysis/critic_coherence.py.
 
 
 def plot_summary(runs: dict, conditions: list[str], seeds: list[int], out: Path) -> None:

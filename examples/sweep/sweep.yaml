@@ -1,0 +1,56 @@
+# ============================================================================
+# ASSUME parameter sweep
+# ============================================================================
+# Edit this file, then run:  bash submit.sh
+# Or in two steps:            python expand.py  &&  sbatch --array=1-N run_array.sh <manifest>
+
+base:
+  # Folder that contains your scenario folder (and any other scenarios)
+  input_path: examples/inputs
+  # Source scenario folder name — its config.yaml + CSVs are the template
+  scenario: MY_SCENARIO
+  # Filename of the config inside that scenario folder
+  config_filename: config.yaml
+  # Which top-level key inside config.yaml is the study case to patch
+  study_case: MY_STUDY_CASE
+
+output:
+  # Where to materialize the variant scenario folders
+  scenarios_dir: examples/outputs/MY_SCENARIO_OUTPUT
+  # Manifest the array job consumes (TSV: one row per task)
+  manifest: examples/outputs/MY_SCENARIO_OUTPUT/manifest.tsv
+
+# Cap how many array tasks run concurrently (SLURM "%K" syntax). null = no cap.
+# H100 nodes are scarce; capping is polite.
+max_parallel: 8
+
+# How to combine `parameters` below:
+#   grid:      cartesian product of all value lists
+#   zip:       lockstep — all lists must be the same length, paired by index
+#   scenarios: ignore `parameters`, use the explicit `scenarios:` list instead
+mode: grid
+
+# Dotted paths into the study_case sub-tree. Strings and numbers both work.
+parameters:
+  #learning_config.learning_rate: [0.0001, 0.0005, 0.001]
+  #learning_config.batch_size: [128, 256]
+  #learning_config.algorithm: [matd3]
+  seed: [3, 4, 5]
+  learning_config.learning_rate: [0.0001, 0.001, 0.01]
+  learning_config.learning_rate_schedule: ["linear", "cosine", "constant"]
+
+
+# Only used when mode: scenarios
+scenarios:
+  - name: low_lr_short
+    params:
+      learning_config.learning_rate: 0.0001
+      learning_config.training_episodes: 50
+  - name: high_lr_short
+    params:
+      learning_config.learning_rate: 0.001
+      learning_config.training_episodes: 50
+  - name: ppo_baseline
+    params:
+      learning_config.algorithm: ppo
+      learning_config.learning_rate: 0.0003

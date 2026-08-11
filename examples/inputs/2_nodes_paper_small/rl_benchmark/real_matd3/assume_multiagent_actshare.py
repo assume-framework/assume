@@ -278,8 +278,24 @@ class MultiAgentRecorder:
     ``install()`` wrapper and ``finally`` branch work unchanged.
     """
 
-    #: transitions averaged for the per-agent reward trace (one 72 h episode)
-    REWARD_WINDOW = 62
+    #: Transitions averaged for the per-agent reward trace: one episode of the
+    #: study case. It is *not* the horizon in hours -- the market opening offsets
+    #: eat the first hours, so it is
+    #:
+    #:     horizon_hours - ((EOM.start_date - start_date) + first_delivery)
+    #:
+    #: which for ``inc_dec_learning`` (72 h, EOM opening at the simulation start,
+    #: first delivery 3 h) is 69, and for the ``*single_case`` family (EOM opening
+    #: at 07:00, first delivery 3 h) is 62 -- the 620 = 62 x 10 of the shared
+    #: starting buffer. ``test_rl_benchmark.py`` derives both from ``config.yaml``
+    #: and asserts this constant against the multi-agent one.
+    #:
+    #: Run 13 was recorded with 62, inherited from the single-agent case, so its
+    #: archived ``rewards`` arrays average the last 62 of each episode's 69
+    #: transitions. Only the reward trace is affected; no bid, critic or
+    #: ``act_share`` number depends on it. A re-run will therefore differ from the
+    #: archive on ``rewards`` alone.
+    REWARD_WINDOW = 69
 
     def __init__(self, observations: np.ndarray, grid: int, every: int):
         # the probe hands us whatever load_observations returned; for a
@@ -541,9 +557,51 @@ def preflight() -> None:
         )
 
 
+#: training blocks per episode: 72 h horizon at train_freq 12h
+BLOCKS_PER_EPISODE = 6
+#: episodes spent collecting before the first gradient step, hence the first frame
+COLLECTING_EPISODES = 5
+
+
+def expected_frames(episodes: int, collecting: int = COLLECTING_EPISODES) -> int:
+    return (episodes - collecting) * BLOCKS_PER_EPISODE
+
+
+def validate_result(path: Path, name: str, seed: int, frames: int) -> None:
+    """Refuse to treat a partial archive as a finished trial.
+
+    ``assume_training_probe`` writes its film from ``finally`` so a crashed run
+    still leaves an inspectable ``.npz``; the cost is that "the file exists" does
+    not mean "the trial finished", and this runner skips on existence alone. Run
+    11 has had this guard since its six TensorBoard failures. The hazard grows
+    with worker count, so it matters more on a cluster than it did here.
+    """
+    d = np.load(path, allow_pickle=False)
+    missing = {"steps", "critic_bids", "critic_q/MATD3", "critic_grad/MATD3",
+               "greedy/MATD3", "rewards", "unit_ids"} - set(d.files)
+    if missing:
+        raise RuntimeError(f"{path.name} is missing {sorted(missing)}")
+    if int(d["seed"]) != seed or str(d["label"]) != name:
+        raise RuntimeError(f"{path.name} carries the wrong seed or label")
+    if len(d["steps"]) != frames:
+        raise RuntimeError(
+            f"{path.name} has {len(d['steps'])} frames, expected {frames} -- "
+            "partial run"
+        )
+    n_agents = len(d["unit_ids"])
+    if d["critic_q/MATD3"].shape[0] != n_agents or d["rewards"].shape[1] != n_agents:
+        raise RuntimeError(f"{path.name} has an agent axis inconsistent with unit_ids")
+
+
 def launch(name: str, seed: int, args) -> tuple[str, int, int, float, Path]:
     out = result_path(args.out_dir, name, seed)
+    episodes = args.episodes or int(CONDITIONS[name].get("episodes", EPISODES))
+    frames = expected_frames(
+        episodes,
+        args.collecting if args.collecting is not None else COLLECTING_EPISODES,
+    )
     if out.exists() and not args.rerun:
+        validate_result(out, name, seed, frames)
         return name, seed, 0, 0.0, out
 
     tag = f"{name}_seed{seed}"
@@ -560,7 +618,6 @@ def launch(name: str, seed: int, args) -> tuple[str, int, int, float, Path]:
     if args.validation_interval is not None:
         overrides["validation_episodes_interval"] = args.validation_interval
 
-    episodes = args.episodes or int(CONDITIONS[name].get("episodes", EPISODES))
     cmd = [
         sys.executable, str(SELF), "--child", name, "--",
         "--study-case", args.study_case,
@@ -606,7 +663,18 @@ def run(args) -> None:
         for fut in concurrent.futures.as_completed(futures):
             name, seed, rc, secs, out = fut.result()
             done += 1
-            status = "ok" if rc == 0 and out.exists() else f"FAILED rc={rc}"
+            if rc == 0 and out.exists():
+                episodes = args.episodes or int(CONDITIONS[name].get("episodes", EPISODES))
+                collecting = (args.collecting if args.collecting is not None
+                              else COLLECTING_EPISODES)
+                try:
+                    validate_result(out, name, seed,
+                                    expected_frames(episodes, collecting))
+                    status = "ok"
+                except RuntimeError as exc:
+                    status = f"INCOMPLETE ({exc})"
+            else:
+                status = f"FAILED rc={rc}"
             print(f"  [{done}/{len(jobs)}] {name} seed {seed}: {status} "
                   f"({secs / 60:.1f} min)", flush=True)
 
@@ -615,6 +683,8 @@ def run(args) -> None:
 
 
 def report(args) -> None:
+    from critic_coherence import argmax_disagreement
+
     for name in args.conditions:
         for seed in args.seeds:
             path = result_path(args.out_dir, name, seed)
@@ -638,19 +708,19 @@ def report(args) -> None:
                   f"mean act_share {share.mean():.3f}, "
                   f"action-block share {block.mean():.3f}")
             header = (f"  {'unit':<10} {'act_share':>9} {'first bid':>10} "
-                      f"{'final bid':>10} {'argmax Q1':>10} {'obs spread':>11} "
+                      f"{'final bid':>10} {'argmax Q1':>10} {'obs disagree':>13} "
                       f"{'reward last':>12}")
             print(header)
             print("  " + "-" * (len(header) - 2))
             for i, u in enumerate(units):
                 argmax = bids[np.argmax(q1[i, :, -1, :], axis=1)]
-                spread = float(np.mean([abs(a - b) for a in argmax for b in argmax]))
+                spread = float(argmax_disagreement(argmax))
                 print(f"  {u:<10} {share[i]:9.3f} "
                       f"{np.median(greedy[i, :, 0]):10.1f} "
                       f"{np.median(greedy[i, :, -1]):10.1f} "
-                      f"{np.median(argmax):10.1f} {spread:11.1f} "
+                      f"{np.median(argmax):10.1f} {spread:13.1f} "
                       f"{rewards[-1, i]:+12.4f}")
-            print(f"  {'TOTAL':<10} {'':>9} {'':>10} {'':>10} {'':>10} {'':>11} "
+            print(f"  {'TOTAL':<10} {'':>9} {'':>10} {'':>10} {'':>10} {'':>13} "
                   f"{rewards[-1].sum():+12.4f}")
 
 

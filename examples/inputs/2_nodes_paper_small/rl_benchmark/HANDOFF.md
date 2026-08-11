@@ -57,10 +57,39 @@ rl_benchmark/
 ├── surrogate/       the closed-form landscape and the Gymnasium env
 ├── sweeps/          training drivers: run_benchmark.py, td3_stability.py
 ├── analysis/        reads a recorded run and explains it; makes the figures
-└── real_matd3/      probes ASSUME's own MATD3, live or from saved .pt files
-                     (runs 07–12 single-agent, run 13 the `assume_multiagent_*`
-                      quartet for the 11-agent `inc_dec_learning` case)
+├── real_matd3/      probes ASSUME's own MATD3, live or from saved .pt files
+│                    (runs 07–12 single-agent, run 13 the `assume_multiagent_*`
+│                     quartet for the 11-agent `inc_dec_learning` case)
+└── test_rl_benchmark.py   the three things that would fail silently
 ```
+
+`analysis/critic_coherence.py` owns the observation-disagreement statistics
+(`argmax_disagreement`, `argmax_range`). Every run from 10 to 13 imports them from
+there; they used to be reimplemented per script with two different definitions,
+which is `RUNS.md` correction 14.
+
+Run the tests with
+
+```bash
+conda run -n assume python -m pytest \
+    examples/inputs/2_nodes_paper_small/rl_benchmark/test_rl_benchmark.py -v
+```
+
+Four groups, all covering things that would fail *silently* — the figures would
+keep rendering, from the wrong input:
+
+* **`MultiAgentRecorder` against the real `TD3.update_policy`.** One real gradient
+  step with real networks, capturing the tensors the critic was actually handed,
+  asserting the recorder reproduces the observation assembly (`matd3.py:585-591`),
+  the agent-major action ordering, and the swept column — end to end. This is the
+  convention run 13's whole archive rests on and it is otherwise pinned only by a
+  comment quoting line numbers.
+* **The run-13 action-scale lever**, which degenerates to a no-op if
+  `CriticTD3.act_dim` ever stops meaning `act_dim * n_agents`.
+* **`act_share`**, against the critic input matrix it describes.
+* **The coherence statistic and the per-episode transition count.**
+
+No simulation, no archive needed; ~8 s.
 
 `sweeps/run_benchmark.py` owns the house palette — `COLORS`, `INK`, `MUTED` and
 the diverging `DIVERGING` ramp used for every signed gradient field. Import
@@ -196,17 +225,22 @@ action space carries any gradient.
     what is left downstream is exactly network init, exploration noise and the
     batch draws. 6 seeds per condition, 40 episodes each:
 
-    | condition | argmax `Q1` last | spread over the 6 obs | actor last | reaches the band at any frame |
-    |---|---|---|---|---|
-    | shaped | 49.5 ± 4.4 | 10.4 | **50.6 ± 3.0** | **6/6** |
-    | unshaped | 89.7 ± 10.6 | **56.4** | 94.3 ± 7.0 | **1/6** |
+    | condition | argmax `Q1` last | disagreement over the 6 obs | range | actor last | reaches the band at any frame |
+    |---|---|---|---|---|---|
+    | shaped | 49.5 ± 4.4 | 4.2 | 10.4 | **50.6 ± 3.0** | **6/6** |
+    | unshaped | 89.7 ± 10.6 | **24.5** | 56.4 | 94.3 ± 7.0 | **1/6** |
 
     The two conditions do not overlap at all on final actor bid — shaped
     44.9–54.1, unshaped 79.3–99.2 — so finding 13's *conclusion* holds. Its
     *number* does not: only 2/6 unshaped seeds end at exactly 100.0. The median
     `argmax` is a weak statistic here, because the six probed observations of a
-    single unshaped run disagree about the preferred bid by 56.4 EUR on average
-    (shaped: 10.4). Say **the unshaped critic never forms a coherent
+    single unshaped run disagree about the preferred bid by 24.5 EUR between an
+    average pair, spanning 56.4 EUR end to end (shaped: 4.2 and 10.4). **Quote the
+    disagreement, not the range, whenever comparing across runs** — the two used to
+    be computed differently in different scripts and were once compared with each
+    other; see `RUNS.md` correction 14 and
+    [`analysis/critic_coherence.py`](analysis/critic_coherence.py). Say **the
+    unshaped critic never forms a coherent
     preference**, not that it prefers the ceiling. Five of the six shaped seeds
     stop just *above* the band, as finding 14 predicts; one ends inside at 44.9
     for +0.041, which is one seed and not a rate.
@@ -270,7 +304,8 @@ action space carries any gradient.
     §6's constrained optimum (32.31 for σ ≈ 1), not on 30. Two mechanically
     unrelated levers — removing observation dimensions, scaling the critic's action
     input — land on one curve, so `act_share` is the variable, not either lever.
-    Run 10's 56.4-EUR disagreement between probed observations falls to **1.5**.
+    Run 10's 24.5-EUR disagreement between probed observations falls to **1.8**
+    (`baseline` here is 21.7, i.e. the same failure as run 10's unshaped).
     `act-x10` is bimodal: 2 seeds converge, seed 42 overshoots to −93.7, which is
     **run 08's failure mode arriving in ASSUME** now that the critic works.
 18. **The window it creates is not run 06's transient one** (run 12). Measured with
@@ -317,8 +352,9 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
     fix inside `CriticTD3` therefore has to be per-agent.**
 21. **Run 10's incoherence statistic inverts here — do not carry it over.** The
     best condition (`act-own-x15`) has the *highest* disagreement between probed
-    observations about `argmax Q1` (~35–45 EUR) and the failing baseline the
-    lowest (~10–20), the reverse of run 12's 18.1 → 1.5. With eleven agents the
+    observations about `argmax Q1` (47.7 EUR, mean over the eleven agents at the
+    final frame) and the failing baselines the lowest (13.7 at 1200 updates, 21.2
+    at 2700), the reverse of run 12's 21.7 → 1.8. With eleven agents the
     critic's preferred bid genuinely should depend on the observation, so
     disagreement stops being evidence of a broken critic. The multi-agent
     baseline's failure is also not run 09's: `diesel_0` parks at 97.1 with
@@ -372,7 +408,7 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
 - ⚠️ "Without shaping, ASSUME's `argmax Q1` stays at 100.0." **The conclusion
   survives 6 seeds, the number does not** (run 10, finding 15). 89.7 ± 10.6, and
   only 2/6 seeds end at 100.0. Do not quote a single unshaped `argmax` — quote
-  the 56.4 EUR disagreement between probed observations, or the fact that 5/6
+  the 24.5 EUR disagreement between probed observations, or the fact that 5/6
   runs never reach the band at all (the sixth grazes it for 13 of 480 cells and
   still ends at 94.4).
 - ⚠️ "Any single-configuration result here is a sample from a bimodal
@@ -494,6 +530,33 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
   `partial_failures_before_retry/` rather than mixed into the final 90 files.
 
 ## Known caveats in the current results
+
+- ⚠️ **The surrogate is not the scenario's reward, and four scripts used it to
+  score real runs.** `reward_from_bid` agrees with the frozen buffer's 620 stored
+  rewards on **24.8 %** of transitions (MAE 0.038, R² 0.78). The real EOM price
+  varies hour to hour — three loss shelves (−0.20/−0.25/−0.30) against the
+  surrogate's one (−0.17) — and `diesel_0` costs 68, not 66. **Bids, critics,
+  `act_share` and the offline fits are measured and stand; every reconstructed
+  "true reward", `regret`, `+0.15 solved` and the `32.31` optimum do not.** Those
+  columns now read `recon`. `RUNS.md` §12 tabulates the measured reward beside
+  them: run 12's headline **survives**, `act-x30` measuring +0.167 ± 0.005 against
+  the reconstructed +0.160. Do not retune `PAPER_SMALL` — the surrogate is exact
+  for runs 01–08 by construction. `RUNS.md` correction 15.
+- ⚠️ **The evaluation database holds two hours per episode**, 10:00 and 11:00 of
+  14 — an unflushed async write at shutdown (`RUNS.md` correction 16). Training is
+  unaffected; best-policy selection, early stopping and any measured reward read
+  from `rl_params` are an early-hours sample. **The clean fix is to have the
+  single-agent `Recorder` snapshot buffer rewards the way `MultiAgentRecorder`
+  already does, then re-run** — deferred to a cluster.
+- ⚠️ **Run 13's recorded critic field is not matd3's actor objective.**
+  `matd3.py:704` holds the other agents at their *stored* actions; the recorder
+  holds them at their *current actors'* outputs. A valid critic slice, but the
+  window / `pulled left` / coherence readings describe the current joint policy.
+  Empty at N = 1, so runs 09–12 are untouched. `RUNS.md` correction 17.
+- **Two `ReplayBuffer` defects in `assume/` are open and untriggered** — an
+  early-`full` wrap that would sample unwritten zero rows, and episode-boundary
+  bootstrapping. No result here is affected (largest buffer 3 450 against a 50 000
+  capacity). See `RUNS.md` §8; fixing them is a library change.
 
 - **`assume_probe_unshaped.npz` is mislabelled** — it preloads
   `buffers/single_10ep_gradient.npz`, whose 280 stored rewards are *shaped*, so

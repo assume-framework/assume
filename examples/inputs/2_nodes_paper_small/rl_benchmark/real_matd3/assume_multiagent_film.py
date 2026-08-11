@@ -115,12 +115,15 @@ def load(out_dir: Path, name: str, seeds: list[int]) -> dict | None:
 
 
 def argmax_spread(run: dict) -> np.ndarray:
-    """Mean pairwise disagreement of ``argmax Q1`` over probed observations."""
-    bids, q1 = run["bids"], run["q1"]          # (agents, obs, frames, grid)
-    peak = bids[np.argmax(q1, axis=3)]         # (agents, obs, frames)
-    n_obs = peak.shape[1]
-    spread = np.abs(peak[:, :, None, :] - peak[:, None, :, :]).sum(axis=(1, 2))
-    return (spread / (n_obs * n_obs)).mean(axis=0)
+    """Mean pairwise disagreement of ``argmax Q1`` over probed observations.
+
+    Defined once in ``analysis/critic_coherence.py`` so runs 10-13 are on one
+    footing; see that module for why it used to differ between them.
+    """
+    from critic_coherence import argmax_disagreement, peak_bids
+
+    peak = peak_bids(run["bids"], run["q1"], axis=3)   # (agents, obs, frames)
+    return argmax_disagreement(peak, axis=1).mean(axis=0)
 
 
 def plot(runs: dict[str, dict], out: Path) -> None:

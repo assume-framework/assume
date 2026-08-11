@@ -242,20 +242,27 @@ def metrics(run: dict) -> dict[str, float]:
     ``assume_film.py`` -- the critic is swept from six real observations and the
     question is what it prefers *typically*, not at one arbitrary hour.
 
-    ``argmax_range`` is there because that median turned out to be the wrong
-    summary on its own. A critic that has actually learned a preference gives
-    nearly the same ``argmax Q1`` whichever observation it is asked from; the
-    unshaped runs give six answers spread over most of the bid axis, so their
+    The disagreement statistics are there because that median turned out to be
+    the wrong summary on its own. A critic that has actually learned a preference
+    gives nearly the same ``argmax Q1`` whichever observation it is asked from;
+    the unshaped runs give six answers spread over most of the bid axis, so their
     median moves a long way on very little. Read ``argmax_last`` and
-    ``argmax_range`` together or not at all.
+    ``argmax_disagreement`` together or not at all.
+
+    Both statistics come from ``analysis/critic_coherence.py`` so that this run's
+    numbers are on the same footing as runs 11-13's. They used to be computed
+    differently in each script, and ``RUNS.md`` quoted one against another.
     """
+    from critic_coherence import argmax_disagreement, argmax_range
+
     argmax = np.median(run["argmax"], axis=0)  # (frames,)
     actor = np.median(run["actor"], axis=0)
     below = np.flatnonzero(argmax <= CEILING)
     last = run["argmax"][:, -1]  # (obs,)
     return {
         "argmax_last": argmax[-1],
-        "argmax_range": last.max() - last.min(),
+        "argmax_disagreement": argmax_disagreement(last),
+        "argmax_range": argmax_range(last),
         "argmax_min": argmax.min(),
         "left_ceiling": float(len(below) > 0),
         "t_flip": float(run["steps"][below[0]]) if len(below) else np.nan,
@@ -271,10 +278,16 @@ def summarize(runs: dict[str, dict[int, dict]]) -> None:
         f"{p.optimal_bid:.0f} -> {p.optimal_reward:+.3f}   |   "
         f"'left ceiling' = median argmax Q1 reached <= {CEILING:.0f} at some frame\n"
     )
+    print("  'disagree' is the mean over distinct pairs of probed observations, "
+          "'range' the max-min;\n  they are different numbers and only 'disagree' "
+          "is comparable with runs 11-13.")
+    print("  WARNING: 'recon reward' applies the SURROGATE curve to the recorded bid -- it "
+          "matches what\n      the simulator paid on 24.8 % of transitions "
+          "(RUNS.md correction 15).\n")
     print(f"  {'condition':<11}{'seeds':>6}{'argmax Q1 last':>23}"
-          f"{'spread over obs':>17}{'actor last':>22}{'true reward':>17}"
+          f"{'disagree':>10}{'range':>8}{'actor last':>22}{'recon reward':>17}"
           f"{'left ceiling':>14}")
-    print("  " + "-" * 110)
+    print("  " + "-" * 111)
     for condition, seeds in runs.items():
         m = {k: np.array([metrics(r)[k] for r in seeds.values()])
              for k in metrics(next(iter(seeds.values())))}
@@ -283,23 +296,24 @@ def summarize(runs: dict[str, dict[int, dict]]) -> None:
         print(
             f"  {condition:<11}{n:>6}"
             f"{m['argmax_last'].mean():>14.1f} +-{m['argmax_last'].std():<6.1f}"
-            f"{m['argmax_range'].mean():>17.1f}"
+            f"{m['argmax_disagreement'].mean():>10.1f}{m['argmax_range'].mean():>8.1f}"
             f"{m['actor_last'].mean():>13.1f} +-{m['actor_last'].std():<6.1f}"
             f"{m['actor_reward'].mean():>+9.3f} +-{m['actor_reward'].std():<5.3f}"
             f"{left:>14}"
         )
 
     print(f"\n  {'condition':<11}{'seed':>6}{'argmax Q1 last':>16}"
-          f"{'spread over obs':>17}{'argmax Q1 min':>15}{'actor last':>12}"
-          f"{'true reward':>13}{'t_flip':>9}")
-    print("  " + "-" * 99)
+          f"{'disagree':>10}{'range':>8}{'argmax Q1 min':>15}{'actor last':>12}"
+          f"{'recon reward':>13}{'t_flip':>9}")
+    print("  " + "-" * 100)
     for condition, seeds in runs.items():
         for seed, run in seeds.items():
             m = metrics(run)
             flip = "never" if np.isnan(m["t_flip"]) else f"{m['t_flip']:.0f}"
             print(
                 f"  {condition:<11}{seed:>6}{m['argmax_last']:>16.1f}"
-                f"{m['argmax_range']:>17.1f}{m['argmax_min']:>15.1f}"
+                f"{m['argmax_disagreement']:>10.1f}{m['argmax_range']:>8.1f}"
+                f"{m['argmax_min']:>15.1f}"
                 f"{m['actor_last']:>12.1f}{m['actor_reward']:>+13.3f}{flip:>9}"
             )
     print()
