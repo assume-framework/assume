@@ -1147,6 +1147,9 @@ def setup_world(
             for unit in op_units:
                 world.add_unit(**unit)
 
+    # publish unit refs to output role to enable exploitability calculation
+    world.output_role.units = world.units
+
     # When use_forecasts_df is False, the loaded forecasts_df does not
     # supersede algorithmic forecast calculation.
     use_forecasts_df = config.get("use_forecasts_df", True)
