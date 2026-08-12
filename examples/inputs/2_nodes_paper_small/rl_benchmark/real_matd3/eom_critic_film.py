@@ -138,6 +138,14 @@ MAX_BID_PRICE = 100.0
 #: so its observation is 50-dimensional against 26. The action count is not the
 #: only thing that moves between the two columns; say so in any ``act_share``
 #: comparison across them.
+#:
+#: ``p1``-``p7`` are the **pivotal-frequency ladder**: ``sb02b``'s fleet and
+#: market with only the demand series changed, so the share of hours whose Nash
+#: equilibrium is the backup's marginal cost runs 13 % -> 88 %. ``p1`` is the
+#: undistorted series, i.e. ``p1`` and ``sb02b`` are the same scenario. They
+#: carry a ``demand_file`` because ``demand()`` cannot otherwise know which
+#: series a case reads. See ``example_02_single_bid/make_demand_ladder.py`` for
+#: the transform and its variance confound.
 CASES: dict[str, dict[str, str]] = {
     "02a": {"scenario": "example_02a", "study_case": "base"},
     "02b": {"scenario": "example_02b", "study_case": "base"},
@@ -145,11 +153,23 @@ CASES: dict[str, dict[str, str]] = {
     "sb02a": {"scenario": "example_02_single_bid", "study_case": "02a"},
     "sb02b": {"scenario": "example_02_single_bid", "study_case": "02b"},
     "sb02c": {"scenario": "example_02_single_bid", "study_case": "02c"},
+    **{
+        f"p{k}": {
+            "scenario": "example_02_single_bid",
+            "study_case": f"p{k}",
+            "demand_file": f"demand_df_p{k}.csv",
+        }
+        for k in range(1, 8)
+    },
 }
 
 #: what a bare invocation runs. The single-bid trio, because that is the open
-#: question; the two-bid cases stay one ``--cases 02a 02b 02c`` away.
+#: question; the two-bid cases stay one ``--cases 02a 02b 02c`` away and the
+#: frequency ladder one ``--cases p1 p2 p3 p4 p5 p6 p7``.
 DEFAULT_CASES = ["sb02a", "sb02b", "sb02c"]
+
+#: the pivotal-frequency ladder, as one argument
+LADDER_CASES = [f"p{k}" for k in range(1, 8)]
 
 #: run 13's three seeds, so the two studies are read at the same seed count
 SEEDS = [42, 1, 2]
@@ -190,11 +210,22 @@ def merit_order(case: str) -> dict:
     """
     import pandas as pd
 
+    import yaml
+
     scenario, study = CASES[case]["scenario"], CASES[case]["study_case"]
     folder = INPUTS / scenario
-    # the single-bid folder carries one unit table per study case
-    units_csv = next(p for p in (folder / f"powerplant_units_{study}.csv",
-                                 folder / "powerplant_units.csv") if p.is_file())
+    # The single-bid folder carries one unit table per fleet, and several study
+    # cases share one -- the p1-p7 ladder is all powerplant_units_02b.csv. So
+    # take the name the config actually declares rather than guessing it from
+    # the study case, and keep the guesses as the fallback for folders whose
+    # study case does not override the key.
+    cfg = yaml.safe_load((folder / "config.yaml").read_text(encoding="utf-8"))
+    declared = cfg.get(study, {}).get("powerplant_units")
+    units_csv = next(p for p in (
+        *( [folder / declared] if declared else [] ),
+        folder / f"powerplant_units_{study}.csv",
+        folder / "powerplant_units.csv",
+    ) if p.is_file())
 
     fuel = pd.read_csv(folder / "fuel_prices_df.csv", index_col=0).loc["price"].astype(float)
     pp = pd.read_csv(units_csv)
@@ -236,11 +267,18 @@ def horizon(case: str, study_case: str | None = None) -> tuple[str, str]:
 
 
 def demand(case: str):
-    """Hourly demand of the case's scenario, over the whole series."""
+    """Hourly demand of the case's scenario, over the whole series.
+
+    A case may override the series with ``demand_file``, the way its study case
+    overrides ``demand_df`` in ``config.yaml`` -- that is the only thing the
+    ``p1``-``p7`` ladder changes, so reading the default file for them would
+    hand every rung the same regime bands and silently defeat the experiment.
+    """
     import pandas as pd
 
-    s = pd.read_csv(INPUTS / CASES[case]["scenario"] / "demand_df.csv",
-                    index_col=0, parse_dates=True)["demand_EOM"]
+    spec = CASES[case]
+    path = INPUTS / spec["scenario"] / spec.get("demand_file", "demand_df.csv")
+    s = pd.read_csv(path, index_col=0, parse_dates=True)["demand_EOM"]
     return s.resample("1h").mean()
 
 
@@ -347,6 +385,12 @@ class EomCriticRecorder:
         # at the first snapshot.
         self.n_obs = len(observations)
         self.obs: np.ndarray | None = None
+        #: the joint action actually played at each probed observation, read
+        #: from the buffer at the same instant as self.obs and never re-read
+        #: (the ring wraps, so a later read would pair a frozen observation
+        #: with another transition's action). Fills the other agents' columns
+        #: in the ":stored" sweeps -- see snapshot().
+        self.stored_act: np.ndarray | None = None
         #: quantile band per regime, set by run_child when --obs-regimes is
         #: passed; None means the plain evenly-spaced selection
         self.bands: dict[str, tuple[float, float]] | None = None
@@ -385,8 +429,9 @@ class EomCriticRecorder:
     def _filled(buf) -> int:
         return len(buf.observations) if bool(buf.full) else int(buf.pos)
 
-    def _sample_observations(self, buf) -> tuple[np.ndarray, list[str]]:
-        """The joint observations to film from, and the regime label of each.
+    def _sample_observations(self, buf) -> tuple[np.ndarray, list[str], np.ndarray]:
+        """The joint observations to film from, their regime labels, and the
+        joint action that was actually **played** at each of them.
 
         Default (``bands`` unset): ``n_obs`` evenly spaced through the buffer,
         which is a spread over whatever hours happened to be collected and
@@ -402,19 +447,29 @@ class EomCriticRecorder:
         "the equilibrium is marginal cost" hours and "the equilibrium is the
         backup's cost" hours. This is the point of the whole exercise: whether
         one critic can hold both equilibria at once.
+
+        The stored actions are read **here**, at the same instant as the
+        observations, and never again. The buffer is a ring that does fill and
+        wrap in these runs (``buffer_fill`` saturates at 50 000), so re-reading
+        ``buf.actions`` at a later frame would pair a frozen observation with
+        some *other* transition's action. Taken together the pair is a genuine
+        transition -- the joint action that was played when this state was
+        visited -- which is what ``matd3.py:704`` feeds the critic for the
+        other agents' slots. See ``snapshot`` for what is done with it.
         """
         fill = self._filled(buf)
         if fill < self.n_obs:
             raise RuntimeError(f"buffer holds {fill} transitions, need {self.n_obs}")
         obs = np.asarray(buf.observations[:fill], dtype=np.float64)
+        act = np.asarray(buf.actions[:fill], dtype=np.float64)
 
         if not self.bands:
             idx = np.linspace(0, fill - 1, self.n_obs).astype(int)
-            return obs[idx], ["any"] * self.n_obs
+            return obs[idx], ["any"] * self.n_obs, act[idx]
 
         # agent 0's column is enough: every agent sees the same market
         order = np.argsort(obs[:, 0, 0], kind="stable")
-        picked, labels = [], []
+        picked, played, labels = [], [], []
         for name, (lo, hi) in self.bands.items():
             a, b = int(round(lo * fill)), int(round(hi * fill))
             if b - a < 1:
@@ -423,10 +478,12 @@ class EomCriticRecorder:
             take = min(self.n_obs, b - a)
             sel = order[a:b][np.linspace(0, (b - a) - 1, take).astype(int)]
             picked.append(obs[sel])
+            played.append(act[sel])
             labels += [name] * take
         if not picked:
             raise RuntimeError("no regime band matched any buffered transition")
-        return np.concatenate(picked, axis=0), labels
+        return (np.concatenate(picked, axis=0), labels,
+                np.concatenate(played, axis=0))
 
     def _reward_window(self, buf) -> np.ndarray:
         """Indices of the transitions collected since the previous frame.
@@ -471,6 +528,10 @@ class EomCriticRecorder:
 
         Columns are indexed into the flat ``(n_agents * act_dim)`` action vector
         the critic takes, in the order ``matd3.py`` concatenates it.
+
+        Every sweep is recorded **twice**, against two different fillings of the
+        *other* agents' columns -- see ``_BASES`` and ``snapshot``. The names
+        here are the base names; the stored-action variant appends ``:stored``.
         """
         base = i * self.act_dim
         if self.act_dim == 1:
@@ -484,6 +545,12 @@ class EomCriticRecorder:
             ("diag", [base + k for k in range(self.act_dim)])
         ]
 
+    def _sweep_names(self, i: int) -> list[str]:
+        """Sweep names in the order ``snapshot`` writes them."""
+        return [f"{name}{suffix}"
+                for name, _ in self._sweep_columns(i)
+                for suffix in ("", ":stored")]
+
     # -- the frame ----------------------------------------------------------
 
     def snapshot(self, algorithm) -> None:
@@ -496,12 +563,13 @@ class EomCriticRecorder:
         self.act_dim = int(algorithm.act_dim)
 
         if self.obs is None:
-            self.obs, self.obs_regime = self._sample_observations(buf)
+            self.obs, self.obs_regime, self.stored_act = \
+                self._sample_observations(buf)
             # a stratified selection returns one block per regime, so the count
             # is n_obs x (regimes present), not n_obs
             self.n_obs = len(self.obs)
             self.unit_ids = [u for u, _ in strategies]
-            self.sweeps = [name for name, _ in self._sweep_columns(0)]
+            self.sweeps = self._sweep_names(0)
             if self.bands:
                 counts = {r: self.obs_regime.count(r) for r in dict.fromkeys(self.obs_regime)}
                 print(f"  probing {self.n_obs} observations by regime: {counts}")
@@ -509,8 +577,22 @@ class EomCriticRecorder:
         n_bids = len(self.bids)
         n_sweeps = len(self.sweeps)
 
-        # every agent's greedy action at the probed observations; the swept
-        # columns are then replaced by the grid inside each agent's own sweep
+        # Two fillings of the OTHER agents' action columns, recorded side by
+        # side. Only the swept columns differ between them; agent i's own
+        # columns are replaced by the bid grid either way.
+        #
+        #   "policy"  every agent at its CURRENT actor's greedy action. This is
+        #             the best-response field -- "is there a better bid against
+        #             what my opponents play now" -- and it is what
+        #             exploitability measures.
+        #   "stored"  every agent at the action it actually PLAYED at this
+        #             transition, which is what matd3.py:704 puts in the other
+        #             slots when it differentiates the actor loss. This is the
+        #             gradient the actor really climbs.
+        #
+        # They are not the same object and the difference between them is
+        # RUNS.md correction 17, which had never been measured. Recording both
+        # costs one extra forward/backward per probe.
         with th.no_grad():
             base = th.stack(
                 [
@@ -520,6 +602,11 @@ class EomCriticRecorder:
                 dim=1,
             )  # (n_obs, n_agents, act_dim)
         flat_base = base.reshape(self.n_obs, n_agents * self.act_dim)
+        flat_stored = th.as_tensor(
+            self.stored_act.reshape(self.n_obs, n_agents * self.act_dim),
+            dtype=th.float32,
+        )
+        bases = {"": flat_base, ":stored": flat_stored}
 
         q1_frame = np.empty((n_agents, n_sweeps, self.n_obs, n_bids), dtype=np.float32)
         grad_frame = np.empty_like(q1_frame)
@@ -535,24 +622,28 @@ class EomCriticRecorder:
                 ),
                 dtype=th.float32,
             )
-            for s, (_, cols) in enumerate(self._sweep_columns(i)):
-                acts = flat_base[:, None, :].repeat(1, n_bids, 1).clone()
-                for c in cols:
-                    acts[:, :, c] = grid
-                acts = acts.reshape(self.n_obs * n_bids, -1)
-                acts.requires_grad_(True)
+            s = 0
+            for _, cols in self._sweep_columns(i):
+                for suffix, filling in bases.items():
+                    acts = filling[:, None, :].repeat(1, n_bids, 1).clone()
+                    for c in cols:
+                        acts[:, :, c] = grid
+                    acts = acts.reshape(self.n_obs * n_bids, -1)
+                    acts.requires_grad_(True)
 
-                # Q1 is the objective matd3.py differentiates for the actor loss
-                q1 = strategy.critics.q1_forward(states, acts)
-                (grad,) = th.autograd.grad(q1.sum(), acts)
+                    # Q1 is the objective matd3.py differentiates for the actor
+                    # loss; only the other agents' columns differ by `suffix`
+                    q1 = strategy.critics.q1_forward(states, acts)
+                    (grad,) = th.autograd.grad(q1.sum(), acts)
 
-                shape = (self.n_obs, n_bids)
-                q1_frame[i, s] = q1.detach().numpy().reshape(shape)
-                # dQ/d(bid in EUR) along the swept direction: the columns move
-                # together, so their gradients add before the EUR rescaling
-                grad_frame[i, s] = (
-                    grad[:, cols].sum(axis=1).numpy().reshape(shape) / MAX_BID_PRICE
-                )
+                    shape = (self.n_obs, n_bids)
+                    q1_frame[i, s] = q1.detach().numpy().reshape(shape)
+                    # dQ/d(bid in EUR) along the swept direction: the columns
+                    # move together, so their gradients add before the rescaling
+                    grad_frame[i, s] = (
+                        grad[:, cols].sum(axis=1).numpy().reshape(shape) / MAX_BID_PRICE
+                    )
+                    s += 1
 
         self.q1.append(q1_frame)
         self.grad1.append(grad_frame)
@@ -613,6 +704,10 @@ class EomCriticRecorder:
             # collected since the previous frame
             rewards=np.stack(self.rewards, axis=0),
             observations=self.obs,
+            # (n_obs, n_agents, act_dim) the joint action played at each probed
+            # observation, i.e. what fills the other agents' columns in the
+            # ":stored" sweeps. Saved so a reader can check the pairing.
+            stored_actions=self.stored_act,
             # (n_obs,) which demand regime each probed observation came from,
             # or all "any" when the selection was not stratified
             obs_regime=np.array(self.obs_regime or ["any"] * self.n_obs),

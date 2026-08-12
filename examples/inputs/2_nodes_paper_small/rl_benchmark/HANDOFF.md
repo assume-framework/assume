@@ -268,6 +268,13 @@ per task, parallelism from the array width.
 Both defects are in the *measurement*, not the learner, so every number they touch
 is provisional until this is done.
 
+**Run 13-rerun does not close this and was never meant to.** It re-ran run 13's
+*configuration* on the cluster and settled reproducibility (finding 13); it used
+the same recorder, so both defects below were live in it too. Nothing is
+outstanding on the rerun — 18/18 `COMPLETED`, written up in
+[`RUNS_Continuation.md`](RUNS_Continuation.md) § 13-rerun. A is a code change to
+`MultiAgentRecorder`, not a batch of jobs.
+
 1. **Record the actor's actual objective.** Give `MultiAgentRecorder` a second
    sweep that holds the other agents at the **replay batch's stored actions**, the
    way `matd3.py:704` does, alongside the current-policy sweep it already takes.
@@ -282,7 +289,11 @@ is provisional until this is done.
 3. **Then re-run** runs 10 and 12's reward columns and run 13's window table on
    the cluster. Runs 10–11's reward columns are currently labelled `recon` and have
    never been recomputed; run 12's measured column exists but is the early-hours
-   sample.
+   sample. **Budget for condition means, not per-seed comparison**: finding 13
+   showed the trajectories do not reproduce across machines, so a fixed-recorder
+   run 13 can only be compared to the archive at the condition level, and any
+   per-seed difference is uninterpretable at 3 seeds. `cluster/rerun_run13.sh`
+   already runs the right 18 tasks once the recorder change lands.
 
 Optionally also fix the two `ReplayBuffer` defects (§caveats) while re-running —
 untriggered at these buffer sizes, but a longer cluster run is exactly where the

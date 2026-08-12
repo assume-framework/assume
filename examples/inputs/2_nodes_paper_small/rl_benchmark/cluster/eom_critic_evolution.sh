@@ -24,6 +24,22 @@
 #   sb02a   example_02_single_bid / 02a           pp_6      SINGLE bid
 #   sb02b   example_02_single_bid / 02b           pp_6-10   SINGLE bid
 #   sb02c   example_02_single_bid / 02c           pp_6-15   SINGLE bid
+#   p1..p7  example_02_single_bid / p1..p7        pp_6-10   SINGLE bid
+#
+# p1-p7 are the PIVOTAL-FREQUENCY LADDER: sb02b's fleet and market with only
+# the demand series changed, so the share of hours whose Nash equilibrium is
+# the backup's marginal cost runs 13% -> 88% (13, 25, 37, 50, 62, 75, 88).
+# p1 is the undistorted series, i.e. p1 IS sb02b and is the ladder's control.
+# Run 14b found the critic fits the regime it sees often and leaves the rare
+# one as noise; this separates "rare" from "pivotal", which are confounded in
+# sb02b. The transform is an affine compression, so every hour keeps its rank
+# and the day/night profile is preserved exactly -- and because residual load
+# is min-max scaled by its own min and max, the scale factor cancels and the
+# agent's OBSERVATION is bit-identical across all seven rungs. Only where the
+# regime boundary falls inside it moves (7000 MW at scaled 0.868 in p1, 0.231
+# in p7). See example_02_single_bid/make_demand_ladder.py.
+#
+#   CASES="p1 p2 p3 p4 p5 p6 p7" bash .../eom_critic_evolution.sh    # 21 tasks
 #
 # The default is the sb* trio. Each sb case is the same fleet, demand, fuel
 # prices and market as the 02x case above it, bidding with
@@ -39,6 +55,17 @@
 # those, and the naive units never enter a critic's input. The two-bid cases
 # take three sweeps per agent (one per action component, plus the diagonal);
 # the single-bid cases take one, named "diag" so every reader works on both.
+#
+# Every sweep is recorded TWICE, against two fillings of the other agents'
+# action columns (RUNS.md correction 17, now measured rather than caveated):
+#   "diag"          others at their CURRENT actors' greedy actions -- the
+#                   best-response field, which is what exploitability measures
+#   "diag:stored"   others at the action they actually PLAYED at that
+#                   transition, which is what matd3.py:704 feeds the critic
+#                   when it differentiates the actor loss
+# Figures default to "diag"; pass --sweep diag:stored to draw the other, which
+# writes to its own file names. Doubles the film size and costs one extra
+# forward/backward per probe.
 #
 # These are also the scenarios exploitability is valid on -- one pay-as-clear
 # EOM, no storage, no redispatch (see the SCOPE note in
@@ -58,7 +85,8 @@
 #   MEM / CPUS      per task (default 8G / 1)
 #   MAX_PARALLEL    array concurrency cap (default: none)
 #   CASES           subset (default "sb02a sb02b sb02c"). Pass "02a 02b 02c"
-#                   for the two-bid originals, or all six for both ladders.
+#                   for the two-bid originals, all six for both ladders, or
+#                   "p1 p2 p3 p4 p5 p6 p7" for the pivotal-frequency ladder.
 #   SEEDS           subset (default: 42 1 2, run 13's seeds)
 #   EPISODES        override training_episodes (default: the study case's 100)
 #   GRID/NOBS/EVERY recorder resolution. Defaults 201 / 4 / 4 keep 02c near

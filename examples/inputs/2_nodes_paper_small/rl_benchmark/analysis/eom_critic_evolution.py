@@ -415,7 +415,7 @@ def plot_film(run: dict, sweep: str, out: Path) -> None:
 
 
 def plot_regime_heatmaps(run: dict, sweep: str, out: Path) -> None:
-    """The critic's field in each demand regime, side by side, plus the difference.
+    """The critic's field in each demand regime, per learning unit.
 
     ``plot_separation`` reduces the critic to one number per frame — where the
     peak of ``Q1`` sits. That answers "does the actor end up somewhere else"
@@ -424,13 +424,14 @@ def plot_regime_heatmaps(run: dict, sweep: str, out: Path) -> None:
     move while the field stays flat, and a flat field is a gradient the actor
     cannot climb no matter how right the peak is.
 
-    So: one panel per regime showing ``dQ1/d(bid)`` over (bid, critic updates),
-    medianed over the learning units and over that regime's probed
-    observations, on **one shared colour scale** so the panels are comparable;
-    then a **difference panel**, the last regime minus the first, on its own
-    scale. Marginal cost and the backup's marginal cost are marked, because
-    those are the two equilibrium prices the panels are being asked to
-    distinguish.
+    Layout: **one column per regime, one row per learning unit**, each panel
+    ``dQ1/d(bid)`` over (bid, critic updates) medianed only over that regime's
+    probed observations. Every panel shares one colour scale, so a unit that
+    has learned the regime and a unit that has not are directly comparable —
+    which the earlier median-over-units version hid, since a single confident
+    unit and nine flat ones median to something that is neither. Marginal cost
+    and the backup's marginal cost are marked, because those are the two
+    equilibrium prices the panels are being asked to distinguish.
     """
     regimes = [g for g in REGIMES if g in set(run["regime"])]
     if len(regimes) < 2:
@@ -441,59 +442,48 @@ def plot_regime_heatmaps(run: dict, sweep: str, out: Path) -> None:
     s = run["sweeps"].index(sweep)
     steps, bids = run["steps"], run["bids"]
     spec = merit_order(run["case"])
+    units = run["units"]
 
-    fields = {}
+    # (unit, regime) -> (frames, grid), and the actor's own trajectory alongside
+    fields, tracks = {}, {}
     for regime in regimes:
         v = subset(run, regime)
-        # median over agents and over that regime's observations
-        fields[regime] = np.median(v["grad"][:, s], axis=(0, 1))    # (frames, grid)
+        for i, unit in enumerate(units):
+            fields[unit, regime] = np.median(v["grad"][i, s], axis=0)
+            tracks[unit, regime] = np.median(v["greedy"][i].min(axis=0), axis=0)
 
-    n = len(regimes)
-    # constrained layout, because the shared colour bar sits *between* the
-    # regime panels and the difference panel and its label runs into the latter
-    # under the default one
-    fig, axes = plt.subplots(1, n + 1, figsize=(4.3 * (n + 1), 4.8),
-                             squeeze=False, sharey=True, layout="constrained")
-    axes = axes[0]
+    ncol, nrow = len(regimes), len(units)
+    # constrained layout: the shared colour bar sits to the right of a tall
+    # stack and its label runs into the panels under the default one
+    fig, axes = plt.subplots(
+        nrow, ncol, figsize=(4.3 * ncol, 2.45 * nrow + 1.0),
+        squeeze=False, sharex=True, sharey=True, layout="constrained")
 
     vmax = float(np.percentile(np.abs(np.stack(list(fields.values()))), 99.5)) or 1e-6
-    for ax, regime in zip(axes, regimes):
-        im = ax.pcolormesh(
-            bids, steps, fields[regime], cmap=DIVERGING,
-            norm=SymLogNorm(linthresh=vmax * 1e-3, vmin=-vmax, vmax=vmax, base=10),
-            shading="nearest", rasterized=True)
-        v = subset(run, regime)
-        traj = np.median(v["greedy"].min(axis=1), axis=(0, 1))
-        ax.plot(traj, steps, lw=3.0, color="white", solid_capstyle="round")
-        ax.plot(traj, steps, lw=1.5, color=INK, solid_capstyle="round")
-        ax.set_title(f"{regime} — NE {REGIMES[regime]}", loc="left",
-                     fontsize=10, color=REGIME_COLOR[regime])
-        ax.set_xlabel("bid price (EUR/MWh)", fontsize=9, color=MUTED)
-    fig.colorbar(im, ax=list(axes[:n]), fraction=0.03, pad=0.012).set_label(
+    norm = SymLogNorm(linthresh=vmax * 1e-3, vmin=-vmax, vmax=vmax, base=10)
+    for row, unit in enumerate(units):
+        for col, regime in enumerate(regimes):
+            ax = axes[row][col]
+            im = ax.pcolormesh(bids, steps, fields[unit, regime], cmap=DIVERGING,
+                               norm=norm, shading="nearest", rasterized=True)
+            traj = tracks[unit, regime]
+            ax.plot(traj, steps, lw=3.0, color="white", solid_capstyle="round")
+            ax.plot(traj, steps, lw=1.5, color=INK, solid_capstyle="round")
+            if row == 0:
+                ax.set_title(f"{regime} — NE {REGIMES[regime]}", loc="left",
+                             fontsize=10, color=REGIME_COLOR[regime])
+            if row == nrow - 1:
+                ax.set_xlabel("bid price (EUR/MWh)", fontsize=9, color=MUTED)
+            if col == 0:
+                ax.set_ylabel(f"{unit}\ncritic updates", fontsize=9, color=MUTED)
+            for level, style in ((spec["mc"], "--"), (spec["backup_mc"], ":")):
+                if bids[0] <= level <= bids[-1]:
+                    ax.axvline(level, lw=1.0, ls=style, color=INK, alpha=0.5)
+            ax.set_xlim(bids[0], bids[-1])
+            strip(ax)
+    fig.colorbar(im, ax=axes.ravel().tolist(), fraction=0.022, pad=0.012).set_label(
         f"dQ1/d(bid), sweep '{sweep}'   (symlog, shared scale)",
         fontsize=8.5, color=MUTED)
-
-    # the difference: what the critic does with the extra information
-    a, b = regimes[0], regimes[-1]
-    diff = fields[b] - fields[a]
-    dmax = float(np.percentile(np.abs(diff), 99.5)) or 1e-6
-    ax = axes[n]
-    im2 = ax.pcolormesh(
-        bids, steps, diff, cmap=DIVERGING,
-        norm=SymLogNorm(linthresh=dmax * 1e-3, vmin=-dmax, vmax=dmax, base=10),
-        shading="nearest", rasterized=True)
-    ax.set_title(f"difference: {b} − {a}", loc="left", fontsize=10, color=INK)
-    ax.set_xlabel("bid price (EUR/MWh)", fontsize=9, color=MUTED)
-    fig.colorbar(im2, ax=ax, fraction=0.06, pad=0.012).set_label(
-        "Δ dQ1/d(bid)  (own scale)", fontsize=8.5, color=MUTED)
-
-    for ax in axes:
-        for level, style in ((spec["mc"], "--"), (spec["backup_mc"], ":")):
-            if bids[0] <= level <= bids[-1]:
-                ax.axvline(level, lw=1.0, ls=style, color=INK, alpha=0.5)
-        ax.set_xlim(bids[0], bids[-1])
-        strip(ax)
-    axes[0].set_ylabel("critic updates", fontsize=9, color=MUTED)
 
     fig.suptitle(
         f"{run['case']} seed {run['seed']} — does the critic see the two "
@@ -509,7 +499,7 @@ def plot_regime_heatmaps(run: dict, sweep: str, out: Path) -> None:
 # ----------------------------------------------------------- NE separation
 
 
-def plot_separation(runs: list[dict], out: Path) -> None:
+def plot_separation(runs: list[dict], sweep: str, out: Path) -> None:
     """Does one actor/critic hold both equilibria at once?
 
     The stage game's Nash equilibrium switches with demand: at ``bertrand``
@@ -523,15 +513,20 @@ def plot_separation(runs: list[dict], out: Path) -> None:
     each near its own reference. If it does not, they lie on top of each other —
     a single price for a game with two answers.
     """
-    runs = [r for r in runs if len(set(r["regime"])) > 1]
+    runs = [r for r in runs if len(set(r["regime"])) > 1
+            and sweep in r["sweeps"]]
     if not runs:
         print("  no run carries more than one probed regime -- "
               "re-record with --obs-regimes (see eom_critic_film.py)")
         return
 
     cases = list(dict.fromkeys(r["case"] for r in runs))
+    # sharey across every panel, not per row: the point of the figure is to
+    # compare where each case's actor and critic settle against the same two
+    # equilibrium prices, and per-panel autoscaling made a run pinned at
+    # marginal cost and a run swinging over the full action range look alike
     fig, axes = plt.subplots(2, len(cases), figsize=(4.9 * len(cases), 7.2),
-                             squeeze=False, sharex="col")
+                             squeeze=False, sharex="col", sharey=True)
     for col, case in enumerate(cases):
         spec = merit_order(case)
         for row, (key, name) in enumerate(((None, "actor: greedy bid"),
@@ -545,8 +540,8 @@ def plot_separation(runs: list[dict], out: Path) -> None:
                     if row == 0:
                         y = np.median(s["greedy"].min(axis=1), axis=(0, 1))
                     else:
-                        sw = s["sweeps"].index("diag")
-                        peak = s["bids"][np.argmax(s["q1"][:, sw], axis=-1)]
+                        k = s["sweeps"].index(sweep)
+                        peak = s["bids"][np.argmax(s["q1"][:, k], axis=-1)]
                         y = np.median(peak, axis=(0, 1))
                     ax.plot(s["steps"], y, lw=1.6, color=REGIME_COLOR[regime],
                             alpha=0.85,
@@ -681,6 +676,10 @@ def main() -> None:
     if not runs:
         raise SystemExit(f"no recorded runs under {args.data_dir}")
 
+    # ":stored" is not a legal filename character on Windows, and drawing both
+    # sweeps must not have the second overwrite the first
+    sw = "" if args.sweep == "diag" else f"-{args.sweep.replace(':', '-')}"
+
     if args.only in (None, "film"):
         for run in runs:
             if args.sweep not in run["sweeps"]:
@@ -706,18 +705,20 @@ def main() -> None:
                     plot_film(
                         view, args.sweep,
                         args.img_dir
-                        / f"14-eom-{run['case']}-seed{run['seed']}{tag}.png",
+                        / f"14-eom-{run['case']}-seed{run['seed']}{tag}{sw}.png",
                     )
     if args.only in (None, "regime-heatmap"):
         for run in runs:
             if len(set(run["regime"])) > 1 and args.sweep in run["sweeps"]:
                 plot_regime_heatmaps(
                     run, args.sweep,
-                    args.img_dir / f"14-eom-regimes-{run['case']}-seed{run['seed']}.png")
+                    args.img_dir
+                    / f"14-eom-regimes-{run['case']}-seed{run['seed']}{sw}.png")
     if args.only in (None, "summary"):
         plot_summary(runs, args.img_dir / "14-eom-summary.png")
     if args.only in (None, "separation"):
-        plot_separation(runs, args.img_dir / "14-eom-ne-separation.png")
+        plot_separation(runs, args.sweep,
+                        args.img_dir / f"14-eom-ne-separation{sw}.png")
 
 
 if __name__ == "__main__":
