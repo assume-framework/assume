@@ -67,6 +67,21 @@
 #                   run's RUNS_Continuation.md section.
 #   KEEP_DB         set to 0 to leave the sqlite databases out of the tarball
 #                   (drops exploitability, keeps the films)
+#   RUN_NAME        data/log/tarball basename (default 14-eom-critic-evolution).
+#                   Give a new one to keep an earlier batch's films instead of
+#                   writing over them -- e.g. RUN_NAME=14b-eom-regimes.
+#   RERUN           set to 1 to refilm trials that already have a valid .npz.
+#                   Needed when only the RECORDING changed and the training did
+#                   not: validate_result() checks schema, label and seed, not
+#                   OBS_REGIMES, so an existing film is otherwise skipped and
+#                   the batch returns the old one.
+#   OBS_REGIMES     set to 1 to stratify the probed observations by demand
+#                   regime, so the critic film can be read separately for the
+#                   two Nash equilibria the stage game switches between
+#                   (bertrand -> marginal cost, pivotal -> backup marginal
+#                   cost). NOBS is then per regime, so the file grows by the
+#                   number of regimes present -- 2 for every case here. See
+#                   REGIMES and merit_order() in real_matd3/eom_critic_film.py.
 # ===========================================================================
 
 set -euo pipefail
@@ -90,7 +105,7 @@ fi
 PYTHON="${ASSUME_PYTHON:-$HOME/miniconda3/envs/assume/bin/python}"
 
 OUT="$REPO/examples/outputs/2_nodes_paper_small/rl_benchmark/runs"
-NAME="14-eom-critic-evolution"
+NAME="${RUN_NAME:-14-eom-critic-evolution}"
 DATA="$OUT/data/$NAME"
 LOGS="$OUT/logs/$NAME"
 EXPORTS="$OUT/exports"
@@ -165,7 +180,9 @@ if [[ "$MODE" == "submit" ]]; then
     echo "  repo    : $REPO"
     echo "  python  : $PYTHON"
     echo "  trials  : $N  ($TRIALS)"
-    echo "  recorder: grid $GRID, $NOBS observations, every $EVERY blocks"
+    echo "  run     : $NAME"
+    echo "  recorder: grid $GRID, $NOBS observations$( [[ "${OBS_REGIMES:-0}" == "1" ]] && echo " PER REGIME" ), every $EVERY blocks"
+    echo "  existing: $( [[ "${RERUN:-0}" == "1" ]] && echo "refilmed (--rerun)" || echo "skipped if valid -- set RERUN=1 to refilm" )"
     echo "  data    : $DATA"
     echo "  logs    : $LOGS"
     echo
@@ -230,6 +247,8 @@ if [[ "$MODE" == "trial" ]]; then
     ARGS=(--cases "$CASE" --seeds "$SEED" --workers 1 --threads 1
           --grid "$GRID" --n-obs "$NOBS" --every "$EVERY" --out-dir "$DATA")
     [[ -n "${EPISODES:-}" ]] && ARGS+=(--episodes "$EPISODES")
+    [[ "${OBS_REGIMES:-0}" == "1" ]] && ARGS+=(--obs-regimes)
+    [[ "${RERUN:-0}" == "1" ]] && ARGS+=(--rerun)
 
     "$PYTHON" "$RUNNER" "${ARGS[@]}"
 

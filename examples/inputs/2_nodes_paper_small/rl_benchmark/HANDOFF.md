@@ -99,6 +99,53 @@ constrained optimum of 32.31.
     With eleven agents the critic's preferred bid genuinely should depend on the
     observation, so disagreement between probed observations stops being evidence
     of a broken critic.
+10. **On a plain energy-only market the same learner works, and `act_share` does
+    not predict it** (run 14, `sb02a`–`sb02c`, single bid, cluster). All 9 trials
+    converge, seeds agree to **0.6–1 EUR** against run 13's 15–17, and the single
+    pivotal unit finds a **+17.2 EUR markup** over marginal cost with reward rising
+    monotonically. `act_share` is **0.004–0.010** — an order of magnitude *below*
+    run 13's failing baseline — and the task is solved anyway. So `act_share`
+    orders outcomes *within* the inc-dec landscape; it is not a general predictor
+    of whether MATD3 can learn. **The failure in runs 09–13 is a property of that
+    reward landscape, not of MATD3, the critic architecture, or the input count.**
+    ⚠️ Not a single-variable contrast: scenario, bid structure, `lr` and horizon
+    all differ from run 13 at once.
+11. **Markup tracks learning *capacity*, not learner count.** 1 × 2500 MW → +17.2;
+    5 × 500 MW → +0.8 (competed to marginal cost); 10 × 500 MW → **+7.8**, back up.
+    What changes between the last two is 5000 MW of learners against the same naive
+    fleet, not the agent count. Do not read the ladder as "more agents ⇒ more
+    competition".
+12b. **The stage game has two equilibria and MATD3 learns only one of them.**
+    Because the naive fleet bids marginal cost, the NE switches with demand:
+    where a learner is left **undispatched** it undercuts and NE is **marginal
+    cost** (`bertrand`); where every learner runs and one is only **partly**
+    dispatched, that unit is marginal and irreplaceable and NE is the **backup's
+    marginal cost, 85.7** (`pivotal`). `sb02b` contains both (67 % / 13 % of
+    hours) and ends **6.4× more exploitable in the pivotal hours** — 2698 against
+    424 EUR/h — with the pivotal trace flat from about episode 5 while the
+    Bertrand trace keeps falling. `sb02c` (all Bertrand) reaches 0.02× of its
+    starting exploitability; `sb02a` (all pivotal) only 0.20 ×, and its residual
+    7209 EUR/h is almost exactly the markup it failed to take. **Bidding down to
+    cost is easy — a mistake is punished at once. Bidding up to a rival's cost 30
+    EUR above your own has no local gradient telling you where to stop.** This is
+    the plain-EOM analogue of the inc-dec cliff, and it is the sharper version of
+    the question runs 01–13 were asking. `analysis/eom_exploitability.py`.
+12. **Exploitability is the sharpest of the three statistics, and it is the one
+    that separates market power from bad play.** Per MW of learner capacity it
+    falls **2.3 → 1.3 → 0.29 EUR/MWh** across `sb02a`/`sb02b`/`sb02c`: the
+    ten-learner case ends **closest to Nash** while bidding *further above*
+    marginal cost than the five-learner case. It measures distance to best
+    response, not distance to competitive pricing. Monotone decreasing over
+    training in all 9 runs.
+13. **ASSUME's MATD3 is chaotic on `inc_dec_learning`, and per-seed bids are not a
+    reproducible quantity across machines** (run 13-rerun). Local vs. cluster, same
+    seed and `--threads 1` on both: divergence starts at **frame 0 at float32
+    rounding scale** (≈1e-7 relative, entering through the simulator and torch, not
+    the RNG stream) and amplifies to **177 EUR** on a 200-wide action range. **What
+    reproduces is the condition means and their ordering** — ≤ 4.1 EUR apart, well
+    inside the seed spreads, monotone in the own share at both budgets, with
+    `act_share` matching to three decimals. Report conditions; treat per-seed
+    columns as one draw.
 
 ## Refuted or revised — do not re-test
 
@@ -115,8 +162,16 @@ constrained optimum of 32.31.
 - ⚠️ "Without shaping or a raised `act_share`, MATD3 never forms a preference" —
   single-agent and budget-dependent (finding 7).
 - ⚠️ "Any single result here is a sample from a bimodal distribution, because BLAS
-  thread count alone flipped a seed." **True of the SB3 surrogate, not of ASSUME**
-  — runs 10 and 13 reproduce bit-identically across thread-count changes.
+  thread count alone flipped a seed." True of the SB3 surrogate. For ASSUME the
+  claim was "runs 10 and 13 reproduce bit-identically across thread-count
+  changes" — **that holds only within one machine.** The run 13 cluster rerun
+  reproduces *none* of the 18 trajectories (finding 13). Thread count was pinned
+  at 1 on both sides, so it is not the lever; the learner is simply chaotic and
+  float32 rounding is enough to separate two runs.
+- ❌ "`act_share` predicts whether MATD3 can learn." It orders outcomes on the
+  inc-dec landscape. Run 14 solves a plain EOM at `act_share` **0.004–0.010**,
+  below run 13's failing baseline (finding 10). This is a stronger reason to
+  finish workstream B than the one B was written for.
 
 ## Traps that cost time
 
@@ -142,6 +197,26 @@ constrained optimum of 32.31.
 - **The `matd3.py:618-628` debug prints are commented out** (run 13 did that) —
   they drew `th.rand(1)` per gradient step per agent, and runs 09–12 were recorded
   with them **live**.
+- **A film's x axis carries two coordinates at once, and `--every` can alias them.**
+  Every episode replays the same calendar, and `train_freq` is snapped by
+  `learning_role.sync_train_freq_with_simulation_horizon` to divide the horizon
+  evenly (`100h` over 31 days → **93h**, 8 blocks). So "critic updates" mixes
+  training progress with position in the horizon, and if `blocks_per_episode /
+  every` is small the frame index samples a *fixed handful of calendar phases
+  forever*. Run 14 hit exactly this: `--every 4` against 8 blocks gave two frames
+  per episode, so the reward trace alternated between the two halves of March
+  (6026 vs 5818 MW) and **reversed direction on 77–95 % of consecutive frames** —
+  which reads as instability and is a calendar. **Check
+  `blocks_per_episode / every` before believing any oscillation in a film**, and
+  prefer a value that divides the block count evenly or equals it.
+  `analysis/eom_critic_evolution.py:frame_schedule` derives the mapping for
+  already-recorded runs; new runs carry `frame_time` and `frame_episode`.
+- **The figure scripts do not run on the cluster.** The house palette lives in
+  `sweeps/run_benchmark.py`, which imports `stable_baselines3` at module level,
+  and SB3 is a surrogate-only dependency that is not in `pyproject.toml` and not
+  in the cluster env. Both collectors are `|| true` throughout so this costs you
+  nothing but the `img/` folder — **redraw locally after unpacking**. Runs 13-rerun
+  and 14 both came back figure-less for this reason.
 
 ## Caveats on the current results
 
@@ -168,6 +243,11 @@ Two of these are the reason workstream A exists.
   before re-running.**
 - **Seed counts are small** (3 per condition for runs 11–13, 6 for run 10). They
   reject easy fixes; they are not success rates.
+- ⚠️ **`RUNS.md` §13's per-seed bid columns are one draw, not the numbers.** The
+  cluster rerun reproduces the condition means and their ordering but none of the
+  18 trajectories (finding 13). Anything quoted per seed off that table — or off
+  runs 09–12, which have never been re-run on a second machine — carries the same
+  caveat.
 - **Two `ReplayBuffer` defects in `assume/` are open and untriggered** — an early
   `full` wrap and episode-boundary bootstrapping. Fixing them is a library change.
 
@@ -262,8 +342,54 @@ two reference points.
 
 ## C. Does any of this generalise? — plain EOM scenarios
 
-Everything above is one redispatch/multi-market scenario with a 90 %-flat reward.
-Nothing says the conclusions survive on an ordinary energy-only market.
+✅ **Answered, and the answer changes the priority of A and B.** Everything in
+runs 01–13 is one redispatch/multi-market scenario with a 90 %-flat reward, and
+**none of the failure picture survives on an ordinary energy-only market**: run 14
+solves all nine trials at an `act_share` an order of magnitude below run 13's
+failing baseline (findings 10–12). So the thing being explained is *that reward
+landscape*, not MATD3 and not `CriticTD3`'s input layout.
+
+What that implies for the rest of the plan:
+
+* **B is still worth doing, for a better reason than it was written for.**
+  `act_share` is now known not to be a general predictor — run 14 falsifies it as
+  one. Late action injection and SimBa are worth screening on the offline γ = 0
+  harness on their own merits; "raise `act_share`" is not the mechanism.
+* **Whatever B finds has a second bar to clear:** it must not *break* the plain
+  EOM, which currently works. `cluster/eom_critic_evolution.sh` is the regression
+  test — 9 tasks, ~15 min each.
+* **A is unchanged and still first.** Run 14 predates it too.
+
+Two open items here, both wired up and neither run:
+
+* **The per-regime critic films.** Finding 12b says the learners solve the
+  Bertrand equilibrium and not the pivotal one; it does **not** say whether the
+  failure is in the critic (it never learns that the pivotal hours pay more) or
+  in the actor (the critic knows, the actor cannot get there). The probed
+  observations are currently sampled without regard to demand, so the existing
+  films cannot answer it. `eom_critic_film.py --obs-regimes` stratifies them by
+  regime — the recorder ranks the buffer on the observation's scaled residual
+  load, which is demand here. Three views then read it, and they answer
+  different halves of the question:
+
+  * `--only regime-heatmap` — the critic's **field** in each regime side by side
+    on one shared colour scale, plus their difference. This is the one that
+    distinguishes a critic failure from an actor failure: a peak can move while
+    the field stays flat, and a flat field is a gradient the actor cannot climb
+    however right the peak is.
+  * `--only separation` — the same reduced to lines, actor bid and `argmax Q1`
+    per regime against both equilibrium prices.
+  * `--regime each --only film` — the full per-unit film, one PNG per regime.
+
+  **One call to record it:**
+
+  ```bash
+  OBS_REGIMES=1 bash .../cluster/eom_critic_evolution.sh
+  ```
+
+  `sb02b` is the case that matters — it is the only one carrying both regimes.
+* **The two-bid ladder** (`02a`–`02c`, act_dim 2), the A/B that isolates bid
+  structure.
 
 * **Port the probes to `example_02a`–`02c`** (`examples/inputs/example_02a` …
   `02c`). ✅ **Done** — `real_matd3/eom_critic_film.py` films the critics of the
@@ -302,6 +428,13 @@ Nothing says the conclusions survive on an ordinary energy-only market.
   total profit. Storages are scored by a volume-preserving Tier-1 rule that holds
   the SoC path fixed, which is a lower bound and not comparable with the thermal
   units it would be averaged against.
+  ✅ **It works end to end on a live learning run** (run 14): 19 evaluation
+  episodes per trial, 96 k–226 k rows, no gaps, monotone decreasing in all nine,
+  and it separates market power from bad play where the bid level alone cannot
+  (finding 12). Read it **learning units only** — the naive fleet is exploitable
+  by construction and dilutes the average — and **per MW**, since the scored units
+  differ 5× in capacity. Ratios to `best_profit` do not work: summed over
+  timesteps the denominator goes small or negative.
 * **Run 13's open equilibrium question is now explicitly out of reach.** Fleet
   reward moves *opposite* to `diesel_0`'s in every run 13 condition, so nothing
   there distinguishes "learned to bid better" from "competed the price down", and
@@ -340,6 +473,9 @@ rl_benchmark/
 ├── real_matd3/      probes ASSUME's own MATD3 (07–12 single, 13 multi-agent,
 │                    eom_critic_film.py for example_02a–c)
 ├── cluster/         one-call SLURM launchers; see its README
+│                    (`analysis/eom_exploitability.py` reads the scratch
+│                     databases, not the .npz films — it is the only script
+│                     here that does)
 ├── test_rl_benchmark.py
 ├── test_exploitability.py               22 unit tests of the clearing /
 │                                        exploitability maths (workstream C)

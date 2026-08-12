@@ -79,7 +79,26 @@ CASES=sb02a SEEDS=42 \
 # both ladders in one 18-task array
 CASES="02a 02b 02c sb02a sb02b sb02c" \
   bash .../cluster/eom_critic_evolution.sh
+
+# the regime-stratified films: probes drawn per Nash equilibrium, so the
+# critic can be read separately for the bertrand and the pivotal state
+RUN_NAME=14b-eom-regimes OBS_REGIMES=1 RERUN=1 NOBS=4 \
+  bash .../cluster/eom_critic_evolution.sh
 ```
+
+`RERUN=1` is not optional there. `validate_result()` checks schema, label and
+seed — not how the observations were sampled — so a trial that already has a
+valid `.npz` is skipped in seconds and the batch hands back the *old*,
+unlabelled film. `RUN_NAME` puts the new batch in its own `data/` and `logs/`
+directory so the earlier run-14 films survive alongside it; reuse the default
+name only if you mean to overwrite them.
+
+Under `OBS_REGIMES=1`, `NOBS` is **per regime**. The recorder ranks the
+observations in the replay buffer by residual load, splits them at the merit
+order's band edges, and drops a band no transition landed in — so `sb02b` gets
+all three (idle / bertrand / pivotal) and `sb02a`, `sb02c` two each. It prints
+which it used (`probing N observations by regime: {...}`). File size grows in
+proportion: `sb02b` goes from ~3.7 MB to ~11 MB per seed.
 
 Locally, without SLURM, the same trials run through the runner directly:
 
@@ -113,6 +132,35 @@ streams, the `sacct` accounting (`MaxRSS` is what sets the next `--mem`), the
 regenerated report as plain text, and the figures. Saved policies are excluded —
 they are bulk and no analysis reads them.
 
+⚠️ **The figure scripts do not run on the cluster** — and the collector will not
+tell you loudly, because every step is `|| true` so one broken figure cannot
+cost you the tarball. The house palette (`DIVERGING`, `INK`, `MUTED`) lives in
+`sweeps/run_benchmark.py`, which imports `stable_baselines3` at module level, and
+SB3 is not in the cluster env (it is a surrogate-only dependency and not in
+`pyproject.toml`). So a batch comes back with **the text reports but no `img/`**,
+and the tarball has no `img/` entry at all. The fix is to redraw locally after
+unpacking:
+
+```bash
+python analysis/eom_critic_evolution.py                     # run 14
+python analysis/eom_exploitability.py                       # run 14, from the .db files
+python real_matd3/assume_multiagent_grids.py                # run 13
+python real_matd3/assume_multiagent_window.py               # run 13
+
+# the regime-stratified batch (--data-dir follows RUN_NAME)
+python analysis/eom_critic_evolution.py \
+    --data-dir ../../../outputs/2_nodes_paper_small/rl_benchmark/runs/data/14b-eom-regimes \
+    --only regime-heatmap
+python analysis/eom_critic_evolution.py --data-dir ... --only separation
+python analysis/eom_critic_evolution.py --data-dir ... --unit each --regime each
+```
+
+The last three only produce anything once the films carry `obs_regime` labels —
+without `OBS_REGIMES=1` they skip themselves silently.
+
+Installing SB3 on the cluster, or moving the palette out of `run_benchmark.py`
+into its own module, would fix it at the source. Neither is done.
+
 Databases are excluded from the run 13 tarball and **kept** in the EOM one,
 because the EOM runs are the ones exploitability is valid on (one pay-as-clear
 market, no storage — see the SCOPE note in
@@ -120,10 +168,20 @@ market, no storage — see the SCOPE note in
 table lives in the sqlite file. `KEEP_DB=0` drops them if the tarball gets
 awkward.
 
+**The command, ready to paste.** Run it from
+`examples/outputs/2_nodes_paper_small/rl_benchmark/runs/exports/` on the laptop —
+it pulls every tarball the cluster has:
+
 ```bash
-# from your laptop
-scp <cluster>:.../runs/exports/eom_1234567.tar.gz .
-tar xzf eom_1234567.tar.gz
+scp fr_fr1096@uc3.scc.kit.edu:/pfs/work9/workspace/scratch/fr_fr1096-finn_basic/code/ADAPT/assume/examples/outputs/2_nodes_paper_small/rl_benchmark/runs/exports/*.tar.gz .
+```
+
+Then unpack one level up, in `runs/`, which is where the tarballs' `data/ logs/
+img/` paths are relative to:
+
+```bash
+cd ..                       # .../rl_benchmark/runs
+for t in exports/*.tar.gz; do tar xzf "$t"; done
 ```
 
 The tarball extracts into the same `data/ logs/ img/` layout the local scripts

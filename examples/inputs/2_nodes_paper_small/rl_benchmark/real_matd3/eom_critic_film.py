@@ -154,6 +154,135 @@ DEFAULT_CASES = ["sb02a", "sb02b", "sb02c"]
 #: run 13's three seeds, so the two studies are read at the same seed count
 SEEDS = [42, 1, 2]
 
+# ------------------------------------------------------------ the stage game
+
+#: Demand regimes, low to high, with the equilibrium each implies. Every
+#: non-learning unit bids its marginal cost, so the merit order is known and the
+#: one-shot game has a closed-form Nash equilibrium that **switches with
+#: demand**. With ``C`` the cheap naive capacity below the learners, ``L`` the
+#: learners' total and ``u`` one learner's:
+#:
+#: ``idle``      D <= C            learners not needed; nothing to exploit.
+#: ``bertrand``  C < D <= C+L-u    at least one learner is completely
+#:                                 undispatched and undercuts any price above
+#:                                 cost, so NE is **everyone at marginal cost**.
+#: ``pivotal``   C+L-u < D <= C+L  every learner runs and one only partly, so
+#:                                 that unit is marginal, cannot be replaced by a
+#:                                 peer, and NE is bidding up to the **backup
+#:                                 generator's marginal cost**.
+#: ``backup``    D > C+L           the backup sets the price; learners are
+#:                                 inframarginal price-takers.
+REGIMES: dict[str, str] = {
+    "idle": "not dispatched",
+    "bertrand": "marginal cost",
+    "pivotal": "backup marginal cost",
+    "backup": "price-taker",
+}
+
+
+def merit_order(case: str) -> dict:
+    """Marginal costs, the learner set and the regime thresholds for one case.
+
+    Marginal cost follows ``PowerPlant``'s convention — fuel price over
+    efficiency, plus CO2 price times emission factor over efficiency, plus
+    ``additional_cost``. It agrees with the recorded observations' last entry to
+    0.1 EUR/MWh, so this is a restatement, not an independent derivation.
+    """
+    import pandas as pd
+
+    scenario, study = CASES[case]["scenario"], CASES[case]["study_case"]
+    folder = INPUTS / scenario
+    # the single-bid folder carries one unit table per study case
+    units_csv = next(p for p in (folder / f"powerplant_units_{study}.csv",
+                                 folder / "powerplant_units.csv") if p.is_file())
+
+    fuel = pd.read_csv(folder / "fuel_prices_df.csv", index_col=0).loc["price"].astype(float)
+    pp = pd.read_csv(units_csv)
+    pp["mc"] = (
+        pp["fuel_type"].map(fuel).astype(float) / pp["efficiency"]
+        + pp["emission_factor"] * float(fuel["co2"]) / pp["efficiency"]
+        + pp["additional_cost"]
+    )
+    learn = pp["bidding_EOM"].str.contains("learning")
+    learners = pp[learn]
+    mc_l = float(learners["mc"].iloc[0])
+
+    cheap = float(pp.loc[~learn & (pp["mc"] < mc_l), "max_power"].sum())
+    total_l = float(learners["max_power"].sum())
+    unit_mw = float(learners["max_power"].iloc[0])
+    above = pp.loc[~learn & (pp["mc"] > mc_l)]
+
+    return {
+        "units": [str(u) for u in learners["name"]],
+        "unit_mw": unit_mw,
+        "mc": mc_l,
+        "backup_mc": float(above["mc"].min()) if len(above) else float("inf"),
+        # (upper bound, name); a timestep falls in the first band it fits
+        "bands": [(cheap, "idle"),
+                  (cheap + total_l - unit_mw, "bertrand"),
+                  (cheap + total_l, "pivotal"),
+                  (float("inf"), "backup")],
+    }
+
+
+def horizon(case: str, study_case: str | None = None) -> tuple[str, str]:
+    """``(start_date, end_date)`` of the case's study case, from its config."""
+    import yaml
+
+    cfg = yaml.safe_load(
+        (INPUTS / CASES[case]["scenario"] / "config.yaml").read_text(encoding="utf-8"))
+    block = cfg[study_case or CASES[case]["study_case"]]
+    return str(block["start_date"]), str(block["end_date"])
+
+
+def demand(case: str):
+    """Hourly demand of the case's scenario, over the whole series."""
+    import pandas as pd
+
+    s = pd.read_csv(INPUTS / CASES[case]["scenario"] / "demand_df.csv",
+                    index_col=0, parse_dates=True)["demand_EOM"]
+    return s.resample("1h").mean()
+
+
+def live_bands(bands) -> list[tuple[float, str]]:
+    """``bands`` with the zero-width ones removed.
+
+    At a single learner ``L - u == 0``, so ``bertrand`` has no demand range at
+    all: the one unit is marginal whenever it runs and no peer can undercut it.
+    That is a fact about the case, not a degenerate edge to paper over.
+    """
+    kept, prev = [], -float("inf")
+    for upper, name in bands:
+        if upper > prev:
+            kept.append((upper, name))
+            prev = upper
+    return kept
+
+
+def regime_quantiles(case: str, start: str, end: str) -> dict[str, tuple[float, float]]:
+    """Each regime's share of the horizon, as a quantile band of demand.
+
+    The recorder cannot see the demand series — it only has the replay buffer,
+    whose first observation entry is the **min-max scaled residual load** of the
+    delivery hour. With no renewables in these scenarios residual load *is*
+    demand, so a rank in the buffer is a rank in demand and a regime maps onto a
+    quantile band. Returning quantiles rather than MW keeps the recorder free of
+    the scaling factors, which live on the strategy and are not reachable from
+    the algorithm object.
+    """
+    import numpy as np
+    import pandas as pd
+
+    d = demand(case).loc[start:end]
+    out, lo = {}, 0.0
+    for upper, name in live_bands(merit_order(case)["bands"]):
+        hi = float((d <= upper).mean())
+        if hi > lo:
+            out[name] = (lo, min(hi, 1.0))
+            lo = hi
+    return out
+
+
 #: Applied to every trial. ``early_stopping_steps`` is disabled so all scenarios
 #: are guaranteed the same number of episodes -- ``example_02a``'s single learner
 #: converges early and would otherwise stop with a different budget from
@@ -218,6 +347,10 @@ class EomCriticRecorder:
         # at the first snapshot.
         self.n_obs = len(observations)
         self.obs: np.ndarray | None = None
+        #: quantile band per regime, set by run_child when --obs-regimes is
+        #: passed; None means the plain evenly-spaced selection
+        self.bands: dict[str, tuple[float, float]] | None = None
+        self.obs_regime: list[str] = []
         self.bids = np.linspace(-MAX_BID_PRICE, MAX_BID_PRICE, grid)
         self.every = every
         self.calls = 0
@@ -230,6 +363,12 @@ class EomCriticRecorder:
         self.actor_actions: list[np.ndarray] = []
         self.rewards: list[np.ndarray] = []
         self.buffer_fill: list[int] = []
+        #: simulated time and episode index at each frame. Without these a frame
+        #: cannot be placed in the horizon at all, and "critic updates" silently
+        #: mixes training progress with position in the month -- see
+        #: analysis/eom_critic_evolution.py's frame_schedule().
+        self.frame_time: list[float] = []
+        self.frame_episode: list[int] = []
         self.unit_ids: list[str] = []
         self.sweeps: list[str] = []
         self.unique_obs_dim = 0
@@ -246,13 +385,48 @@ class EomCriticRecorder:
     def _filled(buf) -> int:
         return len(buf.observations) if bool(buf.full) else int(buf.pos)
 
-    def _sample_observations(self, buf) -> np.ndarray:
-        """n_obs joint observations, evenly spaced through the buffer so far."""
+    def _sample_observations(self, buf) -> tuple[np.ndarray, list[str]]:
+        """The joint observations to film from, and the regime label of each.
+
+        Default (``bands`` unset): ``n_obs`` evenly spaced through the buffer,
+        which is a spread over whatever hours happened to be collected and
+        carries no regime meaning — every label is ``"any"``.
+
+        With ``bands`` set the selection is **stratified by demand regime**.
+        Entry 0 of an observation is the min-max scaled residual load of the
+        delivery hour (``create_observation``'s forward window, first element),
+        and with no renewables in these scenarios residual load is demand — so
+        ranking the buffer on that column ranks it by demand, and a quantile
+        band picks the hours of one regime. ``n_obs`` observations are then
+        spread evenly *within* each band, so a film can be read separately for
+        "the equilibrium is marginal cost" hours and "the equilibrium is the
+        backup's cost" hours. This is the point of the whole exercise: whether
+        one critic can hold both equilibria at once.
+        """
         fill = self._filled(buf)
         if fill < self.n_obs:
             raise RuntimeError(f"buffer holds {fill} transitions, need {self.n_obs}")
-        idx = np.linspace(0, fill - 1, self.n_obs).astype(int)
-        return np.asarray(buf.observations[idx], dtype=np.float64)
+        obs = np.asarray(buf.observations[:fill], dtype=np.float64)
+
+        if not self.bands:
+            idx = np.linspace(0, fill - 1, self.n_obs).astype(int)
+            return obs[idx], ["any"] * self.n_obs
+
+        # agent 0's column is enough: every agent sees the same market
+        order = np.argsort(obs[:, 0, 0], kind="stable")
+        picked, labels = [], []
+        for name, (lo, hi) in self.bands.items():
+            a, b = int(round(lo * fill)), int(round(hi * fill))
+            if b - a < 1:
+                print(f"  regime {name!r} has no transitions in the buffer -- skipped")
+                continue
+            take = min(self.n_obs, b - a)
+            sel = order[a:b][np.linspace(0, (b - a) - 1, take).astype(int)]
+            picked.append(obs[sel])
+            labels += [name] * take
+        if not picked:
+            raise RuntimeError("no regime band matched any buffered transition")
+        return np.concatenate(picked, axis=0), labels
 
     def _reward_window(self, buf) -> np.ndarray:
         """Indices of the transitions collected since the previous frame.
@@ -322,9 +496,15 @@ class EomCriticRecorder:
         self.act_dim = int(algorithm.act_dim)
 
         if self.obs is None:
-            self.obs = self._sample_observations(buf)
+            self.obs, self.obs_regime = self._sample_observations(buf)
+            # a stratified selection returns one block per regime, so the count
+            # is n_obs x (regimes present), not n_obs
+            self.n_obs = len(self.obs)
             self.unit_ids = [u for u, _ in strategies]
             self.sweeps = [name for name, _ in self._sweep_columns(0)]
+            if self.bands:
+                counts = {r: self.obs_regime.count(r) for r in dict.fromkeys(self.obs_regime)}
+                print(f"  probing {self.n_obs} observations by regime: {counts}")
 
         n_bids = len(self.bids)
         n_sweeps = len(self.sweeps)
@@ -387,6 +567,14 @@ class EomCriticRecorder:
         self.buffer_fill.append(fill)
         self.steps.append(self.updates)
 
+        # where in the horizon this frame sits. train_freq is snapped to divide
+        # the horizon evenly (learning_role.sync_train_freq_with_simulation_
+        # horizon), so blocks land on a fixed grid and every episode replays the
+        # same calendar -- which is what makes the frame index alias.
+        role = algorithm.learning_role
+        self.frame_time.append(float(getattr(role.context, "current_timestamp", 0.0)))
+        self.frame_episode.append(int(getattr(role, "episodes_done", -1)))
+
         # the evidence for this run's own act_share, refreshed each frame so the
         # last one describes the whole run
         self.sd_obs = np.asarray(buf.observations[:fill]).std(axis=0)
@@ -425,12 +613,20 @@ class EomCriticRecorder:
             # collected since the previous frame
             rewards=np.stack(self.rewards, axis=0),
             observations=self.obs,
+            # (n_obs,) which demand regime each probed observation came from,
+            # or all "any" when the selection was not stratified
+            obs_regime=np.array(self.obs_regime or ["any"] * self.n_obs),
             unit_ids=np.array(self.unit_ids),
             unique_obs_dim=np.array(self.unique_obs_dim),
             act_dim=np.array(self.act_dim),
             buffer_sd_obs=self.sd_obs,
             buffer_sd_act=self.sd_act,
             buffer_fill=np.array(self.buffer_fill),
+            # (frames,) unix seconds of simulated time, and the episode index.
+            # Absent from anything recorded before 2026-08-12; the analysis
+            # falls back to deriving them from the study case.
+            frame_time=np.array(self.frame_time, dtype=float),
+            frame_episode=np.array(self.frame_episode),
             label=np.array(label),
             seed=np.array(-1 if seed is None else seed),
             config_json=np.array(json.dumps(config or {}, sort_keys=True)),
@@ -445,14 +641,26 @@ class EomCriticRecorder:
 # ---------------------------------------------------------------------- child
 
 
-def run_child(rest: list[str]) -> None:
+def run_child(rest: list[str], bands: dict | None = None) -> None:
     import assume_training_probe as probe
 
     # the joint observations come from the live buffer; only the count is taken
     # from the probe's single-agent loader, whose buffer belongs to another
     # scenario and has the wrong observation dimension
     probe.load_observations = lambda path, n: np.empty((n, 0))
-    probe.Recorder = EomCriticRecorder
+
+    if bands:
+        # the probe constructs the Recorder itself, so the bands are attached
+        # through the class rather than the constructor signature, which has to
+        # stay compatible with assume_training_probe.Recorder
+        class _Stratified(EomCriticRecorder):
+            def __init__(self, observations, grid, every):
+                super().__init__(observations, grid, every)
+                self.bands = bands
+
+        probe.Recorder = _Stratified
+    else:
+        probe.Recorder = EomCriticRecorder
 
     sys.argv = ["assume_training_probe.py", *rest]
     probe.main()
@@ -528,8 +736,15 @@ def launch(case: str, seed: int, args) -> tuple[str, int, int, float, Path]:
     if args.validation_interval is not None:
         overrides["validation_episodes_interval"] = args.validation_interval
 
+    stratify = []
+    if args.obs_regimes:
+        # resolved here rather than in the child: only the parent can read the
+        # demand series and the merit order
+        bands = regime_quantiles(case, *horizon(case, args.study_case))
+        stratify = ["--bands", json.dumps(bands, separators=(",", ":"))]
+
     cmd = [
-        sys.executable, str(SELF), "--child", "--",
+        sys.executable, str(SELF), "--child", *stratify, "--",
         "--scenario", scenario,
         "--study-case", args.study_case or CASES[case]["study_case"],
         "--n-obs", str(args.n_obs),
@@ -666,7 +881,15 @@ def main() -> None:
                         help="concurrent trials; one task per trial on a cluster")
     parser.add_argument("--threads", type=int, default=1,
                         help="torch.set_num_threads in each child")
-    parser.add_argument("--n-obs", type=int, default=4)
+    parser.add_argument("--n-obs", type=int, default=4,
+                        help="observations to film from. With --obs-regimes it "
+                             "is per regime, so the film carries n_obs x "
+                             "(regimes present)")
+    parser.add_argument("--obs-regimes", action="store_true",
+                        help="stratify the probed observations by demand regime "
+                             "(idle / bertrand / pivotal), so the critic film can "
+                             "be read separately for each Nash equilibrium. See "
+                             "REGIMES and merit_order()")
     parser.add_argument("--grid", type=int, default=201)
     parser.add_argument("--every", type=int, default=4,
                         help="snapshot every N-th training block")
@@ -679,7 +902,12 @@ def main() -> None:
 
     if "--child" in sys.argv:
         i = sys.argv.index("--child")
-        run_child(sys.argv[sys.argv.index("--", i) + 1:])
+        # the parent resolves the quantile bands (it can read the demand series;
+        # the recorder cannot) and hands them over as JSON
+        bands = None
+        if "--bands" in sys.argv[:i + 2]:
+            bands = json.loads(sys.argv[sys.argv.index("--bands") + 1])
+        run_child(sys.argv[sys.argv.index("--", i) + 1:], bands)
         return
 
     args = parser.parse_args()
