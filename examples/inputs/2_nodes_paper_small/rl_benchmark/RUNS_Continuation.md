@@ -28,9 +28,9 @@ working-tree config differs from the committed one.
   `assume/reinforcement_learning/exploitability.py` plus the `WriteOutput` hooks
   in `assume/common/outputs.py`, with `test_exploitability.py` and
   `exploitability_two_bid_walkthrough.py` next to this file and the scenario at
-  `examples/inputs/exploit_example/`. ⚠️ It required a `world.py` change so
+  `examples/inputs/exploit_example/`. It required a `world.py` change so
   evaluation episodes write market output at all — see the note below.
-  ⚠️ **Exploitability is only correct for a single day-ahead market with no
+  **Exploitability is only correct for a single day-ahead market with no
   storages**, which is why it is read on `example_02a`–`02c` and **not** on the
   inc-dec cases: `WriteOutput._write_exploitability` selects the whole orderbook
   without filtering by market, so EOM and Redispatch bids are grouped by
@@ -40,7 +40,7 @@ working-tree config differs from the committed one.
   the full statement. **Do not read the `exploitability` table off a run 13-style
   run.**
 
-⚠️ **The exploitability port changed when market output is written.**
+**The exploitability port changed when market output is written.**
 `world.py`'s `add_market_operator` used to withhold `output_agent_addr` whenever
 `learning_mode` **or** `evaluation_mode` was set; it now withholds it only during
 *training* episodes. Exploitability needs this — it reads the evaluation
@@ -66,7 +66,7 @@ episodes`) so it can be reverted without losing the rest.
 
 - **One section per run**, numbered continuously from 14, in this shape:
   *Why* (one paragraph — what question forces this run) · *Command* · *Data* (the
-  archive path) · *Result* (a table) · *Reading* (2–4 sentences) · *⚠️ Caveats*.
+  archive path) · *Result* (a table) · *Reading* (2–4 sentences) · *Caveats*.
   Copy the template at the bottom.
 - **Recompute the numbers from the archived `.npz`**, never from a console log.
   Every table in `RUNS.md` was, which is why its corrections could be made at all.
@@ -99,7 +99,7 @@ nothing here and only lengthens the queue. Use a CPU partition (`cpu_il`, `cpu`,
 Per task, **4 cores and 8 GB** is the right starting point; a 50-episode 11-agent
 trial peaked near 0.9 GB locally.
 
-⚠️ **Thread count is not free.** Run 08 found that BLAS thread count alone flipped
+**Thread count is not free.** Run 08 found that BLAS thread count alone flipped
 a surrogate seed from +31.60 to −60.49. ASSUME itself reproduced bit-identically
 across a thread-count change (runs 10, 13), but every archived ASSUME run used
 **one torch thread**. If a cluster run is meant to be comparable to the archive,
@@ -271,7 +271,7 @@ the **ordering is preserved exactly at both budgets** — monotone in the own sh
 and `baseline` still landing at 80 for 2.25× `act-all-x2`'s budget. Run 13's
 headline is a property of the conditions, not of three lucky seeds.
 
-⚠️ **Caveats:**
+**Caveats:**
 
 - **`RUNS.md` §13's per-seed columns should be read as one draw, not as the
   numbers.** The condition means and the ordering are the reportable part.
@@ -349,7 +349,7 @@ python analysis/eom_critic_evolution.py
   **16 min** (`sb02c`) per task, `MaxRSS` 1.2–1.5 GB
 - **marginal cost of every learning unit: 55.7 EUR/MWh** (CCGT, gas 26, CO₂ 25,
   η 0.60, `additional_cost` 4.0), read off the recorded observations
-- ⚠️ **the two-bid cases `02a`–`02c` have not been run** — only the single-bid
+- **the two-bid cases `02a`–`02c` have not been run** — only the single-bid
   trio is below
 
 Final bid = median over units of each unit's median over probed observations.
@@ -417,7 +417,7 @@ to marginal cost is easy because a mistake is punished immediately; marking up
 to the backup's cost requires finding a price 30 EUR above your own cost with no
 local gradient telling you where to stop.**
 
-⚠️ `pivotal` is 13 % of `sb02b`'s hours and the case is n = 3 seeds. The
+`pivotal` is 13 % of `sb02b`'s hours and the case is n = 3 seeds. The
 within-run contrast is the strong part; the cross-case one shares the confound
 that `sb02a`'s learner is also 5× larger.
 
@@ -430,7 +430,7 @@ competitive pricing, and the two separate exactly where market power is real. It
 is also the first evidence that the `WriteOutput` hook works end to end on a live
 learning run: 19 evaluation episodes, 96 k–226 k rows per trial, no gaps.
 
-⚠️ **Caveats:**
+**Caveats:**
 
 - **The two ladders differ by more than the action count.**
   `EnergyLearningSingleBidStrategy` defaults `foresight` to **24** against the
@@ -454,7 +454,7 @@ learning run: 19 evaluation episodes, 96 k–226 k rows per trial, no gaps.
   with run 13** — scenario, bid structure, learning rate and horizon all differ
   at once. It refutes "MATD3 cannot learn this kind of task"; it does not
   isolate *which* of those the inc-dec failure needs.
-- ⚠️ **The frame index is aliased against the calendar, and the reward panel's
+- **The frame index is aliased against the calendar, and the reward panel's
   sawtooth was the month, not the learner.** `train_freq: 100h` is snapped by
   `learning_role.sync_train_freq_with_simulation_horizon` to divide the horizon
   evenly — **90h** for `sb02a`'s 30 days, **93h** for the 31-day cases, eight
@@ -518,7 +518,7 @@ RUN_NAME=14c-eom-stored  OBS_REGIMES=1 RERUN=1 bash .../cluster/eom_critic_evolu
 - tarballs: `eom_regimes-2.tar.gz`, `eom_6275958.tar.gz`
 - 9/9 `COMPLETED` each; 190 frames, 7600 critic updates, grid 201, every 4
 
-⚠️ **`RERUN=1` is not optional when only the recording changed.**
+**`RERUN=1` is not optional when only the recording changed.**
 `validate_result()` checks schema, label and seed — not how the observations
 were sampled or how many sweeps there are — so an existing `.npz` is skipped in
 seconds and the batch hands back the *old* film. `RUN_NAME` keeps the batches
@@ -575,7 +575,7 @@ in *both* directions. What a shared critic fails to fit is whatever is rare, not
 whatever direction the deviation points — which refutes finding 12b's
 explanation while leaving its measurements intact (findings 14, 15).
 
-⚠️ **Caveats:**
+**Caveats:**
 
 - **Never read this fleet with a median over units.** From `p3` up the
   equilibrium is asymmetric — one unit marks up, four sit at the action floor —
@@ -616,6 +616,6 @@ mean. One paragraph.
 
 **Reading:** 2–4 sentences. What it shows, and what it does *not*.
 
-⚠️ **Caveats:** seed count, budget, anything that differed from the archive
+**Caveats:** seed count, budget, anything that differed from the archive
 (thread count, working-tree config, shaping state).
 ------------------------------------------------------------------------- -->

@@ -31,7 +31,7 @@ its top level. Runs 01b, 08, 09 and 12 have no `img/NN-*` file because their
 figure *is* one of those four, which is the usual reason a run looks like it has
 no plot.
 
-⚠️ **A fresh clone has no starting buffer.**
+**A fresh clone has no starting buffer.**
 `learned_strategies/buffers/single_10ep_standard.npz` — 24 KB, SHA256 `5f1b80b4…`,
 checksum-guarded by both sweep runners — is gitignored by `.gitignore:142`, and
 without it those runners refuse to start. It is a byte-identical copy of
@@ -379,7 +379,7 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
 ## Refuted or revised — do not re-test
 
 - ❌ "The critic smooths the cliff into a ramp." It doesn't; see finding 2.
-- ⚠️ "`policy_delay` fixes it." Raising it does not: 2 → 100.0, 8 → 100.0,
+- "`policy_delay` fixes it." Raising it does not: 2 → 100.0, 8 → 100.0,
   64 → 68 ± 28 (tanh); with softsign, `policy-delay-8` is **0/8**. **But the knob
   is not inert — run 04 turned it the wrong way.** Finding 9: at `policy_delay 2`
   TD3 already crosses the plateau 200–600 environment steps later than DDPG and
@@ -393,7 +393,7 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
 - ❌ "A 1e-5 gradient is too small to move the actor." Adam steps by
   `lr·G/(G+eps)`; anything two orders above `eps = 1e-8` gives a full-sized step.
   Only a hard zero kills it.
-- ⚠️ "The fragmented gradient field is not the binding constraint, because
+- "The fragmented gradient field is not the binding constraint, because
   softsign scores *worse* on every path metric and crosses anyway."
   **The evidence was pooled over the wrong interval** — see finding 7 and
   `RUNS.md` correction 6. During the crossing the path is clean 91–100 %
@@ -401,17 +401,17 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
   post-crossing phase, which for tanh is a consequence of the actor parking at
   the ceiling and feeding the buffer there (after step 2000 the tanh runs place
   100 % of their bids on [50, 100], softsign 0–52 %).
-- ⚠️ "Run 06's window predicts a double dissociation: `warmup` should not break
+- "Run 06's window predicts a double dissociation: `warmup` should not break
   the result, `policy_delay` and low `lr` should." **Half wrong** (run 08).
   `policy-delay-8` fails as predicted, but `lr-1e-4` is the *best* configuration
   in the sweep and `warmup-3000` is no worse than baseline.
-- ⚠️ "Without shaping, ASSUME's `argmax Q1` stays at 100.0." **The conclusion
+- "Without shaping, ASSUME's `argmax Q1` stays at 100.0." **The conclusion
   survives 6 seeds, the number does not** (run 10, finding 15). 89.7 ± 10.6, and
   only 2/6 seeds end at 100.0. Do not quote a single unshaped `argmax` — quote
   the 24.5 EUR disagreement between probed observations, or the fact that 5/6
   runs never reach the band at all (the sixth grazes it for 13 of 480 cells and
   still ends at 94.4).
-- ⚠️ "Any single-configuration result here is a sample from a bimodal
+- "Any single-configuration result here is a sample from a bimodal
   distribution, because BLAS thread count alone flipped a seed" (finding 5).
   **True of the SB3 surrogate, not shown for ASSUME.** Run 10's unshaped seed 42
   reproduces run 09's film to 0.119 EUR across a change of thread count.
@@ -432,13 +432,13 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
 - ❌ "Nothing but the update budget helps on the true reward" (finding 16). True of
   every knob in run 11's 30 configurations, and none of them was `act_share`.
   Finding 17 solves it at the *same* 800-update budget.
-- ⚠️ "Without the shaping or a raised `act_share`, ASSUME's MATD3 never forms a
+- "Without the shaping or a raised `act_share`, ASSUME's MATD3 never forms a
   usable action preference" (findings 13, 15, 17). **A single-agent statement, and
   budget-dependent.** With 11 learners the untouched baseline descends from
   97.1 ± 0.2 at 1200 updates to 80.1 ± 12.3 at 2700 (finding 19). Raising
   `act_share` still orders the outcome, but it multiplies the budget rather than
   enabling learning. Attach a budget to any "cannot learn" claim.
-- ⚠️ "Scaling the critic's action input raises `act_share`" (finding 17's second
+- "Scaling the critic's action input raises `act_share`" (finding 17's second
   lever). **Only at N = 1.** Applied to the whole action vector with N agents it
   saturates at 1/N — 0.091 at N = 11 (finding 20). Scale each critic's *own*
   action column instead.
@@ -531,7 +531,7 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
 
 ## Known caveats in the current results
 
-- ⚠️ **The surrogate is not the scenario's reward, and four scripts used it to
+- **The surrogate is not the scenario's reward, and four scripts used it to
   score real runs.** `reward_from_bid` agrees with the frozen buffer's 620 stored
   rewards on **24.8 %** of transitions (MAE 0.038, R² 0.78). The real EOM price
   varies hour to hour — three loss shelves (−0.20/−0.25/−0.30) against the
@@ -542,13 +542,13 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
   them: run 12's headline **survives**, `act-x30` measuring +0.167 ± 0.005 against
   the reconstructed +0.160. Do not retune `PAPER_SMALL` — the surrogate is exact
   for runs 01–08 by construction. `RUNS.md` correction 15.
-- ⚠️ **The evaluation database holds two hours per episode**, 10:00 and 11:00 of
+- **The evaluation database holds two hours per episode**, 10:00 and 11:00 of
   14 — an unflushed async write at shutdown (`RUNS.md` correction 16). Training is
   unaffected; best-policy selection, early stopping and any measured reward read
   from `rl_params` are an early-hours sample. **The clean fix is to have the
   single-agent `Recorder` snapshot buffer rewards the way `MultiAgentRecorder`
   already does, then re-run** — deferred to a cluster.
-- ⚠️ **Run 13's recorded critic field is not matd3's actor objective.**
+- **Run 13's recorded critic field is not matd3's actor objective.**
   `matd3.py:704` holds the other agents at their *stored* actions; the recorder
   holds them at their *current actors'* outputs. A valid critic slice, but the
   window / `pulled left` / coherence readings describe the current joint policy.
@@ -608,7 +608,7 @@ horizon, so each agent's critic sees **94 observation + 11 action = 105 inputs**
   against those archives now has to account for their *absence*; run 13 is
   internally consistent. Restore with
   `git checkout -- assume/reinforcement_learning/algorithms/matd3.py`.
-- ⚠️ **Run 13 used a working-tree `inc_dec_learning` that is not the committed
+- **Run 13 used a working-tree `inc_dec_learning` that is not the committed
   one.** `config.yaml` was modified but uncommitted during the runs: 72 h horizon
   (committed: 5 h), `learning_rate` 1e-4 (0.001), 50 episodes (8), 5 collecting
   (2), `train_freq` 12h (**1h**). The horizon drives everything — 72 h at 12h

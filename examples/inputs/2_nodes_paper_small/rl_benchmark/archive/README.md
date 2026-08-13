@@ -1,6 +1,6 @@
 # Archive — full-length working docs
 
-⚠️ **Do not read these files by default. They cost ~35 000 tokens together and
+**Do not read these files by default. They cost ~35 000 tokens together and
 will eat a fresh session's context before any work starts.**
 
 | file | lines | what it is |

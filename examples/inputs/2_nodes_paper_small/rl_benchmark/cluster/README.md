@@ -6,7 +6,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Cluster launchers
 
-Two one-call SLURM launchers. Each preflights the checkout, submits a job array
+Four one-call SLURM launchers. Each preflights the checkout, submits a job array
 with **one task per trial**, and chains a collector that rebuilds the report and
 the figures and packs everything into a single tarball for `scp`.
 
@@ -14,6 +14,88 @@ the figures and packs everything into a single tarball for `scp`.
 |---|---|---|
 | [`rerun_run13.sh`](rerun_run13.sh) | run 13 again — eleven learning agents on `inc_dec_learning` | 6 conditions × 3 seeds = 18 |
 | [`eom_critic_evolution.sh`](eom_critic_evolution.sh) | workstream C — critic films of the **learning units only** on the plain-EOM examples | 3 cases × 3 seeds = 9 |
+| [`critic_arch.sh`](critic_arch.sh) | **run 18a/b** — the offline architecture screen and the hyperparameter grid, run live on inc-dec | 19 archs × 3 seeds = 57 (+60 for `ROUNDS=hpo`) |
+| [`hpo_eom.sh`](hpo_eom.sh) | **run 18c** — the same hyperparameter grid on the EOM case `p1`, films stratified per Nash equilibrium | 20 cells × 3 seeds = 60 |
+
+## Run 18 — architectures and hyperparameters, live
+
+`critic_arch.sh` is the live follow-up to run 17's offline γ = 0 screen, which
+found (a) **RSNorm disqualifying** — six variants carrying it pinned at
+`argmax Q1` exactly 100.0 at every width from 143 k to 8.5 M — and (b) **SimBa's
+residual trunk worth about 15× the parameters**, 548 k against 8.48 M for a
+better argmax. Offline there is no bootstrap, no growing buffer and no actor
+moving the action distribution the critic is fitted on; all three are back here.
+The RSNorm carriers are **not** re-run: 24 more tasks of the same answer.
+
+The capacity ladder is a **grid, not a line**. Run 17 moved width at fixed
+depth, so "capacity" and "width" were one variable. Each family now runs at two
+depths up the same four-rung parameter ladder:
+
+| rung | `mlp-d2-*` / `mlp-d4-*` | `sbn-d2-*` / `sbn-d4-*` |
+|---|---|---|
+| 100k | width 249 / 127 | `d_h` 53 / 38 |
+| 500k | width 635 / 301 | `d_h` 122 / 87 |
+| 2M | width 1340 / 617 | `d_h` 247 / 175 |
+| 8M | width 2753 / 1249 | `d_h` 497 / 352 |
+
+Widths are bisected at import time (`critic_architectures._build_ladder`) so the
+rungs stay matched if anything changes. One SimBa block is two `Linear` layers,
+so the two families' depth units are **not** the same count of matrix
+multiplies — read each family's curve against itself, not `d4` against `d4`.
+
+`split` is the new architecture cell: observation and action each get their own
+encoder of **equal width**, merged at layer 2. Late injection gives the action
+its own weight matrix but it still arrives raw and outnumbered; `split` fixes
+the *count*. Equal *scale* is what run 12's `act_share` moved, and `act_share`
+is the invented quantity this workstream exists to replace — so the two have to
+be separable, and this is the cell that separates them.
+
+The hyperparameter grid ([`hpo_grid.py`](../real_matd3/hpo_grid.py)) is shared
+by both scripts, so the inc-dec and the `p1` tables can be laid side by side:
+3 learning rates × {const, linear, cosine}, batch size, policy delay, weight
+decay — 20 cells, a coordinate sweep rather than a 108-cell cross. Learning rate
+and schedule *are* crossed, because a schedule is a statement about the rate.
+`lr0.001-const` reproduces `default` exactly and is the grid's internal control.
+
+**Weight decay is the axis with no config field.** `matd3.py:366` and `:407`
+construct `AdamW(params, lr=...)` and pass nothing else, so every run in this
+benchmark's archive trained at torch's default `0.01` — not at none. It is moved
+by the monkeypatch in [`optim_patches.py`](../real_matd3/optim_patches.py), and
+deliberately *not* applied for cells at 0.01, so those films stay comparable
+with the run 14/15 batches.
+
+`hpo_eom.sh` runs with `OBS_REGIMES=1` by default. Run 14b found the critic fits
+the regime it sees often and leaves the rare one as noise, so the question is
+not only "does a setting help" but "does it help in the regime the critic is
+currently ignoring" — a setting that lifts the aggregate by fitting the common
+regime harder is not an improvement for this benchmark's purpose.
+
+```bash
+bash .../cluster/critic_arch.sh                          # 57 tasks, arch round
+ROUNDS=hpo CELLS=lr bash .../cluster/critic_arch.sh      # the 3x3 grid, 27 tasks
+bash .../cluster/hpo_eom.sh                              # 60 tasks on p1
+CELLS=lr CASES="p1 p4" bash .../cluster/hpo_eom.sh       # 54 tasks, two rungs
+```
+
+Locally, without SLURM:
+
+```bash
+python real_matd3/assume_arch_sweep.py --round arch --workers 4
+python real_matd3/assume_arch_sweep.py --round hpo --cells lr
+python real_matd3/eom_critic_film.py --cases p1 --hp bs512 --obs-regimes
+
+# ~7 min smoke test of the whole path, both rounds
+python real_matd3/assume_arch_sweep.py --round arch hpo \
+    --archs baseline split sbn-d4-500k --cells default wd0 \
+    --seeds 42 --episodes 2 --workers 3
+```
+
+Figures, after unpacking (they do not run on the cluster — see below):
+
+```bash
+python analysis/hpo_grid_film.py --regime each     # one panel per cell, per NE
+python analysis/eom_critic_evolution.py --hp bs512 --data-dir .../18c-hpo-eom
+```
 
 `eom_critic_evolution.sh` knows six cases, three of which run by default:
 
@@ -149,7 +231,9 @@ The collector writes one tarball per batch:
 ```
 examples/outputs/2_nodes_paper_small/rl_benchmark/runs/exports/
 ├── run13_<arrayjobid>.tar.gz
-└── eom_<arrayjobid>.tar.gz
+├── eom_<arrayjobid>.tar.gz
+├── arch18_<arrayjobid>.tar.gz
+└── hpo_<arrayjobid>.tar.gz
 ```
 
 Each holds the films (`data/<run>/*.npz`), the per-trial logs, the SLURM
@@ -157,7 +241,7 @@ streams, the `sacct` accounting (`MaxRSS` is what sets the next `--mem`), the
 regenerated report as plain text, and the figures. Saved policies are excluded —
 they are bulk and no analysis reads them.
 
-⚠️ **The figure scripts do not run on the cluster** — and the collector will not
+**The figure scripts do not run on the cluster** — and the collector will not
 tell you loudly, because every step is `|| true` so one broken figure cannot
 cost you the tarball. The house palette (`DIVERGING`, `INK`, `MUTED`) lives in
 `sweeps/run_benchmark.py`, which imports `stable_baselines3` at module level, and
@@ -171,6 +255,7 @@ python analysis/eom_critic_evolution.py                     # run 14
 python analysis/eom_exploitability.py                       # run 14, from the .db files
 python real_matd3/assume_multiagent_grids.py                # run 13
 python real_matd3/assume_multiagent_window.py               # run 13
+python analysis/hpo_grid_film.py --regime each              # run 18c
 
 # the regime-stratified batch (--data-dir follows RUN_NAME)
 python analysis/eom_critic_evolution.py \

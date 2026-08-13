@@ -24,7 +24,7 @@ so it is not repeated -- what changes is the shape of the data:
   only comparable line here is each unit's **marginal cost**, which is where a
   truthful bidder would sit, so that is what is drawn.
 
-Four figures, selectable with ``--only``:
+Five figures, selectable with ``--only``:
 
 ``film``            one PNG per (case, seed): a panel per learning unit showing
                     ``dQ1/d(bid)`` over (bid, critic updates) with the actor's
@@ -40,8 +40,19 @@ Four figures, selectable with ``--only``:
 ``separation``      the same comparison reduced to two lines per regime — where
                     the actor bids and where ``argmax Q1`` sits — against both
                     equilibrium prices.
+``simplicity``      SimBa's Fourier simplicity score against training, one
+                    panel per case, bold = mean over learning units and faint =
+                    each unit. Higher is simpler. Needs a run recorded on or
+                    after 2026-08-13 with ``--simplicity-lines`` non-zero;
+                    otherwise it says so and skips. See
+                    ``analysis/simplicity_bias.py`` for what the number is —
+                    in particular that it is estimated from random 1-D lines
+                    at full input dimension, **not** from the paper's 2-D grid,
+                    so it is comparable across these runs and not to the
+                    paper's printed values.
 
-The last two need a run recorded with ``eom_critic_film.py --obs-regimes``,
+``regime-heatmap`` and ``separation`` need a run recorded with
+``eom_critic_film.py --obs-regimes``,
 which stratifies the probed observations by demand regime. Without it every
 observation is labelled ``"any"`` and both are skipped. Together they separate
 the two ways a policy can fail to price the pivotal hours: ``separation`` shows
@@ -112,7 +123,7 @@ def marginal_costs(d) -> np.ndarray:
 def frame_schedule(case: str, n_frames: int, every: int = 4) -> dict | None:
     """Where in the simulated horizon each frame sits.
 
-    ⚠️ **The x axis of these figures is not a time axis, and it is aliased.**
+    **The x axis of these figures is not a time axis, and it is aliased.**
     Every episode replays the same calendar month, so a frame carries two
     unrelated coordinates at once: how far training has got, and where in the
     month the snapshot was taken. ``learning_role.sync_train_freq_with_
@@ -248,8 +259,8 @@ def strip(ax, keep_left: bool = True, keep_bottom: bool = True) -> None:
     ax.set_axisbelow(True)
 
 
-def load(out_dir: Path, case: str, seed: int):
-    path = result_path(out_dir, case, seed)
+def load(out_dir: Path, case: str, seed: int, hp: str = "default"):
+    path = result_path(out_dir, case, seed, hp)
     if not path.exists():
         return None
     d = np.load(path, allow_pickle=False)
@@ -260,6 +271,7 @@ def load(out_dir: Path, case: str, seed: int):
               else ["any"] * n_obs)
     return {
         "case": case,
+        "hp": hp,
         "regime": np.array(regime),
         "seed": seed,
         "units": [str(u) for u in d["unit_ids"]],
@@ -270,6 +282,13 @@ def load(out_dir: Path, case: str, seed: int):
         "grad": d["critic_grad/MATD3"],  # same
         "greedy": d["greedy/MATD3"],     # (agents, act_dim, obs, frames), EUR/MWh
         "rewards": d["rewards"],         # (frames, agents)
+        # (frames, agents) SimBa's Fourier simplicity score, higher = simpler.
+        # Absent from anything recorded before 2026-08-13, and all-NaN when the
+        # run was made with --simplicity-lines 0.
+        "simplicity": (
+            d["simplicity"] if "simplicity" in d.files
+            else np.full((len(d["steps"]), len(d["unit_ids"])), np.nan)
+        ),
         "mc": marginal_costs(d),
         "share": act_share_from_sd(
             d["buffer_sd_obs"], d["buffer_sd_act"], int(d["unique_obs_dim"])
@@ -654,6 +673,62 @@ def plot_summary(runs: list[dict], out: Path) -> None:
     print(f"  wrote {out}")
 
 
+def plot_simplicity(runs: list[dict], out: Path) -> None:
+    """SimBa's Fourier simplicity score against training, one panel per case.
+
+    The paper measures this **once, at initialization, on a 2-input template**
+    and reports that it predicts final return (their Fig. 4, and Fig. 17's
+    Pearson 0.79). This is the same functional on the real critic as it
+    trains, so it answers a question they never ask: does a critic that starts
+    simple *stay* simple, and does the trajectory say anything about what the
+    run is doing? Higher is simpler.
+
+    Estimated from random 1-D lines at full input dimension, not from the
+    paper's 2-D grid -- see analysis/simplicity_bias.py. The probe box tracks
+    the live buffer, so a change in the trace is a change in the critic *over
+    the region it is being fitted on*, which is the comparison worth having
+    but is not a fixed-domain measurement.
+    """
+    cases = [c for c in CASES if any(r["case"] == c for r in runs)]
+    if not cases:
+        return
+    have = [r for r in runs if np.isfinite(r["simplicity"]).any()]
+    if not have:
+        print("  no simplicity recorded (run made before 2026-08-13, or "
+              "--simplicity-lines 0) -- skipping")
+        return
+
+    fig, axes = plt.subplots(1, len(cases), figsize=(4.7 * len(cases), 3.8),
+                             squeeze=False)
+    for ax, case in zip(axes[0], cases):
+        for run in (r for r in have if r["case"] == case):
+            s = run["simplicity"]          # (frames, agents)
+            steps = run["steps"][: len(s)]
+            # the mean over units, then every unit faintly behind it: at high
+            # pivotal share this fleet is bimodal (finding 15) and a summary
+            # alone would hide it
+            for i in range(s.shape[1]):
+                ax.plot(steps, s[:, i], lw=0.8, alpha=0.28, color=MUTED)
+            ax.plot(steps, np.nanmean(s, axis=1), lw=1.8, alpha=0.85,
+                    label=f"seed {run['seed']}")
+        ax.set_title(f"{case}", loc="left", fontsize=10.5, color=INK)
+        ax.set_xlabel("critic updates")
+        strip(ax)
+        ax.grid(True, color=MUTED, alpha=0.2, lw=0.7)
+    axes[0][0].set_ylabel("simplicity  s = E[1/c]   (higher = simpler)")
+    axes[0][-1].legend(frameon=False, fontsize=8)
+
+    fig.suptitle(
+        "SimBa's Fourier simplicity score over training  "
+        "(bold = mean over learning units, faint = each unit)",
+        x=0.006, y=1.03, ha="left", fontsize=13, fontweight="bold", color=INK,
+    )
+    fig.tight_layout()
+    fig.savefig(out, dpi=160, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"  wrote {out}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", nargs="+", default=DEFAULT_CASES,
@@ -666,7 +741,8 @@ def main() -> None:
                              "the unit's whole bid, 'a0'/'a1' one component")
     parser.add_argument(
         "--only",
-        choices=("film", "summary", "separation", "regime-heatmap"),
+        choices=("film", "summary", "separation", "regime-heatmap",
+                 "simplicity"),
         default=None)
     parser.add_argument(
         "--regime", default=None, choices=[*REGIMES, "all", "each"],
@@ -678,6 +754,14 @@ def main() -> None:
         help="restrict the film to these learning units, or 'each' for one file "
              "per unit. Combines with --regime, so '--unit each --regime each' "
              "is one film per (unit x regime) for every seed drawn")
+    parser.add_argument(
+        "--hp", default="default",
+        help="which hyperparameter cell's films to draw (hpo_grid.py). "
+             "'default' is the study case's own settings and the historic file "
+             "names, so every batch recorded before run 18c is found unchanged. "
+             "One cell per invocation, and the cell is written into the output "
+             "file names; analysis/hpo_grid_film.py is the cross-cell view",
+    )
     parser.add_argument(
         "--data-dir", type=Path,
         default=OUT_DIR / "runs" / "data" / "14-eom-critic-evolution",
@@ -692,14 +776,21 @@ def main() -> None:
     if args.img_dir is None:
         args.img_dir = OUT_DIR / "runs" / "img" / img_folder(args.data_dir)
     args.img_dir.mkdir(parents=True, exist_ok=True)
-    runs = [r for r in (load(args.data_dir, s, seed)
+    runs = [r for r in (load(args.data_dir, s, seed, args.hp)
                         for s in args.cases for seed in args.seeds) if r]
     if not runs:
-        raise SystemExit(f"no recorded runs under {args.data_dir}")
+        raise SystemExit(
+            f"no recorded runs under {args.data_dir}"
+            + (f" for hyperparameter cell {args.hp!r}" if args.hp != "default" else "")
+        )
 
     # ":stored" is not a legal filename character on Windows, and drawing both
     # sweeps must not have the second overwrite the first
     sw = "" if args.sweep == "diag" else f"-{args.sweep.replace(':', '-')}"
+    # the cell joins the sweep suffix, so one --hp per invocation writes its own
+    # files and a second cell cannot silently overwrite the first
+    if args.hp != "default":
+        sw = f"-{args.hp}{sw}"
 
     if args.only in (None, "film"):
         for run in runs:
@@ -736,10 +827,12 @@ def main() -> None:
                     args.img_dir
                     / f"14-eom-regimes-{run['case']}-seed{run['seed']}{sw}.png")
     if args.only in (None, "summary"):
-        plot_summary(runs, args.img_dir / "14-eom-summary.png")
+        plot_summary(runs, args.img_dir / f"14-eom-summary{sw}.png")
     if args.only in (None, "separation"):
         plot_separation(runs, args.sweep,
                         args.img_dir / f"14-eom-ne-separation{sw}.png")
+    if args.only in (None, "simplicity"):
+        plot_simplicity(runs, args.img_dir / f"14-eom-simplicity{sw}.png")
 
 
 if __name__ == "__main__":

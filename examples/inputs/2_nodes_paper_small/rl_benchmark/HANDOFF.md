@@ -7,7 +7,7 @@ Read this to resume in a fresh session. The detail is deliberately not in here.
 | **`HANDOFF.md`** (this) | the state of the question and the forward plan | always, first |
 | [`RUNS.md`](RUNS.md) | runs 01–13 — one block per run, its command, its numbers | for a specific run |
 | [`RUNS_Continuation.md`](RUNS_Continuation.md) | **new runs go here**, incl. every cluster run | when adding a run |
-| [`archive/`](archive/) | the full-length originals, 2 600 lines | ⚠️ **`grep` only** — reading them costs ~35 k tokens |
+| [`archive/`](archive/) | the full-length originals, 2 600 lines | **`grep` only** — reading them costs ~35 k tokens |
 
 Findings live here. Numbers live in `RUNS.md`. `archive/` is frozen.
 
@@ -24,7 +24,7 @@ halves: a closed-form **surrogate** driving SB3 (runs 01–08, ~3 min per
 Needs `gymnasium` + `stable-baselines3` in the `assume` conda env (installed, not
 in `pyproject.toml`); run scripts with `conda run -n assume python`.
 
-⚠️ **A fresh clone has no starting buffer.**
+**A fresh clone has no starting buffer.**
 `learned_strategies/buffers/single_10ep_standard.npz` — 24 KB, SHA256 `5f1b80b4…`
 — is gitignored and both sweep runners refuse to start without it. It is
 recreatable and contains no policy; `RUNS.md` §8 has the recipe (needs a **72 h**
@@ -80,7 +80,7 @@ constrained optimum of 32.31.
    raising its share solves the task 3/3 at the same 800-update budget
    (`act-x30` → bid 33.0 ± 0.2, measured reward +0.167, against 0/90 in run 11).
    Two mechanically unrelated levers land on one curve, so the *ordering* variable
-   is real. ⚠️ **But `act_share` is my own quantity, not a literature one**, and
+   is real. **But `act_share` is my own quantity, not a literature one**, and
    both levers are experiment monkeypatches rather than an API. **Do not build
    further on it before the workstream B tests below** — the literature has two
    standard mechanisms that address the same thing and one of them predicts the
@@ -108,7 +108,7 @@ constrained optimum of 32.31.
     orders outcomes *within* the inc-dec landscape; it is not a general predictor
     of whether MATD3 can learn. **The failure in runs 09–13 is a property of that
     reward landscape, not of MATD3, the critic architecture, or the input count.**
-    ⚠️ Not a single-variable contrast: scenario, bid structure, `lr` and horizon
+    Not a single-variable contrast: scenario, bid structure, `lr` and horizon
     all differ from run 13 at once.
 11. **Markup tracks learning *capacity*, not learner count.** 1 × 2500 MW → +17.2;
     5 × 500 MW → +0.8 (competed to marginal cost); 10 × 500 MW → **+7.8**, back up.
@@ -126,7 +126,7 @@ constrained optimum of 32.31.
     Bertrand trace keeps falling. `sb02c` (all Bertrand) reaches 0.02× of its
     starting exploitability; `sb02a` (all pivotal) only 0.20 ×, and its residual
     7209 EUR/h is almost exactly the markup it failed to take.
-    ⚠️ **The explanation originally attached to this finding — "bidding down to
+    **The explanation originally attached to this finding — "bidding down to
     cost is easy, bidding up to a rival's cost has no local gradient" — is
     refuted by run 15 (finding 14). The measurements above stand; the direction
     of the deviation is not what makes the difference.**
@@ -168,7 +168,7 @@ constrained optimum of 32.31.
     share of the replay buffer. Fleet outcome moves with it: mean clearing price
     52.73 → 72.26 (against mc 55.71, backup 85.71), profit 234 → 7415 EUR per
     learner, reward +0.002 → +0.146.
-    ⚠️ `p2`'s pivotal rises 5.85× against the trend, off an anomalously low ep1;
+    `p2`'s pivotal rises 5.85× against the trend, off an anomalously low ep1;
     not chased down. Exploitability is not monotone in `k` — read the crossing,
     not the individual rungs.
 15. **At high pivotal share the learners find the ASYMMETRIC equilibrium, and it
@@ -201,12 +201,60 @@ constrained optimum of 32.31.
     moves the critic's peak 7–13 EUR, **largest in the pivotal-heavy cases**,
     where the joint action sets the price. Any single-number critic reading from
     runs 09–13 carries an error of this size.
+17. **RSNorm is disqualifying, and SimBa's residual trunk is worth ~15× the
+    parameters** (run 17, the offline γ = 0 architecture screen, 15 critic
+    architectures × 5 seeds on the frozen buffer). Two effects:
+
+    | group | n | mean `in_band` | best |
+    |---|---:|---:|---:|
+    | carries RSNorm | 6 | **0.005** | 0.03 |
+    | no RSNorm | 7 | **0.253** | 0.57 |
+
+    **RSNorm acts as a gate, not a gradient.** Every variant carrying it is
+    pinned at `argmax` exactly 100.0 at *every* width tested — 143 k, 548 k and
+    8.5 M alike — so it does not merely fail to help, it **cancels the capacity
+    effect entirely**. `simba` against `simba-nornorm` is a single-variable
+    contrast (identical width, seeds, budget, 8,483,842 params both) and is the
+    whole difference between 100.0 and 34.1. This confirms run 12's "z-scoring
+    the observation was the worst cell" was not an artifact of crude z-scoring,
+    and the residual path does **not** repair it.
+
+    **SimBa's residual trunk shifts the whole scaling curve left by ~15×.**
+    Both families measured at the same three widths, `in_band` (argmax):
+
+    | params | plain MLP | SimBa trunk |
+    |---:|---:|---:|
+    | 105 k | 0.10 (94.5) | — |
+    | 143 k | 0.10 (91.5) | **0.27** (70.5) |
+    | 548 k | 0.10 (80.2) | **0.40** (41.0) |
+    | 8.5 M | 0.43 (44.4) | **0.57** (34.1) |
+
+    **The MLP curve is flat at 0.10 from 105 k to 548 k** and only breaks
+    through at 8.5 M. The trunk rises monotonically from the smallest width
+    tested. At matched outcome the trunk needs **548 k against the MLP's
+    8.48 M — 15.5× fewer parameters for a better argmax** (41.0 vs 44.4).
+
+    So capacity alone buys almost nothing until 8.5 M; what the trunk does is
+    make capacity *usable*, which is exactly the claim SimBa's Fig. 2b makes
+    (an MLP degrades as it widens, SimBa improves). **Read this as parameter
+    efficiency at matched outcome, not as a gap at matched parameters** — the
+    matched-parameter reading understates it roughly 15-fold and is what an
+    earlier draft of this finding got wrong.
+
+    **The simplicity score anti-predicts the outcome here**: Pearson **−0.57**,
+    Spearman **−0.67** between simplicity and `in_band` across the 15, against
+    the +0.79 the paper reports between simplicity and return. The simplest
+    critics in the table are exactly the RSNorm-gated ones.
+    **Caveats:** γ = 0 removes bootstrapping and actor feedback, this is one
+    reward landscape and 620 transitions, and `in_band` at 5 seeds × 6 probes
+    is a coarse measure. It is a screen. **Nothing here has been tried live**,
+    and finding 10 says this landscape does not generalise.
 
 ## Refuted or revised — do not re-test
 
 - ❌ "The critic smooths the cliff into a ramp." It doesn't; the critics learn it.
 - ❌ "A 1e-5 gradient is too small to move the actor." Adam is scale-invariant.
-- ⚠️ "`policy_delay` fixes it." Raising it does not (8 → 0/8 with softsign) — but
+- "`policy_delay` fixes it." Raising it does not (8 → 0/8 with softsign) — but
   the knob is not inert; run 04 turned it the **wrong way** (finding 3). Lowering
   it is untested in the surrogate and 0/3 on ASSUME at 800 updates.
 - ❌ "The surrogate's `lr-1e-4` transfers to ASSUME." 95.5 ± 0.3, 0/3 (run 11).
@@ -214,9 +262,9 @@ constrained optimum of 32.31.
   Run 12 has the controls: **shuffled** observations fail identically, and a critic
   that memorises harder learns the band correctly. The observation *count* stood in
   for the input *dimension* count.
-- ⚠️ "Without shaping or a raised `act_share`, MATD3 never forms a preference" —
+- "Without shaping or a raised `act_share`, MATD3 never forms a preference" —
   single-agent and budget-dependent (finding 7).
-- ⚠️ "Any single result here is a sample from a bimodal distribution, because BLAS
+- "Any single result here is a sample from a bimodal distribution, because BLAS
   thread count alone flipped a seed." True of the SB3 surrogate. For ASSUME the
   claim was "runs 10 and 13 reproduce bit-identically across thread-count
   changes" — **that holds only within one machine.** The run 13 cluster rerun
@@ -301,28 +349,28 @@ constrained optimum of 32.31.
 
 Two of these are the reason workstream A exists.
 
-- ⚠️ **Run 13's recorded critic field is not matd3's actor objective.**
+- **Run 13's recorded critic field is not matd3's actor objective.**
   `matd3.py:704` holds the other agents at their **stored** actions; the recorder
   holds them at their **current actors'** greedy outputs. A valid critic slice, but
   the window / `pulled left` / coherence readings describe the response to the
   current joint policy, not the gradient the actor actually climbs. Empty at N = 1,
   so runs 09–12 are untouched. `RUNS.md` correction 17.
-- ⚠️ **The evaluation database holds two hours per episode** (10:00 and 11:00 of
+- **The evaluation database holds two hours per episode** (10:00 and 11:00 of
   14), an unflushed async write at shutdown. Best-policy selection, early stopping
   and any reward read from `rl_params` are an early-hours sample; training is
   unaffected. `RUNS.md` correction 16.
-- ⚠️ **The surrogate is not the scenario's reward** — `reward_from_bid` agrees with
+- **The surrogate is not the scenario's reward** — `reward_from_bid` agrees with
   the frozen buffer's stored rewards on **24.8 %** of transitions. Bids, critics,
   `act_share` and the offline fits stand; every reconstructed reward, `regret`, the
   `+0.15 solved` bar and the `32.31` optimum do not. Run 12's headline survives on
   *measured* reward. Do not retune the surrogate — it is exact for runs 01–08 by
   construction. Correction 15.
-- ⚠️ **Run 13 used a working-tree `inc_dec_learning`** (72 h horizon, lr 1e-4, 50
+- **Run 13 used a working-tree `inc_dec_learning`** (72 h horizon, lr 1e-4, 50
   episodes, `train_freq` 12h), table in `RUNS.md` §3. **Restore or commit it
   before re-running.**
 - **Seed counts are small** (3 per condition for runs 11–13, 6 for run 10). They
   reject easy fixes; they are not success rates.
-- ⚠️ **`RUNS.md` §13's per-seed bid columns are one draw, not the numbers.** The
+- **`RUNS.md` §13's per-seed bid columns are one draw, not the numbers.** The
   cluster rerun reproduces the condition means and their ordering but none of the
   18 trajectories (finding 13). Anything quoted per seed off that table — or off
   runs 09–12, which have never been re-run on a second machine — carries the same
@@ -390,8 +438,42 @@ early-`full` wrap would start returning zero rows.
 
 ## B. Literature-grounded critic changes, instead of `act_share`
 
-**Start here — scoped 2026-08-13, nothing written yet.** Three checks that were
-done so that a fresh session does not redo them:
+✅ **Built 2026-08-13.** The code is in and tested; the offline screen is the
+thing to read. What exists now:
+
+| file | what it is |
+|---|---|
+| [`real_matd3/critic_architectures.py`](real_matd3/critic_architectures.py) | 32 drop-in `CriticTD3` replacements + a `REGISTRY`, **width and depth** knobs, `match_width`, and the run-18 parameter ladder |
+| [`analysis/simplicity_bias.py`](analysis/simplicity_bias.py) | SimBa's Fourier simplicity score, two estimators |
+| `assume_offline_critic.py --round arch` | the γ = 0 screen over any subset of them |
+| `eom_critic_film.py --critic-arch X` | the live sweep, one flag |
+
+**No `assume/` change was needed.** `install_critic_arch` rebinds
+`matd3.CriticTD3` before the world loads, which is enough because
+`create_critics` builds the class by name out of its own module globals.
+
+Three things a fresh session should not have to rediscover:
+
+1. **A normalizer's running statistics must be `nn.Parameter(requires_grad=
+   False)`, never `register_buffer`.** `polyak_update` zips `parameters()`,
+   which does not yield buffers, so a buffer-held running mean never reaches
+   the target critic: `Q` standardizes its inputs, `Q_target` does not, and the
+   TD target is computed on a different input scale for the entire run, in
+   silence. `_stats_to_params` does the promotion; `test_rl_benchmark.py`
+   pins it for every registered variant.
+2. **RSNorm must not update inside `forward`.** `matd3.py:713` calls
+   `q1_forward` on the same batch `forward` just saw, so an update there
+   would count every batch twice *and* make the actor's objective differ from
+   the critic's own Q1. The statistics advance in one place: the twin-Q path,
+   once per replay batch.
+3. **Parameter counts must be matched before architectures can be compared.**
+   SimBa's Fig. 4(a) holds all twelve of their architectures within 1 % of
+   4.5 M (their Appendix D). `simba` at the paper's `d_h = 512` is 8.5 M
+   against the baseline's 93 k, so an unmatched table moves architecture and
+   capacity in the same column. `match_width` bisects the width to a target;
+   `--match-params` turns it on.
+
+Three checks that were done when this was scoped, kept because they still hold:
 
 * **There is no critic-architecture config knob.** `actor_architecture_aliases`
   exists ([`algorithms/__init__.py:12`](../../../../assume/reinforcement_learning/algorithms/__init__.py#L12))
@@ -401,13 +483,10 @@ done so that a fresh session does not redo them:
   patch before the world loads — the same pattern the probes already use — and
   **no `assume/` change at all**. Mirroring the actor's alias dict upstream would
   be the tidier fix and is PR-able, but is not required.
-* **The offline harness hardcodes the critic** at
-  [`assume_offline_critic.py:120`](real_matd3/assume_offline_critic.py#L120).
-  Screening needs a factory plus an `--arch` flag there, ~30 lines.
-* **Sizes.** `critic_architectures.py` (late injection, RSNorm, SimBa blocks,
-  registry) ≈ 110 new lines; harness wiring ≈ 30; `cluster/critic_arch.sh` ≈ 150,
-  ~90 % copied from the two existing launchers. The offline screen is about half
-  a session. Re-evaluating runs 09–13 under whatever wins is the open-ended part.
+* ✅ **The offline harness no longer hardcodes the critic** — `fit(..., arch=)`
+  plus `--round arch`. Still to build: `cluster/critic_arch.sh` ≈ 150 lines,
+  ~90 % copied from the two existing launchers. Re-evaluating runs 09–13 under
+  whatever wins is the open-ended part.
 
 Run 15 also gives B a target it did not have when it was written: **the failure
 mode is a rare regime being unfitted** (finding 14). RSNorm's per-dimension
@@ -455,15 +534,131 @@ hidden sizes `[256, 128]`, Xavier, ReLU, no normalization anywhere.
    0.008, `argmax Q1` pinned at exactly 100.0 in 5/5 seeds. Those two cannot both
    be the whole story. Either `act_share` is measuring the wrong thing, or
    normalization is only safe in company with the residual path and the
-   LayerNorms. **Run RSNorm alone, RSNorm + late injection, and full SimBa on the
-   offline γ = 0 harness** (`real_matd3/assume_offline_critic.py`, 5 seeds, ~15 min,
-   no simulation) before spending any cluster time. That harness already
-   reproduces the live failure, which is what makes it the right place to screen
-   architectures.
+   LayerNorms. ✅ **Wired and runnable:**
 
-Then take whatever survives offline to a live sweep on `inc_dec_learning_single`
-and `inc_dec_learning`, against run 11's `BASELINE` and run 12's `act-x30` as the
-two reference points.
+   ```bash
+   python real_matd3/assume_offline_critic.py --round arch --seeds 5 --threads 8
+   ```
+
+   ~40 s per variant for the eight narrow ones; the `d_h = 512` rows
+   (`simba`, `simba-nornorm`, `simba+late`) are the expensive ones. That
+   harness already reproduces the live failure, which is what makes it the
+   right place to screen architectures.
+
+## B'. The simplicity-bias measure
+
+`analysis/simplicity_bias.py`. SimBa's Fourier complexity
+`c(f) = Σ|f~(k)|·k / Σ|f~(k)|`, simplicity `s = E[1/c]`, **higher is simpler**.
+
+**The definition is general in `n`; their estimator is not.** §2.1 quantifies
+`f : X ⊆ R^n → Y ⊆ R^m` with no dimensional restriction, but the estimator is a
+DFT on a uniform grid over the input domain, costing `G^n` points — 90 000 at
+their `G = 300` and `n = 2`, and nothing at all at our `n ≈ 57`. Hence two
+estimators here:
+
+* **`grid`** — Appendix B step for step: the variant rebuilt with a
+  2-input/1-output head, random init, `300 × 300` on `[-100,100]²`, 100 seeds.
+  6–27 s per variant. This is the only number comparable to *their* protocol.
+  Note their Fig. 4(a) is measured on architecture *templates at
+  initialization*, not on a trained RL critic, so it has no time axis in the
+  paper.
+* **`lines`** — random 1-D directions through the buffer mean at full input
+  dimension, `300 × 300 = 90 000` evaluations, the same budget as one grid.
+  Sub-second. Works on the real critic, so it is the one with a time axis.
+  1-D restrictions of an n-D function are **not** the n-D spectrum measured
+  cheaply. Compare `lines` to `lines` only, never to `grid`.
+
+Two conventions, both load-bearing: the output is **mean-centred** before the
+transform (the DC term otherwise carries the function's mean and swamps
+everything), and frequency is **normalized so Nyquist = 1**. So absolute values
+are *not* comparable to the paper's printed 5.8–6.5 — **the ordering is the
+claim**.
+
+**The RSNorm rows of `grid` are the least trustworthy in that table.** An
+unfitted RSNorm is exactly the identity, so it cannot be scored at all; fitting
+it on `[-100,100]²` makes it divide the input by ~58, so most of what that row
+measures is an input rescaling. `--no-fit-rsnorm` gives the other reading.
+The paper hits this too — its Appendix C.1 reports RSNorm's score moving
+*opposite* to its effect on return, for this reason.
+
+**Over time**: `eom_critic_film.py` records `lines` per agent per frame
+(`--simplicity-lines`, default 128, `0` disables), saved as `simplicity` in
+the `.npz` alongside the critic field, so it shares the film's time axis. The
+offline `--round arch` table carries it per fitted critic, which makes that
+table a direct test of the paper's own central correlation (their Fig. 17
+reports Pearson 0.79 between simplicity score and return) on a case where the
+outcome is known to be a failure.
+
+## B''. Run 18 — the live sweep, and a hyperparameter grid
+
+✅ **Built 2026-08-13, not yet run.** Whatever survived offline now goes to a
+live sweep on `inc_dec_learning_single`, against run 11's `BASELINE` and run
+12's `act-x30` as the two reference points. Everything below is wired,
+smoke-tested end to end, and waiting on cluster time.
+
+| file | what it is |
+|---|---|
+| [`real_matd3/assume_arch_sweep.py`](real_matd3/assume_arch_sweep.py) | run 18a/b — both rounds on inc-dec, one runner |
+| [`real_matd3/hpo_grid.py`](real_matd3/hpo_grid.py) | the 20-cell grid, shared by both hosts |
+| [`real_matd3/optim_patches.py`](real_matd3/optim_patches.py) | weight decay, the one axis with no config field |
+| [`cluster/critic_arch.sh`](cluster/critic_arch.sh) | 57 tasks (arch) / 60 (hpo) |
+| [`cluster/hpo_eom.sh`](cluster/hpo_eom.sh) | 60 tasks — the same grid on `p1`, per Nash equilibrium |
+| [`analysis/live_arch_film.py`](analysis/live_arch_film.py) | one panel per architecture, ordered by parameter count |
+| [`analysis/hpo_grid_film.py`](analysis/hpo_grid_film.py) | one panel per hyperparameter cell, one figure per regime |
+
+**Round 18a — architectures.** 19 cells: `baseline`, `late`, `split`, and both
+families run at **two depths up the same four-rung parameter ladder** (100k /
+500k / 2M / 8M). The six RSNorm carriers and `bn+late` are deliberately absent —
+run 17 measured them at a mean `in_band` of 0.005 with the argmax pinned at
+exactly 100.0 at every width, so re-running them buys 24 tasks of the same
+answer.
+
+The ladder is a **grid, not a line**, and that is the correction to run 17.
+Run 17 moved width at fixed depth, so "capacity" and "width" were one variable
+and neither could be blamed. Now: if the ladder has the same shape at depth 2
+and depth 4, capacity is what matters; if the deeper column wins at equal
+parameters, depth is. One SimBa block is two `Linear` layers, so the two
+families' depth units differ — **read each family's curve against itself**, not
+`d4` against `d4`.
+
+`split` is the new architecture. Late injection gives the action its own weight
+matrix, but it still arrives *raw* and outnumbered at layer 2. `split` gives it
+its own hidden layer at the same width as the observation's, so from layer 2 on
+neither can dominate by how many rows it owns. That separates **equal count**
+from **equal scale** — and equal scale is exactly what `act_share` moved, so
+this is the cell that decides whether run 12's lever has a literature-grounded
+counterpart or was measuring something else.
+
+**Rounds 18b / 18c — hyperparameters.** The same 20 cells on both hosts, so the
+inc-dec and `p1` tables can be laid side by side: 3 learning rates ×
+{const, linear, cosine}, batch size, policy delay, weight decay. A coordinate
+sweep, not a 108-cell cross — nothing in runs 09–17 suggests these four
+interact, and the failure they are aimed at is a critic that never develops a
+slope. Learning rate and schedule *are* crossed, because a schedule is a
+statement about the rate. `lr0.001-const` reproduces `default` and is the grid's
+internal control.
+
+**One thing worth knowing before reading any archived run.** `matd3.py:366` and
+`:407` construct `AdamW(params, lr=...)` and pass nothing else, so **every run in
+this benchmark's archive trained with torch's default `weight_decay = 0.01`** —
+not with none. That is a real prior toward small weights on a critic fitting a
+piecewise-constant reward, and it has never been varied. It is not a
+`LearningConfig` field, so the sweep moves it by rebinding `matd3.AdamW`
+(`optim_patches.py`); cells at 0.01 are left unpatched so their films stay
+comparable with the run 14/15 batches. Adding the field upstream is a decision
+for whoever reads the sweep.
+
+`hpo_eom.sh` runs `OBS_REGIMES=1` by default. Run 14b found the critic fits the
+regime it sees often and leaves the rare one as noise, so the question is not
+"does a setting help" but **"does it help in the regime the critic is currently
+ignoring"** — a setting that lifts the aggregate by fitting the common regime
+harder is not an improvement for this benchmark's purpose.
+
+```bash
+bash cluster/critic_arch.sh                        # 18a, 57 tasks
+ROUNDS=hpo bash cluster/critic_arch.sh             # 18b, 60 tasks
+bash cluster/hpo_eom.sh                            # 18c, 60 tasks on p1
+```
 
 ## C. Does any of this generalise? — plain EOM scenarios
 
@@ -485,17 +680,21 @@ What that implies for the rest of the plan:
   test — 9 tasks, ~15 min each.
 * **A is unchanged and still first.** Run 14 predates it too.
 
-Two open items here, both wired up and neither run:
+**The per-regime critic films are DONE** — runs 14b, 14c and 15 all ran with
+`OBS_REGIMES=1`, and findings 15 and 16 come out of them. What follows is kept
+because it documents the three views and how to record them, not because
+anything is outstanding. **One item is genuinely open: the two-bid ladder, at
+the end of this section.**
 
 * **The per-regime critic films.** Finding 12b says the learners solve the
   Bertrand equilibrium and not the pivotal one; it does **not** say whether the
   failure is in the critic (it never learns that the pivotal hours pay more) or
-  in the actor (the critic knows, the actor cannot get there). The probed
-  observations are currently sampled without regard to demand, so the existing
-  films cannot answer it. `eom_critic_film.py --obs-regimes` stratifies them by
-  regime — the recorder ranks the buffer on the observation's scaled residual
-  load, which is demand here. Three views then read it, and they answer
-  different halves of the question:
+  in the actor (the critic knows, the actor cannot get there). Probed
+  observations sampled without regard to demand cannot answer it.
+  `eom_critic_film.py --obs-regimes` stratifies them by regime — the recorder
+  ranks the buffer on the observation's scaled residual load, which is demand
+  here. Three views then read it, and they answer different halves of the
+  question:
 
   * `--only regime-heatmap` — the critic's **field** in each regime side by side
     on one shared colour scale, plus their difference. This is the one that
@@ -512,9 +711,13 @@ Two open items here, both wired up and neither run:
   OBS_REGIMES=1 bash .../cluster/eom_critic_evolution.sh
   ```
 
-  `sb02b` is the case that matters — it is the only one carrying both regimes.
-* **The two-bid ladder** (`02a`–`02c`, act_dim 2), the A/B that isolates bid
-  structure.
+  `sb02b` is the case that matters — it is the only one carrying both regimes,
+  which 14b confirmed (bands found: `sb02a` idle+pivotal, `sb02b` all three,
+  `sb02c` idle+bertrand).
+* **STILL OPEN — the two-bid ladder** (`02a`–`02c`, act_dim 2), the A/B that
+  isolates bid structure. 9 tasks, `CASES="02a 02b 02c"`. Every EOM finding so
+  far is single-bid, so "one bid for the whole `max_power`" is an uncontrolled
+  variable in all of them.
 
 * **Port the probes to `example_02a`–`02c`** (`examples/inputs/example_02a` …
   `02c`). ✅ **Done** — `real_matd3/eom_critic_film.py` films the critics of the
@@ -534,7 +737,7 @@ Two open items here, both wired up and neither run:
   byte-identical to the originals, so each `sb02x` is an A/B against `02x`. At
   `act_dim` 1 the film has a single bid axis — the shape runs 09–13 recorded —
   and each unit submits one bid, which is exactly what the exploitability probe
-  handles without its ordered-bids decomposition. ⚠️ **The strategy also defaults
+  handles without its ordered-bids decomposition. **The strategy also defaults
   `foresight` to 24 against the two-bid strategy's 12**, so its observation is
   50-dimensional against 26: an `act_share` comparison *across* the two ladders
   moves two things at once. Within a ladder it is clean.
@@ -545,7 +748,7 @@ Two open items here, both wired up and neither run:
   `examples/inputs/exploit_example/`. It needed a `world.py` change so evaluation
   episodes write market output at all — `RUNS_Continuation.md` has the three
   consequences for cluster runs.
-  ⚠️ **It is only correct for a single day-ahead market with no storages**, so it
+  **It is only correct for a single day-ahead market with no storages**, so it
   can be read on `example_02a`–`02c` and **not** on any inc-dec scenario:
   `_write_exploitability` selects the orderbook without filtering by market, so
   EOM and Redispatch bids are grouped by `start_time` and cleared as if they were
@@ -595,8 +798,12 @@ rl_benchmark/
 ├── surrogate/       the closed-form landscape and the Gymnasium env
 ├── sweeps/          training drivers: run_benchmark.py, td3_stability.py
 ├── analysis/        reads a recorded run and explains it; makes the figures
+│                    (simplicity_bias.py is the exception — it needs no run)
 ├── real_matd3/      probes ASSUME's own MATD3 (07–12 single, 13 multi-agent,
-│                    eom_critic_film.py for example_02a–c)
+│                    eom_critic_film.py for example_02a–c,
+│                    critic_architectures.py for workstream B,
+│                    assume_arch_sweep.py + hpo_grid.py + optim_patches.py
+│                    for run 18)
 ├── cluster/         one-call SLURM launchers; see its README
 │                    (`analysis/eom_exploitability.py` reads the scratch
 │                     databases, not the .npz films — it is the only script
@@ -611,7 +818,7 @@ rl_benchmark/
 
 The exploitability code itself lives in `assume/` — `reinforcement_learning/
 exploitability.py` and the `WriteOutput` hooks in `common/outputs.py`. Only its
-test and its explanation are kept here. ⚠️ **The measure is only correct for a
+test and its explanation are kept here. **The measure is only correct for a
 single day-ahead market with no storages** — the SCOPE note at the top of
 `exploitability.py` says why, and it rules out every inc-dec scenario in this
 archive.
@@ -622,6 +829,8 @@ experiment, each its own submitter, array body and collector:
 ```bash
 bash .../rl_benchmark/cluster/rerun_run13.sh            # 18 tasks + tarball
 bash .../rl_benchmark/cluster/eom_critic_evolution.sh   #  9 tasks + tarball
+bash .../rl_benchmark/cluster/critic_arch.sh            # 57 tasks + tarball
+bash .../rl_benchmark/cluster/hpo_eom.sh                # 60 tasks + tarball
 ```
 
 Every script runs from any working directory and resolves archived runs
@@ -634,12 +843,23 @@ R=examples/inputs/2_nodes_paper_small/rl_benchmark
 conda run -n assume python -m pytest $R/test_rl_benchmark.py $R/test_exploitability.py -v
 ```
 
-~15 s, no simulation, no archive, and both run from any working directory.
-`test_rl_benchmark.py` covers four things that would fail *silently* — the
-figures would keep rendering from the wrong input: `MultiAgentRecorder` against a
-real `TD3.update_policy` gradient step (**extend this when workstream A lands**);
+~30 s, no simulation, no archive, and both run from any working directory.
+`test_rl_benchmark.py` covers things that would fail *silently* — the figures
+would keep rendering from the wrong input: `MultiAgentRecorder` against a real
+`TD3.update_policy` gradient step (**extend this when workstream A lands**);
 the run-13 action-scale lever; `act_share`; the coherence statistic and the
-per-episode transition count. `test_exploitability.py` adds 22 pure unit tests of
+per-episode transition count. Its § 5 adds workstream B: every critic variant
+is a drop-in for `CriticTD3`, `q1_forward` agrees with `forward`, running
+statistics survive `polyak_update`, and the Fourier measure recovers a known
+frequency (which is what catches the DC term being left in — an un-centred
+image scores every architecture as near-zero complexity, in the right order).
+Its § 6 adds run 18: the depth knob really moves layers and leaves the width
+alone, the parameter ladder lands on its rungs at both depths in both families,
+every generated ladder name is registered, `split`'s two encoders are the same
+width, the hyperparameter grid is the grid it documents, and the weight-decay
+patch actually reaches the optimizer (without it the `wd` cells would run
+happily and measure torch's default three times over).
+`test_exploitability.py` adds 22 pure unit tests of
 the clearing and exploitability maths — no scenario, no database. (Its `_main()`
 below the tests is a scratch driver for plotting against a Postgres run; it is not
 collected by pytest and is partly dead code.)

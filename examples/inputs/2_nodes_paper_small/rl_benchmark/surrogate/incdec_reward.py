@@ -11,7 +11,7 @@ the learning diesel unit of the ``2_nodes_paper_small`` scenario. It exists so
 that RL algorithms can be compared on *this landscape shape* without paying for a
 HiGHS solve per candidate action.
 
-⚠️ **It is a surrogate, not the scenario's reward. Never use it to score a real
+**It is a surrogate, not the scenario's reward. Never use it to score a real
 ASSUME run.**
 
 Checked against the 620 stored rewards of ``buffers/single_10ep_standard.npz``

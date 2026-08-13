@@ -1,7 +1,7 @@
 # Inc-dec reward landscape: RL algorithm benchmark — runs 01–13
 
 > **Condensed.** The full-length version of this document (1 844 lines) is
-> [`archive/RUNS_full.md`](archive/RUNS_full.md). ⚠️ **Do not read it by default**
+> [`archive/RUNS_full.md`](archive/RUNS_full.md). **Do not read it by default**
 > — it costs ~25 k tokens. `grep` it when a number here is not enough; see
 > [`archive/README.md`](archive/README.md) for what only exists there.
 >
@@ -44,7 +44,7 @@ never learns a usable shape from the true reward at all, not even at 4× budget.
 Run 12's answer is that the action is **1 of 75 critic inputs** and the other 74
 carry 97 % of the input variation; raising the action's share solves it 3/3 at the
 same budget. Run 13 takes that to 11 agents and finds the effect real but weaker
-in kind — it buys **rate**, not feasibility. ⚠️ `act_share` is a quantity invented
+in kind — it buys **rate**, not feasibility. `act_share` is a quantity invented
 here rather than a literature one, and is under review; see `HANDOFF.md`
 workstream B before building on runs 12–13.
 
@@ -296,7 +296,7 @@ run 07's budget; it is a different failure. **With shaping the same run converge
 cleanly to the band's rim** within ~800 updates.
 
 `assume_training_probe.py` wraps `matd3.TD3.update_policy` from the outside, so
-**nothing in `assume/` is edited**. ⚠️ `assume_probe_unshaped.npz` is
+**nothing in `assume/` is edited**. `assume_probe_unshaped.npz` is
 **mislabelled** — it preloads a buffer whose 280 stored rewards are *shaped*. Use
 `assume_probe_unshaped_clean.npz`; the mislabelled run appears to flip, the clean
 one never does.
@@ -369,10 +369,10 @@ was commented out throughout.
 The strongest lever is **critic-update budget**, not any stabiliser: `grad-32` does
 2560 updates and is the only config that forms a substantial descending region.
 All **90/90 archives** carry Q1/Q2 and both autograd gradient fields on 401 bids ×
-6 observations at all 80 blocks. ⚠️ Six initial failures were a concurrent
+6 observations at all 80 blocks. Six initial failures were a concurrent
 TensorBoard async-writer race, **not** failed learning; retried with
 `--disable-tensorboard`, partials kept under `partial_failures_before_retry/`.
-⚠️ 3 seeds and 40 episodes reject easy fixes; they are not rates, and changing
+3 seeds and 40 episodes reject easy fixes; they are not rates, and changing
 `gradient_steps` also changes total optimisation work.
 
 ### 12 — the action's share of the critic's input (**headline 4**)
@@ -418,7 +418,7 @@ Selected rungs: `act ×2` 0.058 → 65.2, `act ×10` 0.234 → 38.4, `act ×30` 
 (0.008, pinned at exactly 100.0 in 5/5 seeds). `act_share` predicts the *ordering*
 across levers, not the exact value.
 
-> ⚠️ **That last cell is in direct tension with the literature and is the next
+> **That last cell is in direct tension with the literature and is the next
 > thing to test.** SimBa (Lee et al., ICLR 2025) makes per-dimension observation
 > standardization by running statistics its single most important component, and
 > DDPG (Lillicrap et al., 2016) batch-normalizes the state input for the same
@@ -463,9 +463,9 @@ task**, against 0/90 in run 11; all 18 probed bids lie in 32.0–34.8. It lands 
 two seeds converge, seed 42 overshoots to −93.7 — run 08's overshoot failure
 arriving in ASSUME for the first time, now that the critic works.
 
-⚠️ **`recon` is reconstructed from the surrogate curve and is not the simulator's
+**`recon` is reconstructed from the surrogate curve and is not the simulator's
 reward** (correction 15); the `measured` column is read from each trial's own
-`rl_params`, and **the headline survives on it**. ⚠️ That column is itself an
+`rl_params`, and **the headline survives on it**. That column is itself an
 early-hours sample — `rl_params` holds only the first two products of each
 episode (correction 16).
 
@@ -490,7 +490,7 @@ window. `pulled left` separates converged from still-moving: `act-x30` 50 % (a
 coin flip), `foresight-3` **100 %** — still descending at bid 40.4 when the budget
 ran out.
 
-⚠️ 3 seeds, one scenario. `act-x30`'s 3/3 rejects "nothing simple works"; it is not
+3 seeds, one scenario. `act-x30`'s 3/3 rejects "nothing simple works"; it is not
 a rate. S = 30 is one arbitrary point. Cutting foresight discards forecast
 information that is worthless *in this scenario* and would not be in general.
 Recorded `dQ/d(bid)` carries the factor S, so **signs are comparable across
@@ -513,7 +513,7 @@ units of `powerplant_units_learning.csv` learning on a 72 h horizon, so each
 critic sees **94 observation + 11 action = 105 inputs**. Only early stopping is
 disabled. ~31 min per 25-episode trial, ~59 min per 50-episode trial.
 
-⚠️ **Run 13 used a working-tree `inc_dec_learning`, not the committed one:**
+**Run 13 used a working-tree `inc_dec_learning`, not the committed one:**
 
 | field | committed at `9cf080eb` | used by run 13 |
 |---|---|---|
@@ -569,11 +569,11 @@ prefixes of their long counterparts** on `greedy`, `critic_q`, `critic_grad`,
 the runs are deterministic given seed and thread count, and the budget-doubling
 comparison is **the same trajectories continued**, not a fresh sample.
 
-⚠️ **Fleet reward runs opposite to `diesel_0`'s in every row** — agents compete, so
+**Fleet reward runs opposite to `diesel_0`'s in every row** — agents compete, so
 falling bids mean falling prices. **"Solved" cannot be defined by fleet profit
 here**, and the closed-form `incdec_reward` landscape does not apply at all (it was
 derived with the rest of the fleet bidding naively), which is why run 13 reads
-rewards from each run's own buffer. ⚠️ Three seeds, wide spreads: `act-all-x2`
+rewards from each run's own buffer. Three seeds, wide spreads: `act-all-x2`
 spans 60.9–95.3. The ordering reproducing at two independent budgets is the
 strongest thing on offer at n = 3.
 
@@ -668,7 +668,7 @@ for any σ > 0 is strictly *above* 30. SAC at `--ent-coef 0.001` lands at 32.34
 against a constrained optimum of 32.31 for σ ≈ 1: it is not approximately solving
 this, it is *sitting on* the constrained optimum for its own residual width.
 
-⚠️ Surrogate numbers, never validated against the simulator — correction 15.
+Surrogate numbers, never validated against the simulator — correction 15.
 **Open task:** replace `hit`/`regret` in `summarize()` with expected reward under
 the policy's actual spread.
 

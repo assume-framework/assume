@@ -85,7 +85,7 @@ Usage
     python real_matd3/eom_critic_film.py --report-only
     python analysis/eom_critic_evolution.py
 
-⚠️ **File size is the one knob that matters.** The film is
+**File size is the one knob that matters.** The film is
 ``n_agents x (act_dim + 1) x n_obs x frames x grid`` floats, twice (Q and its
 gradient). ``example_02c`` at ``--grid 401 --n-obs 6 --every 1`` is ~1.5 GB per
 seed; the defaults here (``--grid 201 --n-obs 4 --every 4``) put it near 30 MB,
@@ -111,6 +111,11 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from _layout import OUT_DIR, SCENARIO  # noqa: E402
+from critic_architectures import REGISTRY as CRITIC_ARCHS  # noqa: E402
+from critic_architectures import build as build_critic  # noqa: E402
+from critic_architectures import describe as describe_critic  # noqa: E402
+from hpo_grid import CELLS as HP_CELLS  # noqa: E402
+from hpo_grid import describe as describe_cell  # noqa: E402
 
 SELF = Path(__file__).resolve()
 REPO = SCENARIO.parents[2]
@@ -125,6 +130,16 @@ SHAPING_LIVE = re.compile(r"^\s{8}if reward > 0:", re.MULTILINE)
 #: multiplied by this to become EUR/MWh, so it is also the bid grid's half-width.
 MAX_BID_PRICE = 100.0
 
+#: SimBa's Fourier simplicity score is recorded per frame alongside the critic
+#: field, so it has the same time axis as everything else in the film -- this
+#: is the "simplicity over training" trace, and it costs one extra forward pass
+#: per agent per frame. 128 lines x 128 samples = 16 384 evaluations, an eighth
+#: of the standalone measurement's budget in ``analysis/simplicity_bias.py``,
+#: which is the right trade when it is being sampled hundreds of times rather
+#: than once. Set ``--simplicity-lines 0`` to switch it off entirely.
+SIMPLICITY_LINES = 128
+SIMPLICITY_SAMPLES = 128
+
 #: The runnable cases, keyed by the short name that ends up in file names and
 #: figures. ``02a``-``02c`` are the stock two-bid examples; ``sb02a``-``sb02c``
 #: are the single-bid folder, one study case per fleet, and are the same three
@@ -134,7 +149,7 @@ MAX_BID_PRICE = 100.0
 #: against the ``02x`` case above it -- same demand, same fuel prices, same
 #: naive fleet, same market.
 #:
-#: ⚠️ The single-bid strategy also defaults ``foresight`` to 24 rather than 12,
+#: The single-bid strategy also defaults ``foresight`` to 24 rather than 12,
 #: so its observation is 50-dimensional against 26. The action count is not the
 #: only thing that moves between the two columns; say so in any ``act_share``
 #: comparison across them.
@@ -351,7 +366,7 @@ def act_share_from_sd(
     observation plus the last ``unique_obs_dim`` entries of every other agent's,
     and all agents' actions.
 
-    ⚠️ ``act_share`` is a quantity invented in run 12, not a literature one, and
+    ``act_share`` is a quantity invented in run 12, not a literature one, and
     ``HANDOFF.md`` § B says not to build on it before the offline architecture
     screen. It is recorded here because it is free -- the buffer std has to be
     taken anyway -- and because the whole point of these runs is whether the
@@ -419,6 +434,14 @@ class EomCriticRecorder:
         self.act_dim = 0
         self.sd_obs: np.ndarray | None = None
         self.sd_act: np.ndarray | None = None
+        #: SimBa's Fourier simplicity score per agent, one row per frame.
+        #: Measurement C of analysis/simplicity_bias.py -- random 1-D lines at
+        #: full input dimension, because the critic input here is 50+-D and the
+        #: paper's 2-D grid estimator does not reach that far. Set
+        #: ``simplicity_lines = 0`` to switch it off.
+        self.simplicity: list[np.ndarray] = []
+        self.simplicity_lines = SIMPLICITY_LINES
+        self.simplicity_samples = SIMPLICITY_SAMPLES
         #: ring position at the previous frame, so the reward window is exactly
         #: "the transitions collected since the last frame" -- see _reward_window
         self._prev_pos: int | None = None
@@ -671,6 +694,67 @@ class EomCriticRecorder:
         self.sd_obs = np.asarray(buf.observations[:fill]).std(axis=0)
         self.sd_act = np.asarray(buf.actions[:fill]).std(axis=0)
 
+        self.simplicity.append(self._simplicity(strategies, buf, fill))
+
+    def _simplicity(self, strategies, buf, fill: int) -> np.ndarray:
+        """SimBa's Fourier simplicity score of each agent's critic, this frame.
+
+        Measurement C of ``analysis/simplicity_bias.py``: random 1-D lines
+        through the *live buffer's* mean input, at full input dimension.
+        Higher is simpler.
+
+        Two choices worth knowing about, both of which make this a trace of the
+        critic rather than of the data:
+
+        * The probe centre and per-dimension step come from the buffer **as it
+          stands at this frame**, so the region being measured tracks where the
+          critic is actually being fitted. A fixed box would drift out of the
+          data as the policy moves and the later frames would measure
+          extrapolation.
+        * It is read in ``eval()`` mode and restored afterwards. A normalizing
+          critic (``rsnorm``, ``simba``) would otherwise fold 16 384 synthetic
+          probe points into its running statistics every frame, which would
+          corrupt training with the measurement.
+
+        Returns all-NaN if switched off, so the saved array keeps its shape.
+        """
+        import torch as th
+
+        n_agents = len(strategies)
+        if not self.simplicity_lines:
+            return np.full(n_agents, np.nan)
+
+        from simplicity_bias import line_score
+
+        obs = np.asarray(buf.observations[:fill])  # (fill, n_agents, obs_dim)
+        acts = np.asarray(buf.actions[:fill]).reshape(fill, -1)
+        u = self.unique_obs_dim
+
+        out = np.empty(n_agents)
+        for i, (_, strategy) in enumerate(strategies):
+            # critic i's observation slot is wider than agent i's own
+            # observation -- it also carries every other agent's unique tail --
+            # so the statistics have to be taken in the critic's own layout,
+            # exactly as _critic_states assembles it and matd3.py:584-591 feeds
+            # it. Taken over the whole buffer, not over the handful of probed
+            # observations, so the step size is the data's spread and not a
+            # six-sample estimate of it.
+            others = np.concatenate(
+                [obs[:, :i, -u:], obs[:, i + 1:, -u:]], axis=1
+            ).reshape(fill, -1)
+            x = np.concatenate([obs[:, i, :], others, acts], axis=1)
+            obs_dim = x.shape[1] - acts.shape[1]
+            out[i] = line_score(
+                strategy.critics,
+                x.mean(axis=0).astype(np.float32),
+                x.std(axis=0).astype(np.float32),
+                n_lines=self.simplicity_lines,
+                n_samples=self.simplicity_samples,
+                obs_dim=obs_dim,
+                seed=len(self.simplicity),  # a fresh set of directions per frame
+            )["s"]
+        return out
+
     # -- output -------------------------------------------------------------
 
     def save(
@@ -703,6 +787,14 @@ class EomCriticRecorder:
             # (frames, n_agents): mean stored reward over the transitions
             # collected since the previous frame
             rewards=np.stack(self.rewards, axis=0),
+            # (frames, n_agents): SimBa's Fourier simplicity score of each
+            # critic, higher = simpler. All-NaN when switched off. Absent from
+            # anything recorded before 2026-08-13.
+            simplicity=np.stack(self.simplicity, axis=0) if self.simplicity
+            else np.zeros((0, len(self.unit_ids))),
+            simplicity_cfg=np.array(
+                [self.simplicity_lines, self.simplicity_samples]
+            ),
             observations=self.obs,
             # (n_obs, n_agents, act_dim) the joint action played at each probed
             # observation, i.e. what fills the other agents' columns in the
@@ -736,7 +828,42 @@ class EomCriticRecorder:
 # ---------------------------------------------------------------------- child
 
 
-def run_child(rest: list[str], bands: dict | None = None) -> None:
+def install_critic_arch(arch: str) -> None:
+    """Swap the critic architecture for the whole process.
+
+    ``matd3.create_critics`` builds ``CriticTD3`` by name out of its own module
+    globals (``matd3.py:388`` and ``:396``), so rebinding that name before the
+    world is constructed is enough -- **no change to** ``assume/`` **at all**.
+    There is no config knob for the critic: ``actor_architecture_aliases``
+    exists for the actor (``algorithms/__init__.py:12``) but has no critic
+    counterpart, and mirroring it upstream would be the tidier fix and is
+    PR-able, but is not required for these experiments.
+
+    Must run before the world loads, which is why it sits in the child rather
+    than the recorder -- the recorder is constructed after the critics are.
+    """
+    if arch == "baseline":
+        return
+    import assume.reinforcement_learning.algorithms.matd3 as matd3
+
+    matd3.CriticTD3 = build_critic(arch)
+    print(f"  critic architecture: {arch} -- {describe_critic(arch)}")
+
+
+def run_child(rest: list[str], bands: dict | None = None,
+              simplicity_lines: int | None = None,
+              critic_arch: str = "baseline",
+              weight_decay: float | None = None) -> None:
+    install_critic_arch(critic_arch)
+    if weight_decay is not None:
+        from optim_patches import TORCH_DEFAULT_WEIGHT_DECAY, install_weight_decay
+
+        # only patch when the cell actually differs: an unpatched AdamW is the
+        # archive's own optimizer, and leaving it alone keeps every 'default'
+        # film bit-comparable with the run 14/15 batches
+        if weight_decay != TORCH_DEFAULT_WEIGHT_DECAY:
+            install_weight_decay(weight_decay)
+
     import assume_training_probe as probe
 
     # the joint observations come from the live buffer; only the count is taken
@@ -744,18 +871,20 @@ def run_child(rest: list[str], bands: dict | None = None) -> None:
     # scenario and has the wrong observation dimension
     probe.load_observations = lambda path, n: np.empty((n, 0))
 
-    if bands:
-        # the probe constructs the Recorder itself, so the bands are attached
-        # through the class rather than the constructor signature, which has to
-        # stay compatible with assume_training_probe.Recorder
-        class _Stratified(EomCriticRecorder):
-            def __init__(self, observations, grid, every):
-                super().__init__(observations, grid, every)
+    # the probe constructs the Recorder itself, so per-run settings are attached
+    # through the class rather than the constructor signature, which has to stay
+    # compatible with assume_training_probe.Recorder
+    class _Configured(EomCriticRecorder):
+        def __init__(self, observations, grid, every):
+            super().__init__(observations, grid, every)
+            if bands:
                 self.bands = bands
+            if simplicity_lines is not None:
+                self.simplicity_lines = simplicity_lines
 
-        probe.Recorder = _Stratified
-    else:
-        probe.Recorder = EomCriticRecorder
+    probe.Recorder = (
+        _Configured if (bands or simplicity_lines is not None) else EomCriticRecorder
+    )
 
     sys.argv = ["assume_training_probe.py", *rest]
     probe.main()
@@ -764,8 +893,11 @@ def run_child(rest: list[str], bands: dict | None = None) -> None:
 # --------------------------------------------------------------------- parent
 
 
-def result_path(out_dir: Path, case: str, seed: int) -> Path:
-    return out_dir / f"eom_film_{case}_seed{seed}.npz"
+def result_path(out_dir: Path, case: str, seed: int, hp: str = "default") -> Path:
+    # 'default' keeps the historic name, so every film recorded before the
+    # hyperparameter round existed still validates and is still found
+    tag = "" if hp == "default" else f"_{hp}"
+    return out_dir / f"eom_film_{case}{tag}_seed{seed}.npz"
 
 
 def preflight(cases: list[str]) -> None:
@@ -809,13 +941,13 @@ def validate_result(path: Path, case: str, seed: int) -> None:
 
 
 def launch(case: str, seed: int, args) -> tuple[str, int, int, float, Path]:
-    out = result_path(args.out_dir, case, seed)
+    out = result_path(args.out_dir, case, seed, args.hp)
     if out.exists() and not args.rerun:
         validate_result(out, case, seed)
         return case, seed, 0, 0.0, out
 
     scenario = CASES[case]["scenario"]
-    tag = f"{case}_seed{seed}"
+    tag = f"{case}_seed{seed}" if args.hp == "default" else f"{case}_{args.hp}_seed{seed}"
     scratch = args.out_dir / "scratch" / tag
     scratch.mkdir(parents=True, exist_ok=True)
     # keyed by the case, not the scenario: example_02_single_bid carries three
@@ -830,6 +962,9 @@ def launch(case: str, seed: int, args) -> tuple[str, int, int, float, Path]:
         overrides["episodes_collecting_initial_experience"] = args.collecting
     if args.validation_interval is not None:
         overrides["validation_episodes_interval"] = args.validation_interval
+    # the hyperparameter cell goes on last, so it wins over the common block if
+    # the two ever name the same field
+    overrides.update(HP_CELLS[args.hp]["overrides"])
 
     stratify = []
     if args.obs_regimes:
@@ -839,7 +974,10 @@ def launch(case: str, seed: int, args) -> tuple[str, int, int, float, Path]:
         stratify = ["--bands", json.dumps(bands, separators=(",", ":"))]
 
     cmd = [
-        sys.executable, str(SELF), "--child", *stratify, "--",
+        sys.executable, str(SELF), "--child", *stratify,
+        "--simplicity-lines", str(args.simplicity_lines),
+        "--critic-arch", args.critic_arch,
+        "--weight-decay", repr(HP_CELLS[args.hp]["weight_decay"]), "--",
         "--scenario", scenario,
         "--study-case", args.study_case or CASES[case]["study_case"],
         "--n-obs", str(args.n_obs),
@@ -906,7 +1044,7 @@ def report(args) -> None:
 
     for case in args.cases:
         for seed in args.seeds:
-            path = result_path(args.out_dir, case, seed)
+            path = result_path(args.out_dir, case, seed, args.hp)
             if not path.exists():
                 print(f"\n{case} seed {seed}: (no results at {path.name})")
                 continue
@@ -924,6 +1062,7 @@ def report(args) -> None:
             )
 
             print(f"\n{case} ({CASES[case]['scenario']}/{CASES[case]['study_case']}) "
+                  f"hp {args.hp} [{describe_cell(args.hp)}] "
                   f"seed {seed}: {len(units)} learning units, act_dim {act_dim}, "
                   f"{greedy.shape[3]} frames, {int(d['steps'][-1])} critic updates, "
                   f"mean act_share {share.mean():.3f}")
@@ -988,6 +1127,29 @@ def main() -> None:
     parser.add_argument("--grid", type=int, default=201)
     parser.add_argument("--every", type=int, default=4,
                         help="snapshot every N-th training block")
+    parser.add_argument(
+        "--critic-arch", default="baseline", choices=list(CRITIC_ARCHS),
+        help="critic architecture (workstream B). 'baseline' is ASSUME's own "
+             "CriticTD3; the rest are late action injection and SimBa, see "
+             "real_matd3/critic_architectures.py. Screen these on the offline "
+             "gamma=0 harness first -- assume_offline_critic.py --round arch",
+    )
+    parser.add_argument(
+        "--simplicity-lines", type=int, default=SIMPLICITY_LINES,
+        help="random directions per agent per frame for SimBa's Fourier "
+             "simplicity score, giving it the same time axis as the critic "
+             "field. 0 switches it off (the saved array is then all-NaN). "
+             "See analysis/simplicity_bias.py for what the number is",
+    )
+    parser.add_argument(
+        "--hp", default="default", choices=list(HP_CELLS),
+        help="one cell of the shared hyperparameter grid (hpo_grid.py). "
+             "'default' is the study case's own settings and keeps the historic "
+             "file names, so it re-validates every film recorded before this "
+             "flag existed. One cell per invocation: on a cluster the cell is "
+             "the array axis, and mixing cells in one film would put two "
+             "configurations on one time axis",
+    )
     parser.add_argument("--rerun", action="store_true")
     parser.add_argument("--report-only", action="store_true")
     parser.add_argument(
@@ -997,12 +1159,23 @@ def main() -> None:
 
     if "--child" in sys.argv:
         i = sys.argv.index("--child")
+        head = sys.argv[i:sys.argv.index("--", i)]  # the parent's own flags
         # the parent resolves the quantile bands (it can read the demand series;
         # the recorder cannot) and hands them over as JSON
-        bands = None
-        if "--bands" in sys.argv[:i + 2]:
-            bands = json.loads(sys.argv[sys.argv.index("--bands") + 1])
-        run_child(sys.argv[sys.argv.index("--", i) + 1:], bands)
+        bands = json.loads(head[head.index("--bands") + 1]) if "--bands" in head else None
+        lines = (
+            int(head[head.index("--simplicity-lines") + 1])
+            if "--simplicity-lines" in head else None
+        )
+        arch = (
+            head[head.index("--critic-arch") + 1]
+            if "--critic-arch" in head else "baseline"
+        )
+        wd = (
+            float(head[head.index("--weight-decay") + 1])
+            if "--weight-decay" in head else None
+        )
+        run_child(sys.argv[sys.argv.index("--", i) + 1:], bands, lines, arch, wd)
         return
 
     args = parser.parse_args()

@@ -80,7 +80,23 @@ from critic_coherence import (  # noqa: E402
 
 th = pytest.importorskip("torch", reason="the levers patch torch modules")
 
+from critic_architectures import (  # noqa: E402  (workstream B)
+    LADDER_DEPTHS,
+    LADDER_TARGETS,
+    REGISTRY,
+    MLPCritic,
+    build,
+    hidden_at,
+    ladder_names,
+    match_width,
+    param_count,
+    sized,
+)
+from hpo_grid import CELLS, GROUPS, resolve  # noqa: E402  (run 18)
+from simplicity_bias import complexity_1d, complexity_2d  # noqa: E402
+
 from assume.reinforcement_learning.algorithms.matd3 import TD3  # noqa: E402
+from assume.reinforcement_learning.learning_utils import polyak_update  # noqa: E402
 from assume.reinforcement_learning.neural_network_architecture import (  # noqa: E402
     CriticTD3,
 )
@@ -1093,3 +1109,328 @@ def test_archived_run_confirms_the_episode_length():
     whole = (len(added) // blocks_per_episode) * blocks_per_episode
     per_episode = added[:whole].reshape(-1, blocks_per_episode).sum(axis=1)
     assert set(per_episode.tolist()) == {expected}
+
+
+# --------------------------------------------------------------------------- #
+# 5. workstream B: the critic architectures, and the simplicity measure
+#
+# Every failure mode below is silent. A normalizer whose running statistics
+# never reach the target critic still trains, still writes films and still
+# fills in a table -- with a TD target computed on a different input scale
+# from the online critic. A simplicity score with the DC term left in still
+# prints a plausible number for every architecture, in the right order.
+
+
+@pytest.mark.parametrize("arch", list(REGISTRY))
+def test_variant_is_a_drop_in_for_the_real_critic(arch):
+    """Same constructor, same interface and same input widths as ``CriticTD3``.
+
+    ``matd3.create_critics`` calls the class with exactly these keywords and
+    then relies on ``forward`` and ``q1_forward``. Anything that does not match
+    cannot be swapped in by the one-line patch workstream B is built around.
+    """
+    critic = build(arch)(
+        n_agents=N_AGENTS, obs_dim=OBS_DIM, act_dim=ACT_DIM,
+        unique_obs_dim=UNIQUE_OBS_DIM, float_type=th.float32,
+    )
+    reference = make_critic()
+    assert critic.obs_dim == reference.obs_dim
+    assert critic.act_dim == reference.act_dim
+
+    gen = th.Generator().manual_seed(0)
+    obs = th.rand(8, critic.obs_dim, generator=gen)
+    act = th.rand(8, critic.act_dim, generator=gen) * 2 - 1
+
+    q1, q2 = critic(obs, act)
+    assert q1.shape == (8, 1) and q2.shape == (8, 1)
+    assert not th.allclose(q1, q2), "the twin heads must stay independent"
+
+
+@pytest.mark.parametrize("arch", list(REGISTRY))
+def test_q1_forward_agrees_with_forward(arch):
+    """The actor's objective must be the critic's own Q1, not a later one.
+
+    ``matd3.py:713`` computes the actor loss from ``q1_forward`` on the same
+    batch ``forward`` has just seen. A normalizer that advanced its running
+    statistics inside ``forward`` would make the two disagree, so the actor
+    would climb a different surface from the one the critic was fitted on.
+    Nothing in the training loop would notice.
+    """
+    critic = build(arch)(
+        n_agents=N_AGENTS, obs_dim=OBS_DIM, act_dim=ACT_DIM,
+        unique_obs_dim=UNIQUE_OBS_DIM, float_type=th.float32,
+    )
+    gen = th.Generator().manual_seed(0)
+    obs = th.rand(8, critic.obs_dim, generator=gen)
+    act = th.rand(8, critic.act_dim, generator=gen) * 2 - 1
+
+    critic.train()
+    q1, _ = critic(obs, act)
+    assert th.allclose(critic.q1_forward(obs, act), q1)
+
+
+@pytest.mark.parametrize("arch", list(REGISTRY))
+def test_running_statistics_reach_the_target_critic(arch):
+    """``polyak_update`` zips ``parameters()``, which does not yield buffers.
+
+    This is the trap ``_stats_to_params`` exists for. A normalizer that keeps
+    its running mean and variance in ``register_buffer`` trains perfectly well
+    and desynchronizes the target critic in total silence: ``Q`` standardizes
+    its inputs, ``Q_target`` does not, and the TD target is computed on a
+    different input scale for the whole run.
+    """
+    kw = dict(n_agents=N_AGENTS, obs_dim=OBS_DIM, act_dim=ACT_DIM,
+              unique_obs_dim=UNIQUE_OBS_DIM, float_type=th.float32)
+    online, target = build(arch)(**kw), build(arch)(**kw)
+
+    stragglers = [n for n, b in online.named_buffers() if th.is_floating_point(b)]
+    assert not stragglers, f"{arch}: Polyak would skip {stragglers}"
+
+    mine, theirs = list(online.parameters()), list(target.parameters())
+    assert len(mine) == len(theirs)
+    assert all(a.shape == b.shape for a, b in zip(mine, theirs))
+
+    if getattr(online, "rsnorm", None) is None:
+        return
+
+    # the assertion above is vacuous unless the statistics actually move, so
+    # feed an off-centre batch and check both that they do and that Polyak
+    # then carries them to the target
+    before = online.rsnorm.mean.clone()
+    online.train()
+    online(th.rand(64, online.obs_dim) + 5.0, th.zeros(64, online.act_dim))
+    assert not th.allclose(before, online.rsnorm.mean)
+
+    polyak_update(list(online.parameters()), list(target.parameters()), tau=1.0)
+    assert th.allclose(online.rsnorm.mean, target.rsnorm.mean)
+
+
+def test_mlp_family_reproduces_the_real_critic_exactly():
+    """``MLPCritic`` with every switch off must *be* ``CriticTD3``.
+
+    It is the width-parameterizable stand-in used whenever a table matches
+    parameter counts, so if it drifts, the control row of that table is
+    quietly a different network from the one ASSUME ships.
+    """
+    kw = dict(n_agents=N_AGENTS, obs_dim=OBS_DIM, act_dim=ACT_DIM,
+              unique_obs_dim=UNIQUE_OBS_DIM, float_type=th.float32)
+    mine, real = MLPCritic(**kw), CriticTD3(**kw)
+    assert [tuple(p.shape) for p in mine.parameters()] == [
+        tuple(p.shape) for p in real.parameters()
+    ]
+
+
+def test_late_injection_keeps_the_action_out_of_the_first_layer():
+    """Lillicrap's layer-2 injection, stated as a shape.
+
+    If the action reached layer 1 this variant would be the baseline with
+    extra steps and every ``late`` row in every table would measure nothing.
+    """
+    critic = build("late")(
+        n_agents=N_AGENTS, obs_dim=OBS_DIM, act_dim=ACT_DIM,
+        unique_obs_dim=UNIQUE_OBS_DIM, float_type=th.float32,
+    )
+    assert critic._q1.fc_obs.in_features == critic.obs_dim  # observation only
+    assert critic._q1.rest[0].in_features == 256 + critic.act_dim  # action joins
+
+
+@pytest.mark.parametrize("cycles", [4, 8, 16])
+def test_complexity_recovers_a_known_frequency(cycles):
+    """A sinusoid at ``cycles`` cycles must measure as ``cycles`` cycles.
+
+    ``c`` is normalized so 1.0 is Nyquist and a ``G``-point axis has Nyquist at
+    ``G / 2`` cycles, so the answer is ``cycles / (G / 2)``. This pins the
+    normalization, and it is also what catches the DC term being left in: an
+    un-centred image puts nearly all its mass at ``k = 0`` and would drive
+    ``c`` toward zero for every architecture alike.
+    """
+    g = 128
+    t = np.arange(g) / g
+    wave = np.sin(2 * np.pi * cycles * t)
+    image = wave[:, None] * np.ones(g)[None, :]
+
+    assert complexity_2d(image + 17.0) == pytest.approx(cycles / (g / 2), rel=1e-6)
+    assert complexity_1d(wave[None, :])[0] == pytest.approx(cycles / (g / 2), rel=1e-6)
+
+
+def test_a_constant_function_has_no_complexity():
+    """No frequency content at all is NaN -- not 0, and not a crash.
+
+    A dead critic, every output identical, is a real outcome in this archive.
+    Scoring it as maximally simple would silently make it the best row.
+    """
+    assert np.isnan(complexity_2d(np.full((16, 16), 3.0)))
+    assert np.isnan(complexity_1d(np.full((1, 16), 3.0))[0])
+
+
+def test_higher_simplicity_means_smoother():
+    """The direction of the measure, pinned once so it cannot quietly flip."""
+    g = 128
+    t = np.arange(g) / g
+    smooth = np.sin(2 * np.pi * 2 * t)[:, None] * np.ones(g)[None, :]
+    rough = np.sin(2 * np.pi * 32 * t)[:, None] * np.ones(g)[None, :]
+    assert 1 / complexity_2d(smooth) > 1 / complexity_2d(rough)
+
+
+def test_width_matching_hits_its_target():
+    """What makes an architecture table a comparison of architectures.
+
+    SimBa's own Fig. 4(a) holds all twelve architectures within 1 % of one
+    parameter count (their Appendix D). Without this, the architecture column
+    and the capacity column are the same column.
+    """
+    target = param_count("baseline", obs_dim=OBS_DIM, act_dim=ACT_DIM,
+                         n_agents=N_AGENTS, unique_obs_dim=UNIQUE_OBS_DIM)
+    for arch in ("simba", "late", "rsnorm"):
+        _, _, got = match_width(arch, target, obs_dim=OBS_DIM, act_dim=ACT_DIM,
+                                n_agents=N_AGENTS, unique_obs_dim=UNIQUE_OBS_DIM)
+        assert abs(got / target - 1) < 0.05, (arch, got, target)
+
+
+# --------------------------------------------------------------------------- #
+# 6. run 18: the two scaling axes, the split trunk, and the hyperparameter grid
+#
+# The failure modes here are the same kind as section 5's: silent. A depth knob
+# that quietly also changes the width makes "is it depth or width" unanswerable
+# while every table still fills in. A hyperparameter cell whose weight decay
+# never reaches the optimizer runs, converges and reports a number.
+
+
+def test_depth_two_is_the_shipped_shape():
+    """``hidden_at(w, 2)`` must be ``CriticTD3``'s own ``[w, w // 2]``.
+
+    Everything recorded before the depth knob existed was built at this shape.
+    If the default drifted, run 17's width ladder and run 18's depth-2 column
+    would be different networks under one name and could not be compared.
+    """
+    assert hidden_at(256, 2) == [256, 128]
+    assert hidden_at(637, 2) == [637, 318]
+
+
+def test_depth_grows_layers_and_leaves_the_width_alone():
+    """The point of the knob: one variable moves.
+
+    A geometric taper would shrink the last hidden layer as depth grew, so
+    "deeper" and "ends narrower" would be the same column.
+    """
+    for depth in (2, 4, 8):
+        hidden = hidden_at(128, depth)
+        assert len(hidden) == depth
+        assert set(hidden[:-1]) == {128}      # constant body
+        assert hidden[-1] == 64               # same 2:1 step into the head
+
+
+@pytest.mark.parametrize("arch", ["baseline", "simba-nornorm"])
+@pytest.mark.parametrize("depth", LADDER_DEPTHS)
+def test_sized_moves_depth_in_both_families(arch, depth):
+    """Both families must actually respond to the depth argument.
+
+    ``sized`` dispatches on the base class, so a family that fell through to
+    the wrong branch would silently return the *width*-scaled class and the
+    whole depth column would be a duplicate of the depth-2 one.
+    """
+    kw = dict(n_agents=N_AGENTS, obs_dim=OBS_DIM, act_dim=ACT_DIM,
+              unique_obs_dim=UNIQUE_OBS_DIM, float_type=th.float32)
+    critic = sized(arch, 64, depth)(**kw)
+    if arch == "baseline":
+        assert len(critic._q1.layers) == depth
+    else:
+        assert len(critic._q1.blocks) == depth
+
+
+@pytest.mark.parametrize("depth", LADDER_DEPTHS)
+def test_the_ladder_lands_on_its_targets_at_every_depth(depth):
+    """A parameter ladder whose rungs are not where it says is not a ladder.
+
+    This is the claim the whole run-18 arch round rests on: at a given rung the
+    two families hold the same capacity, so any difference between them is the
+    architecture. Bisection is exact up to the integer width grid, hence 5 %.
+    """
+    for _, target in LADDER_TARGETS:
+        for arch in ("baseline", "simba-nornorm"):
+            _, _, got = match_width(
+                arch, target, depth=depth, obs_dim=74, act_dim=1,
+                n_agents=1, unique_obs_dim=2,
+            )
+            assert abs(got / target - 1) < 0.05, (arch, depth, target, got)
+
+
+def test_every_ladder_name_is_registered():
+    """``--critic-arch`` and ``--archs`` validate against the registry.
+
+    A name the grid generates but the registry does not carry would pass every
+    preflight and fail once per task, after the walltime is spent.
+    """
+    for name in ladder_names():
+        assert name in REGISTRY, name
+
+
+def test_the_split_trunk_gives_the_action_its_own_equal_width_encoder():
+    """The one thing ``split`` claims, stated as shapes.
+
+    Late injection gives the action its own weight matrix but it still arrives
+    raw and outnumbered. ``split`` fixes the *count*: both branches are the
+    same width, so from layer 2 neither dominates by how many rows it owns. If
+    the branches were unequal the variant would just be ``late`` again.
+    """
+    critic = build("split")(
+        n_agents=N_AGENTS, obs_dim=OBS_DIM, act_dim=ACT_DIM,
+        unique_obs_dim=UNIQUE_OBS_DIM, float_type=th.float32,
+    )
+    q = critic._q1
+    assert q.fc_obs.in_features == critic.obs_dim
+    assert q.fc_act.in_features == critic.act_dim
+    assert q.fc_obs.out_features == q.fc_act.out_features        # equal count
+    # and the merged activation is still the shipped layer-1 width, so the rest
+    # of the network -- and the variant's parameter count -- is comparable
+    assert q.rest[0].in_features == 256
+
+
+def test_the_hyperparameter_grid_is_the_grid_it_documents():
+    """20 cells, nine of them the 3 x 3 learning-rate grid."""
+    assert len(GROUPS["lr"]) == 9
+    assert len(CELLS) == 20
+    for name in GROUPS["lr"]:
+        over = CELLS[name]["overrides"]
+        if over["learning_rate_schedule"] is None:
+            assert "min_learning_rate" not in over
+        else:
+            # a schedule that decays to zero stops learning before the last
+            # episodes are filmed, so the floor is a tenth of the start
+            assert over["min_learning_rate"] == pytest.approx(
+                over["learning_rate"] / 10, rel=1e-3
+            )
+
+
+def test_group_names_expand_and_unknown_names_are_refused():
+    """``CELLS=lr`` on a cluster must mean the nine cells, not a crash at task 1."""
+    assert resolve(["lr"]) == GROUPS["lr"]
+    assert resolve(["all"]) == list(CELLS)
+    assert resolve(["default", "default", "wd0"]) == ["default", "wd0"]
+    with pytest.raises(SystemExit):
+        resolve(["lrs"])
+
+
+def test_weight_decay_reaches_the_optimizer():
+    """The axis with no ``LearningConfig`` field.
+
+    ``matd3.py`` builds ``AdamW(params, lr=...)`` and passes nothing else, so
+    every archived run trained at torch's default 0.01 rather than at none.
+    The sweep moves it by rebinding the name in ``matd3``'s namespace; if that
+    ever stopped working, the ``wd`` cells would run happily and measure the
+    default three times over.
+    """
+    import assume.reinforcement_learning.algorithms.matd3 as matd3
+    from optim_patches import TORCH_DEFAULT_WEIGHT_DECAY, install_weight_decay
+
+    original = matd3.AdamW
+    try:
+        param = th.nn.Parameter(th.zeros(3))
+        assert matd3.AdamW([param], lr=1e-3).param_groups[0]["weight_decay"] == (
+            TORCH_DEFAULT_WEIGHT_DECAY
+        )
+        install_weight_decay(0.0)
+        assert matd3.AdamW([param], lr=1e-3).param_groups[0]["weight_decay"] == 0.0
+    finally:
+        matd3.AdamW = original
+        matd3.__dict__.pop("_ASSUME_ORIGINAL_ADAMW", None)

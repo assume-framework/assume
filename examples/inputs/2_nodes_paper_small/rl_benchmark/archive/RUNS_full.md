@@ -324,7 +324,7 @@ band. `dQ/da` is ≈0 everywhere except a +0.05…+0.10 spike at 32 and a
 **The actors are stuck at the ceiling**, where `dQ/da` is three to four orders of
 magnitude below the signal at the cliff.
 
-> ⚠️ The original reading of this table — "the gradient is too small, so the
+> The original reading of this table — "the gradient is too small, so the
 > actor cannot move" — is **wrong**, see correction 4. Adam is scale-invariant
 > for a consistently-signed gradient, so 10⁻⁵ would still give full-sized steps.
 > What actually freezes these two actors is tanh saturation (§7, run 05); the
@@ -705,7 +705,7 @@ is flat — it apparently never resolves the action dependence at all. The shape
 reward makes `Q` a function of the action *everywhere*, which is a much easier
 regression, and that may be the real reason the shaping works.
 
-> ⚠️ **An earlier version of this section said both films flip.** That run
+> **An earlier version of this section said both films flip.** That run
 > (`assume_probe_unshaped.npz`, kept for the record) was labelled unshaped but
 > preloaded `buffers/single_10ep_gradient.npz`, whose 280 stored rewards are
 > *shaped* — about a third of its training data. Those shaped transitions were
@@ -794,7 +794,7 @@ is looser — up to 9.4 EUR mid-film, ending 51.3 against run 09's 49.0 — but 
 inside the shaped condition's own ±3.0 seed spread. Run 08's chaos warning
 appears to be a property of the SB3 surrogate, not of this scenario.
 
-⚠️ **Six seeds is six seeds.** The two conditions are cleanly separated here (no
+**Six seeds is six seeds.** The two conditions are cleanly separated here (no
 overlap at all on final actor bid: 44.9–54.1 against 79.3–99.2), but nothing in
 this run supports a claim finer than that, and in particular the shaped condition's
 1/6 seeds that end *inside* the band is one seed, not a rate.
@@ -887,7 +887,7 @@ python real_matd3/assume_run_diagnostics.py \
   --out <diagnostic.png>
 ```
 
-⚠️ **The six initial failures were logging failures, not failed learning
+**The six initial failures were logging failures, not failed learning
 runs.** All three `target-noise-0.1-clip-0.2` and all three
 `gamma-0-target-noise-0` processes hit a concurrent TensorBoard async-writer
 `FileNotFoundError`. Their two-frame partial archives were moved to
@@ -897,7 +897,7 @@ final audit is **90/90 complete files**, 30 configs with exactly 3 seeds and 80
 frames each, all carrying the same starting-buffer checksum. The original full
 launch manifest is retained as `manifest-initial-broad.json`.
 
-⚠️ **This is a broad screen, not a stability-rate estimate.** Three seeds
+**This is a broad screen, not a stability-rate estimate.** Three seeds
 and 40 episodes can reject easy fixes, but cannot establish a success rate.
 Moreover, changing `gradient_steps` changes total optimisation work, so the
 `grad-32` comparison deliberately does not separate update budget from episode
@@ -1020,7 +1020,7 @@ one with `direction="backward"` (`fast_pandas.py:864-867`).
 > divided by `n²` and so included the `n` zero self-pairs, reading 5/6 of these
 > (18.1, 18.7, 1.5, 7.4, 1.5). See correction 14.
 
-⚠️ **`final true reward` above is *reconstructed*, not measured** — it applies the
+**`final true reward` above is *reconstructed*, not measured** — it applies the
 surrogate curve to the recorded bid, and that curve matches what the simulator
 actually paid on only 24.8 % of the frozen buffer's transitions (correction 15).
 The measured counterpart, read from each trial's own `rl_params` table:
@@ -1039,7 +1039,7 @@ and the 3/3 all hold. What is *not* established against the simulator is the
 `+0.15` bar itself, the `regret` figures, the `32.31` constrained optimum and the
 exact `[30, 49]` band — all four are properties of the surrogate curve.
 
-⚠️ Second caveat on that column: the `rl_params` table holds only the **first two
+Second caveat on that column: the `rl_params` table holds only the **first two
 products of each episode** (10:00 and 11:00 of 14), so it is an early-hours
 sample, not the episode mean (correction 16). Settling this properly needs the
 probe to record buffer rewards the way `MultiAgentRecorder` already does, and a
@@ -1061,7 +1061,7 @@ condition and 21.7 for `baseline` here, i.e. *the same failure* — falls to **1
 at both `foresight-3` and `act-x30`. The critic forms a preference, and it is the
 right one.
 
-> ⚠️ An earlier version of this paragraph read "56.4 EUR for run 10's unshaped
+> An earlier version of this paragraph read "56.4 EUR for run 10's unshaped
 > condition, 18.1 for `baseline` here", which compared run 10's **range** against
 > run 12's **mean pairwise** number and made `baseline` look three times more
 > coherent than run 10's unshaped critic. On either statistic the two are in fact
@@ -1110,7 +1110,7 @@ flip, which is what a converged optimum looks like; `foresight-3` is **100 %**, 
 it was still descending when the 800-update budget ran out at bid 40.4. That is a
 prediction — `foresight-3` should improve with more episodes — not a result.
 
-⚠️ **Caveats.** Three seeds per condition and one scenario: `act-x30`'s 3/3
+**Caveats.** Three seeds per condition and one scenario: `act-x30`'s 3/3
 rejects "nothing simple works", it is not a success rate. `foresight-3` puts 3/3
 seeds inside the band but is 0/3 against the +0.15 bar, so it is a partial rescue.
 S = 30 is an arbitrary point on a curve that appears to saturate around
@@ -1148,7 +1148,7 @@ python real_matd3/assume_multiagent_window.py   # the descent-window table
   (`early_stopping_steps` 1e6), so both budgets are guaranteed. ~31 min per
   25-episode trial, ~59 min per 50-episode trial
 
-⚠️ **The `inc_dec_learning` study case in the working tree is not the committed
+**The `inc_dec_learning` study case in the working tree is not the committed
 one, and run 13 used the working-tree version.** At the time of the runs
 `config.yaml` was modified but uncommitted:
 
@@ -1261,14 +1261,14 @@ given seed and thread count, and the doubling comparison above is **the same thr
 trajectories continued**, not a fresh sample. It also confirms run 10's finding
 that ASSUME does not inherit the surrogate's BLAS-thread chaos.
 
-⚠️ **Fleet reward runs opposite to `diesel_0`'s in every row.** The best condition
+**Fleet reward runs opposite to `diesel_0`'s in every row.** The best condition
 for `diesel_0` (`act-all-x15`, +0.526) has the second-lowest fleet total, and
 `act-all-x2-50` the lowest at +4.20. Agents compete, so bids falling means prices
 falling; total reward is not what any agent maximises. **"Solved" cannot be defined
 by fleet profit here**, and none of these numbers should be read as a welfare
 result without a separate equilibrium analysis.
 
-⚠️ **Three seeds and one scenario.** `act-all-x2` at 25 episodes spans 60.9–95.3
+**Three seeds and one scenario.** `act-all-x2` at 25 episodes spans 60.9–95.3
 and the 50-episode baseline spans 69.3–97.3; those are wide. The ordering is
 consistent across two independent budgets, which is the strongest thing on offer
 at n = 3, but it is not a rate.
