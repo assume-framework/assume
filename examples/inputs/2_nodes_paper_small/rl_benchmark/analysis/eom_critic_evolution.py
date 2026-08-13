@@ -63,6 +63,7 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -178,6 +179,18 @@ def subset(run: dict, regime: str | None) -> dict:
     out["greedy"] = run["greedy"][:, :, m]  # (agents, act_dim, obs, frames)
     out["regime_label"] = regime
     return out
+
+
+def img_folder(data_dir: Path) -> str:
+    """The `runs/img/` subfolder a data directory's figures belong in.
+
+    `runs/img/` is one folder per experiment class -- `13`, `14a`, `14b`,
+    `14c`, `15` -- and a data directory already carries that as its prefix
+    (`14b-eom-regimes`, `15-pivotal-ladder`). Anything unnumbered keeps its own
+    name rather than silently landing in the top level.
+    """
+    m = re.match(r"^(\d+[a-z]?)", data_dir.name)
+    return m.group(1) if m else data_dir.name
 
 
 def pick_units(run: dict, names: list[str] | None) -> dict:
@@ -485,11 +498,13 @@ def plot_regime_heatmaps(run: dict, sweep: str, out: Path) -> None:
         f"dQ1/d(bid), sweep '{sweep}'   (symlog, shared scale)",
         fontsize=8.5, color=MUTED)
 
+    # two lines: at ten units the figure is tall and narrow enough that a
+    # single-line title runs off the right edge
     fig.suptitle(
         f"{run['case']} seed {run['seed']} — does the critic see the two "
-        f"equilibria differently?   (dashed = marginal cost {spec['mc']:.1f}, "
-        f"dotted = backup {spec['backup_mc']:.1f})",
-        x=0.01, ha="left", fontsize=12, fontweight="bold", color=INK,
+        f"equilibria differently?\nsweep '{sweep}';  dashed = marginal cost "
+        f"{spec['mc']:.1f},  dotted = backup {spec['backup_mc']:.1f}",
+        x=0.01, ha="left", fontsize=11, fontweight="bold", color=INK,
     )
     fig.savefig(out, dpi=150, facecolor="white")
     plt.close(fig)
@@ -667,9 +682,15 @@ def main() -> None:
         "--data-dir", type=Path,
         default=OUT_DIR / "runs" / "data" / "14-eom-critic-evolution",
     )
-    parser.add_argument("--img-dir", type=Path, default=OUT_DIR / "runs" / "img")
+    parser.add_argument(
+        "--img-dir", type=Path, default=None,
+        help="where the figures go. Defaults to runs/img/<run>, where <run> is "
+             "the leading number of --data-dir ('14b-eom-regimes' -> '14b'), so "
+             "every batch lands in its own folder without being told to")
     args = parser.parse_args()
 
+    if args.img_dir is None:
+        args.img_dir = OUT_DIR / "runs" / "img" / img_folder(args.data_dir)
     args.img_dir.mkdir(parents=True, exist_ok=True)
     runs = [r for r in (load(args.data_dir, s, seed)
                         for s in args.cases for seed in args.seeds) if r]

@@ -125,11 +125,12 @@ constrained optimum of 32.31.
     424 EUR/h — with the pivotal trace flat from about episode 5 while the
     Bertrand trace keeps falling. `sb02c` (all Bertrand) reaches 0.02× of its
     starting exploitability; `sb02a` (all pivotal) only 0.20 ×, and its residual
-    7209 EUR/h is almost exactly the markup it failed to take. **Bidding down to
-    cost is easy — a mistake is punished at once. Bidding up to a rival's cost 30
-    EUR above your own has no local gradient telling you where to stop.** This is
-    the plain-EOM analogue of the inc-dec cliff, and it is the sharper version of
-    the question runs 01–13 were asking. `analysis/eom_exploitability.py`.
+    7209 EUR/h is almost exactly the markup it failed to take.
+    ⚠️ **The explanation originally attached to this finding — "bidding down to
+    cost is easy, bidding up to a rival's cost has no local gradient" — is
+    refuted by run 15 (finding 14). The measurements above stand; the direction
+    of the deviation is not what makes the difference.**
+    `analysis/eom_exploitability.py`.
 12. **Exploitability is the sharpest of the three statistics, and it is the one
     that separates market power from bad play.** Per MW of learner capacity it
     falls **2.3 → 1.3 → 0.29 EUR/MWh** across `sb02a`/`sb02b`/`sb02c`: the
@@ -146,6 +147,60 @@ constrained optimum of 32.31.
     inside the seed spreads, monotone in the own share at both budgets, with
     `act_share` matching to three decimals. Report conditions; treat per-seed
     columns as one draw.
+
+14. **What a shared critic fails to fit is whatever is RARE, not whatever
+    direction it points** (run 15, the pivotal-frequency ladder). `p1`–`p7` are
+    `sb02b`'s fleet and market with only the demand series changed, so the
+    pivotal share runs 13 → 88 % (`p1` is the undistorted series, i.e. `p1` **is**
+    `sb02b`, and reproduces it to the decimal). Exploitability per regime at the
+    last evaluation episode:
+
+    | case | pivotal hrs | pivotal | change | bertrand hrs | bertrand | change |
+    |---|---:|---:|---:|---:|---:|---:|
+    | `p1` | 13 % | 2698 | 0.34× | 67 % | 424 | **0.08×** |
+    | `p3` | 38 % | 659 | 0.50× | 62 % | 1871 | 0.21× |
+    | `p5` | 63 % | 841 | 0.23× | 37 % | 5200 | 0.56× |
+    | `p7` | 87 % | **260** | **0.04×** | 13 % | 6313 | 0.67× |
+
+    **The two columns cross.** The same regime converges when common and stays
+    exploitable when rare, in both directions — so finding 12b's "bidding up has
+    no local gradient" explanation is wrong, and the variable is the regime's
+    share of the replay buffer. Fleet outcome moves with it: mean clearing price
+    52.73 → 72.26 (against mc 55.71, backup 85.71), profit 234 → 7415 EUR per
+    learner, reward +0.002 → +0.146.
+    ⚠️ `p2`'s pivotal rises 5.85× against the trend, off an anomalously low ep1;
+    not chased down. Exploitability is not monotone in `k` — read the crossing,
+    not the individual rungs.
+15. **At high pivotal share the learners find the ASYMMETRIC equilibrium, and it
+    is a learned role assignment.** From `p3` up, in all three seeds at every
+    rung, **exactly one unit** marks up to ~70–80 and the other four sit at the
+    action floor. That is correct play, not collapse: under pay-as-clear an
+    infra-marginal unit is paid the clearing price whatever it bids, so the floor
+    is a best response for whoever is dispatched anyway while the marginal unit
+    sets the price. The per-unit critic films show it directly — the marked-up
+    unit's field has an interior optimum on the backup line, the others' are
+    monotone decreasing across the whole bid range, which is the price-taker's
+    value function. **Never read this fleet with a median over units**: the
+    median of a bimodal equilibrium is −100 and means nothing.
+    `runs/img/15/14-eom-regimes-p7-seed42.png`.
+16. **Correction 17 is real and scales with how much the agents matter to each
+    other** (run 14c). Both sweeps are now recorded: `diag` holds the other
+    agents at their current actors' greedy actions, `diag:stored` at the action
+    they actually played, which is what `matd3.py:704` feeds the critic.
+
+    | case | learners | mean \|Δgrad\| / mean \|grad\| | median argmax shift |
+    |---|---:|---:|---:|
+    | `sb02a` | 1 | **0.0000** | 0.0 EUR |
+    | `sb02b` | 5 | 0.407 | 8.3 EUR |
+    | `sb02c` | 10 | 0.356 | 7.0 EUR |
+    | `p4` / `p7` | 5 | 0.83 / 0.73 | 12.7 / 11.3 EUR |
+
+    `sb02a` at exactly zero is the implementation's own control — one learner
+    means no other agents, so the two definitions must coincide, and they do
+    bit-for-bit. Everywhere else the gap is 36–83 % of the gradient magnitude and
+    moves the critic's peak 7–13 EUR, **largest in the pivotal-heavy cases**,
+    where the joint action sets the price. Any single-number critic reading from
+    runs 09–13 carries an error of this size.
 
 ## Refuted or revised — do not re-test
 
@@ -211,6 +266,30 @@ constrained optimum of 32.31.
   prefer a value that divides the block count evenly or equals it.
   `analysis/eom_critic_evolution.py:frame_schedule` derives the mapping for
   already-recorded runs; new runs carry `frame_time` and `frame_episode`.
+- **Exploration never finishes, and the films do not show it.** Two phases:
+  episodes 0–4 are **pure noise** (`curr_action = noise`, sd ≈ 0.20 ≈ 20 EUR/MWh,
+  the actor is not consulted), then actor + Gaussian noise decaying from 0.10.
+  Measured at the last training episode it is still **0.039 (3.9 EUR/MWh)**
+  against the 0.001 the linear schedule implies — a free fit puts the decay on
+  course to reach zero at **episode ~129**, and training stops at 100. Likely
+  cause: `get_progress_remaining`'s `episodes_done` counts the 19 evaluation
+  episodes while the denominator is `training_episodes - collecting = 95`
+  (`95 + 19` fits much better than `95`, though not perfectly). **No finding is
+  affected** — the films record the actor's deterministic output and
+  exploitability is read on evaluation episodes, both noise-free — but every
+  critic here was fitted on a buffer carrying ≥ 3.9 EUR of action jitter, which
+  is a floor on how sharply any of these policies could converge.
+  Why no exploration marker appears in the films: `cfg/warmup = 0` and
+  `frame_episode[0] = 5`, because the recorder hangs off `update_policy`, which
+  only runs once collection is over. The window is not in frame, not missing.
+  Runs ≤ 06 filmed the single-agent surrogate from step 0 and so included it.
+- **The replay buffer wraps two-thirds of the way through.** One ring for the
+  whole run, never reset per episode (`buffer_fill` monotone), but it saturates
+  at 50 000 at **frame 124 = episode 67** and overwrites from there — so the
+  last third of training has forgotten the earliest episodes, including the
+  entire pure-noise phase. Finding 14's "share of the buffer" is therefore a
+  share of the last ~50 000 transitions, not of all training. Identical
+  trajectory across 14c and 15, so cases stay comparable.
 - **The figure scripts do not run on the cluster.** The house palette lives in
   `sweeps/run_benchmark.py`, which imports `stable_baselines3` at module level,
   and SB3 is a surrogate-only dependency that is not in `pyproject.toml` and not
@@ -275,6 +354,16 @@ outstanding on the rerun — 18/18 `COMPLETED`, written up in
 [`RUNS_Continuation.md`](RUNS_Continuation.md) § 13-rerun. A is a code change to
 `MultiAgentRecorder`, not a batch of jobs.
 
+✅ **A.1 is DONE for the EOM recorder** (`real_matd3/eom_critic_film.py`), and it
+measured the defect rather than caveating it — finding 16. Every sweep is
+recorded twice, `diag` and `diag:stored`, at one extra forward/backward per
+probe. The stored actions are read **once**, at the same instant the probe
+observations are frozen: the buffer is a ring that fills and wraps here
+(`buffer_fill` saturates at 50 000), so a later read would pair a frozen
+observation with another transition's action. Figures take `--sweep`.
+**Not yet ported to `MultiAgentRecorder`** — step 1 below is what run 13 needs,
+and the EOM implementation is the template for it.
+
 1. **Record the actor's actual objective.** Give `MultiAgentRecorder` a second
    sweep that holds the other agents at the **replay batch's stored actions**, the
    way `matd3.py:704` does, alongside the current-policy sweep it already takes.
@@ -300,6 +389,31 @@ untriggered at these buffer sizes, but a longer cluster run is exactly where the
 early-`full` wrap would start returning zero rows.
 
 ## B. Literature-grounded critic changes, instead of `act_share`
+
+**Start here — scoped 2026-08-13, nothing written yet.** Three checks that were
+done so that a fresh session does not redo them:
+
+* **There is no critic-architecture config knob.** `actor_architecture_aliases`
+  exists ([`algorithms/__init__.py:12`](../../../../assume/reinforcement_learning/algorithms/__init__.py#L12))
+  but `CriticTD3` is constructed directly at
+  [`matd3.py:388`](../../../../assume/reinforcement_learning/algorithms/matd3.py#L388)
+  and `:396`. A live sweep therefore needs a one-line `matd3.CriticTD3 = MyCritic`
+  patch before the world loads — the same pattern the probes already use — and
+  **no `assume/` change at all**. Mirroring the actor's alias dict upstream would
+  be the tidier fix and is PR-able, but is not required.
+* **The offline harness hardcodes the critic** at
+  [`assume_offline_critic.py:120`](real_matd3/assume_offline_critic.py#L120).
+  Screening needs a factory plus an `--arch` flag there, ~30 lines.
+* **Sizes.** `critic_architectures.py` (late injection, RSNorm, SimBa blocks,
+  registry) ≈ 110 new lines; harness wiring ≈ 30; `cluster/critic_arch.sh` ≈ 150,
+  ~90 % copied from the two existing launchers. The offline screen is about half
+  a session. Re-evaluating runs 09–13 under whatever wins is the open-ended part.
+
+Run 15 also gives B a target it did not have when it was written: **the failure
+mode is a rare regime being unfitted** (finding 14). RSNorm's per-dimension
+standardization and SimBa's "scaling the critic helps" both act on exactly that,
+and the ladder is now a ready-made benchmark for it — `p7`'s bertrand hours
+(13 %, 0.67×) are a clean, reproducible instance of the defect to fix.
 
 `act_share` is a quantity I invented; it orders the outcome but it is not a
 mechanism anyone else uses, and both levers are monkeypatches. The literature has
