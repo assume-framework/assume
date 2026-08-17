@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
+import torch as th
 
 from assume.common.fast_pandas import FastIndex, FastSeries
 from assume.common.forecaster import ForecastIndex, ForecastSeries
@@ -435,6 +436,734 @@ def calculate_naive_residual_load(
     return res_demand_df
 
 
+def calculate_adaptive_merit_order_forecast_inputs(
+    index: FastIndex,
+    units: tuple[BaseUnit, ...],
+    config: MarketConfig,
+) -> dict[str, FastSeries]:
+    """Calculate the forecast-time inputs for adaptive merit-order correction.
+
+    The existing merit-order price and residual-load algorithms remain the
+    baseline. Wind and solar availability are returned separately as
+    capacity-weighted factors.
+    """
+    if config.product_type != "energy":
+        raise ValueError("Adaptive merit-order forecasts support energy markets only")
+    if config.param_dict.get("grid_data"):
+        raise ValueError(
+            "Adaptive merit-order forecasts do not support nodal or zonal markets"
+        )
+    if (
+        config.market_mechanism == "pay_as_bid"
+        or config.param_dict.get("pricing_mechanism") == "pay_as_bid"
+    ):
+        raise ValueError(
+            "Adaptive merit-order forecasts require one scalar clearing price "
+            "per product"
+        )
+
+    if not units:
+        raise ValueError("Adaptive merit-order forecasts require at least one unit")
+
+    powerplants, _, _, _, _ = sort_units(units, config.market_id)
+
+    def availability_factor(technology: str) -> FastSeries:
+        selected_units = []
+        for unit in powerplants:
+            unit_technology = (
+                str(unit.technology).casefold().replace("_", " ").replace("-", " ")
+            )
+            if technology in unit_technology.split():
+                selected_units.append(unit)
+        capacity = sum(float(unit.max_power) for unit in selected_units)
+        if capacity == 0:
+            return FastSeries(index=index, value=0.0)
+        available_capacity = calculate_max_power(selected_units).sum(axis=0)
+        factor = available_capacity / capacity
+        if np.any(factor < 0) or np.any(factor > 1):
+            raise ValueError(
+                "Renewable availability factors must be between zero and one"
+            )
+        return FastSeries(index=index, value=factor.to_numpy())
+
+    merit_order_price = calculate_naive_price(index, units, config)
+    residual_load = calculate_naive_residual_load(index, units, config)
+
+    return {
+        "merit_order_price": FastSeries(index=index, value=merit_order_price),
+        "wind_availability_factor": availability_factor("wind"),
+        "solar_availability_factor": availability_factor("solar"),
+        "residual_load": FastSeries(index=index, value=residual_load),
+    }
+
+
+ADAPTIVE_MERIT_ORDER_FEATURES = (
+    "merit_order_price",
+    "wind_availability_factor",
+    "solar_availability_factor",
+    "residual_load",
+    "lagged_residual",
+    "lagged_price",
+    "hour",
+    "weekday",
+    "weekend",
+)
+
+ADAPTIVE_MERIT_ORDER_SETTINGS = {
+    "minimum_training_samples": 168,
+    "forgetting_factor": 0.995,
+    "location_l1": 0.01,
+    "location_l2": 0.001,
+    "scale_l1": 0.01,
+    "scale_l2": 0.001,
+    "distribution": "gaussian",
+    "features": ADAPTIVE_MERIT_ORDER_FEATURES,
+    "scale_features": None,
+    "sigma_floor": 0.01,
+    "holiday_dates": (),
+    "solver_max_iterations": 1000,
+    "solver_tolerance": 1e-8,
+}
+
+
+def initialize_adaptive_merit_order_feature_state(features, holiday_dates=()) -> dict:
+    """Create feature metadata; scaling is fitted on the initial window later."""
+    features = tuple(features)
+    allowed = set(ADAPTIVE_MERIT_ORDER_FEATURES) | {"holiday"}
+    unknown = set(features) - allowed
+    if unknown:
+        raise ValueError(f"Unknown adaptive merit-order features: {sorted(unknown)}")
+    if len(features) != len(set(features)):
+        raise ValueError("Adaptive merit-order features must not contain duplicates")
+
+    names = ["intercept"]
+    continuous = [False]
+    for feature in features:
+        if feature == "hour":
+            names.extend(("hour_sin", "hour_cos"))
+            continuous.extend((True, True))
+        elif feature == "weekday":
+            names.extend(("weekday_sin", "weekday_cos"))
+            continuous.extend((True, True))
+        elif feature in ("lagged_residual", "lagged_price"):
+            names.extend((feature, f"{feature}_missing"))
+            continuous.extend((True, False))
+        else:
+            names.append(feature)
+            continuous.append(feature not in ("weekend", "holiday"))
+    return {
+        "features": features,
+        "feature_names": tuple(names),
+        "continuous": th.tensor(continuous, dtype=th.bool),
+        "holiday_dates": frozenset(holiday_dates),
+        "means": None,
+        "scales": None,
+    }
+
+
+def build_adaptive_merit_order_feature_vector(
+    feature_state: dict, inputs: dict
+) -> th.Tensor:
+    """Build one unscaled forecast-time feature vector."""
+    values = [1.0]
+    delivery_time = inputs["delivery_time"]
+    for feature in feature_state["features"]:
+        if feature in (
+            "merit_order_price",
+            "wind_availability_factor",
+            "solar_availability_factor",
+            "residual_load",
+        ):
+            values.append(inputs[feature])
+        elif feature in ("lagged_residual", "lagged_price"):
+            value = inputs.get(feature)
+            values.extend(
+                (float("nan") if value is None else value, float(value is None))
+            )
+        elif feature == "hour":
+            angle = th.tensor(2 * th.pi * delivery_time.hour / 24, dtype=th.float64)
+            values.extend((th.sin(angle).item(), th.cos(angle).item()))
+        elif feature == "weekday":
+            angle = th.tensor(2 * th.pi * delivery_time.weekday() / 7, dtype=th.float64)
+            values.extend((th.sin(angle).item(), th.cos(angle).item()))
+        elif feature == "weekend":
+            values.append(float(delivery_time.weekday() >= 5))
+        elif feature == "holiday":
+            values.append(
+                float(
+                    inputs.get("is_holiday", False)
+                    or delivery_time.date() in feature_state["holiday_dates"]
+                )
+            )
+    return th.tensor(values, dtype=th.float64)
+
+
+def fit_adaptive_merit_order_feature_scaling(
+    feature_state: dict, rows: list[dict]
+) -> None:
+    """Fit and freeze continuous-feature scaling on chronological rows."""
+    if not rows:
+        raise ValueError("At least one feature row is required to fit scaling")
+    matrix = th.stack(
+        [build_adaptive_merit_order_feature_vector(feature_state, row) for row in rows]
+    )
+    feature_state["means"] = th.zeros(matrix.shape[1], dtype=th.float64)
+    feature_state["scales"] = th.ones(matrix.shape[1], dtype=th.float64)
+    for column in th.nonzero(feature_state["continuous"]).flatten().tolist():
+        observed = matrix[:, column][th.isfinite(matrix[:, column])]
+        if observed.numel():
+            feature_state["means"][column] = observed.mean()
+            deviation = observed.std(unbiased=False)
+            feature_state["scales"][column] = deviation if deviation > 1e-12 else 1.0
+
+
+def transform_adaptive_merit_order_features(
+    feature_state: dict, inputs: dict
+) -> th.Tensor:
+    """Transform one row with frozen scaling and safe mean imputation."""
+    if feature_state["means"] is None or feature_state["scales"] is None:
+        raise RuntimeError("Feature scaling must be fitted before transformation")
+    result = build_adaptive_merit_order_feature_vector(feature_state, inputs)
+    for column in th.nonzero(feature_state["continuous"]).flatten().tolist():
+        if not th.isfinite(result[column]):
+            result[column] = feature_state["means"][column]
+        result[column] = (
+            result[column] - feature_state["means"][column]
+        ) / feature_state["scales"][column]
+    return result
+
+
+def initialize_online_elastic_net(
+    n_features: int,
+    l1: float,
+    l2: float,
+    forgetting_factor: float,
+    max_iterations: int,
+    tolerance: float,
+) -> dict:
+    """Create discounted Elastic-Net sufficient statistics."""
+    if n_features <= 0 or l1 < 0 or l2 < 0:
+        raise ValueError("Invalid Elastic-Net dimensions or penalties")
+    if not 0 < forgetting_factor <= 1:
+        raise ValueError("forgetting_factor must be in (0, 1]")
+    return {
+        "n_features": n_features,
+        "l1": l1,
+        "l2": l2,
+        "forgetting_factor": forgetting_factor,
+        "max_iterations": max_iterations,
+        "tolerance": tolerance,
+        "gram": th.zeros((n_features, n_features), dtype=th.float64),
+        "target_moment": th.zeros(n_features, dtype=th.float64),
+        "coefficients": th.zeros(n_features, dtype=th.float64),
+        "effective_weight": 0.0,
+    }
+
+
+def solve_online_elastic_net(model: dict) -> None:
+    """Warm-start coordinate descent; the intercept remains unpenalised."""
+    gram = model["gram"] / model["effective_weight"]
+    target_moment = model["target_moment"] / model["effective_weight"]
+    coefficients = model["coefficients"].clone()
+    for _ in range(model["max_iterations"]):
+        previous = coefficients.clone()
+        for column in range(model["n_features"]):
+            diagonal = gram[column, column]
+            if diagonal <= 1e-15:
+                coefficients[column] = 0
+                continue
+            partial = target_moment[column] - (
+                gram[column] @ coefficients - diagonal * coefficients[column]
+            )
+            if column == 0:
+                coefficients[column] = partial / diagonal
+            else:
+                thresholded = th.sign(partial) * th.clamp(
+                    th.abs(partial) - model["l1"], min=0
+                )
+                coefficients[column] = thresholded / (diagonal + model["l2"])
+        if th.max(th.abs(coefficients - previous)).item() <= model["tolerance"]:
+            break
+    model["coefficients"] = coefficients
+
+
+def fit_online_elastic_net(model: dict, features, target) -> None:
+    """Batch-fit the initial chronological Elastic-Net window."""
+    features = th.as_tensor(features, dtype=th.float64)
+    target = th.as_tensor(target, dtype=th.float64)
+    if features.shape != (target.numel(), model["n_features"]):
+        raise ValueError("features or target have the wrong shape")
+    if not th.all(th.isfinite(features)) or not th.all(th.isfinite(target)):
+        raise ValueError("Training data must be finite")
+    model["gram"] = features.T @ features
+    model["target_moment"] = features.T @ target
+    model["effective_weight"] = float(target.numel())
+    solve_online_elastic_net(model)
+
+
+def update_online_elastic_net(model: dict, features, target) -> None:
+    """Apply one exponentially discounted online observation."""
+    features = th.as_tensor(features, dtype=th.float64)
+    target = th.as_tensor(target, dtype=th.float64)
+    if features.shape != (model["n_features"],):
+        raise ValueError("features have the wrong shape")
+    if not th.all(th.isfinite(features)) or not th.isfinite(target):
+        raise ValueError("Online training data must be finite")
+    gamma = model["forgetting_factor"]
+    model["gram"] = gamma * model["gram"] + th.outer(features, features)
+    model["target_moment"] = gamma * model["target_moment"] + features * target
+    model["effective_weight"] = gamma * model["effective_weight"] + 1
+    solve_online_elastic_net(model)
+
+
+def predict_online_elastic_net(model: dict, features):
+    """Predict from one row or a feature matrix."""
+    prediction = th.as_tensor(features, dtype=th.float64) @ model["coefficients"]
+    return prediction.item() if prediction.ndim == 0 else prediction
+
+
+def gaussian_residual_quantile(mean, standard_deviation, probability):
+    """Calculate a Gaussian quantile with PyTorch's inverse CDF."""
+    if not 0 < probability < 1 or standard_deviation < 0:
+        raise ValueError("Invalid probability or standard deviation")
+    distribution = th.distributions.Normal(
+        th.tensor(0.0, dtype=th.float64),
+        th.tensor(1.0, dtype=th.float64),
+    )
+    return (
+        mean
+        + standard_deviation
+        * distribution.icdf(th.tensor(probability, dtype=th.float64)).item()
+    )
+
+
+def initialize_adaptive_merit_order_model(market_id, forecast_inputs, config) -> dict:
+    """Create the online state for one market without fitting future data."""
+    return {
+        "market_id": market_id,
+        "forecast_inputs": forecast_inputs,
+        "config": config,
+        "location_features": initialize_adaptive_merit_order_feature_state(
+            config["features"], config["holiday_dates"]
+        ),
+        "scale_features": initialize_adaptive_merit_order_feature_state(
+            config["scale_features"]
+            if config["scale_features"] is not None
+            else config["features"],
+            config["holiday_dates"],
+        ),
+        "location_model": None,
+        "scale_model": None,
+        "initial_inputs": [],
+        "initial_residuals": [],
+        "residual_by_product": {},
+        "price_by_product": {},
+        "residual_history": [],
+        "pending": {},
+        "pending_by_product": {},
+        "observed_forecast_ids": set(),
+        "last_observed_product": None,
+        "outcomes": [],
+    }
+
+
+def initialize_adaptive_merit_order_correction(index, units, market) -> dict:
+    """Initialize the adaptive model for one market with built-in defaults."""
+    units = tuple(units)
+    if not units:
+        raise ValueError("Adaptive merit-order forecasts require loaded market units")
+    config = ADAPTIVE_MERIT_ORDER_SETTINGS.copy()
+    return {
+        "markets": {
+            market.market_id: initialize_adaptive_merit_order_model(
+                market.market_id,
+                calculate_adaptive_merit_order_forecast_inputs(index, units, market),
+                config,
+            )
+        }
+    }
+
+
+def get_adaptive_merit_order_inputs(model: dict, product_start) -> dict:
+    """Collect predictors known when the product forecast is issued."""
+    timestamp = pd.Timestamp(product_start)
+    lag_time = product_start - pd.Timedelta(days=1)
+    return {
+        "delivery_time": product_start,
+        "merit_order_price": float(
+            model["forecast_inputs"]["merit_order_price"].loc[timestamp]
+        ),
+        "wind_availability_factor": float(
+            model["forecast_inputs"]["wind_availability_factor"].loc[timestamp]
+        ),
+        "solar_availability_factor": float(
+            model["forecast_inputs"]["solar_availability_factor"].loc[timestamp]
+        ),
+        "residual_load": float(
+            model["forecast_inputs"]["residual_load"].loc[timestamp]
+        ),
+        "lagged_residual": model["residual_by_product"].get(lag_time),
+        "lagged_price": model["price_by_product"].get(lag_time),
+        "is_holiday": product_start.date() in model["config"]["holiday_dates"],
+    }
+
+
+def issue_adaptive_merit_order_correction(
+    state, unit_operator_id, market_id, issue_time, products
+) -> list[dict]:
+    """Issue and freeze adaptive merit-order forecasts before clearing."""
+    model = state["markets"].get(market_id)
+    if model is None:
+        return []
+    issued_forecasts = []
+    trained = model["location_model"] is not None and model["scale_model"] is not None
+    for product_start, _, _ in products:
+        forecast_id = (
+            f"{unit_operator_id}|{market_id}|{issue_time.isoformat()}|"
+            f"{product_start.isoformat()}"
+        )
+        if forecast_id in model["pending"]:
+            issued_forecasts.append(dict(model["pending"][forecast_id]["issued"]))
+            continue
+        existing = model["pending_by_product"].get(product_start)
+        if existing and existing not in model["observed_forecast_ids"]:
+            raise ValueError(
+                "An adaptive merit-order forecast for "
+                f"{product_start!s} is already pending"
+            )
+
+        inputs = get_adaptive_merit_order_inputs(model, product_start)
+        location_vector = None
+        scale_vector = None
+        if trained:
+            location_vector = transform_adaptive_merit_order_features(
+                model["location_features"], inputs
+            )
+            scale_vector = transform_adaptive_merit_order_features(
+                model["scale_features"], inputs
+            )
+            residual_mean = predict_online_elastic_net(
+                model["location_model"], location_vector
+            )
+            log_sigma = predict_online_elastic_net(model["scale_model"], scale_vector)
+            log_sigma = th.clamp(
+                th.tensor(log_sigma, dtype=th.float64),
+                min=th.log(th.tensor(model["config"]["sigma_floor"], dtype=th.float64)),
+                max=th.log(th.tensor(1e6, dtype=th.float64)),
+            )
+            residual_std = max(model["config"]["sigma_floor"], th.exp(log_sigma).item())
+            status = "trained"
+        elif len(model["residual_history"]) >= 2:
+            residual_mean = 0.0
+            residual_std = max(
+                model["config"]["sigma_floor"],
+                th.tensor(model["residual_history"], dtype=th.float64)
+                .std(unbiased=True)
+                .item(),
+            )
+            status = "fallback_empirical_uncertainty"
+        else:
+            residual_mean = 0.0
+            residual_std = None
+            status = "fallback_no_uncertainty"
+
+        corrected_mean = inputs["merit_order_price"] + residual_mean
+        issued = {
+            "forecast_id": forecast_id,
+            "unit_operator_id": unit_operator_id,
+            "market_id": market_id,
+            "issue_time": issue_time,
+            "product_start": product_start,
+            "merit_order_price_forecast": inputs["merit_order_price"],
+            "residual_mean_forecast": residual_mean,
+            "corrected_price_mean_forecast": corrected_mean,
+            "residual_std_forecast": residual_std,
+            "price_q10": None
+            if residual_std is None
+            else gaussian_residual_quantile(corrected_mean, residual_std, 0.1),
+            "price_q50": corrected_mean,
+            "price_q90": None
+            if residual_std is None
+            else gaussian_residual_quantile(corrected_mean, residual_std, 0.9),
+            "training_status": status,
+            "training_sample_count": len(model["residual_history"]),
+        }
+        model["pending"][forecast_id] = {
+            "issued": issued.copy(),
+            "inputs": inputs,
+            "location_vector": location_vector,
+            "scale_vector": scale_vector,
+        }
+        model["pending_by_product"][product_start] = forecast_id
+        issued_forecasts.append(issued.copy())
+    return issued_forecasts
+
+
+def adaptive_merit_order_scale_target(error, sigma_floor):
+    """Stable Gaussian scale proxy based on absolute post-forecast error."""
+    error = th.as_tensor(error, dtype=th.float64)
+    sigma_proxy = th.clamp(
+        th.abs(error) * th.sqrt(th.tensor(th.pi / 2, dtype=th.float64)),
+        min=sigma_floor,
+    )
+    return th.log(sigma_proxy)
+
+
+def fit_initial_adaptive_merit_order_models(model: dict) -> None:
+    """Batch-fit location and log-scale on the initial chronological window."""
+    fit_adaptive_merit_order_feature_scaling(
+        model["location_features"], model["initial_inputs"]
+    )
+    fit_adaptive_merit_order_feature_scaling(
+        model["scale_features"], model["initial_inputs"]
+    )
+    location_matrix = th.stack(
+        [
+            transform_adaptive_merit_order_features(model["location_features"], row)
+            for row in model["initial_inputs"]
+        ]
+    )
+    scale_matrix = th.stack(
+        [
+            transform_adaptive_merit_order_features(model["scale_features"], row)
+            for row in model["initial_inputs"]
+        ]
+    )
+    residuals = th.tensor(model["initial_residuals"], dtype=th.float64)
+    config = model["config"]
+    model["location_model"] = initialize_online_elastic_net(
+        location_matrix.shape[1],
+        config["location_l1"],
+        config["location_l2"],
+        config["forgetting_factor"],
+        config["solver_max_iterations"],
+        config["solver_tolerance"],
+    )
+    fit_online_elastic_net(model["location_model"], location_matrix, residuals)
+    errors = residuals - predict_online_elastic_net(
+        model["location_model"], location_matrix
+    )
+    scale_targets = th.stack(
+        [
+            adaptive_merit_order_scale_target(error, config["sigma_floor"])
+            for error in errors
+        ]
+    )
+    model["scale_model"] = initialize_online_elastic_net(
+        scale_matrix.shape[1],
+        config["scale_l1"],
+        config["scale_l2"],
+        config["forgetting_factor"],
+        config["solver_max_iterations"],
+        config["solver_tolerance"],
+    )
+    fit_online_elastic_net(model["scale_model"], scale_matrix, scale_targets)
+
+
+def update_adaptive_merit_order_correction(state, market_id, market_meta) -> list[dict]:
+    """Link realised prices and update only forecasts issued subsequently."""
+    model = state["markets"].get(market_id)
+    if model is None:
+        return []
+    rows = sorted(market_meta, key=lambda row: row["product_start"])
+    starts = [row["product_start"] for row in rows]
+    if len(starts) != len(set(starts)):
+        raise ValueError(
+            "Adaptive merit-order forecasts require one scalar clearing price "
+            "per product"
+        )
+
+    outcomes = []
+    for row in rows:
+        product_start = row["product_start"]
+        price = row["price"]
+        if not isinstance(price, int | float) or not th.isfinite(
+            th.tensor(price, dtype=th.float64)
+        ):
+            raise ValueError(
+                "Adaptive merit-order forecasts require finite clearing prices"
+            )
+        forecast_id = model["pending_by_product"].get(product_start)
+        if forecast_id is None or forecast_id in model["observed_forecast_ids"]:
+            continue
+        if (
+            model["last_observed_product"] is not None
+            and product_start <= model["last_observed_product"]
+        ):
+            raise ValueError(
+                "Adaptive merit-order outcomes must arrive chronologically"
+            )
+
+        pending = model["pending"][forecast_id]
+        issued = pending["issued"]
+        realised_price = float(price)
+        realised_residual = realised_price - issued["merit_order_price_forecast"]
+        post_forecast_residual = realised_residual - issued["residual_mean_forecast"]
+        outcome = issued.copy() | {
+            "realised_price": realised_price,
+            "realised_residual": realised_residual,
+            "post_forecast_residual": post_forecast_residual,
+        }
+        outcomes.append(outcome)
+        model["outcomes"].append(outcome.copy())
+        model["observed_forecast_ids"].add(forecast_id)
+        model["last_observed_product"] = product_start
+        model["price_by_product"][product_start] = realised_price
+        model["residual_by_product"][product_start] = realised_residual
+        model["residual_history"].append(realised_residual)
+
+        trained = (
+            model["location_model"] is not None and model["scale_model"] is not None
+        )
+        if not trained:
+            model["initial_inputs"].append(pending["inputs"])
+            model["initial_residuals"].append(realised_residual)
+            if (
+                len(model["initial_residuals"])
+                == model["config"]["minimum_training_samples"]
+            ):
+                fit_initial_adaptive_merit_order_models(model)
+            continue
+
+        location_vector = pending["location_vector"]
+        scale_vector = pending["scale_vector"]
+        if location_vector is None:
+            location_vector = transform_adaptive_merit_order_features(
+                model["location_features"], pending["inputs"]
+            )
+        if scale_vector is None:
+            scale_vector = transform_adaptive_merit_order_features(
+                model["scale_features"], pending["inputs"]
+            )
+        update_online_elastic_net(
+            model["location_model"], location_vector, realised_residual
+        )
+        update_online_elastic_net(
+            model["scale_model"],
+            scale_vector,
+            adaptive_merit_order_scale_target(
+                post_forecast_residual, model["config"]["sigma_floor"]
+            ),
+        )
+    return outcomes
+
+
+def evaluate_adaptive_merit_order_forecasts(records) -> dict[str, pd.DataFrame]:
+    """Compare merit order, past bias, and adaptive correction."""
+    frame = (
+        records.copy() if isinstance(records, pd.DataFrame) else pd.DataFrame(records)
+    )
+    if frame.empty:
+        raise ValueError(
+            "At least one adaptive merit-order forecast record is required"
+        )
+    frame["issue_time"] = pd.to_datetime(frame["issue_time"])
+    frame["product_start"] = pd.to_datetime(frame["product_start"])
+    frame = frame.sort_values(["issue_time", "product_start"]).reset_index(drop=True)
+    frame["realised_residual"] = (
+        frame["realised_price"] - frame["merit_order_price_forecast"]
+    )
+    residual_sum = 0.0
+    residual_count = 0
+    frame["historical_bias"] = 0.0
+    for _, rows in frame.groupby("issue_time", sort=True).groups.items():
+        frame.loc[rows, "historical_bias"] = (
+            residual_sum / residual_count if residual_count else 0
+        )
+        residuals = frame.loc[rows, "realised_residual"].dropna()
+        residual_sum += residuals.sum()
+        residual_count += residuals.count()
+    frame["constant_historical_bias_forecast"] = (
+        frame["merit_order_price_forecast"] + frame["historical_bias"]
+    )
+    frame["delivery_hour"] = frame["product_start"].dt.hour
+
+    methods = {
+        "merit_order_only": "merit_order_price_forecast",
+        "constant_historical_bias": "constant_historical_bias_forecast",
+        "adaptive_merit_order_correction": "corrected_price_mean_forecast",
+    }
+
+    def metric_rows(group):
+        result = []
+        for method, column in methods.items():
+            error = group[column] - group["realised_price"]
+            row = {
+                "method": method,
+                "samples": error.notna().sum(),
+                "mae": error.abs().mean(),
+                "rmse": error.pow(2).mean() ** 0.5,
+                "central_80_coverage": float("nan"),
+                "central_80_average_width": float("nan"),
+                "pinball_q10": float("nan"),
+                "pinball_q50": float("nan"),
+                "pinball_q90": float("nan"),
+            }
+            if method == "adaptive_merit_order_correction":
+                interval = group["price_q10"].notna() & group["price_q90"].notna()
+                if interval.any():
+                    row["central_80_coverage"] = (
+                        (
+                            group.loc[interval, "realised_price"]
+                            >= group.loc[interval, "price_q10"]
+                        )
+                        & (
+                            group.loc[interval, "realised_price"]
+                            <= group.loc[interval, "price_q90"]
+                        )
+                    ).mean()
+                    row["central_80_average_width"] = (
+                        group.loc[interval, "price_q90"]
+                        - group.loc[interval, "price_q10"]
+                    ).mean()
+                for label, probability in (
+                    ("q10", 0.1),
+                    ("q50", 0.5),
+                    ("q90", 0.9),
+                ):
+                    valid = group[f"price_{label}"].notna()
+                    error_q = (
+                        group.loc[valid, "realised_price"]
+                        - group.loc[valid, f"price_{label}"]
+                    )
+                    row[f"pinball_{label}"] = (
+                        pd.concat(
+                            (
+                                probability * error_q,
+                                (probability - 1) * error_q,
+                            ),
+                            axis=1,
+                        )
+                        .max(axis=1)
+                        .mean()
+                    )
+            result.append(row)
+        return result
+
+    by_hour = []
+    for hour, group in frame.groupby("delivery_hour"):
+        rows = metric_rows(group)
+        for row in rows:
+            row["delivery_hour"] = hour
+        by_hour.extend(rows)
+    sample_columns = [
+        "issue_time",
+        "product_start",
+        "merit_order_price_forecast",
+        "constant_historical_bias_forecast",
+        "corrected_price_mean_forecast",
+        "price_q10",
+        "price_q90",
+        "realised_price",
+        "realised_residual",
+    ]
+    return {
+        "summary": pd.DataFrame(metric_rows(frame)),
+        "by_delivery_hour": pd.DataFrame(by_hour),
+        "samples": frame[sample_columns].head(10),
+    }
+
+
 def extract_buses_and_lines(market_configs: list[MarketConfig]):
     """
     Extract bus and line DataFrames from the first market config that carries grid data.
@@ -715,7 +1444,7 @@ forecast_update_algorithms = {
 
 
 def get_forecast_registries() -> dict[str, dict]:
-    """Returns the three algorithm registry dicts bundled for injection into forecasters."""
+    """Return the forecast algorithm registries bundled with ASSUME."""
     return {
         "init": forecast_algorithms,
         "preprocess": forecast_preprocess_algorithms,

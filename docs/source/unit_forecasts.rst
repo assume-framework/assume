@@ -85,6 +85,10 @@ The resolution flow is:
 
 This design lets you swap algorithms via configuration without touching code.
 
+The optional adaptive merit-order correction is a stateful shadow
+forecast driven by market openings and clearings. It does not replace the
+static ``price`` series used by bidding strategies.
+
 ***********************************
 Configuration
 ***********************************
@@ -110,6 +114,73 @@ Specify which algorithms to use in the ``forecast_algorithms`` section of your s
             preprocess_price: price_default
             update_price: price_default
             update_congestion_signal: congestion_signal_default
+
+Adaptive merit-order correction
+===============================
+
+The adaptive correction is requested directly from an operator forecaster. It
+does not require a YAML setting and does not replace the existing ``price``
+series used by bidding strategies:
+
+.. code-block:: python
+
+    from datetime import timedelta
+
+    forecasts = forecaster.get_adaptive_merit_order_forecast(
+        market_id="EOM",
+        issue_time=current_time,
+        horizon=timedelta(hours=24),
+    )
+
+``horizon`` starts at the market product's first delivery. The method returns
+one immutable forecast row per product in that delivery window.
+
+For every selected energy product, the operator forecaster first calculates
+the existing merit-order forecast :math:`P^{MO}`. After clearing it observes
+the day-ahead price :math:`P^{DA}` and learns the residual
+:math:`r=P^{DA}-P^{MO}`. A separate Elastic-Net model learns residual location,
+while a second model learns log scale. The corrected mean is
+:math:`P^{MO}+\hat{r}`; q10, q50, and q90 use a Gaussian residual distribution.
+Feature matrices, discounted sufficient statistics, coordinate descent, and
+Gaussian inverse-CDF calculations use ``torch.float64`` tensors on CPU by
+default. The double precision is intentional because online discounted
+statistics are updated repeatedly over long simulations.
+
+The default features are merit-order price, separate capacity-weighted wind
+and solar availability factors, forecast residual load, previous-day
+same-hour realised residual and price, cyclic hour and weekday terms, and a
+weekend indicator. General generator availability is deliberately excluded.
+The initial implementation uses built-in settings: 168 training samples,
+``0.995`` forgetting, Gaussian residuals, and a ``0.01`` minimum standard
+deviation.
+
+Information timing and statuses
+--------------------------------
+
+Forecast rows are issued and frozen when
+``get_adaptive_merit_order_forecast`` is called. Cleared prices can therefore
+update only later forecasts. Before the
+initial window is complete, the corrected mean equals merit order. Fewer than
+two outcomes produce ``fallback_no_uncertainty``; two or more produce
+``fallback_empirical_uncertainty`` with expanding residual uncertainty. At the
+configured sample count, scaling is fitted once and frozen and both models are
+activated. Later outcomes update discounted sufficient statistics with the
+configured forgetting factor and use ``trained`` status.
+
+Finalised rows are written to ``adaptive_merit_order_forecast`` and contain the issue
+and delivery timestamps, operator and market identifiers, immutable
+``forecast_id``, merit-order and corrected forecasts, residual location and
+scale, q10/q50/q90, realised price and residual, frozen post-forecast error,
+sample count, and status. The helper
+:func:`~assume.common.forecast_algorithms.evaluate_adaptive_merit_order_forecasts`
+reports MAE, RMSE, pinball loss, central-80% coverage and width overall and by
+delivery hour for merit order, expanding historical mean bias, and adaptive
+correction.
+
+Only non-spatial energy markets with one scalar price per product are
+supported. The correction state belongs to each unit operator; bids, clearing,
+dispatch, and ``forecaster.price`` are unchanged. This is a two-stage Gaussian
+location/scale residual model, not full joint Online Distributional Regression.
 
 Via unit CSV files
 ==================
