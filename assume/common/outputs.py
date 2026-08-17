@@ -231,6 +231,7 @@ class WriteOutput(Role):
 
         if content_type in [
             "market_meta",
+            "adaptive_merit_order_forecast",
             "market_dispatch",
             "unit_dispatch",
             "rl_params",
@@ -303,6 +304,15 @@ class WriteOutput(Role):
         df = pd.DataFrame(market_results)
         df["simulation"] = self.simulation_id
         return df
+
+    def convert_adaptive_merit_order_forecasts(self, forecasts: list[dict]):
+        """Convert adaptive merit-order outcomes to their output table."""
+
+        if len(forecasts) == 0:
+            return
+        df = pd.DataFrame.from_records(forecasts)
+        df["simulation"] = self.simulation_id
+        return df.set_index("product_start")
 
     def convert_market_orders(self, market_orders: any, market_id: str):
         """
@@ -470,6 +480,8 @@ class WriteOutput(Role):
                 match table:
                     case "market_meta":
                         df = self.convert_market_results(data_list)
+                    case "adaptive_merit_order_forecast":
+                        df = self.convert_adaptive_merit_order_forecasts(data_list)
                     case "market_dispatch":
                         df = self.convert_market_dispatch(data_list)
                     case "unit_dispatch":
