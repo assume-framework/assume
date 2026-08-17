@@ -459,6 +459,135 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     assert math.isclose(delta_soc_set_dispatch, delta_soc)
 
 
+class CapacityMarketConfig:
+    """A reserve market - its product is a capacity reservation, not energy."""
+
+    market_id = "CRM_pos"
+    maximum_bid_price = 3000.0
+    minimum_bid_price = -500.0
+    product_type = "capacity_pos"
+    additional_fields = []
+
+
+def test_update_soc_ignores_capacity_products(storage_unit):
+    """
+    Only energy moves the SoC. A reserve market awards *capacity*, which is
+    written to ``outputs["capacity_pos"]`` and leaves ``outputs["energy"]``
+    untouched, so it must not drain or fill the storage.
+    """
+    mc = CapacityMarketConfig()
+    t0, t1 = storage_unit.index[0], storage_unit.index[1]
+    order = {
+        "start_time": t0,
+        "end_time": t1,
+        "only_hours": None,
+        "accepted_volume": 100,
+        "accepted_price": 20,
+    }
+
+    storage_unit.set_dispatch_plan(mc, [order], t0, storage_unit.index[-1])
+
+    assert storage_unit.outputs["capacity_pos"].at[t0] == 100
+    assert storage_unit.outputs["energy"].at[t0] == 0
+    assert (storage_unit.outputs["soc"] == storage_unit.initial_soc).all()
+
+
+def test_set_dispatch_plan_propagates_soc_over_idle_window(
+    mock_market_config, storage_unit
+):
+    """
+    Regression test for https://github.com/assume-framework/assume/issues/562.
+
+    ``outputs["soc"]`` is pre-filled with ``initial_soc``, so *not* writing a
+    time step is not the same as carrying the SoC forward. The SoC therefore
+    has to be propagated over the market's whole delivery period, even for the
+    time steps this unit has no accepted order in - otherwise a gap in the
+    orderbook (e.g. produced by ``remove_empty_bids``) resets the SoC to
+    ``initial_soc`` for the rest of the period.
+    """
+    mc = mock_market_config
+    t0, t1, t2, t3 = storage_unit.index[:4]
+
+    # charge 100 MW during the first hour only
+    order = {
+        "start_time": t0,
+        "end_time": t1,
+        "only_hours": None,
+        "accepted_volume": -100,
+        "accepted_price": 10,
+    }
+    # ... but the market's delivery period covers all three hours
+    storage_unit.set_dispatch_plan(mc, [order], t0, t3)
+
+    expected_soc = storage_unit.initial_soc + (
+        100 * storage_unit.efficiency_charge / storage_unit.capacity
+    )
+    assert math.isclose(storage_unit.outputs["soc"].at[t1], expected_soc)
+    # the idle hours must keep the charged SoC, not fall back to initial_soc
+    assert math.isclose(storage_unit.outputs["soc"].at[t2], expected_soc)
+    assert math.isclose(storage_unit.outputs["soc"].at[t3], expected_soc)
+
+
+def test_set_dispatch_plan_without_orders_propagates_soc(
+    mock_market_config, storage_unit
+):
+    """
+    A unit which submitted no bids at all still has to carry its SoC over the
+    delivery period, so that the next market opening reads the true SoC.
+    """
+    mc = mock_market_config
+    t0, t1, t2, t3 = storage_unit.index[:4]
+
+    order = {
+        "start_time": t0,
+        "end_time": t1,
+        "only_hours": None,
+        "accepted_volume": -100,
+        "accepted_price": 10,
+    }
+    storage_unit.set_dispatch_plan(mc, [order], t0, t1)
+    soc_after_charge = storage_unit.outputs["soc"].at[t1]
+    assert soc_after_charge != storage_unit.initial_soc
+
+    # next delivery period: this unit is not in the orderbook at all
+    storage_unit.set_dispatch_plan(mc, [], t1, t3)
+
+    assert math.isclose(storage_unit.outputs["soc"].at[t2], soc_after_charge)
+    assert math.isclose(storage_unit.outputs["soc"].at[t3], soc_after_charge)
+
+
+def test_update_soc_matches_execute_current_dispatch(mock_market_config, storage_unit):
+    """
+    The SoC path projected at dispatch-planning time must be the one which is
+    later actually executed - otherwise the bidding strategies plan against an
+    SoC trajectory that ``execute_current_dispatch`` will not reproduce.
+
+    Here the accepted discharge volume exceeds what the SoC allows, so both
+    have to clip it the same way.
+    """
+    mc = mock_market_config
+    t0, t1, t2 = storage_unit.index[:3]
+    storage_unit.outputs["soc"].at[t0] = 0.02  # 20 MWh left
+
+    order = {
+        "start_time": t0,
+        "end_time": t1,
+        "only_hours": None,
+        "accepted_volume": 100,  # more than the SoC supports
+        "accepted_price": 45,
+    }
+    storage_unit.set_dispatch_plan(mc, [order], t0, t2)
+
+    projected_soc = storage_unit.outputs["soc"].at[t1]
+    projected_energy = storage_unit.outputs["energy"].at[t0]
+    assert projected_soc >= storage_unit.min_soc
+
+    storage_unit.execute_current_dispatch(t0, t1)
+
+    assert math.isclose(storage_unit.outputs["soc"].at[t1], projected_soc)
+    assert math.isclose(storage_unit.outputs["energy"].at[t0], projected_energy)
+
+
 def test_initialising_invalid_storages():
     index = pd.date_range(
         start=datetime(2023, 7, 1),
