@@ -890,7 +890,7 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         the agent's action selection.
         """
         # get the current soc and energy cost value
-        soc = unit.outputs["soc"].at[start]
+        soc = unit.get_soc(start)
         cost_stored_energy_scaled = (
             unit.outputs["cost_stored_energy"].at[start] / self.max_bid_price
         )
@@ -1048,8 +1048,8 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         order_profit = accepted_price * accepted_volume * duration_hours
         order_cost = abs(marginal_cost * accepted_volume * duration_hours)
 
-        current_soc = unit.outputs["soc"].at[start]
-        next_soc = unit.outputs["soc"].at[next_time]
+        current_soc = unit.get_soc(start)
+        next_soc = unit.get_soc(next_time)
 
         # Calculate and clip the energy cost for the start time
         # cost_stored_energy = average volume-weighted procurement costs of the currently stored energy

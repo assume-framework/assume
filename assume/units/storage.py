@@ -281,6 +281,11 @@ class Storage(SupportsMinMaxCharge):
         The dispatch is only executed, if it is in the constraints given by the unit.
         Returns the volume of the unit within the given time range.
 
+        The planned energy is clipped to the unit's power limits, which
+        invalidates the SOC from ``start`` on, and the SOC is then re-propagated
+        over the executed window - i.e. this is a special case of the
+        invalidate/extend rules in ``set_dispatch_plan`` and ``ensure_soc``.
+
         Args:
             start (datetime.datetime): The start time of the dispatch.
             end (datetime.datetime): The end time of the dispatch.
@@ -289,7 +294,6 @@ class Storage(SupportsMinMaxCharge):
             np.ndarray: The volume of the unit within the given time range.
         """
         start = max(start, self.index[0])
-        time_delta = self.index.freq / timedelta(hours=1)
 
         for t in self.index[start:end]:
             current_power = self.outputs["energy"].at[t]
@@ -305,37 +309,13 @@ class Storage(SupportsMinMaxCharge):
             ):
                 current_power = 0
 
-            # calculate the change in state of charge
-            delta_soc = 0
-            soc = self.outputs["soc"].at[t]
-
-            # discharging
-            if current_power > 0:
-                max_soc_discharge = self.calculate_soc_max_discharge(soc)
-
-                if current_power > max_soc_discharge:
-                    current_power = max_soc_discharge
-
-                delta_soc = (
-                    -current_power * time_delta / self.efficiency_discharge
-                ) / self.capacity
-
-            # charging
-            elif current_power < 0:
-                max_soc_charge = self.calculate_soc_max_charge(soc)
-
-                if current_power < max_soc_charge:
-                    current_power = max_soc_charge
-
-                delta_soc = (
-                    -current_power * time_delta * self.efficiency_charge
-                ) / self.capacity
-
-            # update the values of the state of charge and the energy
-            next_freq = t + self.index.freq
-            if next_freq in self.index:
-                self.outputs["soc"].at[next_freq] = soc + delta_soc
             self.outputs["energy"].at[t] = current_power
+
+        # the executed energy just changed, so the SOC from here on is stale
+        self._soc_valid_until = min(self._soc_valid_until, start)
+        # ... and is re-derived over the window which was just executed.
+        # energy at `end` moves the SOC of the following time step, hence + freq
+        self.ensure_soc(end + self.index.freq)
 
         return self.outputs["energy"].loc[start:end]
 
@@ -444,7 +424,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict charging according to max_soc
         if soc is None:
-            soc = self.outputs["soc"].at[start]
+            soc = self.get_soc(start)
         max_soc_charge = self.calculate_soc_max_charge(soc)
         max_power_charge = max_power_charge.clip(min=max_soc_charge)
 
@@ -490,7 +470,7 @@ class Storage(SupportsMinMaxCharge):
 
         # restrict according to min_soc
         if soc is None:
-            soc = self.outputs["soc"].at[start]
+            soc = self.get_soc(start)
         max_soc_discharge = self.calculate_soc_max_discharge(soc)
         max_power_discharge = max_power_discharge.clip(max=max_soc_discharge)
 

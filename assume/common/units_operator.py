@@ -240,17 +240,7 @@ class UnitsOperator(Role):
 
         marketconfig = self.registered_markets[content["market_id"]]
         self.valid_orders[marketconfig.product_type].extend(orderbook)
-        start_time = content.get("start_time")
-        end_time = content.get("end_time")
-        if start_time is None or end_time is None:
-            # a clearing without any product has no delivery period to propagate
-            logger.debug(
-                "%s got clearing for %s without a delivery period - skipping dispatch",
-                self.id,
-                content["market_id"],
-            )
-        else:
-            self.set_unit_dispatch(orderbook, marketconfig, start_time, end_time)
+        self.set_unit_dispatch(orderbook, marketconfig)
         self.write_actual_dispatch(marketconfig.product_type)
 
         # now once we have the market results and the dispatch has been set
@@ -319,38 +309,21 @@ class UnitsOperator(Role):
         )
 
     def set_unit_dispatch(
-        self,
-        orderbook: Orderbook,
-        marketconfig: MarketConfig,
-        start_time: datetime,
-        end_time: datetime,
+        self, orderbook: Orderbook, marketconfig: MarketConfig
     ) -> None:
         """
         Feeds the current market result back to the units.
 
-        Every unit of this operator is notified, not only the ones which appear
-        in the orderbook. A unit which submitted no bids at all - or whose bids
-        were all dropped by ``remove_empty_bids`` - still has to learn about the
-        delivery period, otherwise state which is propagated across the period
-        (a storage's SOC) would keep its stale pre-filled value for that window.
-
         Args:
             orderbook (Orderbook): The orderbook of the market.
             marketconfig (MarketConfig): The market configuration.
-            start_time (datetime.datetime): The start of the market's delivery period.
-            end_time (datetime.datetime): The end of the market's delivery period.
         """
         orderbook.sort(key=itemgetter("unit_id"))
-        orders_by_unit = {
-            unit_id: list(orders)
-            for unit_id, orders in groupby(orderbook, itemgetter("unit_id"))
-        }
-        for unit_id, unit in self.units.items():
-            unit.set_dispatch_plan(
+        for unit_id, orders in groupby(orderbook, itemgetter("unit_id")):
+            orderbook = list(orders)
+            self.units[unit_id].set_dispatch_plan(
                 marketconfig=marketconfig,
-                orderbook=orders_by_unit.get(unit_id, []),
-                start_time=start_time,
-                end_time=end_time,
+                orderbook=orderbook,
             )
 
     def calculate_unit_cashflow_and_reward(

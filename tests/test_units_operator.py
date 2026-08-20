@@ -13,11 +13,7 @@ from mango.util.clock import ExternalClock
 from mango.util.termination_detection import tasks_complete_or_sleeping
 
 from assume.common.fast_pandas import FastIndex
-from assume.common.forecaster import (
-    DemandForecaster,
-    PowerplantForecaster,
-    UnitForecaster,
-)
+from assume.common.forecaster import DemandForecaster, PowerplantForecaster
 from assume.common.market_objects import MarketConfig, MarketProduct
 from assume.common.units_operator import UnitsOperator
 from assume.common.utils import datetime2timestamp
@@ -27,7 +23,6 @@ from assume.strategies.portfolio_strategies import (
 )
 from assume.units.demand import Demand
 from assume.units.powerplant import PowerPlant
-from assume.units.storage import Storage
 
 start = datetime(2020, 1, 1)
 end = datetime(2020, 12, 2)
@@ -91,81 +86,8 @@ async def test_set_unit_dispatch(units_operator: UnitsOperator):
 
     assert units_operator.units["testdemand"].outputs["energy"].max() == 0
 
-    units_operator.set_unit_dispatch(
-        orderbook, marketconfig, start, start + rd(hours=1)
-    )
+    units_operator.set_unit_dispatch(orderbook, marketconfig)
     assert units_operator.units["testdemand"].outputs["energy"].max() == 500
-
-
-async def test_set_unit_dispatch_notifies_units_without_orders(
-    units_operator: UnitsOperator,
-):
-    """
-    Regression test for https://github.com/assume-framework/assume/issues/837.
-
-    A unit which is absent from the orderbook - because it submitted nothing,
-    or because ``remove_empty_bids`` dropped all its bids - must still be told
-    about the delivery period. For a storage that is what keeps the SoC dense:
-    without it the SoC for the whole (future) delivery window keeps its
-    pre-filled ``initial_soc`` and the next market opening bids against it.
-    """
-    index = FastIndex(start=start, end=end + pd.Timedelta(hours=4), freq="1h")
-    storage = Storage(
-        id="teststorage",
-        unit_operator=units_operator.id,
-        technology="PSPP",
-        bidding_strategies={},
-        forecaster=UnitForecaster(index, market_prices={"EOM": 50}),
-        max_power_charge=-100,
-        max_power_discharge=100,
-        capacity=1000,
-        efficiency_charge=0.9,
-        efficiency_discharge=0.9,
-        initial_soc=0.5,
-    )
-    units_operator.add_unit(storage)
-
-    marketconfig = units_operator.available_markets[0]
-    t0 = start
-    t1 = start + rd(hours=1)
-    t2 = start + rd(hours=2)
-
-    # the storage charges during the first hour
-    storage_orderbook = [
-        {
-            "start_time": t0,
-            "end_time": t1,
-            "volume": -100,
-            "accepted_volume": -100,
-            "price": 10,
-            "accepted_price": 10,
-            "agent_addr": "storage",
-            "unit_id": "teststorage",
-            "only_hours": None,
-        }
-    ]
-    units_operator.set_unit_dispatch(storage_orderbook, marketconfig, t0, t1)
-    soc_after_charge = storage.outputs["soc"].at[t1]
-    assert soc_after_charge > storage.initial_soc
-
-    # next delivery period [t1, t2): only the demand unit is in the orderbook
-    demand_orderbook = [
-        {
-            "start_time": t1,
-            "end_time": t2,
-            "volume": 500,
-            "accepted_volume": 500,
-            "price": 1000,
-            "accepted_price": 1000,
-            "agent_addr": "gen1",
-            "unit_id": "testdemand",
-            "only_hours": None,
-        }
-    ]
-    units_operator.set_unit_dispatch(demand_orderbook, marketconfig, t1, t2)
-
-    # the storage did not participate, but its SoC must still be carried over
-    assert storage.outputs["soc"].at[t2] == soc_after_charge
 
 
 async def test_write_actual_dispatch(units_operator: UnitsOperator):

@@ -688,28 +688,6 @@ class MarketRole(MarketMechanism, Role):
             for agent, bids in groupby(rejected_orderbook, itemgetter("agent_addr"))
         }
 
-        # delivery period covered by this clearing - units need it to propagate
-        # period-spanning state (e.g. a storage's SOC) even if they did not bid.
-        # market_meta is not guaranteed to be sorted by product_start, so take
-        # the extremes instead of the first/last entry, and fall back to the
-        # cleared products if a mechanism does not report them.
-        delivery_start = min(
-            (
-                meta["product_start"]
-                for meta in market_meta
-                if meta.get("product_start") is not None
-            ),
-            default=min((product[0] for product in market_products), default=None),
-        )
-        delivery_end = max(
-            (
-                meta["product_end"]
-                for meta in market_meta
-                if meta.get("product_end") is not None
-            ),
-            default=max((product[1] for product in market_products), default=None),
-        )
-
         for agent in self.registered_agents.keys():
             meta = {
                 "sender_addr": self.context.addr,
@@ -719,8 +697,6 @@ class MarketRole(MarketMechanism, Role):
             closing: ClearingMessage = {
                 "context": "clearing",
                 "market_id": self.marketconfig.market_id,
-                "start_time": delivery_start,
-                "end_time": delivery_end,
                 "accepted_orders": accepted_orders.get(agent, []),
                 "rejected_orders": rejected_orders.get(agent, []),
             }

@@ -129,15 +129,20 @@ def test_soc_constraint(storage_unit):
     storage_unit.outputs["capacity_neg"][start] = -50
     storage_unit.outputs["capacity_pos"][start] = 30
 
-    storage_unit.outputs["soc"][start - timedelta(hours=1)] = 0.05
-    assert storage_unit.outputs["soc"][start - storage_unit.index.freq] == 0.05
+    storage_unit.set_soc(start - timedelta(hours=1), 0.05)
+    assert storage_unit.get_soc(start - storage_unit.index.freq) == 0.05
+    # the SoC at start is propagated from the one just set - the unit is nearly
+    # empty, so the discharge limit binds on the SoC rather than on the power
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
         start, end
     )
     assert min_power_discharge[0] == 40
-    assert max_power_discharge[0] == 60
+    assert math.isclose(
+        max_power_discharge[0],
+        0.05 * storage_unit.capacity * storage_unit.efficiency_discharge,
+    )
 
-    storage_unit.outputs["soc"][start] = 0.95
+    storage_unit.set_soc(start, 0.95)
     min_power_charge, max_power_charge = storage_unit.calculate_min_max_charge(
         start, end
     )
@@ -178,7 +183,7 @@ def test_storage_feedback(storage_unit, mock_market_config):
     ]
     # max_power_charge gets accepted
     mc = mock_market_config
-    storage_unit.set_dispatch_plan(mc, orderbook, start, end)
+    storage_unit.set_dispatch_plan(mc, orderbook)
 
     # second market request for same interval
     min_power_discharge, max_power_discharge = storage_unit.calculate_min_max_discharge(
@@ -329,7 +334,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     assert len(bids) == 0
 
     # dispatch full discharge
-    storage_unit.set_dispatch_plan(mc, bids, start, end)
+    storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
 
     assert storage_unit.outputs["energy"][start] == 100
@@ -341,7 +346,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["energy"][start] = -100
     storage_unit.outputs["soc"][start] = 0.5
 
-    storage_unit.set_dispatch_plan(mc, bids, start, end)
+    storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
 
     assert storage_unit.outputs["energy"][start] == -100
@@ -353,7 +358,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["energy"][start] = 100
     storage_unit.outputs["soc"][start] = 0.05
 
-    storage_unit.set_dispatch_plan(mc, bids, start, end)
+    storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
 
     assert math.isclose(
@@ -365,7 +370,7 @@ def test_set_dispatch_plan(mock_market_config, storage_unit):
     storage_unit.outputs["energy"][start] = -100
     storage_unit.outputs["soc"][start] = 0.95
 
-    storage_unit.set_dispatch_plan(mc, bids, start, end)
+    storage_unit.set_dispatch_plan(mc, bids)
     storage_unit.execute_current_dispatch(start, end)
 
     assert math.isclose(
@@ -417,15 +422,13 @@ def test_set_dispatch_plan_multi_hours(mock_market_config, storage_unit):
     bids[1]["accepted_price"] = 45
 
     # now dispatch full discharge
-    storage_unit.set_dispatch_plan(mc, bids, start, end)
+    storage_unit.set_dispatch_plan(mc, bids)
 
     # is the dispatch plan set correctly
     for i in range(1, 3):
         s = datetime(2022, 1, 1, i)
         s_next = datetime(2022, 1, 1, i + 1)
-        delta_soc_set_dispatch = (
-            storage_unit.outputs["soc"][s] - storage_unit.outputs["soc"][s_next]
-        )
+        delta_soc_set_dispatch = storage_unit.get_soc(s) - storage_unit.get_soc(s_next)
 
         if delta_soc_set_dispatch <= 0:
             delta_set_dispatch = (
@@ -469,41 +472,13 @@ class CapacityMarketConfig:
     additional_fields = []
 
 
-def test_update_soc_ignores_capacity_products(storage_unit):
-    """
-    Only energy moves the SoC. A reserve market awards *capacity*, which is
-    written to ``outputs["capacity_pos"]`` and leaves ``outputs["energy"]``
-    untouched, so it must not drain or fill the storage.
-    """
-    mc = CapacityMarketConfig()
-    t0, t1 = storage_unit.index[0], storage_unit.index[1]
-    order = {
-        "start_time": t0,
-        "end_time": t1,
-        "only_hours": None,
-        "accepted_volume": 100,
-        "accepted_price": 20,
-    }
-
-    storage_unit.set_dispatch_plan(mc, [order], t0, storage_unit.index[-1])
-
-    assert storage_unit.outputs["capacity_pos"].at[t0] == 100
-    assert storage_unit.outputs["energy"].at[t0] == 0
-    assert (storage_unit.outputs["soc"] == storage_unit.initial_soc).all()
-
-
-def test_set_dispatch_plan_propagates_soc_over_idle_window(
-    mock_market_config, storage_unit
-):
+def test_soc_is_propagated_over_idle_time_steps(mock_market_config, storage_unit):
     """
     Regression test for https://github.com/assume-framework/assume/issues/562.
 
     ``outputs["soc"]`` is pre-filled with ``initial_soc``, so *not* writing a
-    time step is not the same as carrying the SoC forward. The SoC therefore
-    has to be propagated over the market's whole delivery period, even for the
-    time steps this unit has no accepted order in - otherwise a gap in the
-    orderbook (e.g. produced by ``remove_empty_bids``) resets the SoC to
-    ``initial_soc`` for the rest of the period.
+    time step is not the same as carrying the SoC forward. Reading through
+    ``get_soc`` propagates over the idle steps instead of returning the filler.
     """
     mc = mock_market_config
     t0, t1, t2, t3 = storage_unit.index[:4]
@@ -516,27 +491,27 @@ def test_set_dispatch_plan_propagates_soc_over_idle_window(
         "accepted_volume": -100,
         "accepted_price": 10,
     }
-    # ... but the market's delivery period covers all three hours
-    storage_unit.set_dispatch_plan(mc, [order], t0, t3)
+    storage_unit.set_dispatch_plan(mc, [order])
 
     expected_soc = storage_unit.initial_soc + (
         100 * storage_unit.efficiency_charge / storage_unit.capacity
     )
-    assert math.isclose(storage_unit.outputs["soc"].at[t1], expected_soc)
+    assert math.isclose(storage_unit.get_soc(t1), expected_soc)
     # the idle hours must keep the charged SoC, not fall back to initial_soc
-    assert math.isclose(storage_unit.outputs["soc"].at[t2], expected_soc)
-    assert math.isclose(storage_unit.outputs["soc"].at[t3], expected_soc)
+    assert math.isclose(storage_unit.get_soc(t2), expected_soc)
+    assert math.isclose(storage_unit.get_soc(t3), expected_soc)
 
 
-def test_set_dispatch_plan_without_orders_propagates_soc(
-    mock_market_config, storage_unit
-):
+def test_soc_without_market_participation(mock_market_config, storage_unit):
     """
-    A unit which submitted no bids at all still has to carry its SoC over the
-    delivery period, so that the next market opening reads the true SoC.
+    Regression test for https://github.com/assume-framework/assume/issues/837.
+
+    A unit which submitted no bids - or whose bids ``remove_empty_bids`` dropped
+    - gets an empty orderbook. That writes no volume and so must not disturb the
+    SoC, which stays readable for the whole horizon.
     """
     mc = mock_market_config
-    t0, t1, t2, t3 = storage_unit.index[:4]
+    t0, t1, t3 = storage_unit.index[0], storage_unit.index[1], storage_unit.index[3]
 
     order = {
         "start_time": t0,
@@ -545,29 +520,78 @@ def test_set_dispatch_plan_without_orders_propagates_soc(
         "accepted_volume": -100,
         "accepted_price": 10,
     }
-    storage_unit.set_dispatch_plan(mc, [order], t0, t1)
-    soc_after_charge = storage_unit.outputs["soc"].at[t1]
+    storage_unit.set_dispatch_plan(mc, [order])
+    soc_after_charge = storage_unit.get_soc(t1)
     assert soc_after_charge != storage_unit.initial_soc
 
     # next delivery period: this unit is not in the orderbook at all
-    storage_unit.set_dispatch_plan(mc, [], t1, t3)
+    storage_unit.set_dispatch_plan(mc, [])
 
-    assert math.isclose(storage_unit.outputs["soc"].at[t2], soc_after_charge)
-    assert math.isclose(storage_unit.outputs["soc"].at[t3], soc_after_charge)
+    assert math.isclose(storage_unit.get_soc(t3), soc_after_charge)
 
 
-def test_update_soc_matches_execute_current_dispatch(mock_market_config, storage_unit):
+def test_soc_is_invalidated_by_a_later_commitment(mock_market_config, storage_unit):
     """
-    The SoC path projected at dispatch-planning time must be the one which is
-    later actually executed - otherwise the bidding strategies plan against an
-    SoC trajectory that ``execute_current_dispatch`` will not reproduce.
+    A read propagates the SoC to the point it was asked for. A commitment made
+    *afterwards*, inside the already propagated range, has to invalidate it -
+    otherwise the stale trajectory would be handed out unchanged.
+    """
+    mc = mock_market_config
+    t0, t1, t2, t3 = storage_unit.index[:4]
 
-    Here the accepted discharge volume exceeds what the SoC allows, so both
-    have to clip it the same way.
+    # nothing committed yet - the SoC is flat over the whole horizon
+    assert storage_unit.get_soc(t3) == storage_unit.initial_soc
+
+    # now a market clears energy in the first hour, inside the propagated range
+    order = {
+        "start_time": t0,
+        "end_time": t1,
+        "only_hours": None,
+        "accepted_volume": -100,
+        "accepted_price": 10,
+    }
+    storage_unit.set_dispatch_plan(mc, [order])
+
+    expected_soc = storage_unit.initial_soc + (
+        100 * storage_unit.efficiency_charge / storage_unit.capacity
+    )
+    assert math.isclose(storage_unit.get_soc(t2), expected_soc)
+    assert math.isclose(storage_unit.get_soc(t3), expected_soc)
+
+
+def test_capacity_products_do_not_move_the_soc(storage_unit):
+    """
+    Only energy moves the SoC. A reserve market awards *capacity*, which is
+    written to ``outputs["capacity_pos"]`` and leaves ``outputs["energy"]``
+    untouched, so it must neither drain nor fill the storage.
+    """
+    mc = CapacityMarketConfig()
+    t0, t1, t3 = storage_unit.index[0], storage_unit.index[1], storage_unit.index[3]
+    order = {
+        "start_time": t0,
+        "end_time": t1,
+        "only_hours": None,
+        "accepted_volume": 100,
+        "accepted_price": 20,
+    }
+
+    storage_unit.set_dispatch_plan(mc, [order])
+
+    assert storage_unit.outputs["capacity_pos"].at[t0] == 100
+    assert storage_unit.outputs["energy"].at[t0] == 0
+    assert storage_unit.get_soc(t3) == storage_unit.initial_soc
+
+
+def test_projected_soc_matches_executed_soc(mock_market_config, storage_unit):
+    """
+    The SoC path a bidding strategy reads must be the one which is later
+    actually executed - otherwise strategies plan against a trajectory
+    ``execute_current_dispatch`` will not reproduce. Here the accepted discharge
+    volume exceeds what the SoC allows, so both have to clip it the same way.
     """
     mc = mock_market_config
     t0, t1, t2 = storage_unit.index[:3]
-    storage_unit.outputs["soc"].at[t0] = 0.02  # 20 MWh left
+    storage_unit.set_soc(t0, 0.02)  # 20 MWh left
 
     order = {
         "start_time": t0,
@@ -576,15 +600,15 @@ def test_update_soc_matches_execute_current_dispatch(mock_market_config, storage
         "accepted_volume": 100,  # more than the SoC supports
         "accepted_price": 45,
     }
-    storage_unit.set_dispatch_plan(mc, [order], t0, t2)
+    storage_unit.set_dispatch_plan(mc, [order])
 
-    projected_soc = storage_unit.outputs["soc"].at[t1]
+    projected_soc = storage_unit.get_soc(t1)
     projected_energy = storage_unit.outputs["energy"].at[t0]
     assert projected_soc >= storage_unit.min_soc
 
-    storage_unit.execute_current_dispatch(t0, t1)
+    storage_unit.execute_current_dispatch(t0, t2)
 
-    assert math.isclose(storage_unit.outputs["soc"].at[t1], projected_soc)
+    assert math.isclose(storage_unit.get_soc(t1), projected_soc)
     assert math.isclose(storage_unit.outputs["energy"].at[t0], projected_energy)
 
 
