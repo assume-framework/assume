@@ -633,6 +633,30 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
+    def apply_power_limits(self, current_power: float) -> float:
+        """
+        Clips a planned power to the power limits of the unit.
+
+        A power between the two minimum powers - but not zero - cannot be run
+        at all and therefore becomes zero.
+
+        Args:
+            current_power (float): The planned power, negative when charging.
+
+        Returns:
+            float: The power the unit can actually run at.
+        """
+        if current_power > self.max_power_discharge:
+            return self.max_power_discharge
+        if current_power < self.max_power_charge:
+            return self.max_power_charge
+        if (
+            self.min_power_discharge > current_power > self.min_power_charge
+            and current_power != 0
+        ):
+            return 0
+        return current_power
+
     def ensure_soc(self, until: datetime) -> None:
         """
         Propagates the state of charge forward until ``until`` is covered.
@@ -643,6 +667,14 @@ class SupportsMinMaxCharge(BaseUnit):
         SOC recurrence from the frontier to ``until``, deriving it purely from
         the currently committed ``outputs["energy"]``, and moves the frontier.
 
+        The committed energy is made feasible on the way - clipped first to the
+        power limits of the unit and then to what the SOC allows - so that the
+        projected SOC path is the one the unit can actually run, and so that
+        ``outputs["energy"]`` never reports a volume the SOC cannot back. This
+        is the single place where that clipping happens: doing it here rather
+        than at commit time keeps it correct no matter in which order several
+        markets clear into the same time step.
+
         Calling it for an already covered point is a no-op, so the cost is
         amortized O(1) per time step. The propagated range is
         ``[frontier, until]`` and therefore contiguous by construction,
@@ -652,15 +684,21 @@ class SupportsMinMaxCharge(BaseUnit):
             until (datetime.datetime): The point in time the SOC is needed for.
         """
         # the SOC of the very last time step cannot be moved any further
-        until = min(until, self.index[-1])
+        last = self.index[-1]
+        until = min(until, last)
         if until <= self._soc_valid_until:
             return
 
         time_delta = self.index.freq / timedelta(hours=1)
 
-        for t in self.index[self._soc_valid_until : until - self.index.freq]:
-            next_t = t + self.index.freq
-            current_power = self.outputs["energy"].at[t]
+        # the energy at `last` has no following time step whose SOC it could
+        # move, but it still has to be feasible, so it is walked as well
+        walk_end = last if until == last else until - self.index.freq
+
+        for t in self.index[self._soc_valid_until : walk_end]:
+            # the unit can only ever run within its power limits, so the SOC
+            # has to be derived from the clipped value rather than the planned one
+            current_power = self.apply_power_limits(self.outputs["energy"].at[t])
 
             # calculate the change in state of charge
             soc = self.outputs["soc"].at[t]
@@ -701,10 +739,10 @@ class SupportsMinMaxCharge(BaseUnit):
                 ) / self.capacity
 
             # update the values of the state of charge and the energy, so that
-            # the projected SOC path is the one execute_current_dispatch will
-            # later actually execute
-            self.outputs["soc"].at[next_t] = soc + delta_soc
+            # the projected SOC path is the one the unit will actually execute
             self.outputs["energy"].at[t] = current_power
+            if t != last:
+                self.outputs["soc"].at[t + self.index.freq] = soc + delta_soc
 
         self._soc_valid_until = until
 

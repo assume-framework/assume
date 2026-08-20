@@ -612,6 +612,165 @@ def test_projected_soc_matches_executed_soc(mock_market_config, storage_unit):
     assert math.isclose(storage_unit.outputs["energy"].at[t0], projected_energy)
 
 
+def _energy_order(start, end, volume, price=45):
+    return {
+        "start_time": start,
+        "end_time": end,
+        "only_hours": None,
+        "accepted_volume": volume,
+        "accepted_price": price,
+    }
+
+
+def test_ensure_soc_clips_to_the_power_limits(mock_market_config, storage_unit):
+    """
+    A market can accept more than the unit can physically run at. The SoC must
+    be derived from the power the unit can actually deliver, not from the
+    accepted volume, and the committed energy has to be corrected along with it.
+    """
+    mc = mock_market_config
+    t0, t1 = storage_unit.index[0], storage_unit.index[1]
+
+    # 250 MW is well within what the SoC supports (475 MW), but way above the
+    # 100 MW the unit can discharge at
+    storage_unit.set_dispatch_plan(mc, [_energy_order(t0, t1, 250)])
+
+    assert storage_unit.get_soc(t1) == pytest.approx(
+        storage_unit.initial_soc
+        - (storage_unit.max_power_discharge / storage_unit.efficiency_discharge)
+        / storage_unit.capacity
+    )
+    assert storage_unit.outputs["energy"].at[t0] == storage_unit.max_power_discharge
+
+
+def test_ensure_soc_clips_volumes_stacked_by_several_markets(
+    mock_market_config, storage_unit
+):
+    """
+    Every single clearing can be feasible on its own while their sum is not -
+    two markets awarding 60 MW each add up to 120 MW on a 100 MW unit. Clipping
+    during propagation catches that, clipping at commit time cannot.
+    """
+    mc = mock_market_config
+    t0, t1 = storage_unit.index[0], storage_unit.index[1]
+
+    storage_unit.set_dispatch_plan(mc, [_energy_order(t0, t1, 60)])
+    storage_unit.set_dispatch_plan(mc, [_energy_order(t0, t1, 60)])
+    assert storage_unit.outputs["energy"].at[t0] == 120
+
+    assert storage_unit.get_soc(t1) == pytest.approx(
+        storage_unit.initial_soc
+        - (storage_unit.max_power_discharge / storage_unit.efficiency_discharge)
+        / storage_unit.capacity
+    )
+    assert storage_unit.outputs["energy"].at[t0] == storage_unit.max_power_discharge
+
+
+def test_ensure_soc_applies_both_the_power_and_the_soc_limit(
+    mock_market_config, storage_unit
+):
+    """
+    The two limits are independent: the power limit caps 250 MW at 100 MW, and
+    an almost empty storage caps it further at the 19 MW its 20 MWh can deliver.
+    """
+    mc = mock_market_config
+    t0, t1 = storage_unit.index[0], storage_unit.index[1]
+    storage_unit.set_soc(t0, 0.02)  # 20 MWh left
+
+    storage_unit.set_dispatch_plan(mc, [_energy_order(t0, t1, 250)])
+
+    soc_max_discharge = storage_unit.calculate_soc_max_discharge(0.02)
+    assert soc_max_discharge < storage_unit.max_power_discharge
+    assert storage_unit.get_soc(t1) == pytest.approx(storage_unit.min_soc)
+    assert storage_unit.outputs["energy"].at[t0] == pytest.approx(soc_max_discharge)
+
+
+def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
+    """
+    The energy of the last time step moves no following SoC, so it is easily
+    left out of the propagation walk - but it is still dispatched and written to
+    the database, and therefore has to be feasible like every other time step.
+    """
+    mc = mock_market_config
+    t3 = storage_unit.index[-1]
+    storage_unit.set_dispatch_plan(
+        mc, [_energy_order(t3, t3 + storage_unit.index.freq, 250)]
+    )
+
+    storage_unit.ensure_soc(t3)
+
+    assert storage_unit.outputs["energy"].at[t3] == storage_unit.max_power_discharge
+    assert storage_unit.execute_current_dispatch(t3, t3)[0] == (
+        storage_unit.max_power_discharge
+    )
+
+
+def test_ensure_soc_drops_power_below_the_minimum():
+    """
+    A unit cannot run between zero and its minimum power, so such a volume
+    becomes zero and leaves the SoC untouched.
+    """
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
+    forecaster = UnitForecaster(index, availability=1, market_prices={"EOM": 50})
+    unit = Storage(
+        id="Test_Storage",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={"EOM": StorageEnergyHeuristicFlexableStrategy()},
+        forecaster=forecaster,
+        max_power_charge=-100,
+        max_power_discharge=100,
+        min_power_charge=-20,
+        min_power_discharge=20,
+        capacity=1000,
+        efficiency_charge=0.9,
+        efficiency_discharge=0.95,
+        initial_soc=0.5,
+    )
+    t0, t1, t2 = unit.index[:3]
+    unit.outputs["energy"].at[t0] = 5  # below min_power_discharge
+    unit.outputs["energy"].at[t1] = -5  # above min_power_charge
+
+    assert unit.get_soc(t2) == unit.initial_soc
+    assert unit.outputs["energy"].at[t0] == 0
+    assert unit.outputs["energy"].at[t1] == 0
+
+
+def test_ensure_soc_is_a_no_op_once_covered(mock_market_config, storage_unit):
+    """
+    Propagation must be idempotent - a second call over an already covered range
+    may neither move the SoC again nor clip the energy a second time.
+    """
+    mc = mock_market_config
+    t0, t1, t2 = storage_unit.index[:3]
+    storage_unit.set_dispatch_plan(mc, [_energy_order(t0, t1, 250)])
+
+    storage_unit.ensure_soc(t2)
+    soc = dict(zip(storage_unit.index[:3], [storage_unit.get_soc(t) for t in (t0, t1, t2)]))
+    energy = storage_unit.outputs["energy"].at[t0]
+
+    storage_unit.ensure_soc(t2)
+    storage_unit.ensure_soc(t1)
+
+    assert storage_unit._soc_valid_until == t2
+    assert storage_unit.outputs["energy"].at[t0] == energy
+    for t, expected in soc.items():
+        assert storage_unit.get_soc(t) == expected
+
+
+def test_ensure_soc_stops_at_the_end_of_the_horizon(storage_unit):
+    """
+    There is no SoC past the last time step, so asking for one clamps to the
+    horizon instead of running off the index.
+    """
+    t3 = storage_unit.index[-1]
+
+    storage_unit.ensure_soc(t3 + 10 * storage_unit.index.freq)
+
+    assert storage_unit._soc_valid_until == t3
+    assert storage_unit.get_soc(t3) == storage_unit.initial_soc
+
+
 def test_initialising_invalid_storages():
     index = pd.date_range(
         start=datetime(2023, 7, 1),

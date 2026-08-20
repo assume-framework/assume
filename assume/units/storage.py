@@ -281,10 +281,10 @@ class Storage(SupportsMinMaxCharge):
         The dispatch is only executed, if it is in the constraints given by the unit.
         Returns the volume of the unit within the given time range.
 
-        The planned energy is clipped to the unit's power limits, which
-        invalidates the SOC from ``start`` on, and the SOC is then re-propagated
-        over the executed window - i.e. this is a special case of the
-        invalidate/extend rules in ``set_dispatch_plan`` and ``ensure_soc``.
+        This invalidates the SOC from ``start`` on and re-derives it over the
+        executed window, which is what clips the planned energy to both the
+        power and the SOC limits of the unit (see ``ensure_soc``) - i.e. this is
+        a special case of the invalidate/extend rules in ``set_dispatch_plan``.
 
         Args:
             start (datetime.datetime): The start time of the dispatch.
@@ -295,26 +295,12 @@ class Storage(SupportsMinMaxCharge):
         """
         start = max(start, self.index[0])
 
-        for t in self.index[start:end]:
-            current_power = self.outputs["energy"].at[t]
-
-            # adjust power to constraints of the unit
-            if current_power > self.max_power_discharge:
-                current_power = self.max_power_discharge
-            elif current_power < self.max_power_charge:
-                current_power = self.max_power_charge
-            elif (
-                self.min_power_discharge > current_power > self.min_power_charge
-                and current_power != 0
-            ):
-                current_power = 0
-
-            self.outputs["energy"].at[t] = current_power
-
-        # the executed energy just changed, so the SOC from here on is stale
+        # the planned energy has not been clipped to what the unit can actually
+        # run at, so the SOC from here on is stale ...
         self._soc_valid_until = min(self._soc_valid_until, start)
-        # ... and is re-derived over the window which was just executed.
-        # energy at `end` moves the SOC of the following time step, hence + freq
+        # ... and is re-derived - together with the feasible energy - over the
+        # window being executed. The energy at `end` moves the SOC of the
+        # following time step, hence + freq
         self.ensure_soc(end + self.index.freq)
 
         return self.outputs["energy"].loc[start:end]
