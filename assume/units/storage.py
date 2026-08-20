@@ -297,7 +297,7 @@ class Storage(SupportsMinMaxCharge):
 
         # the planned energy has not been clipped to what the unit can actually
         # run at, so the SOC from here on is stale ...
-        self._soc_valid_until = min(self._soc_valid_until, start)
+        self._soc_valid_until = min(self._soc_valid_until, self._align_to_index(start))
         # ... and is re-derived - together with the feasible energy - over the
         # window being executed. The energy at `end` moves the SOC of the
         # following time step, hence + freq

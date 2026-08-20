@@ -771,6 +771,72 @@ def test_ensure_soc_stops_at_the_end_of_the_horizon(storage_unit):
     assert storage_unit.get_soc(t3) == storage_unit.initial_soc
 
 
+def test_set_soc_does_not_validate_the_range_before_it(
+    mock_market_config, storage_unit
+):
+    """
+    Moving the frontier forward to ``t`` would mark everything up to ``t`` as
+    valid - including time steps which still hold the pre-filled ``initial_soc``.
+    ``set_soc`` therefore propagates up to ``t`` before overwriting it.
+    """
+    mc = mock_market_config
+    t0, t1, t2 = storage_unit.index[:3]
+
+    # charge in the first hour, so t1 differs from the pre-filled initial_soc
+    storage_unit.set_dispatch_plan(mc, [_energy_order(t0, t1, -100)])
+
+    expected_t1 = storage_unit.initial_soc + (
+        100 * storage_unit.efficiency_charge / storage_unit.capacity
+    )
+    # the frontier is still at t0, and a known SoC is set past it
+    assert storage_unit._soc_valid_until == t0
+    storage_unit.set_soc(t2, 0.7)
+
+    assert storage_unit.get_soc(t1) == pytest.approx(expected_t1)
+    assert storage_unit.get_soc(t2) == 0.7
+
+
+def test_set_soc_invalidates_everything_after_it(mock_market_config, storage_unit):
+    """A known SoC replaces the derived one, so the path after it is rebuilt."""
+    mc = mock_market_config
+    t1, t2, t3 = storage_unit.index[1], storage_unit.index[2], storage_unit.index[3]
+    storage_unit.set_dispatch_plan(mc, [_energy_order(t1, t2, -100)])
+    assert storage_unit.get_soc(t3) != storage_unit.initial_soc
+
+    storage_unit.set_soc(t1, 0.3)
+
+    expected = 0.3 + (100 * storage_unit.efficiency_charge / storage_unit.capacity)
+    assert storage_unit.get_soc(t2) == pytest.approx(expected)
+    assert storage_unit.get_soc(t3) == pytest.approx(expected)
+
+
+def test_soc_frontier_stays_on_the_index_grid(storage_unit):
+    """
+    Slicing the index rounds a start up, so a frontier between two time steps
+    would skip the step it falls inside and that step's energy would never move
+    the SoC. ``execute_current_dispatch`` is called with exactly such an
+    unaligned start - one second past the last executed step - so the frontier
+    is aligned before it is stored. Aligning *up* keeps the exclusion of the
+    already executed step intact. No current call order makes the unaligned
+    frontier produce a wrong SoC, so this guards the invariant itself.
+    """
+    t0, t1, t2, t3 = storage_unit.index[:4]
+    storage_unit.outputs["energy"].at[t1] = -100
+
+    # one second past t1, the way the units operator excludes the executed step
+    storage_unit.execute_current_dispatch(t1 + timedelta(seconds=1), t2)
+    assert storage_unit._soc_valid_until in storage_unit.index
+
+    storage_unit.ensure_soc(t3 - timedelta(minutes=30))
+    assert storage_unit._soc_valid_until in storage_unit.index
+
+    # an unaligned `until` covers the step it falls into rather than half of it
+    charged = 100 * storage_unit.efficiency_charge / storage_unit.capacity
+    assert storage_unit.get_soc(t2) == pytest.approx(
+        storage_unit.initial_soc + charged
+    )
+
+
 def test_initialising_invalid_storages():
     index = pd.date_range(
         start=datetime(2023, 7, 1),

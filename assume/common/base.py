@@ -633,6 +633,27 @@ class SupportsMinMaxCharge(BaseUnit):
             power_charge = min(power_charge, minimum_required - current_power, 0)
         return power_charge
 
+    def _align_to_index(self, t: datetime) -> datetime:
+        """
+        Rounds ``t`` up to the first time step of the index at or after it.
+
+        The SOC frontier has to sit on the index grid, because slicing the index
+        rounds a start up: an off-grid frontier would skip the time step it
+        falls inside, and that step's energy would never move the SOC. Rounding
+        up rather than down keeps a time step which was already walked from
+        being walked a second time.
+
+        Args:
+            t (datetime.datetime): The time to align.
+
+        Returns:
+            datetime.datetime: The first time step of the index at or after ``t``.
+        """
+        remainder = (t - self.index[0]) % self.index.freq
+        if remainder:
+            t += self.index.freq - remainder
+        return t
+
     def apply_power_limits(self, current_power: float) -> float:
         """
         Clips a planned power to the power limits of the unit.
@@ -685,7 +706,7 @@ class SupportsMinMaxCharge(BaseUnit):
         """
         # the SOC of the very last time step cannot be moved any further
         last = self.index[-1]
-        until = min(until, last)
+        until = min(self._align_to_index(until), last)
         if until <= self._soc_valid_until:
             return
 
@@ -751,12 +772,16 @@ class SupportsMinMaxCharge(BaseUnit):
         Sets a known state of charge at ``t`` and marks it valid up to there.
 
         Every SOC value after ``t`` is derived from this one and is therefore
-        invalidated, so the frontier is moved to ``t`` in both directions.
+        invalidated, so the frontier is moved to ``t``. Everything *before* it
+        has to be propagated first: moving the frontier forward over a range
+        which was never walked would mark the pre-filled ``initial_soc`` in it
+        as a valid SOC.
 
         Args:
             t (datetime.datetime): The time to set the SOC at.
             soc (float): The state of charge (between 0 and 1).
         """
+        self.ensure_soc(t)
         self.outputs["soc"].at[t] = soc
         self._soc_valid_until = t
 
@@ -803,7 +828,9 @@ class SupportsMinMaxCharge(BaseUnit):
             return
 
         earliest = min(order["start_time"] for order in orderbook)
-        self._soc_valid_until = min(self._soc_valid_until, earliest)
+        self._soc_valid_until = min(
+            self._soc_valid_until, self._align_to_index(earliest)
+        )
 
 
 class BaseStrategy:
