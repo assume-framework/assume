@@ -776,7 +776,9 @@ def test_ensure_soc_is_a_no_op_once_covered(mock_market_config, storage_unit):
     storage_unit.set_dispatch_plan(mc, [_energy_order(t0, t1, 250)])
 
     storage_unit.ensure_soc(t2)
-    soc = dict(zip(storage_unit.index[:3], [storage_unit.get_soc(t) for t in (t0, t1, t2)]))
+    soc = dict(
+        zip(storage_unit.index[:3], [storage_unit.get_soc(t) for t in (t0, t1, t2)])
+    )
     energy = storage_unit.outputs["energy"].at[t0]
 
     storage_unit.ensure_soc(t2)
@@ -862,9 +864,7 @@ def test_soc_frontier_stays_on_the_index_grid(storage_unit):
 
     # an unaligned `until` covers the step it falls into rather than half of it
     charged = 100 * storage_unit.efficiency_charge / storage_unit.capacity
-    assert storage_unit.get_soc(t2) == pytest.approx(
-        storage_unit.initial_soc + charged
-    )
+    assert storage_unit.get_soc(t2) == pytest.approx(storage_unit.initial_soc + charged)
 
 
 def test_dispatch_does_not_depend_on_when_the_soc_is_read(mock_market_config):
