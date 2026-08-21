@@ -821,7 +821,8 @@ class SupportsMinMaxCharge(BaseUnit):
         Returns:
             float: The state of charge at ``t``.
         """
-        self.ensure_soc(t)
+        if t > self._soc_valid_until:
+            self.ensure_soc(t)
         return self.outputs["soc"].at[t]
 
     def set_dispatch_plan(
