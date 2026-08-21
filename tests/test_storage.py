@@ -867,6 +867,25 @@ def test_soc_frontier_stays_on_the_index_grid(storage_unit):
     assert storage_unit.get_soc(t2) == pytest.approx(storage_unit.initial_soc + charged)
 
 
+def test_execute_current_dispatch_unaligned_end_does_not_advance_past_executed(
+    storage_unit,
+):
+    """
+    An off-grid end must not round up and advance the SoC validity frontier past
+    the time steps that were actually executed.
+    """
+    t0, t1, t2 = storage_unit.index[:3]
+    storage_unit.outputs["energy"].at[t0] = -100
+    storage_unit.outputs["energy"].at[t1] = -100
+
+    # Call with off-grid end falling between t0 and t1; only t0 is executed
+    off_grid_end = t0 + timedelta(minutes=15)
+    storage_unit.execute_current_dispatch(t0, off_grid_end)
+
+    # Only t0 was executed, updating SoC at t1. The frontier must be t1 (not t2).
+    assert storage_unit._soc_valid_until == t1
+
+
 def test_dispatch_does_not_depend_on_when_the_soc_is_read(mock_market_config):
     """
     Clipping the committed volume in place would make the recorded dispatch

@@ -302,7 +302,9 @@ class Storage(SupportsMinMaxCharge):
         self.ensure_soc(start)
         self._soc_valid_until = start
 
+        last_executed = None
         for t in self.index[start:end]:
+            last_executed = t
             soc = self.outputs["soc"].at[t]
             current_power = self.feasible_power(self.outputs["energy"].at[t], soc)
 
@@ -323,7 +325,8 @@ class Storage(SupportsMinMaxCharge):
                     current_power
                 )
 
-        self._soc_valid_until = min(self._align_to_index(end + self.index.freq), last)
+        if last_executed is not None:
+            self._soc_valid_until = min(last_executed + self.index.freq, last)
 
         return self.outputs["energy"].loc[start:end]
 
