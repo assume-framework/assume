@@ -107,7 +107,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
             "power_in",
             "raw_meal_out",
             "preheater_power_input",
-            "raw_meal_output",
+            "preheater_raw_meal_output",
         ),
         "calciner": (
             "power_in",
@@ -120,7 +120,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
             "power_in",
             "material_output",
             "raw_material_mill_power_input",
-            "raw_meal_output",
+            "raw_material_mill_output",
         ),
         "cement_mill": (
             "power_in",
@@ -149,15 +149,13 @@ class CementPlant(DSMFlex, SupportsMinMax):
 
     def _component_power_expr(self, m, t):
         """Plant load: electric heating, auxiliaries and the electric components."""
-        return pyo.quicksum(
-            m.dsm_blocks[block].power_in[t]
-            for block in m.dsm_blocks
-            if hasattr(m.dsm_blocks[block], "power_in")
-        ) + pyo.quicksum(
-            m.dsm_blocks[block].aux_power[t]
-            for block in m.dsm_blocks
-            if hasattr(m.dsm_blocks[block], "aux_power")
+        total_power = pyo.quicksum(
+            m.dsm_blocks[block].power_in[t] for block in m.dsm_blocks
         )
+        for stage in ("preheater", "calciner", "kiln"):
+            if stage in m.dsm_blocks:
+                total_power += m.dsm_blocks[stage].aux_power[t]
+        return total_power
 
     def __init__(
         self,
@@ -165,7 +163,7 @@ class CementPlant(DSMFlex, SupportsMinMax):
         unit_operator: str,
         bidding_strategies: dict,
         forecaster: CementForecaster,
-        components: dict[str, dict] = None,
+        components: dict[str, dict] | None = None,
         technology: str = "cement_plant",
         objective: str = "min_variable_cost",
         flexibility_measure: str = "cost_based_load_shift",
@@ -195,21 +193,24 @@ class CementPlant(DSMFlex, SupportsMinMax):
         if not isinstance(forecaster, CementForecaster):
             raise TypeError(f"forecaster must be of type {CementForecaster.__name__}")
 
+        if self.components is None:
+            self.components = {}
+
         # check if the required components are present in the components dictionary
         for component in self.required_technologies:
-            if component not in components.keys():
+            if component not in self.components.keys():
                 raise ValueError(
                     f"Component {component} is required for the cement plant unit."
                 )
 
         # check if the provided components are valid and do not contain any unknown components
-        for component in components.keys():
+        for component in self.components.keys():
             if (
                 component not in self.required_technologies
                 and component not in self.optional_technologies
             ):
                 raise ValueError(
-                    f"Components {component} is not a valid component for the cement plant unit."
+                    f"Component '{component}' is not a valid component for the cement plant unit."
                 )
 
         # FIXME assuming only one market
@@ -664,7 +665,5 @@ class CementPlant(DSMFlex, SupportsMinMax):
             Calculates the variable cost per time step.
             """
             return m.variable_cost[t] == pyo.quicksum(
-                m.dsm_blocks[block].operating_cost[t]
-                for block in m.dsm_blocks
-                if hasattr(m.dsm_blocks[block], "operating_cost")
+                m.dsm_blocks[block].operating_cost[t] for block in m.dsm_blocks
             )
