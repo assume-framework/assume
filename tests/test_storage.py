@@ -603,13 +603,34 @@ def test_projected_soc_matches_executed_soc(mock_market_config, storage_unit):
     storage_unit.set_dispatch_plan(mc, [order])
 
     projected_soc = storage_unit.get_soc(t1)
-    projected_energy = storage_unit.outputs["energy"].at[t0]
+    projected_energy = storage_unit.get_feasible_energy(t0, t0)[0]
     assert projected_soc >= storage_unit.min_soc
+    assert projected_energy < 100
 
     storage_unit.execute_current_dispatch(t0, t2)
 
     assert math.isclose(storage_unit.get_soc(t1), projected_soc)
     assert math.isclose(storage_unit.outputs["energy"].at[t0], projected_energy)
+
+
+def _storage(**overrides) -> Storage:
+    index = pd.date_range("2022-01-01", periods=4, freq="h")
+    forecaster = UnitForecaster(index, availability=1, market_prices={"EOM": 50})
+    kwargs = dict(
+        id="Test_Storage",
+        unit_operator="TestOperator",
+        technology="TestTechnology",
+        bidding_strategies={"EOM": StorageEnergyHeuristicFlexableStrategy()},
+        forecaster=forecaster,
+        max_power_charge=-100,
+        max_power_discharge=100,
+        capacity=1000,
+        efficiency_charge=0.9,
+        efficiency_discharge=0.95,
+        initial_soc=0.5,
+    )
+    kwargs.update(overrides)
+    return Storage(**kwargs)
 
 
 def _energy_order(start, end, volume, price=45):
@@ -640,7 +661,11 @@ def test_ensure_soc_clips_to_the_power_limits(mock_market_config, storage_unit):
         - (storage_unit.max_power_discharge / storage_unit.efficiency_discharge)
         / storage_unit.capacity
     )
-    assert storage_unit.outputs["energy"].at[t0] == storage_unit.max_power_discharge
+    assert storage_unit.get_feasible_energy(t0, t0)[0] == (
+        storage_unit.max_power_discharge
+    )
+    # ... while the plan itself is left alone until it is executed
+    assert storage_unit.outputs["energy"].at[t0] == 250
 
 
 def test_ensure_soc_clips_volumes_stacked_by_several_markets(
@@ -663,7 +688,9 @@ def test_ensure_soc_clips_volumes_stacked_by_several_markets(
         - (storage_unit.max_power_discharge / storage_unit.efficiency_discharge)
         / storage_unit.capacity
     )
-    assert storage_unit.outputs["energy"].at[t0] == storage_unit.max_power_discharge
+    assert storage_unit.get_feasible_energy(t0, t0)[0] == (
+        storage_unit.max_power_discharge
+    )
 
 
 def test_ensure_soc_applies_both_the_power_and_the_soc_limit(
@@ -682,7 +709,9 @@ def test_ensure_soc_applies_both_the_power_and_the_soc_limit(
     soc_max_discharge = storage_unit.calculate_soc_max_discharge(0.02)
     assert soc_max_discharge < storage_unit.max_power_discharge
     assert storage_unit.get_soc(t1) == pytest.approx(storage_unit.min_soc)
-    assert storage_unit.outputs["energy"].at[t0] == pytest.approx(soc_max_discharge)
+    assert storage_unit.get_feasible_energy(t0, t0)[0] == pytest.approx(
+        soc_max_discharge
+    )
 
 
 def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
@@ -692,17 +721,19 @@ def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
     the database, and therefore has to be feasible like every other time step.
     """
     mc = mock_market_config
-    t3 = storage_unit.index[-1]
+    t2, t3 = storage_unit.index[2], storage_unit.index[-1]
     storage_unit.set_dispatch_plan(
         mc, [_energy_order(t3, t3 + storage_unit.index.freq, 250)]
     )
 
-    storage_unit.ensure_soc(t3)
+    # the last step used to be skipped by the walk, and once the frontier had
+    # reached it nothing could pull it back to clip it either
+    storage_unit.execute_current_dispatch(t2, t2)
 
-    assert storage_unit.outputs["energy"].at[t3] == storage_unit.max_power_discharge
     assert storage_unit.execute_current_dispatch(t3, t3)[0] == (
         storage_unit.max_power_discharge
     )
+    assert storage_unit.outputs["energy"].at[t3] == storage_unit.max_power_discharge
 
 
 def test_ensure_soc_drops_power_below_the_minimum():
@@ -732,8 +763,7 @@ def test_ensure_soc_drops_power_below_the_minimum():
     unit.outputs["energy"].at[t1] = -5  # above min_power_charge
 
     assert unit.get_soc(t2) == unit.initial_soc
-    assert unit.outputs["energy"].at[t0] == 0
-    assert unit.outputs["energy"].at[t1] == 0
+    assert unit.get_feasible_energy(t0, t1) == pytest.approx([0, 0])
 
 
 def test_ensure_soc_is_a_no_op_once_covered(mock_market_config, storage_unit):
@@ -835,6 +865,44 @@ def test_soc_frontier_stays_on_the_index_grid(storage_unit):
     assert storage_unit.get_soc(t2) == pytest.approx(
         storage_unit.initial_soc + charged
     )
+
+
+def test_dispatch_does_not_depend_on_when_the_soc_is_read(mock_market_config):
+    """
+    Clipping the committed volume in place would make the recorded dispatch
+    depend on whether a strategy happened to read the SoC between two market
+    clearings - and ``get_soc`` is called on every bidding round. On a nearly
+    full storage that flips the unit from charging to discharging.
+    """
+    mc = mock_market_config
+
+    def run(peek: bool) -> float:
+        unit = _storage(initial_soc=0.98)
+        t0, t2 = unit.index[0], unit.index[2]
+        unit.set_dispatch_plan(mc, [_energy_order(t0, t0 + unit.index.freq, -100)])
+        if peek:
+            unit.get_soc(t2)  # what a bidding strategy does between clearings
+        unit.set_dispatch_plan(mc, [_energy_order(t0, t0 + unit.index.freq, 60)])
+        unit.get_soc(t2)
+        return unit.outputs["energy"].at[t0]
+
+    assert run(peek=False) == run(peek=True) == -40
+
+
+def test_planned_energy_survives_until_it_is_executed(mock_market_config, storage_unit):
+    """
+    outputs["energy"] is what markets committed - a plan. It only becomes what
+    the unit runs at once execute_current_dispatch delivers it.
+    """
+    mc = mock_market_config
+    t0, t1 = storage_unit.index[0], storage_unit.index[1]
+    storage_unit.set_dispatch_plan(mc, [_energy_order(t0, t1, 250)])
+
+    storage_unit.get_soc(t1)
+    assert storage_unit.outputs["energy"].at[t0] == 250
+
+    storage_unit.execute_current_dispatch(t0, t0)
+    assert storage_unit.outputs["energy"].at[t0] == storage_unit.max_power_discharge
 
 
 def test_initialising_invalid_storages():

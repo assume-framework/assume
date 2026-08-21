@@ -1033,10 +1033,15 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
         next_time = start + unit.index.freq
         duration_hours = (end - start) / timedelta(hours=1)
 
-        # Calculate marginal and starting costs
-        marginal_cost = unit.calculate_marginal_cost(
-            start, unit.outputs[product_type].at[start]
-        )
+        # Calculate marginal and starting costs. The cost depends on the sign of
+        # the dispatch, so it has to be taken from what the unit can actually
+        # run at - a volume the SOC cannot back is clipped, possibly to zero,
+        # and would otherwise be charged as a discharge it never performs.
+        if product_type == "energy":
+            dispatch = unit.get_feasible_energy(start, start)[0]
+        else:
+            dispatch = unit.outputs[product_type].at[start]
+        marginal_cost = unit.calculate_marginal_cost(start, dispatch)
         marginal_cost += unit.get_starting_costs(int(duration_hours))
 
         accepted_volume = order.get("accepted_volume", 0)

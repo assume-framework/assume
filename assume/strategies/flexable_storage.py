@@ -202,8 +202,14 @@ class StorageEnergyHeuristicFlexableStrategy(MinMaxChargeStrategy):
             # end includes the end of the last product, to get the last products' start time we deduct the frequency once
             end_excl = order["end_time"] - unit.index.freq
 
-            # Extract outputs and costs in one step
-            outputs = unit.outputs[product_type].loc[start:end_excl]
+            # Extract outputs and costs in one step. The reward has to reflect
+            # what the unit can actually deliver, not the volume a market
+            # committed to it - outputs["energy"] still holds the latter until
+            # the dispatch is executed.
+            if product_type == "energy":
+                outputs = unit.get_feasible_energy(start, end_excl)
+            else:
+                outputs = unit.outputs[product_type].loc[start:end_excl]
             costs = np.where(
                 outputs != 0,
                 np.abs(outputs)

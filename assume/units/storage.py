@@ -281,10 +281,11 @@ class Storage(SupportsMinMaxCharge):
         The dispatch is only executed, if it is in the constraints given by the unit.
         Returns the volume of the unit within the given time range.
 
-        This invalidates the SOC from ``start`` on and re-derives it over the
-        executed window, which is what clips the planned energy to both the
-        power and the SOC limits of the unit (see ``ensure_soc``) - i.e. this is
-        a special case of the invalidate/extend rules in ``set_dispatch_plan``.
+        This is where a plan becomes physical: the committed volumes are clipped
+        to what the unit can run at - its power limits and what the SOC backs -
+        written into ``outputs["energy"]``, and the SOC is re-derived from them.
+        Up to here ``outputs["energy"]`` holds the plan untouched, and only
+        ``get_feasible_energy`` reports what the unit could deliver.
 
         Args:
             start (datetime.datetime): The start time of the dispatch.
@@ -293,15 +294,36 @@ class Storage(SupportsMinMaxCharge):
         Returns:
             np.ndarray: The volume of the unit within the given time range.
         """
-        start = max(start, self.index[0])
+        start = self._align_to_index(max(start, self.index[0]))
+        last = self.index[-1]
 
-        # the planned energy has not been clipped to what the unit can actually
-        # run at, so the SOC from here on is stale ...
-        self._soc_valid_until = min(self._soc_valid_until, self._align_to_index(start))
-        # ... and is re-derived - together with the feasible energy - over the
-        # window being executed. The energy at `end` moves the SOC of the
-        # following time step, hence + freq
-        self.ensure_soc(end + self.index.freq)
+        # the SOC has to be valid at `start` to derive the dispatch from, but
+        # everything after it is about to be replaced by what is executed here
+        self.ensure_soc(start)
+        self._soc_valid_until = start
+
+        for t in self.index[start:end]:
+            soc = self.outputs["soc"].at[t]
+            current_power = self.feasible_power(self.outputs["energy"].at[t], soc)
+
+            if current_power != self.outputs["energy"].at[t]:
+                logger.warning(
+                    "Unit %s, Time %s: dispatch %s is not feasible, running at %s",
+                    self.id,
+                    t,
+                    self.outputs["energy"].at[t],
+                    current_power,
+                )
+
+            # the plan becomes the actual dispatch
+            self.outputs["energy"].at[t] = current_power
+            self._feasible_energy.at[t] = current_power
+            if t != last:
+                self.outputs["soc"].at[t + self.index.freq] = soc + self.delta_soc(
+                    current_power
+                )
+
+        self._soc_valid_until = min(self._align_to_index(end + self.index.freq), last)
 
         return self.outputs["energy"].loc[start:end]
 
