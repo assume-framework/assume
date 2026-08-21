@@ -1045,9 +1045,10 @@ class BuildingForecaster(DsmUnitForecaster):
             forecaster["building_1_electric_vehicle_1_availability_profile"]
             forecaster["building_1_electric_vehicle_1_range"]
         """
-        if hasattr(self, key):
+        try:
             return getattr(self, key)
-        raise KeyError(f"Forecast '{key}' not found in BuildingForecaster.")
+        except AttributeError:
+            raise KeyError(f"Forecast '{key}' not found in BuildingForecaster.")
 
     def get_price(self, fuel: str) -> FastSeries:
         if fuel not in self.fuel_prices:
