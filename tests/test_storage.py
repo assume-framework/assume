@@ -736,6 +736,21 @@ def test_ensure_soc_clips_the_last_time_step(mock_market_config, storage_unit):
     assert storage_unit.outputs["energy"].at[t3] == storage_unit.max_power_discharge
 
 
+def test_get_feasible_energy_computes_last_time_step(mock_market_config, storage_unit):
+    """
+    ensure_soc stops before the last time step because no subsequent SoC exists.
+    get_feasible_energy must still compute feasible energy for the final step.
+    """
+    mc = mock_market_config
+    t3 = storage_unit.index[-1]
+    storage_unit.set_dispatch_plan(
+        mc, [_energy_order(t3, t3 + storage_unit.index.freq, 250)]
+    )
+
+    feasible = storage_unit.get_feasible_energy(t3, t3)
+    assert feasible[0] == storage_unit.max_power_discharge
+
+
 def test_ensure_soc_drops_power_below_the_minimum():
     """
     A unit cannot run between zero and its minimum power, so such a volume

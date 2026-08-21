@@ -785,7 +785,17 @@ class SupportsMinMaxCharge(BaseUnit):
             numpy.ndarray: The feasible energy over the range.
         """
         # the energy at `end` is derived while moving the SOC to the step after it
+        aligned_end = min(self._align_to_index(end), self.index[-1])
         self.ensure_soc(end + self.index.freq)
+
+        # ensure_soc stops before the last step because no subsequent SoC exists;
+        # derive feasible energy for the final step explicitly
+        if aligned_end == self.index[-1]:
+            soc = self.outputs["soc"].at[aligned_end]
+            self._feasible_energy.at[aligned_end] = self.feasible_power(
+                self.outputs["energy"].at[aligned_end], soc
+            )
+
         return self._feasible_energy.loc[start:end]
 
     def set_soc(self, t: datetime, soc: float) -> None:
