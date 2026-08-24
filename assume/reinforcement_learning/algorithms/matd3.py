@@ -36,8 +36,12 @@ class TD3(DDPG):
         >>> td3.update_policy()
     """
 
-    # Twin critic for clipped double Q-learning, replacing DDPG's single critic.
-    critic_architecture_class = CriticTD3
+    def __init__(self, learning_role):
+        """Initialize the TD3 algorithm."""
+        super().__init__(learning_role)
+
+        # Twin critic for clipped double Q-learning, replacing DDPG's single critic
+        self.critic_architecture_class = CriticTD3
 
     def update_policy(self):
         """Update the policy using the Twin Delayed Deep Deterministic Policy Gradients (TD3).

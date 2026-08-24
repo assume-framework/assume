@@ -60,8 +60,6 @@ class RLAlgorithm:
         "regret",
         "profit",
     )
-    # Algorithms that add noise to a deterministic actor set this from their config (see DDPG/TD3).
-    episodes_collecting_initial_experience: int = 0
 
     def __init__(self, learning_role):
         """Initialize the RL algorithm.
@@ -87,7 +85,11 @@ class RLAlgorithm:
         self.device = self.learning_role.device
         self.float_type = self.learning_role.float_type
 
+        # Placeholder for exploration noise schedule
         self.setup_action_noise_schedule()
+
+        # Algorithms that add noise to a deterministic actor set this from their config (see DDPG/TD3)
+        self.episodes_collecting_initial_experience = 0 
 
     def setup_action_noise_schedule(self) -> None:
         """Set up the exploration noise schedule of the algorithm,
@@ -208,7 +210,7 @@ class RLAlgorithm:
         gradient_steps_done = (
             max(
                 learning_role.episodes_done
-                - off_policy_config.episodes_collecting_initial_experience,
+                - self.episodes_collecting_initial_experience,
                 0,
             )
             * self._updates_per_episode()

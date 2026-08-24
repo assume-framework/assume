@@ -41,9 +41,6 @@ class DDPG(ActorCriticAlgorithm):
         >>> ddpg.update_policy()  # Performs one training iteration
     """
 
-    # Single critic; the TD3 subclass overrides this with its twin critic.
-    critic_architecture_class = CriticDDPG
-
     def __init__(self, learning_role) -> None:
         """Initialize the DDPG algorithm.
 
@@ -61,6 +58,9 @@ class DDPG(ActorCriticAlgorithm):
 
         # Gradient clipping threshold
         self.grad_clip_norm = 1.0
+
+        # Define the critic architecture class for DDPG (single critic)
+        self.critic_architecture_class = CriticDDPG
 
         # Episodes of random actions before learning starts
         self.episodes_collecting_initial_experience = (
