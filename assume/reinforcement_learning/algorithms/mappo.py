@@ -145,12 +145,28 @@ class PPO(ActorCriticAlgorithm):
     def compute_gradient_step_range(
         self, unit_params_list: list[dict]
     ) -> tuple[range, int]:
-        """On-policy step counting: no "gradient steps done in previous
-        episodes" concept, and the number of steps in this update simply
-        equals the length of `unit_params_list`."""
+        """On-policy step counting.
+
+        PPO/MAPPO have no "initial experience" phase and no fixed configured
+        `gradient_steps` — the number of steps performed in this update
+        simply equals `len(unit_params_list)`. But `Learning.update_steps`
+        still resets to 0 every episode, so — just like the off-policy
+        default — we still need a cross-episode offset, here based on
+        `episodes_done` (no initial-experience subtraction needed).
+        """
         actual_gradient_steps = len(unit_params_list)
         gradient_step_range = range(actual_gradient_steps)
-        base_step = self.learning_role.update_steps * actual_gradient_steps
+
+        # steps performed in previous training episodes
+        steps_done_in_previous_episodes = (
+            self.learning_role.episodes_done
+            * self._updates_per_episode()
+            * actual_gradient_steps
+        )
+        base_step = (
+            steps_done_in_previous_episodes
+            + self.learning_role.update_steps * actual_gradient_steps
+        )
         return gradient_step_range, base_step
 
     def create_actors(self) -> None:

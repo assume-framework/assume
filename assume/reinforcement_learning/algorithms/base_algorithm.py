@@ -91,7 +91,7 @@ class RLAlgorithm:
 
     def setup_action_noise_schedule(self) -> None:
         """Set up the exploration noise schedule of the algorithm,
-            to be specified by the specific subclass algorithm.
+        to be specified by the specific subclass algorithm.
         """
 
     def setup_strategy_noise(self, strategy: LearningStrategy) -> None:
@@ -158,6 +158,21 @@ class RLAlgorithm:
         """
         raise NotImplementedError(f"{type(self).__name__} must implement get_action()")
 
+    def _updates_per_episode(self) -> int:
+        """Number of ``train_freq`` intervals in the simulation horizon.
+
+        This is how many times an update (and thus a call to
+        ``write_rl_grad_params_to_output``) fires per episode — used to
+        translate a per-episode step count into a cross-episode offset,
+        since ``Learning.update_steps`` resets to 0 every episode (a fresh
+        ``Learning`` instance is built per episode, see ``init_logging``),
+        while ``episodes_done`` persists across episodes.
+        """
+
+        start = timestamp2datetime(self.learning_role.start)
+        end = timestamp2datetime(self.learning_role.end)
+        return int((end - start) / pd.Timedelta(self.learning_config.train_freq))
+
     def compute_gradient_step_range(
         self, unit_params_list: list[dict]
     ) -> tuple[range, int]:
@@ -170,10 +185,11 @@ class RLAlgorithm:
 
         This default implementation covers off-policy algorithms (TD3/DDPG),
         which perform a fixed, configured number of gradient steps per update
-        and need to account for gradient steps done in previous episodes.
-        PPO/MAPPO override this since on-policy algorithms have no such
-        concept — the number of gradient steps simply equals the length of
-        `unit_params_list`.
+        and need to account for gradient steps done in previous episodes
+        (see ``_updates_per_episode``). PPO/MAPPO override this: they have no
+        "initial experience" phase and no fixed configured `gradient_steps`
+        (the number of steps per update equals `len(unit_params_list)`), but
+        still need the same kind of cross-episode offset.
 
         Args:
             unit_params_list: List of per-gradient-step dicts mapping unit_id
@@ -188,9 +204,6 @@ class RLAlgorithm:
         actual_gradient_steps = off_policy_config.gradient_steps
         gradient_step_range = range(actual_gradient_steps)
 
-        start = timestamp2datetime(learning_role.start)
-        end = timestamp2datetime(learning_role.end)
-
         # gradient steps performed in previous training episodes
         gradient_steps_done = (
             max(
@@ -198,7 +211,7 @@ class RLAlgorithm:
                 - off_policy_config.episodes_collecting_initial_experience,
                 0,
             )
-            * int((end - start) / pd.Timedelta(self.learning_config.train_freq))
+            * self._updates_per_episode()
             * off_policy_config.gradient_steps
         )
         base_step = (
