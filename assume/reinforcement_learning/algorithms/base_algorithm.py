@@ -85,6 +85,23 @@ class RLAlgorithm:
         self.device = self.learning_role.device
         self.float_type = self.learning_role.float_type
 
+        self.setup_action_noise_schedule()
+
+    def setup_action_noise_schedule(self) -> None:
+        """Set up the exploration noise schedule of the algorithm, 
+            to be specified by the specific subclass algorithm.
+        """
+
+    def setup_strategy_noise(self, strategy: LearningStrategy) -> None:
+        """Attach the exploration noise to a registered strategy,
+            to be specified by the specific subclass algorithm.
+
+        Called by the learning role whenever a strategy registers itself.
+
+        Args:
+            strategy: The learning strategy that registered with the learning role.
+        """
+
     def update_learning_rate(
         self,
         optimizers: list[th.optim.Optimizer] | th.optim.Optimizer,

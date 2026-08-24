@@ -99,17 +99,6 @@ class Learning(Role):
                 self.calc_lr_from_progress = lambda x: (
                     self.learning_config.learning_rate
                 )
-            # Only set up noise schedule for off-policy algorithms
-            if is_off_policy(self.learning_config.algorithm):
-                if self.learning_config.off_policy.action_noise_schedule == "linear":
-                    self.calc_noise_from_progress = linear_schedule_func(
-                        self.learning_config.off_policy.noise_dt
-                    )
-                else:
-                    self.calc_noise_from_progress = lambda x: (
-                        self.learning_config.off_policy.noise_dt
-                    )
-            # For on-policy algorithms, no noise schedule needed
 
             self.eval_episodes_done = 0
 
@@ -284,6 +273,9 @@ class Learning(Role):
         """
 
         self.rl_strats[strategy.unit_id] = strategy
+
+        # let the algorithm attach its exploration noise to the strategy, if it uses any
+        self.rl_algorithm.setup_strategy_noise(strategy)
 
     def _new_cache(self) -> dict[str, defaultdict]:
         """Create an empty cache dict, one defaultdict per field this algorithm collects.
@@ -783,12 +775,19 @@ class Learning(Role):
                         logger.info(
                             f"Stopping training as no improvement above {self.learning_config.early_stopping_threshold * 100}% in last {self.learning_config.early_stopping_steps} evaluations for {metric}"
                         )
+                        # only mention the schedules the used algorithm actually has
+                        decaying = []
+                        if self.learning_config.learning_rate_schedule:
+                            decaying.append("learning rate")
                         if (
-                            self.learning_config.learning_rate_schedule
-                            or self.learning_config.off_policy.action_noise_schedule
-                        ) is not None:
+                            is_off_policy(self.learning_config.algorithm)
+                            and self.learning_config.off_policy.action_noise_schedule
+                        ):
+                            decaying.append("action noise")
+
+                        if decaying:
                             logger.info(
-                                f"Learning rate schedule ({self.learning_config.learning_rate_schedule}) or action noise schedule ({self.learning_config.off_policy.action_noise_schedule}) were scheduled to decay, further learning improvement can be possible. End value of schedule may not have been reached."
+                                f"Further learning improvement may be possible, as the {' and '.join(decaying)} decay might not have reached its end value."
                             )
 
                         self.rl_algorithm.save_params(

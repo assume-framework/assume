@@ -66,9 +66,11 @@ class PortfolioLearningStrategy(TorchLearningStrategy, UnitOperatorStrategy):
     actor : torch.nn.Module
         Actor network for determining actions.
     action_noise : NormalActionNoise
-        Noise model added to actions during learning to encourage exploration. Defaults to None.
+        Noise model added to actions during learning to encourage exploration. Only set by
+        algorithms that use exploration noise.
     collect_initial_experience_mode : bool
-        Whether the agent is collecting initial experience through exploration. Defaults to True.
+        Whether the agent is collecting initial experience through exploration. Only enabled by
+        algorithms that use exploration noise. Defaults to False.
 
     Args
     ----

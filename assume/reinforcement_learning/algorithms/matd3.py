@@ -10,6 +10,8 @@ from torch.nn import functional as F
 from assume.common.base import LearningStrategy
 from assume.reinforcement_learning.algorithms.base_algorithm import ActorCriticAlgorithm
 from assume.reinforcement_learning.learning_utils import (
+    NormalActionNoise,
+    linear_schedule_func,
     polyak_update,
 )
 from assume.reinforcement_learning.neural_network_architecture import CriticTD3
@@ -54,6 +56,38 @@ class TD3(ActorCriticAlgorithm):
 
         # Define the critic architecture class for TD3
         self.critic_architecture_class = CriticTD3
+
+    def setup_action_noise_schedule(self) -> None:
+        """Set up the decay schedule of the exploration noise.
+
+        The noise decay factor is applied to the action noise of every
+        strategy at each policy update.
+        """
+        off_policy_config = self.learning_config.off_policy
+
+        if off_policy_config.action_noise_schedule == "linear":
+            self.calc_noise_from_progress = linear_schedule_func(
+                off_policy_config.noise_dt
+            )
+        else:
+            self.calc_noise_from_progress = lambda x: off_policy_config.noise_dt
+
+    def setup_strategy_noise(self, strategy: "LearningStrategy") -> None:
+        """Give the strategy its own action noise process for exploration.
+
+        TD3 acts deterministically, so exploration is driven by the noise added to
+        the actor output, preceded by an initial phase of purely random actions.
+        """
+        off_policy_config = self.learning_config.off_policy
+
+        strategy.collect_initial_experience_mode = True
+        strategy.action_noise = NormalActionNoise(
+            mu=0.0,
+            sigma=off_policy_config.noise_sigma,
+            action_dimension=strategy.act_dim,
+            scale=off_policy_config.noise_scale,
+            dt=off_policy_config.noise_dt,
+        )
 
     def get_action(
         self, strategy: "LearningStrategy", obs: th.Tensor
@@ -137,7 +171,7 @@ class TD3(ActorCriticAlgorithm):
         ]
 
         # update noise decay and learning rate
-        updated_noise_decay = self.learning_role.calc_noise_from_progress(
+        updated_noise_decay = self.calc_noise_from_progress(
             self.learning_role.get_progress_remaining()
         )
 

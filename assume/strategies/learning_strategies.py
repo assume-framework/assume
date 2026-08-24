@@ -16,13 +16,11 @@ from assume.common.base import (
     MinMaxStrategy,
     SupportsMinMax,
     SupportsMinMaxCharge,
-    is_off_policy,
 )
 from assume.common.fast_pandas import FastSeries
 from assume.common.market_objects import MarketConfig, Orderbook, Product
 from assume.common.utils import min_max_scale
 from assume.reinforcement_learning.algorithms import actor_architecture_aliases
-from assume.reinforcement_learning.learning_utils import NormalActionNoise
 from assume.reinforcement_learning.neural_network_architecture import (
     ActorPPO,
     LSTMActorPPO,
@@ -35,6 +33,9 @@ class TorchLearningStrategy(LearningStrategy):
     """
     A strategy to enable machine learning with pytorch.
     """
+
+    # Only algorithms with exploration noise turn this on
+    collect_initial_experience_mode: bool = False
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -89,21 +90,6 @@ class TorchLearningStrategy(LearningStrategy):
         self.exploration_noise_std = self.learning_config.exploration_noise_std
 
         if self.learning_mode or self.evaluation_mode:
-            # Keeping initial random exploration only for off-policy methods.
-            self.collect_initial_experience_mode = is_off_policy(
-                self.learning_config.algorithm
-            )
-
-            if is_off_policy(self.learning_config.algorithm):
-                self.action_noise = NormalActionNoise(
-                    mu=0.0,
-                    sigma=self.learning_config.off_policy.noise_sigma,
-                    action_dimension=self.act_dim,
-                    scale=self.learning_config.off_policy.noise_scale,
-                    dt=self.learning_config.off_policy.noise_dt,
-                )
-            # For on-policy algorithms, no action noise needed - variable remains undefined
-
             self.learning_role.register_strategy(self)
 
         # actor policies are only loaded here from file if learning mode is off (otherwise handled by learning_role)
@@ -369,9 +355,11 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
     order_types : list[str]
         Types of market orders supported by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
-        Noise model added to actions during learning to encourage exploration. Defaults to None.
+        Noise model added to actions during learning to encourage exploration. Only set by
+        algorithms that use exploration noise.
     collect_initial_experience_mode : bool
-        Whether the agent is collecting initial experience through exploration. Defaults to True.
+        Whether the agent is collecting initial experience through exploration. Only enabled by
+        algorithms that use exploration noise. Defaults to False.
 
     Args
     ----
@@ -524,9 +512,7 @@ class EnergyLearningStrategy(TorchLearningStrategy, MinMaxStrategy):
         curr_action, noise, extra_data = super().get_actions(next_observation)
 
         if self.learning_mode and not self.evaluation_mode:
-            if self.collect_initial_experience_mode and is_off_policy(
-                self.learning_config.algorithm
-            ):
+            if self.collect_initial_experience_mode:
                 # Assumes last dimension of the observation corresponds to marginal cost
                 marginal_cost = next_observation[
                     -1
@@ -863,9 +849,11 @@ class StorageEnergyLearningStrategy(TorchLearningStrategy, MinMaxChargeStrategy)
     order_types : list[str]
         Types of market orders used by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
-        Noise model added to actions during learning for exploration. Defaults to None.
+        Noise model added to actions during learning for exploration. Only set by algorithms
+        that use exploration noise.
     collect_initial_experience_mode : bool
-        Whether the agent is in an exploration mode for initial experience. Defaults to True.
+        Whether the agent is in an exploration mode for initial experience. Only enabled by
+        algorithms that use exploration noise. Defaults to False.
 
     Args
     ----
@@ -1162,9 +1150,11 @@ class RenewableEnergyLearningSingleBidStrategy(EnergyLearningSingleBidStrategy):
     order_types : list[str]
         Types of market orders used by the strategy. Defaults to ["SB"].
     action_noise : NormalActionNoise
-        Noise model added to actions during learning for exploration. Defaults to None.
+        Noise model added to actions during learning for exploration. Only set by algorithms
+        that use exploration noise.
     collect_initial_experience_mode : bool
-        Whether the agent is in an exploration mode for initial experience. Defaults to True.
+        Whether the agent is in an exploration mode for initial experience. Only enabled by
+        algorithms that use exploration noise. Defaults to False.
 
     Args
     ----
