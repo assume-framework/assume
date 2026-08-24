@@ -9,7 +9,10 @@ import torch as th
 from torch.nn import functional as F
 from torch.optim import AdamW
 
-from assume.reinforcement_learning.algorithms.base_algorithm import A2CAlgorithm
+from assume.reinforcement_learning.algorithms.base_algorithm import (
+    ActorCriticAlgorithm,
+    RLAlgorithm,
+)
 from assume.reinforcement_learning.neural_network_architecture import (
     ActorPPO,
     CriticPPO,
@@ -19,7 +22,7 @@ from assume.reinforcement_learning.neural_network_architecture import (
 logger = logging.getLogger(__name__)
 
 
-class PPO(A2CAlgorithm):
+class PPO(ActorCriticAlgorithm):
     """
     Proximal Policy Optimization (PPO) Algorithm.
 
@@ -42,6 +45,10 @@ class PPO(A2CAlgorithm):
         >>> ppo = PPO(learning_role)
         >>> ppo.update_policy()
     """
+
+    # On-policy: also cache value estimates, log-probs, and done flags
+    # collected per time-step for GAE computation.
+    buffer_fields = RLAlgorithm.buffer_fields + ("values", "log_probs", "dones")
 
     def __init__(
         self,

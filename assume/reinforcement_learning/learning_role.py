@@ -126,21 +126,13 @@ class Learning(Role):
             self.tensor_board_logger = None
             self.update_steps = None
 
-            # init dictionaries for all learning instances in this role
+            # init the cache dict for all learning instances in this role.
+            # Which fields are collected per time-step is determined by the chosen algorithm (see RLAlgorithm.buffer_fields), so e.g. only
+            # on-policy algorithms (PPO/MAPPO) end up caching value estimates,log-probs, and done flags for GAE computation.
             # Note: we use atomic-swaps later to ensure no overwrites while we write the data into the buffer
             # this works since we do not use multi-threading, otherwise threading.locks would be needed here.
-            self.all_obs = defaultdict(lambda: defaultdict(list))
-            self.all_actions = defaultdict(lambda: defaultdict(list))
-            self.all_noises = defaultdict(lambda: defaultdict(list))
-            self.all_rewards = defaultdict(lambda: defaultdict(list))
-            self.all_regrets = defaultdict(lambda: defaultdict(list))
-            self.all_profits = defaultdict(lambda: defaultdict(list))
-            # On-policy (PPO/MAPPO) only: value estimates, log-probs, and done
-            # flags collected per time-step for GAE computation.
-            if is_on_policy(self.learning_config.algorithm):
-                self.all_values = defaultdict(lambda: defaultdict(list))
-                self.all_log_probs = defaultdict(lambda: defaultdict(list))
-                self.all_dones = defaultdict(lambda: defaultdict(list))
+            self.buffer_fields = self.rl_algorithm.buffer_fields
+            self.cache = self._new_cache()
 
     def on_ready(self):
         """Set up the learning role for reinforcement learning training.
@@ -294,74 +286,52 @@ class Learning(Role):
 
         self.rl_strats[strategy.unit_id] = strategy
 
-    async def store_to_buffer_and_update(self) -> None:
-        # Atomic dict operations - create new references
-        current_obs = self.all_obs
-        current_actions = self.all_actions
-        current_rewards = self.all_rewards
-        current_noises = self.all_noises
-        current_regrets = self.all_regrets
-        current_profits = self.all_profits
-        # On-policy (PPO/MAPPO) only caches
-        if is_on_policy(self.learning_config.algorithm):
-            current_values = self.all_values
-            current_log_probs = self.all_log_probs
-            current_dones = self.all_dones
-        else:
-            current_values = defaultdict(lambda: defaultdict(list))
-            current_log_probs = defaultdict(lambda: defaultdict(list))
-            current_dones = defaultdict(lambda: defaultdict(list))
+    def _new_cache(self) -> dict[str, defaultdict]:
+        """Create an empty cache dict, one defaultdict per field this algorithm collects.
 
-        # Reset cache dicts immediately with new defaultdicts
-        self.all_obs = defaultdict(lambda: defaultdict(list))
-        self.all_actions = defaultdict(lambda: defaultdict(list))
-        self.all_rewards = defaultdict(lambda: defaultdict(list))
-        self.all_noises = defaultdict(lambda: defaultdict(list))
-        self.all_regrets = defaultdict(lambda: defaultdict(list))
-        self.all_profits = defaultdict(lambda: defaultdict(list))
-        if is_on_policy(self.learning_config.algorithm):
-            self.all_values = defaultdict(lambda: defaultdict(list))
-            self.all_log_probs = defaultdict(lambda: defaultdict(list))
-            self.all_dones = defaultdict(lambda: defaultdict(list))
+        Which fields are present is determined by ``self.buffer_fields`` (see ``RLAlgorithm.buffer_fields``), so off-policy and on-policy
+        algorithms end up with different sets of fields without any         conditional logic here.
+        """
+        return {
+            field: defaultdict(lambda: defaultdict(list))
+            for field in self.buffer_fields
+        }
+
+    async def store_to_buffer_and_update(self) -> None:
+        # Atomic dict operations - create new reference, then reset the live
+        # cache immediately with fresh defaultdicts.
+        current_cache = self.cache
+        self.cache = self._new_cache()
 
         # Get timestamps from cache we took
-        all_timestamps = sorted(current_obs.keys())
+        all_timestamps = sorted(current_cache["obs"].keys())
         if len(all_timestamps) > 1:
             # Identify all incomplete timesteps (no reward yet)
             incomplete_timestamps = [
-                ts for ts in all_timestamps if ts not in current_rewards
+                ts for ts in all_timestamps if ts not in current_cache["rewards"]
             ]
 
             # Process only complete timesteps
             timestamps_to_process = [
                 ts for ts in all_timestamps if ts not in incomplete_timestamps
             ]
-            # Carry over incomplete timesteps to new cache dicts so they are
-            # not lost when the cache is reset below.
-            on_policy_active = is_on_policy(self.learning_config.algorithm)
+
+            # Carry over incomplete timesteps to the new cache dict so they are not lost when the cache was reset above. Reward-time
+            # fields are excluded since they only ever arrive together with the reward, i.e. never on an incomplete timestep.
+            carry_over_fields = [
+                f
+                for f in self.buffer_fields
+                if f not in ("rewards", "regret", "profit")
+            ]
             for ts in incomplete_timestamps:
-                self.all_obs[ts] = current_obs[ts]
-                self.all_actions[ts] = current_actions[ts]
-                self.all_noises[ts] = current_noises[ts]
-                if on_policy_active:
-                    if ts in current_values:
-                        self.all_values[ts] = current_values[ts]
-                    if ts in current_log_probs:
-                        self.all_log_probs[ts] = current_log_probs[ts]
-                    if ts in current_dones:
-                        self.all_dones[ts] = current_dones[ts]
+                for field in carry_over_fields:
+                    if ts in current_cache[field]:
+                        self.cache[field][ts] = current_cache[field][ts]
 
             # Create filtered cache (only complete timesteps)
             cache = {
-                "obs": {t: current_obs[t] for t in timestamps_to_process},
-                "actions": {t: current_actions[t] for t in timestamps_to_process},
-                "rewards": {t: current_rewards[t] for t in timestamps_to_process},
-                "noises": {t: current_noises[t] for t in timestamps_to_process},
-                "regret": {t: current_regrets[t] for t in timestamps_to_process},
-                "profit": {t: current_profits[t] for t in timestamps_to_process},
-                "values": {t: current_values[t] for t in timestamps_to_process},
-                "log_probs": {t: current_log_probs[t] for t in timestamps_to_process},
-                "dones": {t: current_dones[t] for t in timestamps_to_process},
+                field: {t: current_cache[field][t] for t in timestamps_to_process}
+                for field in self.buffer_fields
             }
 
             # write data to output agent
@@ -531,7 +501,7 @@ class Learning(Role):
             observation (torch.Tensor): The observation to be added.
 
         """
-        self.all_obs[start][unit_id].append(observation)
+        self.cache["obs"][start][unit_id].append(observation)
 
     def add_actions_to_cache(self, unit_id, start, action, noise) -> None:
         """Add the action and noise to the cache dict, per unit_id.
@@ -551,19 +521,19 @@ class Learning(Role):
             )
             return
 
-        self.all_actions[start][unit_id].append(action)
-        self.all_noises[start][unit_id].append(noise)
+        self.cache["actions"][start][unit_id].append(action)
+        self.cache["noises"][start][unit_id].append(noise)
 
         # For on-policy algorithms (MAPPO), cache PPO metadata at action time so
         # rollout entries stay aligned across strategies and timesteps.
-        if is_on_policy(self.learning_config.algorithm):
+        if "log_probs" in self.cache:
             strategy = self.rl_strats.get(unit_id)
             if strategy is None or not hasattr(strategy, "_last_log_prob"):
                 return
 
             # Avoid duplicate appends if add_actions_to_cache is called multiple
             # times for the same unit/timestamp during one market step.
-            if self.all_log_probs[start][unit_id]:
+            if self.cache["log_probs"][start][unit_id]:
                 return
 
             value = getattr(strategy, "_last_value", 0.0)
@@ -592,9 +562,9 @@ class Learning(Role):
             regret: The regret to be added.
             profit: The profit to be added.
         """
-        self.all_rewards[start][unit_id].append(reward)
-        self.all_regrets[start][unit_id].append(regret)
-        self.all_profits[start][unit_id].append(profit)
+        self.cache["rewards"][start][unit_id].append(reward)
+        self.cache["regret"][start][unit_id].append(regret)
+        self.cache["profit"][start][unit_id].append(profit)
 
     def add_ppo_data_to_cache(
         self, unit_id, start, value, log_prob, done=False
@@ -608,9 +578,9 @@ class Learning(Role):
             log_prob: The log probability of the action.
             done: Whether a terminal state or not.
         """
-        self.all_values[start][unit_id].append(value)
-        self.all_log_probs[start][unit_id].append(log_prob)
-        self.all_dones[start][unit_id].append(float(done))
+        self.cache["values"][start][unit_id].append(value)
+        self.cache["log_probs"][start][unit_id].append(log_prob)
+        self.cache["dones"][start][unit_id].append(float(done))
 
     def load_inter_episodic_data(self, inter_episodic_data):
         """Load the inter-episodic data from the dict stored across simulation runs.

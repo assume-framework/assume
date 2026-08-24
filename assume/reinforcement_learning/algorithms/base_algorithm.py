@@ -45,6 +45,18 @@ class RLAlgorithm:
         ...         pass
     """
 
+    # Per-timestep fields this algorithm caches in the learning role before they are written to the buffer (see ``Learning.cache`` in
+    # learning_role.py). Subclasses extend this tuple with whatever extra data their update step needs, e.g. PPO/MAPPO add value estimates,
+    # log-probs, and done flags for GAE.
+    buffer_fields: tuple[str, ...] = (
+        "obs",
+        "actions",
+        "noises",
+        "rewards",
+        "regret",
+        "profit",
+    )
+
     def __init__(self, learning_role):
         """Initialize the RL algorithm.
 
@@ -170,7 +182,7 @@ class RLAlgorithm:
         """
 
 
-class A2CAlgorithm(RLAlgorithm):
+class ActorCriticAlgorithm(RLAlgorithm):
     """Base actor-critic algorithm class.
 
     Provides shared functionality for actor-critic reinforcement learning algorithms
@@ -188,7 +200,7 @@ class A2CAlgorithm(RLAlgorithm):
             TD3 and DDPG use target networks (True), PPO does not (False).
 
     Example:
-        >>> class ActorCriticAlgorithm(A2CAlgorithm):
+        >>> class ActorCriticAlgorithm(ActorCriticAlgorithm):
         ...     def update_policy(self):
         ...         # Custom actor-critic update logic
         ...         pass

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 from assume.reinforcement_learning.algorithms import (
-    A2CAlgorithm,
+    ActorCriticAlgorithm,
     DDPG,
     LSTMActor,
     MLPActor,
@@ -25,7 +25,7 @@ __all__ = [
     "Learning",
     # Algorithms base classes
     "RLAlgorithm",
-    "A2CAlgorithm",
+    "ActorCriticAlgorithm",
     # Algorithms concrete implementations
     "TD3",
     "DDPG",

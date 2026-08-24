@@ -6,7 +6,7 @@ from importlib.metadata import version
 
 from assume.common import MarketConfig, MarketProduct
 from assume.reinforcement_learning import (
-    A2CAlgorithm,
+    ActorCriticAlgorithm,
     DDPG,
     LSTMActor,
     Learning,
@@ -47,7 +47,7 @@ __all__ = [
     "Learning",
     # RL algorithm base classes
     "RLAlgorithm",
-    "A2CAlgorithm",
+    "ActorCriticAlgorithm",
     # RL concrete algorithms
     "TD3",
     "DDPG",

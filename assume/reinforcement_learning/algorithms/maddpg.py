@@ -8,7 +8,7 @@ import torch as th
 from torch.nn import functional as F
 
 from assume.common.base import LearningStrategy
-from assume.reinforcement_learning.algorithms.base_algorithm import A2CAlgorithm
+from assume.reinforcement_learning.algorithms.base_algorithm import ActorCriticAlgorithm
 from assume.reinforcement_learning.learning_utils import (
     polyak_update,
 )
@@ -17,7 +17,7 @@ from assume.reinforcement_learning.neural_network_architecture import CriticDDPG
 logger = logging.getLogger(__name__)
 
 
-class DDPG(A2CAlgorithm):
+class DDPG(ActorCriticAlgorithm):
     """Deep Deterministic Policy Gradient (DDPG) Algorithm.
 
     An off-policy actor-critic algorithm that uses deterministic policy gradients
